@@ -368,6 +368,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "npcSpeech" => {
+            if let Some(value) = data {
+                let npc_id = extract_string(value, "npcId").unwrap_or_default();
+                let message = extract_string(value, "message").unwrap_or_default();
+
+                if let Some(npc) = state.npcs.get_mut(&npc_id) {
+                    npc.speech_bubble = Some((message, macroquad::time::get_time()));
+                }
+            }
+        }
+
         "targetChanged" => {
             if let Some(value) = data {
                 let player_id = extract_string(value, "player_id").unwrap_or_default();

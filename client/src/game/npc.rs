@@ -67,6 +67,8 @@ pub struct Npc {
     pub death_timer: Option<f32>,
     /// NPC will die after reaching target position
     pub pending_death: bool,
+    /// Speech bubble text and timestamp
+    pub speech_bubble: Option<(String, f64)>,
 }
 
 impl Npc {
@@ -94,6 +96,7 @@ impl Npc {
             last_damage_time: 0.0,
             death_timer: None,
             pending_death: false,
+            speech_bubble: None,
         }
     }
 
