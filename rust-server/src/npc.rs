@@ -72,6 +72,13 @@ pub struct Npc {
     pub idle_until: u64,
     /// Last time HP regen was applied
     pub last_regen_time: u64,
+    /// Speech bubble config (None = NPC never speaks)
+    pub speech_messages: Option<Vec<String>>,
+    pub speech_radius: i32,
+    pub speech_interval_min_ms: u64,
+    pub speech_interval_max_ms: u64,
+    /// Timestamp when this NPC should next speak
+    pub next_speech_at: u64,
 }
 
 impl Npc {
@@ -125,6 +132,11 @@ impl Npc {
             wander_target: None,
             idle_until: 0,
             last_regen_time: 0,
+            speech_messages: prototype.speech.as_ref().map(|s| s.messages.clone()),
+            speech_radius: prototype.speech.as_ref().map(|s| s.radius).unwrap_or(0),
+            speech_interval_min_ms: prototype.speech.as_ref().map(|s| s.interval_min_ms).unwrap_or(15000),
+            speech_interval_max_ms: prototype.speech.as_ref().map(|s| s.interval_max_ms).unwrap_or(45000),
+            next_speech_at: 0,
             stats,
         }
     }
