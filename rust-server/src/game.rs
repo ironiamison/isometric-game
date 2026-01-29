@@ -1264,22 +1264,117 @@ impl GameRoom {
                 let killed = {
                     let mut players = self.players.write().await;
                     if let Some(player) = players.values_mut().find(|p| p.name.eq_ignore_ascii_case(target_name)) {
+                        let id = player.id.clone();
+                        let name = player.name.clone();
                         player.hp = 0;
                         player.is_dead = true;
                         player.death_time = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap()
                             .as_millis() as u64;
-                        Some(player.name.clone())
+                        Some((id, name))
                     } else {
                         None
                     }
                 };
 
                 match killed {
-                    Some(name) => {
+                    Some((target_id, name)) => {
                         self.send_system_message(player_id, &format!("Killed {}", name)).await;
                         tracing::info!("Admin {} killed player {}", player_id, name);
+
+                        // Handle arena death if applicable
+                        let arena_death = {
+                            let arena = self.arena_manager.read().await;
+                            arena.is_fighting() && arena.is_in_ring(&target_id)
+                        };
+                        if arena_death {
+                            let (eliminated_name, killer_name, remaining) = {
+                                let mut arena = self.arena_manager.write().await;
+                                arena.on_player_death(&target_id, Some(player_id));
+                                let eliminated_name = arena.match_stats.fighter_names.get(&target_id).cloned().unwrap_or_default();
+                                let killer_name = arena.match_stats.fighter_names.get(player_id).cloned().unwrap_or_default();
+                                let remaining = arena.active_fighters.len() as u32;
+                                (eliminated_name, killer_name, remaining)
+                            };
+
+                            // Teleport to spectator
+                            {
+                                let spectator_spawn = {
+                                    let arena = self.arena_manager.read().await;
+                                    arena.active_spectator_spawn()
+                                };
+                                let mut players = self.players.write().await;
+                                if let Some(p) = players.get_mut(&target_id) {
+                                    p.hp = p.skills.hitpoints.level;
+                                    p.is_dead = false;
+                                    p.x = spectator_spawn.0;
+                                    p.y = spectator_spawn.1;
+                                }
+                            }
+
+                            self.broadcast_to_arena(ServerMessage::ArenaPlayerEliminated {
+                                player_id: target_id.clone(),
+                                player_name: eliminated_name,
+                                killer_id: player_id.to_string(),
+                                killer_name,
+                                remaining,
+                            }).await;
+
+                            // Check match end
+                            let should_end = {
+                                let arena = self.arena_manager.read().await;
+                                arena.check_match_end()
+                            };
+                            if should_end {
+                                let current_time = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_millis() as u64;
+                                let placements = {
+                                    let mut arena = self.arena_manager.write().await;
+                                    arena.end_match(current_time)
+                                };
+
+                                {
+                                    let mut players = self.players.write().await;
+                                    for placement in &placements {
+                                        if placement.gold_reward > 0 {
+                                            if let Some(p) = players.get_mut(&placement.player_id) {
+                                                p.inventory.gold += placement.gold_reward;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
+                                    placements: placements.iter().map(|p| crate::protocol::ArenaPlacementData {
+                                        rank: p.rank,
+                                        player_id: p.player_id.clone(),
+                                        player_name: p.player_name.clone(),
+                                        kills: p.kills,
+                                        gold_reward: p.gold_reward,
+                                    }).collect(),
+                                }).await;
+
+                                self.broadcast_to_arena(ServerMessage::ArenaStateUpdate {
+                                    state: "results".to_string(),
+                                    countdown_remaining: None,
+                                    queued_count: 0,
+                                    fighter_count: 0,
+                                    entry_fee: {
+                                        let arena = self.arena_manager.read().await;
+                                        arena.config.entry_fee
+                                    },
+                                }).await;
+                            }
+                        } else {
+                            // Normal death broadcast
+                            self.broadcast(ServerMessage::PlayerDied {
+                                id: target_id,
+                                killer_id: player_id.to_string(),
+                            }).await;
+                        }
                     }
                     None => self.send_system_message(player_id, "Player not found").await,
                 }
@@ -1917,6 +2012,8 @@ impl GameRoom {
                     // Check if match should end
                     let should_end = {
                         let arena = self.arena_manager.read().await;
+                        tracing::info!("[ARENA] After death: active_fighters={:?}, state={:?}, check_match_end={}",
+                            arena.active_fighters, arena.state, arena.check_match_end());
                         arena.check_match_end()
                     };
                     if should_end {
@@ -1928,6 +2025,7 @@ impl GameRoom {
                             let mut arena = self.arena_manager.write().await;
                             arena.end_match(current_time)
                         };
+                        tracing::info!("[ARENA] Match ended! {} placements", placements.len());
 
                         // Distribute rewards
                         {
@@ -1953,6 +2051,17 @@ impl GameRoom {
 
                         self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
                             placements: placement_data,
+                        }).await;
+
+                        self.broadcast_to_arena(ServerMessage::ArenaStateUpdate {
+                            state: "results".to_string(),
+                            countdown_remaining: None,
+                            queued_count: 0,
+                            fighter_count: 0,
+                            entry_fee: {
+                                let arena = self.arena_manager.read().await;
+                                arena.config.entry_fee
+                            },
                         }).await;
 
                         // Send inventory updates for gold rewards
@@ -4192,7 +4301,7 @@ impl GameRoom {
             let mut arena = self.arena_manager.write().await;
 
             for (player_id, instance_id) in player_instances.iter() {
-                if !instance_id.starts_with("duel_arena") {
+                if !instance_id.starts_with("pub_duel_arena") {
                     continue;
                 }
                 if let Some(player) = players.get(player_id) {
@@ -4204,11 +4313,17 @@ impl GameRoom {
                     let is_queued = arena.queued_players.contains(&player_id.to_string());
 
                     if in_queue_zone && !is_queued && arena.state == crate::arena::ArenaState::Idle {
-                        if let Err(e) = arena.queue_player(player_id, &player.name, player.inventory.gold) {
-                            queue_errors.push((player_id.clone(), e));
+                        if !arena.queue_rejected.contains(player_id) {
+                            if let Err(e) = arena.queue_player(player_id, &player.name, player.inventory.gold) {
+                                arena.queue_rejected.insert(player_id.clone());
+                                queue_errors.push((player_id.clone(), e));
+                            }
                         }
-                    } else if !in_queue_zone && is_queued && arena.state == crate::arena::ArenaState::Idle {
-                        arena.dequeue_player(player_id);
+                    } else if !in_queue_zone {
+                        if is_queued && arena.state == crate::arena::ArenaState::Idle {
+                            arena.dequeue_player(player_id);
+                        }
+                        arena.queue_rejected.remove(player_id);
                     }
                 }
             }
@@ -4359,7 +4474,7 @@ impl GameRoom {
 
         if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
             for (player_id, instance_id) in player_instances.iter() {
-                if instance_id.starts_with("duel_arena") {
+                if instance_id.starts_with("pub_duel_arena") {
                     if let Some(sender) = senders.get(player_id) {
                         let _ = sender.try_send(bytes.clone());
                     }

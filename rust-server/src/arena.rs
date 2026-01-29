@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use serde::Serialize;
 
 // ---------------------------------------------------------------------------
@@ -56,29 +56,29 @@ impl Default for ArenaConfig {
             entry_fee: 50,
             countdown_duration_ms: 10_000,
             results_duration_ms: 10_000,
-            // Queue zone: southern area near entrance
-            queue_zone: ZoneBounds { min_x: 8, min_y: 24, max_x: 24, max_y: 30 },
+            // Queue / waiting area
+            queue_zone: ZoneBounds { min_x: 13, min_y: 2, max_x: 30, max_y: 13 },
             rings: vec![
-                // Small 1v1 ring
+                // Small 1v1 ring (3,3 - 11,11)
                 RingConfig {
                     name: "1v1 Ring".to_string(),
                     max_players: 2,
-                    ring_zone: ZoneBounds { min_x: 4, min_y: 12, max_x: 12, max_y: 20 },
-                    spectator_zone: ZoneBounds { min_x: 4, min_y: 8, max_x: 12, max_y: 11 },
-                    ring_spawn_points: vec![(6, 15), (10, 17)],
-                    spectator_spawn: (8, 9),
+                    ring_zone: ZoneBounds { min_x: 3, min_y: 3, max_x: 11, max_y: 11 },
+                    spectator_zone: ZoneBounds { min_x: 3, min_y: 12, max_x: 11, max_y: 13 },
+                    ring_spawn_points: vec![(5, 5), (9, 9)],
+                    spectator_spawn: (7, 12),
                 },
-                // Larger FFA ring
+                // Larger FFA ring (15,15 - 29,29)
                 RingConfig {
                     name: "FFA Ring".to_string(),
                     max_players: 8,
-                    ring_zone: ZoneBounds { min_x: 16, min_y: 8, max_x: 28, max_y: 22 },
-                    spectator_zone: ZoneBounds { min_x: 16, min_y: 4, max_x: 28, max_y: 7 },
+                    ring_zone: ZoneBounds { min_x: 15, min_y: 15, max_x: 29, max_y: 29 },
+                    spectator_zone: ZoneBounds { min_x: 13, min_y: 14, max_x: 30, max_y: 14 },
                     ring_spawn_points: vec![
-                        (19, 13), (25, 13), (22, 10), (22, 18),
-                        (19, 10), (25, 10), (19, 18), (25, 18),
+                        (17, 19), (27, 19), (22, 17), (22, 27),
+                        (17, 17), (27, 17), (17, 27), (27, 27),
                     ],
-                    spectator_spawn: (22, 5),
+                    spectator_spawn: (22, 14),
                 },
             ],
         }
@@ -148,6 +148,8 @@ pub struct ArenaManager {
     pub all_arena_players: Vec<String>,
     /// Index into config.rings for the ring selected for the current match
     pub active_ring_index: Option<usize>,
+    /// Players rejected from queue (e.g. insufficient gold) - prevents spam
+    pub queue_rejected: HashSet<String>,
 }
 
 impl ArenaManager {
@@ -162,6 +164,7 @@ impl ArenaManager {
             match_stats: MatchStats::default(),
             all_arena_players: Vec::new(),
             active_ring_index: None,
+            queue_rejected: HashSet::new(),
         }
     }
 
