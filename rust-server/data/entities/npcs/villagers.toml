@@ -31,6 +31,18 @@ quest_giver = true
 [elder_villager.quest_giver]
 available_quests = ["what_happened_here", "spreading_rot"]
 
+[elder_villager.speech]
+radius = 5
+interval_min_ms = 20000
+interval_max_ms = 40000
+messages = [
+    "The old forest isn't what it used to be...",
+    "I remember when this village was just a few huts.",
+    "Adventurer, I could use your help.",
+    "The corruption came without warning...",
+    "Stay vigilant. These lands are not safe.",
+]
+
 [elder_villager.dialogue]
 greeting = "You survived... thank the light. The corruption came without warning. Our village lies in ruins."
 quest_available = "I have a task that might help us understand what happened here."
@@ -74,6 +86,18 @@ shop_id = "blacksmith"
 buy_multiplier = 0.5
 sell_multiplier = 1.0
 restock_interval_minutes = 5
+
+[blacksmith.speech]
+radius = 5
+interval_min_ms = 25000
+interval_max_ms = 45000
+messages = [
+    "Fine steel doesn't forge itself...",
+    "I've got blades sharp enough to split a hair.",
+    "Need repairs? Bring it here.",
+    "Business has been slow since the corruption spread.",
+    "A good weapon could save your life out there.",
+]
 
 [blacksmith.dialogue]
 greeting = "Need something forged? I'm your man."
