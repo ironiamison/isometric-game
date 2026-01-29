@@ -3605,6 +3605,7 @@ impl GameRoom {
         let mut npc_updates = Vec::new();
         let mut respawned_npcs = Vec::new();
         let mut npc_attacks: Vec<(String, String, i32, i32)> = Vec::new(); // (npc_id, target_id, npc_level, max_hit)
+        let mut npc_speech_events: Vec<(String, String, String)> = Vec::new(); // (player_id, npc_id, message)
         {
             let mut npcs = self.npcs.write().await;
 
@@ -3650,9 +3651,63 @@ impl GameRoom {
                 // Apply HP regen
                 npc.apply_regen(current_time);
 
+                // Check NPC speech
+                if let Some(ref messages) = npc.speech_messages {
+                    if !messages.is_empty() && npc.is_alive() {
+                        // Check if any player is within speech radius
+                        let has_nearby_player = player_positions.iter().any(|(_, px, py, _)| {
+                            let dx = (npc.x - px).abs();
+                            let dy = (npc.y - py).abs();
+                            dx.max(dy) <= npc.speech_radius
+                        });
+
+                        if has_nearby_player {
+                            if npc.next_speech_at == 0 {
+                                // First time a player is nearby — set initial timer
+                                let delay = npc.speech_interval_min_ms
+                                    + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+                                npc.next_speech_at = current_time + delay;
+                            } else if current_time >= npc.next_speech_at {
+                                // Time to speak!
+                                let idx = rand::random::<usize>() % messages.len();
+                                let message = messages[idx].clone();
+                                let npc_id = npc.id.clone();
+                                let radius = npc.speech_radius;
+                                let npc_x = npc.x;
+                                let npc_y = npc.y;
+
+                                // Collect nearby player IDs to send speech to
+                                for (pid, px, py, _) in &player_positions {
+                                    let dx = (npc_x - px).abs();
+                                    let dy = (npc_y - py).abs();
+                                    if dx.max(dy) <= radius {
+                                        npc_speech_events.push((pid.clone(), npc_id.clone(), message.clone()));
+                                    }
+                                }
+
+                                // Reset timer
+                                let delay = npc.speech_interval_min_ms
+                                    + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+                                npc.next_speech_at = current_time + delay;
+                            }
+                        } else {
+                            // No players nearby — reset timer
+                            npc.next_speech_at = 0;
+                        }
+                    }
+                }
+
                 // Add to updates (all NPCs including dead ones for client awareness)
                 npc_updates.push(NpcUpdate::from(&*npc));
             }
+        }
+
+        // Send NPC speech bubbles to nearby players
+        for (player_id, npc_id, message) in npc_speech_events {
+            self.send_to_player(&player_id, ServerMessage::NpcSpeech {
+                npc_id: npc_id.clone(),
+                message: message.clone(),
+            }).await;
         }
 
         // Process NPC attacks on players using hit/miss mechanics
