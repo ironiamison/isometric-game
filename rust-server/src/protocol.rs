@@ -321,6 +321,10 @@ pub enum ServerMessage {
     Announcement {
         text: String,
     },
+    NpcSpeech {
+        npc_id: String,
+        message: String,
+    },
     /// Tell client to transition to a different map (interior or world)
     MapTransition {
         map_type: String,      // "interior" or "world"
@@ -522,6 +526,7 @@ impl ServerMessage {
             ServerMessage::EquipmentUpdate { .. } => "equipmentUpdate",
             ServerMessage::EquipResult { .. } => "equipResult",
             ServerMessage::Announcement { .. } => "announcement",
+            ServerMessage::NpcSpeech { .. } => "npcSpeech",
             ServerMessage::MapTransition { .. } => "mapTransition",
             ServerMessage::InteriorData { .. } => "interiorData",
         }
@@ -1506,6 +1511,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         ServerMessage::Announcement { text } => {
             let mut map = Vec::new();
             map.push((Value::String("text".into()), Value::String(text.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::NpcSpeech { npc_id, message } => {
+            let mut map = Vec::new();
+            map.push((Value::String("npcId".into()), Value::String(npc_id.clone().into())));
+            map.push((Value::String("message".into()), Value::String(message.clone().into())));
             Value::Map(map)
         }
         ServerMessage::MapTransition { map_type, map_id, spawn_x, spawn_y, instance_id } => {
