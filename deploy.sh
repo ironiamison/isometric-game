@@ -27,7 +27,7 @@ if [ -n "$CLIENT_CHANGED" ]; then
     echo "Client changes detected, rebuilding WASM..."
     cd "$REPO_DIR/client"
     rustup target add wasm32-unknown-unknown 2>/dev/null || true
-    cargo build --release --target wasm32-unknown-unknown --profile release-wasm
+    cargo build --target wasm32-unknown-unknown --profile release-wasm
     # Copy WASM artifact to web directory
     cp "$REPO_DIR/client/target/wasm32-unknown-unknown/release-wasm/isometric_client.wasm" "$REPO_DIR/client/web/" 2>/dev/null || \
     cp "$REPO_DIR/client/target/wasm32-unknown-unknown/release-wasm/libisometric_client.wasm" "$REPO_DIR/client/web/isometric_client.wasm" 2>/dev/null || true
