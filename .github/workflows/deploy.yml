@@ -1,0 +1,20 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'client/**'
+      - 'rust-server/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: /root/isometric-game/deploy.sh
