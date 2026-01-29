@@ -1176,6 +1176,122 @@ impl Renderer {
                 text_y += line_height;
             }
         }
+
+        // Render NPC speech bubbles
+        for npc in state.npcs.values() {
+            let Some((ref text, time)) = npc.speech_bubble else {
+                continue;
+            };
+
+            let age = (current_time - time) as f32;
+            if age > 5.0 {
+                continue;
+            }
+
+            // Get NPC screen position
+            let (screen_x, screen_y) = world_to_screen(npc.x, npc.y, &state.camera);
+
+            // Fade out in the last 1 second (age 4-5)
+            let alpha = if age > 4.0 {
+                ((5.0 - age) * 255.0) as u8
+            } else {
+                255
+            };
+
+            // Word wrap the text (same params as player bubbles)
+            let max_bubble_width = 220.0;
+            let font_size = 16.0;
+            let line_height = 18.0;
+            let padding_h = 4.0;
+            let padding_v = 1.0;
+            let tail_height = 6.0;
+            let corner_radius = 5.0;
+
+            let lines = self.wrap_text(text, max_bubble_width - padding_h * 2.0, font_size);
+            let num_lines = lines.len().max(1);
+
+            let mut max_line_width = 0.0f32;
+            for line in &lines {
+                let width = self.measure_text_sharp(line, font_size).width;
+                max_line_width = max_line_width.max(width);
+            }
+
+            let bubble_width = (max_line_width + padding_h * 2.0).max(18.0);
+            let bubble_height = num_lines as f32 * line_height + padding_v * 2.0;
+
+            // Position bubble above NPC's head
+            let zoom = state.camera.zoom;
+            let base_offset = (SPRITE_HEIGHT - 8.0) * zoom;
+
+            let is_hovered = state.hovered_entity_id.as_ref() == Some(&npc.id);
+            let is_selected = state.selected_entity_id.as_ref() == Some(&npc.id);
+            let name_offset = if is_hovered || is_selected { 16.0 } else { 0.0 };
+
+            let bubble_x = screen_x - bubble_width / 2.0;
+            let bubble_y = screen_y - base_offset - name_offset - bubble_height - tail_height;
+
+            // Colors with alpha - off-white paper/comic book style
+            let bg_alpha = (alpha as f32 * 0.8) as u8;
+            let bg_color = Color::from_rgba(255, 250, 240, bg_alpha);
+            let border_color = Color::from_rgba(60, 50, 40, alpha);
+            let text_color = Color::from_rgba(30, 25, 20, alpha);
+
+            let r = corner_radius;
+            let bx = bubble_x.floor();
+            let by = bubble_y.floor();
+            let bw = bubble_width.floor();
+            let bh = bubble_height.floor();
+
+            let border_mesh = Self::create_rounded_rect_mesh(bx - 1.0, by - 1.0, bw + 2.0, bh + 2.0, r + 1.0, border_color);
+            draw_mesh(&border_mesh);
+
+            let fill_mesh = Self::create_rounded_rect_mesh(bx, by, bw, bh, r, bg_color);
+            draw_mesh(&fill_mesh);
+
+            // Draw tail
+            let tail_x = screen_x.floor();
+            let tail_top_y = by + bh;
+            let tail_bottom_y = tail_top_y + tail_height;
+            let tail_half_width = 4.0;
+
+            draw_triangle(
+                Vec2::new(tail_x - tail_half_width - 1.0, tail_top_y),
+                Vec2::new(tail_x + tail_half_width + 1.0, tail_top_y),
+                Vec2::new(tail_x, tail_bottom_y + 1.0),
+                border_color,
+            );
+
+            let tail_color_arr = [
+                (bg_color.r * 255.0) as u8,
+                (bg_color.g * 255.0) as u8,
+                (bg_color.b * 255.0) as u8,
+                (bg_color.a * 255.0) as u8,
+            ];
+            let tail_mesh = Mesh {
+                vertices: vec![
+                    Vertex { position: Vec3::new(tail_x - tail_half_width, tail_top_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
+                    Vertex { position: Vec3::new(tail_x + tail_half_width, tail_top_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
+                    Vertex { position: Vec3::new(tail_x, tail_bottom_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
+                ],
+                indices: vec![0, 1, 2],
+                texture: None,
+            };
+            draw_mesh(&tail_mesh);
+
+            draw_line(tail_x - tail_half_width, tail_top_y, tail_x, tail_bottom_y, 1.0, border_color);
+            draw_line(tail_x + tail_half_width, tail_top_y, tail_x, tail_bottom_y, 1.0, border_color);
+
+            // Draw text lines (centered)
+            let bubble_center_x = bx + bw / 2.0;
+            let mut text_y = by + padding_v + font_size * 0.85;
+
+            for line in &lines {
+                let line_width = self.measure_text_sharp(line, font_size).width;
+                let text_x = bubble_center_x - line_width / 2.0;
+                self.draw_text_sharp(line, text_x, text_y, font_size, text_color);
+                text_y += line_height;
+            }
+        }
     }
 
     fn render_projectiles(&self, state: &GameState) {
