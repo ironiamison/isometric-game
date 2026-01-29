@@ -29,8 +29,21 @@ if [ -n "$CLIENT_CHANGED" ]; then
     rustup target add wasm32-unknown-unknown 2>/dev/null || true
     cargo build --target wasm32-unknown-unknown --profile release-wasm
     # Copy WASM artifact to web directory
-    cp "$REPO_DIR/client/target/wasm32-unknown-unknown/release-wasm/isometric_client.wasm" "$REPO_DIR/client/web/" 2>/dev/null || \
-    cp "$REPO_DIR/client/target/wasm32-unknown-unknown/release-wasm/libisometric_client.wasm" "$REPO_DIR/client/web/isometric_client.wasm" 2>/dev/null || true
+    WASM_DIR="$REPO_DIR/client/target/wasm32-unknown-unknown/release-wasm"
+    if [ -f "$WASM_DIR/isometric_client.wasm" ]; then
+        cp "$WASM_DIR/isometric_client.wasm" "$REPO_DIR/client/web/"
+        echo "Copied isometric_client.wasm"
+    elif [ -f "$WASM_DIR/libisometric_client.wasm" ]; then
+        cp "$WASM_DIR/libisometric_client.wasm" "$REPO_DIR/client/web/isometric_client.wasm"
+        echo "Copied libisometric_client.wasm"
+    elif [ -f "$WASM_DIR/isometric-client.wasm" ]; then
+        cp "$WASM_DIR/isometric-client.wasm" "$REPO_DIR/client/web/isometric_client.wasm"
+        echo "Copied isometric-client.wasm"
+    else
+        echo "ERROR: No WASM artifact found in $WASM_DIR"
+        ls -la "$WASM_DIR"/*.wasm 2>/dev/null || echo "No .wasm files found"
+        exit 1
+    fi
     echo "WASM build complete."
 fi
 
