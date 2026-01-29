@@ -11,10 +11,13 @@ import styles from './MenuBar.module.css';
 export function MenuBar() {
   const [showNewInteriorModal, setShowNewInteriorModal] = useState(false);
   const [showOpenInteriorModal, setShowOpenInteriorModal] = useState(false);
+  const [showResizeInteriorModal, setShowResizeInteriorModal] = useState(false);
   const [newInteriorId, setNewInteriorId] = useState('');
   const [newInteriorName, setNewInteriorName] = useState('');
   const [newInteriorWidth, setNewInteriorWidth] = useState(16);
   const [newInteriorHeight, setNewInteriorHeight] = useState(16);
+  const [resizeWidth, setResizeWidth] = useState(16);
+  const [resizeHeight, setResizeHeight] = useState(16);
 
   const {
     chunks,
@@ -38,6 +41,7 @@ export function MenuBar() {
     loadInterior,
     saveCurrentInterior,
     setAvailableInteriors,
+    resizeInterior,
   } = useEditorStore();
 
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -449,6 +453,28 @@ export function MenuBar() {
     switchToOverworld();
   };
 
+  const handleResizeInterior = () => {
+    if (currentInterior) {
+      setResizeWidth(currentInterior.width);
+      setResizeHeight(currentInterior.height);
+      setShowResizeInteriorModal(true);
+    }
+  };
+
+  const handleConfirmResize = () => {
+    if (!currentInterior) return;
+    if (resizeWidth === currentInterior.width && resizeHeight === currentInterior.height) {
+      setShowResizeInteriorModal(false);
+      return;
+    }
+    const confirmed = window.confirm(
+      `Resize "${currentInterior.name}" from ${currentInterior.width}x${currentInterior.height} to ${resizeWidth}x${resizeHeight}?\n\nTiles outside the new bounds will be removed. This cannot be undone.`
+    );
+    if (!confirmed) return;
+    resizeInterior(resizeWidth, resizeHeight);
+    setShowResizeInteriorModal(false);
+  };
+
   return (
     <div className={styles.menuBar}>
       <input
@@ -495,6 +521,9 @@ export function MenuBar() {
               <>
                 <button className={styles.dropdownItem} onClick={handleSaveInterior}>
                   Save Interior {currentInterior?.dirty ? '*' : ''}
+                </button>
+                <button className={styles.dropdownItem} onClick={handleResizeInterior}>
+                  Resize Interior...
                 </button>
                 <div className={styles.separator} />
                 <button className={styles.dropdownItem} onClick={handleBackToOverworld}>
@@ -648,6 +677,45 @@ export function MenuBar() {
             )}
             <div className={styles.modalActions}>
               <button onClick={() => setShowOpenInteriorModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resize Interior Modal */}
+      {showResizeInteriorModal && currentInterior && (
+        <div className={styles.modalOverlay} onClick={() => setShowResizeInteriorModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3>Resize Interior Map</h3>
+            <p style={{ fontSize: '0.85em', color: '#aaa', margin: '0 0 12px' }}>
+              Current size: {currentInterior.width} x {currentInterior.height}
+            </p>
+            <div className={styles.modalFieldRow}>
+              <div className={styles.modalField}>
+                <label>Width (tiles)</label>
+                <input
+                  type="number"
+                  value={resizeWidth}
+                  onChange={(e) => setResizeWidth(Math.max(4, parseInt(e.target.value) || 4))}
+                  min={4}
+                  max={64}
+                  autoFocus
+                />
+              </div>
+              <div className={styles.modalField}>
+                <label>Height (tiles)</label>
+                <input
+                  type="number"
+                  value={resizeHeight}
+                  onChange={(e) => setResizeHeight(Math.max(4, parseInt(e.target.value) || 4))}
+                  min={4}
+                  max={64}
+                />
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button onClick={() => setShowResizeInteriorModal(false)}>Cancel</button>
+              <button onClick={handleConfirmResize} className={styles.primaryButton}>Resize</button>
             </div>
           </div>
         </div>

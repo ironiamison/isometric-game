@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useEditorStore } from '@/state/store';
 import { isometricRenderer } from '@/core/IsometricRenderer';
-import { screenToWorldTile } from '@/core/coords';
+import { screenToWorldTile, worldToChunk, worldToLocal, chunkKey } from '@/core/coords';
 import { Tool, Layer } from '@/types';
 import { history } from '@/core/History';
 import { objectLoader } from '@/core/ObjectLoader';
@@ -258,6 +258,15 @@ export function Canvas() {
             } else if (activeLayer === Layer.Ground || activeLayer === Layer.Objects || activeLayer === Layer.Overhead) {
               setInteriorTile(worldTile.wx, worldTile.wy, activeLayer, 0);
             }
+            // Also erase any walls at this position
+            {
+              const wallsAtPos = currentInterior.walls.filter(
+                (w) => w.x === worldTile.wx && w.y === worldTile.wy
+              );
+              for (const wall of wallsAtPos) {
+                toggleInteriorWall(wall.x, wall.y, wall.edge, wall.gid);
+              }
+            }
             break;
           case Tool.Collision:
             toggleInteriorCollision(worldTile.wx, worldTile.wy);
@@ -372,6 +381,20 @@ export function Canvas() {
           } else if (activeLayer === Layer.Ground || activeLayer === Layer.Objects || activeLayer === Layer.Overhead) {
             // Erase tile
             setTile(worldTile, activeLayer, 0);
+          }
+          // Also erase any walls at this position
+          {
+            const cc = worldToChunk(worldTile);
+            const chunk = chunks.get(chunkKey(cc));
+            if (chunk) {
+              const local = worldToLocal(worldTile);
+              const wallsAtPos = chunk.walls.filter(
+                (w) => w.x === local.lx && w.y === local.ly
+              );
+              for (const wall of wallsAtPos) {
+                toggleWall(worldTile, wall.edge, wall.gid);
+              }
+            }
           }
           break;
         }

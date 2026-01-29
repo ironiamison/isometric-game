@@ -27,6 +27,7 @@ use crate::skills::Skills;
 use crate::data::item_def::EquipmentSlot;
 use sqlx::Row;
 
+mod arena;
 mod chunk;
 mod crafting;
 mod data;
@@ -204,6 +205,7 @@ impl AppState {
             self.item_registry.clone(),
             self.player_instances.clone(),
             self.instance_manager.clone(),
+            Some(self.db.clone()),
         ).await);
         self.rooms.insert(room.id.clone(), room.clone());
         room

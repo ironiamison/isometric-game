@@ -325,6 +325,34 @@ pub enum ServerMessage {
         npc_id: String,
         message: String,
     },
+    // Arena messages
+    ArenaStateUpdate {
+        state: String,
+        countdown_remaining: Option<u32>,
+        queued_count: u32,
+        fighter_count: u32,
+        entry_fee: i32,
+    },
+    ArenaMatchStart {
+        fighter_ids: Vec<String>,
+    },
+    ArenaPlayerEliminated {
+        player_id: String,
+        player_name: String,
+        killer_id: String,
+        killer_name: String,
+        remaining: u32,
+    },
+    ArenaMatchEnd {
+        placements: Vec<ArenaPlacementData>,
+    },
+    ArenaStatsUpdate {
+        wins: i32,
+        kills: i32,
+        deaths: i32,
+        current_streak: i32,
+        best_streak: i32,
+    },
     /// Tell client to transition to a different map (interior or world)
     MapTransition {
         map_type: String,      // "interior" or "world"
@@ -348,6 +376,16 @@ pub enum ServerMessage {
         objects: Vec<ChunkObjectData>,
         walls: Vec<ChunkWallData>,
     },
+}
+
+/// Arena match placement data
+#[derive(Debug, Clone, Serialize)]
+pub struct ArenaPlacementData {
+    pub rank: u32,
+    pub player_id: String,
+    pub player_name: String,
+    pub kills: i32,
+    pub gold_reward: i32,
 }
 
 /// Layer data for chunk transmission
@@ -525,6 +563,11 @@ impl ServerMessage {
             ServerMessage::ShopStockUpdate { .. } => "shopStockUpdate",
             ServerMessage::EquipmentUpdate { .. } => "equipmentUpdate",
             ServerMessage::EquipResult { .. } => "equipResult",
+            ServerMessage::ArenaStateUpdate { .. } => "arenaStateUpdate",
+            ServerMessage::ArenaMatchStart { .. } => "arenaMatchStart",
+            ServerMessage::ArenaPlayerEliminated { .. } => "arenaPlayerEliminated",
+            ServerMessage::ArenaMatchEnd { .. } => "arenaMatchEnd",
+            ServerMessage::ArenaStatsUpdate { .. } => "arenaStatsUpdate",
             ServerMessage::Announcement { .. } => "announcement",
             ServerMessage::NpcSpeech { .. } => "npcSpeech",
             ServerMessage::MapTransition { .. } => "mapTransition",
@@ -1526,6 +1569,59 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("spawnX".into()), Value::F64(*spawn_x as f64)));
             map.push((Value::String("spawnY".into()), Value::F64(*spawn_y as f64)));
             map.push((Value::String("instanceId".into()), Value::String(instance_id.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::ArenaStateUpdate { state, countdown_remaining, queued_count, fighter_count, entry_fee } => {
+            let mut map = Vec::new();
+            map.push((Value::String("state".into()), Value::String(state.clone().into())));
+            map.push((
+                Value::String("countdownRemaining".into()),
+                match countdown_remaining {
+                    Some(r) => Value::Integer((*r as i64).into()),
+                    None => Value::Nil,
+                },
+            ));
+            map.push((Value::String("queuedCount".into()), Value::Integer((*queued_count as i64).into())));
+            map.push((Value::String("fighterCount".into()), Value::Integer((*fighter_count as i64).into())));
+            map.push((Value::String("entryFee".into()), Value::Integer((*entry_fee as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::ArenaMatchStart { fighter_ids } => {
+            let mut map = Vec::new();
+            let ids: Vec<Value> = fighter_ids.iter().map(|id| Value::String(id.clone().into())).collect();
+            map.push((Value::String("fighterIds".into()), Value::Array(ids)));
+            Value::Map(map)
+        }
+        ServerMessage::ArenaPlayerEliminated { player_id, player_name, killer_id, killer_name, remaining } => {
+            let mut map = Vec::new();
+            map.push((Value::String("playerId".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("playerName".into()), Value::String(player_name.clone().into())));
+            map.push((Value::String("killerId".into()), Value::String(killer_id.clone().into())));
+            map.push((Value::String("killerName".into()), Value::String(killer_name.clone().into())));
+            map.push((Value::String("remaining".into()), Value::Integer((*remaining as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::ArenaMatchEnd { placements } => {
+            let mut map = Vec::new();
+            let placement_values: Vec<Value> = placements.iter().map(|p| {
+                let mut pmap = Vec::new();
+                pmap.push((Value::String("rank".into()), Value::Integer((p.rank as i64).into())));
+                pmap.push((Value::String("playerId".into()), Value::String(p.player_id.clone().into())));
+                pmap.push((Value::String("playerName".into()), Value::String(p.player_name.clone().into())));
+                pmap.push((Value::String("kills".into()), Value::Integer((p.kills as i64).into())));
+                pmap.push((Value::String("goldReward".into()), Value::Integer((p.gold_reward as i64).into())));
+                Value::Map(pmap)
+            }).collect();
+            map.push((Value::String("placements".into()), Value::Array(placement_values)));
+            Value::Map(map)
+        }
+        ServerMessage::ArenaStatsUpdate { wins, kills, deaths, current_streak, best_streak } => {
+            let mut map = Vec::new();
+            map.push((Value::String("wins".into()), Value::Integer((*wins as i64).into())));
+            map.push((Value::String("kills".into()), Value::Integer((*kills as i64).into())));
+            map.push((Value::String("deaths".into()), Value::Integer((*deaths as i64).into())));
+            map.push((Value::String("currentStreak".into()), Value::Integer((*current_streak as i64).into())));
+            map.push((Value::String("bestStreak".into()), Value::Integer((*best_streak as i64).into())));
             Value::Map(map)
         }
         ServerMessage::InteriorData {

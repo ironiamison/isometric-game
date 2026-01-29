@@ -235,6 +235,9 @@ interface EditorActions {
   setSelectedExitPortal: (selection: { portalId: string } | null) => void;
   findExitPortalAt: (x: number, y: number) => ExitPortal | null;
 
+  // Resize interior
+  resizeInterior: (newWidth: number, newHeight: number) => void;
+
   // Jump to target
   jumpToPortalTarget: (portal: Portal) => Promise<void>;
   jumpToExitPortalTarget: (portal: ExitPortal) => void;
@@ -1551,6 +1554,65 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     return interior.exitPortals.find((p) =>
       x >= p.x && x < p.x + p.width && y >= p.y && y < p.y + p.height
     ) || null;
+  },
+
+  // Resize interior
+  resizeInterior: (newWidth, newHeight) => {
+    const interior = get().currentInterior;
+    if (!interior) return;
+
+    const oldWidth = interior.width;
+    const oldHeight = interior.height;
+    const newTileCount = newWidth * newHeight;
+
+    // Remap a layer: copy tiles that fit in the new dimensions
+    const remapLayer = (oldLayer: number[]): number[] => {
+      const newLayer = new Array(newTileCount).fill(0);
+      const copyW = Math.min(oldWidth, newWidth);
+      const copyH = Math.min(oldHeight, newHeight);
+      for (let y = 0; y < copyH; y++) {
+        for (let x = 0; x < copyW; x++) {
+          newLayer[y * newWidth + x] = oldLayer[y * oldWidth + x];
+        }
+      }
+      return newLayer;
+    };
+
+    // Remap collision bitset
+    const oldBitset = new BitSet(oldWidth * oldHeight);
+    oldBitset.setRaw(interior.collision);
+    const newBitset = new BitSet(newTileCount);
+    const copyW = Math.min(oldWidth, newWidth);
+    const copyH = Math.min(oldHeight, newHeight);
+    for (let y = 0; y < copyH; y++) {
+      for (let x = 0; x < copyW; x++) {
+        newBitset.set(y * newWidth + x, oldBitset.get(y * oldWidth + x));
+      }
+    }
+
+    // Filter elements that are out of bounds
+    const inBounds = (x: number, y: number) => x >= 0 && x < newWidth && y >= 0 && y < newHeight;
+
+    const updated: InteriorMap = {
+      ...interior,
+      width: newWidth,
+      height: newHeight,
+      layers: {
+        ground: remapLayer(interior.layers.ground),
+        objects: remapLayer(interior.layers.objects),
+        overhead: remapLayer(interior.layers.overhead),
+      },
+      collision: newBitset.getRaw(),
+      spawnPoints: interior.spawnPoints.filter((sp) => inBounds(sp.x, sp.y)),
+      entities: interior.entities.filter((e) => inBounds(e.x, e.y)),
+      mapObjects: interior.mapObjects.filter((o) => inBounds(o.x, o.y)),
+      walls: interior.walls.filter((w) => inBounds(w.x, w.y)),
+      exitPortals: interior.exitPortals.filter((p) => inBounds(p.x, p.y)),
+      dirty: true,
+    };
+
+    set({ currentInterior: updated });
+    interiorStorage.updateInterior(interior.id, updated);
   },
 
   // Jump to target

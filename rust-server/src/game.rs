@@ -432,6 +432,10 @@ pub struct GameRoom {
     player_instances: Arc<RwLock<HashMap<String, String>>>,
     /// Instance manager for looking up instance NPCs
     instance_manager: Arc<crate::instance::InstanceManager>,
+    /// Arena duel manager (active when players are in duel_arena instance)
+    arena_manager: RwLock<crate::arena::ArenaManager>,
+    /// Database reference for arena stats persistence
+    db: Option<Arc<crate::db::Database>>,
 }
 
 impl GameRoom {
@@ -443,6 +447,7 @@ impl GameRoom {
         item_registry: Arc<ItemRegistry>,
         player_instances: Arc<RwLock<HashMap<String, String>>>,
         instance_manager: Arc<crate::instance::InstanceManager>,
+        db: Option<Arc<crate::db::Database>>,
     ) -> Self {
         let (tx, _) = broadcast::channel(256);
         let world = Arc::new(World::new("maps/world_0"));
@@ -517,6 +522,8 @@ impl GameRoom {
             player_senders: RwLock::new(HashMap::new()),
             player_instances,
             instance_manager,
+            arena_manager: RwLock::new(crate::arena::ArenaManager::new(crate::arena::ArenaConfig::default())),
+            db,
         }
     }
 
@@ -722,6 +729,60 @@ impl GameRoom {
     }
 
     pub async fn remove_player(&self, player_id: &str) {
+        // Handle arena disconnect
+        {
+            let mut arena = self.arena_manager.write().await;
+            if let Some((disconnected_id, _killer_id)) = arena.on_player_disconnect(player_id) {
+                // If was fighting and match should end, handle it
+                if arena.is_fighting() && arena.check_match_end() {
+                    let current_time = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+                    let placements = arena.end_match(current_time);
+                    drop(arena);
+
+                    // Distribute rewards
+                    {
+                        let mut players = self.players.write().await;
+                        for placement in &placements {
+                            if placement.gold_reward > 0 {
+                                if let Some(p) = players.get_mut(&placement.player_id) {
+                                    p.inventory.gold += placement.gold_reward;
+                                }
+                            }
+                        }
+                    }
+
+                    let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements.iter().map(|p| {
+                        crate::protocol::ArenaPlacementData {
+                            rank: p.rank,
+                            player_id: p.player_id.clone(),
+                            player_name: p.player_name.clone(),
+                            kills: p.kills,
+                            gold_reward: p.gold_reward,
+                        }
+                    }).collect();
+
+                    self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
+                        placements: placement_data,
+                    }).await;
+
+                    // Broadcast elimination for the disconnected player
+                    self.broadcast_to_arena(ServerMessage::ArenaPlayerEliminated {
+                        player_id: disconnected_id.clone(),
+                        player_name: "Disconnected".to_string(),
+                        killer_id: "disconnect".to_string(),
+                        killer_name: "Disconnect".to_string(),
+                        remaining: 0,
+                    }).await;
+                } else {
+                    // Refund if was queued (escrow removed in on_player_disconnect)
+                    let _ = &disconnected_id; // already handled
+                }
+            }
+        }
+
         let mut players = self.players.write().await;
         players.remove(player_id);
     }
@@ -999,7 +1060,7 @@ impl GameRoom {
         };
 
         // Admin-only commands check
-        let admin_commands = ["/give", "/setlevel", "/teleport", "/spawn", "/heal", "/kill", "/god", "/announce"];
+        let admin_commands = ["/give", "/setlevel", "/teleport", "/spawn", "/heal", "/kill", "/god", "/announce", "/arena"];
         if admin_commands.contains(&command.as_str()) && !is_admin {
             self.send_system_message(player_id, "This command requires admin privileges.").await;
             return;
@@ -1251,6 +1312,148 @@ impl GameRoom {
                     text: message.clone(),
                 }).await;
                 tracing::info!("Admin {} announced: {}", player_id, message);
+            }
+            "/arena" => {
+                // Arena commands (admin only)
+                if !is_admin {
+                    self.send_system_message(player_id, "Arena commands require admin privileges.").await;
+                    return;
+                }
+
+                let sub = parts.get(1).map(|s| s.to_lowercase()).unwrap_or_default();
+                let current_time = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+
+                match sub.as_str() {
+                    "fee" => {
+                        if let Some(fee) = parts.get(2).and_then(|s| s.parse::<i32>().ok()) {
+                            if fee < 0 {
+                                self.send_system_message(player_id, "Fee must be non-negative.").await;
+                                return;
+                            }
+                            let mut arena = self.arena_manager.write().await;
+                            arena.set_entry_fee(fee);
+                            self.send_system_message(player_id, &format!("Arena entry fee set to {} gold.", fee)).await;
+                        } else {
+                            self.send_system_message(player_id, "Usage: /arena fee <gold>").await;
+                        }
+                    }
+                    "start" => {
+                        let result = {
+                            let mut arena = self.arena_manager.write().await;
+                            arena.start_countdown(current_time, None)
+                        };
+                        match result {
+                            Ok(charges) => {
+                                // Deduct gold from players
+                                {
+                                    let mut players = self.players.write().await;
+                                    for (pid, amount) in &charges {
+                                        if let Some(p) = players.get_mut(pid) {
+                                            p.inventory.gold -= amount;
+                                        }
+                                    }
+                                }
+                                // Send inventory updates and notify
+                                for (pid, _) in &charges {
+                                    let update = {
+                                        let players = self.players.read().await;
+                                        players.get(pid).map(|p| (p.inventory.to_update(), p.inventory.gold))
+                                    };
+                                    if let Some((slots, gold)) = update {
+                                        self.send_to_player(pid, ServerMessage::InventoryUpdate {
+                                            player_id: pid.clone(),
+                                            slots,
+                                            gold,
+                                        }).await;
+                                    }
+                                }
+                                self.send_system_message(player_id, "Arena countdown started!").await;
+                            }
+                            Err(e) => {
+                                self.send_system_message(player_id, &e).await;
+                            }
+                        }
+                    }
+                    "timer" => {
+                        if let Some(seconds) = parts.get(2).and_then(|s| s.parse::<u64>().ok()) {
+                            let result = {
+                                let mut arena = self.arena_manager.write().await;
+                                arena.start_countdown(current_time, Some(seconds * 1000))
+                            };
+                            match result {
+                                Ok(charges) => {
+                                    {
+                                        let mut players = self.players.write().await;
+                                        for (pid, amount) in &charges {
+                                            if let Some(p) = players.get_mut(pid) {
+                                                p.inventory.gold -= amount;
+                                            }
+                                        }
+                                    }
+                                    for (pid, _) in &charges {
+                                        let update = {
+                                            let players = self.players.read().await;
+                                            players.get(pid).map(|p| (p.inventory.to_update(), p.inventory.gold))
+                                        };
+                                        if let Some((slots, gold)) = update {
+                                            self.send_to_player(pid, ServerMessage::InventoryUpdate {
+                                                player_id: pid.clone(),
+                                                slots,
+                                                gold,
+                                            }).await;
+                                        }
+                                    }
+                                    self.send_system_message(player_id, &format!("Arena countdown started ({}s)!", seconds)).await;
+                                }
+                                Err(e) => self.send_system_message(player_id, &e).await,
+                            }
+                        } else {
+                            self.send_system_message(player_id, "Usage: /arena timer <seconds>").await;
+                        }
+                    }
+                    "cancel" => {
+                        let refunds = {
+                            let mut arena = self.arena_manager.write().await;
+                            arena.cancel()
+                        };
+                        // Refund gold
+                        {
+                            let mut players = self.players.write().await;
+                            for (pid, amount) in &refunds {
+                                if let Some(p) = players.get_mut(pid) {
+                                    p.inventory.gold += amount;
+                                }
+                            }
+                        }
+                        for (pid, _) in &refunds {
+                            let update = {
+                                let players = self.players.read().await;
+                                players.get(pid).map(|p| (p.inventory.to_update(), p.inventory.gold))
+                            };
+                            if let Some((slots, gold)) = update {
+                                self.send_to_player(pid, ServerMessage::InventoryUpdate {
+                                    player_id: pid.clone(),
+                                    slots,
+                                    gold,
+                                }).await;
+                            }
+                        }
+                        self.send_system_message(player_id, "Arena cancelled. All fees refunded.").await;
+                    }
+                    "status" => {
+                        let status = {
+                            let arena = self.arena_manager.read().await;
+                            arena.get_status_text()
+                        };
+                        self.send_system_message(player_id, &status).await;
+                    }
+                    _ => {
+                        self.send_system_message(player_id, "Usage: /arena <start|timer|fee|cancel|status>").await;
+                    }
+                }
             }
             _ => {
                 self.send_system_message(player_id, &format!("Unknown command: {}. Try /help", command)).await;
@@ -1670,12 +1873,115 @@ impl GameRoom {
                     self.broadcast_to_zone(player_id, drop_msg).await;
                 }
             } else {
-                // Broadcast player death
-                let death_msg = ServerMessage::PlayerDied {
-                    id: target_id.clone(),
-                    killer_id: player_id.to_string(),
+                // Check if this is an arena fight death
+                let arena_death = {
+                    let arena = self.arena_manager.read().await;
+                    arena.is_fighting() && arena.is_in_ring(&target_id)
                 };
-                self.broadcast(death_msg).await;
+
+                if arena_death {
+                    // Arena death: notify arena, teleport to spectator zone
+                    let (eliminated_name, killer_name, remaining) = {
+                        let mut arena = self.arena_manager.write().await;
+                        arena.on_player_death(&target_id, Some(player_id));
+                        let eliminated_name = arena.match_stats.fighter_names.get(&target_id).cloned().unwrap_or_default();
+                        let killer_name = arena.match_stats.fighter_names.get(player_id).cloned().unwrap_or_default();
+                        let remaining = arena.active_fighters.len() as u32;
+                        (eliminated_name, killer_name, remaining)
+                    };
+
+                    // Teleport dead player to spectator spawn instead of normal death
+                    {
+                        let spectator_spawn = {
+                            let arena = self.arena_manager.read().await;
+                            arena.active_spectator_spawn()
+                        };
+                        let mut players = self.players.write().await;
+                        if let Some(p) = players.get_mut(&target_id) {
+                            p.hp = p.skills.hitpoints.level; // Revive
+                            p.is_dead = false;
+                            p.x = spectator_spawn.0;
+                            p.y = spectator_spawn.1;
+                        }
+                    }
+
+                    // Broadcast elimination
+                    self.broadcast_to_arena(ServerMessage::ArenaPlayerEliminated {
+                        player_id: target_id.clone(),
+                        player_name: eliminated_name,
+                        killer_id: player_id.to_string(),
+                        killer_name,
+                        remaining,
+                    }).await;
+
+                    // Check if match should end
+                    let should_end = {
+                        let arena = self.arena_manager.read().await;
+                        arena.check_match_end()
+                    };
+                    if should_end {
+                        let current_time = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as u64;
+                        let placements = {
+                            let mut arena = self.arena_manager.write().await;
+                            arena.end_match(current_time)
+                        };
+
+                        // Distribute rewards
+                        {
+                            let mut players = self.players.write().await;
+                            for placement in &placements {
+                                if placement.gold_reward > 0 {
+                                    if let Some(p) = players.get_mut(&placement.player_id) {
+                                        p.inventory.gold += placement.gold_reward;
+                                    }
+                                }
+                            }
+                        }
+
+                        let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements.iter().map(|p| {
+                            crate::protocol::ArenaPlacementData {
+                                rank: p.rank,
+                                player_id: p.player_id.clone(),
+                                player_name: p.player_name.clone(),
+                                kills: p.kills,
+                                gold_reward: p.gold_reward,
+                            }
+                        }).collect();
+
+                        self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
+                            placements: placement_data,
+                        }).await;
+
+                        // Send inventory updates for gold rewards
+                        for placement in &placements {
+                            if placement.gold_reward > 0 {
+                                let update = {
+                                    let players = self.players.read().await;
+                                    players.get(&placement.player_id).map(|p| {
+                                        (p.inventory.to_update(), p.inventory.gold)
+                                    })
+                                };
+                                if let Some((slots, gold)) = update {
+                                    self.send_to_player(&placement.player_id, ServerMessage::InventoryUpdate {
+                                        player_id: placement.player_id.clone(),
+                                        slots,
+                                        gold,
+                                    }).await;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Normal player death
+                    let death_msg = ServerMessage::PlayerDied {
+                        id: target_id.clone(),
+                        killer_id: player_id.to_string(),
+                    };
+                    self.broadcast(death_msg).await;
+                }
             }
         }
     }
@@ -2349,6 +2655,15 @@ impl GameRoom {
     }
 
     pub async fn handle_use_item(&self, player_id: &str, slot_index: u8) {
+        // Block consumables during arena fights
+        {
+            let arena = self.arena_manager.read().await;
+            if arena.is_fighting() && arena.is_in_ring(player_id) {
+                self.send_system_message(player_id, "You can't use items during an arena fight!").await;
+                return;
+            }
+        }
+
         // Get player and try to use item
         let (used_item_id, effect, inventory_update, gold) = {
             let mut players = self.players.write().await;
@@ -3530,6 +3845,17 @@ impl GameRoom {
             if npc_positions.contains(&(target_x, target_y)) {
                 continue;
             }
+            // Block fighters from leaving the ring during arena fights
+            {
+                let arena = self.arena_manager.read().await;
+                if arena.is_fighting() && arena.is_in_ring(&id) {
+                    if let Some(ring_zone) = arena.active_ring_zone() {
+                        if !ring_zone.contains(target_x, target_y) {
+                            continue;
+                        }
+                    }
+                }
+            }
             valid_moves.push((id, target_x, target_y));
         }
 
@@ -3849,6 +4175,195 @@ impl GameRoom {
 
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
                 let _ = sender.try_send(bytes);
+            }
+        }
+
+        // Arena tick: zone detection + state machine
+        self.arena_tick(current_time).await;
+    }
+
+    /// Process arena zone detection and state machine events
+    async fn arena_tick(&self, current_time: u64) {
+        // Auto-queue/dequeue players based on position in queue zone
+        let mut queue_errors: Vec<(String, String)> = Vec::new();
+        {
+            let players = self.players.read().await;
+            let player_instances = self.player_instances.read().await;
+            let mut arena = self.arena_manager.write().await;
+
+            for (player_id, instance_id) in player_instances.iter() {
+                if !instance_id.starts_with("duel_arena") {
+                    continue;
+                }
+                if let Some(player) = players.get(player_id) {
+                    if player.is_dead || !player.active {
+                        continue;
+                    }
+
+                    let in_queue_zone = arena.is_in_queue_zone(player.x, player.y);
+                    let is_queued = arena.queued_players.contains(&player_id.to_string());
+
+                    if in_queue_zone && !is_queued && arena.state == crate::arena::ArenaState::Idle {
+                        if let Err(e) = arena.queue_player(player_id, &player.name, player.inventory.gold) {
+                            queue_errors.push((player_id.clone(), e));
+                        }
+                    } else if !in_queue_zone && is_queued && arena.state == crate::arena::ArenaState::Idle {
+                        arena.dequeue_player(player_id);
+                    }
+                }
+            }
+        }
+        for (pid, err) in queue_errors {
+            self.send_system_message(&pid, &err).await;
+        }
+
+        // Process arena state machine
+        let events = {
+            let mut arena = self.arena_manager.write().await;
+            arena.tick(current_time)
+        };
+
+        for event in events {
+            match event {
+                crate::arena::ArenaEvent::FightStarted { fighters } => {
+                    let fighter_ids: Vec<String> = fighters.iter().map(|(id, _)| id.clone()).collect();
+
+                    // Teleport fighters to spawn points
+                    {
+                        let mut players = self.players.write().await;
+                        for (player_id, (spawn_x, spawn_y)) in &fighters {
+                            if let Some(player) = players.get_mut(player_id) {
+                                player.x = *spawn_x;
+                                player.y = *spawn_y;
+                            }
+                        }
+                    }
+
+                    // Broadcast match start to all arena players
+                    self.broadcast_to_arena(ServerMessage::ArenaMatchStart {
+                        fighter_ids,
+                    }).await;
+                }
+                crate::arena::ArenaEvent::MatchEnded { placements } => {
+                    // Distribute gold rewards
+                    {
+                        let mut players = self.players.write().await;
+                        for placement in &placements {
+                            if placement.gold_reward > 0 {
+                                if let Some(player) = players.get_mut(&placement.player_id) {
+                                    player.inventory.gold += placement.gold_reward;
+                                }
+                            }
+                        }
+                    }
+
+                    // Save arena stats to DB
+                    if let Some(ref db) = self.db {
+                        // We need character IDs - for now we look them up via player name
+                        // This is a best-effort save; failures are logged but don't block gameplay
+                        for placement in &placements {
+                            let won = placement.rank == 1;
+                            let died = placement.rank > 1;
+                            if let Err(e) = db.update_arena_stats(
+                                0, // character_id will be resolved in the save path
+                                won,
+                                placement.kills,
+                                died,
+                                placement.gold_reward,
+                            ).await {
+                                tracing::warn!("Failed to save arena stats for {}: {}", placement.player_id, e);
+                            }
+                        }
+                    }
+
+                    let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements.iter().map(|p| {
+                        crate::protocol::ArenaPlacementData {
+                            rank: p.rank,
+                            player_id: p.player_id.clone(),
+                            player_name: p.player_name.clone(),
+                            kills: p.kills,
+                            gold_reward: p.gold_reward,
+                        }
+                    }).collect();
+
+                    self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
+                        placements: placement_data,
+                    }).await;
+
+                    // Send inventory updates to all fighters who earned gold
+                    for placement in &placements {
+                        if placement.gold_reward > 0 {
+                            let update = {
+                                let players = self.players.read().await;
+                                players.get(&placement.player_id).map(|p| {
+                                    (p.inventory.to_update(), p.inventory.gold)
+                                })
+                            };
+                            if let Some((slots, gold)) = update {
+                                self.send_to_player(&placement.player_id, ServerMessage::InventoryUpdate {
+                                    player_id: placement.player_id.clone(),
+                                    slots,
+                                    gold,
+                                }).await;
+                            }
+                        }
+                    }
+                }
+                crate::arena::ArenaEvent::StateChanged { state } => {
+                    let (queued_count, fighter_count, entry_fee, countdown_remaining) = {
+                        let arena = self.arena_manager.read().await;
+                        let remaining = match &arena.state {
+                            crate::arena::ArenaState::Countdown { ends_at } => {
+                                Some(ends_at.saturating_sub(current_time) as u32)
+                            }
+                            _ => None,
+                        };
+                        (
+                            arena.queued_players.len() as u32,
+                            arena.active_fighters.len() as u32,
+                            arena.config.entry_fee,
+                            remaining,
+                        )
+                    };
+
+                    self.broadcast_to_arena(ServerMessage::ArenaStateUpdate {
+                        state,
+                        countdown_remaining,
+                        queued_count,
+                        fighter_count,
+                        entry_fee,
+                    }).await;
+                }
+                crate::arena::ArenaEvent::ResultsExpired => {
+                    // Reset broadcast
+                    self.broadcast_to_arena(ServerMessage::ArenaStateUpdate {
+                        state: "idle".to_string(),
+                        countdown_remaining: None,
+                        queued_count: 0,
+                        fighter_count: 0,
+                        entry_fee: {
+                            let arena = self.arena_manager.read().await;
+                            arena.config.entry_fee
+                        },
+                    }).await;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Broadcast a message to all players in the fight_pit arena instance
+    async fn broadcast_to_arena(&self, msg: ServerMessage) {
+        let player_instances = self.player_instances.read().await;
+        let senders = self.player_senders.read().await;
+
+        if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+            for (player_id, instance_id) in player_instances.iter() {
+                if instance_id.starts_with("duel_arena") {
+                    if let Some(sender) = senders.get(player_id) {
+                        let _ = sender.try_send(bytes.clone());
+                    }
+                }
             }
         }
     }

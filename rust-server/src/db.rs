@@ -56,6 +56,19 @@ pub struct CharacterData {
 pub const GENDERS: &[&str] = &["male", "female"];
 pub const SKINS: &[&str] = &["tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"];
 
+/// Arena stats data from the database
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ArenaStatsData {
+    pub character_id: i64,
+    pub total_wins: i32,
+    pub total_matches: i32,
+    pub total_kills: i32,
+    pub total_deaths: i32,
+    pub current_streak: i32,
+    pub best_streak: i32,
+    pub total_gold_won: i32,
+}
+
 pub struct Database {
     pool: SqlitePool,
 }
@@ -223,7 +236,99 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Arena stats table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS arena_stats (
+                character_id INTEGER PRIMARY KEY,
+                total_wins INTEGER DEFAULT 0,
+                total_matches INTEGER DEFAULT 0,
+                total_kills INTEGER DEFAULT 0,
+                total_deaths INTEGER DEFAULT 0,
+                current_streak INTEGER DEFAULT 0,
+                best_streak INTEGER DEFAULT 0,
+                total_gold_won INTEGER DEFAULT 0,
+                FOREIGN KEY(character_id) REFERENCES characters(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
+        Ok(())
+    }
+
+    // =========================================================================
+    // Arena Stats Functions
+    // =========================================================================
+
+    /// Get arena stats for a character, creating a default row if none exists
+    pub async fn get_arena_stats(&self, character_id: i64) -> Result<ArenaStatsData, sqlx::Error> {
+        let row = sqlx::query_as::<_, ArenaStatsData>(
+            "SELECT character_id, total_wins, total_matches, total_kills, total_deaths, current_streak, best_streak, total_gold_won FROM arena_stats WHERE character_id = ?"
+        )
+        .bind(character_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.unwrap_or(ArenaStatsData {
+            character_id,
+            total_wins: 0,
+            total_matches: 0,
+            total_kills: 0,
+            total_deaths: 0,
+            current_streak: 0,
+            best_streak: 0,
+            total_gold_won: 0,
+        }))
+    }
+
+    /// Update arena stats after a match
+    pub async fn update_arena_stats(
+        &self,
+        character_id: i64,
+        won: bool,
+        kills: i32,
+        died: bool,
+        gold_won: i32,
+    ) -> Result<(), sqlx::Error> {
+        // Upsert: insert or update
+        let win_inc = if won { 1 } else { 0 };
+        let death_inc = if died { 1 } else { 0 };
+
+        sqlx::query(
+            r#"
+            INSERT INTO arena_stats (character_id, total_wins, total_matches, total_kills, total_deaths, current_streak, best_streak, total_gold_won)
+            VALUES (?, ?, 1, ?, ?, ?, ?, ?)
+            ON CONFLICT(character_id) DO UPDATE SET
+                total_wins = total_wins + ?,
+                total_matches = total_matches + 1,
+                total_kills = total_kills + ?,
+                total_deaths = total_deaths + ?,
+                current_streak = CASE WHEN ? = 1 THEN current_streak + 1 ELSE 0 END,
+                best_streak = MAX(best_streak, CASE WHEN ? = 1 THEN current_streak + 1 ELSE 0 END),
+                total_gold_won = total_gold_won + ?
+            "#,
+        )
+        // INSERT values
+        .bind(character_id)
+        .bind(win_inc)
+        .bind(kills)
+        .bind(death_inc)
+        .bind(if won { 1 } else { 0 }) // current_streak
+        .bind(if won { 1 } else { 0 }) // best_streak
+        .bind(gold_won)
+        // UPDATE values
+        .bind(win_inc)
+        .bind(kills)
+        .bind(death_inc)
+        .bind(win_inc) // for CASE in current_streak
+        .bind(win_inc) // for CASE in best_streak
+        .bind(gold_won)
+        .execute(&self.pool)
+        .await?;
+
         Ok(())
     }
 
