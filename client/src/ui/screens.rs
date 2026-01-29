@@ -214,6 +214,8 @@ pub struct LoginScreen {
     last_ping_time: f32,
     #[cfg(target_arch = "wasm32")]
     loading: bool,
+    // Remember me
+    remember_me: bool,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -240,10 +242,15 @@ impl LoginScreen {
             stars.push((x, y, phase));
         }
 
+        let (saved_username, remember_me) = match crate::auth::credentials::load_username() {
+            Some(u) => (u, true),
+            None => (String::new(), false),
+        };
+
         Self {
-            username: String::new(),
+            username: saved_username,
             password: String::new(),
-            active_field: LoginField::Username,
+            active_field: if remember_me { LoginField::Password } else { LoginField::Username },
             mode: LoginMode::Login,
             error_message: None,
             auth_client: AuthClient::new(server_url),
@@ -257,6 +264,7 @@ impl LoginScreen {
             last_ping_time: -10.0, // trigger immediate ping
             #[cfg(target_arch = "wasm32")]
             loading: false,
+            remember_me,
         }
     }
 
@@ -278,6 +286,14 @@ impl LoginScreen {
 
     fn measure_text_sharp(&self, text: &str, font_size: f32) -> TextDimensions {
         self.font.measure_text(text, font_size)
+    }
+
+    fn save_remember_me(&self) {
+        if self.remember_me {
+            crate::auth::credentials::save_username(&self.username);
+        } else {
+            crate::auth::credentials::clear_username();
+        }
     }
 
     fn handle_text_input(&mut self) {
@@ -364,6 +380,7 @@ impl Screen for LoginScreen {
                 self.loading = false;
                 match result {
                     AuthResult::Login(Ok(session)) | AuthResult::Register(Ok(session)) => {
+                        self.save_remember_me();
                         return ScreenState::ToCharacterSelect(session);
                     }
                     AuthResult::Login(Err(e)) | AuthResult::Register(Err(e)) => {
@@ -383,25 +400,30 @@ impl Screen for LoginScreen {
         }
 
         // Layout constants (must match render)
-        let box_width = sw.min(340.0);  // Wider inputs
-        let box_height = 40.0;          // Taller inputs
+        let compact = sh < 400.0;
+        let box_width = sw.min(340.0);
+        let box_height = if compact { 32.0 } else { 40.0 };
         let box_x = (sw - box_width) / 2.0;
-        let btn_height = 36.0;          // Taller buttons
-        let spacing = 10.0;             // More spacing
+        let btn_height = 36.0;
+        let spacing = if compact { 4.0 } else { 10.0 };
 
         // Calculate form height (subtitle + inputs + buttons, excluding logo)
         let logo_h = 46.0;
-        let logo_margin = 4.0; // gap between logo bottom and subtitle
+        let logo_margin = 4.0;
         let subtitle_h = 16.0;
-        let form_gap = 8.0; // gap between subtitle and first field
-        let label_h = 12.0;  // label to field gap
-        let field_gap = spacing + 4.0; // between fields
-        let buttons_gap = spacing + 14.0; // between last field and buttons
+        let form_gap = if compact { 2.0 } else { 8.0 };
+        let label_h = 12.0;
+        let field_gap = if compact { 14.0 } else { spacing + 4.0 };
+        let buttons_gap = spacing + 14.0;
+
+        let checkbox_row_h = 20.0;
+        let checkbox_gap = if compact { 4.0 } else { 8.0 };
 
         let form_content_h = subtitle_h + form_gap
             + label_h + box_height  // username
             + field_gap + label_h + box_height  // password
-            + buttons_gap + btn_height; // buttons
+            + checkbox_gap + checkbox_row_h  // remember me
+            + spacing + btn_height; // buttons
 
         // Center the form content vertically, then place logo above it
         let form_content_top = ((sh - form_content_h) / 2.0).max(logo_h + logo_margin + 6.0);
@@ -410,7 +432,8 @@ impl Screen for LoginScreen {
         let username_field_y = username_y + label_h;
         let password_y = username_field_y + box_height + field_gap;
         let password_field_y = password_y + label_h;
-        let buttons_y = password_field_y + box_height + buttons_gap;
+        let remember_y = password_field_y + box_height + checkbox_gap;
+        let buttons_y = remember_y + checkbox_row_h + spacing;
 
         // Handle touch/click on input fields and buttons
         if clicked {
@@ -424,6 +447,11 @@ impl Screen for LoginScreen {
             else if point_in_rect(mx, my, box_x, password_field_y, box_width, box_height) {
                 self.active_field = LoginField::Password;
                 show_keyboard(true);
+            }
+
+            // Remember me checkbox
+            else if point_in_rect(mx, my, box_x, remember_y, box_width, checkbox_row_h) {
+                self.remember_me = !self.remember_me;
             }
 
             // Tapped elsewhere - hide keyboard
@@ -445,6 +473,7 @@ impl Screen for LoginScreen {
 
                         match result {
                             Ok(session) => {
+                                self.save_remember_me();
                                 return ScreenState::ToCharacterSelect(session);
                             }
                             Err(e) => {
@@ -523,7 +552,7 @@ impl Screen for LoginScreen {
 
                 match result {
                     Ok(session) => {
-                        // Go to character select screen
+                        self.save_remember_me();
                         return ScreenState::ToCharacterSelect(session);
                     }
                     Err(e) => {
@@ -593,25 +622,30 @@ impl Screen for LoginScreen {
         // === FORM OVERLAY ===
 
         // Layout constants (must match update) - all floored to avoid subpixel rendering
+        let compact = sh < 400.0;
         let box_width = sw.min(340.0).floor();
-        let box_height = 40.0;
+        let box_height = if compact { 32.0 } else { 40.0 };
         let box_x = ((sw - box_width) / 2.0).floor();
         let btn_height = 36.0;
-        let spacing = 10.0;
+        let spacing = if compact { 4.0 } else { 10.0 };
         let font_size = 16.0;
 
         let logo_h = 46.0;
         let logo_margin = 4.0;
         let subtitle_h = 16.0;
-        let form_gap = 8.0;
+        let form_gap = if compact { 2.0 } else { 8.0 };
         let label_h = 12.0;
-        let field_gap = spacing + 4.0;
+        let field_gap = if compact { 14.0 } else { spacing + 4.0 };
         let buttons_gap = spacing + 14.0;
+
+        let checkbox_row_h = 20.0;
+        let checkbox_gap = if compact { 4.0 } else { 8.0 };
 
         let form_content_h = subtitle_h + form_gap
             + label_h + box_height
             + field_gap + label_h + box_height
-            + buttons_gap + btn_height;
+            + checkbox_gap + checkbox_row_h
+            + spacing + btn_height;
 
         let form_content_top = ((sh - form_content_h) / 2.0).max(logo_h + logo_margin + 6.0).floor();
 
@@ -672,7 +706,7 @@ impl Screen for LoginScreen {
             format!("{}{}", self.username, cursor)
         };
         let text_color = if self.username.is_empty() && !username_active { DARKGRAY } else { WHITE };
-        self.draw_text_sharp(&username_display, box_x + 10.0, field_y + 27.0, font_size, text_color);
+        self.draw_text_sharp(&username_display, box_x + 10.0, field_y + (box_height + font_size) / 2.0, font_size, text_color);
 
         // Password field
         let password_y = (field_y + box_height + field_gap).floor();
@@ -692,16 +726,24 @@ impl Screen for LoginScreen {
             format!("{}{}", masked, cursor)
         };
         let text_color = if self.password.is_empty() && !password_active { DARKGRAY } else { WHITE };
-        self.draw_text_sharp(&password_display, box_x + 10.0, pass_field_y + 27.0, font_size, text_color);
+        self.draw_text_sharp(&password_display, box_x + 10.0, pass_field_y + (box_height + font_size) / 2.0, font_size, text_color);
 
-        // Error message
-        if let Some(ref error) = self.error_message {
-            let error_y = pass_field_y + box_height + 4.0;
-            self.draw_text_sharp(error, box_x, error_y + 14.0, 16.0, RED);
+        // Remember me checkbox
+        let remember_y = (pass_field_y + box_height + checkbox_gap).floor();
+        let cb_size = 16.0;
+        let cb_x = box_x;
+        let cb_y = remember_y + (checkbox_row_h - cb_size) / 2.0;
+        draw_rectangle(cb_x, cb_y, cb_size, cb_size, Color::from_rgba(40, 40, 60, 180));
+        draw_rectangle_lines(cb_x, cb_y, cb_size, cb_size, 2.0, GRAY);
+        if self.remember_me {
+            // Draw checkmark as two lines
+            draw_line(cb_x + 3.0, cb_y + 8.0, cb_x + 6.0, cb_y + 12.0, 2.0, GREEN);
+            draw_line(cb_x + 6.0, cb_y + 12.0, cb_x + 13.0, cb_y + 4.0, 2.0, GREEN);
         }
+        self.draw_text_sharp("Remember me", cb_x + cb_size + 6.0, remember_y + 17.0, font_size, LIGHTGRAY);
 
         // Buttons row
-        let buttons_y = (pass_field_y + box_height + buttons_gap).floor();
+        let buttons_y = (remember_y + checkbox_row_h + spacing).floor();
         let btn_w = ((box_width - spacing) / 2.0).floor();
 
         // Login/Register button (left)
@@ -749,6 +791,11 @@ impl Screen for LoginScreen {
         draw_rectangle_lines(toggle_x + 1.0, buttons_y + 1.0, btn_w - 2.0, btn_height - 2.0, 1.0, Color::new(1.0, 1.0, 1.0, 0.1));
         let toggle_w = self.measure_text_sharp(toggle_text, font_size).width;
         self.draw_text_sharp(toggle_text, (toggle_x + (btn_w - toggle_w) / 2.0).floor(), buttons_y + 24.0, font_size, WHITE);
+
+        // Error message (below buttons)
+        if let Some(ref error) = self.error_message {
+            self.draw_text_sharp(error, box_x, buttons_y + btn_height + 14.0, 16.0, RED);
+        }
 
         // Version (bottom right)
         let version_text = format!("v{}", env!("CARGO_PKG_VERSION"));

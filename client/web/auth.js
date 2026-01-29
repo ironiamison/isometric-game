@@ -76,5 +76,36 @@ miniquad_add_plugin({
         importObject.env.http_cleanup = function (request_id) {
             AUTH_PLUGIN.requests.delete(request_id);
         };
+
+        importObject.env.storage_set = function (key_js, value_js) {
+            const key = consume_js_object(key_js);
+            const value = consume_js_object(value_js);
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {
+                console.error("storage_set error:", e);
+            }
+        };
+
+        importObject.env.storage_get = function (key_js) {
+            const key = consume_js_object(key_js);
+            try {
+                const value = localStorage.getItem(key);
+                if (value === null) return -1;
+                return js_object(value);
+            } catch (e) {
+                console.error("storage_get error:", e);
+                return -1;
+            }
+        };
+
+        importObject.env.storage_remove = function (key_js) {
+            const key = consume_js_object(key_js);
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.error("storage_remove error:", e);
+            }
+        };
     },
 });

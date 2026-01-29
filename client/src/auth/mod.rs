@@ -1,3 +1,4 @@
+pub mod credentials;
 pub mod types;
 
 #[cfg(not(target_arch = "wasm32"))]
