@@ -8,7 +8,6 @@ mod game;
 mod render;
 mod network;
 mod input;
-#[cfg(not(target_arch = "wasm32"))]
 mod auth;
 mod ui;
 mod audio;
