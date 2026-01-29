@@ -750,6 +750,15 @@ impl GameState {
         // Clean up old chat bubbles (older than 5.0 seconds)
         self.chat_bubbles.retain(|bubble| current_time - bubble.time < 5.0);
 
+        // Clean up expired NPC speech bubbles
+        for npc in self.npcs.values_mut() {
+            if let Some((_, time)) = &npc.speech_bubble {
+                if current_time - time > 5.0 {
+                    npc.speech_bubble = None;
+                }
+            }
+        }
+
         // Clean up completed projectiles
         self.projectiles.retain(|p| !p.is_complete(current_time));
 

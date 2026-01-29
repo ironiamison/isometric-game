@@ -1179,6 +1179,10 @@ impl Renderer {
 
         // Render NPC speech bubbles
         for npc in state.npcs.values() {
+            if npc.state == NpcState::Dead {
+                continue;
+            }
+
             let Some((ref text, time)) = npc.speech_bubble else {
                 continue;
             };
