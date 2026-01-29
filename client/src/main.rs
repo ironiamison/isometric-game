@@ -26,8 +26,8 @@ use ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, CharacterCreat
 use auth::AuthSession;
 
 // Production mode - use the production server.
-const SERVER_URL: &str = "http://5.161.177.38:2567";
-const WS_URL: &str = "ws://5.161.177.38:2567";
+const SERVER_URL: &str = "http://aeven.xyz:2567";
+const WS_URL: &str = "ws://aeven.xyz:2567";
 
 // Development mode - use the development server
 // const SERVER_URL: &str = "http://localhost:2567";
