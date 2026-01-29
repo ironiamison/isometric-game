@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+source "$HOME/.cargo/env" 2>/dev/null || true
 
 REPO_DIR="/root/isometric-game"
 cd "$REPO_DIR"
