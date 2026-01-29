@@ -4,7 +4,7 @@ use tracing::{info, warn, error};
 
 use super::prototype::{
     AnimationType, DialogueConfig, EntityBehaviors, EntityPrototype, LootEntry,
-    RawEntityPrototype, ResolvedRewards, ResolvedStats,
+    RawEntityPrototype, ResolvedRewards, ResolvedStats, SpeechConfig,
 };
 
 /// Registry for all entity prototypes
@@ -239,6 +239,8 @@ impl EntityRegistry {
             quest_giver: raw.quest_giver.clone()
                 .or_else(|| parent.and_then(|p| p.quest_giver.clone())),
             dialogue: raw.dialogue.clone().unwrap_or_default(),
+            speech: raw.speech.as_ref().map(SpeechConfig::from)
+                .or_else(|| parent.and_then(|p| p.speech.clone())),
         })
     }
 

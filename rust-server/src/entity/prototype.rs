@@ -90,6 +90,41 @@ pub struct RawEntityBehaviors {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct RawSpeechConfig {
+    #[serde(default = "default_speech_radius")]
+    pub radius: i32,
+    #[serde(default = "default_speech_interval_min")]
+    pub interval_min_ms: u64,
+    #[serde(default = "default_speech_interval_max")]
+    pub interval_max_ms: u64,
+    #[serde(default)]
+    pub messages: Vec<String>,
+}
+
+fn default_speech_radius() -> i32 { 5 }
+fn default_speech_interval_min() -> u64 { 15000 }
+fn default_speech_interval_max() -> u64 { 45000 }
+
+#[derive(Debug, Clone)]
+pub struct SpeechConfig {
+    pub radius: i32,
+    pub interval_min_ms: u64,
+    pub interval_max_ms: u64,
+    pub messages: Vec<String>,
+}
+
+impl From<&RawSpeechConfig> for SpeechConfig {
+    fn from(raw: &RawSpeechConfig) -> Self {
+        Self {
+            radius: raw.radius,
+            interval_min_ms: raw.interval_min_ms,
+            interval_max_ms: raw.interval_max_ms,
+            messages: raw.messages.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct MerchantConfig {
     pub shop_id: String,
     #[serde(default = "default_buy_mult")]
@@ -148,6 +183,7 @@ pub struct RawEntityPrototype {
     pub merchant: Option<MerchantConfig>,
     pub quest_giver: Option<QuestGiverConfig>,
     pub dialogue: Option<DialogueConfig>,
+    pub speech: Option<RawSpeechConfig>,
 }
 
 // ============================================================================
@@ -265,6 +301,7 @@ pub struct EntityPrototype {
     pub merchant: Option<MerchantConfig>,
     pub quest_giver: Option<QuestGiverConfig>,
     pub dialogue: DialogueConfig,
+    pub speech: Option<SpeechConfig>,
 }
 
 impl EntityPrototype {
