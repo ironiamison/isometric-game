@@ -456,6 +456,9 @@ pub struct UiState {
     pub announcements: Vec<Announcement>,
     // Chat log visibility (hidden by default on mobile)
     pub chat_log_visible: bool,
+    // Mobile chat panel
+    pub chat_panel_open: bool,
+    pub chat_active_tab: ChatChannel,
     // Tap-to-pathfind (enabled by default on mobile, disabled on desktop)
     pub tap_to_pathfind: bool,
     // Use joystick instead of D-pad for mobile controls
@@ -531,6 +534,8 @@ impl Default for UiState {
             chat_log_visible: false,
             #[cfg(not(target_os = "android"))]
             chat_log_visible: true,
+            chat_panel_open: false,
+            chat_active_tab: ChatChannel::Local,
             #[cfg(target_os = "android")]
             tap_to_pathfind: false,
             #[cfg(not(target_os = "android"))]

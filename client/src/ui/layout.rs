@@ -77,6 +77,15 @@ pub enum UiElementId {
     // Gold Drop Dialog
     GoldDropConfirm,
     GoldDropCancel,
+
+    // Chat Panel
+    ChatButton,
+    ChatTabLocal,
+    ChatTabGlobal,
+    ChatTabSystem,
+    ChatInputField,
+    ChatSendButton,
+    ChatPanelBackground,
 }
 
 /// A single interactive UI element with its bounds
