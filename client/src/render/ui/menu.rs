@@ -98,28 +98,53 @@ impl Renderer {
         y += row_height + 4.0;
 
         // ===== AUDIO SLIDERS =====
-        let slider_width = inner_width - 50.0;
-        let slider_x = content_x + 42.0;
+        // On Android: Music + SFX side by side on one row
+        // On desktop: separate rows
+        #[cfg(target_os = "android")]
+        {
+            let half_width = (inner_width - 6.0) / 2.0;
+            let label_offset = 30.0;
+            let left_slider_x = content_x + label_offset;
+            let left_slider_w = half_width - label_offset;
+            let right_slider_x = content_x + half_width + 6.0 + label_offset;
+            let right_slider_w = half_width - label_offset;
 
-        // Music slider
-        let music_bounds = Rect::new(slider_x, y, slider_width, slider_height);
-        layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
-        self.draw_compact_slider("Music", slider_x, y, slider_width, slider_height,
-                                 state.ui_state.audio_volume, state.ui_state.audio_muted, is_hovered(music_bounds));
-        y += row_height - 4.0;
+            let music_bounds = Rect::new(left_slider_x, y, left_slider_w, slider_height);
+            layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
+            self.draw_compact_slider("Mus", left_slider_x, y, left_slider_w, slider_height,
+                                     state.ui_state.audio_volume, state.ui_state.audio_muted, is_hovered(music_bounds));
 
-        // SFX slider
-        let sfx_bounds = Rect::new(slider_x, y, slider_width, slider_height);
-        layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
-        self.draw_compact_slider("SFX", slider_x, y, slider_width, slider_height,
-                                 state.ui_state.audio_sfx_volume, state.ui_state.audio_muted, is_hovered(sfx_bounds));
-        y += row_height - 4.0;
+            let sfx_bounds = Rect::new(right_slider_x, y, right_slider_w, slider_height);
+            layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
+            self.draw_compact_slider("SFX", right_slider_x, y, right_slider_w, slider_height,
+                                     state.ui_state.audio_sfx_volume, state.ui_state.audio_muted, is_hovered(sfx_bounds));
+            y += row_height - 4.0;
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            let slider_width = inner_width - 50.0;
+            let slider_x = content_x + 42.0;
+
+            let music_bounds = Rect::new(slider_x, y, slider_width, slider_height);
+            layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
+            self.draw_compact_slider("Music", slider_x, y, slider_width, slider_height,
+                                     state.ui_state.audio_volume, state.ui_state.audio_muted, is_hovered(music_bounds));
+            y += row_height - 4.0;
+
+            let sfx_bounds = Rect::new(slider_x, y, slider_width, slider_height);
+            layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
+            self.draw_compact_slider("SFX", slider_x, y, slider_width, slider_height,
+                                     state.ui_state.audio_sfx_volume, state.ui_state.audio_muted, is_hovered(sfx_bounds));
+            y += row_height - 4.0;
+        }
 
         // UI Scale slider
-        let scale_bounds = Rect::new(slider_x, y, slider_width, slider_height);
+        let ui_slider_width = inner_width - 50.0;
+        let ui_slider_x = content_x + 42.0;
+        let scale_bounds = Rect::new(ui_slider_x, y, ui_slider_width, slider_height);
         layout.add(UiElementId::EscapeMenuUiScaleSlider, scale_bounds);
         let scale_normalized = (state.ui_state.ui_scale - 0.75) / 0.5; // 0.75-1.25 range
-        self.draw_compact_slider("Scale", slider_x, y, slider_width, slider_height,
+        self.draw_compact_slider("Scale", ui_slider_x, y, ui_slider_width, slider_height,
                                  scale_normalized, false, is_hovered(scale_bounds));
         y += row_height;
 
