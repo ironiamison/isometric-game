@@ -36,7 +36,7 @@ env_logger = "0.11"
 # HTTP client for matchmaking
 ureq = { version = "2.10", features = ["json"] }
 # WebSocket (uses wasm-bindgen on WASM which conflicts with miniquad)
-ewebsock = "0.6"
+ewebsock = { version = "0.6", features = ["tls"] }
 
 # Desktop-only dependencies (not Android, not WASM)
 [target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))'.dependencies]
