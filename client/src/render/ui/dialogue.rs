@@ -35,7 +35,36 @@ impl Renderer {
             dialogue.choices.len() as f32 * choice_spacing + 36.0
         };
         let text_margin_bottom = 12.0;
-        let ideal_box_height = 120.0 + text_margin_bottom + choice_area_height;
+
+        // Pre-compute text line count for dynamic height
+        let text_line_count = {
+            let mut count = 0u32;
+            let temp_max_width = box_width - FRAME_THICKNESS * 2.0 - 24.0;
+            for paragraph in dialogue.text.split('\n') {
+                let words: Vec<&str> = paragraph.split_whitespace().collect();
+                if words.is_empty() {
+                    count += 1;
+                    continue;
+                }
+                let mut cur = String::new();
+                for word in words {
+                    let test = if cur.is_empty() { word.to_string() } else { format!("{} {}", cur, word) };
+                    let w = self.measure_text_sharp(&test, 16.0).width;
+                    if w > temp_max_width && !cur.is_empty() {
+                        count += 1;
+                        cur = word.to_string();
+                    } else {
+                        cur = test;
+                    }
+                }
+                if !cur.is_empty() {
+                    count += 1;
+                }
+            }
+            count.max(1)
+        };
+        let text_height = text_line_count as f32 * 22.0;
+        let ideal_box_height = 50.0 + text_height + text_margin_bottom + choice_area_height;
 
         // Clamp height to screen bounds (leave 40px top margin minimum)
         let max_box_height = sh - 40.0 - bottom_margin;
@@ -117,28 +146,37 @@ impl Renderer {
         let text_y = content_y + 28.0;
         let max_line_width = content_width;
 
-        let words: Vec<&str> = dialogue.text.split_whitespace().collect();
         let mut current_line = String::new();
         let mut line_y = text_y;
 
-        for word in words {
-            let test_line = if current_line.is_empty() {
-                word.to_string()
-            } else {
-                format!("{} {}", current_line, word)
-            };
+        for paragraph in dialogue.text.split('\n') {
+            let words: Vec<&str> = paragraph.split_whitespace().collect();
+            if words.is_empty() {
+                // Empty line — advance by line height
+                line_y += 22.0;
+                continue;
+            }
+            for word in words {
+                let test_line = if current_line.is_empty() {
+                    word.to_string()
+                } else {
+                    format!("{} {}", current_line, word)
+                };
 
-            let line_width = self.measure_text_sharp(&test_line, 16.0).width;
-            if line_width > max_line_width && !current_line.is_empty() {
+                let line_width = self.measure_text_sharp(&test_line, 16.0).width;
+                if line_width > max_line_width && !current_line.is_empty() {
+                    self.draw_text_sharp(&current_line, text_x, line_y, 16.0, TEXT_NORMAL);
+                    line_y += 22.0;
+                    current_line = word.to_string();
+                } else {
+                    current_line = test_line;
+                }
+            }
+            if !current_line.is_empty() {
                 self.draw_text_sharp(&current_line, text_x, line_y, 16.0, TEXT_NORMAL);
                 line_y += 22.0;
-                current_line = word.to_string();
-            } else {
-                current_line = test_line;
+                current_line.clear();
             }
-        }
-        if !current_line.is_empty() {
-            self.draw_text_sharp(&current_line, text_x, line_y, 16.0, TEXT_NORMAL);
         }
 
         // ===== CHOICES / CONTINUE =====

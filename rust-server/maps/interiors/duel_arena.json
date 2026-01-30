@@ -3093,7 +3093,14 @@
     ]
   },
   "collision": "/////wEAAAABAGYFAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAB8AAAABAAAAAQAAAAEAAAABAAAAAQAAAAkAAAAJAAAAAQAAAAEAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "arena_board",
+      "x": 21,
+      "y": 2,
+      "level": 1
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1954,

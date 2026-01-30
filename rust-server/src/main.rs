@@ -69,6 +69,7 @@ struct GameSession {
     character_id: i64,        // Database character ID
     account_id: i64,          // Database account ID
     auth_token: String,       // Token used for this session (for validation)
+    current_map: Option<String>, // Interior map ID to auto-enter on connect (None = overworld)
 }
 
 #[derive(Clone)]
@@ -921,6 +922,7 @@ async fn matchmake_join_or_create(
             character_id,
             account_id,
             auth_token: auth_token.clone(),
+            current_map: character_data.current_map.clone(),
         },
     );
 
@@ -1226,8 +1228,9 @@ async fn ws_handler(
             let player_id = session.player_id.clone();
             let character_name = session.character_name.clone();
             let character_id = session.character_id;
+            let current_map = session.current_map.clone();
             ws.on_upgrade(move |socket| {
-                handle_socket(socket, state, room_id, player_id, session_id, character_name, character_id)
+                handle_socket(socket, state, room_id, player_id, session_id, character_name, character_id, current_map)
             })
         }
         _ => {
@@ -1245,6 +1248,7 @@ async fn handle_socket(
     session_id: String,
     character_name: String,
     _character_id: i64,  // Used for future persistence binding
+    current_map: Option<String>,  // Interior map to auto-enter on reconnect
 ) {
     let (mut sender, mut receiver) = socket.split();
 
@@ -1290,57 +1294,54 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
-    // Get player's position and send nearby chunks
-    if let Some((px, py)) = room.get_player_position(&player_id).await {
-        let player_chunk = chunk::ChunkCoord::from_world(px, py);
+    // Only send overworld data if the player is NOT reconnecting into an instance
+    let reconnecting_to_instance = current_map.is_some();
 
-        // Preload and send chunks in a 3x3 area around the player
-        for dy in -1..=1 {
-            for dx in -1..=1 {
-                let coord = chunk::ChunkCoord::new(player_chunk.x + dx, player_chunk.y + dy);
-                if let Some(chunk_msg) = room.handle_chunk_request(coord.x, coord.y).await {
-                    if let Ok(bytes) = protocol::encode_server_message(&chunk_msg) {
+    if !reconnecting_to_instance {
+        // Get player's position and send nearby chunks
+        if let Some((px, py)) = room.get_player_position(&player_id).await {
+            let player_chunk = chunk::ChunkCoord::from_world(px, py);
+
+            // Preload and send chunks in a 3x3 area around the player
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    let coord = chunk::ChunkCoord::new(player_chunk.x + dx, player_chunk.y + dy);
+                    if let Some(chunk_msg) = room.handle_chunk_request(coord.x, coord.y).await {
+                        if let Ok(bytes) = protocol::encode_server_message(&chunk_msg) {
+                            let _ = sender.send(Message::Binary(bytes)).await;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Send existing players to this client (only overworld players, not those in instances)
+        {
+            let instanced_players = state.player_instances.read().await;
+            for existing_player in room.get_all_players().await {
+                if existing_player.id != player_id && !instanced_players.contains_key(&existing_player.id) {
+                    let msg = ServerMessage::PlayerJoined {
+                        id: existing_player.id.clone(),
+                        name: existing_player.name.clone(),
+                        x: existing_player.x,
+                        y: existing_player.y,
+                        gender: existing_player.gender.clone(),
+                        skin: existing_player.skin.clone(),
+                        hair_style: existing_player.hair_style,
+                        hair_color: existing_player.hair_color,
+                    };
+                    if let Ok(bytes) = protocol::encode_server_message(&msg) {
                         let _ = sender.send(Message::Binary(bytes)).await;
                     }
                 }
             }
         }
+
     }
 
-    // Send existing players to this client
-    for existing_player in room.get_all_players().await {
-        if existing_player.id != player_id {
-            let msg = ServerMessage::PlayerJoined {
-                id: existing_player.id.clone(),
-                name: existing_player.name.clone(),
-                x: existing_player.x,
-                y: existing_player.y,
-                gender: existing_player.gender.clone(),
-                skin: existing_player.skin.clone(),
-                hair_style: existing_player.hair_style,
-                hair_color: existing_player.hair_color,
-            };
-            if let Ok(bytes) = protocol::encode_server_message(&msg) {
-                let _ = sender.send(Message::Binary(bytes)).await;
-            }
-        }
-    }
-
-    // Send active quests to this client (from saved state)
-    for quest_msg in room.get_active_quest_messages(&player_id).await {
-        if let Ok(bytes) = protocol::encode_server_message(&quest_msg) {
-            let _ = sender.send(Message::Binary(bytes)).await;
-        }
-    }
-
-    // Send initial inventory to this client
-    if let Some(inv_msg) = room.get_player_inventory_update(&player_id).await {
-        if let Ok(bytes) = protocol::encode_server_message(&inv_msg) {
-            let _ = sender.send(Message::Binary(bytes)).await;
-        }
-    }
-
-    // Notify others about this player
+    // Notify others about this player joining (uses broadcast so the client also
+    // receives its own PlayerJoined which it needs for initialization)
+    // Instance players will ignore this via state sync filtering
     let (x, y) = room.get_player_position(&player_id).await.unwrap_or((0, 0));
     let (gender, skin) = room.get_player_appearance(&player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
     let (hair_style, hair_color) = room.get_player_hair(&player_id).await.unwrap_or((None, None));
@@ -1356,11 +1357,31 @@ async fn handle_socket(
     })
     .await;
 
+    // Send active quests to this client (from saved state)
+    for quest_msg in room.get_active_quest_messages(&player_id).await {
+        if let Ok(bytes) = protocol::encode_server_message(&quest_msg) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
+    // Send initial inventory to this client
+    if let Some(inv_msg) = room.get_player_inventory_update(&player_id).await {
+        if let Ok(bytes) = protocol::encode_server_message(&inv_msg) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
     // Create channel for sending messages to this client
     let (tx, mut rx) = mpsc::channel::<Vec<u8>>(32);
 
     // SECURITY: Register this player's sender for unicast messages
     room.register_player_sender(&player_id, tx).await;
+
+    // If player was in an instance when they disconnected, auto-re-enter it
+    if let Some(ref map_id) = current_map {
+        info!("Auto-re-entering instance '{}' for reconnecting player {}", map_id, player_id);
+        auto_enter_instance(&state, &room, &player_id, map_id).await;
+    }
 
     // Spawn task to forward messages to WebSocket
     let mut send_task = tokio::spawn(async move {
@@ -1429,7 +1450,17 @@ async fn handle_socket(
             .unwrap_or(0);
 
         // Save character state to database
-        if let Some(save_data) = room.get_player_save_data(&player_id).await {
+        if let Some(mut save_data) = room.get_player_save_data(&player_id).await {
+            // If player is in an instance, save their entrance position (overworld coords)
+            // so they respawn at the portal on reconnect, and save current_map for auto-re-entry
+            if save_data.current_map.is_some() {
+                let entrance_positions = state.player_entrance_positions.read().await;
+                if let Some(&(entrance_x, entrance_y)) = entrance_positions.get(&player_id) {
+                    save_data.x = entrance_x as f32;
+                    save_data.y = entrance_y as f32;
+                }
+            }
+
             if let Err(e) = state.db.save_character(
                 character_id,
                 save_data.x,
@@ -1448,6 +1479,7 @@ async fn handle_socket(
                 save_data.equipped_necklace.as_deref(),
                 save_data.equipped_belt.as_deref(),
                 played_time_delta,
+                save_data.current_map.as_deref(),
             ).await {
                 error!("Failed to save character {} on disconnect: {}", character_name, e);
             } else {
@@ -1484,6 +1516,8 @@ async fn handle_socket(
                 }
             }
         }
+        // Clean up entrance position tracking
+        state.player_entrance_positions.write().await.remove(&player_id);
     }
 
     // SECURITY: Unregister player sender before cleanup
@@ -1497,6 +1531,209 @@ async fn handle_socket(
         id: player_id.clone(),
     })
     .await;
+}
+
+/// Auto-enter an instance on reconnect (when current_map was saved in DB)
+async fn auto_enter_instance(
+    state: &AppState,
+    room: &GameRoom,
+    player_id: &str,
+    map_id: &str,
+) {
+    use crate::interior::InstanceType;
+    use crate::protocol::{ChunkLayerData, ChunkPortalData};
+    use base64::Engine;
+
+    let interior = match state.interior_registry.get(map_id) {
+        Some(i) => i,
+        None => {
+            warn!("Auto-enter: unknown interior '{}' for player {}, staying in overworld", map_id, player_id);
+            return;
+        }
+    };
+
+    // Use the default spawn point
+    let spawn = match interior.spawn_points.values().next() {
+        Some(s) => s.clone(),
+        None => {
+            warn!("Auto-enter: interior '{}' has no spawn points", map_id);
+            return;
+        }
+    };
+
+    // Get or create instance
+    let (instance, is_new) = match interior.instance_type {
+        InstanceType::Public => {
+            state.instance_manager.get_or_create_public(&interior.id)
+        }
+        InstanceType::Private => {
+            state.instance_manager.get_or_create_private(&interior.id, player_id)
+        }
+    };
+
+    if is_new || !*instance.npcs_spawned.read().await {
+        instance.spawn_npcs(&interior.entities, &state.entity_registry).await;
+    }
+
+    // Store entrance position (current overworld position from DB)
+    if let Some((entrance_x, entrance_y)) = room.get_player_position(player_id).await {
+        let mut entrance_positions = state.player_entrance_positions.write().await;
+        entrance_positions.insert(player_id.to_string(), (entrance_x, entrance_y));
+    }
+
+    // Track player's instance
+    {
+        let mut player_instances = state.player_instances.write().await;
+        player_instances.insert(player_id.to_string(), instance.id.clone());
+    }
+
+    // Notify overworld players that this player has "left"
+    room.send_to_overworld_players(
+        ServerMessage::PlayerLeft {
+            id: player_id.to_string(),
+        },
+        Some(player_id),
+    ).await;
+
+    // Get other players already in the instance BEFORE adding
+    let other_players_in_instance: Vec<String> = instance.get_player_ids().await;
+
+    instance.add_player(player_id).await;
+    room.set_player_position(player_id, spawn.x as i32, spawn.y as i32).await;
+
+    // Notify instance players
+    if !other_players_in_instance.is_empty() {
+        let player_name = room.get_player_name(player_id).await.unwrap_or_default();
+        let (gender, skin) = room.get_player_appearance(player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+        let (hair_style, hair_color) = room.get_player_hair(player_id).await.unwrap_or((None, None));
+
+        for other_id in &other_players_in_instance {
+            room.send_to_player(
+                other_id,
+                ServerMessage::PlayerJoined {
+                    id: player_id.to_string(),
+                    name: player_name.clone(),
+                    x: spawn.x as i32,
+                    y: spawn.y as i32,
+                    gender: gender.clone(),
+                    skin: skin.clone(),
+                    hair_style,
+                    hair_color,
+                },
+            ).await;
+        }
+
+        for other_id in &other_players_in_instance {
+            if let Some(other_name) = room.get_player_name(other_id).await {
+                let (other_x, other_y) = room.get_player_position(other_id).await.unwrap_or((spawn.x as i32, spawn.y as i32));
+                let (other_gender, other_skin) = room.get_player_appearance(other_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                let (other_hair_style, other_hair_color) = room.get_player_hair(other_id).await.unwrap_or((None, None));
+
+                room.send_to_player(
+                    player_id,
+                    ServerMessage::PlayerJoined {
+                        id: other_id.clone(),
+                        name: other_name,
+                        x: other_x,
+                        y: other_y,
+                        gender: other_gender,
+                        skin: other_skin,
+                        hair_style: other_hair_style,
+                        hair_color: other_hair_color,
+                    },
+                ).await;
+            }
+        }
+    }
+
+    // Send transition message
+    room.send_to_player(
+        player_id,
+        ServerMessage::MapTransition {
+            map_type: "interior".to_string(),
+            map_id: interior.id.clone(),
+            spawn_x: spawn.x,
+            spawn_y: spawn.y,
+            instance_id: instance.id.clone(),
+        },
+    ).await;
+
+    // Send interior map data
+    let layers = vec![
+        ChunkLayerData { layer_type: 0, tiles: interior.layers.ground.clone() },
+        ChunkLayerData { layer_type: 1, tiles: interior.layers.objects.clone() },
+        ChunkLayerData { layer_type: 2, tiles: interior.layers.overhead.clone() },
+    ];
+
+    let collision = if interior.collision.is_empty() {
+        vec![]
+    } else {
+        base64::engine::general_purpose::STANDARD.decode(&interior.collision).unwrap_or_default()
+    };
+
+    let portals: Vec<ChunkPortalData> = interior.portals.iter().map(|p| ChunkPortalData {
+        id: p.id.clone(),
+        x: p.x,
+        y: p.y,
+        width: p.width,
+        height: p.height,
+        target_map: p.target_map.clone(),
+        target_spawn: p.target_spawn.clone().unwrap_or_default(),
+    }).collect();
+
+    let objects: Vec<protocol::ChunkObjectData> = interior.map_objects.iter().map(|o| protocol::ChunkObjectData {
+        gid: o.gid,
+        tile_x: o.x,
+        tile_y: o.y,
+        width: o.width,
+        height: o.height,
+    }).collect();
+
+    let walls: Vec<protocol::ChunkWallData> = interior.walls.iter().map(|w| protocol::ChunkWallData {
+        gid: w.gid,
+        tile_x: w.x,
+        tile_y: w.y,
+        edge: w.edge.clone(),
+    }).collect();
+
+    room.send_to_player(
+        player_id,
+        ServerMessage::InteriorData {
+            map_id: interior.id.clone(),
+            name: interior.name.clone(),
+            instance_id: instance.id.clone(),
+            width: interior.size.width,
+            height: interior.size.height,
+            spawn_x: spawn.x,
+            spawn_y: spawn.y,
+            layers,
+            collision,
+            portals,
+            objects,
+            walls,
+        },
+    ).await;
+
+    // Send NPC updates
+    let npc_updates = instance.get_npc_updates().await;
+    if !npc_updates.is_empty() {
+        room.send_to_player(
+            player_id,
+            ServerMessage::StateSync {
+                tick: 0,
+                players: vec![],
+                npcs: npc_updates,
+            },
+        ).await;
+    }
+
+    // Send ground items
+    let ground_items = room.get_ground_items_in_instance(Some(&instance.id)).await;
+    for item_msg in ground_items {
+        room.send_to_player(player_id, item_msg).await;
+    }
+
+    info!("Auto-entered player {} into instance {} (map: {})", player_id, instance.id, map_id);
 }
 
 async fn handle_enter_portal(
@@ -1637,6 +1874,26 @@ async fn handle_enter_portal(
                         },
                     ).await;
 
+                    // Notify overworld players that this player has returned
+                    {
+                        let player_name = room.get_player_name(player_id).await.unwrap_or_default();
+                        let (gender, skin) = room.get_player_appearance(player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                        let (hair_style, hair_color) = room.get_player_hair(player_id).await.unwrap_or((None, None));
+                        room.send_to_overworld_players(
+                            ServerMessage::PlayerJoined {
+                                id: player_id.to_string(),
+                                name: player_name,
+                                x: spawn_x as i32,
+                                y: spawn_y as i32,
+                                gender,
+                                skin,
+                                hair_style,
+                                hair_color,
+                            },
+                            Some(player_id),
+                        ).await;
+                    }
+
                     return;
                 } else {
                     // Portal leads to another interior - fall through to normal handling
@@ -1727,6 +1984,14 @@ async fn handle_enter_portal(
         let mut player_instances = state.player_instances.write().await;
         player_instances.insert(player_id.to_string(), instance.id.clone());
     }
+
+    // Notify overworld players that this player has "left" (so they don't see a frozen sprite)
+    room.send_to_overworld_players(
+        ServerMessage::PlayerLeft {
+            id: player_id.to_string(),
+        },
+        Some(player_id),
+    ).await;
 
     // Get other players already in the instance BEFORE adding this player
     let other_players_in_instance: Vec<String> = instance.get_player_ids().await;
@@ -2013,7 +2278,7 @@ async fn main() {
 
                 // Get the room and character save data
                 if let Some(room) = save_state.rooms.get(room_id) {
-                    if let Some(save_data) = room.get_player_save_data(player_id).await {
+                    if let Some(mut save_data) = room.get_player_save_data(player_id).await {
                         // Compute played time delta and reset anchor
                         let played_time_delta = save_state.play_time_anchors
                             .get(&character_id)
@@ -2021,6 +2286,15 @@ async fn main() {
                             .unwrap_or(0);
                         // Reset the anchor to now
                         save_state.play_time_anchors.insert(character_id, std::time::Instant::now());
+
+                        // If in instance, save entrance position instead of interior position
+                        if save_data.current_map.is_some() {
+                            let entrance_positions = save_state.player_entrance_positions.read().await;
+                            if let Some(&(entrance_x, entrance_y)) = entrance_positions.get(player_id) {
+                                save_data.x = entrance_x as f32;
+                                save_data.y = entrance_y as f32;
+                            }
+                        }
 
                         if let Err(e) = save_state.db.save_character(
                             character_id,
@@ -2040,6 +2314,7 @@ async fn main() {
                             save_data.equipped_necklace.as_deref(),
                             save_data.equipped_belt.as_deref(),
                             played_time_delta,
+                            save_data.current_map.as_deref(),
                         ).await {
                             warn!("Auto-save failed for character {}: {}", character_name, e);
                         } else {

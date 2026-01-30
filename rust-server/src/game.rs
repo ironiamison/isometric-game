@@ -58,6 +58,7 @@ pub struct PlayerSaveData {
     pub equipped_gloves: Option<String>,
     pub equipped_necklace: Option<String>,
     pub equipped_belt: Option<String>,
+    pub current_map: Option<String>,
 }
 
 // ============================================================================
@@ -554,6 +555,26 @@ impl GameRoom {
         }
     }
 
+    /// Send a message to all overworld players (those not in any instance), optionally excluding one player
+    pub async fn send_to_overworld_players(&self, msg: ServerMessage, exclude: Option<&str>) {
+        let player_instances = self.player_instances.read().await;
+        let senders = self.player_senders.read().await;
+
+        if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+            for (player_id, sender) in senders.iter() {
+                if let Some(excluded) = exclude {
+                    if player_id == excluded {
+                        continue;
+                    }
+                }
+                // Only send to players NOT in any instance
+                if !player_instances.contains_key(player_id) {
+                    let _ = sender.try_send(bytes.clone());
+                }
+            }
+        }
+    }
+
     /// Register a player's message sender for unicast
     pub async fn register_player_sender(&self, player_id: &str, sender: mpsc::Sender<Vec<u8>>) {
         let mut senders = self.player_senders.write().await;
@@ -789,6 +810,14 @@ impl GameRoom {
 
     /// Get player data for saving to database
     pub async fn get_player_save_data(&self, player_id: &str) -> Option<PlayerSaveData> {
+        // Check if player is in an instance and get the map_id
+        let current_map = if self.player_instances.read().await.contains_key(player_id) {
+            self.instance_manager.find_player_instance(player_id).await
+                .map(|inst| inst.map_id.clone())
+        } else {
+            None
+        };
+
         let players = self.players.read().await;
         players.get(player_id).map(|p| {
             // Serialize inventory to JSON - new format with string item IDs
@@ -822,6 +851,7 @@ impl GameRoom {
                 equipped_gloves: p.equipped_gloves.clone(),
                 equipped_necklace: p.equipped_necklace.clone(),
                 equipped_belt: p.equipped_belt.clone(),
+                current_map: current_map.clone(),
             }
         })
     }
@@ -2064,6 +2094,25 @@ impl GameRoom {
                             },
                         }).await;
 
+                        // Teleport all fighters (including winner) to spectator spawn
+                        {
+                            let spectator_spawn = {
+                                let arena = self.arena_manager.read().await;
+                                arena.active_spectator_spawn()
+                            };
+                            let mut players = self.players.write().await;
+                            for placement in &placements {
+                                if let Some(p) = players.get_mut(&placement.player_id) {
+                                    p.x = spectator_spawn.0;
+                                    p.y = spectator_spawn.1;
+                                    if p.is_dead {
+                                        p.hp = p.skills.hitpoints.level;
+                                        p.is_dead = false;
+                                    }
+                                }
+                            }
+                        }
+
                         // Send inventory updates for gold rewards
                         for placement in &placements {
                             if placement.gold_reward > 0 {
@@ -2081,6 +2130,32 @@ impl GameRoom {
                                     }).await;
                                 }
                             }
+                        }
+
+                        // Save arena stats to DB
+                        if let Some(ref db) = self.db {
+                            for placement in &placements {
+                                if let Some(char_id) = placement.player_id.strip_prefix("char_").and_then(|s| s.parse::<i64>().ok()) {
+                                    let won = placement.rank == 1;
+                                    let died = placement.rank > 1;
+                                    if let Err(e) = db.update_arena_stats(
+                                        char_id,
+                                        won,
+                                        placement.kills,
+                                        died,
+                                        placement.gold_reward,
+                                    ).await {
+                                        tracing::warn!("Failed to save arena stats for {}: {}", placement.player_id, e);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Notify winner
+                        if let Some(winner) = placements.iter().find(|p| p.rank == 1) {
+                            self.send_system_message(&winner.player_id, &format!(
+                                "You won the arena match! +{} gold", winner.gold_reward
+                            )).await;
                         }
                     }
                 } else {
@@ -2401,6 +2476,43 @@ impl GameRoom {
             return;
         }
 
+        // Arena leaderboard interaction
+        if entity_type == "arena_board" {
+            if let Some(ref db) = self.db {
+                match db.get_arena_leaderboard().await {
+                    Ok(entries) => {
+                        let mut text = String::from("=== Arena Leaderboard ===\n\n");
+                        if entries.is_empty() {
+                            text.push_str("No arena matches recorded yet.");
+                        } else {
+                            text.push_str("Rank | Name | Wins | Kills | Gold Won\n");
+                            for (i, (name, kills, wins, gold)) in entries.iter().enumerate() {
+                                text.push_str(&format!(
+                                    "#{} | {} | {} | {} | {}\n",
+                                    i + 1, name, wins, kills, gold
+                                ));
+                            }
+                        }
+                        self.send_to_player(player_id, ServerMessage::ShowDialogue {
+                            quest_id: String::new(),
+                            npc_id: npc_id.to_string(),
+                            speaker: "Arena Leaderboard".to_string(),
+                            text,
+                            choices: vec![crate::protocol::DialogueChoice {
+                                id: "close".to_string(),
+                                text: "Close".to_string(),
+                            }],
+                        }).await;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to fetch arena leaderboard: {}", e);
+                        self.send_system_message(player_id, "Failed to load leaderboard.").await;
+                    }
+                }
+            }
+            return;
+        }
+
         // Check entity prototype for behaviors
         let prototype = self.entity_registry.get(&entity_type);
 
@@ -2653,6 +2765,12 @@ impl GameRoom {
 
     /// Handle dialogue choice from player
     pub async fn handle_dialogue_choice(&self, player_id: &str, quest_id: &str, choice_id: &str) {
+        // Non-quest dialogues (e.g. leaderboard) just close
+        if quest_id.is_empty() {
+            self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+            return;
+        }
+
         let mut quest_states = self.player_quest_states.write().await;
         let quest_state = quest_states.entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
