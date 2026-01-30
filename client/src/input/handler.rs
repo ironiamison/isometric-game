@@ -144,17 +144,28 @@ impl InputHandler {
         }
     }
 
+    /// Load touch control icons (call once after creation in async context)
+    pub async fn load_touch_icons(&mut self) {
+        self.touch_controls.load_icons().await;
+    }
+
     pub fn process(&mut self, state: &mut GameState, layout: &UiLayout, audio: &mut AudioManager) -> Vec<InputCommand> {
         let mut commands = Vec::new();
         let current_time = get_time();
 
         // Update touch controls (for mobile)
         let in_dialogue = state.ui_state.active_dialogue.is_some();
-        let hide_action_buttons = state.ui_state.inventory_open
+        let any_panel_open = state.ui_state.inventory_open
             || state.ui_state.character_panel_open
             || state.ui_state.skills_open
+            || state.ui_state.escape_menu_open
+            || state.ui_state.crafting_open
+            || state.ui_state.shop_data.is_some()
+            || state.ui_state.quest_log_open
             || in_dialogue;
-        self.touch_controls.update(current_time, hide_action_buttons, in_dialogue, state.ui_state.use_joystick);
+        let hide_action_buttons = any_panel_open;
+        let hide_direction_controls = any_panel_open;
+        self.touch_controls.update(current_time, hide_action_buttons, hide_direction_controls, state.ui_state.use_joystick);
 
         // Get current mouse/touch position in virtual coordinates (for UI hit detection)
         let (raw_mx, raw_my) = mouse_position();
@@ -2356,5 +2367,10 @@ impl InputHandler {
     /// Set hide_action_buttons to true when panels like inventory are open
     pub fn render_touch_controls(&self, hide_action_buttons: bool, hide_all_controls: bool, use_joystick: bool) {
         self.touch_controls.render(hide_action_buttons, hide_all_controls, use_joystick);
+    }
+
+    /// Update attack button to show the currently equipped weapon sprite
+    pub fn update_attack_button_icon(&mut self, weapon_id: Option<&str>, item_sprites: &crate::render::SpriteStore) {
+        self.touch_controls.update_attack_icon(weapon_id, item_sprites);
     }
 }

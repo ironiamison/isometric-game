@@ -131,7 +131,8 @@ async fn main() {
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
                             let network = NetworkClient::new_guest(WS_URL);
-                            let input_handler = InputHandler::new();
+                            let mut input_handler = InputHandler::new();
+                            input_handler.load_touch_icons().await;
 
                             // Start background music
                             audio.play_music("assets/audio/start.ogg").await;
@@ -165,7 +166,8 @@ async fn main() {
                                 &session.token,
                                 character_id,
                             );
-                            let input_handler = InputHandler::new();
+                            let mut input_handler = InputHandler::new();
+                            input_handler.load_touch_icons().await;
 
                             // Start background music
                             audio.play_music("assets/audio/start.ogg").await;
@@ -264,6 +266,7 @@ async fn main() {
         let mut game_state = GameState::new();
         let mut network = NetworkClient::new_guest(WS_URL);
         let mut input_handler = InputHandler::new();
+        input_handler.load_touch_icons().await;
 
         loop {
             run_game_frame(&mut game_state, &mut network, &mut input_handler, &renderer, &mut audio);

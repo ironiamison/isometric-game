@@ -114,7 +114,8 @@ async fn async_main() {
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
                             let network = NetworkClient::new_guest(WS_URL);
-                            let input_handler = InputHandler::new();
+                            let mut input_handler = InputHandler::new();
+                            input_handler.load_touch_icons().await;
 
                             audio.play_music("assets/audio/start.ogg").await;
 
@@ -145,7 +146,8 @@ async fn async_main() {
                                 &session.token,
                                 character_id,
                             );
-                            let input_handler = InputHandler::new();
+                            let mut input_handler = InputHandler::new();
+                            input_handler.load_touch_icons().await;
 
                             audio.play_music("assets/audio/start.ogg").await;
 
@@ -287,7 +289,8 @@ async fn async_main() {
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
                             let network = NetworkClient::new_guest(WS_URL);
-                            let input_handler = InputHandler::new();
+                            let mut input_handler = InputHandler::new();
+                            input_handler.load_touch_icons().await;
 
                             audio.play_music("assets/audio/start.ogg").await;
 
@@ -372,7 +375,8 @@ async fn async_main() {
                                     &session.token,
                                     0,
                                 );
-                                let input_handler = InputHandler::new();
+                                let mut input_handler = InputHandler::new();
+                                input_handler.load_touch_icons().await;
 
                                 audio.play_music("assets/audio/start.ogg").await;
 

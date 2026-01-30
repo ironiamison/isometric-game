@@ -319,11 +319,20 @@ pub fn run_game_frame(
     renderer.render_transition_overlay(game_state);
 
     // 7. Render touch controls (mobile only)
-    // Hide action buttons when panels are open
+    // Update attack button icon to show equipped weapon
+    let weapon_id = game_state.get_local_player()
+        .and_then(|p| p.equipped_weapon.as_deref());
+    input_handler.update_attack_button_icon(weapon_id, &renderer.item_sprites);
+
+    // Hide controls when any panel is open
     let in_dialogue = game_state.ui_state.active_dialogue.is_some();
-    let hide_action_buttons = game_state.ui_state.inventory_open
+    let any_panel_open = game_state.ui_state.inventory_open
         || game_state.ui_state.character_panel_open
         || game_state.ui_state.skills_open
+        || game_state.ui_state.escape_menu_open
+        || game_state.ui_state.crafting_open
+        || game_state.ui_state.shop_data.is_some()
+        || game_state.ui_state.quest_log_open
         || in_dialogue;
-    input_handler.render_touch_controls(hide_action_buttons, in_dialogue, game_state.ui_state.use_joystick);
+    input_handler.render_touch_controls(any_panel_open, any_panel_open, game_state.ui_state.use_joystick);
 }

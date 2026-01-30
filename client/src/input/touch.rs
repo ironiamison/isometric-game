@@ -515,10 +515,12 @@ pub struct TouchButton {
     touch_id: Option<u64>,
     /// Label to display
     pub label: String,
-    /// Color when not pressed
-    pub color: Color,
-    /// Color when pressed
-    pub pressed_color: Color,
+    /// Optional icon texture
+    pub icon: Option<Texture2D>,
+    /// Optional source rect for atlas-based sprites
+    pub icon_source: Option<Rect>,
+    /// Sub-label drawn below the icon (e.g. "ATTACK")
+    pub sub_label: Option<String>,
 }
 
 impl TouchButton {
@@ -530,8 +532,9 @@ impl TouchButton {
             just_pressed: false,
             touch_id: None,
             label: label.to_string(),
-            color: Color::new(1.0, 0.3, 0.3, 0.5),
-            pressed_color: Color::new(1.0, 0.5, 0.5, 0.7),
+            icon: None,
+            icon_source: None,
+            sub_label: None,
         }
     }
 
@@ -596,30 +599,85 @@ impl TouchButton {
         self.just_pressed
     }
 
-    /// Render the button
+    /// Render the button (themed to match game UI)
     pub fn render(&self) {
-        let color = if self.pressed { self.pressed_color } else { self.color };
+        let base_alpha = if self.pressed { 0.55 } else { 0.4 };
 
-        // Draw button circle
-        draw_circle(self.position.x, self.position.y, self.radius, color);
-        draw_circle_lines(
-            self.position.x,
-            self.position.y,
-            self.radius,
-            3.0,
-            Color::new(1.0, 1.0, 1.0, 0.7),
-        );
+        let (bg, border, highlight) = if self.pressed {
+            (
+                Color::new(0.180, 0.200, 0.145, base_alpha),
+                Color::new(0.855, 0.698, 0.424, base_alpha + 0.1),
+                Color::new(0.855, 0.698, 0.424, 0.2),
+            )
+        } else {
+            (
+                Color::new(0.086, 0.086, 0.118, base_alpha),
+                Color::new(0.227, 0.212, 0.188, base_alpha),
+                Color::new(0.0, 0.0, 0.0, 0.0),
+            )
+        };
 
-        // Draw label
-        let font_size = 16.0;
-        let text_dim = measure_text(&self.label, None, font_size as u16, 1.0);
-        draw_text(
-            &self.label,
-            self.position.x - text_dim.width / 2.0,
-            self.position.y + text_dim.height / 4.0,
-            font_size,
-            WHITE,
-        );
+        // Outer border circle
+        draw_circle(self.position.x, self.position.y, self.radius, border);
+        // Inner background
+        draw_circle(self.position.x, self.position.y, self.radius - 2.0, bg);
+        // Press highlight
+        if self.pressed {
+            draw_circle(self.position.x, self.position.y, self.radius - 4.0, highlight);
+        }
+
+        let content_alpha = if self.pressed { 0.7 } else { 0.55 };
+
+        // Draw icon if available, otherwise fall back to text label
+        if let Some(tex) = &self.icon {
+            let has_sub = self.sub_label.is_some();
+            let icon_size = if has_sub { self.radius * 1.0 } else { self.radius * 1.2 };
+            let icon_y_offset = if has_sub { -8.0 } else { 0.0 };
+            draw_texture_ex(
+                tex,
+                self.position.x - icon_size / 2.0,
+                self.position.y - icon_size / 2.0 + icon_y_offset,
+                Color::new(1.0, 1.0, 1.0, content_alpha),
+                DrawTextureParams {
+                    dest_size: Some(vec2(icon_size, icon_size)),
+                    source: self.icon_source.map(|r| Rect::new(r.x, r.y, r.w, r.h)),
+                    ..Default::default()
+                },
+            );
+
+            // Draw sub-label inside the circle, below the icon
+            if let Some(sub) = &self.sub_label {
+                let font_size = 11.0;
+                let text_dim = measure_text(sub, None, font_size as u16, 1.0);
+                let text_color = if self.pressed {
+                    Color::new(0.855, 0.698, 0.424, content_alpha)
+                } else {
+                    Color::new(0.780, 0.740, 0.680, content_alpha)
+                };
+                draw_text(
+                    sub,
+                    self.position.x - text_dim.width / 2.0,
+                    self.position.y + self.radius - 8.0,
+                    font_size,
+                    text_color,
+                );
+            }
+        } else {
+            let font_size = 16.0;
+            let text_dim = measure_text(&self.label, None, font_size as u16, 1.0);
+            let text_color = if self.pressed {
+                Color::new(0.855, 0.698, 0.424, content_alpha)
+            } else {
+                Color::new(0.780, 0.740, 0.680, content_alpha)
+            };
+            draw_text(
+                &self.label,
+                self.position.x - text_dim.width / 2.0,
+                self.position.y + text_dim.height / 4.0,
+                font_size,
+                text_color,
+            );
+        }
     }
 }
 
@@ -649,7 +707,7 @@ impl TouchControls {
         Self {
             dpad: VirtualDPad::new(),
             joystick: VirtualJoystick::new(),
-            attack_button: TouchButton::new(attack_x, attack_y, 40.0, "ATK"),
+            attack_button: TouchButton::new(attack_x, attack_y, 40.0, "ATTACK"),
             interact_button: TouchButton::new(interact_x, interact_y, 32.0, "USE"),
             #[cfg(target_os = "android")]
             enabled: true,
@@ -657,6 +715,27 @@ impl TouchControls {
             enabled: false,
             touch_consumed: false,
         }
+    }
+
+    /// Load icon textures for touch buttons (fallback only — weapon icon is set dynamically)
+    pub async fn load_icons(&mut self) {
+        // No static attack icon — it's set dynamically from equipped weapon
+    }
+
+    /// Update the attack button icon to show the currently equipped weapon
+    pub fn update_attack_icon(&mut self, weapon_id: Option<&str>, item_sprites: &crate::render::SpriteStore) {
+        if let Some(id) = weapon_id {
+            if let Some((tex, source_rect)) = item_sprites.get(id) {
+                self.attack_button.icon = Some(tex.clone());
+                self.attack_button.icon_source = source_rect;
+                self.attack_button.sub_label = Some("ATTACK".to_string());
+                return;
+            }
+        }
+        // No weapon equipped or sprite not found — clear icon, show label
+        self.attack_button.icon = None;
+        self.attack_button.icon_source = None;
+        self.attack_button.sub_label = None;
     }
 
     /// Update all touch controls
