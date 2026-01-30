@@ -116,6 +116,19 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             // Direction from server
                             let dir = direction.map(|d| Direction::from_u8(d as u8)).unwrap_or(player.direction);
 
+                            // If local player recently sent a Face command, preserve local direction
+                            // (prevents stale server stateSyncs from undoing the face direction)
+                            let dir = if is_local_player {
+                                let elapsed = macroquad::time::get_time() - state.last_face_command_time;
+                                if elapsed < 0.5 {
+                                    player.direction // keep local direction
+                                } else {
+                                    dir
+                                }
+                            } else {
+                                dir
+                            };
+
                             if let (Some(x), Some(y)) = (x, y) {
                                 // Set server state - local player direction only updates when moving
                                 player.set_server_state(x as f32, y as f32, vel_x, vel_y, dir, is_local_player);
