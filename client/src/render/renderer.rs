@@ -2851,7 +2851,24 @@ impl Renderer {
 
                 // Pulsing transparency (2 second cycle, 80-100% opacity)
                 let alpha_pulse = ((time * 3.14 + phase_offset).sin() * 0.5 + 0.5) as f32;
-                let alpha = (204.0 + alpha_pulse * 51.0) as u8; // 204-255 (80-100%)
+                let mut alpha = (204.0 + alpha_pulse * 51.0) as u8; // 204-255 (80-100%)
+
+                // Fade icon out when speech bubble appears, fade back in when it disappears
+                if let Some((_, bubble_time)) = &npc.speech_bubble {
+                    let age = (time - bubble_time) as f32;
+                    let icon_alpha = if age < 0.5 {
+                        // Fade out over first 0.5s as bubble appears
+                        ((1.0 - age / 0.5) * 255.0) as u8
+                    } else if age > 4.0 && age <= 5.0 {
+                        // Fade back in during last second as bubble fades out
+                        (((age - 4.0)) * 255.0) as u8
+                    } else if age > 5.0 {
+                        255 // Fully visible after bubble is gone
+                    } else {
+                        0 // Hidden while bubble is showing
+                    };
+                    alpha = alpha.min(icon_alpha);
+                }
 
                 let icon_x = screen_x - (icon_size * zoom) / 2.0;
                 let icon_y = top_y - 20.0 * zoom;

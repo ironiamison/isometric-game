@@ -4263,6 +4263,114 @@ impl GameRoom {
             }).await;
         }
 
+        // Process NPC speech for instance NPCs (interiors)
+        {
+            let players = self.players.read().await;
+            // Collect instance player positions: instance_id -> Vec<(player_id, x, y)>
+            let mut instance_players: HashMap<String, Vec<(String, i32, i32)>> = HashMap::new();
+            let player_inst = self.player_instances.read().await;
+            for (pid, inst_id) in player_inst.iter() {
+                if let Some(p) = players.get(pid) {
+                    if p.active && p.is_alive() {
+                        instance_players.entry(inst_id.clone()).or_default().push((pid.clone(), p.x, p.y));
+                    }
+                }
+            }
+            drop(players);
+            drop(player_inst);
+
+            let mut instance_speech_events: Vec<(String, String, String)> = Vec::new();
+
+            // Check public instances
+            for entry in self.instance_manager.public_instances.iter() {
+                let instance = entry.value();
+                if let Some(inst_players) = instance_players.get(&instance.id) {
+                    let mut npcs = instance.npcs.write().await;
+                    for npc in npcs.values_mut() {
+                        if let Some(ref messages) = npc.speech_messages {
+                            if !messages.is_empty() && npc.is_alive() {
+                                let has_nearby = inst_players.iter().any(|(_, px, py)| {
+                                    let dx = (npc.x - px).abs();
+                                    let dy = (npc.y - py).abs();
+                                    dx.max(dy) <= npc.speech_radius
+                                });
+                                if has_nearby {
+                                    if npc.next_speech_at == 0 {
+                                        let delay = npc.speech_interval_min_ms
+                                            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+                                        npc.next_speech_at = current_time + delay;
+                                    } else if current_time >= npc.next_speech_at {
+                                        let idx = rand::random::<usize>() % messages.len();
+                                        let message = messages[idx].clone();
+                                        for (pid, px, py) in inst_players {
+                                            let dx = (npc.x - px).abs();
+                                            let dy = (npc.y - py).abs();
+                                            if dx.max(dy) <= npc.speech_radius {
+                                                instance_speech_events.push((pid.clone(), npc.id.clone(), message.clone()));
+                                            }
+                                        }
+                                        let delay = npc.speech_interval_min_ms
+                                            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+                                        npc.next_speech_at = current_time + delay;
+                                    }
+                                } else {
+                                    npc.next_speech_at = 0;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check private instances
+            for entry in self.instance_manager.private_instances.iter() {
+                let instance = entry.value();
+                if let Some(inst_players) = instance_players.get(&instance.id) {
+                    let mut npcs = instance.npcs.write().await;
+                    for npc in npcs.values_mut() {
+                        if let Some(ref messages) = npc.speech_messages {
+                            if !messages.is_empty() && npc.is_alive() {
+                                let has_nearby = inst_players.iter().any(|(_, px, py)| {
+                                    let dx = (npc.x - px).abs();
+                                    let dy = (npc.y - py).abs();
+                                    dx.max(dy) <= npc.speech_radius
+                                });
+                                if has_nearby {
+                                    if npc.next_speech_at == 0 {
+                                        let delay = npc.speech_interval_min_ms
+                                            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+                                        npc.next_speech_at = current_time + delay;
+                                    } else if current_time >= npc.next_speech_at {
+                                        let idx = rand::random::<usize>() % messages.len();
+                                        let message = messages[idx].clone();
+                                        for (pid, px, py) in inst_players {
+                                            let dx = (npc.x - px).abs();
+                                            let dy = (npc.y - py).abs();
+                                            if dx.max(dy) <= npc.speech_radius {
+                                                instance_speech_events.push((pid.clone(), npc.id.clone(), message.clone()));
+                                            }
+                                        }
+                                        let delay = npc.speech_interval_min_ms
+                                            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+                                        npc.next_speech_at = current_time + delay;
+                                    }
+                                } else {
+                                    npc.next_speech_at = 0;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (player_id, npc_id, message) in instance_speech_events {
+                self.send_to_player(&player_id, ServerMessage::NpcSpeech {
+                    npc_id: npc_id.clone(),
+                    message: message.clone(),
+                }).await;
+            }
+        }
+
         // Process NPC attacks on players using hit/miss mechanics
         for (npc_id, target_id, npc_level, max_hit) in npc_attacks {
             let (target_hp, target_x, target_y, died, damage): (i32, f32, f32, bool, i32) = {
