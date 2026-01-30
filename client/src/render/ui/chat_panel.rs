@@ -1,0 +1,163 @@
+//! Mobile chat panel rendering - fullscreen overlay with tabs
+
+use macroquad::prelude::*;
+use crate::game::{GameState, ChatChannel};
+use crate::ui::{UiElementId, UiLayout};
+use crate::util::virtual_screen_size;
+use super::super::Renderer;
+use super::common::*;
+
+impl Renderer {
+    /// Render the fullscreen chat panel overlay
+    pub(crate) fn render_chat_panel(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+        if !state.ui_state.chat_panel_open {
+            return;
+        }
+
+        let (sw, sh) = virtual_screen_size();
+
+        // Semi-transparent overlay (blocks game interaction)
+        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.6));
+        layout.add(UiElementId::ChatPanelBackground, macroquad::prelude::Rect::new(0.0, 0.0, sw, sh));
+
+        // Panel dimensions - nearly fullscreen with small margin
+        let margin = 10.0;
+        let panel_x = margin;
+        let panel_y = margin;
+        let panel_w = sw - margin * 2.0;
+        let panel_h = sh - margin * 2.0;
+
+        // Panel frame
+        self.draw_panel_frame(panel_x, panel_y, panel_w, panel_h);
+
+        // === TAB BAR ===
+        let tab_y = panel_y + FRAME_THICKNESS;
+        let tab_w = (panel_w - FRAME_THICKNESS * 2.0) / 3.0;
+        let tab_h = TAB_HEIGHT;
+        let tab_x_start = panel_x + FRAME_THICKNESS;
+
+        let tabs = [
+            (UiElementId::ChatTabLocal, "Local", ChatChannel::Local),
+            (UiElementId::ChatTabGlobal, "Global", ChatChannel::Global),
+            (UiElementId::ChatTabSystem, "System", ChatChannel::System),
+        ];
+
+        for (i, (id, label, channel)) in tabs.iter().enumerate() {
+            let tx = tab_x_start + i as f32 * tab_w;
+            let is_active = std::mem::discriminant(&state.ui_state.chat_active_tab) == std::mem::discriminant(channel);
+            let is_hovered = hovered.as_ref() == Some(id);
+
+            let bg = if is_active {
+                HEADER_BG
+            } else if is_hovered {
+                SLOT_HOVER_BG
+            } else {
+                PANEL_BG_DARK
+            };
+
+            draw_rectangle(tx, tab_y, tab_w, tab_h, bg);
+            draw_rectangle_lines(tx, tab_y, tab_w, tab_h, 1.0, HEADER_BORDER);
+
+            if is_active {
+                // Gold underline for active tab
+                draw_rectangle(tx + 2.0, tab_y + tab_h - 2.0, tab_w - 4.0, 2.0, FRAME_ACCENT);
+            }
+
+            let text_w = self.measure_text_sharp(label, TAB_FONT_SIZE).width;
+            self.draw_text_sharp(label, (tx + (tab_w - text_w) / 2.0).floor(),
+                               (tab_y + tab_h / 2.0 + 5.0).floor(), TAB_FONT_SIZE,
+                               if is_active { TEXT_TITLE } else { TEXT_DIM });
+
+            layout.add(id.clone(), macroquad::prelude::Rect::new(tx, tab_y, tab_w, tab_h));
+        }
+
+        // === MESSAGE LIST ===
+        let messages_y = tab_y + tab_h + 4.0;
+        let input_bar_h = 48.0;
+        let is_system_tab = matches!(state.ui_state.chat_active_tab, ChatChannel::System);
+        let messages_h = if is_system_tab {
+            panel_y + panel_h - FRAME_THICKNESS - messages_y
+        } else {
+            panel_y + panel_h - FRAME_THICKNESS - input_bar_h - 4.0 - messages_y
+        };
+        let messages_x = panel_x + FRAME_THICKNESS + 8.0;
+        let messages_w = panel_w - FRAME_THICKNESS * 2.0 - 16.0;
+
+        // Message area background
+        draw_rectangle(panel_x + FRAME_THICKNESS, messages_y,
+                      panel_w - FRAME_THICKNESS * 2.0, messages_h, PANEL_BG_DARK);
+
+        // Filter and render messages
+        let font_size = 16.0;
+        let line_height = 20.0;
+        let max_lines = (messages_h / line_height) as usize;
+
+        let filtered: Vec<_> = state.ui_state.chat_messages.iter()
+            .filter(|m| std::mem::discriminant(&m.channel) == std::mem::discriminant(&state.ui_state.chat_active_tab))
+            .collect();
+
+        // Render from bottom up, newest messages at bottom
+        let mut y = messages_y + messages_h - line_height;
+        let mut lines_drawn = 0;
+
+        for msg in filtered.iter().rev() {
+            if lines_drawn >= max_lines {
+                break;
+            }
+
+            let (color, text) = match msg.channel {
+                ChatChannel::Local => (WHITE, format!("{}: {}", msg.sender_name, msg.text)),
+                ChatChannel::Global => (SKYBLUE, format!("[G] {}: {}", msg.sender_name, msg.text)),
+                ChatChannel::System => (Color::from_rgba(255, 220, 100, 255), format!("{} {}", msg.sender_name, msg.text)),
+            };
+
+            let wrapped = self.wrap_text(&text, messages_w, font_size);
+            for line in wrapped.iter().rev() {
+                if lines_drawn >= max_lines || y < messages_y {
+                    break;
+                }
+                self.draw_text_sharp(line, messages_x, y, font_size, color);
+                y -= line_height;
+                lines_drawn += 1;
+            }
+        }
+
+        // === INPUT BAR (hidden on System tab) ===
+        if !is_system_tab {
+            let input_y = panel_y + panel_h - FRAME_THICKNESS - input_bar_h;
+            let send_btn_w = 60.0;
+            let input_w = panel_w - FRAME_THICKNESS * 2.0 - send_btn_w - 12.0;
+            let input_x = panel_x + FRAME_THICKNESS + 4.0;
+
+            // Input field background
+            draw_rectangle(input_x, input_y, input_w, input_bar_h, SLOT_BG_EMPTY);
+            draw_rectangle_lines(input_x, input_y, input_w, input_bar_h, 1.0, SLOT_BORDER);
+
+            // Input text
+            let text_y = input_y + input_bar_h / 2.0 + 5.0;
+            let display_text = if state.ui_state.chat_input.is_empty() {
+                "Tap to chat..."
+            } else {
+                &state.ui_state.chat_input
+            };
+            let text_color = if state.ui_state.chat_input.is_empty() { TEXT_DIM } else { TEXT_NORMAL };
+            self.draw_text_sharp(display_text, input_x + 8.0, text_y, font_size, text_color);
+
+            layout.add(UiElementId::ChatInputField, macroquad::prelude::Rect::new(input_x, input_y, input_w, input_bar_h));
+
+            // Send button
+            let send_x = input_x + input_w + 8.0;
+            let is_send_hovered = hovered.as_ref() == Some(&UiElementId::ChatSendButton);
+            let send_bg = if is_send_hovered { SLOT_HOVER_BG } else { HEADER_BG };
+            draw_rectangle(send_x, input_y, send_btn_w, input_bar_h, send_bg);
+            draw_rectangle_lines(send_x, input_y, send_btn_w, input_bar_h, 1.0, FRAME_MID);
+
+            let send_label = "Send";
+            let send_w = self.measure_text_sharp(send_label, font_size).width;
+            self.draw_text_sharp(send_label, (send_x + (send_btn_w - send_w) / 2.0).floor(),
+                                text_y, font_size, TEXT_TITLE);
+
+            layout.add(UiElementId::ChatSendButton, macroquad::prelude::Rect::new(send_x, input_y, send_btn_w, input_bar_h));
+        }
+    }
+}
