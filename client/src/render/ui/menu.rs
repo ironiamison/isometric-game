@@ -192,11 +192,14 @@ impl Renderer {
         self.draw_text_sharp(disconnect_text, (disconnect_x + (disconnect_width - disconnect_text_width) / 2.0).floor(),
                             (disconnect_y + 19.0).floor(), 16.0, disconnect_text_color);
 
-        // ===== FOOTER HINT =====
-        let hint = "[Esc] Close";
-        let hint_width = self.measure_text_sharp(hint, 16.0).width;
-        self.draw_text_sharp(hint, (menu_x + (menu_width - hint_width) / 2.0).floor(),
-                            (menu_y + menu_height - FRAME_THICKNESS - 6.0).floor(), 16.0, TEXT_DIM);
+        // ===== FOOTER HINT (desktop only) =====
+        #[cfg(not(target_os = "android"))]
+        {
+            let hint = "[Esc] Close";
+            let hint_width = self.measure_text_sharp(hint, 16.0).width;
+            self.draw_text_sharp(hint, (menu_x + (menu_width - hint_width) / 2.0).floor(),
+                                (menu_y + menu_height - FRAME_THICKNESS - 6.0).floor(), 16.0, TEXT_DIM);
+        }
     }
 
     /// Draw a compact slider with label on left
