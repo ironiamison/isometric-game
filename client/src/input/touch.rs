@@ -310,6 +310,197 @@ impl VirtualDPad {
     }
 }
 
+/// Virtual joystick for mobile controls
+/// Touch-drag from a center point to determine direction
+pub struct VirtualJoystick {
+    /// Center position (set on touch start)
+    center: Vec2,
+    /// Current touch position
+    touch_pos: Vec2,
+    /// Dead zone radius (below this, no direction)
+    dead_zone: f32,
+    /// Display radius for the outer circle
+    outer_radius: f32,
+    /// Touch ID tracking input
+    touch_id: Option<u64>,
+    /// Current direction output
+    current_dir: DPadDirection,
+    /// Time when direction was first pressed
+    press_time: f64,
+    /// Whether a move command has been sent
+    move_sent: bool,
+    /// Direction that was just released
+    just_released_dir: DPadDirection,
+}
+
+impl VirtualJoystick {
+    pub fn new() -> Self {
+        Self {
+            center: Vec2::ZERO,
+            touch_pos: Vec2::ZERO,
+            dead_zone: 15.0,
+            outer_radius: 60.0,
+            touch_id: None,
+            current_dir: DPadDirection::None,
+            press_time: 0.0,
+            move_sent: false,
+            just_released_dir: DPadDirection::None,
+        }
+    }
+
+    /// Map an angle to a 4-way cardinal direction
+    fn angle_to_direction(dx: f32, dy: f32) -> DPadDirection {
+        // atan2 gives angle from positive X axis, but we want cardinal directions
+        let angle = dy.atan2(dx);
+        // Divide circle into 4 quadrants: right (-45..45), down (45..135), left (135..-135), up (-135..-45)
+        let pi = std::f32::consts::PI;
+        if angle > -pi / 4.0 && angle <= pi / 4.0 {
+            DPadDirection::Right
+        } else if angle > pi / 4.0 && angle <= 3.0 * pi / 4.0 {
+            DPadDirection::Down
+        } else if angle > -3.0 * pi / 4.0 && angle <= -pi / 4.0 {
+            DPadDirection::Up
+        } else {
+            DPadDirection::Left
+        }
+    }
+
+    /// Update joystick state based on touch input
+    /// Returns true if this joystick consumed the touch
+    pub fn update(&mut self, touches: &[Touch], current_time: f64) -> bool {
+        let (screen_w, _) = virtual_screen_size();
+        self.just_released_dir = DPadDirection::None;
+
+        // If we're tracking a touch, update or release it
+        if let Some(tracking_id) = self.touch_id {
+            let tracked = touches.iter().find(|t| t.id == tracking_id);
+
+            match tracked {
+                Some(touch) => {
+                    match touch.phase {
+                        TouchPhase::Moved | TouchPhase::Stationary => {
+                            let (vx, vy) = to_virtual_coords(touch.position.x, touch.position.y);
+                            self.touch_pos = vec2(vx, vy);
+                            let delta = self.touch_pos - self.center;
+                            let dist = delta.length();
+                            if dist > self.dead_zone {
+                                let new_dir = Self::angle_to_direction(delta.x, delta.y);
+                                if new_dir != self.current_dir && !self.move_sent {
+                                    self.press_time = current_time;
+                                }
+                                self.current_dir = new_dir;
+                            } else {
+                                self.current_dir = DPadDirection::None;
+                            }
+                        }
+                        TouchPhase::Ended | TouchPhase::Cancelled => {
+                            self.just_released_dir = self.current_dir;
+                            self.release();
+                        }
+                        _ => {}
+                    }
+                }
+                None => {
+                    self.just_released_dir = self.current_dir;
+                    self.release();
+                }
+            }
+            return true;
+        }
+
+        // Look for a new touch on left half of screen
+        for touch in touches {
+            if touch.phase == TouchPhase::Started {
+                let (x, y) = to_virtual_coords(touch.position.x, touch.position.y);
+                if x < screen_w * 0.5 {
+                    self.touch_id = Some(touch.id);
+                    self.center = vec2(x, y);
+                    self.touch_pos = vec2(x, y);
+                    self.current_dir = DPadDirection::None;
+                    self.press_time = current_time;
+                    self.move_sent = false;
+
+                    // Check for same-frame end
+                    let also_ended = touches.iter().any(|t| {
+                        t.id == touch.id && matches!(t.phase, TouchPhase::Ended | TouchPhase::Cancelled)
+                    });
+                    if also_ended {
+                        self.just_released_dir = self.current_dir;
+                        self.release();
+                    }
+
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn release(&mut self) {
+        self.touch_id = None;
+        self.current_dir = DPadDirection::None;
+        self.move_sent = false;
+    }
+
+    pub fn get_direction(&self) -> DPadDirection {
+        self.current_dir
+    }
+
+    pub fn get_just_released(&self) -> DPadDirection {
+        self.just_released_dir
+    }
+
+    pub fn get_press_time(&self) -> f64 {
+        self.press_time
+    }
+
+    pub fn set_move_sent(&mut self, sent: bool) {
+        self.move_sent = sent;
+    }
+
+    pub fn was_move_sent(&self) -> bool {
+        self.move_sent
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.touch_id.is_some()
+    }
+
+    /// Render the joystick (only when active)
+    pub fn render(&self) {
+        if let Some(_) = self.touch_id {
+            // Outer circle
+            draw_circle(
+                self.center.x, self.center.y, self.outer_radius,
+                Color::new(1.0, 1.0, 1.0, 0.1),
+            );
+            draw_circle_lines(
+                self.center.x, self.center.y, self.outer_radius,
+                2.0, Color::new(1.0, 1.0, 1.0, 0.25),
+            );
+
+            // Inner circle (thumb position, clamped to outer radius)
+            let delta = self.touch_pos - self.center;
+            let dist = delta.length();
+            let clamped = if dist > self.outer_radius {
+                self.center + delta.normalize() * self.outer_radius
+            } else {
+                self.touch_pos
+            };
+            let inner_alpha = if dist > self.dead_zone { 0.5 } else { 0.25 };
+            draw_circle(
+                clamped.x, clamped.y, 20.0,
+                Color::new(1.0, 1.0, 1.0, inner_alpha),
+            );
+            draw_circle_lines(
+                clamped.x, clamped.y, 20.0,
+                2.0, Color::new(1.0, 1.0, 1.0, 0.6),
+            );
+        }
+    }
+}
+
 /// Touch button for actions like attack
 pub struct TouchButton {
     /// Position of the button
@@ -435,6 +626,7 @@ impl TouchButton {
 /// Container for all touch controls
 pub struct TouchControls {
     pub dpad: VirtualDPad,
+    pub joystick: VirtualJoystick,
     pub attack_button: TouchButton,
     pub interact_button: TouchButton,
     /// Whether touch controls are enabled (typically only on Android)
@@ -456,6 +648,7 @@ impl TouchControls {
 
         Self {
             dpad: VirtualDPad::new(),
+            joystick: VirtualJoystick::new(),
             attack_button: TouchButton::new(attack_x, attack_y, 40.0, "ATK"),
             interact_button: TouchButton::new(interact_x, interact_y, 32.0, "USE"),
             #[cfg(target_os = "android")]
@@ -468,7 +661,7 @@ impl TouchControls {
 
     /// Update all touch controls
     /// Set hide_action_buttons to true when panels like inventory are open
-    pub fn update(&mut self, current_time: f64, hide_action_buttons: bool, hide_all_controls: bool) {
+    pub fn update(&mut self, current_time: f64, hide_action_buttons: bool, hide_all_controls: bool, use_joystick: bool) {
         self.touch_consumed = false;
 
         if !self.enabled {
@@ -490,15 +683,18 @@ impl TouchControls {
         } else {
             (self.attack_button.update(&touches), self.interact_button.update(&touches))
         };
-        let dpad_consumed = if hide_all_controls {
+        let direction_consumed = if hide_all_controls {
             false
+        } else if use_joystick {
+            self.joystick.update(&touches, current_time)
         } else {
             self.dpad.update(&touches, current_time)
         };
 
         // Mark touch as consumed if any control is active or just received input
-        self.touch_consumed = attack_consumed || interact_consumed || dpad_consumed
+        self.touch_consumed = attack_consumed || interact_consumed || direction_consumed
             || self.dpad.is_active()
+            || self.joystick.is_active()
             || self.attack_button.is_pressed()
             || self.interact_button.is_pressed();
     }
@@ -511,13 +707,17 @@ impl TouchControls {
 
     /// Render all touch controls
     /// Set hide_action_buttons to true when panels like inventory are open
-    pub fn render(&self, hide_action_buttons: bool, hide_all_controls: bool) {
+    pub fn render(&self, hide_action_buttons: bool, hide_all_controls: bool, use_joystick: bool) {
         if !self.enabled {
             return;
         }
 
         if !hide_all_controls {
-            self.dpad.render();
+            if use_joystick {
+                self.joystick.render();
+            } else {
+                self.dpad.render();
+            }
         }
         if !hide_action_buttons {
             self.attack_button.render();
@@ -525,12 +725,17 @@ impl TouchControls {
         }
     }
 
-    /// Get current D-pad direction
+    /// Get current direction (from whichever input mode is active)
     pub fn get_direction(&self) -> DPadDirection {
         if !self.enabled {
             return DPadDirection::None;
         }
-        self.dpad.get_direction()
+        // Return from whichever is active
+        if self.joystick.is_active() {
+            self.joystick.get_direction()
+        } else {
+            self.dpad.get_direction()
+        }
     }
 
     /// Get direction that was just released (for tap-to-face)
@@ -538,22 +743,31 @@ impl TouchControls {
         if !self.enabled {
             return DPadDirection::None;
         }
+        let joy_rel = self.joystick.get_just_released();
+        if joy_rel != DPadDirection::None {
+            return joy_rel;
+        }
         self.dpad.get_just_released()
     }
 
-    /// Get D-pad press time for threshold checking
+    /// Get press time for threshold checking
     pub fn get_dpad_press_time(&self) -> f64 {
-        self.dpad.get_press_time()
+        if self.joystick.is_active() {
+            self.joystick.get_press_time()
+        } else {
+            self.dpad.get_press_time()
+        }
     }
 
     /// Mark that a move command was sent
     pub fn set_dpad_move_sent(&mut self, sent: bool) {
         self.dpad.set_move_sent(sent);
+        self.joystick.set_move_sent(sent);
     }
 
-    /// Check if D-pad move was sent (held past threshold)
+    /// Check if move was sent (held past threshold)
     pub fn was_dpad_move_sent(&self) -> bool {
-        self.dpad.was_move_sent()
+        self.dpad.was_move_sent() || self.joystick.was_move_sent()
     }
 
     /// Check if attack button is held (for continuous attacking like space bar)

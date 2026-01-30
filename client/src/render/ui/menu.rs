@@ -148,7 +148,19 @@ impl Renderer {
         draw_button(chat_bounds.x, chat_bounds.y, toggle_w, btn_height, chat_text, state.ui_state.chat_log_visible, is_hovered(chat_bounds), self);
         let tap_text = if state.ui_state.tap_to_pathfind { "TapWalk" } else { "TapWalk" };
         draw_button(tap_walk_bounds.x, tap_walk_bounds.y, toggle_w, btn_height, tap_text, state.ui_state.tap_to_pathfind, is_hovered(tap_walk_bounds), self);
-        y += row_height + 8.0;
+        y += row_height;
+
+        // Row 3: Joystick toggle (Android only)
+        #[cfg(target_os = "android")]
+        {
+            let joystick_bounds = Rect::new(content_x, y, toggle_w, btn_height);
+            layout.add(UiElementId::EscapeMenuJoystickToggle, joystick_bounds);
+            let joystick_text = "Joystick";
+            draw_button(joystick_bounds.x, joystick_bounds.y, toggle_w, btn_height, joystick_text, state.ui_state.use_joystick, is_hovered(joystick_bounds), self);
+            y += row_height;
+        }
+
+        y += 8.0;
 
         // ===== DISCONNECT BUTTON =====
         let disconnect_width = inner_width;

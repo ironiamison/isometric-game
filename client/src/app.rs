@@ -325,5 +325,5 @@ pub fn run_game_frame(
         || game_state.ui_state.character_panel_open
         || game_state.ui_state.skills_open
         || in_dialogue;
-    input_handler.render_touch_controls(hide_action_buttons, in_dialogue);
+    input_handler.render_touch_controls(hide_action_buttons, in_dialogue, game_state.ui_state.use_joystick);
 }

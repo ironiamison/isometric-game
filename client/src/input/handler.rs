@@ -154,7 +154,7 @@ impl InputHandler {
             || state.ui_state.character_panel_open
             || state.ui_state.skills_open
             || in_dialogue;
-        self.touch_controls.update(current_time, hide_action_buttons, in_dialogue);
+        self.touch_controls.update(current_time, hide_action_buttons, in_dialogue, state.ui_state.use_joystick);
 
         // Get current mouse/touch position in virtual coordinates (for UI hit detection)
         let (raw_mx, raw_my) = mouse_position();
@@ -749,6 +749,11 @@ impl InputHandler {
                         UiElementId::EscapeMenuTapPathfindToggle => {
                             audio.play_sfx("enter");
                             state.ui_state.tap_to_pathfind = !state.ui_state.tap_to_pathfind;
+                            return commands;
+                        }
+                        UiElementId::EscapeMenuJoystickToggle => {
+                            audio.play_sfx("enter");
+                            state.ui_state.use_joystick = !state.ui_state.use_joystick;
                             return commands;
                         }
                         UiElementId::EscapeMenuDisconnect => {
@@ -2349,7 +2354,7 @@ impl InputHandler {
 
     /// Render touch controls overlay (call after all other rendering)
     /// Set hide_action_buttons to true when panels like inventory are open
-    pub fn render_touch_controls(&self, hide_action_buttons: bool, hide_all_controls: bool) {
-        self.touch_controls.render(hide_action_buttons, hide_all_controls);
+    pub fn render_touch_controls(&self, hide_action_buttons: bool, hide_all_controls: bool, use_joystick: bool) {
+        self.touch_controls.render(hide_action_buttons, hide_all_controls, use_joystick);
     }
 }

@@ -458,6 +458,8 @@ pub struct UiState {
     pub chat_log_visible: bool,
     // Tap-to-pathfind (enabled by default on mobile, disabled on desktop)
     pub tap_to_pathfind: bool,
+    // Use joystick instead of D-pad for mobile controls
+    pub use_joystick: bool,
     // Dialogue scroll offset and touch scroll tracking
     pub dialogue_scroll_offset: f32,
     pub dialogue_touch_scroll_id: Option<u64>,
@@ -533,6 +535,7 @@ impl Default for UiState {
             tap_to_pathfind: false,
             #[cfg(not(target_os = "android"))]
             tap_to_pathfind: true,
+            use_joystick: false,
             dialogue_scroll_offset: 0.0,
             dialogue_touch_scroll_id: None,
             dialogue_touch_last_y: 0.0,
