@@ -17,8 +17,8 @@ use crate::ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, Charact
 use crate::auth::AuthSession;
 
 // Production mode - use the production server.
-pub const SERVER_URL: &str = "https://aeven.xyz:2567";
-pub const WS_URL: &str = "wss://aeven.xyz:2567";
+pub const SERVER_URL: &str = "https://aeven.xyz";
+pub const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - use the development server
 // pub const SERVER_URL: &str = "http://localhost:2567";
