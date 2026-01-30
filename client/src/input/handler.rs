@@ -1449,6 +1449,9 @@ impl InputHandler {
                 state.ui_state.chat_input.clear();
                 state.ui_state.chat_cursor = 0;
                 state.ui_state.chat_scroll_offset = 0;
+                if state.ui_state.chat_panel_open {
+                    state.ui_state.chat_panel_open = false;
+                }
                 return commands;
             }
 
@@ -1459,10 +1462,11 @@ impl InputHandler {
                     audio.play_sfx("send_message");
                     commands.push(InputCommand::Chat { text });
                 }
-                state.ui_state.chat_open = false;
                 state.ui_state.chat_input.clear();
                 state.ui_state.chat_cursor = 0;
                 state.ui_state.chat_scroll_offset = 0;
+                // Close keyboard input but keep chat panel open if it's showing
+                state.ui_state.chat_open = false;
                 return commands;
             }
 
