@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use std::collections::HashSet;
-use crate::game::{GameState, ContextMenu, ContextMenuTarget, DragState, DragSource, GoldDropDialog, PathState, pathfinding};
+use crate::game::{GameState, ChatChannel, ContextMenu, ContextMenuTarget, DragState, DragSource, GoldDropDialog, PathState, pathfinding};
 use crate::render::animation::AnimationState;
 use crate::render::isometric::screen_to_world;
 use crate::ui::{UiElementId, UiLayout};
@@ -678,6 +678,46 @@ impl InputHandler {
                         // Toggle escape/settings menu
                         state.ui_state.escape_menu_open = !state.ui_state.escape_menu_open;
                         return commands;
+                    }
+                    UiElementId::ChatButton => {
+                        audio.play_sfx("enter");
+                        state.ui_state.chat_panel_open = !state.ui_state.chat_panel_open;
+                        if state.ui_state.chat_panel_open {
+                            state.ui_state.chat_active_tab = ChatChannel::Local;
+                            // Close other panels
+                            state.ui_state.inventory_open = false;
+                            state.ui_state.character_panel_open = false;
+                            state.ui_state.skills_open = false;
+                            state.ui_state.social_open = false;
+                        }
+                    }
+                    UiElementId::ChatTabLocal => {
+                        audio.play_sfx("enter");
+                        state.ui_state.chat_active_tab = ChatChannel::Local;
+                    }
+                    UiElementId::ChatTabGlobal => {
+                        audio.play_sfx("enter");
+                        state.ui_state.chat_active_tab = ChatChannel::Global;
+                    }
+                    UiElementId::ChatTabSystem => {
+                        audio.play_sfx("enter");
+                        state.ui_state.chat_active_tab = ChatChannel::System;
+                    }
+                    UiElementId::ChatSendButton => {
+                        let text = state.ui_state.chat_input.trim().to_string();
+                        if !text.is_empty() {
+                            audio.play_sfx("send_message");
+                            commands.push(InputCommand::Chat { text });
+                        }
+                        state.ui_state.chat_input.clear();
+                        state.ui_state.chat_cursor = 0;
+                    }
+                    UiElementId::ChatInputField => {
+                        // On Android, this should trigger the native keyboard
+                        state.ui_state.chat_open = true;
+                    }
+                    UiElementId::ChatPanelBackground => {
+                        // Consume tap - don't let it pass through to game world
                     }
                     _ => {}
                 }
@@ -1378,6 +1418,12 @@ impl InputHandler {
             }
 
             // Don't process other input while crafting is open
+            return commands;
+        }
+
+        // Block game-world input when chat panel is open (mobile)
+        if state.ui_state.chat_panel_open {
+            // Only process UI element clicks (handled above), not game world input
             return commands;
         }
 
