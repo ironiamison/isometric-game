@@ -8,7 +8,7 @@ use crate::util::{asset_path, SpriteManifest, SpriteAtlasInfo, virtual_screen_si
 use crate::game::{GameState, Player, Camera, ConnectionStatus, LayerType, GroundItem, ChunkLayerType, CHUNK_SIZE, MapObject, ChatChannel, Direction, DragSource, Wall, WallEdge};
 use crate::game::npc::{Npc, NpcState};
 use crate::game::tilemap::get_tile_color;
-use crate::ui::UiLayout;
+use crate::ui::{UiElementId, UiLayout};
 use super::ui::common::{SlotState, CORNER_ACCENT_SIZE};
 use super::isometric::{world_to_screen, world_to_screen_exact, TILE_WIDTH, TILE_HEIGHT, calculate_depth};
 use super::animation::{SPRITE_WIDTH, SPRITE_HEIGHT, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT, NpcAnimation, get_weapon_frame, get_weapon_offset, get_boot_frame, get_boot_offset, get_body_armor_frame, get_body_armor_offset, get_head_frame, get_head_offset, get_back_static_frame, get_back_static_offset, get_offhand_frame, get_offhand_offset, AnimationState};
@@ -3649,6 +3649,21 @@ impl Renderer {
         // Menu buttons (bottom-right, above exp bar)
         self.render_menu_buttons(state, hovered, &mut layout);
 
+        // Chat button (top-left, above quest tracker) - mobile only
+        #[cfg(target_os = "android")]
+        {
+            let chat_btn_x = 10.0;
+            let chat_btn_y = 10.0;
+            if let Some(tex) = &self.chat_small_icon {
+                let btn_size = 32.0;
+                draw_texture_ex(tex, chat_btn_x, chat_btn_y, WHITE, DrawTextureParams {
+                    dest_size: Some(Vec2::new(btn_size, btn_size)),
+                    ..Default::default()
+                });
+                layout.add(UiElementId::ChatButton, macroquad::prelude::Rect::new(chat_btn_x, chat_btn_y, btn_size, btn_size));
+            }
+        }
+
         // Quest objective tracker (top-left)
         self.render_quest_tracker(state);
 
@@ -3705,6 +3720,9 @@ impl Renderer {
         if state.ui_state.escape_menu_open {
             self.render_escape_menu(state, &mut layout);
         }
+
+        // Chat panel (fullscreen overlay, on top of everything)
+        self.render_chat_panel(state, hovered, &mut layout);
 
         layout
     }
