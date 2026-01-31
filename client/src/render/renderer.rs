@@ -188,6 +188,10 @@ pub struct Renderer {
     pub(crate) coin_small_icon: Option<Texture2D>,
     /// Material for head+hair composite rendering (shader-based)
     head_hair_material: Option<Material>,
+    /// Material for animated water tile rendering (shader-based)
+    water_material: Option<Material>,
+    /// Material for wave overlay drawn on top of water tiles
+    water_overlay_material: Option<Material>,
 }
 
 impl Renderer {
@@ -574,6 +578,61 @@ impl Renderer {
             }
         };
 
+        // Load water animation shader material
+        let water_material = match load_material(
+            ShaderSource::Glsl {
+                vertex: shaders::WATER_VERTEX,
+                fragment: shaders::WATER_FRAGMENT,
+            },
+            MaterialParams {
+                uniforms: vec![
+                    UniformDesc::new("Time", UniformType::Float1),
+                ],
+                ..Default::default()
+            },
+        ) {
+            Ok(mat) => {
+                log::info!("Loaded water animation shader");
+                Some(mat)
+            }
+            Err(e) => {
+                log::warn!("Failed to load water shader: {}. Water tiles will render without animation.", e);
+                None
+            }
+        };
+
+        // Load water overlay shader material
+        let water_overlay_material = match load_material(
+            ShaderSource::Glsl {
+                vertex: shaders::WATER_VERTEX,
+                fragment: shaders::WATER_OVERLAY_FRAGMENT,
+            },
+            MaterialParams {
+                uniforms: vec![
+                    UniformDesc::new("Time", UniformType::Float1),
+                    UniformDesc::new("WorldPos", UniformType::Float2),
+                ],
+                pipeline_params: macroquad::miniquad::PipelineParams {
+                    color_blend: Some(macroquad::miniquad::BlendState::new(
+                        macroquad::miniquad::Equation::Add,
+                        macroquad::miniquad::BlendFactor::Value(macroquad::miniquad::BlendValue::SourceAlpha),
+                        macroquad::miniquad::BlendFactor::OneMinusValue(macroquad::miniquad::BlendValue::SourceAlpha),
+                    )),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        ) {
+            Ok(mat) => {
+                log::info!("Loaded water overlay shader");
+                Some(mat)
+            }
+            Err(e) => {
+                log::warn!("Failed to load water overlay shader: {}", e);
+                None
+            }
+        };
+
         #[cfg(target_arch = "wasm32")]
         Self::hide_loading();
 
@@ -599,6 +658,8 @@ impl Renderer {
             chat_small_icon,
             coin_small_icon,
             head_hair_material,
+            water_material,
+            water_overlay_material,
         }
     }
 
@@ -710,14 +771,28 @@ impl Renderer {
     }
 
     /// Draw a tile sprite from the tileset
-    fn draw_tile_sprite(&self, screen_x: f32, screen_y: f32, tile_id: u32, zoom: f32) {
+    fn draw_tile_sprite(&self, screen_x: f32, screen_y: f32, tile_id: u32, zoom: f32, world_pos: Option<(f32, f32)>) {
         let scaled_width = TILE_WIDTH * zoom;
         let scaled_height = TILE_HEIGHT * zoom;
 
+        // Apply water shader for water tiles (tile ID 418)
+        let is_water = tile_id == 418;
+        if is_water {
+            if let Some(ref mat) = self.water_material {
+                mat.set_uniform("Time", get_time() as f32);
+                gl_use_material(mat);
+            }
+        }
+
         if let (Some(tileset), Some(uv)) = (&self.tileset, self.get_tile_uv(tile_id)) {
-            // Center the tile on screen position
             let draw_x = screen_x - scaled_width / 2.0;
             let draw_y = screen_y - scaled_height / 2.0;
+            let source = Rect::new(
+                uv.x * tileset.width(),
+                uv.y * tileset.height(),
+                TILESET_TILE_WIDTH,
+                TILESET_TILE_HEIGHT,
+            );
 
             draw_texture_ex(
                 tileset,
@@ -725,20 +800,45 @@ impl Renderer {
                 draw_y,
                 WHITE,
                 DrawTextureParams {
-                    source: Some(Rect::new(
-                        uv.x * tileset.width(),
-                        uv.y * tileset.height(),
-                        TILESET_TILE_WIDTH,
-                        TILESET_TILE_HEIGHT,
-                    )),
+                    source: Some(source),
                     dest_size: Some(Vec2::new(scaled_width, scaled_height)),
                     ..Default::default()
                 },
             );
+
+            if is_water && self.water_material.is_some() {
+                gl_use_default_material();
+            }
+
+            // Draw wave overlay on top of water tiles
+            if is_water {
+                if let (Some(ref mat), Some((wx, wy))) = (&self.water_overlay_material, world_pos) {
+                    mat.set_uniform("Time", get_time() as f32);
+                    mat.set_uniform("WorldPos", (wx, wy));
+                    gl_use_material(mat);
+
+                    draw_texture_ex(
+                        tileset,
+                        draw_x,
+                        draw_y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(source),
+                            dest_size: Some(Vec2::new(scaled_width, scaled_height)),
+                            ..Default::default()
+                        },
+                    );
+
+                    gl_use_default_material();
+                }
+            }
         } else {
-            // Fallback to colored tile
             let color = get_tile_color(tile_id);
             self.draw_isometric_tile(screen_x, screen_y, color, zoom);
+
+            if is_water && self.water_material.is_some() {
+                gl_use_default_material();
+            }
         }
     }
 
@@ -1610,7 +1710,7 @@ impl Renderer {
                             }
 
                             // Draw tile sprite (or fallback to colored tile)
-                            self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom);
+                            self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom, Some((world_x as f32, world_y as f32)));
 
                             // Draw collision indicator in debug mode
                             if state.debug_mode && chunk.collision.get(idx).copied().unwrap_or(false) {
@@ -1654,7 +1754,7 @@ impl Renderer {
                     }
 
                     // Draw tile sprite (or fallback to colored tile)
-                    self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom);
+                    self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom, Some((x as f32, y as f32)));
 
                     // Draw collision indicator in debug mode
                     if state.debug_mode && tilemap.collision.get(idx).copied().unwrap_or(false) {
@@ -1684,7 +1784,7 @@ impl Renderer {
 
         // Draw object tile sprite (slightly elevated)
         let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25;
-        self.draw_tile_sprite(screen_x, elevated_y, tile_id, zoom);
+        self.draw_tile_sprite(screen_x, elevated_y, tile_id, zoom, None);
     }
 
     fn draw_isometric_tile(&self, screen_x: f32, screen_y: f32, color: Color, zoom: f32) {
@@ -3766,6 +3866,14 @@ impl Renderer {
             // XP Globes (to the left of player stats)
             let globe_stats_y = tag_y + tag_height / 2.0 + 8.0; // Slightly below name tag center
             self.render_xp_globes(&state.xp_globes, bar_x, globe_stats_y);
+
+            // XP Drop Feed (below gathering status or HP bar)
+            let drop_start_y = if state.is_gathering {
+                hp_bar_y + bar_height + 4.0 + 22.0 + 110.0 // ~100px below gathering box
+            } else {
+                hp_bar_y + bar_height + 110.0
+            };
+            self.render_xp_drop_feed(&state.xp_drop_feed, bar_x, bar_width, drop_start_y);
         }
 
         // Note: Interactive UI (inventory, crafting, dialogue, quick slots) is rendered

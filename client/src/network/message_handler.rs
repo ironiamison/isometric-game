@@ -625,10 +625,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             time: macroquad::time::get_time(),
                         });
 
-                        // Update XP globes
+                        // Update XP globes and drop feed
                         if let Some(skill_type) = SkillType::from_str(&skill_name) {
                             let xp_for_next = crate::game::skills::total_xp_for_level(level + 1);
                             state.xp_globes.on_xp_gain(skill_type, total_xp, xp_for_next, level);
+                            state.xp_drop_feed.push(skill_type, xp_gained);
                         }
                     }
                 }

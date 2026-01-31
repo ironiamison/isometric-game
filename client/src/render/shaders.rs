@@ -30,6 +30,96 @@ void main() {
 /// - HairTexture: Hair sprite sheet
 /// - HairUvTransform: vec4(offset_x, offset_y, scale_x, scale_y) to transform head UV to hair UV
 /// - Tint: vec4 color tint to apply (default white with full alpha for normal rendering)
+/// Vertex shader for animated water tiles
+pub const WATER_VERTEX: &str = r#"#version 100
+precision lowp float;
+
+attribute vec3 position;
+attribute vec2 texcoord;
+
+varying vec2 uv;
+
+uniform mat4 Model;
+uniform mat4 Projection;
+
+void main() {
+    gl_Position = Projection * Model * vec4(position, 1);
+    uv = texcoord;
+}
+"#;
+
+/// Fragment shader for base water tiles — subtle color shimmer only, no UV distortion.
+pub const WATER_FRAGMENT: &str = r#"#version 100
+precision lowp float;
+
+varying vec2 uv;
+
+uniform sampler2D Texture;
+uniform float Time;
+
+void main() {
+    vec4 color = texture2D(Texture, uv);
+
+    if (color.a < 0.01) {
+        discard;
+    }
+
+    // Subtle brightness shimmer
+    float shimmer = sin(uv.x * 8.0 + uv.y * 6.0 + Time * 1.5) * 0.03;
+    color.rgb += shimmer;
+
+    // Slight blue tint shift
+    color.b += sin(Time * 0.7) * 0.01;
+
+    gl_FragColor = color;
+}
+"#;
+
+/// Fragment shader for the wave overlay drawn on top of water tiles.
+/// Uses world position so waves are continuous across tile boundaries.
+///
+/// Uniforms:
+/// - Texture: tileset texture (used only for diamond alpha mask)
+/// - Time: elapsed seconds
+/// - WorldPos: vec2(world_x, world_y) tile coordinates
+pub const WATER_OVERLAY_FRAGMENT: &str = r#"#version 100
+precision lowp float;
+
+varying vec2 uv;
+
+uniform sampler2D Texture;
+uniform float Time;
+uniform vec2 WorldPos;
+
+void main() {
+    // Use base tile alpha as diamond mask
+    float mask = texture2D(Texture, uv).a;
+    if (mask < 0.01) {
+        discard;
+    }
+
+    // Convert local UV to continuous world UV so waves span across tiles
+    vec2 wuv = WorldPos + uv;
+
+    // Layer 1: broad slow wave bands moving diagonally
+    float wave1 = sin(wuv.x * 3.0 + wuv.y * 2.0 + Time * 0.8) * 0.5 + 0.5;
+    wave1 = smoothstep(0.55, 0.7, wave1) * 0.12;
+
+    // Layer 2: finer ripples moving the other direction
+    float wave2 = sin(wuv.x * 6.0 - wuv.y * 4.0 + Time * 1.3) * 0.5 + 0.5;
+    wave2 = smoothstep(0.6, 0.75, wave2) * 0.08;
+
+    // Layer 3: very fine sparkle/caustic dots
+    float caustic = sin(wuv.x * 10.0 + Time * 1.0) * sin(wuv.y * 8.0 - Time * 0.7);
+    caustic = smoothstep(0.7, 0.9, caustic) * 0.1;
+
+    float brightness = wave1 + wave2 + caustic;
+
+    // White-ish highlight with low opacity
+    gl_FragColor = vec4(0.7, 0.8, 1.0, brightness * mask);
+}
+"#;
+
 pub const HEAD_HAIR_FRAGMENT: &str = r#"#version 100
 precision lowp float;
 

@@ -155,7 +155,7 @@ base_price = 8
 
 [raw_trout]
 display_name = "Raw Trout"
-sprite = "raw_trout"
+sprite = "trout"
 description = "A common freshwater fish. Good for cooking."
 category = "material"
 max_stack = 99

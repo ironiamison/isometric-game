@@ -293,6 +293,33 @@ pub struct SkillXpEvent {
     pub time: f64,
 }
 
+/// An XP drop notification that floats up and fades out in the HUD
+pub struct XpDrop {
+    pub skill_type: super::SkillType,
+    pub xp_gained: i64,
+    pub time: f64,
+}
+
+/// Manages the XP drop feed displayed below the player stats panel
+#[derive(Default)]
+pub struct XpDropFeed {
+    pub drops: Vec<XpDrop>,
+}
+
+impl XpDropFeed {
+    pub fn new() -> Self {
+        Self { drops: Vec::new() }
+    }
+
+    pub fn push(&mut self, skill_type: super::SkillType, xp_gained: i64) {
+        self.drops.push(XpDrop {
+            skill_type,
+            xp_gained,
+            time: macroquad::time::get_time(),
+        });
+    }
+}
+
 /// Chat bubble displayed above a player's head
 pub struct ChatBubble {
     pub player_id: String,
@@ -628,6 +655,7 @@ pub struct GameState {
     pub level_up_events: Vec<LevelUpEvent>,
     pub skill_xp_events: Vec<SkillXpEvent>,
     pub xp_globes: XpGlobesManager,
+    pub xp_drop_feed: XpDropFeed,
     pub projectiles: Vec<Projectile>,
 
     // Chat bubbles above players
@@ -707,6 +735,7 @@ impl GameState {
             level_up_events: Vec::new(),
             skill_xp_events: Vec::new(),
             xp_globes: XpGlobesManager::new(),
+            xp_drop_feed: XpDropFeed::new(),
             projectiles: Vec::new(),
             chat_bubbles: Vec::new(),
             inventory: Inventory::new(),
@@ -796,6 +825,9 @@ impl GameState {
 
         // Clean up old skill XP events (older than 1.5 seconds)
         self.skill_xp_events.retain(|event| current_time - event.time < 1.5);
+
+        // Clean up old XP drops (older than 3.0 seconds)
+        self.xp_drop_feed.drops.retain(|drop| current_time - drop.time < 3.0);
 
         // Clean up old chat bubbles (older than 5.0 seconds)
         self.chat_bubbles.retain(|bubble| current_time - bubble.time < 5.0);

@@ -315,7 +315,7 @@ sprite = "fishing_rod"
 description = "A simple rod for fishing. Not much good as a weapon, but a must for anglers."
 category = "equipment"
 max_stack = 1
-base_price = 25
+base_price = 100
 sellable = true
 [fishing_rod.equipment]
 slot_type = "weapon"

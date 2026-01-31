@@ -1,0 +1,8 @@
+id = "fisherman_andy"
+display_name = "Fisherman Andy's Gear"
+
+[[stock]]
+item_id = "fishing_rod"
+max_quantity = 1
+restock_rate = 1
+restock_interval_minutes = 1

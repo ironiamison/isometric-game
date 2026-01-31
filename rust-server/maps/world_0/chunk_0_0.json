@@ -3086,7 +3086,14 @@
     ]
   },
   "collision": "Bx/g+wEfIIBBHyCAYR0ggAEQIICQAAAAAAAggAAAIIAF4CGAASAhgAAg4fsBOgEAAQgDAAAKHAAACBAAAApwAAAIQAAACkAAADhAAABAQAAAwEEAAABCAAAAQgAAADQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "id": "fisherman_andy_1",
+      "template": "fisherman_andy",
+      "x": 11,
+      "y": 9
+    }
+  ],
   "mapObjects": [
     {
       "id": "obj_1769035636547_p7iusc4ds",
