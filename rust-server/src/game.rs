@@ -4273,6 +4273,18 @@ impl GameRoom {
         {
             let mut npcs = self.npcs.write().await;
 
+            // Snapshot loaded chunks for synchronous walkability checks during NPC updates
+            let chunks_snapshot: std::collections::HashMap<crate::chunk::ChunkCoord, std::sync::Arc<crate::chunk::Chunk>> = self.world.chunks_snapshot().await;
+            let walkable_check = |wx: i32, wy: i32| -> bool {
+                let coord = crate::chunk::ChunkCoord::from_world(wx, wy);
+                if let Some(chunk) = chunks_snapshot.get(&coord) {
+                    let (lx, ly) = crate::chunk::world_to_local(wx, wy);
+                    chunk.is_walkable_local(lx, ly)
+                } else {
+                    false
+                }
+            };
+
             // Collect NPC positions for collision detection (only alive NPCs)
             let mut npc_positions: std::collections::HashMap<String, (i32, i32)> = npcs
                 .values()
@@ -4302,7 +4314,7 @@ impl GameRoom {
                 }
 
                 // Run NPC AI update
-                if let Some((target_id, max_hit)) = npc.update(delta_time, &player_positions, &occupied_tiles, current_time) {
+                if let Some((target_id, max_hit)) = npc.update(delta_time, &player_positions, &occupied_tiles, current_time, &walkable_check) {
                     // Store NPC level and max hit for hit/miss calculation during attack processing
                     npc_attacks.push((npc.id.clone(), target_id, npc.level, max_hit));
                 }

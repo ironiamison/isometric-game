@@ -457,6 +457,11 @@ impl World {
             .and_then(|p| p["value"].as_bool())
     }
 
+    /// Get a snapshot of all currently loaded chunks for synchronous access
+    pub async fn chunks_snapshot(&self) -> HashMap<ChunkCoord, Arc<Chunk>> {
+        self.chunks.read().await.clone()
+    }
+
     /// Check if a world position is walkable
     pub async fn is_tile_walkable(&self, world_x: i32, world_y: i32) -> bool {
         let coord = ChunkCoord::from_world(world_x, world_y);

@@ -257,12 +257,21 @@ impl Npc {
     }
 
     /// Pick a random wander target within radius of spawn point
-    fn pick_wander_target(&self) -> (i32, i32) {
+    fn pick_wander_target(&self, walkable_check: &dyn Fn(i32, i32) -> bool) -> (i32, i32) {
         let mut rng = rand::thread_rng();
         let radius = self.stats.wander_radius;
-        let dx = rng.gen_range(-radius..=radius);
-        let dy = rng.gen_range(-radius..=radius);
-        (self.spawn_x + dx, self.spawn_y + dy)
+        // Try a few times to find a walkable target
+        for _ in 0..8 {
+            let dx = rng.gen_range(-radius..=radius);
+            let dy = rng.gen_range(-radius..=radius);
+            let tx = self.spawn_x + dx;
+            let ty = self.spawn_y + dy;
+            if walkable_check(tx, ty) {
+                return (tx, ty);
+            }
+        }
+        // Fallback to current position (will be rejected as same-position in caller)
+        (self.x, self.y)
     }
 
     /// Set a random idle pause duration
@@ -293,6 +302,7 @@ impl Npc {
         target_y: i32,
         current_time: u64,
         occupied_tiles: &[(i32, i32)],
+        walkable_check: &dyn Fn(i32, i32) -> bool,
     ) -> bool {
         // Check movement cooldown
         if current_time - self.last_move_time < self.get_move_cooldown_ms() {
@@ -348,6 +358,11 @@ impl Npc {
             let new_x = self.x + move_x;
             let new_y = self.y + move_y;
 
+            // Check if tile is walkable (collision check)
+            if !walkable_check(new_x, new_y) {
+                continue; // Tile has collision
+            }
+
             // Check if tile is occupied by another NPC
             if occupied_tiles.iter().any(|(ox, oy)| *ox == new_x && *oy == new_y) {
                 continue; // Try next candidate
@@ -375,6 +390,7 @@ impl Npc {
         players: &[(String, i32, i32, i32)], // (id, x, y, hp) - grid positions
         other_npc_positions: &[(i32, i32)],  // positions of other NPCs (excluding self)
         current_time: u64,
+        walkable_check: &dyn Fn(i32, i32) -> bool,
     ) -> Option<(String, i32)> {
         // Reset attack flag each tick - will be set to true if we attack this tick
         self.just_attacked = false;
@@ -414,7 +430,7 @@ impl Npc {
 
                 // Check if wandering is enabled and idle pause has elapsed
                 if self.stats.wander_enabled && current_time >= self.idle_until {
-                    let target = self.pick_wander_target();
+                    let target = self.pick_wander_target(walkable_check);
                     // Only wander if target is different from current position
                     if target.0 != self.x || target.1 != self.y {
                         self.wander_target = Some(target);
@@ -454,7 +470,7 @@ impl Npc {
                         self.wander_target = None;
                         self.set_random_idle_pause(current_time);
                     } else {
-                        self.try_move_toward(tx, ty, current_time, other_npc_positions);
+                        self.try_move_toward(tx, ty, current_time, other_npc_positions, walkable_check);
                     }
                 } else {
                     // No target, go idle
@@ -485,7 +501,7 @@ impl Npc {
                         self.state = NpcState::Attacking;
                     } else if !Self::is_in_attack_range(self.x, self.y, tx, ty, self.get_attack_range()) {
                         // Not in range, move toward target (one tile at a time)
-                        self.try_move_toward(tx, ty, current_time, other_npc_positions);
+                        self.try_move_toward(tx, ty, current_time, other_npc_positions, walkable_check);
                     }
                     // If in range but movement not done, stay in Chasing and wait
                 } else {
@@ -546,7 +562,7 @@ impl Npc {
                     }
                 } else {
                     // Move toward spawn (one tile at a time)
-                    self.try_move_toward(self.spawn_x, self.spawn_y, current_time, other_npc_positions);
+                    self.try_move_toward(self.spawn_x, self.spawn_y, current_time, other_npc_positions, walkable_check);
                 }
             }
 
