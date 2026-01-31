@@ -838,10 +838,13 @@ impl TouchControls {
         }
     }
 
-    /// Mark that a move command was sent
+    /// Mark that a move command was sent (only on the active control)
     pub fn set_dpad_move_sent(&mut self, sent: bool) {
-        self.dpad.set_move_sent(sent);
-        self.joystick.set_move_sent(sent);
+        if self.joystick.get_direction() != DPadDirection::None {
+            self.joystick.set_move_sent(sent);
+        } else {
+            self.dpad.set_move_sent(sent);
+        }
     }
 
     /// Check if move was sent (held past threshold)
