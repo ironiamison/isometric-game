@@ -1,6 +1,9 @@
 #!/bin/bash
 # Generate sprite manifest for Android builds
 # Run this from the client directory whenever sprites are added/removed
+#
+# Updates only the sprite list arrays (enemies, equipment, weapons, inventory,
+# objects, walls) while preserving all other fields (weapon_frame_sizes, atlases, etc.)
 
 set -e
 
@@ -10,55 +13,39 @@ MANIFEST="assets/sprite_manifest.json"
 
 echo "Generating sprite manifest..."
 
-# Helper function to generate JSON array from find results
-generate_array() {
+# Helper: produce a JSON array from .png files in a directory
+json_array() {
     local dir="$1"
     local strip_prefix="$2"
 
     find "$dir" -name "*.png" 2>/dev/null | \
         sed "s|${strip_prefix}/||;s|\.png$||" | \
         sort | \
-        while IFS= read -r line; do
-            echo "    \"$line\""
-        done | \
-        paste -sd ',' - | \
-        sed 's/,/,\n/g'
+        jq -R . | jq -s .
 }
 
-{
-    echo '{'
+enemies=$(json_array "assets/sprites/enemies" "assets/sprites/enemies")
+equipment=$(json_array "assets/sprites/equipment" "assets/sprites")
+weapons=$(json_array "assets/sprites/weapons" "assets/sprites/weapons")
+inventory=$(json_array "assets/sprites/inventory" "assets/sprites/inventory")
+objects=$(json_array "assets/sprites/objects" "assets/sprites/objects")
+walls=$(json_array "assets/sprites/walls" "assets/sprites/walls")
 
-    echo '  "enemies": ['
-    generate_array "assets/sprites/enemies" "assets/sprites/enemies"
-    echo '  ],'
-
-    echo '  "equipment": ['
-    generate_array "assets/sprites/equipment" "assets/sprites"
-    echo '  ],'
-
-    echo '  "weapons": ['
-    generate_array "assets/sprites/weapons" "assets/sprites/weapons"
-    echo '  ],'
-
-    echo '  "inventory": ['
-    generate_array "assets/sprites/inventory" "assets/sprites/inventory"
-    echo '  ],'
-
-    echo '  "objects": ['
-    generate_array "assets/sprites/objects" "assets/sprites/objects"
-    echo '  ],'
-
-    echo '  "walls": ['
-    generate_array "assets/sprites/walls" "assets/sprites/walls"
-    echo '  ]'
-
-    echo '}'
-} > "$MANIFEST"
+# Merge the new arrays into the existing manifest, preserving all other keys
+jq \
+    --argjson enemies "$enemies" \
+    --argjson equipment "$equipment" \
+    --argjson weapons "$weapons" \
+    --argjson inventory "$inventory" \
+    --argjson objects "$objects" \
+    --argjson walls "$walls" \
+    '.enemies = $enemies | .equipment = $equipment | .weapons = $weapons | .inventory = $inventory | .objects = $objects | .walls = $walls' \
+    "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
 
 echo "Generated $MANIFEST"
-echo "  - enemies: $(find assets/sprites/enemies -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-echo "  - equipment: $(find assets/sprites/equipment -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-echo "  - weapons: $(find assets/sprites/weapons -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-echo "  - inventory: $(find assets/sprites/inventory -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-echo "  - objects: $(find assets/sprites/objects -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
-echo "  - walls: $(find assets/sprites/walls -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+echo "  - enemies: $(echo "$enemies" | jq length)"
+echo "  - equipment: $(echo "$equipment" | jq length)"
+echo "  - weapons: $(echo "$weapons" | jq length)"
+echo "  - inventory: $(echo "$inventory" | jq length)"
+echo "  - objects: $(echo "$objects" | jq length)"
+echo "  - walls: $(echo "$walls" | jq length)"
