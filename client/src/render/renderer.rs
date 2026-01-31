@@ -1005,6 +1005,9 @@ impl Renderer {
         self.render_tilemap_layer(state, LayerType::Overhead);
         timings.overhead_ms = (get_time() - t2) * 1000.0;
 
+        // 4.5. Render name tags above all map elements (overhead, walls, objects, etc.)
+        self.render_name_tags(state);
+
         // 5. Render floating damage numbers
         let t3 = get_time();
         self.render_damage_numbers(state);
@@ -1190,6 +1193,131 @@ impl Renderer {
             vertices,
             indices,
             texture: None,
+        }
+    }
+
+    /// Render name tags for all hovered/selected players and NPCs.
+    /// Called after overhead tiles so names always appear above all map elements.
+    fn render_name_tags(&self, state: &GameState) {
+        // Player name tags
+        for player in state.players.values() {
+            let is_selected = state.selected_entity_id.as_ref() == Some(&player.id);
+            let is_hovered = state.hovered_entity_id.as_ref() == Some(&player.id);
+            if !is_selected && !is_hovered {
+                continue;
+            }
+
+            let (screen_x, screen_y) = world_to_screen(player.x, player.y, &state.camera);
+            let zoom = state.camera.zoom;
+            let scaled_sprite_height = SPRITE_HEIGHT * zoom;
+            let has_sprite = self.get_player_sprite(&player.gender, &player.skin).is_some();
+            let name_y_offset = if has_sprite { scaled_sprite_height - 8.0 * zoom } else { 24.0 * zoom };
+
+            let name_width = self.measure_text_sharp(&player.name, 16.0).width;
+            let gm_width = if player.is_admin { self.measure_text_sharp(" (GM)", 16.0).width - 2.0 } else { 0.0 };
+            let total_width = name_width + gm_width;
+            let name_x = screen_x - total_width / 2.0;
+            let name_y = screen_y - name_y_offset + 2.0;
+
+            let padding = 4.0;
+            draw_rectangle(
+                name_x - padding,
+                name_y - 14.0,
+                total_width + padding * 2.0,
+                18.0,
+                Color::from_rgba(0, 0, 0, 180),
+            );
+
+            self.draw_text_sharp(&player.name, name_x, name_y, 16.0, WHITE);
+
+            if player.is_admin {
+                let gold_color = Color::from_rgba(255, 215, 0, 255);
+                self.draw_text_sharp(" (GM)", name_x + name_width, name_y, 16.0, gold_color);
+            }
+        }
+
+        // NPC name tags
+        for npc in state.npcs.values() {
+            if npc.death_timer.is_some() || npc.is_death_animation_complete() {
+                continue;
+            }
+
+            let is_selected = state.selected_entity_id.as_ref() == Some(&npc.id);
+            let is_hovered = state.hovered_entity_id.as_ref() == Some(&npc.id);
+            if !is_selected && !is_hovered {
+                continue;
+            }
+
+            let (screen_x, screen_y) = world_to_screen(npc.x, npc.y, &state.camera);
+            let zoom = state.camera.zoom;
+
+            // Compute sprite height to find top_y
+            let sprite_height = if let Some(sprite) = self.npc_sprites.get(&npc.entity_type) {
+                let frame_height = sprite.height();
+                (frame_height * zoom).round()
+            } else {
+                // Fallback ellipse sizing
+                let time = macroquad::time::get_time() as f32;
+                let wobble = (time * 2.0 + npc.x + npc.y).sin() * 0.5 + 0.5;
+                let radius = (10.0 + wobble * 1.5) * zoom;
+                let height_offset = (8.0 + wobble * 2.0) * zoom;
+                (height_offset + radius) * 2.0
+            };
+            let top_y = screen_y - sprite_height + 4.0 * zoom;
+
+            let name_color = if npc.is_hostile() {
+                Color::from_rgba(255, 150, 150, 255)
+            } else if npc.is_quest_giver {
+                Color::from_rgba(150, 220, 255, 255)
+            } else if npc.is_merchant {
+                Color::from_rgba(150, 255, 150, 255)
+            } else {
+                Color::from_rgba(255, 255, 255, 255)
+            };
+
+            let name = npc.name();
+            let name_width = self.measure_text_sharp(&name, 16.0).width;
+            let name_y = top_y - 5.0 * zoom;
+            let padding = 4.0;
+
+            let small_icon: Option<&Texture2D> = if npc.is_quest_giver {
+                self.chat_small_icon.as_ref()
+            } else {
+                None
+            };
+
+            let icon_gap = 4.0;
+            let (total_width, icon_width) = if let Some(tex) = small_icon {
+                let w = tex.width();
+                (w + icon_gap + name_width, w)
+            } else {
+                (name_width, 0.0)
+            };
+            let content_x = screen_x - total_width / 2.0;
+
+            let bar_height = 18.0;
+            draw_rectangle(
+                content_x - padding,
+                name_y - 14.0,
+                total_width + padding * 2.0,
+                bar_height,
+                Color::from_rgba(0, 0, 0, 180),
+            );
+
+            if let Some(tex) = small_icon {
+                let icon_h = tex.height();
+                let bar_top = name_y - 14.0;
+                let icon_y = bar_top + (bar_height - icon_h) / 2.0;
+                draw_texture_ex(tex, content_x, icon_y, WHITE, DrawTextureParams::default());
+            }
+
+            let text_x = if small_icon.is_some() {
+                content_x + icon_width + icon_gap
+            } else {
+                content_x
+            };
+
+            self.draw_text_sharp(&name, text_x, name_y, 16.0, name_color);
         }
     }
 
@@ -2565,45 +2693,7 @@ impl Renderer {
         let name_y_offset = if has_sprite { scaled_sprite_height - 8.0 * zoom } else { 24.0 * zoom };
 
         let show_name = is_selected || is_hovered;
-        if show_name {
-            // Build display name with optional (GM) suffix
-            let name_width = self.measure_text_sharp(&player.name, 16.0).width;
-            let gm_width = if player.is_admin { self.measure_text_sharp(" (GM)", 16.0).width - 2.0 } else { 0.0 };
-            let total_width = name_width + gm_width;
-            let name_x = screen_x - total_width / 2.0;
-            let name_y = screen_y - name_y_offset + 2.0;
-
-            // Background for readability
-            let padding = 4.0;
-            draw_rectangle(
-                name_x - padding,
-                name_y - 14.0,
-                total_width + padding * 2.0,
-                18.0,
-                Color::from_rgba(0, 0, 0, 180),
-            );
-
-            // Draw player name in white
-            self.draw_text_sharp(
-                &player.name,
-                name_x,
-                name_y,
-                16.0,
-                WHITE,
-            );
-
-            // Draw (GM) suffix in gold if admin
-            if player.is_admin {
-                let gold_color = Color::from_rgba(255, 215, 0, 255);
-                self.draw_text_sharp(
-                    " (GM)",
-                    name_x + name_width,
-                    name_y,
-                    16.0,
-                    gold_color,
-                );
-            }
-        }
+        // Name tag drawing is deferred to render_name_tags() so it appears above all map elements
 
         // Health bar - only show within 3 seconds of taking damage (and when not at full HP)
         let current_time = macroquad::time::get_time();
@@ -3043,71 +3133,7 @@ impl Renderer {
 
         // NPC name with level - only show when hovered or selected
         let show_name = is_selected || is_hovered;
-        if show_name {
-            let name = npc.name();
-            let name_width = self.measure_text_sharp(&name, 16.0).width;
-            let name_y = top_y - 5.0 * zoom;
-            let padding = 4.0;
-
-            // Get the small icon texture for the name bar (quest givers only)
-            let small_icon: Option<&Texture2D> = if npc.is_quest_giver {
-                self.chat_small_icon.as_ref()
-            } else {
-                None
-            };
-
-            let icon_gap = 4.0;  // Gap between icon and text
-
-            // Calculate total width and starting position
-            let (total_width, icon_width) = if let Some(tex) = small_icon {
-                let w = tex.width();
-                (w + icon_gap + name_width, w)
-            } else {
-                (name_width, 0.0)
-            };
-            let content_x = screen_x - total_width / 2.0;
-
-            // Background for readability
-            let bar_height = 18.0;
-            draw_rectangle(
-                content_x - padding,
-                name_y - 14.0,
-                total_width + padding * 2.0,
-                bar_height,
-                Color::from_rgba(0, 0, 0, 180),
-            );
-
-            // Draw small icon if present
-            if let Some(tex) = small_icon {
-                let icon_h = tex.height();
-                // Center icon vertically in the bar
-                let bar_top = name_y - 14.0;
-                let icon_y = bar_top + (bar_height - icon_h) / 2.0;
-
-                draw_texture_ex(
-                    tex,
-                    content_x,
-                    icon_y,
-                    WHITE,
-                    DrawTextureParams::default(),
-                );
-            }
-
-            // Draw name text (offset by icon if present)
-            let text_x = if small_icon.is_some() {
-                content_x + icon_width + icon_gap
-            } else {
-                content_x
-            };
-
-            self.draw_text_sharp(
-                &name,
-                text_x,
-                name_y,
-                16.0,
-                name_color,
-            );
-        }
+        // Name tag drawing is deferred to render_name_tags() so it appears above all map elements
 
         // Health bar - only show within 3 seconds of taking damage (and when not at full HP)
         let current_time = macroquad::time::get_time();
