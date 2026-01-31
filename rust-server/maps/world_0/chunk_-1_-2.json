@@ -3089,6 +3089,5 @@
   "entities": [],
   "mapObjects": [],
   "walls": [],
-  "portals": [],
-  "gatheringZones": []
+  "portals": []
 }

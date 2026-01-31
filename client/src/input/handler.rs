@@ -1121,6 +1121,12 @@ impl InputHandler {
             if mouse_clicked {
                 if let Some(ref element) = clicked_element {
                     match element {
+                    UiElementId::ShopCraftingCloseButton => {
+                        state.ui_state.crafting_open = false;
+                        state.ui_state.crafting_npc_id = None;
+                        state.ui_state.shop_data = None;
+                        return commands;
+                    }
                     UiElementId::MainTab(idx) => {
                         state.ui_state.shop_main_tab = *idx;
                         return commands;

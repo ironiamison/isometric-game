@@ -3085,43 +3085,378 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAA=",
   "entities": [
     {
-      "id": "entity_1769298626596_tyqledwk3",
       "entityId": "springs",
-      "name": "springs",
       "x": 10,
       "y": 2,
       "level": 1
     },
     {
-      "id": "entity_1769298626928_19mkxjbwe",
       "entityId": "springs",
-      "name": "springs",
       "x": 2,
       "y": 14,
       "level": 1
     },
     {
-      "id": "entity_1769298627311_nfm00qg3k",
       "entityId": "springs",
-      "name": "springs",
       "x": 20,
       "y": 21,
       "level": 1
     },
     {
-      "id": "entity_1769298627630_vj74m1eug",
       "entityId": "springs",
-      "name": "springs",
       "x": 4,
       "y": 23,
       "level": 1
     }
   ],
-  "mapObjects": [],
+  "mapObjects": [
+    {
+      "gid": 1495,
+      "x": 0,
+      "y": 31,
+      "width": 148,
+      "height": 210
+    },
+    {
+      "gid": 1743,
+      "x": 5,
+      "y": 22,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 9,
+      "y": 28,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 7,
+      "y": 12,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 10,
+      "y": 8,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 19,
+      "y": 13,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 18,
+      "y": 26,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 14,
+      "y": 23,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 17,
+      "y": 15,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 26,
+      "y": 24,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 27,
+      "y": 27,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 22,
+      "y": 18,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 14,
+      "y": 16,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 12,
+      "y": 14,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 24,
+      "y": 7,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 20,
+      "y": 1,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 15,
+      "y": 8,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 4,
+      "y": 2,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1743,
+      "x": 2,
+      "y": 2,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 5,
+      "y": 19,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 18,
+      "y": 11,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 13,
+      "y": 15,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 12,
+      "y": 12,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 18,
+      "y": 12,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 16,
+      "y": 19,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 15,
+      "y": 11,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 17,
+      "y": 21,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 23,
+      "y": 25,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 23,
+      "y": 26,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 29,
+      "y": 24,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 28,
+      "y": 27,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 29,
+      "y": 29,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 22,
+      "y": 27,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1741,
+      "x": 29,
+      "y": 28,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1742,
+      "x": 15,
+      "y": 26,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1742,
+      "x": 12,
+      "y": 24,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1742,
+      "x": 12,
+      "y": 20,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1740,
+      "x": 24,
+      "y": 10,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1740,
+      "x": 24,
+      "y": 5,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1740,
+      "x": 27,
+      "y": 9,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1740,
+      "x": 27,
+      "y": 14,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1740,
+      "x": 23,
+      "y": 12,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1740,
+      "x": 20,
+      "y": 9,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1740,
+      "x": 17,
+      "y": 12,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1742,
+      "x": 2,
+      "y": 1,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1742,
+      "x": 6,
+      "y": 3,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1742,
+      "x": 6,
+      "y": 7,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1742,
+      "x": 30,
+      "y": 4,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1742,
+      "x": 30,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    }
+  ],
   "walls": [],
-  "portals": [],
-  "gatheringZones": []
+  "portals": []
 }

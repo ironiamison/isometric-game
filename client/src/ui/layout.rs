@@ -45,6 +45,9 @@ pub enum UiElementId {
     // World Items
     GroundItem(String), // item instance ID
 
+    // Shop/Crafting close button
+    ShopCraftingCloseButton,
+
     // Shop
     ShopBuyItem(usize),
     ShopSellItem(usize),

@@ -647,7 +647,7 @@ impl TouchButton {
 
             // Draw sub-label inside the circle, below the icon
             if let Some(sub) = &self.sub_label {
-                let font_size = 11.0;
+                let font_size = 16.0;
                 let text_dim = measure_text(sub, None, font_size as u16, 1.0);
                 let text_color = if self.pressed {
                     Color::new(0.855, 0.698, 0.424, content_alpha)
@@ -657,7 +657,7 @@ impl TouchButton {
                 draw_text(
                     sub,
                     self.position.x - text_dim.width / 2.0,
-                    self.position.y + self.radius - 8.0,
+                    self.position.y + self.radius - 14.0,
                     font_size,
                     text_color,
                 );

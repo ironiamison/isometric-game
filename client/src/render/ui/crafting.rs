@@ -12,8 +12,8 @@ impl Renderer {
     pub(crate) fn render_crafting(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
         let (sw, sh) = virtual_screen_size();
 
-        let panel_width = 650.0;
-        let panel_height = 450.0;
+        let panel_width = (650.0_f32).min(sw - 16.0);
+        let panel_height = (450.0_f32).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 
@@ -93,7 +93,22 @@ impl Renderer {
         let recipes_text_x = main_tab_x + (main_tab_width - recipes_dims.width) / 2.0;
         self.draw_text_sharp("Crafting", recipes_text_x, main_tab_y + 19.0, TAB_FONT_SIZE, recipes_text_color);
 
-        self.draw_text_sharp("[Esc] Close", header_x + header_w - 80.0, header_y + 26.0, 16.0, TEXT_DIM);
+        // Close button (X)
+        let close_btn_size = 28.0;
+        let close_btn_x = header_x + header_w - close_btn_size - 6.0;
+        let close_btn_y = header_y + (HEADER_HEIGHT - close_btn_size) / 2.0;
+        let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
+        layout.add(UiElementId::ShopCraftingCloseButton, close_bounds);
+
+        let is_close_hovered = matches!(hovered, Some(UiElementId::ShopCraftingCloseButton));
+        let close_bg = if is_close_hovered { Color::new(0.6, 0.15, 0.15, 1.0) } else { SLOT_BG_EMPTY };
+        let close_border = if is_close_hovered { Color::new(0.8, 0.3, 0.3, 1.0) } else { SLOT_BORDER };
+        draw_rectangle(close_btn_x, close_btn_y, close_btn_size, close_btn_size, close_border);
+        draw_rectangle(close_btn_x + 1.0, close_btn_y + 1.0, close_btn_size - 2.0, close_btn_size - 2.0, close_bg);
+
+        let x_dims = self.measure_text_sharp("X", 16.0);
+        let x_color = if is_close_hovered { WHITE } else { TEXT_DIM };
+        self.draw_text_sharp("X", close_btn_x + (close_btn_size - x_dims.width) / 2.0, close_btn_y + 20.0, 16.0, x_color);
 
         // ===== CONTENT AREA =====
         let content_y = panel_y + FRAME_THICKNESS + HEADER_HEIGHT + 4.0;
@@ -225,7 +240,7 @@ impl Renderer {
             .collect();
 
         // ===== RECIPE LIST (left side) =====
-        let list_width = 220.0;
+        let list_width = (220.0_f32).min((content_width - 32.0) * 0.38);
         let list_x = panel_x + FRAME_THICKNESS + 10.0;
         let list_y = if show_tabs { tab_y + tab_height + 12.0 } else { content_y + 2.0 };
         let list_height = if show_tabs { content_height - tab_height - 20.0 } else { content_height - 10.0 };
