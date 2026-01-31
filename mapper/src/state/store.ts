@@ -12,6 +12,7 @@ import type {
   Wall,
   WallEdge,
   Portal,
+  GatheringZone,
   InteriorMap,
   SpawnPoint,
   ExitPortal,
@@ -161,6 +162,11 @@ interface EditorActions {
   removePortal: (chunkCoord: ChunkCoord, portalId: string) => void;
   updatePortal: (chunkCoord: ChunkCoord, portalId: string, updates: Partial<Portal>) => void;
 
+  // Gathering zone actions
+  selectedGatheringZoneId: string;
+  toggleGatheringZone: (world: WorldCoord) => void;
+  setSelectedGatheringZoneId: (zoneId: string) => void;
+
   // Asset actions
   setTilesets: (tilesets: Tileset[]) => void;
   setEntityRegistry: (registry: EntityRegistry) => void;
@@ -275,6 +281,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   selectedEntitySpawn: null,
   selectedMapObject: null,
   selectedPortal: null,
+  selectedGatheringZoneId: 'pond',
   selectedTiles: new Set(),
 
   tilesets: [],
@@ -1066,6 +1073,77 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       dirty: true,
     }));
   },
+
+  // Gathering zone actions
+  toggleGatheringZone: (world) => {
+    const chunkCoord = worldToChunk(world);
+    get().getOrCreateChunk(chunkCoord);
+    const local = worldToLocal(world);
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk) return;
+
+    const existing = (chunk.gatheringZones || []).find(
+      (g) => g.x === local.lx && g.y === local.ly
+    );
+
+    if (existing) {
+      // Remove existing gathering zone at this tile
+      history.push({
+        type: 'removeGatheringZone',
+        description: `Remove gathering zone at ${world.wx},${world.wy}`,
+        undo: () => {
+          get().updateChunk(chunkCoord, (c) => ({
+            ...c,
+            gatheringZones: [...(c.gatheringZones || []), existing],
+            dirty: true,
+          }));
+        },
+        redo: () => get().toggleGatheringZone(world),
+      });
+
+      get().updateChunk(chunkCoord, (c) => ({
+        ...c,
+        gatheringZones: (c.gatheringZones || []).filter((g) => g.id !== existing.id),
+        dirty: true,
+      }));
+    } else {
+      // Add new gathering zone at this tile
+      const zoneId = get().selectedGatheringZoneId;
+      const newZone: GatheringZone = {
+        id: `gz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        x: local.lx,
+        y: local.ly,
+        zoneId,
+      };
+
+      history.push({
+        type: 'addGatheringZone',
+        description: `Add gathering zone '${zoneId}' at ${world.wx},${world.wy}`,
+        undo: () => {
+          get().updateChunk(chunkCoord, (c) => ({
+            ...c,
+            gatheringZones: (c.gatheringZones || []).filter((g) => g.id !== newZone.id),
+            dirty: true,
+          }));
+        },
+        redo: () => {
+          get().updateChunk(chunkCoord, (c) => ({
+            ...c,
+            gatheringZones: [...(c.gatheringZones || []), newZone],
+            dirty: true,
+          }));
+        },
+      });
+
+      get().updateChunk(chunkCoord, (c) => ({
+        ...c,
+        gatheringZones: [...(c.gatheringZones || []), newZone],
+        dirty: true,
+      }));
+    }
+  },
+
+  setSelectedGatheringZoneId: (zoneId) => set({ selectedGatheringZoneId: zoneId }),
 
   // Asset actions
   setTilesets: (tilesets) => set({ tilesets }),

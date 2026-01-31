@@ -3746,5 +3746,6 @@
       "edge": "down"
     }
   ],
-  "portals": []
+  "portals": [],
+  "gatheringZones": []
 }

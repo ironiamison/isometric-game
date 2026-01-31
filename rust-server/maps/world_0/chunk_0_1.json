@@ -3086,17 +3086,9 @@
     ]
   },
   "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-  "entities": [
-    {
-      "id": "entity_1769386696524_ii14z63w6",
-      "entityId": "corrupted_pig",
-      "name": "corrupted_pig",
-      "x": 5,
-      "y": 3,
-      "level": 1
-    }
-  ],
+  "entities": [],
   "mapObjects": [],
   "walls": [],
-  "portals": []
+  "portals": [],
+  "gatheringZones": []
 }

@@ -11,6 +11,7 @@ import type {
   SimplifiedMapObject,
   SimplifiedWall,
   SimplifiedPortal,
+  SimplifiedGatheringZone,
 } from '@/types';
 import { chunkKey, CHUNK_SIZE } from './coords';
 import { BitSet } from './BitSet';
@@ -66,6 +67,7 @@ export class ChunkManager {
       mapObjects: [],
       walls: [],
       portals: [],
+      gatheringZones: [],
       dirty: false,
     };
 
@@ -235,6 +237,12 @@ export class ChunkManager {
         targetMap: p.targetMap,
         targetSpawn: p.targetSpawn,
       })),
+      gatheringZones: (data.gatheringZones || []).map((g, i) => ({
+        id: `gz_${i}`,
+        x: g.x,
+        y: g.y,
+        zoneId: g.zoneId,
+      })),
       dirty: false,
     };
 
@@ -396,6 +404,12 @@ export class ChunkManager {
       targetSpawn: p.targetSpawn,
     }));
 
+    const gatheringZones: SimplifiedGatheringZone[] = (chunk.gatheringZones || []).map((g) => ({
+      x: g.x,
+      y: g.y,
+      zoneId: g.zoneId,
+    }));
+
     return {
       version: 2,
       coord: chunk.coord,
@@ -410,6 +424,7 @@ export class ChunkManager {
       mapObjects,
       walls,
       portals,
+      gatheringZones,
     };
   }
 
@@ -444,6 +459,7 @@ export class ChunkManager {
       mapObjects: [],
       walls: [],
       portals: [],
+      gatheringZones: [],
       dirty: true,
     };
 

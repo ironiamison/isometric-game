@@ -3550,5 +3550,6 @@
       "targetMap": "duel_arena",
       "targetSpawn": "entrance"
     }
-  ]
+  ],
+  "gatheringZones": []
 }

@@ -53,6 +53,20 @@ export const Layer = {
 } as const;
 export type Layer = typeof Layer[keyof typeof Layer];
 
+// Gathering zone marker (placed per-tile in chunks)
+export interface GatheringZone {
+  id: string;
+  x: number; // Local tile X within chunk
+  y: number; // Local tile Y within chunk
+  zoneId: string; // Zone config ID (e.g., "pond", "river", "ocean")
+}
+
+export interface SimplifiedGatheringZone {
+  x: number;
+  y: number;
+  zoneId: string;
+}
+
 // Tool types
 export const Tool = {
   Select: 'select',
@@ -69,6 +83,7 @@ export const Tool = {
   Portal: 'portal',
   SpawnPoint: 'spawnPoint',
   ExitPortal: 'exitPortal',
+  GatheringZone: 'gatheringZone',
 } as const;
 export type Tool = typeof Tool[keyof typeof Tool];
 
@@ -138,6 +153,7 @@ export interface Chunk {
   mapObjects: MapObject[]; // Trees, rocks, decorations
   walls: Wall[];
   portals: Portal[];
+  gatheringZones: GatheringZone[];
   dirty: boolean;
 }
 
@@ -242,6 +258,7 @@ export interface SimplifiedChunk {
   mapObjects: SimplifiedMapObject[];
   walls: SimplifiedWall[];
   portals: SimplifiedPortal[];
+  gatheringZones: SimplifiedGatheringZone[];
 }
 
 export interface SimplifiedEntitySpawn {

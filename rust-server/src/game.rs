@@ -466,8 +466,8 @@ impl GameRoom {
         let chunk_coords = world.discover_chunk_coords();
         tracing::info!("Discovered {} chunk files", chunk_coords.len());
 
-        for coord in chunk_coords {
-            if let Some(chunk) = world.get_or_load_chunk(coord).await {
+        for coord in &chunk_coords {
+            if let Some(chunk) = world.get_or_load_chunk(*coord).await {
                 for spawn in &chunk.entity_spawns {
                     let npc_id = spawn.unique_id.clone()
                         .unwrap_or_else(|| format!("npc_{}", npc_counter));
@@ -505,7 +505,7 @@ impl GameRoom {
         tracing::info!("Loaded {} shop definitions", shop_registry.len());
 
         // Load gathering system
-        let gathering = match crate::gathering::GatheringSystem::load(std::path::Path::new("data")) {
+        let mut gathering = match crate::gathering::GatheringSystem::load(std::path::Path::new("data")) {
             Ok(g) => {
                 tracing::info!("Loaded gathering system with {} zones", g.zones.len());
                 g
@@ -515,6 +515,24 @@ impl GameRoom {
                 crate::gathering::GatheringSystem::new()
             }
         };
+
+        // Load gathering markers from chunk data
+        let mut chunk_marker_count = 0;
+        for coord in &chunk_coords {
+            if let Some(chunk) = world.get_or_load_chunk(*coord).await {
+                for gz in &chunk.gathering_zones {
+                    gathering.add_marker(crate::gathering::GatheringMarker {
+                        x: gz.world_x,
+                        y: gz.world_y,
+                        zone_id: gz.zone_id.clone(),
+                    });
+                    chunk_marker_count += 1;
+                }
+            }
+        }
+        if chunk_marker_count > 0 {
+            tracing::info!("Loaded {} gathering markers from chunk data", chunk_marker_count);
+        }
 
         Self {
             id: Uuid::new_v4().to_string(),

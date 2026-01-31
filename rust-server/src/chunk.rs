@@ -58,6 +58,17 @@ pub struct Wall {
     pub edge: WallEdge,
 }
 
+/// A gathering zone marker on a tile
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GatheringZoneMarker {
+    /// World tile X coordinate
+    pub world_x: i32,
+    /// World tile Y coordinate
+    pub world_y: i32,
+    /// Zone ID (e.g., "pond", "river", "ocean")
+    pub zone_id: String,
+}
+
 /// A portal that teleports players to another map
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -192,6 +203,8 @@ pub struct Chunk {
     pub walls: Vec<Wall>,
     /// Portals that teleport players to other maps
     pub portals: Vec<Portal>,
+    /// Gathering zone markers (fishing spots, etc.)
+    pub gathering_zones: Vec<GatheringZoneMarker>,
 }
 
 impl Chunk {
@@ -209,6 +222,7 @@ impl Chunk {
             objects: Vec::new(),
             walls: Vec::new(),
             portals: Vec::new(),
+            gathering_zones: Vec::new(),
         }
     }
 

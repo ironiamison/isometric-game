@@ -120,6 +120,11 @@ export class IsometricRenderer {
       }
     }
 
+    // Always render gathering zones when visible
+    for (const chunk of sortedChunks) {
+      this.renderGatheringZones(chunk, viewport);
+    }
+
     if (this.options.showGrid) {
       this.renderGrid(viewport);
     }
@@ -776,6 +781,46 @@ export class IsometricRenderer {
         const label = portal.targetMap || 'Portal';
         this.ctx.fillText(
           label,
+          screen.sx,
+          screen.sy + (TILE_HEIGHT / 2) * viewport.zoom
+        );
+      }
+    }
+  }
+
+  private renderGatheringZones(chunk: Chunk, viewport: Viewport): void {
+    if (!this.ctx || !chunk.gatheringZones || chunk.gatheringZones.length === 0) return;
+
+    for (const gz of chunk.gatheringZones) {
+      const worldCoord = chunkLocalToWorld(chunk.coord, { lx: gz.x, ly: gz.y });
+      const screen = worldToScreen(worldCoord, viewport);
+
+      const hw = (TILE_WIDTH / 2) * viewport.zoom;
+      const hh = (TILE_HEIGHT / 2) * viewport.zoom;
+
+      // Draw semi-transparent teal diamond
+      this.ctx.fillStyle = 'rgba(0, 180, 220, 0.4)';
+      this.ctx.beginPath();
+      this.ctx.moveTo(screen.sx, screen.sy);
+      this.ctx.lineTo(screen.sx + hw, screen.sy + hh);
+      this.ctx.lineTo(screen.sx, screen.sy + TILE_HEIGHT * viewport.zoom);
+      this.ctx.lineTo(screen.sx - hw, screen.sy + hh);
+      this.ctx.closePath();
+      this.ctx.fill();
+
+      // Draw border
+      this.ctx.strokeStyle = 'rgba(0, 220, 255, 0.8)';
+      this.ctx.lineWidth = 2;
+      this.ctx.stroke();
+
+      // Draw zone label
+      if (viewport.zoom >= 0.5) {
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = `bold ${9 * Math.max(1, viewport.zoom)}px sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(
+          gz.zoneId,
           screen.sx,
           screen.sy + (TILE_HEIGHT / 2) * viewport.zoom
         );

@@ -3106,5 +3106,6 @@
   ],
   "mapObjects": [],
   "walls": [],
-  "portals": []
+  "portals": [],
+  "gatheringZones": []
 }

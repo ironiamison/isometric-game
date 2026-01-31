@@ -184,6 +184,7 @@ class StorageManager {
       mapObjects: (stored.mapObjects as Chunk['mapObjects']) || [],
       walls: (stored.walls as Chunk['walls']) || [],
       portals: (stored.portals as Chunk['portals']) || [],
+      gatheringZones: (stored.gatheringZones as Chunk['gatheringZones']) || [],
       dirty: false,
     };
   }

@@ -98,6 +98,10 @@ pub struct SpriteManifest {
     pub walls_atlas: Option<SpriteAtlasInfo>,
     #[serde(default)]
     pub inventory_atlas: Option<SpriteAtlasInfo>,
+    /// Per-weapon frame size overrides: { "weapon_id": [width, height] }
+    /// Weapons not listed here use the default 68x84.
+    #[serde(default)]
+    pub weapon_frame_sizes: std::collections::HashMap<String, [f32; 2]>,
 }
 
 impl SpriteManifest {

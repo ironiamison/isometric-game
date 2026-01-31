@@ -141,6 +141,12 @@ impl SpriteStore {
     }
 }
 
+pub struct WeaponSprite {
+    pub texture: Texture2D,
+    pub frame_width: f32,
+    pub frame_height: f32,
+}
+
 pub struct Renderer {
     player_color: Color,
     local_player_color: Color,
@@ -153,7 +159,7 @@ pub struct Renderer {
     /// Equipment sprite sheets by item ID (e.g., "peasant_suit")
     equipment_sprites: HashMap<String, Texture2D>,
     /// Weapon sprite sheets by item ID (e.g., "goblin_axe")
-    weapon_sprites: HashMap<String, Texture2D>,
+    weapon_sprites: HashMap<String, WeaponSprite>,
     /// Item inventory sprites by item ID
     pub(crate) item_sprites: SpriteStore,
     /// Map object sprites by filename number (e.g., "101")
@@ -342,7 +348,13 @@ impl Renderer {
 
             // Load weapons (individual - animation spritesheets)
             set_loading!("Loading weapons...");
-            let weapons = load_individual_sprites(&manifest.weapons, "assets/sprites/weapons", &mut loaded, total, "Loading weapons...").await;
+            let weapon_textures = load_individual_sprites(&manifest.weapons, "assets/sprites/weapons", &mut loaded, total, "Loading weapons...").await;
+            let weapons: HashMap<String, WeaponSprite> = weapon_textures.into_iter().map(|(id, texture)| {
+                let (fw, fh) = manifest.weapon_frame_sizes.get(&id)
+                    .map(|s| (s[0], s[1]))
+                    .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                (id, WeaponSprite { texture, frame_width: fw, frame_height: fh })
+            }).collect();
 
             // Load items - atlas if available
             set_loading!("Loading items...");
@@ -413,7 +425,13 @@ impl Renderer {
             use crate::util::load_sprites_from_dir_or_manifest;
 
             let equipment = load_sprites_from_dir_or_manifest("assets/sprites/equipment", &manifest.equipment, "assets/sprites").await;
-            let weapons = load_sprites_from_dir_or_manifest("assets/sprites/weapons", &manifest.weapons, "assets/sprites/weapons").await;
+            let weapon_textures = load_sprites_from_dir_or_manifest("assets/sprites/weapons", &manifest.weapons, "assets/sprites/weapons").await;
+            let weapons: HashMap<String, WeaponSprite> = weapon_textures.into_iter().map(|(id, texture)| {
+                let (fw, fh) = manifest.weapon_frame_sizes.get(&id)
+                    .map(|s| (s[0], s[1]))
+                    .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                (id, WeaponSprite { texture, frame_width: fw, frame_height: fh })
+            }).collect();
             let items = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/inventory", &manifest.inventory, "assets/sprites/inventory").await);
             let objects = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/objects", &manifest.objects, "assets/sprites/objects").await);
             let walls = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/walls", &manifest.walls, "assets/sprites/walls").await);
@@ -1840,21 +1858,22 @@ impl Renderer {
 
             // Calculate weapon frame info if weapon is equipped
             let weapon_info = player.equipped_weapon.as_ref().and_then(|weapon_id| {
-                self.weapon_sprites.get(weapon_id).map(|weapon_sprite| {
+                self.weapon_sprites.get(weapon_id).map(|ws| {
                     let anim_frame = player.animation.frame as u32;
                     let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
                     let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame);
-                    (weapon_sprite, weapon_frame, offset_x, offset_y)
+                    (&ws.texture, weapon_frame, offset_x, offset_y, ws.frame_width, ws.frame_height)
                 })
             });
 
-            // Scaled weapon dimensions
-            let scaled_weapon_width = WEAPON_SPRITE_WIDTH * zoom;
-            let scaled_weapon_height = WEAPON_SPRITE_HEIGHT * zoom;
+            // Scaled weapon dimensions (per-weapon)
+            let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info.as_ref()
+                .map(|(_, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
+                .unwrap_or((WEAPON_SPRITE_WIDTH * zoom, WEAPON_SPRITE_HEIGHT * zoom, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
 
             // Draw weapon under-layer (before player sprite)
-            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y)) = weapon_info {
-                let weapon_src_x = weapon_frame.frame_under as f32 * WEAPON_SPRITE_WIDTH;
+            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+                let weapon_src_x = weapon_frame.frame_under as f32 * wf_width;
                 let weapon_draw_x = draw_x + offset_x * zoom;
                 let weapon_draw_y = draw_y + offset_y * zoom;
 
@@ -3615,7 +3634,7 @@ impl Renderer {
             // Gathering status indicator (below HP bar)
             if state.is_gathering {
                 let gather_y = hp_bar_y + bar_height + 4.0;
-                let gather_h = 18.0;
+                let gather_h = 22.0;
                 // Semi-transparent background
                 draw_rectangle(bar_x, gather_y, bar_width, gather_h, Color::new(0.05, 0.15, 0.25, 0.7));
                 draw_rectangle_lines(bar_x, gather_y, bar_width, gather_h, 1.0, Color::new(0.2, 0.5, 0.7, 0.5));
@@ -3623,8 +3642,8 @@ impl Renderer {
                 let dot_count = ((macroquad::time::get_time() * 2.0) as usize % 4) as usize;
                 let dots = ".".repeat(dot_count);
                 let label = format!("Fishing{}", dots);
-                let label_w = self.measure_text_sharp(&label, 12.0).width;
-                self.draw_text_sharp(&label, (bar_x + (bar_width - label_w) / 2.0).floor(), (gather_y + 13.0).floor(), 12.0, Color::new(0.4, 0.8, 0.95, 0.9));
+                let label_w = self.measure_text_sharp(&label, 16.0).width;
+                self.draw_text_sharp(&label, (bar_x + (bar_width - label_w) / 2.0).floor(), (gather_y + 15.0).floor(), 16.0, Color::new(0.4, 0.8, 0.95, 0.9));
             }
 
             // XP Globes (to the left of player stats)

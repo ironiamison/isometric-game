@@ -12,6 +12,7 @@ const tools: { id: Tool; label: string; shortcut: string; group?: string; mode?:
   { id: Tool.Entity, label: 'Entity', shortcut: 'N' },
   { id: Tool.Object, label: 'Object', shortcut: 'O' },
   { id: Tool.Portal, label: 'Portal', shortcut: 'P', mode: 'overworld' },
+  { id: Tool.GatheringZone, label: 'Gathering', shortcut: 'F', mode: 'overworld' },
   { id: Tool.Eyedropper, label: 'Eyedropper', shortcut: 'I' },
   { id: Tool.WallDown, label: 'Wall Down', shortcut: 'D', group: 'walls' },
   { id: Tool.WallRight, label: 'Wall Right', shortcut: 'R', group: 'walls' },

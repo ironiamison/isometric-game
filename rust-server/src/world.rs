@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-use crate::chunk::{world_to_local, Chunk, ChunkCoord, ChunkLayer, ChunkLayerType, EntitySpawn, MapObject, Portal, Wall, WallEdge, CHUNK_SIZE};
+use crate::chunk::{world_to_local, Chunk, ChunkCoord, ChunkLayer, ChunkLayerType, EntitySpawn, GatheringZoneMarker, MapObject, Portal, Wall, WallEdge, CHUNK_SIZE};
 
 /// World manager that handles loading and caching chunks
 pub struct World {
@@ -244,6 +244,23 @@ impl World {
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default();
         chunk.portals = portals;
+
+        // Parse gathering zones
+        if let Some(gz_array) = value["gatheringZones"].as_array() {
+            for gz in gz_array {
+                if let (Some(x), Some(y), Some(zone_id)) = (
+                    gz["x"].as_i64(),
+                    gz["y"].as_i64(),
+                    gz["zoneId"].as_str(),
+                ) {
+                    chunk.gathering_zones.push(GatheringZoneMarker {
+                        world_x: coord.x * CHUNK_SIZE as i32 + x as i32,
+                        world_y: coord.y * CHUNK_SIZE as i32 + y as i32,
+                        zone_id: zone_id.to_string(),
+                    });
+                }
+            }
+        }
 
         Ok(chunk)
     }

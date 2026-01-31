@@ -3086,16 +3086,7 @@
     ]
   },
   "collision": "Bx/g+wEfIIBBHyCAYR0ggAEQIICQAAAAAAAggAAAIIAF4CGAASAhgAAg4fsBOgEAAQgDAAAKHAAACBAAAApwAAAIQAAACkAAADhAAABAQAAAwEEAAABCAAAAQgAAADQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-  "entities": [
-    {
-      "id": "entity_1769386697620_9u71psxlu",
-      "entityId": "corrupted_pig",
-      "name": "corrupted_pig",
-      "x": 10,
-      "y": 28,
-      "level": 1
-    }
-  ],
+  "entities": [],
   "mapObjects": [
     {
       "id": "obj_1769035636547_p7iusc4ds",
@@ -3790,6 +3781,290 @@
       "height": 1,
       "targetMap": "old_house",
       "targetSpawn": "entrance"
+    }
+  ],
+  "gatheringZones": [
+    {
+      "id": "gz_1769818639931_o4h6siahy",
+      "x": 11,
+      "y": 18,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818641054_mwzyjnuzq",
+      "x": 11,
+      "y": 17,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818641314_mn6wlx9f9",
+      "x": 11,
+      "y": 16,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818641570_jh7kiqzwd",
+      "x": 11,
+      "y": 15,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818641861_efsviqafn",
+      "x": 11,
+      "y": 14,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818642157_f22tfl7kh",
+      "x": 11,
+      "y": 13,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818642452_2lb8cvqc8",
+      "x": 11,
+      "y": 12,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818642719_xp0v6in5m",
+      "x": 11,
+      "y": 11,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818643693_rmi6ajb48",
+      "x": 12,
+      "y": 11,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818643985_mc1yrqf3n",
+      "x": 13,
+      "y": 11,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818644254_lrnbfghqu",
+      "x": 13,
+      "y": 9,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818644781_t8lfto0i9",
+      "x": 13,
+      "y": 10,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818645105_w7j8pmo90",
+      "x": 13,
+      "y": 8,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818645448_24zhtswh7",
+      "x": 14,
+      "y": 8,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818645737_l3dd4uwq2",
+      "x": 15,
+      "y": 8,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818646030_k1f7j34to",
+      "x": 16,
+      "y": 8,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818646414_yxvc9jn60",
+      "x": 16,
+      "y": 9,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818646862_p9qm4tvbs",
+      "x": 16,
+      "y": 10,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818649096_v27u5l172",
+      "x": 15,
+      "y": 11,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818649390_kuod2f5d2",
+      "x": 16,
+      "y": 12,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818650383_3yfnj21qn",
+      "x": 17,
+      "y": 12,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818650709_0xttjr4tq",
+      "x": 17,
+      "y": 13,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818653135_zkggw6je1",
+      "x": 18,
+      "y": 13,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818653336_zsgrs3ny1",
+      "x": 19,
+      "y": 13,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818653951_m9uwrsjly",
+      "x": 20,
+      "y": 13,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818654245_xkfuciyrd",
+      "x": 20,
+      "y": 14,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818656064_5c4jm77v5",
+      "x": 21,
+      "y": 15,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818656440_96e0chmt6",
+      "x": 22,
+      "y": 15,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818656966_vsgh8fkfu",
+      "x": 22,
+      "y": 16,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818657248_i2deqqjmm",
+      "x": 22,
+      "y": 17,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818657491_ez1erq4un",
+      "x": 22,
+      "y": 18,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818657764_qf60vy6gf",
+      "x": 22,
+      "y": 19,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818658049_urrxz9279",
+      "x": 22,
+      "y": 20,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818658631_vi47ixr8j",
+      "x": 22,
+      "y": 21,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818659190_qrofjkiyt",
+      "x": 22,
+      "y": 22,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818660205_areksiswm",
+      "x": 21,
+      "y": 23,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818660463_p8b2xvyqt",
+      "x": 22,
+      "y": 23,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818661536_qy0gc5qrx",
+      "x": 20,
+      "y": 23,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818662108_n2sgddcme",
+      "x": 18,
+      "y": 23,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818662466_qoe97va19",
+      "x": 17,
+      "y": 22,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818663110_sd5xfeole",
+      "x": 17,
+      "y": 21,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818663652_0lgbjx33y",
+      "x": 16,
+      "y": 20,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818663984_yju7zvtbt",
+      "x": 15,
+      "y": 20,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818664324_cgau74zu5",
+      "x": 14,
+      "y": 20,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818664638_d6tpo1qlw",
+      "x": 14,
+      "y": 19,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818664976_jkfhxmnlb",
+      "x": 13,
+      "y": 18,
+      "zoneId": "pond"
+    },
+    {
+      "id": "gz_1769818665343_029xw7y9m",
+      "x": 12,
+      "y": 18,
+      "zoneId": "pond"
     }
   ]
 }

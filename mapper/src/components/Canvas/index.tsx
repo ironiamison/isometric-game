@@ -47,6 +47,7 @@ export function Canvas() {
     addMapObject,
     removeMapObject,
     addPortal,
+    toggleGatheringZone,
     setSelectedTileId,
     findEntityAtWorld,
     setSelectedEntitySpawn,
@@ -531,6 +532,10 @@ export function Canvas() {
           }
           break;
         }
+        case Tool.GatheringZone: {
+          toggleGatheringZone(worldTile);
+          break;
+        }
       }
     },
     [
@@ -552,6 +557,7 @@ export function Canvas() {
       addMapObject,
       removeMapObject,
       addPortal,
+      toggleGatheringZone,
       setSelectedTileId,
       findEntityAtWorld,
       setSelectedEntitySpawn,
