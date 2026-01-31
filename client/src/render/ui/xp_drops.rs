@@ -18,14 +18,14 @@ impl Renderer {
     pub fn render_xp_drop_feed(&self, feed: &XpDropFeed, right_edge_x: f32, bar_width: f32, start_y: f32) {
         let current_time = macroquad::time::get_time();
 
-        for drop in feed.drops.iter() {
+        for (i, drop) in feed.drops.iter().enumerate() {
             let age = current_time - drop.time;
             if age >= DROP_LIFETIME {
                 continue;
             }
 
             let t = age / DROP_LIFETIME; // 0.0 to 1.0
-            let y_offset = -(t as f32 * FLOAT_DISTANCE); // float upward
+            let y_offset = -(t as f32 * FLOAT_DISTANCE) + (i as f32 * ROW_HEIGHT); // float upward, stagger vertically
 
             // Opacity: full until FADE_START, then fade out
             let opacity = if age < FADE_START {
@@ -46,9 +46,7 @@ impl Renderer {
             self.draw_xp_drop_icon(drop.skill_type, x, y - ICON_SIZE / 2.0 - 2.0, opacity);
 
             // Draw XP text
-            let skill_color = self.get_xp_drop_skill_color(drop.skill_type);
-            let color = Color::new(skill_color.r, skill_color.g, skill_color.b, opacity);
-            self.draw_text_sharp(&text, x + ICON_SIZE + 4.0, y, 16.0, color);
+            self.draw_text_sharp(&text, x + ICON_SIZE + 4.0, y, 16.0, Color::new(1.0, 1.0, 1.0, opacity));
         }
     }
 

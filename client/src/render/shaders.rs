@@ -102,21 +102,21 @@ void main() {
     vec2 wuv = WorldPos + uv;
 
     // Layer 1: broad slow wave bands moving diagonally
-    float wave1 = sin(wuv.x * 3.0 + wuv.y * 2.0 + Time * 0.8) * 0.5 + 0.5;
-    wave1 = smoothstep(0.55, 0.7, wave1) * 0.12;
+    float wave1 = sin(wuv.x * 3.0 + wuv.y * 2.0 + Time * 0.3) * 0.5 + 0.5;
+    wave1 = smoothstep(0.55, 0.75, wave1) * 0.06;
 
     // Layer 2: finer ripples moving the other direction
-    float wave2 = sin(wuv.x * 6.0 - wuv.y * 4.0 + Time * 1.3) * 0.5 + 0.5;
-    wave2 = smoothstep(0.6, 0.75, wave2) * 0.08;
+    float wave2 = sin(wuv.x * 6.0 - wuv.y * 4.0 + Time * 0.5) * 0.5 + 0.5;
+    wave2 = smoothstep(0.6, 0.8, wave2) * 0.04;
 
     // Layer 3: very fine sparkle/caustic dots
-    float caustic = sin(wuv.x * 10.0 + Time * 1.0) * sin(wuv.y * 8.0 - Time * 0.7);
-    caustic = smoothstep(0.7, 0.9, caustic) * 0.1;
+    float caustic = sin(wuv.x * 10.0 + Time * 0.4) * sin(wuv.y * 8.0 - Time * 0.25);
+    caustic = smoothstep(0.75, 0.92, caustic) * 0.05;
 
     float brightness = wave1 + wave2 + caustic;
 
     // White-ish highlight with low opacity
-    gl_FragColor = vec4(0.7, 0.8, 1.0, brightness * mask);
+    gl_FragColor = vec4(0.8, 0.85, 1.0, brightness * mask);
 }
 "#;
 
