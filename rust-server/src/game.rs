@@ -1899,6 +1899,39 @@ impl GameRoom {
         };
         self.broadcast(result_msg).await;
 
+        // Award combat XP on every successful hit (OSRS style: XP per damage dealt)
+        if actual_damage > 0 {
+            let xp_results = {
+                let mut players = self.players.write().await;
+                if let Some(attacker) = players.get_mut(player_id) {
+                    Some(attacker.award_combat_xp(actual_damage))
+                } else {
+                    None
+                }
+            };
+
+            if let Some(results) = xp_results {
+                for (skill_type, xp_gained, total_xp, level, leveled_up) in results {
+                    self.send_to_player(player_id, ServerMessage::SkillXp {
+                        player_id: player_id.to_string(),
+                        skill: skill_type.as_str().to_string(),
+                        xp_gained,
+                        total_xp,
+                        level,
+                    }).await;
+
+                    if leveled_up {
+                        tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
+                        self.broadcast(ServerMessage::SkillLevelUp {
+                            player_id: player_id.to_string(),
+                            skill: skill_type.as_str().to_string(),
+                            new_level: level,
+                        }).await;
+                    }
+                }
+            }
+        }
+
         // Handle death
         if target_died {
             tracing::info!("{} killed {}", attacker_name, target_name);
@@ -1910,50 +1943,6 @@ impl GameRoom {
                         .map(|n| (n.prototype_id.clone(), n.level))
                         .unwrap_or(("unknown".to_string(), 1))
                 };
-
-                // Calculate EXP reward from prototype
-                let exp_reward = if let Some(prototype) = self.entity_registry.get(&prototype_id) {
-                    crate::entity::calculate_exp_reward(prototype, npc_level)
-                } else {
-                    0 // No prototype found, no exp
-                };
-
-                // Award combat XP to killer based on damage dealt
-                // Use exp_reward as a proxy for "damage" in XP calculation
-                let xp_results: Option<Vec<(SkillType, i64, i64, i32, bool)>> = if exp_reward > 0 {
-                    let mut players = self.players.write().await;
-                    if let Some(killer) = players.get_mut(player_id) {
-                        Some(killer.award_combat_xp(exp_reward))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-
-                // Send skill XP and level-up messages (after releasing write lock)
-                if let Some(results) = xp_results {
-                    for (skill_type, xp_gained, total_xp, level, leveled_up) in results {
-                        // Send XP gain message
-                        self.send_to_player(player_id, ServerMessage::SkillXp {
-                            player_id: player_id.to_string(),
-                            skill: skill_type.as_str().to_string(),
-                            xp_gained,
-                            total_xp,
-                            level,
-                        }).await;
-
-                        // Send level-up message if applicable
-                        if leveled_up {
-                            tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
-                            self.broadcast(ServerMessage::SkillLevelUp {
-                                player_id: player_id.to_string(),
-                                skill: skill_type.as_str().to_string(),
-                                new_level: level,
-                            }).await;
-                        }
-                    }
-                }
 
                 // Broadcast NPC death
                 let death_msg = ServerMessage::NpcDied {

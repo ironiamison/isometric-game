@@ -8,7 +8,6 @@ const DROP_LIFETIME: f64 = 3.0;
 const FLOAT_DISTANCE: f32 = 100.0; // How far drops travel upward
 const FADE_START: f64 = 2.0; // When fading begins
 const ICON_SIZE: f32 = 16.0;
-const ROW_HEIGHT: f32 = 20.0;
 const UI_ICON_SIZE: f32 = 24.0;
 
 use super::super::Renderer;
@@ -18,14 +17,14 @@ impl Renderer {
     pub fn render_xp_drop_feed(&self, feed: &XpDropFeed, right_edge_x: f32, bar_width: f32, start_y: f32) {
         let current_time = macroquad::time::get_time();
 
-        for (i, drop) in feed.drops.iter().enumerate() {
+        for drop in feed.drops.iter() {
             let age = current_time - drop.time;
             if age >= DROP_LIFETIME {
                 continue;
             }
 
             let t = age / DROP_LIFETIME; // 0.0 to 1.0
-            let y_offset = -(t as f32 * FLOAT_DISTANCE) + (i as f32 * ROW_HEIGHT); // float upward, stagger vertically
+            let y_offset = -(t as f32 * FLOAT_DISTANCE) + drop.display_y_offset; // float upward, smooth slot offset
 
             // Opacity: full until FADE_START, then fade out
             let opacity = if age < FADE_START {
