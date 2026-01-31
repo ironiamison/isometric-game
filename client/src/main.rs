@@ -26,12 +26,12 @@ use ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, CharacterCreat
 use auth::AuthSession;
 
 // Production mode - use the production server.
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+// const SERVER_URL: &str = "https://aeven.xyz";
+// const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - use the development server
-// const SERVER_URL: &str = "http://localhost:2567";
-// const WS_URL: &str = "ws://localhost:2567";
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -432,6 +432,8 @@ fn run_game_frame(
             InputCommand::ShopSell { npc_id, item_id, quantity } => ClientMessage::ShopSell { npc_id: npc_id.clone(), item_id: item_id.clone(), quantity: *quantity },
             // Portal commands
             InputCommand::EnterPortal { portal_id } => ClientMessage::EnterPortal { portal_id: portal_id.clone() },
+            InputCommand::StartGathering { marker_x, marker_y } => ClientMessage::StartGathering { marker_x: *marker_x, marker_y: *marker_y },
+            InputCommand::StopGathering => ClientMessage::StopGathering,
         };
         network.send(&msg);
     }

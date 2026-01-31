@@ -437,6 +437,8 @@ pub struct GameRoom {
     arena_manager: RwLock<crate::arena::ArenaManager>,
     /// Database reference for arena stats persistence
     db: Option<Arc<crate::db::Database>>,
+    /// Gathering system (fishing, woodcutting, mining)
+    gathering: RwLock<crate::gathering::GatheringSystem>,
 }
 
 impl GameRoom {
@@ -502,6 +504,18 @@ impl GameRoom {
         }
         tracing::info!("Loaded {} shop definitions", shop_registry.len());
 
+        // Load gathering system
+        let gathering = match crate::gathering::GatheringSystem::load(std::path::Path::new("data")) {
+            Ok(g) => {
+                tracing::info!("Loaded gathering system with {} zones", g.zones.len());
+                g
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load gathering system: {} (using empty)", e);
+                crate::gathering::GatheringSystem::new()
+            }
+        };
+
         Self {
             id: Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -525,6 +539,7 @@ impl GameRoom {
             instance_manager,
             arena_manager: RwLock::new(crate::arena::ArenaManager::new(crate::arena::ArenaConfig::default())),
             db,
+            gathering: RwLock::new(gathering),
         }
     }
 
@@ -3982,6 +3997,62 @@ impl GameRoom {
         }).await;
     }
 
+    pub async fn get_gathering_markers_message(&self) -> ServerMessage {
+        let gathering = self.gathering.read().await;
+        let markers = gathering.markers.iter().map(|m| {
+            let skill = gathering.zones.get(&m.zone_id)
+                .map(|z| z.skill.clone())
+                .unwrap_or_else(|| "unknown".to_string());
+            crate::protocol::GatheringMarkerData {
+                x: m.x,
+                y: m.y,
+                zone_id: m.zone_id.clone(),
+                skill,
+            }
+        }).collect();
+        ServerMessage::GatheringMarkers { markers }
+    }
+
+    pub async fn handle_start_gathering(&self, player_id: &str, marker_x: i32, marker_y: i32) {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let fishing_level = {
+            let players = self.players.read().await;
+            players.get(player_id).map(|p| p.skills.fishing.level).unwrap_or(1)
+        };
+
+        let mut gathering = self.gathering.write().await;
+        match gathering.start_gathering(player_id, marker_x, marker_y, fishing_level, current_time) {
+            Ok(zone_id) => {
+                self.broadcast(ServerMessage::GatheringStarted {
+                    player_id: player_id.to_string(),
+                    marker_x,
+                    marker_y,
+                    zone_id,
+                }).await;
+            }
+            Err(msg) => {
+                self.send_to_player(player_id, ServerMessage::Error {
+                    code: 400,
+                    message: msg,
+                }).await;
+            }
+        }
+    }
+
+    pub async fn handle_stop_gathering(&self, player_id: &str) {
+        let mut gathering = self.gathering.write().await;
+        if gathering.stop_gathering(player_id).is_some() {
+            self.broadcast(ServerMessage::GatheringStopped {
+                player_id: player_id.to_string(),
+                reason: "cancelled".to_string(),
+            }).await;
+        }
+    }
+
     pub async fn tick(&self) {
         let delta_time = 1.0 / TICK_RATE;
         let current_time = std::time::SystemTime::now()
@@ -4146,11 +4217,33 @@ impl GameRoom {
             }
         }
 
+        // Stop gathering for any player who moved
+        {
+            let mut gathering = self.gathering.write().await;
+            let mut stopped = Vec::new();
+            for id in &moved_players {
+                if gathering.is_gathering(id) {
+                    gathering.stop_gathering(id);
+                    stopped.push(id.clone());
+                }
+            }
+            drop(gathering);
+            for id in stopped {
+                self.send_to_player(&id, ServerMessage::GatheringStopped {
+                    player_id: id.clone(),
+                    reason: "moved".to_string(),
+                }).await;
+            }
+        }
+
         // Get player positions for NPC AI (only alive players, grid positions)
         let player_positions: Vec<(String, i32, i32, i32)> = {
             let players = self.players.read().await;
+            let gathering = self.gathering.read().await;
             players.values()
                 .filter(|p| p.active && p.is_alive())
+                // Players in gathering zones are invisible to NPCs
+                .filter(|p| !gathering.is_gathering(&p.id))
                 .map(|p| (p.id.clone(), p.x, p.y, p.hp))
                 .collect()
         };
@@ -4373,6 +4466,13 @@ impl GameRoom {
 
         // Process NPC attacks on players using hit/miss mechanics
         for (npc_id, target_id, npc_level, max_hit) in npc_attacks {
+            // Players in gathering zones are immune to NPC damage
+            {
+                let gathering = self.gathering.read().await;
+                if gathering.is_gathering(&target_id) {
+                    continue;
+                }
+            }
             let (target_hp, target_x, target_y, died, damage): (i32, f32, f32, bool, i32) = {
                 let mut players = self.players.write().await;
                 if let Some(target) = players.get_mut(&target_id) {
@@ -4460,6 +4560,105 @@ impl GameRoom {
             if items.remove(&item_id).is_some() {
                 drop(items);
                 self.broadcast(ServerMessage::ItemDespawned { item_id }).await;
+            }
+        }
+
+        // Gathering tick: process active gatherers and bonus tiles
+        // Phase 1: Gather results (hold locks)
+        struct GatherTick {
+            pid: String,
+            item_id: String,
+            xp_gained: i64,
+            total_xp: i64,
+            level: i32,
+            leveled: bool,
+            inv_update: Vec<crate::item::InventorySlotUpdate>,
+            gold: i32,
+        }
+        let (gather_ticks, inventory_full_players, bonus_events) = {
+            let mut gathering = self.gathering.write().await;
+            let mut players = self.players.write().await;
+
+            let gatherer_ids: Vec<String> = gathering.player_states.keys().cloned().collect();
+            let mut ticks: Vec<GatherTick> = Vec::new();
+            let mut inv_full: Vec<String> = Vec::new();
+
+            for pid in &gatherer_ids {
+                let fishing_level = players.get(pid).map(|p| p.skills.fishing.level).unwrap_or(1);
+                if let Some(result) = gathering.tick_gathering(pid, fishing_level, current_time) {
+                    if let Some(player) = players.get_mut(pid) {
+                        let leftover = player.inventory.add_item(&result.item_id, 1, &self.item_registry);
+                        if leftover > 0 {
+                            inv_full.push(pid.clone());
+                            continue;
+                        }
+                        let leveled = player.skills.fishing.add_xp(result.xp_gained);
+                        ticks.push(GatherTick {
+                            pid: pid.clone(),
+                            item_id: result.item_id,
+                            xp_gained: result.xp_gained,
+                            total_xp: player.skills.fishing.xp,
+                            level: player.skills.fishing.level,
+                            leveled,
+                            inv_update: player.inventory.to_update(),
+                            gold: player.inventory.gold,
+                        });
+                    }
+                }
+            }
+
+            // Stop gathering for inventory-full players
+            for pid in &inv_full {
+                gathering.stop_gathering(pid);
+            }
+
+            let bonus_events = gathering.tick_bonus_tiles(current_time);
+            (ticks, inv_full, bonus_events)
+        };
+
+        // Phase 2: Send messages (no locks held)
+        for tick in gather_ticks {
+            self.send_to_player(&tick.pid, ServerMessage::GatheringResult {
+                player_id: tick.pid.clone(),
+                item_id: tick.item_id,
+                xp_gained: tick.xp_gained,
+            }).await;
+            self.send_to_player(&tick.pid, ServerMessage::InventoryUpdate {
+                player_id: tick.pid.clone(),
+                slots: tick.inv_update,
+                gold: tick.gold,
+            }).await;
+            self.send_to_player(&tick.pid, ServerMessage::SkillXp {
+                player_id: tick.pid.clone(),
+                skill: "fishing".to_string(),
+                xp_gained: tick.xp_gained,
+                total_xp: tick.total_xp,
+                level: tick.level,
+            }).await;
+            if tick.leveled {
+                self.broadcast(ServerMessage::SkillLevelUp {
+                    player_id: tick.pid.clone(),
+                    skill: "fishing".to_string(),
+                    new_level: tick.level,
+                }).await;
+            }
+        }
+        for pid in inventory_full_players {
+            self.send_to_player(&pid, ServerMessage::GatheringStopped {
+                player_id: pid.clone(),
+                reason: "inventory_full".to_string(),
+            }).await;
+        }
+        for event in bonus_events {
+            match event {
+                crate::gathering::BonusTileEvent::Spawned { x, y, zone_id } => {
+                    self.broadcast(ServerMessage::BonusTileSpawned {
+                        x, y, zone_id, telegraph_duration: 5000,
+                    }).await;
+                }
+                crate::gathering::BonusTileEvent::Expired { x, y } => {
+                    self.broadcast(ServerMessage::BonusTileExpired { x, y }).await;
+                }
             }
         }
 

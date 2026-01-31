@@ -129,6 +129,62 @@ base_price = 5
 # Fishing & Gathering
 # =============================================================================
 
+[raw_shrimp]
+display_name = "Raw Shrimp"
+sprite = "raw_shrimp"
+description = "A tiny shrimp. Can be cooked for a small meal."
+category = "material"
+max_stack = 99
+base_price = 3
+
+[raw_sardine]
+display_name = "Raw Sardine"
+sprite = "raw_sardine"
+description = "A small oily fish. Better cooked than raw."
+category = "material"
+max_stack = 99
+base_price = 5
+
+[raw_herring]
+display_name = "Raw Herring"
+sprite = "raw_herring"
+description = "A silvery fish common in streams."
+category = "material"
+max_stack = 99
+base_price = 8
+
+[raw_trout]
+display_name = "Raw Trout"
+sprite = "raw_trout"
+description = "A common freshwater fish. Good for cooking."
+category = "material"
+max_stack = 99
+base_price = 12
+
+[raw_salmon]
+display_name = "Raw Salmon"
+sprite = "raw_salmon"
+description = "A pink-fleshed fish that swims upstream. Nutritious when cooked."
+category = "material"
+max_stack = 99
+base_price = 18
+
+[raw_lobster]
+display_name = "Raw Lobster"
+sprite = "raw_lobster"
+description = "A large crustacean with meaty claws. A prized catch."
+category = "material"
+max_stack = 99
+base_price = 30
+
+[raw_swordfish]
+display_name = "Raw Swordfish"
+sprite = "raw_swordfish"
+description = "A powerful ocean fish with a sharp bill. Rare and valuable."
+category = "material"
+max_stack = 99
+base_price = 50
+
 [trout]
 display_name = "Trout"
 sprite = "trout"

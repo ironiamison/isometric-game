@@ -1,4 +1,4 @@
-use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState};
+use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState, GatheringMarker, BonusTile, GatheringBuff};
 use crate::game::npc::{Npc, NpcState};
 use crate::render::OVERWORLD_NAME;
 use super::protocol::{extract_string, extract_f32, extract_i32, extract_u32, extract_u64, extract_array, extract_u8, extract_bool};
@@ -1493,6 +1493,145 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         state.map_transition.state = crate::game::state::TransitionState::FadingIn;
                     }
                     _ => {}
+                }
+            }
+        }
+
+        "gatheringMarkers" => {
+            if let Some(value) = data {
+                if let Some(markers_arr) = extract_array(value, "markers") {
+                    let mut markers = Vec::new();
+                    for m in markers_arr {
+                        let x = extract_i32(m, "x").unwrap_or(0);
+                        let y = extract_i32(m, "y").unwrap_or(0);
+                        let zone_id = extract_string(m, "zone_id").unwrap_or_default();
+                        let skill = extract_string(m, "skill").unwrap_or_default();
+                        markers.push(GatheringMarker { x, y, zone_id, skill });
+                    }
+                    log::info!("Received {} gathering markers", markers.len());
+                    state.gathering_markers = markers;
+                }
+            }
+        }
+
+        "gatheringStarted" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let zone_id = extract_string(value, "zone_id").unwrap_or_default();
+                log::info!("Gathering started for player {} in zone {}", player_id, zone_id);
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    state.is_gathering = true;
+                }
+            }
+        }
+
+        "gatheringResult" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let item_id = extract_string(value, "item_id").unwrap_or_default();
+                let xp_gained = extract_i32(value, "xp_gained").unwrap_or(0) as i64;
+                log::info!("Gathering result: player {} got {} (+{}xp)", player_id, item_id, xp_gained);
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    let item_name = state.item_registry.get(&item_id)
+                        .map(|d| d.display_name.clone())
+                        .unwrap_or(item_id.clone());
+                    // Add XP event for floating text
+                    if let Some(player) = state.players.get(&player_id) {
+                        state.skill_xp_events.push(SkillXpEvent {
+                            x: player.x,
+                            y: player.y,
+                            skill: "Fishing".to_string(),
+                            xp_gained,
+                            time: macroquad::time::get_time(),
+                        });
+                    }
+                    // Add chat message about the catch
+                    state.ui_state.chat_messages.push(ChatMessage::system(
+                        format!("You caught a {}! (+{} Fishing XP)", item_name, xp_gained)
+                    ));
+                }
+            }
+        }
+
+        "gatheringStopped" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let reason = extract_string(value, "reason").unwrap_or_default();
+                log::info!("Gathering stopped for player {}: {}", player_id, reason);
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    state.is_gathering = false;
+                    if reason == "inventory_full" {
+                        state.ui_state.chat_messages.push(ChatMessage::system(
+                            "Your inventory is full!".to_string()
+                        ));
+                    }
+                }
+            }
+        }
+
+        "bonusTileSpawned" => {
+            if let Some(value) = data {
+                let x = extract_i32(value, "x").unwrap_or(0);
+                let y = extract_i32(value, "y").unwrap_or(0);
+                let zone_id = extract_string(value, "zone_id").unwrap_or_default();
+                let telegraph_duration = extract_u64(value, "telegraph_duration").unwrap_or(5) as f64;
+                log::info!("Bonus tile spawned at ({}, {}) in zone {}", x, y, zone_id);
+                state.bonus_tiles.push(BonusTile {
+                    x, y, zone_id,
+                    spawn_time: macroquad::time::get_time(),
+                    telegraph_duration,
+                });
+            }
+        }
+
+        "bonusTileClaimed" => {
+            if let Some(value) = data {
+                let x = extract_i32(value, "x").unwrap_or(0);
+                let y = extract_i32(value, "y").unwrap_or(0);
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                log::info!("Bonus tile at ({}, {}) claimed by {}", x, y, player_id);
+                // Remove the bonus tile
+                state.bonus_tiles.retain(|t| t.x != x || t.y != y);
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    state.ui_state.chat_messages.push(ChatMessage::system(
+                        "You claimed the bonus spot! 2x gathering speed for 30s!".to_string()
+                    ));
+                }
+            }
+        }
+
+        "bonusTileExpired" => {
+            if let Some(value) = data {
+                let x = extract_i32(value, "x").unwrap_or(0);
+                let y = extract_i32(value, "y").unwrap_or(0);
+                log::info!("Bonus tile at ({}, {}) expired", x, y);
+                state.bonus_tiles.retain(|t| t.x != x || t.y != y);
+            }
+        }
+
+        "buffApplied" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let buff_type = extract_string(value, "buff_type").unwrap_or_default();
+                let duration = extract_u64(value, "duration").unwrap_or(30) as f64;
+                log::info!("Buff {} applied to player {} for {}s", buff_type, player_id, duration);
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    state.gathering_buff = Some(GatheringBuff {
+                        buff_type,
+                        start_time: macroquad::time::get_time(),
+                        duration,
+                    });
+                }
+            }
+        }
+
+        "buffExpired" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let buff_type = extract_string(value, "buff_type").unwrap_or_default();
+                log::info!("Buff {} expired for player {}", buff_type, player_id);
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    state.gathering_buff = None;
                 }
             }
         }

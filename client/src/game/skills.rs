@@ -1,23 +1,25 @@
-//! Combat skills system for the client.
+//! Skills system for the client.
 //!
 //! This is a simplified version that tracks skill data received from the server.
-//! All combat calculations happen server-side.
+//! All calculations happen server-side.
 //!
-//! Skills: Hitpoints, Combat
+//! Skills: Hitpoints, Combat, Fishing
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Combat: Combined attack/strength/defence skill for all combat
+//! - Fishing: Gathering skill for catching fish
 
 use serde::{Deserialize, Serialize};
 
 /// Maximum skill level
 pub const MAX_LEVEL: i32 = 99;
 
-/// Skill types for combat
+/// Skill types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SkillType {
     Hitpoints,
     Combat,
+    Fishing,
 }
 
 impl SkillType {
@@ -25,6 +27,7 @@ impl SkillType {
         match self {
             SkillType::Hitpoints => "hitpoints",
             SkillType::Combat => "combat",
+            SkillType::Fishing => "fishing",
         }
     }
 
@@ -32,6 +35,7 @@ impl SkillType {
         match s.to_lowercase().as_str() {
             "hitpoints" => Some(SkillType::Hitpoints),
             "combat" => Some(SkillType::Combat),
+            "fishing" => Some(SkillType::Fishing),
             _ => None,
         }
     }
@@ -40,6 +44,7 @@ impl SkillType {
         match self {
             SkillType::Hitpoints => "Hitpoints",
             SkillType::Combat => "Combat",
+            SkillType::Fishing => "Fishing",
         }
     }
 }
@@ -99,11 +104,13 @@ impl Default for Skill {
     }
 }
 
-/// All combat skills for a player
+/// All skills for a player
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Skills {
     pub hitpoints: Skill,
     pub combat: Skill,
+    #[serde(default)]
+    pub fishing: Skill,
 }
 
 impl Default for Skills {
@@ -113,11 +120,12 @@ impl Default for Skills {
 }
 
 impl Skills {
-    /// Create new skills with starting values (HP 10, Combat 3)
+    /// Create new skills with starting values (HP 10, Combat 3, Fishing 1)
     pub fn new() -> Self {
         Self {
             hitpoints: Skill::new(10),
             combat: Skill::new(3),
+            fishing: Skill::new(1),
         }
     }
 
@@ -132,6 +140,7 @@ impl Skills {
         match skill_type {
             SkillType::Hitpoints => &self.hitpoints,
             SkillType::Combat => &self.combat,
+            SkillType::Fishing => &self.fishing,
         }
     }
 
@@ -140,6 +149,7 @@ impl Skills {
         match skill_type {
             SkillType::Hitpoints => &mut self.hitpoints,
             SkillType::Combat => &mut self.combat,
+            SkillType::Fishing => &mut self.fishing,
         }
     }
 
@@ -152,6 +162,6 @@ impl Skills {
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level
+        self.hitpoints.level + self.combat.level + self.fishing.level
     }
 }

@@ -85,6 +85,7 @@ pub enum UiElementId {
     ChatTabSystem,
     ChatInputField,
     ChatSendButton,
+    ChatCloseButton,
     ChatPanelBackground,
 }
 

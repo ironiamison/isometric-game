@@ -747,6 +747,12 @@ impl Renderer {
                 }
             }
         }
+        // 1.7. Render gathering marker overlays (fishing spots, etc.)
+        self.render_gathering_markers(state);
+
+        // 1.8. Render bonus tile indicators (pulsing glow)
+        self.render_bonus_tiles(state);
+
         timings.ground_ms = (get_time() - t0) * 1000.0;
 
         // 2. Collect renderable items (players + NPCs + items + object tiles + map objects) for depth sorting
@@ -3082,6 +3088,112 @@ impl Renderer {
         }
     }
 
+    /// Render gathering marker overlays (e.g., fish icons on fishing spots)
+    fn render_gathering_markers(&self, state: &GameState) {
+        let zoom = state.camera.zoom;
+        for marker in &state.gathering_markers {
+            // Map skill type to sprite name
+            let sprite_id = match marker.skill.as_str() {
+                "fishing" => "trout",
+                _ => continue,
+            };
+
+            let (screen_x, screen_y) = world_to_screen(marker.x as f32, marker.y as f32, &state.camera);
+
+            if let Some((texture, source_rect)) = self.item_sprites.get(sprite_id) {
+                let (sprite_w, sprite_h) = if let Some(r) = source_rect {
+                    (r.w, r.h)
+                } else {
+                    (texture.width(), texture.height())
+                };
+                let icon_width = sprite_w * zoom;
+                let icon_height = sprite_h * zoom;
+
+                let alpha = Color::new(1.0, 1.0, 1.0, 0.7);
+                draw_texture_ex(
+                    texture,
+                    screen_x - icon_width / 2.0,
+                    screen_y - icon_height / 2.0,
+                    alpha,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(icon_width, icon_height)),
+                        source: source_rect,
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+    }
+
+    /// Render bonus tile indicators (pulsing golden glow on the ground)
+    fn render_bonus_tiles(&self, state: &GameState) {
+        let zoom = state.camera.zoom;
+        let time = macroquad::time::get_time();
+
+        for tile in &state.bonus_tiles {
+            let elapsed = time - tile.spawn_time;
+            let progress = (elapsed / tile.telegraph_duration).min(1.0) as f32;
+
+            // Pulsing alpha: oscillates faster as it approaches expiry
+            let pulse_speed = 3.0 + progress as f64 * 8.0;
+            let pulse = ((time * pulse_speed).sin() as f32 * 0.5 + 0.5) * 0.4 + 0.2;
+
+            let (screen_x, screen_y) = world_to_screen(tile.x as f32, tile.y as f32, &state.camera);
+
+            // Draw a golden diamond shape (isometric tile highlight)
+            let half_w = 16.0 * zoom;
+            let half_h = 8.0 * zoom;
+            let color = Color::new(1.0, 0.85, 0.2, pulse);
+
+            // Draw as a filled isometric diamond
+            draw_triangle(
+                Vec2::new(screen_x, screen_y - half_h),
+                Vec2::new(screen_x + half_w, screen_y),
+                Vec2::new(screen_x, screen_y + half_h),
+                color,
+            );
+            draw_triangle(
+                Vec2::new(screen_x, screen_y - half_h),
+                Vec2::new(screen_x - half_w, screen_y),
+                Vec2::new(screen_x, screen_y + half_h),
+                color,
+            );
+
+            // Draw a star/sparkle icon in the center
+            let star_color = Color::new(1.0, 1.0, 0.6, pulse + 0.3);
+            draw_circle(screen_x, screen_y, 3.0 * zoom, star_color);
+        }
+    }
+
+    /// Render gathering buff timer indicator (top-center HUD)
+    fn render_gathering_buff(&self, state: &GameState) {
+        if !state.is_gathering { return; }
+        if let Some(ref buff) = state.gathering_buff {
+            let time = macroquad::time::get_time();
+            let elapsed = time - buff.start_time;
+            let remaining = (buff.duration - elapsed).max(0.0);
+            if remaining <= 0.0 { return; }
+            let progress = (remaining / buff.duration) as f32;
+
+            let sw = screen_width();
+            let bar_w = 120.0;
+            let bar_h = 14.0;
+            let x = (sw - bar_w) / 2.0;
+            let y = 40.0;
+
+            // Background
+            draw_rectangle(x - 1.0, y - 1.0, bar_w + 2.0, bar_h + 2.0, Color::new(0.0, 0.0, 0.0, 0.6));
+            // Fill
+            let fill_color = Color::new(1.0, 0.85, 0.2, 0.8);
+            draw_rectangle(x, y, bar_w * progress, bar_h, fill_color);
+            // Text
+            let label = format!("2x Gather {:.0}s", remaining);
+            let font_size = 10.0;
+            let text_w = self.font.measure_text(&label, font_size).width;
+            self.draw_text_sharp(&label, x + (bar_w - text_w) / 2.0, y + 11.0, font_size, WHITE);
+        }
+    }
+
     /// Render a gold pile with multiple animated nuggets
     fn render_gold_pile(&self, item: &GroundItem, camera: &Camera) {
         let (screen_x, screen_y) = world_to_screen(item.x, item.y, camera);
@@ -3500,6 +3612,21 @@ impl Renderer {
             let hp_text_w = self.measure_text_sharp(&hp_text, font_size).width;
             self.draw_text_sharp(&hp_text, (hp_bar_x + (bar_width - hp_text_w) / 2.0).floor(), (hp_bar_y + 14.0).floor(), font_size, TEXT_NORMAL);
 
+            // Gathering status indicator (below HP bar)
+            if state.is_gathering {
+                let gather_y = hp_bar_y + bar_height + 4.0;
+                let gather_h = 18.0;
+                // Semi-transparent background
+                draw_rectangle(bar_x, gather_y, bar_width, gather_h, Color::new(0.05, 0.15, 0.25, 0.7));
+                draw_rectangle_lines(bar_x, gather_y, bar_width, gather_h, 1.0, Color::new(0.2, 0.5, 0.7, 0.5));
+                // Animated dots
+                let dot_count = ((macroquad::time::get_time() * 2.0) as usize % 4) as usize;
+                let dots = ".".repeat(dot_count);
+                let label = format!("Fishing{}", dots);
+                let label_w = self.measure_text_sharp(&label, 12.0).width;
+                self.draw_text_sharp(&label, (bar_x + (bar_width - label_w) / 2.0).floor(), (gather_y + 13.0).floor(), 12.0, Color::new(0.4, 0.8, 0.95, 0.9));
+            }
+
             // XP Globes (to the left of player stats)
             let globe_stats_y = tag_y + tag_height / 2.0 + 8.0; // Slightly below name tag center
             self.render_xp_globes(&state.xp_globes, bar_x, globe_stats_y);
@@ -3640,6 +3767,9 @@ impl Renderer {
         // Skills panel (when open)
         self.render_skills_panel(state, hovered, &mut layout);
 
+        // Gathering buff timer indicator
+        self.render_gathering_buff(state);
+
         // Character panel (when open)
         self.render_character_panel(state, hovered, &mut layout);
 
@@ -3652,15 +3782,25 @@ impl Renderer {
         // Chat button (top-left, above quest tracker) - mobile only
         #[cfg(target_os = "android")]
         {
-            let chat_btn_x = 10.0;
-            let chat_btn_y = 10.0;
             if let Some(tex) = &self.chat_small_icon {
-                let btn_size = 32.0;
-                draw_texture_ex(tex, chat_btn_x, chat_btn_y, WHITE, DrawTextureParams {
-                    dest_size: Some(Vec2::new(btn_size, btn_size)),
-                    ..Default::default()
-                });
-                layout.add(UiElementId::ChatButton, macroquad::prelude::Rect::new(chat_btn_x, chat_btn_y, btn_size, btn_size));
+                let icon_w = tex.width();
+                let icon_h = tex.height();
+                let padding = 6.0;
+                let btn_size = icon_w.max(icon_h) + padding * 2.0;
+                let btn_x = 10.0;
+                let btn_y = 10.0;
+
+                // Circular background
+                let center_x = btn_x + btn_size / 2.0;
+                let center_y = btn_y + btn_size / 2.0;
+                let radius = btn_size / 2.0;
+                draw_circle(center_x, center_y, radius, Color::new(0.1, 0.1, 0.13, 0.85));
+                draw_circle_lines(center_x, center_y, radius, 1.0, Color::new(0.557, 0.424, 0.267, 1.0));
+
+                // Icon at original size (no scaling)
+                draw_texture(tex, btn_x + (btn_size - icon_w) / 2.0, btn_y + (btn_size - icon_h) / 2.0, WHITE);
+
+                layout.add(UiElementId::ChatButton, macroquad::prelude::Rect::new(btn_x, btn_y, btn_size, btn_size));
             }
         }
 

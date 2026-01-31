@@ -17,12 +17,12 @@ use crate::ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, Charact
 use crate::auth::AuthSession;
 
 // Production mode - use the production server.
-pub const SERVER_URL: &str = "https://aeven.xyz";
-pub const WS_URL: &str = "wss://aeven.xyz";
+// pub const SERVER_URL: &str = "https://aeven.xyz";
+// pub const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - use the development server
-// pub const SERVER_URL: &str = "http://localhost:2567";
-// pub const WS_URL: &str = "ws://localhost:2567";
+pub const SERVER_URL: &str = "http://localhost:2567";
+pub const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -210,6 +210,8 @@ pub fn run_game_frame(
             InputCommand::ShopBuy { npc_id, item_id, quantity } => ClientMessage::ShopBuy { npc_id: npc_id.clone(), item_id: item_id.clone(), quantity: *quantity },
             InputCommand::ShopSell { npc_id, item_id, quantity } => ClientMessage::ShopSell { npc_id: npc_id.clone(), item_id: item_id.clone(), quantity: *quantity },
             InputCommand::EnterPortal { portal_id } => ClientMessage::EnterPortal { portal_id: portal_id.clone() },
+            InputCommand::StartGathering { marker_x, marker_y } => ClientMessage::StartGathering { marker_x: *marker_x, marker_y: *marker_y },
+            InputCommand::StopGathering => ClientMessage::StopGathering,
         };
         network.send(&msg);
     }
@@ -333,6 +335,7 @@ pub fn run_game_frame(
         || game_state.ui_state.crafting_open
         || game_state.ui_state.shop_data.is_some()
         || game_state.ui_state.quest_log_open
+        || game_state.ui_state.chat_panel_open
         || in_dialogue;
     input_handler.render_touch_controls(any_panel_open, any_panel_open, game_state.ui_state.use_joystick);
 }

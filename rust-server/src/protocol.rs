@@ -91,6 +91,14 @@ pub enum ClientMessage {
     /// Enter a portal to transition to another map
     #[serde(rename = "enterPortal")]
     EnterPortal { portal_id: String },
+
+    /// Start gathering at a marker tile
+    #[serde(rename = "startGathering")]
+    StartGathering { marker_x: i32, marker_y: i32 },
+
+    /// Stop gathering
+    #[serde(rename = "stopGathering")]
+    StopGathering,
 }
 
 // ============================================================================
@@ -376,6 +384,58 @@ pub enum ServerMessage {
         objects: Vec<ChunkObjectData>,
         walls: Vec<ChunkWallData>,
     },
+    // Gathering messages
+    GatheringMarkers {
+        markers: Vec<GatheringMarkerData>,
+    },
+    GatheringStarted {
+        player_id: String,
+        marker_x: i32,
+        marker_y: i32,
+        zone_id: String,
+    },
+    GatheringResult {
+        player_id: String,
+        item_id: String,
+        xp_gained: i64,
+    },
+    GatheringStopped {
+        player_id: String,
+        reason: String, // "cancelled", "moved", "inventory_full"
+    },
+    BonusTileSpawned {
+        x: i32,
+        y: i32,
+        zone_id: String,
+        telegraph_duration: u64,
+    },
+    BonusTileClaimed {
+        x: i32,
+        y: i32,
+        player_id: String,
+    },
+    BonusTileExpired {
+        x: i32,
+        y: i32,
+    },
+    BuffApplied {
+        player_id: String,
+        buff_type: String,
+        duration: u64,
+    },
+    BuffExpired {
+        player_id: String,
+        buff_type: String,
+    },
+}
+
+/// Gathering marker position sent to clients
+#[derive(Debug, Clone, Serialize)]
+pub struct GatheringMarkerData {
+    pub x: i32,
+    pub y: i32,
+    pub zone_id: String,
+    pub skill: String,
 }
 
 /// Arena match placement data
@@ -572,6 +632,15 @@ impl ServerMessage {
             ServerMessage::NpcSpeech { .. } => "npcSpeech",
             ServerMessage::MapTransition { .. } => "mapTransition",
             ServerMessage::InteriorData { .. } => "interiorData",
+            ServerMessage::GatheringMarkers { .. } => "gatheringMarkers",
+            ServerMessage::GatheringStarted { .. } => "gatheringStarted",
+            ServerMessage::GatheringResult { .. } => "gatheringResult",
+            ServerMessage::GatheringStopped { .. } => "gatheringStopped",
+            ServerMessage::BonusTileSpawned { .. } => "bonusTileSpawned",
+            ServerMessage::BonusTileClaimed { .. } => "bonusTileClaimed",
+            ServerMessage::BonusTileExpired { .. } => "bonusTileExpired",
+            ServerMessage::BuffApplied { .. } => "buffApplied",
+            ServerMessage::BuffExpired { .. } => "buffExpired",
         }
     }
 }
@@ -1722,6 +1791,74 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
 
             Value::Map(map)
         }
+        ServerMessage::GatheringMarkers { markers } => {
+            let mut map = Vec::new();
+            let marker_values: Vec<Value> = markers.iter().map(|m| {
+                let mut mmap = Vec::new();
+                mmap.push((Value::String("x".into()), Value::Integer((m.x as i64).into())));
+                mmap.push((Value::String("y".into()), Value::Integer((m.y as i64).into())));
+                mmap.push((Value::String("zone_id".into()), Value::String(m.zone_id.clone().into())));
+                mmap.push((Value::String("skill".into()), Value::String(m.skill.clone().into())));
+                Value::Map(mmap)
+            }).collect();
+            map.push((Value::String("markers".into()), Value::Array(marker_values)));
+            Value::Map(map)
+        }
+        ServerMessage::GatheringStarted { player_id, marker_x, marker_y, zone_id } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("marker_x".into()), Value::Integer((*marker_x as i64).into())));
+            map.push((Value::String("marker_y".into()), Value::Integer((*marker_y as i64).into())));
+            map.push((Value::String("zone_id".into()), Value::String(zone_id.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::GatheringResult { player_id, item_id, xp_gained } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
+            map.push((Value::String("xp_gained".into()), Value::Integer((*xp_gained).into())));
+            Value::Map(map)
+        }
+        ServerMessage::GatheringStopped { player_id, reason } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::BonusTileSpawned { x, y, zone_id, telegraph_duration } => {
+            let mut map = Vec::new();
+            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
+            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+            map.push((Value::String("zone_id".into()), Value::String(zone_id.clone().into())));
+            map.push((Value::String("telegraph_duration".into()), Value::Integer((*telegraph_duration as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::BonusTileClaimed { x, y, player_id } => {
+            let mut map = Vec::new();
+            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
+            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::BonusTileExpired { x, y } => {
+            let mut map = Vec::new();
+            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
+            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::BuffApplied { player_id, buff_type, duration } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("buff_type".into()), Value::String(buff_type.clone().into())));
+            map.push((Value::String("duration".into()), Value::Integer((*duration as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::BuffExpired { player_id, buff_type } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("buff_type".into()), Value::String(buff_type.clone().into())));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -1902,6 +2039,12 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let portal_id = extract_string(msg_data, "portalId").unwrap_or_default();
             Ok(ClientMessage::EnterPortal { portal_id })
         }
+        "startGathering" => {
+            let marker_x = extract_i32(msg_data, "marker_x").unwrap_or(0);
+            let marker_y = extract_i32(msg_data, "marker_y").unwrap_or(0);
+            Ok(ClientMessage::StartGathering { marker_x, marker_y })
+        }
+        "stopGathering" => Ok(ClientMessage::StopGathering),
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }

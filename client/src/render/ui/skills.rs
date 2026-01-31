@@ -1,5 +1,5 @@
-//! Skills panel rendering - compact 3x3 grid showing combat skill levels
-//! 2 active skills (Hitpoints, Combat), 6 locked placeholder slots
+//! Skills panel rendering - compact 3x3 grid showing skill levels
+//! 3 active skills (Hitpoints, Combat, Fishing), 5 locked placeholder slots
 
 use macroquad::prelude::*;
 use crate::game::{GameState, SkillType};
@@ -26,10 +26,11 @@ const TOTAL_SKILL_SLOTS: usize = 8;
 const UI_ICON_SIZE: f32 = 24.0;
 const UI_ICON_COLS: usize = 10;
 
-/// Active skills in display order (consolidated combat system)
-const ACTIVE_SKILLS: [SkillType; 2] = [
+/// Active skills in display order
+const ACTIVE_SKILLS: [SkillType; 3] = [
     SkillType::Hitpoints,
     SkillType::Combat,
+    SkillType::Fishing,
 ];
 
 impl Renderer {
@@ -135,6 +136,7 @@ impl Renderer {
         let (icon_col, icon_row) = match skill_type {
             SkillType::Hitpoints => (0, 6),
             SkillType::Combat => (2, 6),
+            SkillType::Fishing => (4, 6),
         };
 
         let icon_size = UI_ICON_SIZE * scale;
@@ -163,6 +165,7 @@ impl Renderer {
             let letter = match skill_type {
                 SkillType::Hitpoints => "H",
                 SkillType::Combat => "C",
+                SkillType::Fishing => "F",
             };
             let icon_color = self.get_skill_icon_color(skill_type);
             let letter_dims = self.measure_text_sharp(letter, 16.0);
@@ -211,6 +214,7 @@ impl Renderer {
         match skill_type {
             SkillType::Hitpoints => Color::new(0.8, 0.2, 0.2, 1.0),  // Red
             SkillType::Combat => Color::new(0.85, 0.65, 0.15, 1.0), // Gold/orange
+            SkillType::Fishing => Color::new(0.2, 0.6, 0.85, 1.0),  // Blue
         }
     }
 

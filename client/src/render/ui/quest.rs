@@ -171,7 +171,7 @@ impl Renderer {
             460.0
         } else {
             #[cfg(target_os = "android")]
-            { 50.0 } // Below chat button (10 + 32 + 8)
+            { 46.0 } // Below chat button (10 + 28 + 8)
             #[cfg(not(target_os = "android"))]
             { 20.0 }
         };

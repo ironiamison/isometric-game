@@ -78,6 +78,13 @@ pub enum ClientMessage {
 
     #[serde(rename = "enterPortal")]
     EnterPortal { portal_id: String },
+
+    // Gathering commands
+    #[serde(rename = "startGathering")]
+    StartGathering { marker_x: i32, marker_y: i32 },
+
+    #[serde(rename = "stopGathering")]
+    StopGathering,
 }
 
 impl ClientMessage {
@@ -202,6 +209,12 @@ impl ClientMessage {
                 data.insert("portalId".into(), Value::String(portal_id.clone().into()));
                 "enterPortal"
             }
+            ClientMessage::StartGathering { marker_x, marker_y } => {
+                data.insert("marker_x".into(), Value::Integer((*marker_x as i64).into()));
+                data.insert("marker_y".into(), Value::Integer((*marker_y as i64).into()));
+                "startGathering"
+            }
+            ClientMessage::StopGathering => "stopGathering",
         };
 
         (msg_type, data)

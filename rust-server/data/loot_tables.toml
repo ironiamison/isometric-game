@@ -1,0 +1,79 @@
+# Loot table definitions for gathering
+# Tiered roll system: first roll tier (common/uncommon/rare), then roll item within tier
+# level_scaling adjusts tier weight per player level above zone minimum
+
+[fish_beginner]
+skill = "fishing"
+
+[fish_beginner.tiers.common]
+base_weight = 70
+level_scaling = -0.5
+items = [
+    { id = "raw_shrimp", level = 1, weight = 10, xp_bonus = 0 },
+    { id = "raw_sardine", level = 5, weight = 10, xp_bonus = 5 },
+]
+
+[fish_beginner.tiers.uncommon]
+base_weight = 25
+level_scaling = 0.3
+items = [
+    { id = "raw_herring", level = 10, weight = 10, xp_bonus = 10 },
+]
+
+[fish_beginner.tiers.rare]
+base_weight = 5
+level_scaling = 0.2
+items = [
+    { id = "raw_trout", level = 20, weight = 10, xp_bonus = 25 },
+]
+
+[fish_intermediate]
+skill = "fishing"
+
+[fish_intermediate.tiers.common]
+base_weight = 60
+level_scaling = -0.4
+items = [
+    { id = "raw_herring", level = 10, weight = 10, xp_bonus = 0 },
+    { id = "raw_trout", level = 20, weight = 10, xp_bonus = 10 },
+]
+
+[fish_intermediate.tiers.uncommon]
+base_weight = 30
+level_scaling = 0.3
+items = [
+    { id = "raw_salmon", level = 25, weight = 10, xp_bonus = 20 },
+]
+
+[fish_intermediate.tiers.rare]
+base_weight = 10
+level_scaling = 0.1
+items = [
+    { id = "raw_lobster", level = 40, weight = 10, xp_bonus = 40 },
+]
+
+[fish_advanced]
+skill = "fishing"
+
+[fish_advanced.tiers.common]
+base_weight = 50
+level_scaling = -0.3
+items = [
+    { id = "raw_salmon", level = 25, weight = 10, xp_bonus = 0 },
+    { id = "raw_lobster", level = 40, weight = 10, xp_bonus = 15 },
+]
+
+[fish_advanced.tiers.uncommon]
+base_weight = 35
+level_scaling = 0.2
+items = [
+    { id = "raw_swordfish", level = 50, weight = 10, xp_bonus = 35 },
+]
+
+[fish_advanced.tiers.rare]
+base_weight = 15
+level_scaling = 0.1
+items = [
+    { id = "raw_swordfish", level = 50, weight = 5, xp_bonus = 60 },
+    { id = "oyster", level = 60, weight = 5, xp_bonus = 80 },
+]

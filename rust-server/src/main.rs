@@ -34,6 +34,7 @@ mod data;
 mod db;
 mod entity;
 mod game;
+mod gathering;
 mod instance;
 mod interior;
 mod interior_registry;
@@ -1294,6 +1295,12 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send gathering marker positions
+    let gathering_markers = room.get_gathering_markers_message().await;
+    if let Ok(bytes) = protocol::encode_server_message(&gathering_markers) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Only send overworld data if the player is NOT reconnecting into an instance
     let reconnecting_to_instance = current_map.is_some();
 
@@ -2218,6 +2225,12 @@ async fn handle_client_message(
         }
         ClientMessage::EnterPortal { portal_id } => {
             handle_enter_portal(state, room, player_id, &portal_id).await;
+        }
+        ClientMessage::StartGathering { marker_x, marker_y } => {
+            room.handle_start_gathering(player_id, marker_x, marker_y).await;
+        }
+        ClientMessage::StopGathering => {
+            room.handle_stop_gathering(player_id).await;
         }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}

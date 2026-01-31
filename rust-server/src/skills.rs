@@ -1,8 +1,9 @@
-//! Combat skills system following RuneScape-style mechanics.
+//! Skills system following RuneScape-style mechanics.
 //!
-//! Skills: Hitpoints, Combat
+//! Skills: Hitpoints, Combat, Fishing
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Combat: Combined attack/strength/defence skill for all combat
+//! - Fishing: Gathering skill for catching fish
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -10,12 +11,13 @@ use serde::{Deserialize, Serialize};
 /// Maximum skill level
 pub const MAX_LEVEL: i32 = 99;
 
-/// Skill types for combat
+/// Skill types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SkillType {
     Hitpoints,
     Combat,
+    Fishing,
 }
 
 impl SkillType {
@@ -23,6 +25,7 @@ impl SkillType {
         match self {
             SkillType::Hitpoints => "hitpoints",
             SkillType::Combat => "combat",
+            SkillType::Fishing => "fishing",
         }
     }
 }
@@ -117,11 +120,13 @@ impl Default for Skill {
     }
 }
 
-/// All combat skills for a player
+/// All skills for a player
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Skills {
     pub hitpoints: Skill,
     pub combat: Skill,
+    #[serde(default)]
+    pub fishing: Skill,
 }
 
 impl Default for Skills {
@@ -131,11 +136,12 @@ impl Default for Skills {
 }
 
 impl Skills {
-    /// Create new skills with starting values (HP 10, Combat 3)
+    /// Create new skills with starting values (HP 10, Combat 3, Fishing 1)
     pub fn new() -> Self {
         Self {
             hitpoints: Skill::new(10),
             combat: Skill::new(3),
+            fishing: Skill::new(1),
         }
     }
 
@@ -150,6 +156,7 @@ impl Skills {
         match skill_type {
             SkillType::Hitpoints => &self.hitpoints,
             SkillType::Combat => &self.combat,
+            SkillType::Fishing => &self.fishing,
         }
     }
 
@@ -158,12 +165,13 @@ impl Skills {
         match skill_type {
             SkillType::Hitpoints => &mut self.hitpoints,
             SkillType::Combat => &mut self.combat,
+            SkillType::Fishing => &mut self.fishing,
         }
     }
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level
+        self.hitpoints.level + self.combat.level + self.fishing.level
     }
 }
 
@@ -187,6 +195,7 @@ impl LegacySkills {
                 level: combat_level,
                 xp: total_combat_xp,
             },
+            fishing: Skill::new(1),
         }
     }
 }
@@ -293,6 +302,7 @@ mod tests {
         let max_skills = Skills {
             hitpoints: Skill::new(99),
             combat: Skill::new(99),
+            fishing: Skill::new(1),
         };
         // combat_level = floor((99 + 99) / 2) = 99
         assert_eq!(max_skills.combat_level(), 99);
@@ -301,8 +311,8 @@ mod tests {
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Combat 3 = 13
-        assert_eq!(skills.total_level(), 13);
+        // HP 10 + Combat 3 + Fishing 1 = 14
+        assert_eq!(skills.total_level(), 14);
     }
 
     #[test]

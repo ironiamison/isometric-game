@@ -77,6 +77,9 @@ pub enum InputCommand {
     ShopSell { npc_id: String, item_id: String, quantity: u32 },
     // Portal commands
     EnterPortal { portal_id: String },
+    // Gathering commands
+    StartGathering { marker_x: i32, marker_y: i32 },
+    StopGathering,
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -713,11 +716,23 @@ impl InputHandler {
                         state.ui_state.chat_cursor = 0;
                     }
                     UiElementId::ChatInputField => {
-                        // On Android, this should trigger the native keyboard
                         state.ui_state.chat_open = true;
+                        #[cfg(target_os = "android")]
+                        macroquad::miniquad::window::show_keyboard(true);
+                    }
+                    UiElementId::ChatCloseButton => {
+                        audio.play_sfx("enter");
+                        state.ui_state.chat_panel_open = false;
+                        state.ui_state.chat_open = false;
+                        #[cfg(target_os = "android")]
+                        macroquad::miniquad::window::show_keyboard(false);
                     }
                     UiElementId::ChatPanelBackground => {
-                        // Consume tap - don't let it pass through to game world
+                        // Tapping outside the panel content closes the chat panel
+                        state.ui_state.chat_panel_open = false;
+                        state.ui_state.chat_open = false;
+                        #[cfg(target_os = "android")]
+                        macroquad::miniquad::window::show_keyboard(false);
                     }
                     _ => {}
                 }
@@ -1421,13 +1436,7 @@ impl InputHandler {
             return commands;
         }
 
-        // Block game-world input when chat panel is open (mobile)
-        if state.ui_state.chat_panel_open {
-            // Only process UI element clicks (handled above), not game world input
-            return commands;
-        }
-
-        // Handle chat input mode
+        // Handle chat input mode (must be before chat_panel_open block so typing works)
         if state.ui_state.chat_open {
             // Helper to convert character index to byte index
             let char_to_byte_index = |s: &str, char_idx: usize| -> usize {
@@ -1452,6 +1461,8 @@ impl InputHandler {
                 if state.ui_state.chat_panel_open {
                     state.ui_state.chat_panel_open = false;
                 }
+                #[cfg(target_os = "android")]
+                macroquad::miniquad::window::show_keyboard(false);
                 return commands;
             }
 
@@ -1467,6 +1478,8 @@ impl InputHandler {
                 state.ui_state.chat_scroll_offset = 0;
                 // Close keyboard input but keep chat panel open if it's showing
                 state.ui_state.chat_open = false;
+                #[cfg(target_os = "android")]
+                macroquad::miniquad::window::show_keyboard(false);
                 return commands;
             }
 
@@ -1556,6 +1569,11 @@ impl InputHandler {
                 }
             }
 
+            return commands;
+        }
+
+        // Block game-world input when chat panel is open (mobile)
+        if state.ui_state.chat_panel_open {
             return commands;
         }
 
@@ -1863,6 +1881,7 @@ impl InputHandler {
         }
 
         // Attack (Space key or touch attack button) - holding continues attacking with cooldown
+        // If fishing rod equipped and on/near a fishing tile, start gathering instead
         // Also stop movement when attacking (player must stand still)
         let attack_input = is_key_down(KeyCode::Space) || self.touch_controls.attack_pressed();
         if attack_input {
@@ -1877,17 +1896,42 @@ impl InputHandler {
             state.clear_auto_path();
 
             if current_time - self.last_attack_time >= self.attack_cooldown {
-                log::info!("Space held - sending Attack command");
-                commands.push(InputCommand::Attack);
-                self.last_attack_time = current_time;
+                // Check if we should gather instead of attack
+                let should_gather = if let Some(player) = state.get_local_player() {
+                    if player.equipped_weapon.as_deref() == Some("fishing_rod") {
+                        let px = player.x.round() as i32;
+                        let py = player.y.round() as i32;
+                        // Check if standing on or adjacent to a fishing marker
+                        state.gathering_markers.iter().find(|m| {
+                            m.skill == "fishing" && (m.x - px).abs() <= 1 && (m.y - py).abs() <= 1
+                        }).map(|m| (m.x, m.y))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
 
-                // Set attack animation based on weapon type
-                // First, determine the animation type by reading weapon info
-                let anim_state = if let Some(player) = state.get_local_player() {
-                    if let Some(ref weapon_id) = player.equipped_weapon {
-                        if let Some(item_def) = state.item_registry.get(weapon_id) {
-                            if item_def.weapon_type.as_deref() == Some("ranged") {
-                                AnimationState::ShootingBow
+                if let Some((marker_x, marker_y)) = should_gather {
+                    if !state.is_gathering {
+                        log::info!("Fishing rod equipped near fishing spot - sending StartGathering");
+                        commands.push(InputCommand::StartGathering { marker_x, marker_y });
+                        self.last_attack_time = current_time;
+                    }
+                } else {
+                    log::info!("Space held - sending Attack command");
+                    commands.push(InputCommand::Attack);
+                    self.last_attack_time = current_time;
+
+                    // Set attack animation based on weapon type
+                    let anim_state = if let Some(player) = state.get_local_player() {
+                        if let Some(ref weapon_id) = player.equipped_weapon {
+                            if let Some(item_def) = state.item_registry.get(weapon_id) {
+                                if item_def.weapon_type.as_deref() == Some("ranged") {
+                                    AnimationState::ShootingBow
+                                } else {
+                                    AnimationState::Attacking
+                                }
                             } else {
                                 AnimationState::Attacking
                             }
@@ -1896,15 +1940,13 @@ impl InputHandler {
                         }
                     } else {
                         AnimationState::Attacking
-                    }
-                } else {
-                    AnimationState::Attacking
-                };
+                    };
 
-                // Now apply the animation to the player
-                if let Some(local_id) = &state.local_player_id.clone() {
-                    if let Some(player) = state.players.get_mut(local_id) {
-                        player.animation.set_state(anim_state);
+                    // Now apply the animation to the player
+                    if let Some(local_id) = &state.local_player_id.clone() {
+                        if let Some(player) = state.players.get_mut(local_id) {
+                            player.animation.set_state(anim_state);
+                        }
                     }
                 }
             }

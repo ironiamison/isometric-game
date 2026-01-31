@@ -1,0 +1,26 @@
+# Gathering zone definitions
+# Each zone maps to a skill, level requirement, loot table, and gather speed
+
+[zones.pond]
+skill = "fishing"
+level_required = 1
+loot_table = "fish_beginner"
+bonus_spawn_frequency = 60
+base_gather_speed = 5.0
+base_xp = 10
+
+[zones.river]
+skill = "fishing"
+level_required = 15
+loot_table = "fish_intermediate"
+bonus_spawn_frequency = 50
+base_gather_speed = 4.5
+base_xp = 25
+
+[zones.ocean]
+skill = "fishing"
+level_required = 40
+loot_table = "fish_advanced"
+bonus_spawn_frequency = 45
+base_gather_speed = 4.0
+base_xp = 50

@@ -30,9 +30,34 @@ impl Renderer {
         // Panel frame
         self.draw_panel_frame(panel_x, panel_y, panel_w, panel_h);
 
+        // === CLOSE BUTTON (top-right corner) ===
+        let close_size = 32.0;
+        let close_x = panel_x + panel_w - close_size - FRAME_THICKNESS - 4.0;
+        let close_y = panel_y + FRAME_THICKNESS + 4.0;
+
+        let close_bounds = macroquad::prelude::Rect::new(close_x, close_y, close_size, close_size);
+        layout.add(UiElementId::ChatCloseButton, close_bounds);
+
+        let is_close_hovered = hovered.as_ref() == Some(&UiElementId::ChatCloseButton);
+        let (btn_bg, btn_border) = if is_close_hovered {
+            (Color::new(0.4, 0.15, 0.15, 1.0), Color::new(0.6, 0.2, 0.2, 1.0))
+        } else {
+            (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
+        };
+        draw_rectangle(close_x, close_y, close_size, close_size, btn_bg);
+        draw_rectangle_lines(close_x, close_y, close_size, close_size, 1.0, btn_border);
+
+        // X icon
+        let x_margin = 8.0;
+        let x_color = if is_close_hovered { Color::new(1.0, 0.4, 0.4, 1.0) } else { TEXT_DIM };
+        draw_line(close_x + x_margin, close_y + x_margin,
+                 close_x + close_size - x_margin, close_y + close_size - x_margin, 2.0, x_color);
+        draw_line(close_x + close_size - x_margin, close_y + x_margin,
+                 close_x + x_margin, close_y + close_size - x_margin, 2.0, x_color);
+
         // === TAB BAR ===
         let tab_y = panel_y + FRAME_THICKNESS;
-        let tab_w = (panel_w - FRAME_THICKNESS * 2.0) / 3.0;
+        let tab_w = (panel_w - FRAME_THICKNESS * 2.0 - close_size - 8.0) / 3.0;
         let tab_h = TAB_HEIGHT;
         let tab_x_start = panel_x + FRAME_THICKNESS;
 

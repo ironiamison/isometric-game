@@ -274,6 +274,7 @@ impl Renderer {
         let (icon_col, icon_row) = match skill_type {
             SkillType::Hitpoints => (0, 6),
             SkillType::Combat => (2, 6),
+            SkillType::Fishing => (4, 6),
         };
 
         if let Some(ref texture) = self.ui_icons {
@@ -300,6 +301,7 @@ impl Renderer {
             let letter = match skill_type {
                 SkillType::Hitpoints => "H",
                 SkillType::Combat => "C",
+                SkillType::Fishing => "F",
             };
             let color = self.get_xp_globe_skill_color(skill_type);
             let dims = self.measure_text_sharp(letter, 18.0);
@@ -317,6 +319,7 @@ impl Renderer {
         match skill_type {
             SkillType::Hitpoints => Color::new(0.8, 0.2, 0.2, 1.0),
             SkillType::Combat => Color::new(0.85, 0.65, 0.15, 1.0),
+            SkillType::Fishing => Color::new(0.2, 0.6, 0.85, 1.0),
         }
     }
 

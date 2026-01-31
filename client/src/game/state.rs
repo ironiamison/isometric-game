@@ -353,6 +353,33 @@ pub struct Announcement {
     pub time: f64,
 }
 
+/// A gathering marker tile in the world (fishing spot, mining node, etc.)
+#[derive(Debug, Clone)]
+pub struct GatheringMarker {
+    pub x: i32,
+    pub y: i32,
+    pub zone_id: String,
+    pub skill: String,
+}
+
+/// An active bonus tile event (glowing spot that gives 2x gather speed)
+#[derive(Debug, Clone)]
+pub struct BonusTile {
+    pub x: i32,
+    pub y: i32,
+    pub zone_id: String,
+    pub spawn_time: f64,
+    pub telegraph_duration: f64,
+}
+
+/// An active gathering buff on a player
+#[derive(Debug, Clone)]
+pub struct GatheringBuff {
+    pub buff_type: String,
+    pub start_time: f64,
+    pub duration: f64,
+}
+
 /// Target for context menu - what was right-clicked
 #[derive(Debug, Clone)]
 pub enum ContextMenuTarget {
@@ -582,6 +609,14 @@ pub struct GameState {
     pub ground_items: HashMap<String, GroundItem>,
     /// Items waiting to spawn (with spawn time) - delays loot appearance until after death animation
     pub pending_ground_items: Vec<(GroundItem, f64)>,
+    /// Gathering marker positions received from server
+    pub gathering_markers: Vec<GatheringMarker>,
+    /// Whether the local player is currently gathering
+    pub is_gathering: bool,
+    /// Active bonus tile events
+    pub bonus_tiles: Vec<BonusTile>,
+    /// Active gathering buff on local player
+    pub gathering_buff: Option<GatheringBuff>,
 
     // Targeting
     pub selected_entity_id: Option<String>,
@@ -660,6 +695,10 @@ impl GameState {
             npcs: HashMap::new(),
             ground_items: HashMap::new(),
             pending_ground_items: Vec::new(),
+            gathering_markers: Vec::new(),
+            is_gathering: false,
+            bonus_tiles: Vec::new(),
+            gathering_buff: None,
             selected_entity_id: None,
             damage_events: Vec::new(),
             level_up_events: Vec::new(),

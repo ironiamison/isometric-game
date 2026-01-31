@@ -1,0 +1,27 @@
+# Gathering marker positions in the world
+# Each marker is a tile where players can stand to gather
+
+[[markers]]
+x = 10
+y = 25
+zone_id = "pond"
+
+[[markers]]
+x = 11
+y = 25
+zone_id = "pond"
+
+[[markers]]
+x = 12
+y = 25
+zone_id = "pond"
+
+[[markers]]
+x = 10
+y = 26
+zone_id = "pond"
+
+[[markers]]
+x = 11
+y = 26
+zone_id = "pond"
