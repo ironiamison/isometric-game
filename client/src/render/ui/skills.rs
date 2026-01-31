@@ -132,35 +132,45 @@ impl Renderer {
         draw_line(x + 2.0, y + 2.0, x + size - 2.0, y + 2.0, 2.0, SLOT_INNER_SHADOW);
         draw_line(x + 2.0, y + 2.0, x + 2.0, y + size - 2.0, 2.0, SLOT_INNER_SHADOW);
 
-        // Draw skill icon from ui_icons.png spritesheet (scaled)
-        let (icon_col, icon_row) = match skill_type {
-            SkillType::Hitpoints => (0, 6),
-            SkillType::Combat => (2, 6),
-            SkillType::Fishing => (4, 6),
-        };
-
+        // Draw skill icon (scaled)
         let icon_size = UI_ICON_SIZE * scale;
-        if let Some(ref texture) = self.ui_icons {
+        let icon_x = x + (size - icon_size) / 2.0;
+        let icon_y = y + (size - icon_size) / 2.0 - 2.0 * scale;
+
+        // Use dedicated texture for fishing, sprite sheet for others
+        let drew_icon = if skill_type == SkillType::Fishing {
+            if let Some(ref tex) = self.fishing_skill_icon {
+                draw_texture_ex(
+                    tex, icon_x, icon_y, WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(icon_size, icon_size)),
+                        ..Default::default()
+                    },
+                );
+                true
+            } else { false }
+        } else if let Some(ref texture) = self.ui_icons {
+            let (icon_col, icon_row) = match skill_type {
+                SkillType::Hitpoints => (0, 6),
+                SkillType::Combat => (2, 6),
+                SkillType::Fishing => unreachable!(),
+            };
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
             let src_rect = Rect::new(src_x, src_y, UI_ICON_SIZE, UI_ICON_SIZE);
 
-            // Center the icon in the slot, slightly up to leave room for level
-            let icon_x = x + (size - icon_size) / 2.0;
-            let icon_y = y + (size - icon_size) / 2.0 - 2.0 * scale;
-
             draw_texture_ex(
-                texture,
-                icon_x,
-                icon_y,
-                WHITE,
+                texture, icon_x, icon_y, WHITE,
                 DrawTextureParams {
                     source: Some(src_rect),
                     dest_size: Some(Vec2::new(icon_size, icon_size)),
                     ..Default::default()
                 },
             );
-        } else {
+            true
+        } else { false };
+
+        if !drew_icon {
             // Fallback to letter if texture not loaded (native font size)
             let letter = match skill_type {
                 SkillType::Hitpoints => "H",

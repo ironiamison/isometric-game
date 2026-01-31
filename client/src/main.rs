@@ -432,7 +432,15 @@ fn run_game_frame(
             InputCommand::ShopSell { npc_id, item_id, quantity } => ClientMessage::ShopSell { npc_id: npc_id.clone(), item_id: item_id.clone(), quantity: *quantity },
             // Portal commands
             InputCommand::EnterPortal { portal_id } => ClientMessage::EnterPortal { portal_id: portal_id.clone() },
-            InputCommand::StartGathering { marker_x, marker_y } => ClientMessage::StartGathering { marker_x: *marker_x, marker_y: *marker_y },
+            InputCommand::StartGathering { marker_x, marker_y } => {
+                // Play attack animation so it looks like the player is casting/throwing
+                if let Some(local_id) = &game_state.local_player_id {
+                    if let Some(player) = game_state.players.get_mut(local_id) {
+                        player.play_attack();
+                    }
+                }
+                ClientMessage::StartGathering { marker_x: *marker_x, marker_y: *marker_y }
+            },
             InputCommand::StopGathering => ClientMessage::StopGathering,
         };
         network.send(&msg);

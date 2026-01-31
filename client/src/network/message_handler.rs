@@ -1521,6 +1521,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 log::info!("Gathering started for player {} in zone {}", player_id, zone_id);
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.is_gathering = true;
+                    state.gathering_started_at = macroquad::time::get_time();
                 }
             }
         }
@@ -1547,7 +1548,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                     // Add chat message about the catch
                     state.ui_state.chat_messages.push(ChatMessage::system(
-                        format!("You caught a {}! (+{} Fishing XP)", item_name, xp_gained)
+                        format!("You caught a {}!", item_name)
                     ));
                 }
             }

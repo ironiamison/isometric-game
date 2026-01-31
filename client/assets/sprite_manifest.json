@@ -69,6 +69,9 @@
     "steel_sword",
     "twin_blade"
   ],
+  "weapon_frame_sizes": {
+    "fishing_rod": [70, 86]
+  },
   "inventory": [
     "admin_robes",
     "ancient_boots",

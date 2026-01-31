@@ -182,6 +182,8 @@ pub struct Renderer {
     pub(crate) ui_icons: Option<Texture2D>,
     /// Small chat icon for quest giver name tags
     pub(crate) chat_small_icon: Option<Texture2D>,
+    /// Fishing skill icon (dedicated 32x32 texture)
+    pub(crate) fishing_skill_icon: Option<Texture2D>,
     /// Small coin icon for merchant name tags
     pub(crate) coin_small_icon: Option<Texture2D>,
     /// Material for head+hair composite rendering (shader-based)
@@ -523,6 +525,17 @@ impl Renderer {
             }
         };
 
+        let fishing_skill_icon = match load_texture(&asset_path("assets/ui/fishing_skill.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load fishing_skill icon: {}", e);
+                None
+            }
+        };
+
         let coin_small_icon = match load_texture(&asset_path("assets/ui/coin_small.png")).await {
             Ok(tex) => {
                 tex.set_filter(FilterMode::Nearest);
@@ -582,6 +595,7 @@ impl Renderer {
             circular_stone_texture,
             menu_button_icons,
             ui_icons,
+            fishing_skill_icon,
             chat_small_icon,
             coin_small_icon,
             head_hair_material,
@@ -851,6 +865,13 @@ impl Renderer {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&player.id);
                     let is_hovered = state.hovered_entity_id.as_ref() == Some(&player.id);
                     self.render_player(player, is_local, is_selected, is_hovered, &state.camera);
+                    if is_local && state.is_gathering {
+                        // Delay the line until the cast animation finishes
+                        let elapsed = macroquad::time::get_time() - state.gathering_started_at;
+                        if elapsed > 0.2 {
+                            self.render_fishing_line(player, &state.camera);
+                        }
+                    }
                 }
                 Renderable::Npc(npc) => {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&npc.id);
@@ -1883,7 +1904,7 @@ impl Renderer {
                     weapon_draw_y,
                     tint,
                     DrawTextureParams {
-                        source: Some(Rect::new(weapon_src_x, 0.0, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT)),
+                        source: Some(Rect::new(weapon_src_x, 0.0, wf_width, wf_height)),
                         dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
                         flip_x: weapon_frame.flip_h,
                         ..Default::default()
@@ -2389,9 +2410,9 @@ impl Renderer {
             }
 
             // Draw weapon over-layer (after equipment, for attack frame 2 front overlay)
-            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y)) = weapon_info {
+            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
                 if let Some(frame_over) = weapon_frame.frame_over {
-                    let weapon_src_x = frame_over as f32 * WEAPON_SPRITE_WIDTH;
+                    let weapon_src_x = frame_over as f32 * wf_width;
                     let weapon_draw_x = draw_x + offset_x * zoom;
                     let weapon_draw_y = draw_y + offset_y * zoom;
 
@@ -2401,7 +2422,7 @@ impl Renderer {
                         weapon_draw_y,
                         tint,
                         DrawTextureParams {
-                            source: Some(Rect::new(weapon_src_x, 0.0, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(weapon_src_x, 0.0, wf_width, wf_height)),
                             dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
                             flip_x: weapon_frame.flip_h,
                             ..Default::default()
@@ -2531,20 +2552,21 @@ impl Renderer {
 
             // Calculate weapon frame info if weapon is equipped
             let weapon_info = player.equipped_weapon.as_ref().and_then(|weapon_id| {
-                self.weapon_sprites.get(weapon_id).map(|weapon_sprite| {
+                self.weapon_sprites.get(weapon_id).map(|ws| {
                     let anim_frame = player.animation.frame as u32;
                     let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
                     let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame);
-                    (weapon_sprite, weapon_frame, offset_x, offset_y)
+                    (&ws.texture, weapon_frame, offset_x, offset_y, ws.frame_width, ws.frame_height)
                 })
             });
 
-            let scaled_weapon_width = WEAPON_SPRITE_WIDTH * zoom;
-            let scaled_weapon_height = WEAPON_SPRITE_HEIGHT * zoom;
+            let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info.as_ref()
+                .map(|(_, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
+                .unwrap_or((WEAPON_SPRITE_WIDTH * zoom, WEAPON_SPRITE_HEIGHT * zoom, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
 
             // Draw weapon under-layer (before player sprite)
-            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y)) = weapon_info {
-                let weapon_src_x = weapon_frame.frame_under as f32 * WEAPON_SPRITE_WIDTH;
+            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+                let weapon_src_x = weapon_frame.frame_under as f32 * wf_width;
                 let weapon_draw_x = draw_x + offset_x * zoom;
                 let weapon_draw_y = draw_y + offset_y * zoom;
 
@@ -2554,7 +2576,7 @@ impl Renderer {
                     weapon_draw_y,
                     silhouette_tint,
                     DrawTextureParams {
-                        source: Some(Rect::new(weapon_src_x, 0.0, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT)),
+                        source: Some(Rect::new(weapon_src_x, 0.0, wf_width, wf_height)),
                         dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
                         flip_x: weapon_frame.flip_h,
                         ..Default::default()
@@ -2714,9 +2736,9 @@ impl Renderer {
 
 
             // Draw weapon over-layer (after equipment)
-            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y)) = weapon_info {
+            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
                 if let Some(frame_over) = weapon_frame.frame_over {
-                    let weapon_src_x = frame_over as f32 * WEAPON_SPRITE_WIDTH;
+                    let weapon_src_x = frame_over as f32 * wf_width;
                     let weapon_draw_x = draw_x + offset_x * zoom;
                     let weapon_draw_y = draw_y + offset_y * zoom;
 
@@ -2726,7 +2748,7 @@ impl Renderer {
                         weapon_draw_y,
                         silhouette_tint,
                         DrawTextureParams {
-                            source: Some(Rect::new(weapon_src_x, 0.0, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(weapon_src_x, 0.0, wf_width, wf_height)),
                             dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
                             flip_x: weapon_frame.flip_h,
                             ..Default::default()
@@ -3107,8 +3129,103 @@ impl Renderer {
         }
     }
 
+    /// Render a fishing line from the player's rod tip to a landing point in the water
+    fn render_fishing_line(&self, player: &Player, camera: &Camera) {
+        use crate::game::Direction;
+        use super::animation::{get_weapon_offset, get_weapon_frame, should_flip_horizontal};
+
+        let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
+        let zoom = camera.zoom;
+        let time = macroquad::time::get_time();
+
+        // Compute weapon draw position (same as render_player)
+        let draw_x = screen_x - SPRITE_WIDTH * zoom / 2.0;
+        let draw_y = screen_y - SPRITE_HEIGHT * zoom + 8.0 * zoom;
+
+        let anim_frame = player.animation.frame as u32;
+        let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame);
+        let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
+        let flip = weapon_frame.flip_h;
+
+        // Fishing rod frame size (from manifest: 70x86)
+        let fw: f32 = 70.0;
+        let fh: f32 = 86.0;
+
+        let weapon_draw_x = draw_x + offset_x * zoom;
+        let weapon_draw_y = draw_y + offset_y * zoom;
+
+        // Rod tip position within the weapon frame (in unscaled pixels)
+        // These are the approximate pixel positions of the rod tip in each frame
+        let (tip_px, tip_py) = match player.animation.direction {
+            Direction::Down  => (12.0, 63.0),  // frame 0: rod points down, tip is lower
+            Direction::Left  => (16.0, 38.0),  // frame 1: mirrored adjustment (+4x, +8y)
+            Direction::Up    => (16.0, 38.0),  // frame 1 flipped: (-4 screen-left, +8y down)
+            Direction::Right => (12.0, 63.0),  // frame 0 flipped: rod points down, tip is lower
+        };
+
+        // Account for horizontal flip
+        let tip_in_frame_x = if flip { fw - tip_px } else { tip_px };
+
+        let rod_x = weapon_draw_x + tip_in_frame_x * zoom;
+        let rod_y = weapon_draw_y + tip_py * zoom;
+
+        // Landing point: center of a tile 2-3 tiles ahead in the facing direction
+        // Use player position as seed for stable per-session random distance
+        let seed = (player.x * 73.137 + player.y * 37.891) as f32;
+        let cast_dist = 2.0 + (seed.sin() * 0.5 + 0.5); // range [2.0, 3.0]
+        let (tile_dx, tile_dy): (f32, f32) = match player.animation.direction {
+            Direction::Down  => ( 0.0,  cast_dist),
+            Direction::Up    => ( 0.0, -cast_dist),
+            Direction::Left  => (-cast_dist,  0.0),
+            Direction::Right => ( cast_dist,  0.0),
+        };
+
+        let (land_base_x, land_base_y) = world_to_screen(
+            player.x + tile_dx,
+            player.y + tile_dy,
+            camera,
+        );
+
+        // Gentle sway at the landing point
+        let sway_x = (time * 0.8).sin() as f32 * 2.0 * zoom;
+        let sway_y = (time * 0.6).cos() as f32 * 1.0 * zoom;
+        let land_x = land_base_x + sway_x;
+        let land_y = land_base_y + sway_y;
+
+        // Draw line as a catenary curve using segments
+        let segments = 8;
+        let line_color = Color::new(1.0, 1.0, 1.0, 0.85);
+        let line_thickness = (1.0 * zoom).max(0.5);
+
+        for i in 0..segments {
+            let t0 = i as f32 / segments as f32;
+            let t1 = (i + 1) as f32 / segments as f32;
+
+            let x0 = rod_x + (land_x - rod_x) * t0;
+            let x1 = rod_x + (land_x - rod_x) * t1;
+            let y0_base = rod_y + (land_y - rod_y) * t0;
+            let y1_base = rod_y + (land_y - rod_y) * t1;
+
+            // Parabolic droop, max at midpoint
+            let droop_amount = 10.0 * zoom;
+            let sag0 = droop_amount * 4.0 * t0 * (1.0 - t0);
+            let sag1 = droop_amount * 4.0 * t1 * (1.0 - t1);
+
+            // Slight wind ripple increasing toward the end
+            let wind = (time * 2.5 + t0 as f64 * 3.0).sin() as f32 * 1.5 * zoom * t0;
+
+            draw_line(x0 + wind * 0.5, y0_base + sag0, x1 + wind * 0.5, y1_base + sag1, line_thickness, line_color);
+        }
+
+        // Small bobber at the landing point
+        let bobber_bob = (time * 1.5).sin() as f32 * 1.5 * zoom;
+        draw_circle(land_x, land_y + bobber_bob, 2.0 * zoom, Color::new(0.8, 0.2, 0.1, 0.8));
+        draw_circle(land_x, land_y + bobber_bob, 1.2 * zoom, Color::new(1.0, 0.4, 0.2, 0.9));
+    }
+
     /// Render gathering marker overlays (e.g., fish icons on fishing spots)
     fn render_gathering_markers(&self, state: &GameState) {
+        if !state.debug_mode { return; }
         let zoom = state.camera.zoom;
         for marker in &state.gathering_markers {
             // Map skill type to sprite name

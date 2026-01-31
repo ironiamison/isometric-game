@@ -270,33 +270,37 @@ impl Renderer {
     }
 
     fn draw_xp_globe_icon(&self, skill_type: SkillType, center_x: f32, center_y: f32, opacity: f32) {
-        // Icon positions in ui_icons.png (same as skills panel)
-        let (icon_col, icon_row) = match skill_type {
-            SkillType::Hitpoints => (0, 6),
-            SkillType::Combat => (2, 6),
-            SkillType::Fishing => (4, 6),
-        };
+        let icon_x = center_x - ICON_SIZE / 2.0;
+        let icon_y = center_y - ICON_SIZE / 2.0;
+        let tint = Color::new(1.0, 1.0, 1.0, opacity);
 
-        if let Some(ref texture) = self.ui_icons {
+        let drew_icon = if skill_type == SkillType::Fishing {
+            if let Some(ref tex) = self.fishing_skill_icon {
+                draw_texture_ex(tex, icon_x, icon_y, tint, DrawTextureParams {
+                    dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
+                    ..Default::default()
+                });
+                true
+            } else { false }
+        } else if let Some(ref texture) = self.ui_icons {
+            let (icon_col, icon_row) = match skill_type {
+                SkillType::Hitpoints => (0, 6),
+                SkillType::Combat => (2, 6),
+                SkillType::Fishing => unreachable!(),
+            };
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
             let src_rect = Rect::new(src_x, src_y, UI_ICON_SIZE, UI_ICON_SIZE);
 
-            let icon_x = center_x - ICON_SIZE / 2.0;
-            let icon_y = center_y - ICON_SIZE / 2.0;
+            draw_texture_ex(texture, icon_x, icon_y, tint, DrawTextureParams {
+                source: Some(src_rect),
+                dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
+                ..Default::default()
+            });
+            true
+        } else { false };
 
-            draw_texture_ex(
-                texture,
-                icon_x,
-                icon_y,
-                Color::new(1.0, 1.0, 1.0, opacity),
-                DrawTextureParams {
-                    source: Some(src_rect),
-                    dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
-                    ..Default::default()
-                },
-            );
-        } else {
+        if !drew_icon {
             // Fallback to letter
             let letter = match skill_type {
                 SkillType::Hitpoints => "H",

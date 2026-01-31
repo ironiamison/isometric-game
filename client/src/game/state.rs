@@ -613,6 +613,8 @@ pub struct GameState {
     pub gathering_markers: Vec<GatheringMarker>,
     /// Whether the local player is currently gathering
     pub is_gathering: bool,
+    /// Timestamp when gathering started (for cast animation delay)
+    pub gathering_started_at: f64,
     /// Active bonus tile events
     pub bonus_tiles: Vec<BonusTile>,
     /// Active gathering buff on local player
@@ -697,6 +699,7 @@ impl GameState {
             pending_ground_items: Vec::new(),
             gathering_markers: Vec::new(),
             is_gathering: false,
+            gathering_started_at: 0.0,
             bonus_tiles: Vec::new(),
             gathering_buff: None,
             selected_entity_id: None,
