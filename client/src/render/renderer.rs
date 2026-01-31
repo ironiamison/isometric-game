@@ -4017,11 +4017,15 @@ impl Renderer {
         // Character panel (when open)
         self.render_character_panel(state, hovered, &mut layout);
 
-        // Quick slots (always visible at bottom, above exp bar)
-        self.render_quick_slots(state, hovered, &mut layout);
+        // Quick slots and menu buttons - hide on mobile when crafting/shop panel is open
+        let hide_bottom_bar = cfg!(target_os = "android") && state.ui_state.crafting_open;
+        if !hide_bottom_bar {
+            // Quick slots (always visible at bottom, above exp bar)
+            self.render_quick_slots(state, hovered, &mut layout);
 
-        // Menu buttons (bottom-right, above exp bar)
-        self.render_menu_buttons(state, hovered, &mut layout);
+            // Menu buttons (bottom-right, above exp bar)
+            self.render_menu_buttons(state, hovered, &mut layout);
+        }
 
         // Chat button (top-left, above quest tracker) - mobile only
         #[cfg(target_os = "android")]

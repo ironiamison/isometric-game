@@ -12,7 +12,7 @@ const SHOP_ITEM_SPACING: f32 = 4.0;
 const SCROLLBAR_WIDTH: f32 = 8.0;
 const COLUMN_GAP: f32 = 10.0;
 const HEADER_HEIGHT: f32 = 24.0;
-const TRANSACTION_HEIGHT: f32 = 80.0;
+const TRANSACTION_HEIGHT: f32 = 36.0;
 
 impl Renderer {
     pub(crate) fn render_shop_tab(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout, panel_x: f32, content_y: f32, content_width: f32, content_height: f32) {
@@ -299,92 +299,67 @@ impl Renderer {
         draw_rectangle(x + 1.0, bar_y + 1.0, width - 2.0, TRANSACTION_HEIGHT - 2.0, PANEL_BG_MID);
 
         // Get selected item info
-        let (item_name, total_price, can_buy) = if let Some(stock_item) = shop_data.stock.get(state.ui_state.shop_selected_buy_index) {
-            let name = state.item_registry.get(&stock_item.item_id)
-                .map(|def| def.display_name.as_str())
-                .unwrap_or(&stock_item.item_id);
+        let (total_price, can_buy) = if let Some(stock_item) = shop_data.stock.get(state.ui_state.shop_selected_buy_index) {
             let total = stock_item.price * state.ui_state.shop_buy_quantity;
             let can_afford = state.inventory.gold >= total;
             let in_stock = stock_item.quantity >= state.ui_state.shop_buy_quantity;
-            (name, total, can_afford && in_stock)
+            (total, can_afford && in_stock)
         } else {
-            ("", 0, false)
+            (0, false)
         };
 
-        // Item name
-        self.draw_text_sharp(item_name, x + 11.0, bar_y + 16.0, 16.0, TEXT_NORMAL);
-
-        // Quantity controls
-        let qty_y = bar_y + 38.0;
-        let qty_label = "Qty:";
-        let qty_dims = self.measure_text_sharp(qty_label, 16.0);
-        self.draw_text_sharp(qty_label, x + 11.0, qty_y, 16.0, TEXT_DIM);
+        // Single compact row: [-] qty [+]  price  [Buy]
+        let row_y = bar_y + (TRANSACTION_HEIGHT) / 2.0;
+        let btn_size = 18.0;
+        let btn_y = row_y - btn_size / 2.0;
+        let mut cx = x + 6.0;
 
         // Minus button
-        let btn_size = 18.0;
-        let minus_x = x + 11.0 + qty_dims.width + 12.0;
-        let btn_y = qty_y - 13.0;
-        let minus_bounds = Rect::new(minus_x, btn_y, btn_size, btn_size);
+        let minus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
         layout.add(UiElementId::ShopBuyQuantityMinus, minus_bounds);
         let minus_hovered = matches!(hovered, Some(UiElementId::ShopBuyQuantityMinus));
         let minus_bg = if minus_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
-        draw_rectangle(minus_x, btn_y, btn_size, btn_size, SLOT_BORDER);
-        draw_rectangle(minus_x + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, minus_bg);
-        
-        let minus_text_dims = self.measure_text_sharp("-", 16.0);
-        self.draw_text_sharp("-", minus_x + (btn_size - minus_text_dims.width) / 2.0, qty_y - 1.0, 16.0, TEXT_NORMAL);
+        draw_rectangle(cx, btn_y, btn_size, btn_size, SLOT_BORDER);
+        draw_rectangle(cx + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, minus_bg);
+        let minus_dims = self.measure_text_sharp("-", 16.0);
+        self.draw_text_sharp("-", cx + (btn_size - minus_dims.width) / 2.0, row_y + 5.0, 16.0, TEXT_NORMAL);
+        cx += btn_size + 4.0;
 
-        // Quantity display
+        // Quantity
         let qty_text = format!("{}", state.ui_state.shop_buy_quantity);
-        let qty_val_dims = self.measure_text_sharp(&qty_text, 16.0);
-        let qty_val_x = minus_x + btn_size + 8.0;
-        self.draw_text_sharp(&qty_text, qty_val_x, qty_y, 16.0, TEXT_TITLE);
+        let qty_dims = self.measure_text_sharp(&qty_text, 16.0);
+        self.draw_text_sharp(&qty_text, cx, row_y + 5.0, 16.0, TEXT_TITLE);
+        cx += qty_dims.width + 4.0;
 
         // Plus button
-        let plus_x = qty_val_x + qty_val_dims.width + 8.0;
-        let plus_bounds = Rect::new(plus_x, btn_y, btn_size, btn_size);
+        let plus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
         layout.add(UiElementId::ShopBuyQuantityPlus, plus_bounds);
         let plus_hovered = matches!(hovered, Some(UiElementId::ShopBuyQuantityPlus));
         let plus_bg = if plus_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
-        draw_rectangle(plus_x, btn_y, btn_size, btn_size, SLOT_BORDER);
-        draw_rectangle(plus_x + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, plus_bg);
-        
-        let plus_text_dims = self.measure_text_sharp("+", 16.0);
-        self.draw_text_sharp("+", plus_x + (btn_size - plus_text_dims.width) / 2.0, qty_y - 1.0, 16.0, TEXT_NORMAL);
+        draw_rectangle(cx, btn_y, btn_size, btn_size, SLOT_BORDER);
+        draw_rectangle(cx + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, plus_bg);
+        let plus_dims = self.measure_text_sharp("+", 16.0);
+        self.draw_text_sharp("+", cx + (btn_size - plus_dims.width) / 2.0, row_y + 5.0, 16.0, TEXT_NORMAL);
+        cx += btn_size + 8.0;
 
-        // Total and Buy button row
-        let total_y = bar_y + 60.0;
-        let total_label = "Total:";
-        let total_dims = self.measure_text_sharp(total_label, 16.0);
-        self.draw_text_sharp(total_label, x + 11.0, total_y - 2.0, 16.0, TEXT_DIM);
-        
-        let price_text = format!("{}g", total_price);
-        let price_color = if can_buy { TEXT_GOLD } else { Color::new(0.8, 0.3, 0.3, 1.0) };
-        let price_x = x + 11.0 + total_dims.width + 8.0;
-        
-        // Nugget icon
+        // Price with nugget icon
         let icon_size = 12.0;
         let icon_margin = 4.0;
+        let price_text = format!("{}g", total_price);
+        let price_color = if can_buy { TEXT_GOLD } else { Color::new(0.8, 0.3, 0.3, 1.0) };
         if let Some(texture) = &self.gold_nugget_texture {
-            draw_texture_ex(
-                texture,
-                price_x,
-                total_y - 13.0,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(vec2(icon_size, icon_size)),
-                    ..Default::default()
-                },
-            );
+            draw_texture_ex(texture, cx, row_y - 4.0, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(icon_size, icon_size)),
+                ..Default::default()
+            });
         }
-        
-        self.draw_text_sharp(&price_text, price_x + icon_size + icon_margin, total_y - 2.0, 16.0, price_color);
+        self.draw_text_sharp(&price_text, cx + icon_size + icon_margin, row_y + 5.0, 16.0, price_color);
 
-        // Buy button
-        let button_w = 60.0;
-        let button_h = 28.0;
-        let button_x = x + width - button_w - 8.0;
-        let button_y = bar_y + TRANSACTION_HEIGHT - button_h - 8.0;
+        // Buy button (right-aligned)
+        let button_w = 50.0;
+        let button_h = 24.0;
+        let button_x = x + width - button_w - 4.0;
+        let button_y = row_y - button_h / 2.0;
         let button_bounds = Rect::new(button_x, button_y, button_w, button_h);
         layout.add(UiElementId::ShopBuyConfirmButton, button_bounds);
 
@@ -402,8 +377,7 @@ impl Renderer {
 
         let button_text_color = if can_buy { WHITE } else { TEXT_DIM };
         let btn_dims = self.measure_text_sharp("Buy", 16.0);
-        let btn_text_x = button_x + (button_w - btn_dims.width) / 2.0;
-        self.draw_text_sharp("Buy", btn_text_x, button_y + 19.0, 16.0, button_text_color);
+        self.draw_text_sharp("Buy", button_x + (button_w - btn_dims.width) / 2.0, button_y + 17.0, 16.0, button_text_color);
     }
 
     fn render_sell_transaction(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout, x: f32, bar_y: f32, width: f32, shop_data: &crate::game::ShopData) {
@@ -416,100 +390,75 @@ impl Renderer {
             .filter_map(|slot| slot.as_ref())
             .collect();
 
-        let (item_name, total_price, can_sell) = if let Some(inv_slot) = inventory_items.get(state.ui_state.shop_selected_sell_index) {
-            let name = state.item_registry.get(&inv_slot.item_id)
-                .map(|def| def.display_name.as_str())
-                .unwrap_or(&inv_slot.item_id);
+        let (total_price, can_sell) = if let Some(inv_slot) = inventory_items.get(state.ui_state.shop_selected_sell_index) {
             if let Some(item_def) = state.item_registry.get(&inv_slot.item_id) {
                 if item_def.sellable {
                     let sell_price = (item_def.base_price as f32 * shop_data.buy_multiplier) as i32;
                     let total = sell_price * state.ui_state.shop_sell_quantity;
                     let has_quantity = inv_slot.quantity >= state.ui_state.shop_sell_quantity;
-                    (name, total, has_quantity)
+                    (total, has_quantity)
                 } else {
-                    (name, 0, false)
+                    (0, false)
                 }
             } else {
-                (name, 0, false)
+                (0, false)
             }
         } else {
-            ("", 0, false)
+            (0, false)
         };
 
-        // Item name
-        self.draw_text_sharp(item_name, x + 11.0, bar_y + 16.0, 16.0, TEXT_NORMAL);
-
-        // Quantity controls
-        let qty_y = bar_y + 38.0;
-        let qty_label = "Qty:";
-        let qty_dims = self.measure_text_sharp(qty_label, 16.0);
-        self.draw_text_sharp(qty_label, x + 11.0, qty_y, 16.0, TEXT_DIM);
+        // Single compact row: [-] qty [+]  price  [Sell]
+        let row_y = bar_y + (TRANSACTION_HEIGHT) / 2.0;
+        let btn_size = 18.0;
+        let btn_y = row_y - btn_size / 2.0;
+        let mut cx = x + 6.0;
 
         // Minus button
-        let btn_size = 18.0;
-        let minus_x = x + 11.0 + qty_dims.width + 12.0;
-        let btn_y = qty_y - 13.0;
-        let minus_bounds = Rect::new(minus_x, btn_y, btn_size, btn_size);
+        let minus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
         layout.add(UiElementId::ShopSellQuantityMinus, minus_bounds);
         let minus_hovered = matches!(hovered, Some(UiElementId::ShopSellQuantityMinus));
         let minus_bg = if minus_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
-        draw_rectangle(minus_x, btn_y, btn_size, btn_size, SLOT_BORDER);
-        draw_rectangle(minus_x + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, minus_bg);
-        
-        let minus_text_dims = self.measure_text_sharp("-", 16.0);
-        self.draw_text_sharp("-", minus_x + (btn_size - minus_text_dims.width) / 2.0, qty_y - 1.0, 16.0, TEXT_NORMAL);
+        draw_rectangle(cx, btn_y, btn_size, btn_size, SLOT_BORDER);
+        draw_rectangle(cx + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, minus_bg);
+        let minus_dims = self.measure_text_sharp("-", 16.0);
+        self.draw_text_sharp("-", cx + (btn_size - minus_dims.width) / 2.0, row_y + 5.0, 16.0, TEXT_NORMAL);
+        cx += btn_size + 4.0;
 
-        // Quantity display
+        // Quantity
         let qty_text = format!("{}", state.ui_state.shop_sell_quantity);
-        let qty_val_dims = self.measure_text_sharp(&qty_text, 16.0);
-        let qty_val_x = minus_x + btn_size + 8.0;
-        self.draw_text_sharp(&qty_text, qty_val_x, qty_y, 16.0, TEXT_TITLE);
+        let qty_dims = self.measure_text_sharp(&qty_text, 16.0);
+        self.draw_text_sharp(&qty_text, cx, row_y + 5.0, 16.0, TEXT_TITLE);
+        cx += qty_dims.width + 4.0;
 
         // Plus button
-        let plus_x = qty_val_x + qty_val_dims.width + 8.0;
-        let plus_bounds = Rect::new(plus_x, btn_y, btn_size, btn_size);
+        let plus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
         layout.add(UiElementId::ShopSellQuantityPlus, plus_bounds);
         let plus_hovered = matches!(hovered, Some(UiElementId::ShopSellQuantityPlus));
         let plus_bg = if plus_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
-        draw_rectangle(plus_x, btn_y, btn_size, btn_size, SLOT_BORDER);
-        draw_rectangle(plus_x + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, plus_bg);
-        
-        let plus_text_dims = self.measure_text_sharp("+", 16.0);
-        self.draw_text_sharp("+", plus_x + (btn_size - plus_text_dims.width) / 2.0, qty_y - 1.0, 16.0, TEXT_NORMAL);
+        draw_rectangle(cx, btn_y, btn_size, btn_size, SLOT_BORDER);
+        draw_rectangle(cx + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, plus_bg);
+        let plus_dims = self.measure_text_sharp("+", 16.0);
+        self.draw_text_sharp("+", cx + (btn_size - plus_dims.width) / 2.0, row_y + 5.0, 16.0, TEXT_NORMAL);
+        cx += btn_size + 8.0;
 
-        // Total and Sell button row
-        let total_y = bar_y + 60.0;
-        let total_label = "You get:";
-        let total_dims = self.measure_text_sharp(total_label, 16.0);
-        self.draw_text_sharp(total_label, x + 11.0, total_y - 2.0, 16.0, TEXT_DIM);
-        
-        let price_text = format!("{}g", total_price);
-        let price_color = if can_sell { TEXT_GOLD } else { Color::new(0.8, 0.3, 0.3, 1.0) };
-        let price_x = x + 11.0 + total_dims.width + 8.0;
-        
-        // Nugget icon
+        // Price with nugget icon
         let icon_size = 12.0;
         let icon_margin = 4.0;
+        let price_text = format!("{}g", total_price);
+        let price_color = if can_sell { TEXT_GOLD } else { Color::new(0.8, 0.3, 0.3, 1.0) };
         if let Some(texture) = &self.gold_nugget_texture {
-            draw_texture_ex(
-                texture,
-                price_x,
-                total_y - 13.0,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(vec2(icon_size, icon_size)),
-                    ..Default::default()
-                },
-            );
+            draw_texture_ex(texture, cx, row_y - 4.0, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(icon_size, icon_size)),
+                ..Default::default()
+            });
         }
-        
-        self.draw_text_sharp(&price_text, price_x + icon_size + icon_margin, total_y - 2.0, 16.0, price_color);
+        self.draw_text_sharp(&price_text, cx + icon_size + icon_margin, row_y + 5.0, 16.0, price_color);
 
-        // Sell button
-        let button_w = 60.0;
-        let button_h = 28.0;
-        let button_x = x + width - button_w - 8.0;
-        let button_y = bar_y + TRANSACTION_HEIGHT - button_h - 8.0;
+        // Sell button (right-aligned)
+        let button_w = 50.0;
+        let button_h = 24.0;
+        let button_x = x + width - button_w - 4.0;
+        let button_y = row_y - button_h / 2.0;
         let button_bounds = Rect::new(button_x, button_y, button_w, button_h);
         layout.add(UiElementId::ShopSellConfirmButton, button_bounds);
 
@@ -527,7 +476,6 @@ impl Renderer {
 
         let button_text_color = if can_sell { WHITE } else { TEXT_DIM };
         let btn_dims = self.measure_text_sharp("Sell", 16.0);
-        let btn_text_x = button_x + (button_w - btn_dims.width) / 2.0;
-        self.draw_text_sharp("Sell", btn_text_x, button_y + 19.0, 16.0, button_text_color);
+        self.draw_text_sharp("Sell", button_x + (button_w - btn_dims.width) / 2.0, button_y + 17.0, 16.0, button_text_color);
     }
 }
