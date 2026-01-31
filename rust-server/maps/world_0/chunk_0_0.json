@@ -3088,10 +3088,10 @@
   "collision": "Bx/g+wEfIIBBHyCAYR0ggAEQIICQAAAAAAAggAAAIIAF4CGAASAhgAAg4fsBOgEAAQgDAAAKHAAACBAAAApwAAAIQAAACkAAADhAAABAQAAAwEEAAABCAAAAQgAAADQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [
     {
-      "id": "fisherman_andy_1",
-      "template": "fisherman_andy",
+      "entityId": "fisherman_andy",
       "x": 11,
-      "y": 9
+      "y": 9,
+      "level": 1
     }
   ],
   "mapObjects": [

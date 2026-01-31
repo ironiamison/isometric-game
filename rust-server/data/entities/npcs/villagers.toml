@@ -108,7 +108,7 @@ shop_open = "Take a look at my wares."
 # ============================================================================
 [fisherman_andy]
 display_name = "Fisherman Andy"
-sprite = "fisherman"
+sprite = "lee"
 animation_type = "humanoid"
 description = "An old fisherman who knows all the best spots. He sells basic fishing gear."
 
