@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -86,7 +86,11 @@
       <div id="loading-pct">0%</div>
       <div id="loading-label">Initializing...</div>
     </div>
-    <canvas id="glcanvas" tabindex="1"></canvas>
+    <canvas
+      id="glcanvas"
+      tabindex="1"
+      style="image-rendering: pixelated"
+    ></canvas>
     <script src="https://not-fl3.github.io/miniquad-samples/mq_js_bundle.js"></script>
     <script src="sapp_jsutils.js"></script>
     <script src="quad-storage.js"></script>
