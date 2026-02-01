@@ -4448,7 +4448,7 @@ impl GameRoom {
             // TODO: Add server-side interior collision checking
             if !players_in_instances.contains(&id) {
                 // Check static tile collision (only for overworld players)
-                if !self.world.is_tile_walkable(target_x, target_y).await {
+                if !self.world.is_tile_walkable_loaded(target_x, target_y).await {
                     continue;
                 }
             }
@@ -4596,11 +4596,11 @@ impl GameRoom {
         {
             let mut npcs = self.npcs.write().await;
 
-            // Snapshot loaded chunks for synchronous walkability checks during NPC updates
-            let chunks_snapshot: std::collections::HashMap<crate::chunk::ChunkCoord, std::sync::Arc<crate::chunk::Chunk>> = self.world.chunks_snapshot().await;
+            // Borrow loaded chunks for synchronous walkability checks during NPC updates
+            let chunks_guard = self.world.chunks_read().await;
             let walkable_check = |wx: i32, wy: i32| -> bool {
                 let coord = crate::chunk::ChunkCoord::from_world(wx, wy);
-                if let Some(chunk) = chunks_snapshot.get(&coord) {
+                if let Some(chunk) = chunks_guard.get(&coord) {
                     let (lx, ly) = crate::chunk::world_to_local(wx, wy);
                     chunk.is_walkable_local(lx, ly)
                 } else {

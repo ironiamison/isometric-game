@@ -462,7 +462,12 @@ impl World {
         self.chunks.read().await.clone()
     }
 
-    /// Check if a world position is walkable
+    /// Get a read guard to the loaded chunks (avoids cloning the entire map)
+    pub async fn chunks_read(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<ChunkCoord, Arc<Chunk>>> {
+        self.chunks.read().await
+    }
+
+    /// Check if a world position is walkable (loads chunk from disk if needed)
     pub async fn is_tile_walkable(&self, world_x: i32, world_y: i32) -> bool {
         let coord = ChunkCoord::from_world(world_x, world_y);
 
@@ -471,6 +476,19 @@ impl World {
             chunk.is_walkable_local(local_x, local_y)
         } else {
             false // Non-existent chunks are impassable
+        }
+    }
+
+    /// Check if a world position is walkable using only already-loaded chunks.
+    /// Returns false for tiles in unloaded chunks (no disk I/O).
+    pub async fn is_tile_walkable_loaded(&self, world_x: i32, world_y: i32) -> bool {
+        let coord = ChunkCoord::from_world(world_x, world_y);
+        let chunks = self.chunks.read().await;
+        if let Some(chunk) = chunks.get(&coord) {
+            let (local_x, local_y) = world_to_local(world_x, world_y);
+            chunk.is_walkable_local(local_x, local_y)
+        } else {
+            false
         }
     }
 
