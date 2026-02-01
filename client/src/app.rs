@@ -253,6 +253,7 @@ pub fn run_game_frame(
                 chunk_y: coord.y,
             });
         }
+        game_state.chunk_manager.unload_distant_chunks();
     }
 
     // Store frame timings
