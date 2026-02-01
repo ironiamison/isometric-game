@@ -1124,14 +1124,77 @@ impl InputHandler {
 
         // Handle crafting mode
         if state.ui_state.crafting_open {
+            // Touch drag scrolling for shop lists on mobile
+            let all_touches: Vec<macroquad::input::Touch> = macroquad::input::touches();
+            if let Some(tracking_id) = state.ui_state.shop_touch_scroll_id {
+                if let Some(touch) = all_touches.iter().find(|t| t.id == tracking_id) {
+                    match touch.phase {
+                        macroquad::input::TouchPhase::Moved | macroquad::input::TouchPhase::Stationary => {
+                            let (_, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
+                            let dy = state.ui_state.shop_touch_last_y - vy;
+                            if !state.ui_state.shop_touch_dragged {
+                                let total_dy = (state.ui_state.shop_touch_start_y - vy).abs();
+                                if total_dy > 8.0 {
+                                    state.ui_state.shop_touch_dragged = true;
+                                }
+                            }
+                            if state.ui_state.shop_touch_dragged {
+                                let item_height = 48.0 + 4.0; // SHOP_ITEM_HEIGHT + SHOP_ITEM_SPACING
+                                if state.ui_state.shop_touch_scroll_column == 0 {
+                                    let max_scroll = state.ui_state.shop_data.as_ref()
+                                        .map(|d| ((d.stock.len() as f32) * item_height - 200.0).max(0.0))
+                                        .unwrap_or(0.0);
+                                    state.ui_state.shop_buy_scroll = (state.ui_state.shop_buy_scroll + dy).clamp(0.0, max_scroll);
+                                } else {
+                                    let inventory_count = state.inventory.slots.iter().filter(|s| s.is_some()).count();
+                                    let max_scroll = ((inventory_count as f32) * item_height - 200.0).max(0.0);
+                                    state.ui_state.shop_sell_scroll = (state.ui_state.shop_sell_scroll + dy).clamp(0.0, max_scroll);
+                                }
+                            }
+                            state.ui_state.shop_touch_last_y = vy;
+                        }
+                        macroquad::input::TouchPhase::Ended | macroquad::input::TouchPhase::Cancelled => {
+                            state.ui_state.shop_touch_scroll_id = None;
+                        }
+                        _ => {}
+                    }
+                } else {
+                    state.ui_state.shop_touch_scroll_id = None;
+                }
+            } else {
+                for touch in &all_touches {
+                    if touch.phase == macroquad::input::TouchPhase::Started {
+                        let (vx, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
+                        let hit = layout.hit_test(vx, vy);
+                        let buy_area = matches!(hit, Some(UiElementId::ShopBuyScrollArea) | Some(UiElementId::ShopBuyItem(_)));
+                        let sell_area = matches!(hit, Some(UiElementId::ShopSellScrollArea) | Some(UiElementId::ShopSellItem(_)));
+                        if buy_area || sell_area {
+                            state.ui_state.shop_touch_scroll_id = Some(touch.id);
+                            state.ui_state.shop_touch_scroll_column = if buy_area { 0 } else { 1 };
+                            state.ui_state.shop_touch_last_y = vy;
+                            state.ui_state.shop_touch_start_y = vy;
+                            state.ui_state.shop_touch_dragged = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Suppress click actions if the touch was a scroll drag
+            let was_shop_touch_drag = state.ui_state.shop_touch_dragged && state.ui_state.shop_touch_scroll_id.is_none();
+            if was_shop_touch_drag {
+                state.ui_state.shop_touch_dragged = false;
+            }
+
             // Handle mouse clicks on crafting elements (only on mouse down, not release)
-            if mouse_clicked {
+            if mouse_clicked && !was_shop_touch_drag {
                 if let Some(ref element) = clicked_element {
                     match element {
                     UiElementId::ShopCraftingCloseButton => {
                         state.ui_state.crafting_open = false;
                         state.ui_state.crafting_npc_id = None;
                         state.ui_state.shop_data = None;
+                        state.ui_state.shop_quantity_hold_element = None;
                         return commands;
                     }
                     UiElementId::MainTab(idx) => {
@@ -1183,20 +1246,32 @@ impl InputHandler {
                         if state.ui_state.shop_buy_quantity > 1 {
                             state.ui_state.shop_buy_quantity -= 1;
                         }
+                        state.ui_state.shop_quantity_hold_element = Some(UiElementId::ShopBuyQuantityMinus);
+                        state.ui_state.shop_quantity_hold_start = current_time;
+                        state.ui_state.shop_quantity_hold_last_repeat = current_time;
                         return commands;
                     }
                     UiElementId::ShopBuyQuantityPlus => {
                         state.ui_state.shop_buy_quantity += 1;
+                        state.ui_state.shop_quantity_hold_element = Some(UiElementId::ShopBuyQuantityPlus);
+                        state.ui_state.shop_quantity_hold_start = current_time;
+                        state.ui_state.shop_quantity_hold_last_repeat = current_time;
                         return commands;
                     }
                     UiElementId::ShopSellQuantityMinus => {
                         if state.ui_state.shop_sell_quantity > 1 {
                             state.ui_state.shop_sell_quantity -= 1;
                         }
+                        state.ui_state.shop_quantity_hold_element = Some(UiElementId::ShopSellQuantityMinus);
+                        state.ui_state.shop_quantity_hold_start = current_time;
+                        state.ui_state.shop_quantity_hold_last_repeat = current_time;
                         return commands;
                     }
                     UiElementId::ShopSellQuantityPlus => {
                         state.ui_state.shop_sell_quantity += 1;
+                        state.ui_state.shop_quantity_hold_element = Some(UiElementId::ShopSellQuantityPlus);
+                        state.ui_state.shop_quantity_hold_start = current_time;
+                        state.ui_state.shop_quantity_hold_last_repeat = current_time;
                         return commands;
                     }
                     UiElementId::ShopBuyConfirmButton => {
@@ -1234,11 +1309,54 @@ impl InputHandler {
                 }
             }
 
+            // Hold-to-repeat for quantity +/- buttons
+            if is_mouse_button_down(MouseButton::Left) {
+                if let Some(ref hold_elem) = state.ui_state.shop_quantity_hold_element {
+                    // Check if still hovering the same button
+                    let still_hovering = state.ui_state.hovered_element.as_ref() == Some(hold_elem);
+                    if still_hovering {
+                        const INITIAL_DELAY: f64 = 0.4;
+                        const REPEAT_INTERVAL: f64 = 0.06;
+                        let held_duration = current_time - state.ui_state.shop_quantity_hold_start;
+                        if held_duration >= INITIAL_DELAY {
+                            let since_last = current_time - state.ui_state.shop_quantity_hold_last_repeat;
+                            if since_last >= REPEAT_INTERVAL {
+                                state.ui_state.shop_quantity_hold_last_repeat = current_time;
+                                match hold_elem {
+                                    UiElementId::ShopBuyQuantityMinus => {
+                                        if state.ui_state.shop_buy_quantity > 1 {
+                                            state.ui_state.shop_buy_quantity -= 1;
+                                        }
+                                    }
+                                    UiElementId::ShopBuyQuantityPlus => {
+                                        state.ui_state.shop_buy_quantity += 1;
+                                    }
+                                    UiElementId::ShopSellQuantityMinus => {
+                                        if state.ui_state.shop_sell_quantity > 1 {
+                                            state.ui_state.shop_sell_quantity -= 1;
+                                        }
+                                    }
+                                    UiElementId::ShopSellQuantityPlus => {
+                                        state.ui_state.shop_sell_quantity += 1;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    } else {
+                        state.ui_state.shop_quantity_hold_element = None;
+                    }
+                }
+            } else {
+                state.ui_state.shop_quantity_hold_element = None;
+            }
+
             // Escape closes crafting/shop menu
             if is_key_pressed(KeyCode::Escape) {
                 state.ui_state.crafting_open = false;
                 state.ui_state.crafting_npc_id = None;
                 state.ui_state.shop_data = None;
+                state.ui_state.shop_quantity_hold_element = None;
                 return commands;
             }
 

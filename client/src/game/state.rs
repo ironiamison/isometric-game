@@ -485,6 +485,16 @@ pub struct UiState {
     pub shop_sell_quantity: i32,
     pub shop_buy_scroll: f32,  // Scroll offset for buy list (pixels)
     pub shop_sell_scroll: f32, // Scroll offset for sell list (pixels)
+    // Touch drag scroll tracking for shop lists
+    pub shop_touch_scroll_id: Option<u64>,
+    pub shop_touch_scroll_column: u8, // 0=buy, 1=sell
+    pub shop_touch_last_y: f32,
+    pub shop_touch_start_y: f32,
+    pub shop_touch_dragged: bool,
+    // Hold-to-repeat for quantity +/- buttons
+    pub shop_quantity_hold_element: Option<UiElementId>,
+    pub shop_quantity_hold_start: f64,
+    pub shop_quantity_hold_last_repeat: f64,
     // Escape menu state
     pub escape_menu_open: bool,
     // Audio settings (synced with AudioManager)
@@ -566,6 +576,14 @@ impl Default for UiState {
             shop_sell_quantity: 1,
             shop_buy_scroll: 0.0,
             shop_sell_scroll: 0.0,
+            shop_touch_scroll_id: None,
+            shop_touch_scroll_column: 0,
+            shop_touch_last_y: 0.0,
+            shop_touch_start_y: 0.0,
+            shop_touch_dragged: false,
+            shop_quantity_hold_element: None,
+            shop_quantity_hold_start: 0.0,
+            shop_quantity_hold_last_repeat: 0.0,
             escape_menu_open: false,
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,

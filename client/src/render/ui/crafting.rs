@@ -93,22 +93,29 @@ impl Renderer {
         let recipes_text_x = main_tab_x + (main_tab_width - recipes_dims.width) / 2.0;
         self.draw_text_sharp("Crafting", recipes_text_x, main_tab_y + 19.0, TAB_FONT_SIZE, recipes_text_color);
 
-        // Close button (X)
-        let close_btn_size = 28.0;
+        // Close button (X) - same style as dialogue close button
+        let is_mobile = cfg!(target_os = "android");
+        let close_btn_size = if is_mobile { 32.0 } else { 28.0 };
         let close_btn_x = header_x + header_w - close_btn_size - 6.0;
         let close_btn_y = header_y + (HEADER_HEIGHT - close_btn_size) / 2.0;
         let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
         layout.add(UiElementId::ShopCraftingCloseButton, close_bounds);
 
         let is_close_hovered = matches!(hovered, Some(UiElementId::ShopCraftingCloseButton));
-        let close_bg = if is_close_hovered { Color::new(0.6, 0.15, 0.15, 1.0) } else { SLOT_BG_EMPTY };
-        let close_border = if is_close_hovered { Color::new(0.8, 0.3, 0.3, 1.0) } else { SLOT_BORDER };
+        let (close_bg, close_border) = if is_close_hovered {
+            (Color::new(0.4, 0.15, 0.15, 1.0), Color::new(0.6, 0.2, 0.2, 1.0))
+        } else {
+            (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
+        };
         draw_rectangle(close_btn_x, close_btn_y, close_btn_size, close_btn_size, close_border);
         draw_rectangle(close_btn_x + 1.0, close_btn_y + 1.0, close_btn_size - 2.0, close_btn_size - 2.0, close_bg);
 
-        let x_dims = self.measure_text_sharp("X", 16.0);
-        let x_color = if is_close_hovered { WHITE } else { TEXT_DIM };
-        self.draw_text_sharp("X", close_btn_x + (close_btn_size - x_dims.width) / 2.0, close_btn_y + 20.0, 16.0, x_color);
+        let cx = close_btn_x + close_btn_size / 2.0;
+        let cy = close_btn_y + close_btn_size / 2.0;
+        let cross = close_btn_size * 0.25;
+        let cross_color = if is_close_hovered { TEXT_TITLE } else { TEXT_DIM };
+        draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
+        draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
 
         // ===== CONTENT AREA =====
         let content_y = panel_y + FRAME_THICKNESS + HEADER_HEIGHT + 4.0;

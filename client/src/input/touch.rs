@@ -758,26 +758,23 @@ impl TouchControls {
         // Get all current touches
         let touches: Vec<Touch> = touches();
 
-        // Only update action buttons when no panels are open
-        let (attack_consumed, interact_consumed) = if hide_action_buttons {
-            (false, false)
-        } else {
-            (self.attack_button.update(&touches), self.interact_button.update(&touches))
-        };
-        let direction_consumed = if hide_all_controls {
-            false
-        } else if use_joystick {
+        // Always update controls so they can process touch-end events and clear state.
+        // Without this, hiding controls while a touch is active leaves them permanently
+        // "active", causing touch_consumed to stay true and blocking all UI clicks.
+        let attack_consumed = self.attack_button.update(&touches);
+        let interact_consumed = self.interact_button.update(&touches);
+        let direction_consumed = if use_joystick {
             self.joystick.update(&touches, current_time)
         } else {
             self.dpad.update(&touches, current_time)
         };
 
-        // Mark touch as consumed if any control is active or just received input
-        self.touch_consumed = attack_consumed || interact_consumed || direction_consumed
-            || self.dpad.is_active()
-            || self.joystick.is_active()
-            || self.attack_button.is_pressed()
-            || self.interact_button.is_pressed();
+        // Only count as consumed when the controls are visible
+        self.touch_consumed =
+            (!hide_action_buttons && (attack_consumed || interact_consumed
+                || self.attack_button.is_pressed() || self.interact_button.is_pressed()))
+            || (!hide_all_controls && (direction_consumed
+                || self.dpad.is_active() || self.joystick.is_active()));
     }
 
     /// Check if touch input was consumed by controls this frame

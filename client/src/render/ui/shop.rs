@@ -323,13 +323,13 @@ impl Renderer {
         draw_rectangle(cx + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, minus_bg);
         let minus_dims = self.measure_text_sharp("-", 16.0);
         self.draw_text_sharp("-", cx + (btn_size - minus_dims.width) / 2.0, row_y + 5.0, 16.0, TEXT_NORMAL);
-        cx += btn_size + 4.0;
+        cx += btn_size + 10.0;
 
         // Quantity
         let qty_text = format!("{}", state.ui_state.shop_buy_quantity);
         let qty_dims = self.measure_text_sharp(&qty_text, 16.0);
         self.draw_text_sharp(&qty_text, cx, row_y + 5.0, 16.0, TEXT_TITLE);
-        cx += qty_dims.width + 4.0;
+        cx += qty_dims.width + 10.0;
 
         // Plus button
         let plus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
@@ -422,13 +422,13 @@ impl Renderer {
         draw_rectangle(cx + 1.0, btn_y + 1.0, btn_size - 2.0, btn_size - 2.0, minus_bg);
         let minus_dims = self.measure_text_sharp("-", 16.0);
         self.draw_text_sharp("-", cx + (btn_size - minus_dims.width) / 2.0, row_y + 5.0, 16.0, TEXT_NORMAL);
-        cx += btn_size + 4.0;
+        cx += btn_size + 10.0;
 
         // Quantity
         let qty_text = format!("{}", state.ui_state.shop_sell_quantity);
         let qty_dims = self.measure_text_sharp(&qty_text, 16.0);
         self.draw_text_sharp(&qty_text, cx, row_y + 5.0, 16.0, TEXT_TITLE);
-        cx += qty_dims.width + 4.0;
+        cx += qty_dims.width + 10.0;
 
         // Plus button
         let plus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
