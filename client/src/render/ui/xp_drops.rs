@@ -4,9 +4,10 @@ use macroquad::prelude::*;
 use crate::game::state::XpDropFeed;
 use crate::game::SkillType;
 
-const DROP_LIFETIME: f64 = 3.0;
-const FLOAT_DISTANCE: f32 = 100.0; // How far drops travel upward
-const FADE_START: f64 = 2.0; // When fading begins
+const DROP_LIFETIME: f64 = 2.0;
+const FLOAT_DISTANCE: f32 = 120.0; // How far drops travel upward
+const FADE_START: f64 = 0.6; // When fading begins
+const ROW_HEIGHT: f32 = 20.0;
 const ICON_SIZE: f32 = 16.0;
 const UI_ICON_SIZE: f32 = 24.0;
 
@@ -17,16 +18,27 @@ impl Renderer {
     pub fn render_xp_drop_feed(&self, feed: &XpDropFeed, right_edge_x: f32, bar_width: f32, start_y: f32) {
         let current_time = macroquad::time::get_time();
 
-        for drop in feed.drops.iter() {
-            let age = current_time - drop.time;
-            if age >= DROP_LIFETIME {
-                continue;
+        // Sort drops by time so we can detect groups and assign slot offsets
+        let mut sorted: Vec<_> = feed.drops.iter()
+            .filter(|d| current_time - d.time < DROP_LIFETIME)
+            .collect();
+        sorted.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
+
+        // Assign slot indices: drops within 0.05s of each other are in the same group
+        const GROUP_THRESHOLD: f64 = 0.05;
+        let mut slot: u32 = 0;
+        let mut group_start_time = f64::NEG_INFINITY;
+
+        for drop in sorted.iter() {
+            if drop.time - group_start_time > GROUP_THRESHOLD {
+                group_start_time = drop.time;
+                slot = 0;
             }
 
-            let t = age / DROP_LIFETIME; // 0.0 to 1.0
-            let y_offset = -(t as f32 * FLOAT_DISTANCE) + drop.display_y_offset; // float upward, smooth slot offset
+            let age = current_time - drop.time;
+            let t = age / DROP_LIFETIME;
+            let y_offset = -(t as f32 * FLOAT_DISTANCE) + slot as f32 * ROW_HEIGHT;
 
-            // Opacity: full until FADE_START, then fade out
             let opacity = if age < FADE_START {
                 1.0
             } else {
@@ -38,14 +50,19 @@ impl Renderer {
             let text_w = self.measure_text_sharp(&text, 16.0).width;
             let total_w = ICON_SIZE + 4.0 + text_w;
 
-            // Right-align within the bar area
             let x = right_edge_x + bar_width - total_w;
 
-            // Draw skill icon
             self.draw_xp_drop_icon(drop.skill_type, x, y - ICON_SIZE / 2.0 - 2.0, opacity);
 
-            // Draw XP text
-            self.draw_text_sharp(&text, x + ICON_SIZE + 4.0, y, 16.0, Color::new(1.0, 1.0, 1.0, opacity));
+            // Black outline
+            let tx = x + ICON_SIZE + 4.0;
+            let outline = Color::new(0.0, 0.0, 0.0, opacity);
+            for &(dx, dy) in &[(-1.0_f32, 0.0_f32), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)] {
+                self.draw_text_sharp(&text, tx + dx, y + dy, 16.0, outline);
+            }
+            self.draw_text_sharp(&text, tx, y, 16.0, Color::new(1.0, 1.0, 1.0, opacity));
+
+            slot += 1;
         }
     }
 

@@ -298,8 +298,6 @@ pub struct XpDrop {
     pub skill_type: super::SkillType,
     pub xp_gained: i64,
     pub time: f64,
-    /// Current smooth vertical slot offset (animated toward target index * ROW_HEIGHT)
-    pub display_y_offset: f32,
 }
 
 /// Manages the XP drop feed displayed below the player stats panel
@@ -318,21 +316,11 @@ impl XpDropFeed {
             skill_type,
             xp_gained,
             time: macroquad::time::get_time(),
-            display_y_offset: 0.0,
         });
     }
 
-    /// Update smooth vertical positions for all active drops.
-    /// Call once per frame before rendering.
-    pub fn update(&mut self, dt: f32) {
-        const ROW_HEIGHT: f32 = 20.0;
-        const LERP_SPEED: f32 = 10.0;
-
-        for (i, drop) in self.drops.iter_mut().enumerate() {
-            let target = i as f32 * ROW_HEIGHT;
-            drop.display_y_offset += (target - drop.display_y_offset) * (LERP_SPEED * dt).min(1.0);
-        }
-    }
+    /// No-op — positioning is purely time-based in the renderer.
+    pub fn update(&mut self, _dt: f32) {}
 }
 
 /// Chat bubble displayed above a player's head
@@ -852,7 +840,7 @@ impl GameState {
 
         // Update and clean up XP drops
         self.xp_drop_feed.update(delta);
-        self.xp_drop_feed.drops.retain(|drop| current_time - drop.time < 3.0);
+        self.xp_drop_feed.drops.retain(|drop| current_time - drop.time < 2.0);
 
         // Clean up old chat bubbles (older than 5.0 seconds)
         self.chat_bubbles.retain(|bubble| current_time - bubble.time < 5.0);
