@@ -1007,10 +1007,10 @@
       497,
       497,
       497,
-      497,
-      497,
-      497,
-      497,
+      555,
+      555,
+      555,
+      555,
       497,
       497,
       497,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "BAf8/wYAAIACAACAAgAAgAIAAIACAACAAgAAgAIAAIACAACAAgAAgAIAAIAC/ACABgQDgAYEBIAGJAiACBwIgJAP8P+QAAAAdgYAAAYLCAD+Efz/AvA/gALgD4ACAACAAgAAgAIAAIAHAACACAAAgAgAAIAMAACABAAAgAMAAIA=",
+  "collision": "BAf8/wYAAIACAACAAgAAgAIAAIACAACAAgAAgAIAAIACAACAAgAAgAIAAIAC/ACABgQDgAYEBIAGJAiACBwIgJAP8P+QAAAAdgYAAAYLCAD+Efz/AvA/gALgD4ACAACAAgAAgAMAAIAHAACACQAAgAkAAIANAACABQAAgP///4E=",
   "entities": [],
   "mapObjects": [
     {
@@ -3465,8 +3465,197 @@
       "y": 19,
       "width": 24,
       "height": 18
+    },
+    {
+      "gid": 1763,
+      "x": 2,
+      "y": 28,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "gid": 1764,
+      "x": 1,
+      "y": 30,
+      "width": 63,
+      "height": 27
     }
   ],
-  "walls": [],
+  "walls": [
+    {
+      "gid": 989,
+      "x": 0,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 989,
+      "x": 0,
+      "y": 28,
+      "edge": "right"
+    },
+    {
+      "gid": 989,
+      "x": 0,
+      "y": 29,
+      "edge": "right"
+    },
+    {
+      "gid": 989,
+      "x": 0,
+      "y": 27,
+      "edge": "right"
+    },
+    {
+      "gid": 989,
+      "x": 0,
+      "y": 30,
+      "edge": "right"
+    },
+    {
+      "gid": 658,
+      "x": 0,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 1,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 2,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 4,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 3,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 5,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 22,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 6,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 7,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 8,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 9,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 10,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 11,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 12,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 13,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 14,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 21,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 20,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 19,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 658,
+      "x": 18,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 657,
+      "x": 15,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 659,
+      "x": 16,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 672,
+      "x": 17,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 659,
+      "x": 23,
+      "y": 31,
+      "edge": "down"
+    }
+  ],
   "portals": []
 }

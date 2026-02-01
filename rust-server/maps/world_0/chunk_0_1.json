@@ -3086,9 +3086,21 @@
     ]
   },
   "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "pig",
+      "x": 6,
+      "y": 1,
+      "level": 1
+    },
+    {
+      "entityId": "pig",
+      "x": 17,
+      "y": 7,
+      "level": 1
+    }
+  ],
   "mapObjects": [],
   "walls": [],
-  "portals": [],
-  "gatheringZones": []
+  "portals": []
 }
