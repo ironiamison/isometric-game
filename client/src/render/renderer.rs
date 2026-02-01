@@ -926,6 +926,11 @@ impl Renderer {
             renderables.push((depth, Renderable::Npc(npc)));
         }
 
+        // Screen bounds for culling renderables
+        let (cull_screen_w, cull_screen_h) = virtual_screen_size();
+        // Large margin for tall objects (trees, walls) that may be rooted off-screen but visible
+        let cull_margin = TILE_WIDTH * 6.0;
+
         // Add object layer tiles (trees, rocks, buildings) from static tilemap
         for layer in &state.tilemap.layers {
             if layer.layer_type == LayerType::Objects {
@@ -934,6 +939,11 @@ impl Renderer {
                         let idx = (y * state.tilemap.width + x) as usize;
                         let tile_id = layer.tiles.get(idx).copied().unwrap_or(0);
                         if tile_id > 0 {
+                            let (sx, sy) = world_to_screen(x as f32, y as f32, &state.camera);
+                            if sx < -cull_margin || sx > cull_screen_w + cull_margin
+                                || sy < -cull_margin || sy > cull_screen_h + cull_margin {
+                                continue;
+                            }
                             let depth = calculate_depth(x as f32, y as f32, 1);
                             renderables.push((depth, Renderable::Tile { x, y, tile_id }));
                         }
@@ -945,12 +955,21 @@ impl Renderer {
         // Add map objects from loaded chunks (trees, rocks, decorations placed in Tiled)
         for chunk in state.chunk_manager.chunks().values() {
             for obj in &chunk.objects {
-                // Depth is based on tile_y (bottom edge of object for proper sorting)
+                let (sx, sy) = world_to_screen(obj.tile_x as f32, obj.tile_y as f32, &state.camera);
+                if sx < -cull_margin || sx > cull_screen_w + cull_margin
+                    || sy < -cull_margin || sy > cull_screen_h + cull_margin {
+                    continue;
+                }
                 let depth = calculate_depth(obj.tile_x as f32, obj.tile_y as f32, 1);
                 renderables.push((depth, Renderable::ChunkObject(obj)));
             }
             // Add walls from chunks
             for wall in &chunk.walls {
+                let (sx, sy) = world_to_screen(wall.tile_x as f32, wall.tile_y as f32, &state.camera);
+                if sx < -cull_margin || sx > cull_screen_w + cull_margin
+                    || sy < -cull_margin || sy > cull_screen_h + cull_margin {
+                    continue;
+                }
                 let depth = calculate_depth(wall.tile_x as f32, wall.tile_y as f32, 1);
                 renderables.push((depth, Renderable::ChunkWall(wall)));
             }
