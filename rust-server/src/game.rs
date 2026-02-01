@@ -4366,6 +4366,17 @@ impl GameRoom {
             *tick
         };
 
+        // Periodically unload distant chunks to prevent unbounded memory/CPU growth
+        if current_tick % 100 == 0 {
+            let active_coords: Vec<ChunkCoord> = {
+                let chunks = self.player_chunks.read().await;
+                chunks.values().cloned().collect()
+            };
+            if !active_coords.is_empty() {
+                self.world.unload_distant_chunks(&active_coords, 5).await;
+            }
+        }
+
         // Handle player respawns
         let mut respawned_players = Vec::new();
         {
