@@ -1230,20 +1230,48 @@ impl GameRoom {
     /// Handle face command - change direction without moving
     pub async fn handle_face(&self, player_id: &str, direction: u8) {
         tracing::info!("[SERVER] handle_face called: player_id={}, direction={}", player_id, direction);
-        let mut players = self.players.write().await;
-        if let Some(player) = players.get_mut(player_id) {
-            // Don't allow direction changes while sitting
-            if player.sitting_at.is_some() {
+        let should_stop_gathering = {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                // Don't allow direction changes while sitting
+                if player.sitting_at.is_some() {
+                    return;
+                }
+                let old_dir = player.direction;
+                player.direction = Direction::from_u8(direction);
+                tracing::info!("[SERVER] Updated player direction: {:?} -> {:?}", old_dir, player.direction);
+                // Ensure player is not moving when just facing
+                player.move_dx = 0;
+                player.move_dy = 0;
+
+                // Check if player is gathering and no longer facing a marker
+                let gathering = self.gathering.read().await;
+                if gathering.is_gathering(player_id) {
+                    let (fdx, fdy): (i32, i32) = match player.direction {
+                        Direction::Down => (0, 1),
+                        Direction::Up => (0, -1),
+                        Direction::Left => (-1, 0),
+                        Direction::Right => (1, 0),
+                        Direction::DownLeft => (-1, 1),
+                        Direction::DownRight => (1, 1),
+                        Direction::UpLeft => (-1, -1),
+                        Direction::UpRight => (1, -1),
+                    };
+                    let face_x = player.x + fdx;
+                    let face_y = player.y + fdy;
+                    let facing_marker = gathering.markers.iter().any(|m| m.x == face_x && m.y == face_y);
+                    !facing_marker
+                } else {
+                    false
+                }
+            } else {
+                tracing::warn!("[SERVER] handle_face: player not found: {}", player_id);
                 return;
             }
-            let old_dir = player.direction;
-            player.direction = Direction::from_u8(direction);
-            tracing::info!("[SERVER] Updated player direction: {:?} -> {:?}", old_dir, player.direction);
-            // Ensure player is not moving when just facing
-            player.move_dx = 0;
-            player.move_dy = 0;
-        } else {
-            tracing::warn!("[SERVER] handle_face: player not found: {}", player_id);
+        };
+
+        if should_stop_gathering {
+            self.handle_stop_gathering(player_id).await;
         }
     }
 
@@ -4191,10 +4219,32 @@ impl GameRoom {
             .unwrap()
             .as_millis() as u64;
 
-        let fishing_level = {
+        let (fishing_level, player_x, player_y, player_dir) = {
             let players = self.players.read().await;
-            players.get(player_id).map(|p| p.skills.fishing.level).unwrap_or(1)
+            match players.get(player_id) {
+                Some(p) => (p.skills.fishing.level, p.x, p.y, p.direction),
+                None => return,
+            }
         };
+
+        // Check player is facing the gathering marker
+        let (fdx, fdy): (i32, i32) = match player_dir {
+            Direction::Down => (0, 1),
+            Direction::Up => (0, -1),
+            Direction::Left => (-1, 0),
+            Direction::Right => (1, 0),
+            Direction::DownLeft => (-1, 1),
+            Direction::DownRight => (1, 1),
+            Direction::UpLeft => (-1, -1),
+            Direction::UpRight => (1, -1),
+        };
+        if player_x + fdx != marker_x || player_y + fdy != marker_y {
+            self.send_to_player(player_id, ServerMessage::Error {
+                code: 400,
+                message: "You must face the gathering spot".to_string(),
+            }).await;
+            return;
+        }
 
         let mut gathering = self.gathering.write().await;
         match gathering.start_gathering(player_id, marker_x, marker_y, fishing_level, current_time) {
@@ -4596,7 +4646,7 @@ impl GameRoom {
             }
             drop(gathering);
             for id in stopped {
-                self.send_to_player(&id, ServerMessage::GatheringStopped {
+                self.broadcast(ServerMessage::GatheringStopped {
                     player_id: id.clone(),
                     reason: "moved".to_string(),
                 }).await;
@@ -5023,7 +5073,7 @@ impl GameRoom {
             }
         }
         for pid in inventory_full_players {
-            self.send_to_player(&pid, ServerMessage::GatheringStopped {
+            self.broadcast(ServerMessage::GatheringStopped {
                 player_id: pid.clone(),
                 reason: "inventory_full".to_string(),
             }).await;

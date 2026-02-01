@@ -988,9 +988,9 @@ impl Renderer {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&player.id);
                     let is_hovered = state.hovered_entity_id.as_ref() == Some(&player.id);
                     self.render_player(player, is_local, is_selected, is_hovered, &state.camera);
-                    if is_local && state.is_gathering {
+                    if player.is_gathering {
                         // Delay the line until the cast animation finishes
-                        let elapsed = macroquad::time::get_time() - state.gathering_started_at;
+                        let elapsed = macroquad::time::get_time() - player.gathering_started_at;
                         if elapsed > 0.2 {
                             self.render_fishing_line(player, &state.camera);
                         }
@@ -3320,10 +3320,10 @@ impl Renderer {
         // Rod tip position within the weapon frame (in unscaled pixels)
         // These are the approximate pixel positions of the rod tip in each frame
         let (tip_px, tip_py) = match player.animation.direction {
-            Direction::Down  => (12.0, 63.0),  // frame 0: rod points down, tip is lower
+            Direction::Down  => (14.0, 61.0),  // frame 0: rod points down, tip is lower (+2x, -2y adjust)
             Direction::Left  => (16.0, 38.0),  // frame 1: mirrored adjustment (+4x, +8y)
             Direction::Up    => (16.0, 38.0),  // frame 1 flipped: (-4 screen-left, +8y down)
-            Direction::Right => (12.0, 63.0),  // frame 0 flipped: rod points down, tip is lower
+            Direction::Right => (10.0, 61.0),  // frame 0 flipped: mirrored down adjust (-2x, -2y)
         };
 
         // Account for horizontal flip

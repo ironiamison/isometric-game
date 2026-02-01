@@ -1935,9 +1935,12 @@ impl InputHandler {
                     if player.equipped_weapon.as_deref() == Some("fishing_rod") {
                         let px = player.x.round() as i32;
                         let py = player.y.round() as i32;
-                        // Check if standing on or adjacent to a fishing marker
+                        let (fdx, fdy) = player.direction.to_unit_vector();
+                        let face_x = px + fdx as i32;
+                        let face_y = py + fdy as i32;
+                        // Check if the tile we're facing is a fishing marker
                         state.gathering_markers.iter().find(|m| {
-                            m.skill == "fishing" && (m.x - px).abs() <= 1 && (m.y - py).abs() <= 1
+                            m.skill == "fishing" && m.x == face_x && m.y == face_y
                         }).map(|m| (m.x, m.y))
                     } else {
                         None

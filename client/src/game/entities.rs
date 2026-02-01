@@ -120,6 +120,10 @@ pub struct Player {
 
     // Last time this player took damage (for health bar visibility)
     pub last_damage_time: f64,
+
+    // Gathering state (for fishing line rendering)
+    pub is_gathering: bool,
+    pub gathering_started_at: f64,
 }
 
 impl Player {
@@ -160,6 +164,8 @@ impl Player {
             is_admin: false,
             animation: PlayerAnimation::new(),
             last_damage_time: 0.0,
+            is_gathering: false,
+            gathering_started_at: 0.0,
         }
     }
 

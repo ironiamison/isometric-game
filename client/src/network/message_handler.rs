@@ -1584,6 +1584,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
                 let zone_id = extract_string(value, "zone_id").unwrap_or_default();
                 log::info!("Gathering started for player {} in zone {}", player_id, zone_id);
+                if let Some(player) = state.players.get_mut(&player_id) {
+                    player.is_gathering = true;
+                    player.gathering_started_at = macroquad::time::get_time();
+                    player.play_attack();
+                }
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.is_gathering = true;
                     state.gathering_started_at = macroquad::time::get_time();
@@ -1624,6 +1629,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
                 let reason = extract_string(value, "reason").unwrap_or_default();
                 log::info!("Gathering stopped for player {}: {}", player_id, reason);
+                if let Some(player) = state.players.get_mut(&player_id) {
+                    player.is_gathering = false;
+                }
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.is_gathering = false;
                     if reason == "inventory_full" {
