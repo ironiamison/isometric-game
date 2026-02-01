@@ -3350,8 +3350,8 @@ impl GameRoom {
             }
         };
 
-        // Check distance (must be within 2.5 tiles)
-        if distance > 2.5 || !is_alive {
+        // Check distance (must be within 10 tiles — generous to allow for NPC wandering)
+        if distance > 10.0 || !is_alive {
             self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Too far from merchant")).await;
             return;
         }
@@ -3551,8 +3551,8 @@ impl GameRoom {
             }
         };
 
-        // Check distance (must be within 2.5 tiles)
-        if distance > 2.5 || !is_alive {
+        // Check distance (must be within 10 tiles — generous to allow for NPC wandering)
+        if distance > 10.0 || !is_alive {
             self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("Too far from merchant")).await;
             return;
         }
