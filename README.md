@@ -1,8 +1,8 @@
 # Aeven
 
 An isometric pixel-art MMORPG inspired by classic RuneScape, built with Rust.
+<img width="1026" height="753" alt="image" src="https://github.com/user-attachments/assets/8e0a588f-64a4-43fc-86bf-a0dfd8fbded4" />
 
-![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
 
 ## About
 
