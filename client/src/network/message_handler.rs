@@ -176,6 +176,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             // Update sitting state
                             let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
                             if sitting && player.animation.state != crate::render::animation::AnimationState::SittingChair {
+                                // Snap position immediately so remote players don't "walk" to the chair
+                                if !is_local_player {
+                                    player.x = player.target_x;
+                                    player.y = player.target_y;
+                                    player.server_x = player.target_x;
+                                    player.server_y = player.target_y;
+                                }
                                 player.sit_chair();
                                 if is_local_player {
                                     state.is_sitting = true;

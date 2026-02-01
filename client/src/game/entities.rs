@@ -416,9 +416,20 @@ impl Player {
         self.animation.set_state(AnimationState::SittingChair);
     }
 
-    /// Stand up from sitting
+    /// Stand up from sitting - move to tile in front of chair
     pub fn stand_up(&mut self) {
         self.animation.set_state(AnimationState::Idle);
+        let (dx, dy) = match self.direction {
+            Direction::Up => (0.0, -1.0),
+            Direction::Down => (0.0, 1.0),
+            Direction::Left => (-1.0, 0.0),
+            Direction::Right => (1.0, 0.0),
+            _ => (0.0, 0.0),
+        };
+        self.x += dx;
+        self.y += dy;
+        self.target_x = self.x;
+        self.target_y = self.y;
     }
 
     /// Smooth interpolation toward target position

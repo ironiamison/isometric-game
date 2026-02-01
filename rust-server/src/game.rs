@@ -1173,6 +1173,15 @@ impl GameRoom {
 
                     // Only allow standing up when moving in the chair's facing direction
                     if move_dir == Some(player.direction) {
+                        let (fdx, fdy) = match player.direction {
+                            Direction::Up => (0, -1),
+                            Direction::Down => (0, 1),
+                            Direction::Left => (-1, 0),
+                            Direction::Right => (1, 0),
+                            _ => (0, 0),
+                        };
+                        player.x = pos.0 + fdx;
+                        player.y = pos.1 + fdy;
                         player.sitting_at = None;
                         chair_to_free = Some(pos);
                     }
@@ -4333,6 +4342,12 @@ impl GameRoom {
         };
 
         if let Some((tx, ty)) = sitting_at {
+            // Get the chair's facing direction
+            let chair_direction = {
+                let chairs = self.chairs.read().await;
+                chairs.get(&(tx, ty)).map(|c| c.direction)
+            };
+
             // Free the chair
             {
                 let mut chairs = self.chairs.write().await;
@@ -4342,11 +4357,22 @@ impl GameRoom {
                     }
                 }
             }
-            // Clear player sitting state
+            // Clear player sitting state and move to tile in front of chair
             {
                 let mut players = self.players.write().await;
                 if let Some(player) = players.get_mut(player_id) {
                     player.sitting_at = None;
+                    if let Some(dir) = chair_direction {
+                        let (dx, dy) = match dir {
+                            Direction::Up => (0, -1),
+                            Direction::Down => (0, 1),
+                            Direction::Left => (-1, 0),
+                            Direction::Right => (1, 0),
+                            _ => (0, 0),
+                        };
+                        player.x = tx + dx;
+                        player.y = ty + dy;
+                    }
                 }
             }
         }
