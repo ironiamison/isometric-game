@@ -691,13 +691,50 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         ));
                     }
 
+                    let now = macroquad::time::get_time();
+                    let px = player.x;
+                    let py = player.y;
+
                     state.level_up_events.push(LevelUpEvent {
-                        x: player.x,
-                        y: player.y,
+                        x: px,
+                        y: py,
                         skill: skill_name,
                         new_level,
-                        time: macroquad::time::get_time(),
+                        time: now,
                     });
+
+                    // Spawn firework particles around the player
+                    use crate::game::state::FireworkParticle;
+                    let firework_colors: [(u8, u8, u8); 8] = [
+                        (255, 50, 50),    // red
+                        (50, 255, 50),    // green
+                        (80, 80, 255),    // blue
+                        (255, 255, 50),   // yellow
+                        (255, 100, 255),  // pink
+                        (50, 255, 255),   // cyan
+                        (255, 165, 0),    // orange
+                        (255, 255, 255),  // white
+                    ];
+                    for i in 0..12 {
+                        let spread = (i as f32 / 12.0) * std::f32::consts::PI;
+                        let angle = -std::f32::consts::PI + spread;
+                        let speed = 120.0 + (i as f32 % 4.0) * 40.0;
+                        let color = firework_colors[i % firework_colors.len()];
+                        state.firework_particles.push(FireworkParticle {
+                            origin_x: px,
+                            origin_y: py,
+                            ox: 0.0,
+                            oy: 0.0,
+                            vx: angle.cos() * speed * 0.5,
+                            vy: angle.sin() * speed - 160.0,
+                            color,
+                            time: now,
+                            size: 2.0,
+                            trail: Vec::new(),
+                            is_spark: false,
+                            has_burst: false,
+                        });
+                    }
                 }
             }
         }

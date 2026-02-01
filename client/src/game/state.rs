@@ -284,6 +284,28 @@ pub struct LevelUpEvent {
     pub time: f64,
 }
 
+/// A single firework particle for level-up celebrations
+pub struct FireworkParticle {
+    /// World origin (where player was)
+    pub origin_x: f32,
+    pub origin_y: f32,
+    /// Screen-pixel offset from origin
+    pub ox: f32,
+    pub oy: f32,
+    /// Screen-pixel velocity
+    pub vx: f32,
+    pub vy: f32,
+    pub color: (u8, u8, u8),
+    pub time: f64,
+    pub size: f32,
+    /// Previous positions for tail (screen offsets)
+    pub trail: Vec<(f32, f32)>,
+    /// If true, this is a secondary burst particle (no further explosion)
+    pub is_spark: bool,
+    /// Whether this particle has already burst
+    pub has_burst: bool,
+}
+
 /// Floating skill XP gain text
 pub struct SkillXpEvent {
     pub x: f32,
@@ -680,6 +702,7 @@ pub struct GameState {
     // Combat feedback
     pub damage_events: Vec<DamageEvent>,
     pub level_up_events: Vec<LevelUpEvent>,
+    pub firework_particles: Vec<FireworkParticle>,
     pub skill_xp_events: Vec<SkillXpEvent>,
     pub xp_globes: XpGlobesManager,
     pub xp_drop_feed: XpDropFeed,
@@ -763,6 +786,7 @@ impl GameState {
             selected_entity_id: None,
             damage_events: Vec::new(),
             level_up_events: Vec::new(),
+            firework_particles: Vec::new(),
             skill_xp_events: Vec::new(),
             xp_globes: XpGlobesManager::new(),
             xp_drop_feed: XpDropFeed::new(),
@@ -851,7 +875,51 @@ impl GameState {
         self.damage_events.retain(|event| current_time - event.time < 1.2);
 
         // Clean up old level up events (older than 2.0 seconds)
-        self.level_up_events.retain(|event| current_time - event.time < 2.0);
+        self.level_up_events.retain(|event| current_time - event.time < 1.2);
+
+        // Update firework particles (screen-pixel physics)
+        let mut new_sparks = Vec::new();
+        for p in &mut self.firework_particles {
+            // Record trail
+            p.trail.push((p.ox, p.oy));
+            if p.trail.len() > 5 {
+                p.trail.remove(0);
+            }
+
+            p.vx *= 0.94;
+            p.vy += 300.0 * delta;
+            p.ox += p.vx * delta;
+            p.oy += p.vy * delta;
+
+            // Main particles burst into sparks when they start falling
+            let age = (current_time - p.time) as f32;
+            if !p.is_spark && !p.has_burst && age > 0.15 && p.vy > 0.0 {
+                p.has_burst = true;
+                for j in 0..5 {
+                    let a = (j as f32 / 5.0) * std::f32::consts::TAU;
+                    let s = 30.0 + (j as f32 % 3.0) * 15.0;
+                    new_sparks.push(FireworkParticle {
+                        origin_x: p.origin_x,
+                        origin_y: p.origin_y,
+                        ox: p.ox,
+                        oy: p.oy,
+                        vx: a.cos() * s,
+                        vy: a.sin() * s,
+                        color: p.color,
+                        time: current_time,
+                        size: 1.5,
+                        trail: Vec::new(),
+                        is_spark: true,
+                        has_burst: true,
+                    });
+                }
+            }
+        }
+        self.firework_particles.extend(new_sparks);
+        self.firework_particles.retain(|p| {
+            let age = current_time - p.time;
+            if p.is_spark { age < 0.5 } else { age < 1.0 }
+        });
 
         // Clean up old skill XP events (older than 1.5 seconds)
         self.skill_xp_events.retain(|event| current_time - event.time < 1.5);

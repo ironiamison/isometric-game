@@ -1037,6 +1037,7 @@ impl Renderer {
 
         // 6. Render floating level up text
         self.render_level_up_events(state);
+        self.render_firework_particles(state);
 
         // 7. Render chat bubbles above players
         self.render_chat_bubbles(state);
@@ -1059,48 +1060,66 @@ impl Renderer {
 
     fn render_level_up_events(&self, state: &GameState) {
         let current_time = macroquad::time::get_time();
+        const DURATION: f32 = 1.2;
+        const FONT_SIZE: f32 = 16.0;
 
         for event in &state.level_up_events {
             let age = (current_time - event.time) as f32;
-            if age > 2.0 {
+            if age > DURATION {
                 continue;
             }
 
-            // Calculate position with upward float
-            let float_offset = age * 20.0; // Float up over time
+            let t = age / DURATION;
+            let float_offset = (age * 40.0).round();
+
             let (screen_x, screen_y) = world_to_screen(event.x, event.y, &state.camera);
-            let final_y = screen_y - 40.0 - float_offset;
+            let height_offset = (SPRITE_HEIGHT - 8.0) / 2.0;
+            let final_y = (screen_y - height_offset - float_offset).round();
 
-            // Fade out over time (slower fade)
-            let alpha = ((2.0 - age) / 2.0 * 255.0) as u8;
+            let alpha = if t < 0.5 { 1.0 } else { 1.0 - (t - 0.5) * 2.0 };
 
-            // Draw "LEVEL UP!" text with outline
             let text = format!("LEVEL UP! ({})", event.new_level);
-            let font_size = 24.0;
-            let text_width = measure_text(&text, None, font_size as u16, 1.0).width;
+            let text_dims = self.measure_text_sharp(&text, FONT_SIZE);
+            let draw_x = (screen_x - text_dims.width / 2.0).round();
 
-            // Outline
-            let outline_color = Color::from_rgba(0, 0, 0, alpha);
-            for ox in [-2.0, 2.0] {
-                for oy in [-2.0, 2.0] {
-                    draw_text(
-                        &text,
-                        screen_x - text_width / 2.0 + ox,
-                        final_y + oy,
-                        font_size,
-                        outline_color,
-                    );
-                }
+            let outline_color = Color::new(0.0, 0.0, 0.0, alpha * 0.9);
+            for &(ox, oy) in &[(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                self.draw_text_sharp(&text, draw_x + ox, final_y + oy, FONT_SIZE, outline_color);
             }
 
-            // Main text (gold color)
-            draw_text(
-                &text,
-                screen_x - text_width / 2.0,
-                final_y,
-                font_size,
-                Color::from_rgba(255, 215, 0, alpha),
-            );
+            let base_color = Color::new(1.0, 1.0, 0.0, alpha);
+            self.draw_text_sharp(&text, draw_x, final_y, FONT_SIZE, base_color);
+        }
+    }
+
+    fn render_firework_particles(&self, state: &GameState) {
+        let current_time = macroquad::time::get_time();
+        let zoom = state.camera.zoom;
+
+        for p in &state.firework_particles {
+            let age = (current_time - p.time) as f32;
+            let max_age = if p.is_spark { 0.5 } else { 1.0 };
+            if age > max_age {
+                continue;
+            }
+
+            let (origin_x, origin_y) = world_to_screen(p.origin_x, p.origin_y, &state.camera);
+            let base_y = origin_y - 10.0;
+
+            // Draw trail
+            let trail_len = p.trail.len();
+            for (i, &(tx, ty)) in p.trail.iter().enumerate() {
+                let t = (i + 1) as f32 / (trail_len + 1) as f32;
+                let trail_alpha = (t * 150.0 * (1.0 - age / max_age)) as u8;
+                let trail_size = p.size * t * 0.6 * zoom;
+                let c = Color::from_rgba(p.color.0, p.color.1, p.color.2, trail_alpha);
+                draw_circle(origin_x + tx, base_y + ty, trail_size, c);
+            }
+
+            // Draw head
+            let alpha = ((1.0 - age / max_age) * 255.0) as u8;
+            let color = Color::from_rgba(p.color.0, p.color.1, p.color.2, alpha);
+            draw_circle(origin_x + p.ox, base_y + p.oy, p.size * zoom, color);
         }
     }
 
