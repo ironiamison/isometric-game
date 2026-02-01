@@ -167,7 +167,11 @@ impl InputHandler {
             || state.ui_state.quest_log_open
             || in_dialogue;
         let hide_action_buttons = any_panel_open;
-        let hide_direction_controls = any_panel_open;
+        let hide_direction_controls = state.ui_state.escape_menu_open
+            || state.ui_state.crafting_open
+            || state.ui_state.shop_data.is_some()
+            || state.ui_state.quest_log_open
+            || in_dialogue;
         self.touch_controls.update(current_time, hide_action_buttons, hide_direction_controls, state.ui_state.use_joystick);
 
         // Get current mouse/touch position in virtual coordinates (for UI hit detection)
@@ -1693,15 +1697,18 @@ impl InputHandler {
         }
 
         // Handle D-pad release for tap-to-face
+        // Use a longer window for tap detection on release - even if movement started,
+        // a quick release (under 300ms total) is treated as a face-only tap.
+        const TAP_RELEASE_WINDOW: f64 = 0.30; // 300ms
         if dpad_released != DPadDirection::None {
-            if self.touch_controls.was_dpad_move_sent() {
-                // Was moving, now stopped - send stop command
-                commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
-                self.last_dx = 0.0;
-                self.last_dy = 0.0;
-                self.last_send_time = current_time;
-            } else {
-                // Quick tap - send Face command
+            let hold_duration = current_time - self.touch_controls.get_dpad_press_time();
+            let was_short_tap = hold_duration < TAP_RELEASE_WINDOW;
+
+            if was_short_tap {
+                // Short tap - send stop if we were moving, then send Face
+                if self.touch_controls.was_dpad_move_sent() {
+                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                }
                 let attack_anim = state.get_local_player().map_or(false, |p| {
                     matches!(
                         p.animation.state,
@@ -1710,11 +1717,19 @@ impl InputHandler {
                 });
                 if !attack_anim {
                     let dir = dpad_released.to_direction_u8();
-                    log::info!("[INPUT] D-pad tap - sending Face command: direction={}", dir);
+                    log::info!("[INPUT] D-pad tap - sending Face command: direction={} (hold={:.0}ms)", dir, hold_duration * 1000.0);
                     commands.push(InputCommand::Face { direction: dir });
                     self.last_send_time = current_time;
                 }
+            } else if self.touch_controls.was_dpad_move_sent() {
+                // Long hold that was moving - send stop command
+                commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
             }
+            self.last_dx = 0.0;
+            self.last_dy = 0.0;
+            self.last_send_time = current_time;
+            self.move_sent = false;
+            self.touch_controls.set_dpad_move_sent(false);
         }
 
         self.prev_dir = keyboard_dir;

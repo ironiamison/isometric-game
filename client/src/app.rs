@@ -345,5 +345,11 @@ pub fn run_game_frame(
         || game_state.ui_state.quest_log_open
         || game_state.ui_state.chat_panel_open
         || in_dialogue;
-    input_handler.render_touch_controls(any_panel_open, any_panel_open, game_state.ui_state.use_joystick);
+    let hide_direction_controls = game_state.ui_state.escape_menu_open
+        || game_state.ui_state.crafting_open
+        || game_state.ui_state.shop_data.is_some()
+        || game_state.ui_state.quest_log_open
+        || game_state.ui_state.chat_panel_open
+        || in_dialogue;
+    input_handler.render_touch_controls(any_panel_open, hide_direction_controls, game_state.ui_state.use_joystick);
 }

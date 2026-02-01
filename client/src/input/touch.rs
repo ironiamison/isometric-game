@@ -233,7 +233,8 @@ impl VirtualDPad {
     fn release(&mut self) {
         self.touch_id = None;
         self.current_dir = DPadDirection::None;
-        self.move_sent = false;
+        // move_sent is intentionally NOT cleared here - the input handler
+        // reads it on release to decide whether to send a stop command.
     }
 
     /// Get current direction (None if not pressed)
@@ -440,7 +441,8 @@ impl VirtualJoystick {
     fn release(&mut self) {
         self.touch_id = None;
         self.current_dir = DPadDirection::None;
-        self.move_sent = false;
+        // move_sent is intentionally NOT cleared here - the input handler
+        // reads it on release to decide whether to send a stop command.
     }
 
     pub fn get_direction(&self) -> DPadDirection {
