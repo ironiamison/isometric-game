@@ -59,6 +59,8 @@ pub struct PlayerSaveData {
     pub equipped_necklace: Option<String>,
     pub equipped_belt: Option<String>,
     pub current_map: Option<String>,
+    pub sitting_at_x: Option<i32>,
+    pub sitting_at_y: Option<i32>,
 }
 
 // ============================================================================
@@ -161,6 +163,8 @@ pub struct Player {
     pub is_god_mode: bool, // Invincibility for admins
     // HP regeneration tracking
     pub last_regen_time: u64,
+    /// Tile coordinates of chair player is sitting on (None if not sitting)
+    pub sitting_at: Option<(i32, i32)>,
 }
 
 const PLAYER_RESPAWN_TIME_MS: u64 = 5000; // 5 seconds to respawn
@@ -203,6 +207,7 @@ impl Player {
             is_admin: false,
             is_god_mode: false,
             last_regen_time: 0,
+            sitting_at: None,
         }
     }
 
@@ -394,6 +399,30 @@ pub struct PlayerUpdate {
     pub equipped_belt: Option<String>,
     // Admin status
     pub is_admin: bool,
+    pub sitting: bool,
+}
+
+// ============================================================================
+// Chair System
+// ============================================================================
+
+/// A chair's state on the map
+#[derive(Debug, Clone)]
+pub struct ChairState {
+    pub direction: Direction,
+    pub occupied_by: Option<String>,
+}
+
+/// Config for loading chairs from TOML
+#[derive(Debug, Deserialize)]
+struct ChairsConfig {
+    chairs: Vec<ChairConfigEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChairConfigEntry {
+    gid: u32,
+    direction: String,
 }
 
 // ============================================================================
@@ -439,6 +468,10 @@ pub struct GameRoom {
     db: Option<Arc<crate::db::Database>>,
     /// Gathering system (fishing, woodcutting, mining)
     gathering: RwLock<crate::gathering::GatheringSystem>,
+    /// Chair GID -> direction mapping (loaded from config)
+    chair_gids: HashMap<u32, Direction>,
+    /// Chair positions on the map: (tile_x, tile_y) -> ChairState
+    chairs: RwLock<HashMap<(i32, i32), ChairState>>,
 }
 
 impl GameRoom {
@@ -534,6 +567,48 @@ impl GameRoom {
             tracing::info!("Loaded {} gathering markers from chunk data", chunk_marker_count);
         }
 
+        // Load chair config
+        let mut chair_gids: HashMap<u32, Direction> = HashMap::new();
+        match std::fs::read_to_string("data/chairs.toml") {
+            Ok(content) => {
+                match toml::from_str::<ChairsConfig>(&content) {
+                    Ok(config) => {
+                        for entry in config.chairs {
+                            let dir = match entry.direction.as_str() {
+                                "down" => Direction::Down,
+                                "left" => Direction::Left,
+                                "up" => Direction::Up,
+                                "right" => Direction::Right,
+                                _ => Direction::Down,
+                            };
+                            chair_gids.insert(entry.gid, dir);
+                        }
+                        tracing::info!("Loaded {} chair GID definitions", chair_gids.len());
+                    }
+                    Err(e) => tracing::warn!("Failed to parse chairs.toml: {}", e),
+                }
+            }
+            Err(e) => tracing::warn!("Failed to read chairs.toml: {} (no chairs)", e),
+        }
+
+        // Populate chair positions from chunk map objects
+        let mut chairs: HashMap<(i32, i32), ChairState> = HashMap::new();
+        for coord in &chunk_coords {
+            if let Some(chunk) = world.get_or_load_chunk(*coord).await {
+                for obj in &chunk.objects {
+                    if let Some(&dir) = chair_gids.get(&obj.gid) {
+                        chairs.insert((obj.tile_x, obj.tile_y), ChairState {
+                            direction: dir,
+                            occupied_by: None,
+                        });
+                    }
+                }
+            }
+        }
+        if !chairs.is_empty() {
+            tracing::info!("Found {} chairs on the map", chairs.len());
+        }
+
         Self {
             id: Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -558,6 +633,8 @@ impl GameRoom {
             arena_manager: RwLock::new(crate::arena::ArenaManager::new(crate::arena::ArenaConfig::default())),
             db,
             gathering: RwLock::new(gathering),
+            chair_gids,
+            chairs: RwLock::new(chairs),
         }
     }
 
@@ -720,8 +797,9 @@ impl GameRoom {
         equipped_necklace: Option<String>,
         equipped_belt: Option<String>,
         is_admin: bool,
+        sitting_at_x: Option<i32>,
+        sitting_at_y: Option<i32>,
     ) {
-        let mut players = self.players.write().await;
         let mut player = Player::new(player_id, name, x, y, gender, skin, hair_style, hair_color);
 
         // Restore saved stats
@@ -765,11 +843,23 @@ impl GameRoom {
             }
         }
 
+        // Restore sitting state and set direction from chair before inserting into players map
+        if let (Some(sx), Some(sy)) = (sitting_at_x, sitting_at_y) {
+            let mut chairs = self.chairs.write().await;
+            if let Some(chair) = chairs.get_mut(&(sx, sy)) {
+                player.sitting_at = Some((sx, sy));
+                player.direction = chair.direction;
+                chair.occupied_by = Some(player_id.to_string());
+            }
+            // If chair no longer exists, don't restore sitting state
+        }
+
         tracing::info!(
             "Restored player {} at ({}, {}) with {} HP, combat level {}, {} gold, appearance: {} {}",
             name, x, y, hp, player.combat_level(), gold, gender, skin
         );
 
+        let mut players = self.players.write().await;
         players.insert(player_id.to_string(), player);
     }
 
@@ -837,6 +927,21 @@ impl GameRoom {
             }
         }
 
+        // Free any chair the player was sitting on
+        {
+            let players = self.players.read().await;
+            if let Some(player) = players.get(player_id) {
+                if let Some((tx, ty)) = player.sitting_at {
+                    let mut chairs = self.chairs.write().await;
+                    if let Some(chair) = chairs.get_mut(&(tx, ty)) {
+                        if chair.occupied_by.as_deref() == Some(player_id) {
+                            chair.occupied_by = None;
+                        }
+                    }
+                }
+            }
+        }
+
         let mut players = self.players.write().await;
         players.remove(player_id);
     }
@@ -885,6 +990,8 @@ impl GameRoom {
                 equipped_necklace: p.equipped_necklace.clone(),
                 equipped_belt: p.equipped_belt.clone(),
                 current_map: current_map.clone(),
+                sitting_at_x: p.sitting_at.map(|(x, _)| x),
+                sitting_at_y: p.sitting_at.map(|(_, y)| y),
             }
         })
     }
@@ -947,6 +1054,18 @@ impl GameRoom {
     pub async fn get_all_players(&self) -> Vec<Player> {
         let players = self.players.read().await;
         players.values().filter(|p| p.active).cloned().collect()
+    }
+
+    /// Get sitting info for a player: returns Some((tile_x, tile_y, direction)) if sitting
+    pub async fn get_player_sitting_info(&self, player_id: &str) -> Option<(i32, i32, u8)> {
+        let sitting_at = {
+            let players = self.players.read().await;
+            players.get(player_id)?.sitting_at?
+        };
+        let (sx, sy) = sitting_at;
+        let chairs = self.chairs.read().await;
+        let chair = chairs.get(&(sx, sy))?;
+        Some((sx, sy, chair.direction as u8))
     }
 
     pub async fn get_player_position(&self, player_id: &str) -> Option<(i32, i32)> {
@@ -1037,31 +1156,64 @@ impl GameRoom {
     }
 
     pub async fn handle_move(&self, player_id: &str, dx: f32, dy: f32) {
-        let mut players = self.players.write().await;
-        if let Some(player) = players.get_mut(player_id) {
-            // Convert to grid movement (-1, 0, or 1)
-            // No diagonal movement in grid-based system
-            let move_dx: i32;
-            let move_dy: i32;
+        let mut chair_to_free: Option<(i32, i32)> = None;
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                // Auto-stand when trying to move while sitting (only in chair facing direction)
+                if let Some(pos) = player.sitting_at {
+                    // Determine intended movement direction
+                    let move_dir = if dx.abs() > dy.abs() {
+                        if dx > 0.1 { Some(Direction::Right) } else if dx < -0.1 { Some(Direction::Left) } else { None }
+                    } else if dy.abs() > 0.1 {
+                        if dy > 0.1 { Some(Direction::Down) } else { Some(Direction::Up) }
+                    } else {
+                        None
+                    };
 
-            if dx.abs() > dy.abs() {
-                // Horizontal priority
-                move_dx = if dx > 0.1 { 1 } else if dx < -0.1 { -1 } else { 0 };
-                move_dy = 0;
-            } else if dy.abs() > 0.1 {
-                // Vertical priority
-                move_dx = 0;
-                move_dy = if dy > 0.1 { 1 } else if dy < -0.1 { -1 } else { 0 };
-            } else {
-                move_dx = 0;
-                move_dy = 0;
+                    // Only allow standing up when moving in the chair's facing direction
+                    if move_dir == Some(player.direction) {
+                        player.sitting_at = None;
+                        chair_to_free = Some(pos);
+                    }
+                    // Either way, don't process actual movement while sitting
+                    player.move_dx = 0;
+                    player.move_dy = 0;
+                } else {
+                    // Convert to grid movement (-1, 0, or 1)
+                    // No diagonal movement in grid-based system
+                    let move_dx: i32;
+                    let move_dy: i32;
+
+                    if dx.abs() > dy.abs() {
+                        // Horizontal priority
+                        move_dx = if dx > 0.1 { 1 } else if dx < -0.1 { -1 } else { 0 };
+                        move_dy = 0;
+                    } else if dy.abs() > 0.1 {
+                        // Vertical priority
+                        move_dx = 0;
+                        move_dy = if dy > 0.1 { 1 } else if dy < -0.1 { -1 } else { 0 };
+                    } else {
+                        move_dx = 0;
+                        move_dy = 0;
+                    }
+
+                    player.move_dx = move_dx;
+                    player.move_dy = move_dy;
+
+                    if move_dx != 0 || move_dy != 0 {
+                        player.direction = Direction::from_velocity(move_dx as f32, move_dy as f32);
+                    }
+                }
             }
-
-            player.move_dx = move_dx;
-            player.move_dy = move_dy;
-
-            if move_dx != 0 || move_dy != 0 {
-                player.direction = Direction::from_velocity(move_dx as f32, move_dy as f32);
+        }
+        // Free chair outside of players lock
+        if let Some((tx, ty)) = chair_to_free {
+            let mut chairs = self.chairs.write().await;
+            if let Some(chair) = chairs.get_mut(&(tx, ty)) {
+                if chair.occupied_by.as_deref() == Some(player_id) {
+                    chair.occupied_by = None;
+                }
             }
         }
     }
@@ -1071,6 +1223,10 @@ impl GameRoom {
         tracing::info!("[SERVER] handle_face called: player_id={}, direction={}", player_id, direction);
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
+            // Don't allow direction changes while sitting
+            if player.sitting_at.is_some() {
+                return;
+            }
             let old_dir = player.direction;
             player.direction = Direction::from_u8(direction);
             tracing::info!("[SERVER] Updated player direction: {:?} -> {:?}", old_dir, player.direction);
@@ -4060,6 +4216,142 @@ impl GameRoom {
         }
     }
 
+    // ========================================================================
+    // Chair System
+    // ========================================================================
+
+    pub async fn get_chair_positions_message(&self) -> ServerMessage {
+        let chairs = self.chairs.read().await;
+        let positions: Vec<(i32, i32)> = chairs.keys().cloned().collect();
+        ServerMessage::ChairPositions { positions }
+    }
+
+    pub async fn handle_sit_chair(&self, player_id: &str, tile_x: i32, tile_y: i32) {
+        // Validate chair exists and is unoccupied
+        {
+            let chairs = self.chairs.read().await;
+            let chair = match chairs.get(&(tile_x, tile_y)) {
+                Some(c) => c,
+                None => {
+                    self.send_to_player(player_id, ServerMessage::Error {
+                        code: 400,
+                        message: "No chair at that position".to_string(),
+                    }).await;
+                    return;
+                }
+            };
+            if chair.occupied_by.is_some() {
+                self.send_to_player(player_id, ServerMessage::Error {
+                    code: 400,
+                    message: "Chair is occupied".to_string(),
+                }).await;
+                return;
+            }
+        }
+
+        // Check player position - must be directly behind the chair (opposite of facing direction)
+        let (player_x, player_y, already_sitting) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => (p.x, p.y, p.sitting_at.is_some()),
+                None => return,
+            }
+        };
+
+        if already_sitting {
+            return;
+        }
+
+        // Get chair direction to validate approach
+        let chair_dir = {
+            let chairs = self.chairs.read().await;
+            match chairs.get(&(tile_x, tile_y)) {
+                Some(c) => c.direction,
+                None => return,
+            }
+        };
+
+        // Player must be at the tile in front of the chair (in the facing direction)
+        let (expected_x, expected_y) = match chair_dir {
+            Direction::Down => (tile_x, tile_y + 1),
+            Direction::Up => (tile_x, tile_y - 1),
+            Direction::Left => (tile_x - 1, tile_y),
+            Direction::Right => (tile_x + 1, tile_y),
+            _ => (tile_x, tile_y + 1), // fallback for diagonal dirs
+        };
+
+        if player_x != expected_x || player_y != expected_y {
+            self.send_to_player(player_id, ServerMessage::Error {
+                code: 400,
+                message: "Must approach chair from the front".to_string(),
+            }).await;
+            return;
+        }
+
+        // Sit down
+        let direction = {
+            let mut chairs = self.chairs.write().await;
+            if let Some(chair) = chairs.get_mut(&(tile_x, tile_y)) {
+                // Double-check not occupied (race condition guard)
+                if chair.occupied_by.is_some() {
+                    return;
+                }
+                chair.occupied_by = Some(player_id.to_string());
+                chair.direction
+            } else {
+                return;
+            }
+        };
+
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.sitting_at = Some((tile_x, tile_y));
+                player.x = tile_x;
+                player.y = tile_y;
+                player.direction = direction;
+                player.move_dx = 0;
+                player.move_dy = 0;
+            }
+        }
+
+        self.send_to_player(player_id, ServerMessage::SitResult {
+            success: true,
+            tile_x,
+            tile_y,
+            direction: direction as u8,
+        }).await;
+    }
+
+    pub async fn handle_stand_up(&self, player_id: &str) {
+        let sitting_at = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => p.sitting_at,
+                None => return,
+            }
+        };
+
+        if let Some((tx, ty)) = sitting_at {
+            // Free the chair
+            {
+                let mut chairs = self.chairs.write().await;
+                if let Some(chair) = chairs.get_mut(&(tx, ty)) {
+                    if chair.occupied_by.as_deref() == Some(player_id) {
+                        chair.occupied_by = None;
+                    }
+                }
+            }
+            // Clear player sitting state
+            {
+                let mut players = self.players.write().await;
+                if let Some(player) = players.get_mut(player_id) {
+                    player.sitting_at = None;
+                }
+            }
+        }
+    }
+
     pub async fn tick(&self) {
         let delta_time = 1.0 / TICK_RATE;
         let current_time = std::time::SystemTime::now()
@@ -4098,13 +4390,13 @@ impl GameRoom {
 
         // Collect pending moves (id, target_x, target_y)
         // Use tick-based cooldown for deterministic timing (5 ticks = 250ms)
-        let pending_moves: Vec<(String, i32, i32)> = {
+        let pending_moves: Vec<(String, i32, i32, Direction)> = {
             let players = self.players.read().await;
             players.values()
                 .filter(|p| p.active && !p.is_dead)
                 .filter(|p| p.move_dx != 0 || p.move_dy != 0)
                 .filter(|p| current_tick - p.last_move_tick >= MOVE_COOLDOWN_TICKS)
-                .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy))
+                .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.direction))
                 .collect()
         };
 
@@ -4130,9 +4422,16 @@ impl GameRoom {
             instances.keys().cloned().collect()
         };
 
+        // Snapshot chair state for collision checking (position -> (occupied_by, direction))
+        let chair_snapshot: HashMap<(i32, i32), (Option<String>, Direction)> = {
+            let chairs = self.chairs.read().await;
+            chairs.iter().map(|(k, v)| (*k, (v.occupied_by.clone(), v.direction))).collect()
+        };
+
         // Check walkability and entity collision for each pending move
         let mut valid_moves: Vec<(String, i32, i32)> = Vec::new();
-        for (id, target_x, target_y) in pending_moves {
+        let mut auto_sit_requests: Vec<(String, i32, i32)> = Vec::new();
+        for (id, target_x, target_y, move_dir) in pending_moves {
             // Skip world collision check for players in interiors
             // Interior collision is handled client-side for now
             // TODO: Add server-side interior collision checking
@@ -4150,6 +4449,24 @@ impl GameRoom {
             if npc_positions.contains(&(target_x, target_y)) {
                 continue;
             }
+            // Check if target tile is a chair
+            if let Some((occupied_by, chair_dir)) = chair_snapshot.get(&(target_x, target_y)) {
+                // Only allow sitting when approaching from the chair's facing direction
+                // (player walks toward the chair from in front, so move_dir is opposite of chair_dir)
+                let is_approaching_from_front = match chair_dir {
+                    Direction::Down => move_dir == Direction::Up,
+                    Direction::Up => move_dir == Direction::Down,
+                    Direction::Left => move_dir == Direction::Right,
+                    Direction::Right => move_dir == Direction::Left,
+                    _ => false,
+                };
+                if is_approaching_from_front && occupied_by.is_none() {
+                    // Correct direction and unoccupied - auto-sit
+                    auto_sit_requests.push((id, target_x, target_y));
+                }
+                // Always block the move (chair is solid from all directions)
+                continue;
+            }
             // Block fighters from leaving the ring during arena fights
             {
                 let arena = self.arena_manager.read().await;
@@ -4162,6 +4479,11 @@ impl GameRoom {
                 }
             }
             valid_moves.push((id, target_x, target_y));
+        }
+
+        // Process auto-sit requests (players who walked into unoccupied chairs)
+        for (id, tile_x, tile_y) in auto_sit_requests {
+            self.handle_sit_chair(&id, tile_x, tile_y).await;
         }
 
         // Apply valid moves and collect player updates
@@ -4220,6 +4542,7 @@ impl GameRoom {
                     equipped_necklace: player.equipped_necklace.clone(),
                     equipped_belt: player.equipped_belt.clone(),
                     is_admin: player.is_admin,
+                    sitting: player.sitting_at.is_some(),
                 });
             }
         }

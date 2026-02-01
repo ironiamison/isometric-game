@@ -173,6 +173,19 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.equipped_belt = equipped_belt.clone();
                             // Update admin status
                             player.is_admin = is_admin;
+                            // Update sitting state
+                            let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
+                            if sitting && player.animation.state != crate::render::animation::AnimationState::SittingChair {
+                                player.sit_chair();
+                                if is_local_player {
+                                    state.is_sitting = true;
+                                }
+                            } else if !sitting && player.animation.state == crate::render::animation::AnimationState::SittingChair {
+                                player.stand_up();
+                                if is_local_player {
+                                    state.is_sitting = false;
+                                }
+                            }
                         } else if state.local_player_id.as_ref() != Some(&id) && !id.is_empty() {
                             // Player not in our map - create them from stateSync data
                             // This handles players re-appearing after map transitions
@@ -198,6 +211,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 new_player.equipped_necklace = equipped_necklace;
                                 new_player.equipped_belt = equipped_belt;
                                 new_player.is_admin = is_admin;
+                                let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
+                                if sitting {
+                                    new_player.sit_chair();
+                                }
                                 if let Some(hp_val) = hp {
                                     new_player.hp = hp_val;
                                 }
@@ -1494,6 +1511,46 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         state.map_transition.state = crate::game::state::TransitionState::FadingIn;
                     }
                     _ => {}
+                }
+            }
+        }
+
+        "chairPositions" => {
+            if let Some(value) = data {
+                if let Some(positions_arr) = extract_array(value, "positions") {
+                    let mut positions = Vec::new();
+                    for p in positions_arr {
+                        let x = extract_i32(p, "x").unwrap_or(0);
+                        let y = extract_i32(p, "y").unwrap_or(0);
+                        positions.push((x, y));
+                    }
+                    log::info!("Received {} chair positions", positions.len());
+                    state.chair_positions = positions;
+                }
+            }
+        }
+
+        "sitResult" => {
+            if let Some(value) = data {
+                let success = extract_bool(value, "success").unwrap_or(false);
+                if success {
+                    let tile_x = extract_i32(value, "tileX").unwrap_or(0);
+                    let tile_y = extract_i32(value, "tileY").unwrap_or(0);
+                    let direction = extract_i32(value, "direction").unwrap_or(0) as u8;
+                    state.is_sitting = true;
+                    if let Some(local_id) = &state.local_player_id {
+                        if let Some(player) = state.players.get_mut(local_id) {
+                            player.x = tile_x as f32;
+                            player.y = tile_y as f32;
+                            player.server_x = tile_x as f32;
+                            player.server_y = tile_y as f32;
+                            player.target_x = tile_x as f32;
+                            player.target_y = tile_y as f32;
+                            player.direction = Direction::from_u8(direction);
+                            player.animation.direction = Direction::from_u8(direction);
+                            player.sit_chair();
+                        }
+                    }
                 }
             }
         }

@@ -50,6 +50,8 @@ pub struct CharacterData {
     pub created_at: Option<String>,
     pub is_admin: bool,         // Game Master privileges
     pub current_map: Option<String>, // Interior map ID if player is in an instance (NULL = overworld)
+    pub sitting_at_x: Option<i32>,   // Chair tile X if sitting (NULL = not sitting)
+    pub sitting_at_y: Option<i32>,   // Chair tile Y if sitting (NULL = not sitting)
 }
 
 
@@ -199,6 +201,25 @@ impl Database {
 
         if !current_map_exists {
             sqlx::query("ALTER TABLE characters ADD COLUMN current_map TEXT DEFAULT NULL")
+                .execute(pool)
+                .await
+                .ok();
+        }
+
+        // Migration: Add sitting_at columns if they don't exist
+        let sitting_at_x_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'sitting_at_x'"
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !sitting_at_x_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN sitting_at_x INTEGER DEFAULT NULL")
+                .execute(pool)
+                .await
+                .ok();
+            sqlx::query("ALTER TABLE characters ADD COLUMN sitting_at_y INTEGER DEFAULT NULL")
                 .execute(pool)
                 .await
                 .ok();
@@ -448,7 +469,8 @@ impl Database {
             r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, gold,
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
-                inventory_json, skills_json, played_time, is_admin, created_at, current_map
+                inventory_json, skills_json, played_time, is_admin, created_at, current_map,
+                sitting_at_x, sitting_at_y
             FROM characters WHERE account_id = ? ORDER BY created_at DESC"#,
         )
         .bind(account_id)
@@ -500,6 +522,8 @@ impl Database {
                 created_at: r.get("created_at"),
                 is_admin: r.try_get::<bool, _>("is_admin").unwrap_or(false),
                 current_map: r.try_get::<Option<String>, _>("current_map").unwrap_or(None),
+                sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
+                sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
             }
         }).collect())
     }
@@ -601,7 +625,8 @@ impl Database {
             r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, gold,
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
-                inventory_json, skills_json, played_time, is_admin, created_at, current_map
+                inventory_json, skills_json, played_time, is_admin, created_at, current_map,
+                sitting_at_x, sitting_at_y
             FROM characters WHERE id = ?"#,
         )
         .bind(character_id)
@@ -653,6 +678,8 @@ impl Database {
                 created_at: r.get("created_at"),
                 is_admin: r.try_get::<bool, _>("is_admin").unwrap_or(false),
                 current_map: r.try_get::<Option<String>, _>("current_map").unwrap_or(None),
+                sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
+                sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
             }
         }))
     }
@@ -708,6 +735,8 @@ impl Database {
         equipped_belt: Option<&str>,
         played_time_delta: i64,
         current_map: Option<&str>,
+        sitting_at_x: Option<i32>,
+        sitting_at_y: Option<i32>,
     ) -> Result<(), sqlx::Error> {
         // Serialize skills to JSON for the skills_json column
         let skills_json = serde_json::to_string(skills).unwrap_or_else(|_| "{}".to_string());
@@ -724,7 +753,9 @@ impl Database {
                 equipped_back = ?, equipped_feet = ?, equipped_ring = ?,
                 equipped_gloves = ?, equipped_necklace = ?, equipped_belt = ?,
                 played_time = played_time + ?,
-                current_map = ?
+                current_map = ?,
+                sitting_at_x = ?,
+                sitting_at_y = ?
             WHERE id = ?"#,
         )
         .bind(x)
@@ -746,6 +777,8 @@ impl Database {
         .bind(equipped_belt)
         .bind(played_time_delta)
         .bind(current_map)
+        .bind(sitting_at_x)
+        .bind(sitting_at_y)
         .bind(character_id)
         .execute(&self.pool)
         .await?;

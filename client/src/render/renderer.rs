@@ -912,7 +912,11 @@ impl Renderer {
         // Add players
         for player in state.players.values() {
             let is_local = state.local_player_id.as_ref() == Some(&player.id);
-            let depth = calculate_depth(player.x, player.y, 1);
+            let mut depth = calculate_depth(player.x, player.y, 1);
+            // Sitting players render on top of the chair object at the same tile
+            if player.animation.state == crate::render::animation::AnimationState::SittingChair {
+                depth += 0.5;
+            }
             renderables.push((depth, Renderable::Player(player, is_local)));
         }
 
@@ -2086,6 +2090,13 @@ impl Renderer {
             self.render_tile_selection(player.x, player.y, camera);
         }
 
+        // Vertical offset for sitting on chair (shift up to center on tile)
+        let sit_offset_y = if player.animation.state == crate::render::animation::AnimationState::SittingChair {
+            10.0 * zoom
+        } else {
+            0.0
+        };
+
         // Draw shadow under player
         draw_ellipse(screen_x, screen_y, 16.0 * zoom, 7.0 * zoom, 0.0, Color::from_rgba(0, 0, 0, 60));
 
@@ -2103,10 +2114,12 @@ impl Renderer {
 
             // Position sprite so feet are at screen_y
             let draw_x = screen_x - scaled_sprite_width / 2.0;
-            let draw_y = screen_y - scaled_sprite_height + 8.0 * zoom; // Offset to align feet with tile
+            let draw_y = screen_y - scaled_sprite_height + 8.0 * zoom + sit_offset_y; // Offset to align feet with tile
 
-            // Calculate weapon frame info if weapon is equipped
-            let weapon_info = player.equipped_weapon.as_ref().and_then(|weapon_id| {
+            // Calculate weapon frame info if weapon is equipped (hidden when sitting)
+            let is_sitting = matches!(player.animation.state,
+                crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
+            let weapon_info = player.equipped_weapon.as_ref().filter(|_| !is_sitting).and_then(|weapon_id| {
                 self.weapon_sprites.get(weapon_id).map(|ws| {
                     let anim_frame = player.animation.frame as u32;
                     let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
@@ -2244,7 +2257,8 @@ impl Renderer {
                             // Hair is centered: hair_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2 + hair_offset_x = 3 + hair_offset_x
                             // Head uses head_offset_x directly
                             let hair_base_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 + hair_offset_x;
-                            let hair_base_y = hair_offset_y;
+                            let hair_sit_offset_shader = if player.animation.state == AnimationState::SittingChair { 7.0 } else { 0.0 };
+                            let hair_base_y = hair_offset_y + hair_sit_offset_shader;
                             let delta_x = hair_base_x - head_offset_x;
                             let delta_y = hair_base_y - head_offset_y;
 
@@ -2375,8 +2389,9 @@ impl Renderer {
                                 (x_offset, -3.0)
                             };
 
+                            let hair_sit_offset_fb = if player.animation.state == AnimationState::SittingChair { 7.0 } else { 0.0 };
                             let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                            let hair_draw_y = draw_y + hair_offset_y * zoom;
+                            let hair_draw_y = draw_y + (hair_offset_y + hair_sit_offset_fb) * zoom;
 
                             draw_texture_ex(
                                 hair_tex,
@@ -2452,8 +2467,9 @@ impl Renderer {
                             (x_offset, -3.0)
                         };
 
+                        let hair_sit_offset = if player.animation.state == AnimationState::SittingChair { 7.0 } else { 0.0 };
                         let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                        let hair_draw_y = draw_y + hair_offset_y * zoom;
+                        let hair_draw_y = draw_y + (hair_offset_y + hair_sit_offset) * zoom;
 
                         draw_texture_ex(
                             hair_tex,
@@ -2740,8 +2756,10 @@ impl Renderer {
             let draw_x = screen_x - scaled_sprite_width / 2.0;
             let draw_y = screen_y - scaled_sprite_height + 8.0 * zoom;
 
-            // Calculate weapon frame info if weapon is equipped
-            let weapon_info = player.equipped_weapon.as_ref().and_then(|weapon_id| {
+            // Calculate weapon frame info if weapon is equipped (hidden when sitting)
+            let is_sitting_sil = matches!(player.animation.state,
+                crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
+            let weapon_info = player.equipped_weapon.as_ref().filter(|_| !is_sitting_sil).and_then(|weapon_id| {
                 self.weapon_sprites.get(weapon_id).map(|ws| {
                     let anim_frame = player.animation.frame as u32;
                     let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);

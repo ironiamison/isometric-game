@@ -758,7 +758,7 @@ pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_f
             // Down/Right: left 4px, up 3px (mirrored for right)
             if use_back { (-1.0, -2.0) } else { (-4.0, -3.0) }
         }
-        AnimationState::SittingChair => (0.0, 0.0),
+        AnimationState::SittingChair => (0.0, -3.0),
         AnimationState::SittingGround => (0.0, 0.0),
     };
 
@@ -845,7 +845,7 @@ pub fn get_head_offset(state: AnimationState, direction: Direction, anim_frame: 
             }
         }
         AnimationState::SittingChair => {
-            if use_back { (-1.0, 0.0) } else { (0.0, 0.0) }
+            if use_back { (-1.0, 7.0) } else { (0.0, 7.0) }
         }
         AnimationState::SittingGround => {
             if use_back { (-1.0, 0.0) } else { (0.0, 0.0) }

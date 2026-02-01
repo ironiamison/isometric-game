@@ -655,6 +655,12 @@ pub struct GameState {
     pub gathering_markers: Vec<GatheringMarker>,
     /// Whether the local player is currently gathering
     pub is_gathering: bool,
+    /// Whether the local player is currently sitting on a chair
+    pub is_sitting: bool,
+    /// Chair positions on the map (received from server)
+    pub chair_positions: Vec<(i32, i32)>,
+    /// Pending chair to sit on after pathfinding completes
+    pub pending_chair_sit: Option<(i32, i32)>,
     /// Timestamp when gathering started (for cast animation delay)
     pub gathering_started_at: f64,
     /// Active bonus tile events
@@ -742,6 +748,9 @@ impl GameState {
             pending_ground_items: Vec::new(),
             gathering_markers: Vec::new(),
             is_gathering: false,
+            is_sitting: false,
+            chair_positions: Vec::new(),
+            pending_chair_sit: None,
             gathering_started_at: 0.0,
             bonus_tiles: Vec::new(),
             gathering_buff: None,

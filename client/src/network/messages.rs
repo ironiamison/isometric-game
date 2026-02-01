@@ -85,6 +85,13 @@ pub enum ClientMessage {
 
     #[serde(rename = "stopGathering")]
     StopGathering,
+
+    // Chair commands
+    #[serde(rename = "sitChair")]
+    SitChair { tile_x: i32, tile_y: i32 },
+
+    #[serde(rename = "standUp")]
+    StandUp,
 }
 
 impl ClientMessage {
@@ -215,6 +222,12 @@ impl ClientMessage {
                 "startGathering"
             }
             ClientMessage::StopGathering => "stopGathering",
+            ClientMessage::SitChair { tile_x, tile_y } => {
+                data.insert("tile_x".into(), Value::Integer((*tile_x as i64).into()));
+                data.insert("tile_y".into(), Value::Integer((*tile_y as i64).into()));
+                "sitChair"
+            }
+            ClientMessage::StandUp => "standUp",
         };
 
         (msg_type, data)

@@ -99,6 +99,14 @@ pub enum ClientMessage {
     /// Stop gathering
     #[serde(rename = "stopGathering")]
     StopGathering,
+
+    /// Request to sit on a chair
+    #[serde(rename = "sitChair")]
+    SitChair { tile_x: i32, tile_y: i32 },
+
+    /// Stand up from chair
+    #[serde(rename = "standUp")]
+    StandUp,
 }
 
 // ============================================================================
@@ -427,6 +435,15 @@ pub enum ServerMessage {
         player_id: String,
         buff_type: String,
     },
+    ChairPositions {
+        positions: Vec<(i32, i32)>,
+    },
+    SitResult {
+        success: bool,
+        tile_x: i32,
+        tile_y: i32,
+        direction: u8,
+    },
 }
 
 /// Gathering marker position sent to clients
@@ -641,6 +658,8 @@ impl ServerMessage {
             ServerMessage::BonusTileExpired { .. } => "bonusTileExpired",
             ServerMessage::BuffApplied { .. } => "buffApplied",
             ServerMessage::BuffExpired { .. } => "buffExpired",
+            ServerMessage::ChairPositions { .. } => "chairPositions",
+            ServerMessage::SitResult { .. } => "sitResult",
         }
     }
 }
@@ -812,6 +831,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     pmap.push((
                         Value::String("is_admin".into()),
                         Value::Boolean(p.is_admin),
+                    ));
+                    pmap.push((
+                        Value::String("sitting".into()),
+                        Value::Boolean(p.sitting),
                     ));
                     Value::Map(pmap)
                 })
@@ -1859,6 +1882,25 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("buff_type".into()), Value::String(buff_type.clone().into())));
             Value::Map(map)
         }
+        ServerMessage::ChairPositions { positions } => {
+            let mut map = Vec::new();
+            let pos_values: Vec<Value> = positions.iter().map(|(x, y)| {
+                let mut pmap = Vec::new();
+                pmap.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
+                pmap.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+                Value::Map(pmap)
+            }).collect();
+            map.push((Value::String("positions".into()), Value::Array(pos_values)));
+            Value::Map(map)
+        }
+        ServerMessage::SitResult { success, tile_x, tile_y, direction } => {
+            let mut map = Vec::new();
+            map.push((Value::String("success".into()), Value::Boolean(*success)));
+            map.push((Value::String("tileX".into()), Value::Integer((*tile_x as i64).into())));
+            map.push((Value::String("tileY".into()), Value::Integer((*tile_y as i64).into())));
+            map.push((Value::String("direction".into()), Value::Integer((*direction as i64).into())));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -2045,6 +2087,12 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::StartGathering { marker_x, marker_y })
         }
         "stopGathering" => Ok(ClientMessage::StopGathering),
+        "sitChair" => {
+            let tile_x = extract_i32(msg_data, "tile_x").unwrap_or(0);
+            let tile_y = extract_i32(msg_data, "tile_y").unwrap_or(0);
+            Ok(ClientMessage::SitChair { tile_x, tile_y })
+        }
+        "standUp" => Ok(ClientMessage::StandUp),
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }

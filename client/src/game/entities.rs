@@ -264,9 +264,12 @@ impl Player {
         // Direction handling:
         // - Remote players: always accept server direction
         // - Local player when moving: accept server direction (confirms movement)
+        // - Local player when sitting: accept server direction (chair controls it)
         // - Local player when stationary: keep local direction (Face commands control it)
         let is_moving = vel_x != 0.0 || vel_y != 0.0;
-        if !is_local_player || is_moving {
+        let is_sitting = matches!(self.animation.state,
+            crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
+        if !is_local_player || is_moving || is_sitting {
             self.direction = dir;
         }
 

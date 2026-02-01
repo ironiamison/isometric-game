@@ -80,6 +80,9 @@ pub enum InputCommand {
     // Gathering commands
     StartGathering { marker_x: i32, marker_y: i32 },
     StopGathering,
+    // Chair commands
+    SitChair { tile_x: i32, tile_y: i32 },
+    StandUp,
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -1756,6 +1759,9 @@ impl InputHandler {
         // Check if we have any movement input (keyboard or D-pad)
         let has_movement_input = new_dir != CardinalDir::None;
 
+        // Movement while sitting is handled server-side (direction-validated auto-stand)
+        // Just let the move command go through - server will stand up if direction matches
+
         if has_movement_input && !is_attacking {
             // Determine hold duration based on input source
             let hold_duration = if has_dpad_input {
@@ -1767,7 +1773,10 @@ impl InputHandler {
 
             if past_threshold {
                 // Past threshold - check if target tile is walkable before sending movement
-                let can_move = if let Some(player) = state.get_local_player() {
+                // Skip client-side check when sitting (server handles direction-validated stand-up)
+                let can_move = if state.is_sitting {
+                    true
+                } else if let Some(player) = state.get_local_player() {
                     let player_x = player.x.round() as i32;
                     let player_y = player.y.round() as i32;
                     let target_x = player_x + dx as i32;
@@ -1894,6 +1903,10 @@ impl InputHandler {
                         }
                     }
                 }
+                // Handle chair sit target
+                if let Some((cx, cy)) = state.pending_chair_sit.take() {
+                    commands.push(InputCommand::SitChair { tile_x: cx, tile_y: cy });
+                }
                 state.auto_path = None;
 
                 // Send stop command so we don't keep moving in the last direction
@@ -1905,7 +1918,7 @@ impl InputHandler {
         // If fishing rod equipped and on/near a fishing tile, start gathering instead
         // Also stop movement when attacking (player must stand still)
         let attack_input = is_key_down(KeyCode::Space) || self.touch_controls.attack_pressed();
-        if attack_input {
+        if attack_input && !state.is_sitting {
             // Send stop command if we were moving via keyboard or auto-path
             let was_pathing = state.auto_path.is_some();
             if self.last_dx != 0.0 || self.last_dy != 0.0 || was_pathing {
@@ -2191,6 +2204,42 @@ impl InputHandler {
             } else if let Some(entity_id) = clicked_player {
                 // Player clicked - target them
                 commands.push(InputCommand::Target { entity_id });
+            } else if state.chair_positions.contains(&(clicked_tile_x, clicked_tile_y)) {
+                // Clicked on a chair - try to sit
+                if !state.is_sitting {
+                    if let Some(local_id) = &state.local_player_id {
+                        if let Some(player) = state.players.get(local_id) {
+                            let px = player.x.round() as i32;
+                            let py = player.y.round() as i32;
+                            let cdx = (px - clicked_tile_x).abs();
+                            let cdy = (py - clicked_tile_y).abs();
+                            if cdx <= 1 && cdy <= 1 {
+                                // Within range - sit immediately
+                                commands.push(InputCommand::SitChair { tile_x: clicked_tile_x, tile_y: clicked_tile_y });
+                            } else {
+                                // Out of range - pathfind to adjacent tile, then sit
+                                let occupied = build_occupied_set(state);
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                    (px, py),
+                                    (clicked_tile_x, clicked_tile_y),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
+                                ) {
+                                    state.auto_path = Some(PathState {
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: None,
+                                        interact_target: None,
+                                    });
+                                    state.pending_chair_sit = Some((clicked_tile_x, clicked_tile_y));
+                                }
+                            }
+                        }
+                    }
+                }
             } else if state.ui_state.tap_to_pathfind {
                 // Clicked on empty space - try to path there (if tap-to-pathfind enabled)
                 let tile_x = world_x.round() as i32;
@@ -2415,8 +2464,39 @@ impl InputHandler {
         // Touch interact button also picks up items if no NPC nearby
         let interact_pressed = is_key_pressed(KeyCode::E) || self.touch_controls.interact_pressed();
         if interact_pressed {
-            if let Some(local_id) = &state.local_player_id {
+            // If sitting, stand up
+            if state.is_sitting {
+                commands.push(InputCommand::StandUp);
+                state.is_sitting = false;
+                if let Some(local_id) = &state.local_player_id {
+                    if let Some(player) = state.players.get_mut(local_id) {
+                        player.stand_up();
+                    }
+                }
+            } else if let Some(local_id) = &state.local_player_id {
+                // Check for nearby chairs first, then NPCs
+                let mut sat_on_chair = false;
                 if let Some(player) = state.players.get(local_id) {
+                    let px = player.x.round() as i32;
+                    let py = player.y.round() as i32;
+                    let mut nearest_chair: Option<((i32, i32), i32)> = None;
+                    for &(cx, cy) in &state.chair_positions {
+                        let cdx = (px - cx).abs();
+                        let cdy = (py - cy).abs();
+                        let dist = cdx.max(cdy);
+                        if dist <= 1 {
+                            if nearest_chair.is_none() || dist < nearest_chair.unwrap().1 {
+                                nearest_chair = Some(((cx, cy), dist));
+                            }
+                        }
+                    }
+                    if let Some(((cx, cy), _)) = nearest_chair {
+                        commands.push(InputCommand::SitChair { tile_x: cx, tile_y: cy });
+                        sat_on_chair = true;
+                    }
+                }
+                if !sat_on_chair {
+                    if let Some(player) = state.players.get(local_id) {
                     // Find nearest NPC within interaction range (2.5 tiles)
                     const INTERACT_RANGE: f32 = 2.5;
                     let mut nearest_npc: Option<(String, f32)> = None;
@@ -2458,6 +2538,7 @@ impl InputHandler {
                         if let Some((item_id, _)) = nearest_item {
                             commands.push(InputCommand::Pickup { item_id });
                         }
+                    }
                     }
                 }
             }

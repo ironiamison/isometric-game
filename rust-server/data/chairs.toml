@@ -1,0 +1,75 @@
+# Chair definitions
+# GID = firstGid (1162) + object_id from mapper
+# Directions: "down" (0), "left" (1), "up" (2), "right" (3)
+
+[[chairs]]
+gid = 1286
+direction = "down"
+
+[[chairs]]
+gid = 1287
+direction = "right"
+
+[[chairs]]
+gid = 1288
+direction = "left"
+
+[[chairs]]
+gid = 1289
+direction = "up"
+
+[[chairs]]
+gid = 1309
+direction = "up"
+
+[[chairs]]
+gid = 1310
+direction = "left"
+
+[[chairs]]
+gid = 1416
+direction = "down"
+
+[[chairs]]
+gid = 1417
+direction = "right"
+
+[[chairs]]
+gid = 1418
+direction = "down"
+
+[[chairs]]
+gid = 1419
+direction = "right"
+
+[[chairs]]
+gid = 1420
+direction = "down"
+
+[[chairs]]
+gid = 1421
+direction = "right"
+
+[[chairs]]
+gid = 1952
+direction = "left"
+
+[[chairs]]
+gid = 1953
+direction = "up"
+
+[[chairs]]
+gid = 1954
+direction = "down"
+
+[[chairs]]
+gid = 1955
+direction = "right"
+
+[[chairs]]
+gid = 1979
+direction = "right"
+
+[[chairs]]
+gid = 1980
+direction = "down"

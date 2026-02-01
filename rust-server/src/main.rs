@@ -958,6 +958,8 @@ async fn matchmake_join_or_create(
         character_data.equipped_necklace.clone(),
         character_data.equipped_belt.clone(),
         character_data.is_admin,
+        character_data.sitting_at_x,
+        character_data.sitting_at_y,
     ).await;
 
     // Load quest state from database
@@ -1301,6 +1303,12 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send chair positions
+    let chair_positions = room.get_chair_positions_message().await;
+    if let Ok(bytes) = protocol::encode_server_message(&chair_positions) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Only send overworld data if the player is NOT reconnecting into an instance
     let reconnecting_to_instance = current_map.is_some();
 
@@ -1363,6 +1371,19 @@ async fn handle_socket(
         hair_color,
     })
     .await;
+
+    // If player was sitting on a chair, send SitResult so client shows sitting animation
+    if let Some((sx, sy, direction)) = room.get_player_sitting_info(&player_id).await {
+        let sit_msg = ServerMessage::SitResult {
+            success: true,
+            tile_x: sx,
+            tile_y: sy,
+            direction,
+        };
+        if let Ok(bytes) = protocol::encode_server_message(&sit_msg) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
 
     // Send active quests to this client (from saved state)
     for quest_msg in room.get_active_quest_messages(&player_id).await {
@@ -1487,6 +1508,8 @@ async fn handle_socket(
                 save_data.equipped_belt.as_deref(),
                 played_time_delta,
                 save_data.current_map.as_deref(),
+                save_data.sitting_at_x,
+                save_data.sitting_at_y,
             ).await {
                 error!("Failed to save character {} on disconnect: {}", character_name, e);
             } else {
@@ -2232,6 +2255,12 @@ async fn handle_client_message(
         ClientMessage::StopGathering => {
             room.handle_stop_gathering(player_id).await;
         }
+        ClientMessage::SitChair { tile_x, tile_y } => {
+            room.handle_sit_chair(player_id, tile_x, tile_y).await;
+        }
+        ClientMessage::StandUp => {
+            room.handle_stand_up(player_id).await;
+        }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
     }
@@ -2328,6 +2357,8 @@ async fn main() {
                             save_data.equipped_belt.as_deref(),
                             played_time_delta,
                             save_data.current_map.as_deref(),
+                            save_data.sitting_at_x,
+                            save_data.sitting_at_y,
                         ).await {
                             warn!("Auto-save failed for character {}: {}", character_name, e);
                         } else {
