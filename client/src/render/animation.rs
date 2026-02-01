@@ -758,7 +758,7 @@ pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_f
             // Down/Right: left 4px, up 3px (mirrored for right)
             if use_back { (-1.0, -2.0) } else { (-4.0, -3.0) }
         }
-        AnimationState::SittingChair => (0.0, -3.0),
+        AnimationState::SittingChair => (0.0, -2.0),
         AnimationState::SittingGround => (0.0, 0.0),
     };
 
@@ -960,7 +960,8 @@ pub fn get_back_static_offset(state: AnimationState, direction: Direction, anim_
                 Direction::Right => (1.0, 0.0),  // Right 1px (mirrored from Down)
             }
         }
-        AnimationState::SittingChair | AnimationState::SittingGround => (0.0, 0.0),
+        AnimationState::SittingChair => (0.0, 7.0),
+        AnimationState::SittingGround => (0.0, 0.0),
     };
 
     // Invert x offset when flipped (skip for ShootingBow which handles direction itself)
