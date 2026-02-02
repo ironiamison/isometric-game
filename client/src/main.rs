@@ -11,6 +11,7 @@ mod input;
 mod auth;
 mod ui;
 mod audio;
+mod settings;
 
 use audio::AudioManager;
 
@@ -130,6 +131,21 @@ async fn main() {
                             game_state.ui_state.audio_volume = audio.music_volume();
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
+                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            if !settings::load_control_scheme_chosen() {
+                                game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
+                                    quest_id: "__control_scheme__".to_string(),
+                                    npc_id: String::new(),
+                                    speaker: "Control Scheme".to_string(),
+                                    text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
+                                    choices: vec![
+                                        game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space + Enter)".to_string() },
+                                        game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl + Always-on Chat)".to_string() },
+                                    ],
+                                    show_time: get_time(),
+                                });
+                            }
                             let network = NetworkClient::new_guest(WS_URL);
                             let mut input_handler = InputHandler::new();
                             input_handler.load_touch_icons().await;
@@ -160,6 +176,21 @@ async fn main() {
                             game_state.ui_state.audio_volume = audio.music_volume();
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
+                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            if !settings::load_control_scheme_chosen() {
+                                game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
+                                    quest_id: "__control_scheme__".to_string(),
+                                    npc_id: String::new(),
+                                    speaker: "Control Scheme".to_string(),
+                                    text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
+                                    choices: vec![
+                                        game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space + Enter)".to_string() },
+                                        game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl + Always-on Chat)".to_string() },
+                                    ],
+                                    show_time: get_time(),
+                                });
+                            }
 
                             let network = NetworkClient::new_authenticated(
                                 WS_URL,
@@ -413,9 +444,20 @@ fn run_game_frame(
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem { slot_index: *slot_index as u32 },
             // Quest-related commands
             InputCommand::Interact { npc_id } => ClientMessage::Interact { npc_id: npc_id.clone() },
-            InputCommand::DialogueChoice { quest_id, choice_id } => ClientMessage::DialogueChoice {
-                quest_id: quest_id.clone(),
-                choice_id: choice_id.clone(),
+            InputCommand::DialogueChoice { quest_id, choice_id } => {
+                if quest_id == "__control_scheme__" {
+                    let classic = choice_id == "classic";
+                    game_state.ui_state.classic_controls = classic;
+                    if classic { game_state.ui_state.chat_open = true; }
+                    settings::save_classic_controls(classic);
+                    settings::save_control_scheme_chosen();
+                    game_state.ui_state.active_dialogue = None;
+                    continue;
+                }
+                ClientMessage::DialogueChoice {
+                    quest_id: quest_id.clone(),
+                    choice_id: choice_id.clone(),
+                }
             },
             InputCommand::CloseDialogue => {
                 // Just close locally, no server message needed

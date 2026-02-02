@@ -579,6 +579,8 @@ pub struct UiState {
     pub inventory_touch_last_y: f32,
     pub inventory_scrollbar_dragging: bool,
     pub inventory_scrollbar_drag_last_y: f32,
+    // Control scheme: false = Modern (WASD+Space+Enter), true = Classic (Arrows+Ctrl+always-on chat)
+    pub classic_controls: bool,
 }
 
 impl Default for UiState {
@@ -662,6 +664,7 @@ impl Default for UiState {
             inventory_touch_last_y: 0.0,
             inventory_scrollbar_dragging: false,
             inventory_scrollbar_drag_last_y: 0.0,
+            classic_controls: false,
         }
     }
 }

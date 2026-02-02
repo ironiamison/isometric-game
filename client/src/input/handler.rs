@@ -853,6 +853,18 @@ impl InputHandler {
                             state.ui_state.use_joystick = !state.ui_state.use_joystick;
                             return commands;
                         }
+                        UiElementId::EscapeMenuControlSchemeToggle => {
+                            audio.play_sfx("enter");
+                            state.ui_state.classic_controls = !state.ui_state.classic_controls;
+                            if state.ui_state.classic_controls {
+                                state.ui_state.chat_open = true;
+                                state.ui_state.chat_cursor = state.ui_state.chat_input.chars().count();
+                            } else {
+                                state.ui_state.chat_open = false;
+                            }
+                            crate::settings::save_classic_controls(state.ui_state.classic_controls);
+                            return commands;
+                        }
                         UiElementId::EscapeMenuDisconnect => {
                             audio.play_sfx("enter");
                             state.disconnect_requested = true;
@@ -1094,9 +1106,11 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::DialogueClose => {
-                            commands.push(InputCommand::CloseDialogue);
-                            state.ui_state.active_dialogue = None;
-                            return commands;
+                            if dialogue.quest_id != "__control_scheme__" {
+                                commands.push(InputCommand::CloseDialogue);
+                                state.ui_state.active_dialogue = None;
+                                return commands;
+                            }
                         }
                         _ => {}
                     }
@@ -1105,7 +1119,8 @@ impl InputHandler {
 
             if !dialogue.choices.is_empty() {
                 // Dialogue with choices - Escape cancels, number keys select
-                if is_key_pressed(KeyCode::Escape) {
+                // Don't allow closing the control scheme choice dialogue with Escape
+                if is_key_pressed(KeyCode::Escape) && dialogue.quest_id != "__control_scheme__" {
                     commands.push(InputCommand::CloseDialogue);
                     state.ui_state.active_dialogue = None;
                     return commands;
@@ -1593,6 +1608,8 @@ impl InputHandler {
 
         // Handle chat input mode (must be before chat_panel_open block so typing works)
         if state.ui_state.chat_open {
+            let classic = state.ui_state.classic_controls;
+
             // Helper to convert character index to byte index
             let char_to_byte_index = |s: &str, char_idx: usize| -> usize {
                 s.char_indices()
@@ -1607,8 +1624,13 @@ impl InputHandler {
 
             let current_time = macroquad::time::get_time();
 
-            // Escape cancels chat
+            // Escape cancels chat (in classic mode, Escape opens ESC menu instead - don't close chat)
             if is_key_pressed(KeyCode::Escape) {
+                if classic {
+                    // In classic mode, Escape toggles the ESC menu, chat stays open
+                    state.ui_state.escape_menu_open = !state.ui_state.escape_menu_open;
+                    return commands;
+                }
                 state.ui_state.chat_open = false;
                 state.ui_state.chat_input.clear();
                 state.ui_state.chat_cursor = 0;
@@ -1631,8 +1653,12 @@ impl InputHandler {
                 state.ui_state.chat_input.clear();
                 state.ui_state.chat_cursor = 0;
                 state.ui_state.chat_scroll_offset = 0;
-                // Close keyboard input but keep chat panel open if it's showing
-                state.ui_state.chat_open = false;
+                if classic {
+                    // In classic mode, chat stays open after sending
+                } else {
+                    // Close keyboard input but keep chat panel open if it's showing
+                    state.ui_state.chat_open = false;
+                }
                 #[cfg(target_os = "android")]
                 macroquad::miniquad::window::show_keyboard(false);
                 return commands;
@@ -1641,7 +1667,12 @@ impl InputHandler {
             let char_count = state.ui_state.chat_input.chars().count();
 
             // Check if any repeatable key is held
-            let repeatable_keys = [KeyCode::Left, KeyCode::Right, KeyCode::Backspace, KeyCode::Delete];
+            let repeatable_keys = if classic {
+                // In classic mode, arrow keys are for movement, not chat cursor
+                vec![KeyCode::Backspace, KeyCode::Delete]
+            } else {
+                vec![KeyCode::Left, KeyCode::Right, KeyCode::Backspace, KeyCode::Delete]
+            };
             let any_repeatable_held = repeatable_keys.iter().any(|k| is_key_down(*k));
 
             // Reset repeat state if no repeatable keys held
@@ -1669,18 +1700,21 @@ impl InputHandler {
             };
 
             // Arrow key navigation (drain char queue after to prevent ghost characters)
-            if should_fire(KeyCode::Left, state, current_time) {
-                if state.ui_state.chat_cursor > 0 {
-                    state.ui_state.chat_cursor -= 1;
+            // In classic mode, arrow keys are used for movement, not chat cursor
+            if !classic {
+                if should_fire(KeyCode::Left, state, current_time) {
+                    if state.ui_state.chat_cursor > 0 {
+                        state.ui_state.chat_cursor -= 1;
+                    }
+                    while get_char_pressed().is_some() {}
                 }
-                while get_char_pressed().is_some() {}
-            }
-            if should_fire(KeyCode::Right, state, current_time) {
-                let char_count = state.ui_state.chat_input.chars().count();
-                if state.ui_state.chat_cursor < char_count {
-                    state.ui_state.chat_cursor += 1;
+                if should_fire(KeyCode::Right, state, current_time) {
+                    let char_count = state.ui_state.chat_input.chars().count();
+                    if state.ui_state.chat_cursor < char_count {
+                        state.ui_state.chat_cursor += 1;
+                    }
+                    while get_char_pressed().is_some() {}
                 }
-                while get_char_pressed().is_some() {}
             }
             // Home/End for quick navigation (no repeat needed)
             if is_key_pressed(KeyCode::Home) {
@@ -1724,7 +1758,10 @@ impl InputHandler {
                 }
             }
 
-            return commands;
+            // In classic mode, don't return - fall through to movement/attack handling
+            if !classic {
+                return commands;
+            }
         }
 
         // Block game-world input when chat panel is open (mobile)
@@ -1732,8 +1769,10 @@ impl InputHandler {
             return commands;
         }
 
-        // Enter key opens chat
-        if is_key_pressed(KeyCode::Enter) {
+        let classic = state.ui_state.classic_controls;
+
+        // Enter key opens chat (not in classic mode - chat is always open)
+        if !classic && is_key_pressed(KeyCode::Enter) {
             state.ui_state.chat_open = true;
             state.ui_state.chat_input.clear();
             state.ui_state.chat_cursor = 0;
@@ -1746,11 +1785,11 @@ impl InputHandler {
         // Drain character queue when chat is closed to prevent accumulation
         while get_char_pressed().is_some() {}
 
-        // Read which keys are held
-        let up = is_key_down(KeyCode::W) || is_key_down(KeyCode::Up);
-        let down = is_key_down(KeyCode::S) || is_key_down(KeyCode::Down);
-        let left = is_key_down(KeyCode::A) || is_key_down(KeyCode::Left);
-        let right = is_key_down(KeyCode::D) || is_key_down(KeyCode::Right);
+        // Read which keys are held (in classic mode, only arrow keys - WASD goes to chat)
+        let up = if classic { is_key_down(KeyCode::Up) } else { is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) };
+        let down = if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) };
+        let left = if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) };
+        let right = if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) };
 
         // Get touch D-pad input (for mobile)
         use crate::input::touch::DPadDirection;
@@ -1890,8 +1929,13 @@ impl InputHandler {
         };
 
         // Only send Move commands if held past the threshold
-        // Don't move while attacking - check both Space key/touch button and animation state
-        let is_attacking = is_key_down(KeyCode::Space) || self.touch_controls.attack_pressed() || state.get_local_player().map_or(false, |p| {
+        // Don't move while attacking - check both attack key/touch button and animation state
+        let attack_key_down = if classic {
+            is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl)
+        } else {
+            is_key_down(KeyCode::Space)
+        };
+        let is_attacking = attack_key_down || self.touch_controls.attack_pressed() || state.get_local_player().map_or(false, |p| {
             matches!(
                 p.animation.state,
                 AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
@@ -2063,7 +2107,7 @@ impl InputHandler {
         // Attack (Space key or touch attack button) - holding continues attacking with cooldown
         // If fishing rod equipped and on/near a fishing tile, start gathering instead
         // Also stop movement when attacking (player must stand still)
-        let attack_input = is_key_down(KeyCode::Space) || self.touch_controls.attack_pressed();
+        let attack_input = attack_key_down || self.touch_controls.attack_pressed();
         if attack_input && !state.is_sitting {
             // Send stop command if we were moving via keyboard or auto-path
             let was_pathing = state.auto_path.is_some();
@@ -2489,7 +2533,8 @@ impl InputHandler {
         }
 
         // Toggle inventory (I key) with mutual exclusivity
-        if is_key_pressed(KeyCode::I) {
+        // In classic mode, letter/number keys go to chat input, not hotkeys
+        if !classic && is_key_pressed(KeyCode::I) {
             audio.play_sfx("enter");
             if state.ui_state.inventory_open {
                 state.ui_state.inventory_open = false;
@@ -2582,7 +2627,7 @@ impl InputHandler {
         }
 
         // Toggle character panel (C key) with mutual exclusivity
-        if is_key_pressed(KeyCode::C) {
+        if !classic && is_key_pressed(KeyCode::C) {
             audio.play_sfx("enter");
             if state.ui_state.character_panel_open {
                 state.ui_state.character_panel_open = false;
@@ -2594,7 +2639,7 @@ impl InputHandler {
             }
         }
 
-        // Use/equip items (1-5 keys for quick slots)
+        // Use/equip items (1-5 keys for quick slots, disabled in classic mode)
         let quick_slot_keys = [
             (KeyCode::Key1, 0usize),
             (KeyCode::Key2, 1usize),
@@ -2603,7 +2648,7 @@ impl InputHandler {
             (KeyCode::Key5, 4usize),
         ];
         for (key, slot_idx) in quick_slot_keys {
-            if is_key_pressed(key) {
+            if !classic && is_key_pressed(key) {
                 if let Some(Some(slot)) = state.inventory.slots.get(slot_idx) {
                     let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
                     if item_def.equipment.is_some() {
@@ -2618,7 +2663,7 @@ impl InputHandler {
         }
 
         // Pickup nearest item (F key or touch interact when no NPC nearby)
-        let pickup_pressed = is_key_pressed(KeyCode::F);
+        let pickup_pressed = !classic && is_key_pressed(KeyCode::F);
         if pickup_pressed {
             // Get local player position
             if let Some(local_id) = &state.local_player_id {
@@ -2648,7 +2693,7 @@ impl InputHandler {
 
         // Interact with nearest NPC (E key or touch interact button)
         // Touch interact button also picks up items if no NPC nearby
-        let interact_pressed = is_key_pressed(KeyCode::E) || self.touch_controls.interact_pressed();
+        let interact_pressed = (!classic && is_key_pressed(KeyCode::E)) || self.touch_controls.interact_pressed();
         if interact_pressed {
             // If sitting, stand up
             if state.is_sitting {
@@ -2731,7 +2776,7 @@ impl InputHandler {
         }
 
         // Toggle quest log (Q key)
-        if is_key_pressed(KeyCode::Q) {
+        if !classic && is_key_pressed(KeyCode::Q) {
             state.ui_state.quest_log_open = !state.ui_state.quest_log_open;
         }
 

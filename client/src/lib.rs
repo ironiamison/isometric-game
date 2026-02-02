@@ -17,6 +17,7 @@ pub mod input;
 pub mod auth;
 pub mod ui;
 pub mod audio;
+pub mod settings;
 mod app;
 
 use audio::AudioManager;
@@ -113,6 +114,10 @@ async fn async_main() {
                             game_state.ui_state.audio_volume = audio.music_volume();
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
+                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            #[cfg(not(target_os = "android"))]
+                            app::maybe_show_control_scheme_dialogue(&mut game_state);
                             let network = NetworkClient::new_guest(WS_URL);
                             let mut input_handler = InputHandler::new();
                             input_handler.load_touch_icons().await;
@@ -140,6 +145,10 @@ async fn async_main() {
                             game_state.ui_state.audio_volume = audio.music_volume();
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
+                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            #[cfg(not(target_os = "android"))]
+                            app::maybe_show_control_scheme_dialogue(&mut game_state);
 
                             let network = NetworkClient::new_authenticated(
                                 WS_URL,
@@ -288,6 +297,9 @@ async fn async_main() {
                             game_state.ui_state.audio_volume = audio.music_volume();
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
+                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            app::maybe_show_control_scheme_dialogue(&mut game_state);
                             let network = NetworkClient::new_guest(WS_URL);
                             let mut input_handler = InputHandler::new();
                             input_handler.load_touch_icons().await;
@@ -361,6 +373,9 @@ async fn async_main() {
                                 game_state.ui_state.audio_volume = audio.music_volume();
                                 game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                                 game_state.ui_state.audio_muted = audio.is_muted();
+                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            app::maybe_show_control_scheme_dialogue(&mut game_state);
 
                                 // Store matchmaking results in localStorage for WASM network client
                                 {

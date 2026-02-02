@@ -4100,7 +4100,12 @@ impl Renderer {
         if state.ui_state.chat_log_visible {
             let chat_x = 10.0;
             let (_, chat_sh) = virtual_screen_size();
-            let chat_y = chat_sh - 20.0;
+            // In classic mode, push chat log up above the always-visible chat input box
+            let chat_y = if state.ui_state.classic_controls {
+                chat_sh - 58.0
+            } else {
+                chat_sh - 20.0
+            };
             let line_height = 18.0;
             let max_chat_width = 400.0;
             let font_size = 16.0;
@@ -4316,7 +4321,12 @@ impl Renderer {
             }
 
             // Hint
-            self.draw_text_sharp("Press Enter to send, Escape to cancel", input_x, input_y + input_height + 12.0, 16.0, LIGHTGRAY);
+            let hint = if state.ui_state.classic_controls {
+                "Press Enter to send"
+            } else {
+                "Press Enter to send, Escape to cancel"
+            };
+            self.draw_text_sharp(hint, input_x, input_y + input_height + 12.0, 16.0, LIGHTGRAY);
         }
     }
 

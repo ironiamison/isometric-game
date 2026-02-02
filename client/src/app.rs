@@ -28,6 +28,31 @@ pub const WS_URL: &str = "wss://aeven.xyz";
 // Set to false for production builds
 pub const DEV_MODE: bool = false;
 
+/// Show the control scheme choice dialogue if the player hasn't chosen yet.
+/// Skipped on Android (no keyboard).
+#[cfg(not(target_os = "android"))]
+pub fn maybe_show_control_scheme_dialogue(game_state: &mut GameState) {
+    if !crate::settings::load_control_scheme_chosen() {
+        game_state.ui_state.active_dialogue = Some(crate::game::state::ActiveDialogue {
+            quest_id: "__control_scheme__".to_string(),
+            npc_id: String::new(),
+            speaker: "Control Scheme".to_string(),
+            text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
+            choices: vec![
+                crate::game::state::DialogueChoice {
+                    id: "modern".to_string(),
+                    text: "Modern (WASD + Space + Enter)".to_string(),
+                },
+                crate::game::state::DialogueChoice {
+                    id: "classic".to_string(),
+                    text: "Classic (Arrows + Ctrl + Always-on Chat)".to_string(),
+                },
+            ],
+            show_time: get_time(),
+        });
+    }
+}
+
 pub fn window_conf() -> Conf {
     Conf {
         window_title: "New Aeven".to_string(),
@@ -197,9 +222,20 @@ pub fn run_game_frame(
             InputCommand::Pickup { item_id } => ClientMessage::Pickup { item_id: item_id.clone() },
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem { slot_index: *slot_index as u32 },
             InputCommand::Interact { npc_id } => ClientMessage::Interact { npc_id: npc_id.clone() },
-            InputCommand::DialogueChoice { quest_id, choice_id } => ClientMessage::DialogueChoice {
-                quest_id: quest_id.clone(),
-                choice_id: choice_id.clone(),
+            InputCommand::DialogueChoice { quest_id, choice_id } => {
+                if quest_id == "__control_scheme__" {
+                    let classic = choice_id == "classic";
+                    game_state.ui_state.classic_controls = classic;
+                    if classic { game_state.ui_state.chat_open = true; }
+                    crate::settings::save_classic_controls(classic);
+                    crate::settings::save_control_scheme_chosen();
+                    game_state.ui_state.active_dialogue = None;
+                    continue;
+                }
+                ClientMessage::DialogueChoice {
+                    quest_id: quest_id.clone(),
+                    choice_id: choice_id.clone(),
+                }
             },
             InputCommand::CloseDialogue => {
                 continue;
