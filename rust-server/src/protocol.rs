@@ -107,6 +107,14 @@ pub enum ClientMessage {
     /// Stand up from chair
     #[serde(rename = "standUp")]
     StandUp,
+
+    /// Plant a seed in a farming patch
+    #[serde(rename = "plantSeed")]
+    PlantSeed { patch_id: String, item_id: String },
+
+    /// Harvest a crop from a farming patch
+    #[serde(rename = "harvestCrop")]
+    HarvestCrop { patch_id: String },
 }
 
 // ============================================================================
@@ -444,6 +452,30 @@ pub enum ServerMessage {
         tile_y: i32,
         direction: u8,
     },
+    /// Send all farming patch states (on connect/area load)
+    FarmingPatchStates {
+        patches: Vec<FarmingPatchData>,
+    },
+    /// Update a single farming patch state
+    PatchStateUpdate {
+        patch_id: String,
+        state: String,
+        crop_id: String,
+        growth_stage: u32,
+        owner_id: String,
+    },
+}
+
+/// Farming patch data for client synchronization
+#[derive(Debug, Clone, Serialize)]
+pub struct FarmingPatchData {
+    pub patch_id: String,
+    pub x: i32,
+    pub y: i32,
+    pub state: String,       // "empty", "growing", "harvestable"
+    pub crop_id: String,
+    pub growth_stage: u32,
+    pub owner_id: String,
 }
 
 /// Gathering marker position sent to clients
@@ -660,6 +692,8 @@ impl ServerMessage {
             ServerMessage::BuffExpired { .. } => "buffExpired",
             ServerMessage::ChairPositions { .. } => "chairPositions",
             ServerMessage::SitResult { .. } => "sitResult",
+            ServerMessage::FarmingPatchStates { .. } => "farmingPatchStates",
+            ServerMessage::PatchStateUpdate { .. } => "patchStateUpdate",
         }
     }
 }
@@ -1901,6 +1935,31 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("direction".into()), Value::Integer((*direction as i64).into())));
             Value::Map(map)
         }
+        ServerMessage::FarmingPatchStates { patches } => {
+            let mut map = Vec::new();
+            let patch_values: Vec<Value> = patches.iter().map(|p| {
+                let mut pmap = Vec::new();
+                pmap.push((Value::String("patch_id".into()), Value::String(p.patch_id.clone().into())));
+                pmap.push((Value::String("x".into()), Value::Integer((p.x as i64).into())));
+                pmap.push((Value::String("y".into()), Value::Integer((p.y as i64).into())));
+                pmap.push((Value::String("state".into()), Value::String(p.state.clone().into())));
+                pmap.push((Value::String("crop_id".into()), Value::String(p.crop_id.clone().into())));
+                pmap.push((Value::String("growth_stage".into()), Value::Integer((p.growth_stage as i64).into())));
+                pmap.push((Value::String("owner_id".into()), Value::String(p.owner_id.clone().into())));
+                Value::Map(pmap)
+            }).collect();
+            map.push((Value::String("patches".into()), Value::Array(patch_values)));
+            Value::Map(map)
+        }
+        ServerMessage::PatchStateUpdate { patch_id, state, crop_id, growth_stage, owner_id } => {
+            let mut map = Vec::new();
+            map.push((Value::String("patch_id".into()), Value::String(patch_id.clone().into())));
+            map.push((Value::String("state".into()), Value::String(state.clone().into())));
+            map.push((Value::String("crop_id".into()), Value::String(crop_id.clone().into())));
+            map.push((Value::String("growth_stage".into()), Value::Integer((*growth_stage as i64).into())));
+            map.push((Value::String("owner_id".into()), Value::String(owner_id.clone().into())));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -2093,6 +2152,15 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::SitChair { tile_x, tile_y })
         }
         "standUp" => Ok(ClientMessage::StandUp),
+        "plantSeed" => {
+            let patch_id = extract_string(msg_data, "patch_id").unwrap_or_default();
+            let item_id = extract_string(msg_data, "item_id").unwrap_or_default();
+            Ok(ClientMessage::PlantSeed { patch_id, item_id })
+        }
+        "harvestCrop" => {
+            let patch_id = extract_string(msg_data, "patch_id").unwrap_or_default();
+            Ok(ClientMessage::HarvestCrop { patch_id })
+        }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }

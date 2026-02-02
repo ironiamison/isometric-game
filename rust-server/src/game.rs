@@ -472,6 +472,8 @@ pub struct GameRoom {
     chair_gids: HashMap<u32, Direction>,
     /// Chair positions on the map: (tile_x, tile_y) -> ChairState
     chairs: RwLock<HashMap<(i32, i32), ChairState>>,
+    /// Farming system (allotment patches, crop growth)
+    farming: RwLock<crate::farming::FarmingSystem>,
 }
 
 impl GameRoom {
@@ -567,6 +569,36 @@ impl GameRoom {
             tracing::info!("Loaded {} gathering markers from chunk data", chunk_marker_count);
         }
 
+        // Load farming system
+        let mut farming = match crate::farming::FarmingSystem::load(std::path::Path::new("data")) {
+            Ok(f) => {
+                tracing::info!("Loaded farming system with {} crops, {} patches", f.crops.len(), f.patches.len());
+                f
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load farming system: {} (using empty)", e);
+                crate::farming::FarmingSystem::new()
+            }
+        };
+
+        // Restore planted patches from database
+        if let Some(ref db) = db {
+            match db.load_farming_patches().await {
+                Ok(saved_patches) => {
+                    let count = saved_patches.len();
+                    for (patch_id, player_id, crop_id, planted_at) in saved_patches {
+                        farming.restore_patch(&patch_id, &player_id, &crop_id, planted_at);
+                    }
+                    if count > 0 {
+                        tracing::info!("Restored {} planted farming patches from database", count);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load farming patches from database: {}", e);
+                }
+            }
+        }
+
         // Load chair config
         let mut chair_gids: HashMap<u32, Direction> = HashMap::new();
         match std::fs::read_to_string("data/chairs.toml") {
@@ -635,6 +667,7 @@ impl GameRoom {
             gathering: RwLock::new(gathering),
             chair_gids,
             chairs: RwLock::new(chairs),
+            farming: RwLock::new(farming),
         }
     }
 
@@ -2744,7 +2777,19 @@ impl GameRoom {
             .map(|p| p.behaviors.quest_giver)
             .unwrap_or(false);
 
-        if is_merchant && (quests.is_empty() || !is_quest_giver) {
+        // Check if all quests for this NPC are completed (for merchant fallback)
+        let all_quests_completed = if is_merchant && is_quest_giver && !quests.is_empty() {
+            let quest_states = self.player_quest_states.read().await;
+            if let Some(quest_state) = quest_states.get(player_id) {
+                quests.iter().all(|q| quest_state.is_quest_completed(&q.id))
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if is_merchant && (quests.is_empty() || !is_quest_giver || all_quests_completed) {
             tracing::info!("Player {} opening shop with NPC {} ({})", player_id, npc_id, entity_type);
 
             // Get merchant config to load shop data
@@ -2959,10 +3004,38 @@ impl GameRoom {
                             let mut players = self.players.write().await;
                             if let Some(player) = players.get_mut(player_id) {
                                 player.inventory.gold += quest.rewards.gold;
-                                // TODO: Grant EXP and items
+                                for item_reward in &quest.rewards.items {
+                                    player.inventory.add_item(&item_reward.item_id, item_reward.count, &self.item_registry);
+                                }
+                                let slots = player.inventory.to_update();
+                                let gold = player.inventory.gold;
+                                drop(players);
+                                self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                                    player_id: player_id.to_string(),
+                                    slots,
+                                    gold,
+                                }).await;
                             }
                         }
                         tracing::info!("Player {} completed quest {}", player_id, quest_id);
+                    }
+
+                    // Handle granted items from give_item()
+                    if !script_result.granted_items.is_empty() {
+                        let mut players = self.players.write().await;
+                        if let Some(player) = players.get_mut(player_id) {
+                            for (item_id, count) in &script_result.granted_items {
+                                player.inventory.add_item(item_id, *count, &self.item_registry);
+                            }
+                            let slots = player.inventory.to_update();
+                            let gold = player.inventory.gold;
+                            drop(players);
+                            self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                                player_id: player_id.to_string(),
+                                slots,
+                                gold,
+                            }).await;
+                        }
                     }
 
                     // Send notifications
@@ -3085,9 +3158,38 @@ impl GameRoom {
                         let mut players = self.players.write().await;
                         if let Some(player) = players.get_mut(player_id) {
                             player.inventory.gold += quest.rewards.gold;
+                            for item_reward in &quest.rewards.items {
+                                player.inventory.add_item(&item_reward.item_id, item_reward.count, &self.item_registry);
+                            }
+                            let slots = player.inventory.to_update();
+                            let gold = player.inventory.gold;
+                            drop(players);
+                            self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                                player_id: player_id.to_string(),
+                                slots,
+                                gold,
+                            }).await;
                         }
                     }
                     tracing::info!("Player {} completed quest {}", player_id, quest_id);
+                }
+
+                // Handle granted items from give_item()
+                if !script_result.granted_items.is_empty() {
+                    let mut players = self.players.write().await;
+                    if let Some(player) = players.get_mut(player_id) {
+                        for (item_id, count) in &script_result.granted_items {
+                            player.inventory.add_item(item_id, *count, &self.item_registry);
+                        }
+                        let slots = player.inventory.to_update();
+                        let gold = player.inventory.gold;
+                        drop(players);
+                        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                            player_id: player_id.to_string(),
+                            slots,
+                            gold,
+                        }).await;
+                    }
                 }
             }
             Err(e) => {
@@ -4428,6 +4530,208 @@ impl GameRoom {
         }
     }
 
+    pub async fn handle_plant_seed(&self, player_id: &str, patch_id: &str, item_id: &str) {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        // Get player farming level and check they have the seed
+        let farming_level = {
+            let players = self.players.read().await;
+            let player = match players.get(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+            if !player.inventory.has_item(item_id, 1) {
+                self.send_to_player(player_id, ServerMessage::Error {
+                    code: 400,
+                    message: "You don't have that seed".to_string(),
+                }).await;
+                return;
+            }
+            player.skills.farming.level
+        };
+
+        // Try to plant
+        let result = {
+            let mut farming = self.farming.write().await;
+            farming.plant_seed(patch_id, item_id, player_id, farming_level, current_time)
+        };
+
+        match result {
+            Ok((crop_id, xp)) => {
+                // Consume the seed
+                let inv_update = {
+                    let mut players = self.players.write().await;
+                    let player = players.get_mut(player_id).unwrap();
+                    player.inventory.remove_item(item_id, 1);
+
+                    // Grant planting XP
+                    let leveled = player.skills.farming.add_xp(xp);
+                    let skill = &player.skills.farming;
+                    let gold = player.inventory.gold;
+
+                    (player.inventory.to_update(), gold, skill.xp, skill.level, leveled)
+                };
+
+                // Send inventory update
+                self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                    player_id: player_id.to_string(),
+                    slots: inv_update.0,
+                    gold: inv_update.1,
+                }).await;
+
+                // Send XP gain
+                self.send_to_player(player_id, ServerMessage::SkillXp {
+                    player_id: player_id.to_string(),
+                    skill: "farming".to_string(),
+                    xp_gained: xp,
+                    total_xp: inv_update.2,
+                    level: inv_update.3,
+                }).await;
+
+                if inv_update.4 {
+                    self.broadcast(ServerMessage::SkillLevelUp {
+                        player_id: player_id.to_string(),
+                        skill: "farming".to_string(),
+                        new_level: inv_update.3,
+                    }).await;
+                }
+
+                // Persist to database
+                if let Some(ref db) = self.db {
+                    if let Err(e) = db.save_farming_patch(patch_id, player_id, &crop_id, current_time).await {
+                        tracing::warn!("Failed to save farming patch {}: {}", patch_id, e);
+                    }
+                }
+
+                // Send patch update to this player only (per-player instanced)
+                self.send_to_player(player_id, ServerMessage::PatchStateUpdate {
+                    patch_id: patch_id.to_string(),
+                    state: "growing".to_string(),
+                    crop_id,
+                    growth_stage: 0,
+                    owner_id: player_id.to_string(),
+                }).await;
+
+                // Fire quest event for planting
+                self.process_quest_item_collect(player_id, &format!("plant_{}", item_id), 1).await;
+            }
+            Err(e) => {
+                self.send_to_player(player_id, ServerMessage::Error {
+                    code: 400,
+                    message: e,
+                }).await;
+            }
+        }
+    }
+
+    pub async fn handle_harvest_crop(&self, player_id: &str, patch_id: &str) {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let result = {
+            let mut farming = self.farming.write().await;
+            farming.harvest_crop(patch_id, player_id, current_time)
+        };
+
+        match result {
+            Ok(harvest) => {
+                // Add produce + optional seed to inventory, grant XP
+                let inv_update = {
+                    let mut players = self.players.write().await;
+                    let player = players.get_mut(player_id).unwrap();
+
+                    player.inventory.add_item(&harvest.produce_item, harvest.amount, &self.item_registry);
+                    if harvest.seed_returned {
+                        player.inventory.add_item(&harvest.seed_item, 1, &self.item_registry);
+                    }
+
+                    let leveled = player.skills.farming.add_xp(harvest.xp_gained);
+                    let skill = &player.skills.farming;
+                    let gold = player.inventory.gold;
+
+                    (player.inventory.to_update(), gold, skill.xp, skill.level, leveled)
+                };
+
+                // Send inventory update
+                self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                    player_id: player_id.to_string(),
+                    slots: inv_update.0,
+                    gold: inv_update.1,
+                }).await;
+
+                // Send XP gain
+                self.send_to_player(player_id, ServerMessage::SkillXp {
+                    player_id: player_id.to_string(),
+                    skill: "farming".to_string(),
+                    xp_gained: harvest.xp_gained,
+                    total_xp: inv_update.2,
+                    level: inv_update.3,
+                }).await;
+
+                if inv_update.4 {
+                    self.broadcast(ServerMessage::SkillLevelUp {
+                        player_id: player_id.to_string(),
+                        skill: "farming".to_string(),
+                        new_level: inv_update.3,
+                    }).await;
+                }
+
+                // Send patch reset to this player only (per-player instanced)
+                self.send_to_player(player_id, ServerMessage::PatchStateUpdate {
+                    patch_id: patch_id.to_string(),
+                    state: "empty".to_string(),
+                    crop_id: String::new(),
+                    growth_stage: 0,
+                    owner_id: String::new(),
+                }).await;
+
+                // Delete from database
+                if let Some(ref db) = self.db {
+                    if let Err(e) = db.delete_farming_patch(patch_id, player_id).await {
+                        tracing::warn!("Failed to delete farming patch {}: {}", patch_id, e);
+                    }
+                }
+
+                // Fire quest event for harvesting
+                self.process_quest_item_collect(player_id, &format!("harvest_{}", harvest.produce_item), harvest.amount).await;
+            }
+            Err(e) => {
+                self.send_to_player(player_id, ServerMessage::Error {
+                    code: 400,
+                    message: e,
+                }).await;
+            }
+        }
+    }
+
+    /// Get farming patch states message for a specific connecting client
+    pub async fn get_farming_patches_message(&self, player_id: &str) -> ServerMessage {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let farming = self.farming.read().await;
+        let updates = farming.get_player_patch_states(player_id, current_time);
+        let patches = updates.into_iter().map(|u| {
+            let patch = farming.patches.get(&u.patch_id).unwrap();
+            crate::protocol::FarmingPatchData {
+                patch_id: u.patch_id,
+                x: patch.x,
+                y: patch.y,
+                state: u.state,
+                crop_id: u.crop_id,
+                growth_stage: u.growth_stage,
+                owner_id: u.owner_id,
+            }
+        }).collect();
+        ServerMessage::FarmingPatchStates { patches }
+    }
+
     pub async fn tick(&self) {
         let delta_time = 1.0 / TICK_RATE;
         let current_time = std::time::SystemTime::now()
@@ -5088,6 +5392,23 @@ impl GameRoom {
                 crate::gathering::BonusTileEvent::Expired { x, y } => {
                     self.broadcast(ServerMessage::BonusTileExpired { x, y }).await;
                 }
+            }
+        }
+
+        // Farming tick: check growth stage transitions (every 5 seconds / ~100 ticks)
+        if current_tick % 100 == 50 {
+            let updates = {
+                let mut farming = self.farming.write().await;
+                farming.tick_growth(current_time)
+            };
+            for (target_player_id, update) in updates {
+                self.send_to_player(&target_player_id, ServerMessage::PatchStateUpdate {
+                    patch_id: update.patch_id,
+                    state: update.state,
+                    crop_id: update.crop_id,
+                    growth_stage: update.growth_stage,
+                    owner_id: update.owner_id,
+                }).await;
             }
         }
 

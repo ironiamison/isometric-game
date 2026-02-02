@@ -30,8 +30,8 @@ use auth::AuthSession;
 // const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - use the development server
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -447,6 +447,8 @@ fn run_game_frame(
             InputCommand::StopGathering => ClientMessage::StopGathering,
             InputCommand::SitChair { tile_x, tile_y } => ClientMessage::SitChair { tile_x: *tile_x, tile_y: *tile_y },
             InputCommand::StandUp => ClientMessage::StandUp,
+            InputCommand::PlantSeed { patch_id, item_id } => ClientMessage::PlantSeed { patch_id: patch_id.clone(), item_id: item_id.clone() },
+            InputCommand::HarvestCrop { patch_id } => ClientMessage::HarvestCrop { patch_id: patch_id.clone() },
         };
         network.send(&msg);
     }

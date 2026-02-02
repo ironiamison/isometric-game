@@ -186,6 +186,8 @@ pub struct Renderer {
     pub(crate) fishing_skill_icon: Option<Texture2D>,
     /// Small coin icon for merchant name tags
     pub(crate) coin_small_icon: Option<Texture2D>,
+    /// Farming crop sprite sheets by crop name (e.g., "potato" -> Texture2D)
+    farming_sprites: HashMap<String, Texture2D>,
     /// Material for head+hair composite rendering (shader-based)
     head_hair_material: Option<Material>,
     /// Material for animated water tile rendering (shader-based)
@@ -551,6 +553,21 @@ impl Renderer {
             }
         };
 
+        // Load farming crop sprite sheets
+        let farming_crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach", "watermelon"];
+        let mut farming_sprites = HashMap::new();
+        for crop in &farming_crop_names {
+            let path = asset_path(&format!("assets/sprites/farming/farming_{}.png", crop));
+            match load_texture(&path).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    farming_sprites.insert(crop.to_string(), tex);
+                }
+                Err(_) => {}
+            }
+        }
+        log::info!("Loaded {} farming sprites", farming_sprites.len());
+
         set_loading!("Loading shaders...");
 
         // Load head+hair composite shader material
@@ -657,6 +674,7 @@ impl Renderer {
             fishing_skill_icon,
             chat_small_icon,
             coin_small_icon,
+            farming_sprites,
             head_hair_material,
             water_material,
             water_overlay_material,
@@ -879,7 +897,10 @@ impl Renderer {
                 }
             }
         }
-        // 1.7. Render gathering marker overlays (fishing spots, etc.)
+        // 1.7. Render farming patches
+        self.render_farming_patches(state);
+
+        // 1.8. Render gathering marker overlays (fishing spots, etc.)
         self.render_gathering_markers(state);
 
         // 1.8. Render bonus tile indicators (pulsing glow)
@@ -1030,6 +1051,7 @@ impl Renderer {
 
         // 4.5. Render name tags above all map elements (overhead, walls, objects, etc.)
         self.render_name_tags(state);
+        self.render_farming_patch_labels(state);
 
         // 5. Render floating damage numbers
         let t3 = get_time();
@@ -3405,7 +3427,231 @@ impl Renderer {
         draw_circle(land_x, land_y + bobber_bob, 1.2 * zoom, Color::new(1.0, 0.4, 0.2, 0.9));
     }
 
-    /// Render gathering marker overlays (e.g., fish icons on fishing spots)
+    /// Render farming patches in two passes: signs first (behind), then crops on top
+    fn render_farming_patches(&self, state: &GameState) {
+        let zoom = state.camera.zoom;
+        let time = macroquad::time::get_time();
+        let frame_w = 16.0;
+        let frame_h = 32.0;
+
+        // Pass 1: Draw signs behind crops (at the top/back of the tile)
+        for patch in state.farming_patches.values() {
+            if patch.state != "growing" && patch.state != "harvestable" {
+                continue;
+            }
+            let sign_name = Self::crop_to_sprite_name(&patch.crop_id);
+            if let Some(texture) = self.farming_sprites.get(sign_name.as_str()) {
+                let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+                let sign_frame = 5u32;
+                let src_x = sign_frame as f32 * frame_w;
+                let sign_w = frame_w * zoom;
+                let sign_h = frame_h * zoom;
+                // Position at the top (back) of the isometric tile
+                let sign_x = screen_x - sign_w / 2.0;
+                let sign_y = screen_y - sign_h - 4.0 * zoom;
+                draw_texture_ex(
+                    texture,
+                    sign_x,
+                    sign_y,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(src_x, 0.0, frame_w, frame_h)),
+                        dest_size: Some(Vec2::new(sign_w, sign_h)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        // Pass 2: Draw crops and empty patch fallbacks on top
+        for patch in state.farming_patches.values() {
+            let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+
+            // Determine which sprite frame to show
+            let (sprite_name, frame_index) = match patch.state.as_str() {
+                "empty" => (None, 0u32),
+                "growing" => {
+                    let name = Self::crop_to_sprite_name(&patch.crop_id);
+                    let frame = match patch.growth_stage {
+                        0 => 0,
+                        1 => 2,
+                        2 => 3,
+                        3 => 4,
+                        _ => 4,
+                    };
+                    (Some(name), frame)
+                }
+                "harvestable" => {
+                    let name = Self::crop_to_sprite_name(&patch.crop_id);
+                    (Some(name), 4)
+                }
+                _ => (None, 0),
+            };
+
+            // Try to draw sprite
+            let drew_sprite = if let Some(ref name) = sprite_name {
+                if let Some(texture) = self.farming_sprites.get(name.as_str()) {
+                    let src_x = frame_index as f32 * frame_w;
+                    let draw_w = frame_w * zoom;
+                    let draw_h = frame_h * zoom;
+
+                    let tint = WHITE;
+
+                    draw_texture_ex(
+                        texture,
+                        screen_x - draw_w / 2.0,
+                        screen_y - draw_h + draw_h * 0.25,
+                        tint,
+                        DrawTextureParams {
+                            source: Some(Rect::new(src_x, 0.0, frame_w, frame_h)),
+                            dest_size: Some(Vec2::new(draw_w, draw_h)),
+                            ..Default::default()
+                        },
+                    );
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            // Fallback: draw colored diamond for empty patches or missing sprites
+            if !drew_sprite {
+                let half_w = 16.0 * zoom;
+                let half_h = 8.0 * zoom;
+                let base_color = Color::new(0.35, 0.25, 0.15, 0.5);
+                let border_color = Color::new(0.45, 0.35, 0.2, 0.6);
+
+                draw_triangle(
+                    Vec2::new(screen_x, screen_y - half_h),
+                    Vec2::new(screen_x - half_w, screen_y),
+                    Vec2::new(screen_x, screen_y + half_h),
+                    base_color,
+                );
+                draw_triangle(
+                    Vec2::new(screen_x, screen_y - half_h),
+                    Vec2::new(screen_x + half_w, screen_y),
+                    Vec2::new(screen_x, screen_y + half_h),
+                    base_color,
+                );
+                draw_line(screen_x, screen_y - half_h, screen_x - half_w, screen_y, 1.0, border_color);
+                draw_line(screen_x - half_w, screen_y, screen_x, screen_y + half_h, 1.0, border_color);
+                draw_line(screen_x, screen_y + half_h, screen_x + half_w, screen_y, 1.0, border_color);
+                draw_line(screen_x + half_w, screen_y, screen_x, screen_y - half_h, 1.0, border_color);
+            }
+
+            // Draw soft pulsing green overlay on tile for harvestable crops
+            if patch.state == "harvestable" {
+                let half_w = 16.0 * zoom;
+                let half_h = 8.0 * zoom;
+                // Slow, gentle pulse between 0.08 and 0.18 alpha
+                let pulse_alpha = ((time * 1.2).sin() as f32 * 0.05 + 0.13).clamp(0.08, 0.18);
+                let glow = Color::new(0.2, 0.7, 0.3, pulse_alpha);
+                draw_triangle(
+                    Vec2::new(screen_x, screen_y - half_h),
+                    Vec2::new(screen_x - half_w, screen_y),
+                    Vec2::new(screen_x, screen_y + half_h),
+                    glow,
+                );
+                draw_triangle(
+                    Vec2::new(screen_x, screen_y - half_h),
+                    Vec2::new(screen_x + half_w, screen_y),
+                    Vec2::new(screen_x, screen_y + half_h),
+                    glow,
+                );
+            }
+        }
+    }
+
+    /// Map crop_id from farming config to sprite sheet name
+    fn crop_to_sprite_name(crop_id: &str) -> String {
+        crop_id.to_string()
+    }
+
+    fn render_farming_patch_labels(&self, state: &GameState) {
+        let hovered_tile = match state.hovered_tile {
+            Some(t) => t,
+            None => return,
+        };
+
+        // Check if hovered tile is a farming patch
+        let patch_id = match state.farming_patch_positions.get(&hovered_tile) {
+            Some(id) => id,
+            None => return,
+        };
+        let patch = match state.farming_patches.get(patch_id) {
+            Some(p) => p,
+            None => return,
+        };
+
+        let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+        let zoom = state.camera.zoom;
+
+        // Build label text
+        let (label, color) = match patch.state.as_str() {
+            "empty" => (
+                "Allotment (Empty)".to_string(),
+                Color::new(0.7, 0.6, 0.4, 1.0),
+            ),
+            "growing" => {
+                let crop_name = patch.crop_id.replace('_', " ");
+                let crop_name = crop_name.split_whitespace()
+                    .map(|w| {
+                        let mut c = w.chars();
+                        match c.next() {
+                            Some(f) => f.to_uppercase().to_string() + c.as_str(),
+                            None => String::new(),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                (
+                    format!("{} (Stage {}/4)", crop_name, patch.growth_stage),
+                    Color::new(0.4, 0.8, 0.3, 1.0),
+                )
+            }
+            "harvestable" => {
+                let crop_name = patch.crop_id.replace('_', " ");
+                let crop_name = crop_name.split_whitespace()
+                    .map(|w| {
+                        let mut c = w.chars();
+                        match c.next() {
+                            Some(f) => f.to_uppercase().to_string() + c.as_str(),
+                            None => String::new(),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                (
+                    format!("{} (Ready!)", crop_name),
+                    Color::new(1.0, 0.9, 0.3, 1.0),
+                )
+            }
+            _ => (
+                "Allotment".to_string(),
+                Color::new(0.7, 0.7, 0.7, 1.0),
+            ),
+        };
+
+        let label_width = self.measure_text_sharp(&label, 16.0).width;
+        let label_x = screen_x - label_width / 2.0;
+        let label_y = screen_y - 16.0 * zoom;
+
+        // Background
+        let padding = 4.0;
+        draw_rectangle(
+            label_x - padding,
+            label_y - 14.0,
+            label_width + padding * 2.0,
+            18.0,
+            Color::from_rgba(0, 0, 0, 180),
+        );
+
+        // Text
+        self.draw_text_sharp(&label, label_x, label_y, 16.0, color);
+    }
+
     fn render_gathering_markers(&self, state: &GameState) {
         if !state.debug_mode { return; }
         let zoom = state.camera.zoom;

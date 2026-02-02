@@ -1,0 +1,64 @@
+# Farming seeds - plantable in allotment patches
+
+[potato_seed]
+display_name = "Potato Seed"
+sprite = "potato_seed"
+description = "A seed that grows into a potato plant. Requires Farming level 1."
+category = "material"
+max_stack = 99
+base_price = 5
+sellable = true
+
+[onion_seed]
+display_name = "Onion Seed"
+sprite = "onion_seed"
+description = "A seed that grows into an onion plant. Requires Farming level 1."
+category = "material"
+max_stack = 99
+base_price = 5
+sellable = true
+
+[tomato_seed]
+display_name = "Tomato Seed"
+sprite = "tomato_seed"
+description = "A seed that grows into a tomato plant. Requires Farming level 15."
+category = "material"
+max_stack = 99
+base_price = 15
+sellable = true
+
+[cabbage_seed]
+display_name = "Cabbage Seed"
+sprite = "cabbage_seed"
+description = "A seed that grows into a cabbage. Requires Farming level 15."
+category = "material"
+max_stack = 99
+base_price = 15
+sellable = true
+
+[strawberry_seed]
+display_name = "Strawberry Seed"
+sprite = "strawberry_seed"
+description = "A seed that grows into strawberries. Requires Farming level 30."
+category = "material"
+max_stack = 99
+base_price = 30
+sellable = true
+
+[sweetcorn_seed]
+display_name = "Sweetcorn Seed"
+sprite = "sweetcorn_seed"
+description = "A seed that grows into sweetcorn. Requires Farming level 30."
+category = "material"
+max_stack = 99
+base_price = 30
+sellable = true
+
+[watermelon_seed]
+display_name = "Watermelon Seed"
+sprite = "watermelon_seed"
+description = "A seed that grows into a watermelon. Requires Farming level 45."
+category = "material"
+max_stack = 99
+base_price = 50
+sellable = true

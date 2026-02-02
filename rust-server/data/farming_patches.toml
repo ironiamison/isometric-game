@@ -1,0 +1,87 @@
+# Farming crop definitions
+# Each crop defines what seed is needed, what it produces, level requirements,
+# growth timing, harvest yields, and XP rewards.
+
+[potato]
+seed_item = "potato_seed"
+produce_item = "potato"
+level_required = 1
+growth_time_minutes = 5
+growth_stages = 4
+harvest_amount_min = 3
+harvest_amount_max = 5
+xp_planting = 2
+xp_per_harvest = 8
+seed_return_chance = 0.15
+
+[onion]
+seed_item = "onion_seed"
+produce_item = "onion"
+level_required = 1
+growth_time_minutes = 5
+growth_stages = 4
+harvest_amount_min = 3
+harvest_amount_max = 5
+xp_planting = 2
+xp_per_harvest = 8
+seed_return_chance = 0.15
+
+[tomato]
+seed_item = "tomato_seed"
+produce_item = "tomato"
+level_required = 15
+growth_time_minutes = 8
+growth_stages = 4
+harvest_amount_min = 3
+harvest_amount_max = 6
+xp_planting = 4
+xp_per_harvest = 15
+seed_return_chance = 0.15
+
+[cabbage]
+seed_item = "cabbage_seed"
+produce_item = "cabbage"
+level_required = 15
+growth_time_minutes = 8
+growth_stages = 4
+harvest_amount_min = 3
+harvest_amount_max = 6
+xp_planting = 4
+xp_per_harvest = 18
+seed_return_chance = 0.15
+
+[strawberry]
+seed_item = "strawberry_seed"
+produce_item = "strawberry"
+level_required = 30
+growth_time_minutes = 12
+growth_stages = 4
+harvest_amount_min = 4
+harvest_amount_max = 7
+xp_planting = 6
+xp_per_harvest = 25
+seed_return_chance = 0.15
+
+[sweetcorn]
+seed_item = "sweetcorn_seed"
+produce_item = "sweetcorn"
+level_required = 30
+growth_time_minutes = 12
+growth_stages = 4
+harvest_amount_min = 3
+harvest_amount_max = 6
+xp_planting = 6
+xp_per_harvest = 22
+seed_return_chance = 0.15
+
+[watermelon]
+seed_item = "watermelon_seed"
+produce_item = "watermelon"
+level_required = 45
+growth_time_minutes = 15
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 3
+xp_planting = 8
+xp_per_harvest = 35
+seed_return_chance = 0.15

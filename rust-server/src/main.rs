@@ -33,6 +33,7 @@ mod crafting;
 mod data;
 mod db;
 mod entity;
+mod farming;
 mod game;
 mod gathering;
 mod instance;
@@ -1303,6 +1304,12 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send farming patch states (per-player instanced)
+    let farming_patches = room.get_farming_patches_message(&player_id).await;
+    if let Ok(bytes) = protocol::encode_server_message(&farming_patches) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Send chair positions
     let chair_positions = room.get_chair_positions_message().await;
     if let Ok(bytes) = protocol::encode_server_message(&chair_positions) {
@@ -2260,6 +2267,12 @@ async fn handle_client_message(
         }
         ClientMessage::StandUp => {
             room.handle_stand_up(player_id).await;
+        }
+        ClientMessage::PlantSeed { patch_id, item_id } => {
+            room.handle_plant_seed(player_id, &patch_id, &item_id).await;
+        }
+        ClientMessage::HarvestCrop { patch_id } => {
+            room.handle_harvest_crop(player_id, &patch_id).await;
         }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}

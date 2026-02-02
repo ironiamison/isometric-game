@@ -32,6 +32,12 @@ drop_chance = 0.25
 quantity_min = 1
 quantity_max = 1
 
+[[slime.loot]]
+item_id = "onion_seed"
+drop_chance = 0.06
+quantity_min = 1
+quantity_max = 1
+
 [slime.behaviors]
 hostile = true
 wander_enabled = true

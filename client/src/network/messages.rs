@@ -92,6 +92,13 @@ pub enum ClientMessage {
 
     #[serde(rename = "standUp")]
     StandUp,
+
+    // Farming commands
+    #[serde(rename = "plantSeed")]
+    PlantSeed { patch_id: String, item_id: String },
+
+    #[serde(rename = "harvestCrop")]
+    HarvestCrop { patch_id: String },
 }
 
 impl ClientMessage {
@@ -228,6 +235,15 @@ impl ClientMessage {
                 "sitChair"
             }
             ClientMessage::StandUp => "standUp",
+            ClientMessage::PlantSeed { patch_id, item_id } => {
+                data.insert("patch_id".into(), Value::String(patch_id.clone().into()));
+                data.insert("item_id".into(), Value::String(item_id.clone().into()));
+                "plantSeed"
+            }
+            ClientMessage::HarvestCrop { patch_id } => {
+                data.insert("patch_id".into(), Value::String(patch_id.clone().into()));
+                "harvestCrop"
+            }
         };
 
         (msg_type, data)

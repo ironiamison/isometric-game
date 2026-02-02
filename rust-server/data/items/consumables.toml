@@ -13,6 +13,62 @@ sellable = true
 type = "heal"
 amount = 30
 
+# ============================================================================
+# Farm Produce Cooking
+# ============================================================================
+
+[baked_potato]
+display_name = "Baked Potato"
+sprite = "item_baked_potato"
+description = "A simple baked potato. Restores 12 HP."
+category = "consumable"
+max_stack = 10
+base_price = 15
+sellable = true
+
+[baked_potato.use_effect]
+type = "heal"
+amount = 12
+
+[tomato_soup]
+display_name = "Tomato Soup"
+sprite = "item_tomato_soup"
+description = "A warm bowl of tomato soup. Restores 18 HP."
+category = "consumable"
+max_stack = 10
+base_price = 30
+sellable = true
+
+[tomato_soup.use_effect]
+type = "heal"
+amount = 18
+
+[sweetcorn_bread]
+display_name = "Sweetcorn Bread"
+sprite = "item_sweetcorn_bread"
+description = "Bread made with freshly ground sweetcorn. Restores 16 HP."
+category = "consumable"
+max_stack = 10
+base_price = 25
+sellable = true
+
+[sweetcorn_bread.use_effect]
+type = "heal"
+amount = 16
+
+[vegetable_stew]
+display_name = "Vegetable Stew"
+sprite = "item_vegetable_stew"
+description = "A hearty stew made from assorted vegetables. Restores 25 HP."
+category = "consumable"
+max_stack = 10
+base_price = 50
+sellable = true
+
+[vegetable_stew.use_effect]
+type = "heal"
+amount = 25
+
 # [mana_potion]
 # display_name = "Mana Potion"
 # sprite = "item_mana_potion"

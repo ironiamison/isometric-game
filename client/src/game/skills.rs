@@ -20,6 +20,7 @@ pub enum SkillType {
     Hitpoints,
     Combat,
     Fishing,
+    Farming,
 }
 
 impl SkillType {
@@ -28,6 +29,7 @@ impl SkillType {
             SkillType::Hitpoints => "hitpoints",
             SkillType::Combat => "combat",
             SkillType::Fishing => "fishing",
+            SkillType::Farming => "farming",
         }
     }
 
@@ -36,6 +38,7 @@ impl SkillType {
             "hitpoints" => Some(SkillType::Hitpoints),
             "combat" => Some(SkillType::Combat),
             "fishing" => Some(SkillType::Fishing),
+            "farming" => Some(SkillType::Farming),
             _ => None,
         }
     }
@@ -45,6 +48,7 @@ impl SkillType {
             SkillType::Hitpoints => "Hitpoints",
             SkillType::Combat => "Combat",
             SkillType::Fishing => "Fishing",
+            SkillType::Farming => "Farming",
         }
     }
 }
@@ -111,6 +115,8 @@ pub struct Skills {
     pub combat: Skill,
     #[serde(default)]
     pub fishing: Skill,
+    #[serde(default)]
+    pub farming: Skill,
 }
 
 impl Default for Skills {
@@ -126,6 +132,7 @@ impl Skills {
             hitpoints: Skill::new(10),
             combat: Skill::new(3),
             fishing: Skill::new(1),
+            farming: Skill::new(1),
         }
     }
 
@@ -141,6 +148,7 @@ impl Skills {
             SkillType::Hitpoints => &self.hitpoints,
             SkillType::Combat => &self.combat,
             SkillType::Fishing => &self.fishing,
+            SkillType::Farming => &self.farming,
         }
     }
 
@@ -150,6 +158,7 @@ impl Skills {
             SkillType::Hitpoints => &mut self.hitpoints,
             SkillType::Combat => &mut self.combat,
             SkillType::Fishing => &mut self.fishing,
+            SkillType::Farming => &mut self.farming,
         }
     }
 
@@ -162,6 +171,6 @@ impl Skills {
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level + self.fishing.level
+        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level
     }
 }

@@ -1,49 +1,72 @@
 # Consumable crafting recipes - potions, salves, etc.
+# ============================================================================
+# Farm Produce Cooking Recipes
+# ============================================================================
 
-[slime_salve]
-display_name = "Slime Salve"
-description = "A healing salve made from slime cores. Converts cores into a health potion."
+[baked_potato]
+display_name = "Baked Potato"
+description = "Bake a potato over the fire for a simple meal."
 category = "consumables"
 level_required = 1
 
-[[slime_salve.ingredients]]
-item_id = "slime_core"
-count = 3
-
-[[slime_salve.results]]
-item_id = "health_potion"
+[[baked_potato.ingredients]]
+item_id = "potato"
 count = 1
 
+[[baked_potato.results]]
+item_id = "baked_potato"
+count = 1
 
-[greater_health_potion]
-display_name = "Greater Health Potion"
-description = "Combine multiple health potions into a more potent brew."
+[tomato_soup]
+display_name = "Tomato Soup"
+description = "Simmer tomatoes and onions into a warm soup."
 category = "consumables"
-level_required = 5
+level_required = 15
 
-[[greater_health_potion.ingredients]]
-item_id = "health_potion"
-count = 3
-
-[[greater_health_potion.ingredients]]
-item_id = "slime_core"
+[[tomato_soup.ingredients]]
+item_id = "tomato"
 count = 2
 
-[[greater_health_potion.results]]
-item_id = "health_potion"
-count = 5
+[[tomato_soup.ingredients]]
+item_id = "onion"
+count = 1
 
+[[tomato_soup.results]]
+item_id = "tomato_soup"
+count = 1
 
-[mana_extract]
-display_name = "Mana Extract"
-description = "Extract magical essence from slime cores to create a mana potion."
+[sweetcorn_bread]
+display_name = "Sweetcorn Bread"
+description = "Grind sweetcorn into flour and bake into bread."
 category = "consumables"
-level_required = 3
+level_required = 30
 
-[[mana_extract.ingredients]]
-item_id = "slime_core"
-count = 5
+[[sweetcorn_bread.ingredients]]
+item_id = "sweetcorn"
+count = 2
 
-[[mana_extract.results]]
-item_id = "mana_potion"
+[[sweetcorn_bread.results]]
+item_id = "sweetcorn_bread"
+count = 1
+
+[vegetable_stew]
+display_name = "Vegetable Stew"
+description = "A hearty stew from assorted farm vegetables."
+category = "consumables"
+level_required = 20
+
+[[vegetable_stew.ingredients]]
+item_id = "potato"
+count = 1
+
+[[vegetable_stew.ingredients]]
+item_id = "onion"
+count = 1
+
+[[vegetable_stew.ingredients]]
+item_id = "cabbage"
+count = 1
+
+[[vegetable_stew.results]]
+item_id = "vegetable_stew"
 count = 1

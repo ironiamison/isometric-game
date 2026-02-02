@@ -85,6 +85,8 @@ pub struct ScriptResult {
     pub notifications: Vec<String>,
     /// Bonus rewards granted
     pub bonus_rewards: Option<BonusReward>,
+    /// Items granted via give_item()
+    pub granted_items: Vec<(String, i32)>,
     /// New dialogue step to persist (for tracking dialogue progress)
     pub new_dialogue_step: Option<u32>,
 }
@@ -97,6 +99,7 @@ impl Default for ScriptResult {
             quest_completed: false,
             notifications: Vec::new(),
             bonus_rewards: None,
+            granted_items: Vec::new(),
             new_dialogue_step: None,
         }
     }
@@ -328,6 +331,20 @@ impl QuestRunner {
         })?;
         ctx_table.set("grant_bonus_reward", grant_bonus_reward)?;
 
+        // Add give_item method - queues items to be added to player inventory
+        let give_item = lua.create_function(|lua, (this, item_id, count): (Table, String, Option<i32>)| {
+            let result: Table = this.get("_result")?;
+            let items: Table = result.get::<Table>("_granted_items").unwrap_or_else(|_| lua.create_table().unwrap());
+            let len = items.len().unwrap_or(0);
+            let entry = lua.create_table()?;
+            entry.set("item_id", item_id)?;
+            entry.set("count", count.unwrap_or(1))?;
+            items.set(len + 1, entry)?;
+            result.set("_granted_items", items)?;
+            Ok(())
+        })?;
+        ctx_table.set("give_item", give_item)?;
+
         // Add show_dialogue method - returns the player's choice or throws error to pause
         let player_choice_val = player_choice.map(|s| s.to_string());
         let show_dialogue = lua.create_function(move |lua, (this, options): (Table, Table)| {
@@ -463,6 +480,17 @@ impl QuestRunner {
                 exp,
                 items: Vec::new(),
             });
+        }
+
+        // Extract granted items if present
+        if let Ok(items) = result_table.get::<Table>("_granted_items") {
+            for pair in items.pairs::<i64, Table>() {
+                if let Ok((_, entry)) = pair {
+                    if let (Ok(item_id), Ok(count)) = (entry.get::<String>("item_id"), entry.get::<i32>("count")) {
+                        result.granted_items.push((item_id, count));
+                    }
+                }
+            }
         }
 
         // Extract new dialogue step for persistence

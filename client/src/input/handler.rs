@@ -83,6 +83,9 @@ pub enum InputCommand {
     // Chair commands
     SitChair { tile_x: i32, tile_y: i32 },
     StandUp,
+    // Farming commands
+    PlantSeed { patch_id: String, item_id: String },
+    HarvestCrop { patch_id: String },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -376,21 +379,42 @@ impl InputHandler {
                                 let is_adjacent = dx <= 1 && dy <= 1 && (dx > 0 || dy > 0);
 
                                 if is_adjacent {
-                                    // Check for Ctrl/Cmd modifier for single item drop
-                                    let ctrl_held = is_key_down(KeyCode::LeftControl)
-                                        || is_key_down(KeyCode::RightControl)
-                                        || is_key_down(KeyCode::LeftSuper)
-                                        || is_key_down(KeyCode::RightSuper);
+                                    // Check if dropping a seed onto a farming patch
+                                    let is_seed_on_patch = if let Some(patch_id) = state.farming_patch_positions.get(&(tile_x, tile_y)) {
+                                        if let Some(patch) = state.farming_patches.get(patch_id) {
+                                            if patch.state == "empty" {
+                                                // Check if dragged item is a seed
+                                                if let Some(Some(slot)) = state.inventory.slots.get(*from_idx) {
+                                                    if slot.item_id.ends_with("_seed") {
+                                                        commands.push(InputCommand::PlantSeed {
+                                                            patch_id: patch_id.clone(),
+                                                            item_id: slot.item_id.clone(),
+                                                        });
+                                                        audio.play_sfx("item_put");
+                                                        true
+                                                    } else { false }
+                                                } else { false }
+                                            } else { false }
+                                        } else { false }
+                                    } else { false };
 
-                                    let quantity = if ctrl_held { 1 } else { drag.quantity as u32 };
+                                    if !is_seed_on_patch {
+                                        // Check for Ctrl/Cmd modifier for single item drop
+                                        let ctrl_held = is_key_down(KeyCode::LeftControl)
+                                            || is_key_down(KeyCode::RightControl)
+                                            || is_key_down(KeyCode::LeftSuper)
+                                            || is_key_down(KeyCode::RightSuper);
 
-                                    commands.push(InputCommand::DropItem {
-                                        slot_index: *from_idx as u8,
-                                        quantity,
-                                        target_x: Some(tile_x),
-                                        target_y: Some(tile_y),
-                                    });
-                                    audio.play_sfx("item_put");
+                                        let quantity = if ctrl_held { 1 } else { drag.quantity as u32 };
+
+                                        commands.push(InputCommand::DropItem {
+                                            slot_index: *from_idx as u8,
+                                            quantity,
+                                            target_x: Some(tile_x),
+                                            target_y: Some(tile_y),
+                                        });
+                                        audio.play_sfx("item_put");
+                                    }
                                 }
                             }
                         }
@@ -2025,6 +2049,10 @@ impl InputHandler {
                 if let Some((cx, cy)) = state.pending_chair_sit.take() {
                     commands.push(InputCommand::SitChair { tile_x: cx, tile_y: cy });
                 }
+                // Handle farming harvest target
+                if let Some(patch_id) = state.pending_harvest_patch.take() {
+                    commands.push(InputCommand::HarvestCrop { patch_id });
+                }
                 state.auto_path = None;
 
                 // Send stop command so we don't keep moving in the last direction
@@ -2325,6 +2353,43 @@ impl InputHandler {
             } else if let Some(entity_id) = clicked_player {
                 // Player clicked - target them
                 commands.push(InputCommand::Target { entity_id });
+            } else if let Some(patch_id) = state.farming_patch_positions.get(&(clicked_tile_x, clicked_tile_y)).cloned() {
+                // Clicked on a farming patch
+                if let Some(patch) = state.farming_patches.get(&patch_id) {
+                    if patch.state == "harvestable" {
+                        if let Some(local_id) = &state.local_player_id {
+                            if let Some(player) = state.players.get(local_id) {
+                                let px = player.x.round() as i32;
+                                let py = player.y.round() as i32;
+                                let cdx = (px - clicked_tile_x).abs();
+                                let cdy = (py - clicked_tile_y).abs();
+                                if cdx <= 1 && cdy <= 1 {
+                                    commands.push(InputCommand::HarvestCrop { patch_id });
+                                } else {
+                                    // Out of range - pathfind to adjacent tile
+                                    let occupied = build_occupied_set(state);
+                                    const MAX_PATH_DISTANCE: i32 = 32;
+                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                        (px, py),
+                                        (clicked_tile_x, clicked_tile_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    ) {
+                                        state.auto_path = Some(PathState {
+                                            path,
+                                            current_index: 0,
+                                            destination: dest,
+                                            pickup_target: None,
+                                            interact_target: None,
+                                        });
+                                        state.pending_harvest_patch = Some(patch_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             } else if state.chair_positions.contains(&(clicked_tile_x, clicked_tile_y)) {
                 // Clicked on a chair - try to sit
                 if !state.is_sitting {

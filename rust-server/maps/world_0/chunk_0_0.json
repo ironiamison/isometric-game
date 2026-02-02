@@ -3092,6 +3092,12 @@
       "x": 11,
       "y": 9,
       "level": 1
+    },
+    {
+      "entityId": "farmer_barley",
+      "x": 26,
+      "y": 5,
+      "level": 1
     }
   ],
   "mapObjects": [

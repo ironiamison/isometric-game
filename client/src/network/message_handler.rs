@@ -1,4 +1,4 @@
-use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState, GatheringMarker, BonusTile, GatheringBuff};
+use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch};
 use crate::game::npc::{Npc, NpcState};
 use crate::render::OVERWORLD_NAME;
 use super::protocol::{extract_string, extract_f32, extract_i32, extract_u32, extract_u64, extract_array, extract_u8, extract_bool};
@@ -1743,6 +1743,52 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 log::info!("Buff {} expired for player {}", buff_type, player_id);
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.gathering_buff = None;
+                }
+            }
+        }
+
+        "farmingPatchStates" => {
+            if let Some(value) = data {
+                if let Some(patches_arr) = extract_array(value, "patches") {
+                    state.farming_patches.clear();
+                    state.farming_patch_positions.clear();
+                    for p in patches_arr {
+                        let patch_id = extract_string(p, "patch_id").unwrap_or_default();
+                        let x = extract_i32(p, "x").unwrap_or(0);
+                        let y = extract_i32(p, "y").unwrap_or(0);
+                        let patch_state = extract_string(p, "state").unwrap_or_else(|| "empty".to_string());
+                        let crop_id = extract_string(p, "crop_id").unwrap_or_default();
+                        let growth_stage = extract_u32(p, "growth_stage").unwrap_or(0);
+                        let owner_id = extract_string(p, "owner_id").unwrap_or_default();
+                        state.farming_patch_positions.insert((x, y), patch_id.clone());
+                        state.farming_patches.insert(patch_id.clone(), FarmingPatch {
+                            patch_id,
+                            x,
+                            y,
+                            state: patch_state,
+                            crop_id,
+                            growth_stage,
+                            owner_id,
+                        });
+                    }
+                    log::info!("Received {} farming patches", state.farming_patches.len());
+                }
+            }
+        }
+
+        "patchStateUpdate" => {
+            if let Some(value) = data {
+                let patch_id = extract_string(value, "patch_id").unwrap_or_default();
+                let patch_state = extract_string(value, "state").unwrap_or_else(|| "empty".to_string());
+                let crop_id = extract_string(value, "crop_id").unwrap_or_default();
+                let growth_stage = extract_u32(value, "growth_stage").unwrap_or(0);
+                let owner_id = extract_string(value, "owner_id").unwrap_or_default();
+
+                if let Some(patch) = state.farming_patches.get_mut(&patch_id) {
+                    patch.state = patch_state;
+                    patch.crop_id = crop_id;
+                    patch.growth_stage = growth_stage;
+                    patch.owner_id = owner_id;
                 }
             }
         }

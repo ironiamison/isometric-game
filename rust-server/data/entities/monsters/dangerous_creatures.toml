@@ -38,6 +38,12 @@ drop_chance = 0.15
 quantity_min = 1
 quantity_max = 1
 
+[[spider.loot]]
+item_id = "strawberry_seed"
+drop_chance = 0.05
+quantity_min = 1
+quantity_max = 1
+
 [spider.behaviors]
 hostile = true
 wander_enabled = true

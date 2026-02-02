@@ -405,6 +405,18 @@ pub struct Announcement {
     pub time: f64,
 }
 
+/// A farming patch in the world
+#[derive(Debug, Clone)]
+pub struct FarmingPatch {
+    pub patch_id: String,
+    pub x: i32,
+    pub y: i32,
+    pub state: String,       // "empty", "growing", "harvestable"
+    pub crop_id: String,
+    pub growth_stage: u32,
+    pub owner_id: String,
+}
+
 /// A gathering marker tile in the world (fishing spot, mining node, etc.)
 #[derive(Debug, Clone)]
 pub struct GatheringMarker {
@@ -679,6 +691,10 @@ pub struct GameState {
     pub ground_items: HashMap<String, GroundItem>,
     /// Items waiting to spawn (with spawn time) - delays loot appearance until after death animation
     pub pending_ground_items: Vec<(GroundItem, f64)>,
+    /// Farming patches received from server
+    pub farming_patches: HashMap<String, FarmingPatch>,
+    /// Farming patch lookup by position
+    pub farming_patch_positions: HashMap<(i32, i32), String>,
     /// Gathering marker positions received from server
     pub gathering_markers: Vec<GatheringMarker>,
     /// Whether the local player is currently gathering
@@ -689,6 +705,7 @@ pub struct GameState {
     pub chair_positions: Vec<(i32, i32)>,
     /// Pending chair to sit on after pathfinding completes
     pub pending_chair_sit: Option<(i32, i32)>,
+    pub pending_harvest_patch: Option<String>,
     /// Timestamp when gathering started (for cast animation delay)
     pub gathering_started_at: f64,
     /// Active bonus tile events
@@ -775,11 +792,14 @@ impl GameState {
             npcs: HashMap::new(),
             ground_items: HashMap::new(),
             pending_ground_items: Vec::new(),
+            farming_patches: HashMap::new(),
+            farming_patch_positions: HashMap::new(),
             gathering_markers: Vec::new(),
             is_gathering: false,
             is_sitting: false,
             chair_positions: Vec::new(),
             pending_chair_sit: None,
+            pending_harvest_patch: None,
             gathering_started_at: 0.0,
             bonus_tiles: Vec::new(),
             gathering_buff: None,

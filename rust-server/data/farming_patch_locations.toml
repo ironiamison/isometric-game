@@ -1,0 +1,99 @@
+# Farming patch locations in the world
+# Each patch is a fixed allotment that players can plant seeds in.
+# 4x4 grid from (27,6) to (30,9)
+
+[[patches]]
+id = "allotment_1"
+x = 27
+y = 6
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_2"
+x = 28
+y = 6
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_3"
+x = 29
+y = 6
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_4"
+x = 30
+y = 6
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_5"
+x = 27
+y = 7
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_6"
+x = 28
+y = 7
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_7"
+x = 29
+y = 7
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_8"
+x = 30
+y = 7
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_9"
+x = 27
+y = 8
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_10"
+x = 28
+y = 8
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_11"
+x = 29
+y = 8
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_12"
+x = 30
+y = 8
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_13"
+x = 27
+y = 9
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_14"
+x = 28
+y = 9
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_15"
+x = 29
+y = 9
+patch_type = "allotment"
+
+[[patches]]
+id = "allotment_16"
+x = 30
+y = 9
+patch_type = "allotment"

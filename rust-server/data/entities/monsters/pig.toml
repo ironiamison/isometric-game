@@ -34,6 +34,12 @@ drop_chance = 0.20
 quantity_min = 1
 quantity_max = 1
 
+[[pig.loot]]
+item_id = "potato_seed"
+drop_chance = 0.08
+quantity_min = 1
+quantity_max = 2
+
 [pig.behaviors]
 hostile = true
 wander_enabled = true

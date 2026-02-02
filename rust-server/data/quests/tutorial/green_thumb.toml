@@ -1,0 +1,46 @@
+# Green Thumb - Farming tutorial quest
+# Given by Farmer Barley near the allotment patches
+
+[quest]
+id = "green_thumb"
+name = "Green Thumb"
+description = "Farmer Barley wants to teach you the basics of farming. Plant some potatoes and harvest them when they're ready."
+giver_npc = "farmer_barley"
+level_required = 1
+repeatable = false
+lua_script = "tutorial/green_thumb.lua"
+
+[[quest.objectives]]
+id = "plant_potatoes"
+type = "collect_item"
+target = "plant_potato_seed"
+count = 3
+description = "Plant 3 potato seeds"
+
+[[quest.objectives]]
+id = "harvest_potatoes"
+type = "collect_item"
+target = "harvest_potato"
+count = 3
+description = "Harvest 3 potatoes"
+
+[[quest.objectives]]
+id = "return_to_barley"
+type = "talk_to"
+target = "farmer_barley"
+description = "Return to Farmer Barley"
+sequential = true
+
+[quest.rewards]
+exp = 250
+gold = 50
+items = [
+    { id = "onion_seed", count = 5 },
+    { id = "tomato_seed", count = 3 },
+]
+
+[quest.dialogue]
+offer = "You look like you could use a lesson in farming! Tell you what - I'll give you some potato seeds. Plant them in the allotment patches nearby, wait for them to grow, and harvest the spuds. Bring me the results and I'll set you up proper."
+accept = "Here are three potato seeds. Drag them from your inventory onto an empty allotment patch to plant. They'll take about five minutes to grow. Come back when you've harvested three potatoes!"
+progress = "Still waiting on those potatoes? Check the patches - they might be ready to harvest!"
+complete = "Beautiful spuds! You're a natural farmer. Here, take these seeds - onions and tomatoes will fetch a good price. My shop's open to you now. Happy farming!"

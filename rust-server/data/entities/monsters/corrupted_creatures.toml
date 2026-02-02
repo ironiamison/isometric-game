@@ -44,6 +44,12 @@ drop_chance = 0.05
 quantity_min = 1
 quantity_max = 1
 
+[[corrupted_pig.loot]]
+item_id = "tomato_seed"
+drop_chance = 0.06
+quantity_min = 1
+quantity_max = 2
+
 [corrupted_pig.behaviors]
 hostile = true
 wander_enabled = true

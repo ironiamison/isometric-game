@@ -292,6 +292,25 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Farming patches table - per-player instanced patch state
+        // Drop old schema if it exists (migrated from single-player to per-player)
+        sqlx::query("DROP TABLE IF EXISTS farming_patches")
+            .execute(pool)
+            .await?;
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS farming_patches (
+                patch_id TEXT NOT NULL,
+                player_id TEXT NOT NULL,
+                crop_id TEXT NOT NULL,
+                planted_at INTEGER NOT NULL,
+                PRIMARY KEY (patch_id, player_id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -957,5 +976,61 @@ impl Database {
         );
 
         Ok(())
+    }
+
+    // =========================================================================
+    // Farming Patch Persistence
+    // =========================================================================
+
+    /// Save a planted farming patch to the database (per-player instanced)
+    pub async fn save_farming_patch(
+        &self,
+        patch_id: &str,
+        player_id: &str,
+        crop_id: &str,
+        planted_at: u64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO farming_patches (patch_id, player_id, crop_id, planted_at)
+            VALUES (?, ?, ?, ?)
+            "#,
+        )
+        .bind(patch_id)
+        .bind(player_id)
+        .bind(crop_id)
+        .bind(planted_at as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Delete a farming patch for a specific player (after harvest or reset)
+    pub async fn delete_farming_patch(&self, patch_id: &str, player_id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM farming_patches WHERE patch_id = ? AND player_id = ?")
+            .bind(patch_id)
+            .bind(player_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Load all planted farming patches from the database
+    pub async fn load_farming_patches(&self) -> Result<Vec<(String, String, String, u64)>, sqlx::Error> {
+        let rows = sqlx::query(
+            "SELECT patch_id, player_id, crop_id, planted_at FROM farming_patches"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let patches = rows.iter().map(|row| {
+            let patch_id: String = row.get("patch_id");
+            let player_id: String = row.get("player_id");
+            let crop_id: String = row.get("crop_id");
+            let planted_at: i64 = row.get("planted_at");
+            (patch_id, player_id, crop_id, planted_at as u64)
+        }).collect();
+
+        Ok(patches)
     }
 }

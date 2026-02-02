@@ -83,7 +83,8 @@ impl Renderer {
             let (icon_col, icon_row) = match skill_type {
                 SkillType::Hitpoints => (0, 6),
                 SkillType::Combat => (2, 6),
-                SkillType::Fishing => unreachable!(),
+                SkillType::Fishing => (4, 6),
+                SkillType::Farming => (4, 6),
             };
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
@@ -102,6 +103,7 @@ impl Renderer {
             SkillType::Hitpoints => "H",
             SkillType::Combat => "C",
             SkillType::Fishing => "F",
+            SkillType::Farming => "Fm",
         };
         self.draw_text_sharp(letter, x, y + 12.0, 16.0, Color::new(color.r, color.g, color.b, opacity));
     }
@@ -111,6 +113,7 @@ impl Renderer {
             SkillType::Hitpoints => Color::new(0.8, 0.2, 0.2, 1.0),
             SkillType::Combat => Color::new(0.85, 0.65, 0.15, 1.0),
             SkillType::Fishing => Color::new(0.2, 0.6, 0.85, 1.0),
+            SkillType::Farming => Color::new(0.3, 0.75, 0.3, 1.0),
         }
     }
 }

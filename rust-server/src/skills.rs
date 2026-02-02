@@ -18,6 +18,7 @@ pub enum SkillType {
     Hitpoints,
     Combat,
     Fishing,
+    Farming,
 }
 
 impl SkillType {
@@ -26,6 +27,7 @@ impl SkillType {
             SkillType::Hitpoints => "hitpoints",
             SkillType::Combat => "combat",
             SkillType::Fishing => "fishing",
+            SkillType::Farming => "farming",
         }
     }
 }
@@ -127,6 +129,8 @@ pub struct Skills {
     pub combat: Skill,
     #[serde(default)]
     pub fishing: Skill,
+    #[serde(default)]
+    pub farming: Skill,
 }
 
 impl Default for Skills {
@@ -142,6 +146,7 @@ impl Skills {
             hitpoints: Skill::new(10),
             combat: Skill::new(3),
             fishing: Skill::new(1),
+            farming: Skill::new(1),
         }
     }
 
@@ -157,6 +162,7 @@ impl Skills {
             SkillType::Hitpoints => &self.hitpoints,
             SkillType::Combat => &self.combat,
             SkillType::Fishing => &self.fishing,
+            SkillType::Farming => &self.farming,
         }
     }
 
@@ -166,12 +172,13 @@ impl Skills {
             SkillType::Hitpoints => &mut self.hitpoints,
             SkillType::Combat => &mut self.combat,
             SkillType::Fishing => &mut self.fishing,
+            SkillType::Farming => &mut self.farming,
         }
     }
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level + self.fishing.level
+        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level
     }
 }
 
@@ -196,6 +203,7 @@ impl LegacySkills {
                 xp: total_combat_xp,
             },
             fishing: Skill::new(1),
+            farming: Skill::new(1),
         }
     }
 }
@@ -303,6 +311,7 @@ mod tests {
             hitpoints: Skill::new(99),
             combat: Skill::new(99),
             fishing: Skill::new(1),
+            farming: Skill::new(1),
         };
         // combat_level = floor((99 + 99) / 2) = 99
         assert_eq!(max_skills.combat_level(), 99);
@@ -311,8 +320,8 @@ mod tests {
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Combat 3 + Fishing 1 = 14
-        assert_eq!(skills.total_level(), 14);
+        // HP 10 + Combat 3 + Fishing 1 + Farming 1 = 15
+        assert_eq!(skills.total_level(), 15);
     }
 
     #[test]
