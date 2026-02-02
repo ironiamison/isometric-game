@@ -542,14 +542,6 @@ impl World {
 
     /// Get a safe spawn position in the world (prefers chunk 0,0)
     pub async fn get_spawn_position(&self) -> (i32, i32) {
-        // Try chunk (0, 0) first
-        if let Some(chunk) = self.get_or_load_chunk(ChunkCoord::new(0, 0)).await {
-            if let Some((local_x, local_y)) = chunk.get_safe_spawn() {
-                return (local_x as i32, local_y as i32);
-            }
-        }
-
-        // Default to center of chunk 0,0
         (15, 4)
     }
 
