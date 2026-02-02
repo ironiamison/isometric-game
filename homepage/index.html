@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New Aeven — A Pixel Art Isometric MMO</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Nunito:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --parchment: #f5e6c8;
+        --parchment-dark: #e8d4a8;
+        --ink: #3b2a1a;
+        --ink-light: #6b5a4a;
+        --moss: #5a7247;
+        --moss-light: #7a9a5f;
+        --moss-glow: #a8d48a;
+        --sky-top: #2a1a3a;
+        --sky-mid: #3a2855;
+        --sky-bottom: #5a3a6a;
+        --gold: #d4a844;
+        --gold-light: #f0cc66;
+        --ember: #c45a3a;
+        --water: #5a8aaa;
+        --water-light: #7ab4d4;
+        --shadow: rgba(30, 15, 5, 0.3);
+        --pixel-border: 3px;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        image-rendering: pixelated;
+      }
+
+      body {
+        font-family: "Nunito", sans-serif;
+        color: var(--ink);
+        background: var(--sky-top);
+        overflow-x: hidden;
+        cursor: default;
+      }
+      .pixel-font {
+        font-family: "Silkscreen", monospace;
+        letter-spacing: 0.5px;
+      }
+      .pixel-box {
+        border: var(--pixel-border) solid var(--ink);
+        box-shadow: inset -4px -4px 0 rgba(0, 0, 0, 0.15),
+          inset 4px 4px 0 rgba(255, 255, 255, 0.1), 6px 6px 0 rgba(0, 0, 0, 0.2);
+      }
+      .pixel-btn {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.85rem;
+        padding: 12px 24px;
+        border: var(--pixel-border) solid var(--ink);
+        cursor: pointer;
+        position: relative;
+        transition: transform 0.1s, box-shadow 0.1s;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+        box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.2),
+          inset 3px 3px 0 rgba(255, 255, 255, 0.15),
+          4px 4px 0 rgba(0, 0, 0, 0.3);
+      }
+
+      .pixel-btn:hover {
+        transform: translate(-1px, -1px);
+        box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.2),
+          inset 3px 3px 0 rgba(255, 255, 255, 0.15),
+          6px 6px 0 rgba(0, 0, 0, 0.3);
+      }
+
+      .pixel-btn:active {
+        transform: translate(2px, 2px);
+        box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.2),
+          inset -3px -3px 0 rgba(255, 255, 255, 0.15),
+          1px 1px 0 rgba(0, 0, 0, 0.3);
+      }
+
+      .btn-primary {
+        background: var(--moss);
+        color: var(--parchment);
+      }
+      .btn-primary:hover {
+        background: var(--moss-light);
+      }
+
+      .btn-gold {
+        background: var(--gold);
+        color: var(--ink);
+      }
+      .btn-gold:hover {
+        background: var(--gold-light);
+      }
+
+      .btn-ember {
+        background: var(--ember);
+        color: var(--parchment);
+      }
+      .btn-ember:hover {
+        background: #d46a4a;
+      }
+
+      .btn-water {
+        background: var(--water);
+        color: var(--parchment);
+      }
+      .btn-water:hover {
+        background: var(--water-light);
+      }
+      .hero {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+        padding: 2rem;
+      }
+
+      .sky {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          180deg,
+          var(--sky-top) 0%,
+          var(--sky-mid) 40%,
+          var(--sky-bottom) 70%,
+          #7a5a3a 100%
+        );
+        z-index: 0;
+      }
+      .stars {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+      }
+
+      .star {
+        position: absolute;
+        background: #ffe8aa;
+        width: 3px;
+        height: 3px;
+        animation: twinkle 3s ease-in-out infinite alternate;
+      }
+
+      @keyframes twinkle {
+        0% {
+          opacity: 0.3;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      .ground {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 180px;
+        z-index: 2;
+      }
+
+      .ground-layer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+
+      .ground-back {
+        height: 140px;
+        background: repeating-linear-gradient(
+          90deg,
+          #5a7a44 0px,
+          #5a7a44 8px,
+          #4d6b3a 8px,
+          #4d6b3a 16px
+        );
+        border-top: 4px solid #3d5a2a;
+      }
+
+      .ground-front {
+        height: 80px;
+        background: repeating-linear-gradient(
+          90deg,
+          #6a8a54 0px,
+          #6a8a54 12px,
+          #5d7d47 12px,
+          #5d7d47 24px
+        );
+        border-top: 4px solid #4a6a34;
+      }
+
+      .ground-dirt {
+        height: 30px;
+        background: repeating-linear-gradient(
+          90deg,
+          #8a6a44 0px,
+          #8a6a44 8px,
+          #7d5d3a 8px,
+          #7d5d3a 16px
+        );
+        border-top: 3px solid #6a5030;
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 10;
+      }
+
+      .game-title {
+        font-family: "Silkscreen", monospace;
+        font-size: clamp(2.5rem, 8vw, 5.5rem);
+        color: var(--gold-light);
+        text-shadow: 0 0 20px rgba(240, 200, 100, 0.4), 4px 4px 0 #5a3a1a,
+          6px 6px 0 rgba(0, 0, 0, 0.3);
+        margin-bottom: 0.3em;
+        line-height: 1.1;
+        animation: titleFloat 4s ease-in-out infinite;
+      }
+
+      @keyframes titleFloat {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+
+      .game-subtitle {
+        font-family: "Nunito", sans-serif;
+        font-size: clamp(1rem, 2.5vw, 1.4rem);
+        color: var(--parchment);
+        opacity: 0.85;
+        margin-bottom: 2.5rem;
+        font-weight: 400;
+        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .hero-actions .pixel-btn {
+        font-size: 1rem;
+        padding: 14px 32px;
+      }
+
+      .scroll-hint {
+        position: absolute;
+        bottom: 200px;
+        z-index: 10;
+        animation: bounce 2s ease-in-out infinite;
+      }
+
+      .scroll-hint svg {
+        width: 28px;
+        height: 28px;
+        fill: var(--parchment);
+        opacity: 0.5;
+      }
+
+      @keyframes bounce {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(8px);
+        }
+      }
+
+      .section {
+        position: relative;
+        padding: 5rem 2rem;
+      }
+
+      .section-inner {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .section-title {
+        font-family: "Silkscreen", monospace;
+        font-size: clamp(1.5rem, 4vw, 2.2rem);
+        margin-bottom: 1.5rem;
+        position: relative;
+        display: inline-block;
+      }
+
+      .section-title::after {
+        content: "";
+        display: block;
+        width: 60%;
+        height: 4px;
+        background: var(--gold);
+        margin-top: 6px;
+      }
+
+      .about {
+        background: repeating-linear-gradient(
+            0deg,
+            transparent 0px,
+            transparent 3px,
+            rgba(0, 0, 0, 0.02) 3px,
+            rgba(0, 0, 0, 0.02) 4px
+          ),
+          var(--parchment);
+      }
+
+      .about .section-title {
+        color: var(--ink);
+      }
+
+      .about-text {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: var(--ink-light);
+        max-width: 640px;
+      }
+
+      .about-text strong {
+        color: var(--ink);
+      }
+
+      .feature-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 1.5rem;
+      }
+
+      .chip {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.7rem;
+        padding: 6px 14px;
+        border: 2px solid var(--ink);
+        background: var(--parchment-dark);
+        color: var(--ink);
+        box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15);
+      }
+
+      .cards-section {
+        background: repeating-linear-gradient(
+            90deg,
+            transparent 0px,
+            transparent 60px,
+            rgba(255, 255, 255, 0.02) 60px,
+            rgba(255, 255, 255, 0.02) 61px
+          ),
+          linear-gradient(180deg, #2a1e14 0%, #3a2a1a 100%);
+      }
+
+      .cards-section .section-title {
+        color: var(--parchment);
+      }
+
+      .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2rem;
+      }
+
+      .card {
+        background: var(--parchment);
+        padding: 2rem 1.5rem;
+        text-align: center;
+        transition: transform 0.15s;
+      }
+
+      .card:hover {
+        transform: translate(-2px, -2px);
+        box-shadow: inset -4px -4px 0 rgba(0, 0, 0, 0.15),
+          inset 4px 4px 0 rgba(255, 255, 255, 0.1), 8px 8px 0 rgba(0, 0, 0, 0.3);
+      }
+
+      .card-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.8rem;
+        display: block;
+      }
+
+      .card-title {
+        font-family: "Silkscreen", monospace;
+        font-size: 1rem;
+        color: var(--ink);
+        margin-bottom: 0.5rem;
+      }
+
+      .card-desc {
+        font-size: 0.95rem;
+        color: var(--ink-light);
+        line-height: 1.6;
+        margin-bottom: 1.2rem;
+      }
+      .media-section {
+        background: repeating-linear-gradient(
+            0deg,
+            transparent 0px,
+            transparent 3px,
+            rgba(0, 0, 0, 0.02) 3px,
+            rgba(0, 0, 0, 0.02) 4px
+          ),
+          var(--parchment);
+      }
+
+      .media-section .section-title {
+        color: var(--ink);
+      }
+
+      .media-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1rem;
+        margin-top: 2rem;
+      }
+
+      .media-placeholder {
+        aspect-ratio: 16/10;
+        background: repeating-conic-gradient(
+            var(--parchment-dark) 0% 25%,
+            var(--parchment) 0% 50%
+          )
+          0 0 / 16px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-light);
+        font-family: "Silkscreen", monospace;
+        font-size: 0.8rem;
+      }
+
+      footer {
+        background: #1a1210;
+        padding: 2.5rem 2rem;
+        text-align: center;
+        color: var(--parchment);
+        font-size: 0.85rem;
+      }
+
+      footer a {
+        color: var(--gold);
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        text-decoration: underline;
+      }
+
+      .footer-pixel {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.75rem;
+        opacity: 0.5;
+        margin-top: 0.8rem;
+      }
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        padding: 0.8rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(26, 18, 16, 0.85);
+        backdrop-filter: blur(6px);
+        border-bottom: 3px solid rgba(90, 60, 30, 0.4);
+        transform: translateY(-100%);
+        transition: transform 0.3s;
+      }
+
+      nav.visible {
+        transform: translateY(0);
+      }
+
+      .nav-brand {
+        font-family: "Silkscreen", monospace;
+        font-size: 1rem;
+        color: var(--gold-light);
+        text-decoration: none;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 1.2rem;
+        list-style: none;
+      }
+
+      .nav-links a {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.7rem;
+        color: var(--parchment);
+        text-decoration: none;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+
+      .nav-links a:hover {
+        opacity: 1;
+      }
+
+      .pixel-divider {
+        height: 12px;
+        background: repeating-linear-gradient(
+          90deg,
+          var(--ink) 0px,
+          var(--ink) 4px,
+          transparent 4px,
+          transparent 8px
+        );
+        opacity: 0.15;
+      }
+
+      .divider-diamond {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        padding: 1rem 0;
+      }
+
+      .diamond {
+        width: 8px;
+        height: 8px;
+        background: var(--gold);
+        transform: rotate(45deg);
+      }
+
+      .fade-up {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+
+      .fade-up.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 600px) {
+        .hero-actions {
+          flex-direction: column;
+          align-items: center;
+        }
+        .hero-actions .pixel-btn {
+          width: 100%;
+          max-width: 260px;
+        }
+        .nav-links {
+          gap: 0.8rem;
+        }
+        .nav-links a {
+          font-size: 0.6rem;
+        }
+        .section {
+          padding: 3.5rem 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ════════ NAV ════════ -->
+    <nav id="nav">
+      <a href="#" class="nav-brand">New Aeven</a>
+      <ul class="nav-links">
+        <li><a href="#about">About</a></li>
+        <li><a href="#play">Play</a></li>
+        <li><a href="#community">Community</a></li>
+        <li><a href="#media">Media</a></li>
+      </ul>
+    </nav>
+
+    <!-- ════════ HERO ════════ -->
+    <section class="hero">
+      <div class="sky"></div>
+      <div class="stars" id="stars"></div>
+
+      <div class="hero-content">
+        <h1 class="game-title">New Aeven</h1>
+        <p class="game-subtitle">
+          A cozy pixel-art isometric MMO — craft, explore, and adventure
+          together
+        </p>
+        <div class="hero-actions">
+          <a href="#play" class="pixel-btn btn-primary">Play Now</a>
+          <a href="#community" class="pixel-btn btn-gold">Join Us</a>
+        </div>
+      </div>
+
+      <div class="scroll-hint">
+        <svg viewBox="0 0 24 24"><path d="M12 16l-6-6h12z" /></svg>
+      </div>
+
+      <div class="ground">
+        <div class="ground-layer ground-back"></div>
+        <div class="ground-layer ground-front" style="height: 80px"></div>
+        <div class="ground-layer ground-dirt"></div>
+      </div>
+    </section>
+
+    <!-- ════════ ABOUT ════════ -->
+    <section class="section about" id="about">
+      <div class="section-inner fade-up">
+        <h2 class="section-title">What is New Aeven?</h2>
+        <p class="about-text">
+          <strong>New Aeven</strong> is a 2.5D isometric MMO set in a
+          handcrafted pixel-art world. Grow crops on your farm, craft gear at
+          your workbench, explore dungeons with friends, or simply hang out in
+          town and trade. No rush, no pay-to-win — just a living world waiting
+          for you to make it home.
+        </p>
+        <div class="feature-chips">
+          <span class="chip">Farming</span>
+          <span class="chip">Crafting</span>
+          <span class="chip">Dungeons</span>
+          <span class="chip">Trading</span>
+          <span class="chip">Pixel Art</span>
+          <span class="chip">Co-op</span>
+          <span class="chip">Open World</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="pixel-divider"></div>
+
+    <!-- ════════ PLAY / DOWNLOAD ════════ -->
+    <section class="section cards-section" id="play">
+      <div class="section-inner">
+        <h2 class="section-title fade-up">Play</h2>
+        <div class="cards-grid">
+          <div class="card pixel-box fade-up">
+            <span class="card-icon">&#x1F310;</span>
+            <h3 class="card-title">Play in Browser</h3>
+            <p class="card-desc">
+              Jump in instantly — no download needed. Works on any browser.
+            </p>
+            <a href="/play" class="pixel-btn btn-water">Launch</a>
+          </div>
+
+          <div
+            class="card pixel-box fade-up desktop-download-card"
+            style="position: relative"
+          >
+            <span class="card-icon">&#x1F5A5;</span>
+            <h3 class="card-title">Desktop</h3>
+            <p class="card-desc">
+              Download for Windows, macOS, or Linux for the best experience.
+            </p>
+            <a
+              href="https://discord.gg/DEUEhkrAms"
+              class="pixel-btn btn-primary desktop-download-btn"
+              style="position: relative"
+            >
+              Download
+            </a>
+          </div>
+
+          <div class="card pixel-box fade-up">
+            <span class="card-icon">&#x1F4F1;</span>
+            <h3 class="card-title">Android</h3>
+            <p class="card-desc">
+              Take Aeven with you. Available on Android devices.
+            </p>
+            <a href="https://discord.gg/DEUEhkrAms" class="pixel-btn btn-ember"
+              >Get APK</a
+            >
+          </div>
+          <script>
+            // Pixel tooltip logic for desktop download button
+            document.addEventListener("DOMContentLoaded", function () {
+              var btn = document.querySelector(".desktop-download-btn");
+              var tooltip = btn ? btn.querySelector(".pixel-tooltip") : null;
+              if (btn && tooltip) {
+                btn.addEventListener("mouseenter", function () {
+                  tooltip.style.display = "block";
+                  tooltip.style.opacity = "1";
+                });
+                btn.addEventListener("mouseleave", function () {
+                  tooltip.style.opacity = "0";
+                  setTimeout(function () {
+                    tooltip.style.display = "none";
+                  }, 140);
+                });
+                btn.addEventListener("focus", function () {
+                  tooltip.style.display = "block";
+                  tooltip.style.opacity = "1";
+                });
+                btn.addEventListener("blur", function () {
+                  tooltip.style.opacity = "0";
+                  setTimeout(function () {
+                    tooltip.style.display = "none";
+                  }, 140);
+                });
+              }
+            });
+          </script>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider-diamond">
+      <span class="diamond"></span>
+      <span class="diamond"></span>
+      <span class="diamond"></span>
+    </div>
+
+    <!-- ════════ COMMUNITY ════════ -->
+    <section class="section about" id="community">
+      <div class="section-inner">
+        <h2 class="section-title fade-up">Community</h2>
+        <p class="about-text fade-up" style="margin-bottom: 1.5rem">
+          New Aeven is built alongside its community. Come say hello, share your
+          adventures, report bugs, or just hang out.
+        </p>
+        <div class="hero-actions fade-up">
+          <a
+            href="https://discord.gg/DEUEhkrAms"
+            class="pixel-btn btn-primary"
+            style="background: #5865f2"
+            >Discord</a
+          >
+          <a href="https://discord.gg/DEUEhkrAms" class="pixel-btn btn-gold"
+            >Wiki</a
+          >
+        </div>
+      </div>
+    </section>
+
+    <div class="pixel-divider"></div>
+
+    <!-- ════════ MEDIA ════════ -->
+    <section class="section cards-section" id="media">
+      <div class="section-inner">
+        <h2 class="section-title fade-up" style="color: var(--parchment)">
+          Media
+        </h2>
+        <div class="media-grid">
+          <div
+            class="pixel-box fade-up media-screenshot"
+            style="overflow: hidden; aspect-ratio: 16/9"
+          >
+            <img
+              src="screenshots/screenshot-1.png"
+              alt="Screenshot 1 of New Aeven gameplay"
+              style="
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+                border-radius: 6px;
+              "
+            />
+          </div>
+          <div
+            class="pixel-box fade-up media-screenshot"
+            style="overflow: hidden; aspect-ratio: 16/9"
+          >
+            <img
+              src="screenshots/screenshot-2.png"
+              alt="Screenshot 2 of New Aeven gameplay"
+              style="
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+                border-radius: 6px;
+              "
+            />
+          </div>
+          <div
+            class="pixel-box fade-up media-screenshot"
+            style="overflow: hidden; aspect-ratio: 16/9"
+          >
+            <img
+              src="screenshots/screenshot-3.png"
+              alt="Screenshot 3 of New Aeven gameplay"
+              style="
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+                border-radius: 6px;
+              "
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ FOOTER ════════ -->
+    <footer>
+      <p>New Aeven &mdash; made with care</p>
+      <p class="footer-pixel">* * *</p>
+    </footer>
+
+    <!-- ════════ SCRIPTS ════════ -->
+    <script>
+      // Generate pixel stars
+      const starsEl = document.getElementById("stars");
+      for (let i = 0; i < 60; i++) {
+        const star = document.createElement("div");
+        star.className = "star";
+        star.style.left = Math.random() * 100 + "%";
+        star.style.top = Math.random() * 60 + "%";
+        star.style.animationDelay = Math.random() * 3 + "s";
+        star.style.animationDuration = 2 + Math.random() * 3 + "s";
+        if (Math.random() > 0.7) {
+          star.style.width = "4px";
+          star.style.height = "4px";
+        }
+        starsEl.appendChild(star);
+      }
+
+      // Nav show on scroll
+      const nav = document.getElementById("nav");
+      window.addEventListener("scroll", () => {
+        nav.classList.toggle(
+          "visible",
+          window.scrollY > window.innerHeight * 0.4
+        );
+      });
+
+      // Intersection observer for fade-ups
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry, i) => {
+            if (entry.isIntersecting) {
+              // Stagger siblings
+              const siblings =
+                entry.target.parentElement.querySelectorAll(".fade-up");
+              const idx = Array.from(siblings).indexOf(entry.target);
+              setTimeout(() => {
+                entry.target.classList.add("visible");
+              }, idx * 100);
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.15 }
+      );
+
+      document
+        .querySelectorAll(".fade-up")
+        .forEach((el) => observer.observe(el));
+    </script>
+  </body>
+</html>
