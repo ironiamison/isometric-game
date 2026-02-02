@@ -101,11 +101,10 @@
     <script>
       // Prevent early focus events that cause RefCell double-borrow panic in miniquad.
       // The canvas starts non-focusable; we restore tabindex after WASM init settles.
-      var canvas = document.getElementById("glcanvas");
-      canvas.removeAttribute("tabindex");
+      document.getElementById("glcanvas").removeAttribute("tabindex");
       load("isometric_client.wasm");
       setTimeout(function () {
-        canvas.setAttribute("tabindex", "1");
+        document.getElementById("glcanvas").setAttribute("tabindex", "1");
       }, 500);
     </script>
   </body>
