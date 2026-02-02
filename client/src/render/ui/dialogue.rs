@@ -30,7 +30,7 @@ impl Renderer {
         let bottom_margin = if is_mobile { 20.0 } else { 60.0 };
 
         let choice_area_height = if dialogue.choices.is_empty() {
-            0.0
+            40.0 // space for the Continue button
         } else {
             dialogue.choices.len() as f32 * choice_spacing + 36.0
         };
