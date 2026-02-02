@@ -56,6 +56,10 @@ impl Renderer {
         let sell_header_x = right_x + (column_width - sell_header_dims.width) / 2.0;
         self.draw_text_sharp("SELL", sell_header_x, header_y + 17.0, 16.0, TEXT_TITLE);
 
+        // Divider line between buy and sell columns
+        let divider_x = left_x + column_width + COLUMN_GAP / 2.0;
+        draw_line(divider_x, header_y, divider_x, bar_y + TRANSACTION_HEIGHT, 1.0, HEADER_BORDER);
+
         // STEP 3: Render transaction bars ON TOP to cover any list overflow at the bottom
         self.render_buy_transaction(state, hovered, layout, left_x, bar_y, column_width, shop_data);
         self.render_sell_transaction(state, hovered, layout, right_x, bar_y, column_width, shop_data);

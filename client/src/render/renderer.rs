@@ -3434,6 +3434,9 @@ impl Renderer {
 
     /// Render farming patches in two passes: signs first (behind), then crops on top
     fn render_farming_patches(&self, state: &GameState) {
+        if state.current_interior.is_some() {
+            return;
+        }
         let zoom = state.camera.zoom;
         let time = macroquad::time::get_time();
         let frame_w = 16.0;
@@ -3575,6 +3578,9 @@ impl Renderer {
     }
 
     fn render_farming_patch_labels(&self, state: &GameState) {
+        if state.current_interior.is_some() {
+            return;
+        }
         let hovered_tile = match state.hovered_tile {
             Some(t) => t,
             None => return,

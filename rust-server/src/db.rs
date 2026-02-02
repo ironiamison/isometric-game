@@ -118,8 +118,8 @@ impl Database {
                 name TEXT UNIQUE NOT NULL,
                 gender TEXT NOT NULL DEFAULT 'male',
                 skin TEXT NOT NULL DEFAULT 'tan',
-                x REAL DEFAULT 16.0,
-                y REAL DEFAULT 16.0,
+                x REAL DEFAULT 15.0,
+                y REAL DEFAULT 4.0,
                 hp INTEGER DEFAULT 10,
                 max_hp INTEGER DEFAULT 10,
                 level INTEGER DEFAULT 3,
@@ -605,8 +605,8 @@ impl Database {
         let result = sqlx::query(
             r#"INSERT INTO characters
                (account_id, name, gender, skin, hair_style, hair_color,
-                equipped_weapon, equipped_body, equipped_feet, gold)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+                equipped_weapon, equipped_body, equipped_feet, gold, x, y)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 15.0, 4.0)"#,
         )
         .bind(account_id)
         .bind(name)
