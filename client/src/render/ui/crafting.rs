@@ -71,27 +71,30 @@ impl Renderer {
 
         main_tab_x += main_tab_width + 4.0;
 
-        // Crafting Tab (formerly Recipes)
-        let is_recipes_selected = state.ui_state.shop_main_tab == 0;
-        let recipes_bounds = Rect::new(main_tab_x, main_tab_y, main_tab_width, main_tab_height);
-        layout.add(UiElementId::MainTab(0), recipes_bounds);
+        // Crafting Tab (formerly Recipes) - only show if shop allows it
+        let show_crafting = state.ui_state.shop_data.as_ref().map_or(true, |s| s.show_crafting);
+        if show_crafting {
+            let is_recipes_selected = state.ui_state.shop_main_tab == 0;
+            let recipes_bounds = Rect::new(main_tab_x, main_tab_y, main_tab_width, main_tab_height);
+            layout.add(UiElementId::MainTab(0), recipes_bounds);
 
-        let is_recipes_hovered = matches!(hovered, Some(UiElementId::MainTab(0)));
-        let (recipes_bg, recipes_border) = if is_recipes_selected {
-            (SLOT_HOVER_BG, SLOT_SELECTED_BORDER)
-        } else if is_recipes_hovered {
-            (Color::new(0.141, 0.141, 0.188, 1.0), SLOT_HOVER_BORDER)
-        } else {
-            (SLOT_BG_EMPTY, SLOT_BORDER)
-        };
+            let is_recipes_hovered = matches!(hovered, Some(UiElementId::MainTab(0)));
+            let (recipes_bg, recipes_border) = if is_recipes_selected {
+                (SLOT_HOVER_BG, SLOT_SELECTED_BORDER)
+            } else if is_recipes_hovered {
+                (Color::new(0.141, 0.141, 0.188, 1.0), SLOT_HOVER_BORDER)
+            } else {
+                (SLOT_BG_EMPTY, SLOT_BORDER)
+            };
 
-        draw_rectangle(main_tab_x, main_tab_y, main_tab_width, main_tab_height, recipes_border);
-        draw_rectangle(main_tab_x + 1.0, main_tab_y + 1.0, main_tab_width - 2.0, main_tab_height - 2.0, recipes_bg);
+            draw_rectangle(main_tab_x, main_tab_y, main_tab_width, main_tab_height, recipes_border);
+            draw_rectangle(main_tab_x + 1.0, main_tab_y + 1.0, main_tab_width - 2.0, main_tab_height - 2.0, recipes_bg);
 
-        let recipes_text_color = if is_recipes_selected { TEXT_TITLE } else if is_recipes_hovered { TEXT_NORMAL } else { TEXT_DIM };
-        let recipes_dims = self.measure_text_sharp("Crafting", TAB_FONT_SIZE);
-        let recipes_text_x = main_tab_x + (main_tab_width - recipes_dims.width) / 2.0;
-        self.draw_text_sharp("Crafting", recipes_text_x, main_tab_y + 19.0, TAB_FONT_SIZE, recipes_text_color);
+            let recipes_text_color = if is_recipes_selected { TEXT_TITLE } else if is_recipes_hovered { TEXT_NORMAL } else { TEXT_DIM };
+            let recipes_dims = self.measure_text_sharp("Crafting", TAB_FONT_SIZE);
+            let recipes_text_x = main_tab_x + (main_tab_width - recipes_dims.width) / 2.0;
+            self.draw_text_sharp("Crafting", recipes_text_x, main_tab_y + 19.0, TAB_FONT_SIZE, recipes_text_color);
+        }
 
         // Close button (X) - same style as dialogue close button
         let is_mobile = cfg!(target_os = "android");
@@ -124,7 +127,7 @@ impl Renderer {
 
         // Render appropriate tab content
         match state.ui_state.shop_main_tab {
-            0 => self.render_recipes_tab(state, hovered, layout, panel_x, content_y, content_width, content_height),
+            0 if show_crafting => self.render_recipes_tab(state, hovered, layout, panel_x, content_y, content_width, content_height),
             1 => self.render_shop_tab(state, hovered, layout, panel_x, content_y, content_width, content_height),
             _ => {}
         }

@@ -132,7 +132,11 @@ pub struct MerchantConfig {
     #[serde(default = "default_sell_mult")]
     pub sell_multiplier: f32,
     pub restock_interval_minutes: Option<u32>,
+    #[serde(default = "default_show_crafting")]
+    pub show_crafting: bool,
 }
+
+fn default_show_crafting() -> bool { true }
 
 fn default_buy_mult() -> f32 { 0.5 }
 fn default_sell_mult() -> f32 { 1.0 }

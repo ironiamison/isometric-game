@@ -619,6 +619,7 @@ pub struct ShopData {
     pub display_name: String,
     pub buy_multiplier: f32,
     pub sell_multiplier: f32,
+    pub show_crafting: bool,
     pub stock: Vec<ShopStockItemData>,
 }
 
@@ -1553,6 +1554,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             shop_map.push((Value::String("displayName".into()), Value::String(shop.display_name.clone().into())));
             shop_map.push((Value::String("buyMultiplier".into()), Value::F64(shop.buy_multiplier as f64)));
             shop_map.push((Value::String("sellMultiplier".into()), Value::F64(shop.sell_multiplier as f64)));
+            shop_map.push((Value::String("showCrafting".into()), Value::Boolean(shop.show_crafting)));
 
             let stock_values: Vec<Value> = shop.stock.iter().map(|s| {
                 let mut smap = Vec::new();

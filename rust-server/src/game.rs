@@ -2818,6 +2818,7 @@ impl GameRoom {
                             display_name: shop_def.display_name.clone(),
                             buy_multiplier: merchant_config.buy_multiplier,
                             sell_multiplier: merchant_config.sell_multiplier,
+                            show_crafting: merchant_config.show_crafting,
                             stock,
                         };
 

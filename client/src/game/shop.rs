@@ -9,6 +9,7 @@ pub struct ShopData {
     pub display_name: String,
     pub buy_multiplier: f32,
     pub sell_multiplier: f32,
+    pub show_crafting: bool,
     pub stock: Vec<ShopStockItem>,
 }
 

@@ -140,6 +140,7 @@ shop_id = "fisherman_andy"
 buy_multiplier = 0.5
 sell_multiplier = 1.0
 restock_interval_minutes = 5
+show_crafting = false
 
 [fisherman_andy.speech]
 radius = 5
