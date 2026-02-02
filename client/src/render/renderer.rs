@@ -1118,6 +1118,11 @@ impl Renderer {
         let current_time = macroquad::time::get_time();
         let zoom = state.camera.zoom;
 
+        // Use the player's current position so fireworks track with movement
+        let (player_wx, player_wy) = state.get_local_player()
+            .map(|p| (p.x, p.y))
+            .unwrap_or((0.0, 0.0));
+
         for p in &state.firework_particles {
             let age = (current_time - p.time) as f32;
             let max_age = if p.is_spark { 0.5 } else { 1.0 };
@@ -1125,7 +1130,7 @@ impl Renderer {
                 continue;
             }
 
-            let (origin_x, origin_y) = world_to_screen(p.origin_x, p.origin_y, &state.camera);
+            let (origin_x, origin_y) = world_to_screen(player_wx, player_wy, &state.camera);
             let base_y = origin_y - 10.0;
 
             // Draw trail

@@ -550,7 +550,7 @@ impl World {
         }
 
         // Default to center of chunk 0,0
-        (16, 16)
+        (15, 4)
     }
 
     /// Check if a chunk exists (either loaded or loadable)
