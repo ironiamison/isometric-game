@@ -554,7 +554,7 @@ impl Renderer {
         };
 
         // Load farming crop sprite sheets
-        let farming_crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach", "watermelon"];
+        let farming_crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
         let mut farming_sprites = HashMap::new();
         for crop in &farming_crop_names {
             let path = asset_path(&format!("assets/sprites/farming/farming_{}.png", crop));
