@@ -5424,42 +5424,51 @@ impl GameRoom {
         }
 
         // Send state sync to each player, filtering players and NPCs by instance
+        // Optimization: group players by instance and pre-encode shared NPC data
         let tick = *self.tick.read().await;
         let player_instances = self.player_instances.read().await;
         let senders = self.player_senders.read().await;
 
+        // Group senders by instance (None = overworld)
+        let mut instance_groups: std::collections::HashMap<Option<&String>, Vec<(&String, &tokio::sync::mpsc::Sender<Vec<u8>>)>> = std::collections::HashMap::new();
         for (player_id, sender) in senders.iter() {
-            // Get this player's current instance (None = overworld)
-            let my_instance = player_instances.get(player_id);
+            let instance = player_instances.get(player_id);
+            instance_groups.entry(instance).or_default().push((player_id, sender));
+        }
 
-            // Filter players: only send players in the same instance/overworld
-            let players_for_player: Vec<PlayerUpdate> = player_updates
-                .iter()
-                .filter(|p| {
-                    let other_instance = player_instances.get(&p.id);
-                    // Both in overworld (both None) or both in same instance
-                    my_instance == other_instance
-                })
-                .cloned()
-                .collect();
+        // Pre-filter player updates by instance
+        let mut players_by_instance: std::collections::HashMap<Option<&String>, Vec<&PlayerUpdate>> = std::collections::HashMap::new();
+        for p in &player_updates {
+            let instance = player_instances.get(&p.id);
+            players_by_instance.entry(instance).or_default().push(p);
+        }
 
-            // Filter NPCs: players in instances should not receive world NPCs
-            let npcs_for_player = if player_instances.contains_key(player_id) {
-                // Player is in an instance - send empty NPC list (instance NPCs are sent separately)
+        // For each instance group, encode once and send to all players in that group
+        for (instance, group_senders) in &instance_groups {
+            let players_for_group: Vec<PlayerUpdate> = players_by_instance
+                .get(instance)
+                .map(|ps| ps.iter().map(|p| (*p).clone()).collect())
+                .unwrap_or_default();
+
+            let npcs_for_group = if instance.is_some() {
+                // Players in instances don't receive world NPCs
                 Vec::new()
             } else {
-                // Player is in overworld - send all world NPCs
+                // Overworld players share the same NPC list (no clone per player)
                 npc_updates.clone()
             };
 
             let msg = ServerMessage::StateSync {
                 tick,
-                players: players_for_player,
-                npcs: npcs_for_player,
+                players: players_for_group,
+                npcs: npcs_for_group,
             };
 
+            // Encode once for this entire group
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-                let _ = sender.try_send(bytes);
+                for (_player_id, sender) in group_senders {
+                    let _ = sender.try_send(bytes.clone());
+                }
             }
         }
 

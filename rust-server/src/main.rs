@@ -2310,48 +2310,61 @@ async fn main() {
     });
 
     // Spawn auto-save loop (every 30 seconds)
+    // Snapshots all player data quickly under locks, then spawns DB writes
+    // concurrently so they don't block the game tick loop.
     let save_state = state.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(30));
         loop {
             interval.tick().await;
 
-            let mut saved_count = 0;
-            // Iterate through all active sessions and save their characters
+            // Phase 1: Snapshot all player data quickly (holds locks briefly)
+            let mut snapshots = Vec::new();
             for session in save_state.sessions.iter() {
                 let session_data = session.value().clone();
-                let room_id = &session_data.room_id;
-                let player_id = &session_data.player_id;
-                let character_name = &session_data.character_name;
                 let character_id = session_data.character_id;
-                let auth_token = &session_data.auth_token;
+                let character_name = session_data.character_name.clone();
 
-                if !save_state.auth_sessions.contains_key(auth_token) {
+                if !save_state.auth_sessions.contains_key(&session_data.auth_token) {
                     warn!("Auto-save skipped for {}: auth token no longer valid", character_name);
                     continue;
                 }
 
-                // Get the room and character save data
-                if let Some(room) = save_state.rooms.get(room_id) {
-                    if let Some(mut save_data) = room.get_player_save_data(player_id).await {
+                if let Some(room) = save_state.rooms.get(&session_data.room_id) {
+                    let save_data = room.get_player_save_data(&session_data.player_id).await;
+                    let quest_state = room.get_player_quest_state(&session_data.player_id).await;
+
+                    if let Some(mut save_data) = save_data {
                         // Compute played time delta and reset anchor
                         let played_time_delta = save_state.play_time_anchors
                             .get(&character_id)
                             .map(|anchor| anchor.elapsed().as_secs() as i64)
                             .unwrap_or(0);
-                        // Reset the anchor to now
                         save_state.play_time_anchors.insert(character_id, std::time::Instant::now());
 
                         // If in instance, save entrance position instead of interior position
                         if save_data.current_map.is_some() {
                             let entrance_positions = save_state.player_entrance_positions.read().await;
-                            if let Some(&(entrance_x, entrance_y)) = entrance_positions.get(player_id) {
+                            if let Some(&(entrance_x, entrance_y)) = entrance_positions.get(&session_data.player_id) {
                                 save_data.x = entrance_x as f32;
                                 save_data.y = entrance_y as f32;
                             }
                         }
 
-                        if let Err(e) = save_state.db.save_character(
+                        snapshots.push((character_id, character_name, save_data, quest_state, played_time_delta));
+                    }
+                }
+            }
+
+            // Phase 2: Write all snapshots to DB concurrently (no locks held)
+            if !snapshots.is_empty() {
+                let save_count = snapshots.len();
+                let mut save_tasks = Vec::with_capacity(save_count);
+
+                for (character_id, character_name, save_data, quest_state, played_time_delta) in snapshots {
+                    let db = save_state.db.clone();
+                    save_tasks.push(tokio::spawn(async move {
+                        if let Err(e) = db.save_character(
                             character_id,
                             save_data.x,
                             save_data.y,
@@ -2374,19 +2387,22 @@ async fn main() {
                             save_data.sitting_at_y,
                         ).await {
                             warn!("Auto-save failed for character {}: {}", character_name, e);
-                        } else {
-                            saved_count += 1;
                         }
-                    }
 
-                    // Also save quest state
-                    if let Some(quest_state) = room.get_player_quest_state(player_id).await {
-                        let _ = save_state.db.save_character_quest_state(character_id, &quest_state).await;
+                        if let Some(quest_state) = quest_state {
+                            let _ = db.save_character_quest_state(character_id, &quest_state).await;
+                        }
+                    }));
+                }
+
+                // Wait for all saves to finish (they run concurrently)
+                let mut saved_count = 0;
+                for task in save_tasks {
+                    if task.await.is_ok() {
+                        saved_count += 1;
                     }
                 }
-            }
 
-            if saved_count > 0 {
                 info!("Auto-saved {} character(s) to database", saved_count);
             }
         }
