@@ -86,6 +86,12 @@ pub enum InputCommand {
     // Farming commands
     PlantSeed { patch_id: String, item_id: String },
     HarvestCrop { patch_id: String },
+    // Friend system commands
+    SendFriendRequest { target_name: String },
+    AcceptFriendRequest { requester_id: i64 },
+    DeclineFriendRequest { requester_id: i64 },
+    RemoveFriend { friend_id: i64 },
+    GetOnlinePlayers,
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -686,11 +692,14 @@ impl InputHandler {
                         // Toggle social panel, close others if opening
                         if state.ui_state.social_open {
                             state.ui_state.social_open = false;
+                            state.social_state.add_friend_focused = false;
                         } else {
                             state.ui_state.social_open = true;
                             state.ui_state.inventory_open = false;
                             state.ui_state.character_panel_open = false;
-                                                        state.ui_state.skills_open = false;
+                            state.ui_state.skills_open = false;
+                            // Request online players list when opening panel
+                            commands.push(InputCommand::GetOnlinePlayers);
                         }
                         return commands;
                     }
@@ -769,7 +778,114 @@ impl InputHandler {
                         #[cfg(target_os = "android")]
                         macroquad::miniquad::window::show_keyboard(false);
                     }
-                    _ => {}
+                    // Social panel handlers
+                    UiElementId::SocialTabNearby => {
+                        audio.play_sfx("enter");
+                        state.social_state.active_tab = crate::game::SocialTab::Nearby;
+                    }
+                    UiElementId::SocialTabOnline => {
+                        audio.play_sfx("enter");
+                        state.social_state.active_tab = crate::game::SocialTab::Online;
+                        // Request online players list
+                        commands.push(InputCommand::GetOnlinePlayers);
+                    }
+                    UiElementId::SocialTabFriends => {
+                        audio.play_sfx("enter");
+                        state.social_state.active_tab = crate::game::SocialTab::Friends;
+                    }
+                    UiElementId::SocialPlayerRow(idx) => {
+                        // Send friend request to this player (from nearby or online list)
+                        audio.play_sfx("enter");
+                        let player_name = match state.social_state.active_tab {
+                            crate::game::SocialTab::Nearby => {
+                                // Get player from nearby list (state.players minus local player)
+                                let local_id = state.local_player_id.as_ref();
+                                let nearby: Vec<_> = state.players.values()
+                                    .filter(|p| Some(&p.id) != local_id)
+                                    .collect();
+                                nearby.get(*idx).map(|p| p.name.clone())
+                            }
+                            crate::game::SocialTab::Online => {
+                                state.social_state.online_players.get(*idx).map(|p| p.name.clone())
+                            }
+                            _ => None,
+                        };
+                        if let Some(name) = player_name {
+                            commands.push(InputCommand::SendFriendRequest { target_name: name });
+                        }
+                    }
+                    UiElementId::SocialRequestAccept(idx) => {
+                        audio.play_sfx("enter");
+                        if let Some(request) = state.social_state.pending_requests.get(*idx).cloned() {
+                            let requester_id = request.from_id;
+                            let requester_name = request.from_name.clone();
+                            commands.push(InputCommand::AcceptFriendRequest { requester_id });
+                            // Remove from pending list immediately for responsive UI
+                            state.social_state.pending_requests.remove(*idx);
+                            state.social_state.pending_request_count = state.social_state.pending_requests.len();
+                            // Also add to friends list immediately (they're online since they sent the request)
+                            if !state.social_state.friends.iter().any(|f| f.id == requester_id) {
+                                state.social_state.friends.push(crate::game::FriendInfo {
+                                    id: requester_id,
+                                    name: requester_name,
+                                    online: true,
+                                });
+                                // Sort friends list (online first)
+                                state.social_state.friends.sort_by(|a, b| {
+                                    match (a.online, b.online) {
+                                        (true, false) => std::cmp::Ordering::Less,
+                                        (false, true) => std::cmp::Ordering::Greater,
+                                        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    UiElementId::SocialRequestDecline(idx) => {
+                        audio.play_sfx("enter");
+                        if let Some(request) = state.social_state.pending_requests.get(*idx) {
+                            let requester_id = request.from_id;
+                            commands.push(InputCommand::DeclineFriendRequest { requester_id });
+                            // Remove from local list immediately
+                            state.social_state.pending_requests.remove(*idx);
+                            state.social_state.pending_request_count = state.social_state.pending_requests.len();
+                        }
+                    }
+                    UiElementId::SocialRemoveFriend(idx) => {
+                        audio.play_sfx("enter");
+                        if let Some(friend) = state.social_state.friends.get(*idx) {
+                            let friend_id = friend.id;
+                            commands.push(InputCommand::RemoveFriend { friend_id });
+                            // Remove from local list immediately
+                            state.social_state.friends.remove(*idx);
+                        }
+                    }
+                    UiElementId::SocialAddFriendButton => {
+                        // Send friend request by name
+                        let name = state.social_state.add_friend_input.trim().to_string();
+                        if !name.is_empty() {
+                            audio.play_sfx("enter");
+                            commands.push(InputCommand::SendFriendRequest { target_name: name });
+                            state.social_state.add_friend_input.clear();
+                            state.social_state.add_friend_focused = false;
+                            #[cfg(target_os = "android")]
+                            macroquad::miniquad::window::show_keyboard(false);
+                        }
+                    }
+                    UiElementId::SocialAddFriendInput => {
+                        // Focus the input for typing
+                        state.social_state.add_friend_focused = true;
+                        #[cfg(target_os = "android")]
+                        macroquad::miniquad::window::show_keyboard(true);
+                    }
+                    _ => {
+                        // Clicking elsewhere unfocuses the add friend input
+                        if state.social_state.add_friend_focused {
+                            state.social_state.add_friend_focused = false;
+                            #[cfg(target_os = "android")]
+                            macroquad::miniquad::window::show_keyboard(false);
+                        }
+                    }
                 }
             }
         }
@@ -1607,6 +1723,51 @@ impl InputHandler {
             }
 
             // Don't process other input while crafting is open
+            return commands;
+        }
+
+        // Handle add friend input when focused
+        if state.social_state.add_friend_focused && state.ui_state.social_open {
+            // Escape unfocuses the input
+            if is_key_pressed(KeyCode::Escape) {
+                state.social_state.add_friend_focused = false;
+                #[cfg(target_os = "android")]
+                macroquad::miniquad::window::show_keyboard(false);
+                return commands;
+            }
+
+            // Enter sends friend request
+            if is_key_pressed(KeyCode::Enter) {
+                let name = state.social_state.add_friend_input.trim().to_string();
+                if !name.is_empty() {
+                    audio.play_sfx("enter");
+                    commands.push(InputCommand::SendFriendRequest { target_name: name });
+                    state.social_state.add_friend_input.clear();
+                }
+                state.social_state.add_friend_focused = false;
+                #[cfg(target_os = "android")]
+                macroquad::miniquad::window::show_keyboard(false);
+                return commands;
+            }
+
+            // Backspace removes last character
+            if is_key_pressed(KeyCode::Backspace) {
+                state.social_state.add_friend_input.pop();
+            }
+
+            // Capture typed characters
+            while let Some(c) = get_char_pressed() {
+                // Filter control characters
+                if c.is_control() || !c.is_ascii_graphic() && !c.is_ascii_whitespace() && !c.is_alphanumeric() {
+                    continue;
+                }
+                // Limit input length
+                if state.social_state.add_friend_input.len() < 20 {
+                    state.social_state.add_friend_input.push(c);
+                }
+            }
+
+            // Don't process other input while typing in add friend field
             return commands;
         }
 
@@ -2543,8 +2704,10 @@ impl InputHandler {
                 audio.play_sfx("enter");
                 state.ui_state.inventory_open = false;
                 state.ui_state.character_panel_open = false;
-                                state.ui_state.social_open = false;
+                state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
+                // Reset social panel input state
+                state.social_state.add_friend_focused = false;
             } else if state.selected_entity_id.is_some() {
                 commands.push(InputCommand::ClearTarget);
             } else {

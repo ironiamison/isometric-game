@@ -93,6 +93,20 @@ pub enum UiElementId {
     ChatPanelBackground,
     ChatMessageArea,
     ChatLogArea,
+
+    // Social Panel
+    SocialTabNearby,
+    SocialTabOnline,
+    SocialTabFriends,
+    SocialPlayerRow(usize),
+    SocialFriendRow(usize),
+    SocialRequestAccept(usize),
+    SocialRequestDecline(usize),
+    SocialRemoveFriend(usize),
+    SocialAddFriendInput,
+    SocialAddFriendButton,
+    SocialPanelClose,
+    SocialScrollArea,
 }
 
 /// A single interactive UI element with its bounds

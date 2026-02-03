@@ -18,3 +18,4 @@ pub mod area_banner;
 pub mod xp_globes;
 pub mod chat_panel;
 pub mod xp_drops;
+pub mod social_panel;

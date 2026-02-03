@@ -115,6 +115,28 @@ pub enum ClientMessage {
     /// Harvest a crop from a farming patch
     #[serde(rename = "harvestCrop")]
     HarvestCrop { patch_id: String },
+
+    // ===== Friend System Messages =====
+
+    /// Send a friend request to a player by name
+    #[serde(rename = "sendFriendRequest")]
+    SendFriendRequest { target_name: String },
+
+    /// Accept a pending friend request
+    #[serde(rename = "acceptFriendRequest")]
+    AcceptFriendRequest { requester_id: i64 },
+
+    /// Decline a pending friend request
+    #[serde(rename = "declineFriendRequest")]
+    DeclineFriendRequest { requester_id: i64 },
+
+    /// Remove a friend from your friends list
+    #[serde(rename = "removeFriend")]
+    RemoveFriend { friend_id: i64 },
+
+    /// Request list of all online players
+    #[serde(rename = "getOnlinePlayers")]
+    GetOnlinePlayers,
 }
 
 // ============================================================================
@@ -464,6 +486,50 @@ pub enum ServerMessage {
         growth_stage: u32,
         owner_id: String,
     },
+
+    // ===== Friend System Messages =====
+
+    /// Sent when someone sends you a friend request
+    FriendRequestReceived {
+        from_id: i64,
+        from_name: String,
+    },
+    /// Sent when your friend request is accepted
+    FriendRequestAccepted {
+        friend_id: i64,
+        friend_name: String,
+    },
+    /// Sent when your friend request is declined
+    FriendRequestDeclined {
+        by_id: i64,
+    },
+    /// Sent when a friend removes you (or you remove them)
+    FriendRemoved {
+        friend_id: i64,
+    },
+    /// Full friends list sent on connect
+    FriendsList {
+        friends: Vec<FriendInfo>,
+    },
+    /// Pending friend requests sent on connect
+    PendingFriendRequests {
+        requests: Vec<PendingRequestInfo>,
+    },
+    /// List of online players (response to GetOnlinePlayers)
+    OnlinePlayersList {
+        players: Vec<OnlinePlayerInfo>,
+    },
+    /// Sent when a friend's online status changes
+    FriendStatusChanged {
+        friend_id: i64,
+        online: bool,
+    },
+    /// Result of a friend action (success/error feedback)
+    FriendActionResult {
+        action: String,
+        success: bool,
+        error: Option<String>,
+    },
 }
 
 /// Farming patch data for client synchronization
@@ -476,6 +542,29 @@ pub struct FarmingPatchData {
     pub crop_id: String,
     pub growth_stage: u32,
     pub owner_id: String,
+}
+
+/// Friend info for friends list
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendInfo {
+    pub id: i64,
+    pub name: String,
+    pub online: bool,
+}
+
+/// Pending friend request info
+#[derive(Debug, Clone, Serialize)]
+pub struct PendingRequestInfo {
+    pub from_id: i64,
+    pub from_name: String,
+}
+
+/// Online player info for the social panel
+#[derive(Debug, Clone, Serialize)]
+pub struct OnlinePlayerInfo {
+    pub id: i64,
+    pub name: String,
+    pub is_friend: bool,
 }
 
 /// Gathering marker position sent to clients
@@ -695,6 +784,16 @@ impl ServerMessage {
             ServerMessage::SitResult { .. } => "sitResult",
             ServerMessage::FarmingPatchStates { .. } => "farmingPatchStates",
             ServerMessage::PatchStateUpdate { .. } => "patchStateUpdate",
+            // Friend system messages
+            ServerMessage::FriendRequestReceived { .. } => "friendRequestReceived",
+            ServerMessage::FriendRequestAccepted { .. } => "friendRequestAccepted",
+            ServerMessage::FriendRequestDeclined { .. } => "friendRequestDeclined",
+            ServerMessage::FriendRemoved { .. } => "friendRemoved",
+            ServerMessage::FriendsList { .. } => "friendsList",
+            ServerMessage::PendingFriendRequests { .. } => "pendingFriendRequests",
+            ServerMessage::OnlinePlayersList { .. } => "onlinePlayersList",
+            ServerMessage::FriendStatusChanged { .. } => "friendStatusChanged",
+            ServerMessage::FriendActionResult { .. } => "friendActionResult",
         }
     }
 }
@@ -1962,6 +2061,79 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("owner_id".into()), Value::String(owner_id.clone().into())));
             Value::Map(map)
         }
+        // Friend system messages
+        ServerMessage::FriendRequestReceived { from_id, from_name } => {
+            let mut map = Vec::new();
+            map.push((Value::String("from_id".into()), Value::Integer((*from_id).into())));
+            map.push((Value::String("from_name".into()), Value::String(from_name.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::FriendRequestAccepted { friend_id, friend_name } => {
+            let mut map = Vec::new();
+            map.push((Value::String("friend_id".into()), Value::Integer((*friend_id).into())));
+            map.push((Value::String("friend_name".into()), Value::String(friend_name.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::FriendRequestDeclined { by_id } => {
+            let mut map = Vec::new();
+            map.push((Value::String("by_id".into()), Value::Integer((*by_id).into())));
+            Value::Map(map)
+        }
+        ServerMessage::FriendRemoved { friend_id } => {
+            let mut map = Vec::new();
+            map.push((Value::String("friend_id".into()), Value::Integer((*friend_id).into())));
+            Value::Map(map)
+        }
+        ServerMessage::FriendsList { friends } => {
+            let mut map = Vec::new();
+            let friend_values: Vec<Value> = friends.iter().map(|f| {
+                let mut fmap = Vec::new();
+                fmap.push((Value::String("id".into()), Value::Integer(f.id.into())));
+                fmap.push((Value::String("name".into()), Value::String(f.name.clone().into())));
+                fmap.push((Value::String("online".into()), Value::Boolean(f.online)));
+                Value::Map(fmap)
+            }).collect();
+            map.push((Value::String("friends".into()), Value::Array(friend_values)));
+            Value::Map(map)
+        }
+        ServerMessage::PendingFriendRequests { requests } => {
+            let mut map = Vec::new();
+            let request_values: Vec<Value> = requests.iter().map(|r| {
+                let mut rmap = Vec::new();
+                rmap.push((Value::String("from_id".into()), Value::Integer(r.from_id.into())));
+                rmap.push((Value::String("from_name".into()), Value::String(r.from_name.clone().into())));
+                Value::Map(rmap)
+            }).collect();
+            map.push((Value::String("requests".into()), Value::Array(request_values)));
+            Value::Map(map)
+        }
+        ServerMessage::OnlinePlayersList { players } => {
+            let mut map = Vec::new();
+            let player_values: Vec<Value> = players.iter().map(|p| {
+                let mut pmap = Vec::new();
+                pmap.push((Value::String("id".into()), Value::Integer(p.id.into())));
+                pmap.push((Value::String("name".into()), Value::String(p.name.clone().into())));
+                pmap.push((Value::String("is_friend".into()), Value::Boolean(p.is_friend)));
+                Value::Map(pmap)
+            }).collect();
+            map.push((Value::String("players".into()), Value::Array(player_values)));
+            Value::Map(map)
+        }
+        ServerMessage::FriendStatusChanged { friend_id, online } => {
+            let mut map = Vec::new();
+            map.push((Value::String("friend_id".into()), Value::Integer((*friend_id).into())));
+            map.push((Value::String("online".into()), Value::Boolean(*online)));
+            Value::Map(map)
+        }
+        ServerMessage::FriendActionResult { action, success, error } => {
+            let mut map = Vec::new();
+            map.push((Value::String("action".into()), Value::String(action.clone().into())));
+            map.push((Value::String("success".into()), Value::Boolean(*success)));
+            if let Some(err) = error {
+                map.push((Value::String("error".into()), Value::String(err.clone().into())));
+            }
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -2163,6 +2335,24 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let patch_id = extract_string(msg_data, "patch_id").unwrap_or_default();
             Ok(ClientMessage::HarvestCrop { patch_id })
         }
+        // Friend system messages
+        "sendFriendRequest" => {
+            let target_name = extract_string(msg_data, "target_name").unwrap_or_default();
+            Ok(ClientMessage::SendFriendRequest { target_name })
+        }
+        "acceptFriendRequest" => {
+            let requester_id = extract_i64(msg_data, "requester_id").unwrap_or(0);
+            Ok(ClientMessage::AcceptFriendRequest { requester_id })
+        }
+        "declineFriendRequest" => {
+            let requester_id = extract_i64(msg_data, "requester_id").unwrap_or(0);
+            Ok(ClientMessage::DeclineFriendRequest { requester_id })
+        }
+        "removeFriend" => {
+            let friend_id = extract_i64(msg_data, "friend_id").unwrap_or(0);
+            Ok(ClientMessage::RemoveFriend { friend_id })
+        }
+        "getOnlinePlayers" => Ok(ClientMessage::GetOnlinePlayers),
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }
@@ -2200,6 +2390,17 @@ fn extract_i32(value: &rmpv::Value, key: &str) -> Option<i32> {
                 v.as_i64()
                     .map(|i| i as i32)
                     .or_else(|| v.as_u64().map(|u| u as i32))
+            })
+    })
+}
+
+fn extract_i64(value: &rmpv::Value, key: &str) -> Option<i64> {
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| {
+                v.as_i64()
+                    .or_else(|| v.as_u64().map(|u| u as i64))
             })
     })
 }

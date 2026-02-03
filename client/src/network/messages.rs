@@ -99,6 +99,22 @@ pub enum ClientMessage {
 
     #[serde(rename = "harvestCrop")]
     HarvestCrop { patch_id: String },
+
+    // Friend system commands
+    #[serde(rename = "sendFriendRequest")]
+    SendFriendRequest { target_name: String },
+
+    #[serde(rename = "acceptFriendRequest")]
+    AcceptFriendRequest { requester_id: i64 },
+
+    #[serde(rename = "declineFriendRequest")]
+    DeclineFriendRequest { requester_id: i64 },
+
+    #[serde(rename = "removeFriend")]
+    RemoveFriend { friend_id: i64 },
+
+    #[serde(rename = "getOnlinePlayers")]
+    GetOnlinePlayers,
 }
 
 impl ClientMessage {
@@ -244,6 +260,23 @@ impl ClientMessage {
                 data.insert("patch_id".into(), Value::String(patch_id.clone().into()));
                 "harvestCrop"
             }
+            ClientMessage::SendFriendRequest { target_name } => {
+                data.insert("target_name".into(), Value::String(target_name.clone().into()));
+                "sendFriendRequest"
+            }
+            ClientMessage::AcceptFriendRequest { requester_id } => {
+                data.insert("requester_id".into(), Value::Integer((*requester_id).into()));
+                "acceptFriendRequest"
+            }
+            ClientMessage::DeclineFriendRequest { requester_id } => {
+                data.insert("requester_id".into(), Value::Integer((*requester_id).into()));
+                "declineFriendRequest"
+            }
+            ClientMessage::RemoveFriend { friend_id } => {
+                data.insert("friend_id".into(), Value::Integer((*friend_id).into()));
+                "removeFriend"
+            }
+            ClientMessage::GetOnlinePlayers => "getOnlinePlayers",
         };
 
         (msg_type, data)

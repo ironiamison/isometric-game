@@ -154,8 +154,8 @@ pub struct Renderer {
     tileset: Option<Texture2D>,
     /// Player sprite sheets by appearance key (e.g., "male_tan")
     player_sprites: HashMap<String, Texture2D>,
-    /// Hair sprite sheets by style index (0-5)
-    hair_sprites: HashMap<i32, Texture2D>,
+    /// Hair sprite sheets by gender and style (e.g., "male_0", "female_0")
+    hair_sprites: HashMap<String, Texture2D>,
     /// Equipment sprite sheets by item ID (e.g., "peasant_suit")
     equipment_sprites: HashMap<String, Texture2D>,
     /// Weapon sprite sheets by item ID (e.g., "goblin_axe")
@@ -283,15 +283,30 @@ impl Renderer {
         set_loading!("Loading hair sprites...");
 
         let mut hair_sprites = HashMap::new();
+        // Load male hair sprites (hair_0.png through hair_5.png)
         for style in 0..6 {
             let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
             match load_texture(&path).await {
                 Ok(tex) => {
                     tex.set_filter(FilterMode::Nearest);
-                    hair_sprites.insert(style, tex);
+                    hair_sprites.insert(format!("male_{}", style), tex);
                 }
                 Err(e) => {
                     log::warn!("Failed to load hair sprite {}: {}", path, e);
+                }
+            }
+            loaded += 1;
+        }
+        // Load female hair sprites (hair_female_0.png through hair_female_5.png)
+        for style in 0..6 {
+            let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+            match load_texture(&path).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    hair_sprites.insert(format!("female_{}", style), tex);
+                }
+                Err(e) => {
+                    log::warn!("Failed to load female hair sprite {}: {}", path, e);
                 }
             }
             loaded += 1;
@@ -2279,7 +2294,8 @@ impl Renderer {
                 // Player has head equipment - use shader compositing if available
                 if has_shader {
                     if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
-                        if let Some(hair_tex) = self.hair_sprites.get(&style) {
+                        let hair_key = format!("{}_{}", player.gender, style);
+                        if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
                             // Calculate hair frame info
                             let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                             let frame_index = color * 2 + if is_back { 1 } else { 0 };
@@ -2421,7 +2437,8 @@ impl Renderer {
                     // No shader available, draw hair then head (hair will show through transparent areas)
                     // Draw hair first
                     if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
-                        if let Some(hair_tex) = self.hair_sprites.get(&style) {
+                        let hair_key = format!("{}_{}", player.gender, style);
+                        if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
                             let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                             let frame_index = color * 2 + if is_back { 1 } else { 0 };
                             let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
@@ -2499,7 +2516,8 @@ impl Renderer {
             } else {
                 // No head equipment - draw hair normally
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
-                    if let Some(hair_tex) = self.hair_sprites.get(&style) {
+                    let hair_key = format!("{}_{}", player.gender, style);
+                    if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
                         let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                         let frame_index = color * 2 + if is_back { 1 } else { 0 };
                         let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
@@ -2878,7 +2896,8 @@ impl Renderer {
             const HAIR_SPRITE_HEIGHT: f32 = 54.0;
             if player.equipped_head.is_none() {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
-                    if let Some(hair_tex) = self.hair_sprites.get(&style) {
+                    let hair_key = format!("{}_{}", player.gender, style);
+                    if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
                         let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                         let frame_index = color * 2 + if is_back { 1 } else { 0 };
                         let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
@@ -4388,6 +4407,9 @@ impl Renderer {
 
         // Character panel (when open)
         self.render_character_panel(state, hovered, &mut layout);
+
+        // Social panel (when open)
+        self.render_social_panel(state, hovered, &mut layout);
 
         // Quick slots and menu buttons - hide on mobile when crafting/shop panel is open
         let hide_bottom_bar = cfg!(target_os = "android") && state.ui_state.crafting_open;

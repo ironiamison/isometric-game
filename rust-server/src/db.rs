@@ -28,7 +28,7 @@ pub struct CharacterData {
     pub name: String,
     pub gender: String,         // "male" or "female"
     pub skin: String,           // "tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"
-    pub hair_style: Option<i32>, // 0-2 (or None for bald)
+    pub hair_style: Option<i32>, // 0-5 (or None for bald)
     pub hair_color: Option<i32>, // 0-6 (color variant index)
     pub x: f32,
     pub y: f32,
@@ -307,6 +307,37 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Friendships table - for friend system
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS friendships (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                requester_id INTEGER NOT NULL,
+                recipient_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (requester_id) REFERENCES characters(id),
+                FOREIGN KEY (recipient_id) REFERENCES characters(id),
+                UNIQUE(requester_id, recipient_id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        // Create index for faster friend lookups
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships(requester_id)"
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_friendships_recipient ON friendships(recipient_id)"
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -580,10 +611,10 @@ impl Database {
             return Err(format!("Invalid skin: {}", skin));
         }
 
-        // Validate hair_style (0-2) and hair_color (0-9) if provided
+        // Validate hair_style (0-5) and hair_color (0-9) if provided
         if let Some(style) = hair_style {
-            if style < 0 || style > 2 {
-                return Err(format!("Invalid hair style: {} (must be 0-2)", style));
+            if style < 0 || style > 5 {
+                return Err(format!("Invalid hair style: {} (must be 0-5)", style));
             }
         }
         if let Some(color) = hair_color {
@@ -1028,5 +1059,205 @@ impl Database {
         }).collect();
 
         Ok(patches)
+    }
+
+    // =========================================================================
+    // Friend System Functions
+    // =========================================================================
+
+    /// Send a friend request (creates pending friendship)
+    pub async fn create_friend_request(
+        &self,
+        requester_id: i64,
+        recipient_id: i64,
+    ) -> Result<(), String> {
+        // Check if friendship already exists in either direction
+        let existing = sqlx::query(
+            r#"SELECT id FROM friendships
+               WHERE (requester_id = ? AND recipient_id = ?)
+                  OR (requester_id = ? AND recipient_id = ?)"#
+        )
+        .bind(requester_id)
+        .bind(recipient_id)
+        .bind(recipient_id)
+        .bind(requester_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        if existing.is_some() {
+            return Err("Friend request already exists or you are already friends".to_string());
+        }
+
+        sqlx::query(
+            "INSERT INTO friendships (requester_id, recipient_id, status) VALUES (?, ?, 'pending')"
+        )
+        .bind(requester_id)
+        .bind(recipient_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        tracing::info!("Friend request created: {} -> {}", requester_id, recipient_id);
+        Ok(())
+    }
+
+    /// Accept a friend request (changes status to accepted)
+    pub async fn accept_friend_request(
+        &self,
+        requester_id: i64,
+        recipient_id: i64,
+    ) -> Result<(), String> {
+        let result = sqlx::query(
+            "UPDATE friendships SET status = 'accepted' WHERE requester_id = ? AND recipient_id = ? AND status = 'pending'"
+        )
+        .bind(requester_id)
+        .bind(recipient_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        if result.rows_affected() == 0 {
+            return Err("No pending friend request found".to_string());
+        }
+
+        tracing::info!("Friend request accepted: {} <- {}", requester_id, recipient_id);
+        Ok(())
+    }
+
+    /// Decline a friend request (deletes the pending friendship)
+    pub async fn decline_friend_request(
+        &self,
+        requester_id: i64,
+        recipient_id: i64,
+    ) -> Result<(), String> {
+        let result = sqlx::query(
+            "DELETE FROM friendships WHERE requester_id = ? AND recipient_id = ? AND status = 'pending'"
+        )
+        .bind(requester_id)
+        .bind(recipient_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        if result.rows_affected() == 0 {
+            return Err("No pending friend request found".to_string());
+        }
+
+        tracing::info!("Friend request declined: {} <- {}", requester_id, recipient_id);
+        Ok(())
+    }
+
+    /// Remove a friend (deletes the accepted friendship in either direction)
+    pub async fn remove_friend(
+        &self,
+        character_id: i64,
+        friend_id: i64,
+    ) -> Result<(), String> {
+        let result = sqlx::query(
+            r#"DELETE FROM friendships
+               WHERE status = 'accepted'
+                 AND ((requester_id = ? AND recipient_id = ?)
+                   OR (requester_id = ? AND recipient_id = ?))"#
+        )
+        .bind(character_id)
+        .bind(friend_id)
+        .bind(friend_id)
+        .bind(character_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        if result.rows_affected() == 0 {
+            return Err("Friendship not found".to_string());
+        }
+
+        tracing::info!("Friendship removed: {} <-> {}", character_id, friend_id);
+        Ok(())
+    }
+
+    /// Get all accepted friends for a character (returns character_id and name)
+    pub async fn get_friends_list(&self, character_id: i64) -> Result<Vec<(i64, String)>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT c.id, c.name FROM characters c
+               INNER JOIN friendships f ON
+                   (f.requester_id = ? AND f.recipient_id = c.id AND f.status = 'accepted')
+                OR (f.recipient_id = ? AND f.requester_id = c.id AND f.status = 'accepted')"#
+        )
+        .bind(character_id)
+        .bind(character_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.iter().map(|r| {
+            (r.get("id"), r.get("name"))
+        }).collect())
+    }
+
+    /// Get pending friend requests received by a character (returns requester_id and name)
+    pub async fn get_pending_requests(&self, character_id: i64) -> Result<Vec<(i64, String)>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT c.id, c.name FROM characters c
+               INNER JOIN friendships f ON f.requester_id = c.id
+               WHERE f.recipient_id = ? AND f.status = 'pending'"#
+        )
+        .bind(character_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.iter().map(|r| {
+            (r.get("id"), r.get("name"))
+        }).collect())
+    }
+
+    /// Get character ID by name (for sending friend requests by name)
+    pub async fn get_character_id_by_name(&self, name: &str) -> Result<Option<i64>, sqlx::Error> {
+        let row = sqlx::query("SELECT id FROM characters WHERE name = ?")
+            .bind(name)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(row.map(|r| r.get("id")))
+    }
+
+    /// Get character name by ID
+    pub async fn get_character_name_by_id(&self, id: i64) -> Result<Option<String>, sqlx::Error> {
+        let row = sqlx::query("SELECT name FROM characters WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(row.map(|r| r.get("name")))
+    }
+
+    /// Check if two characters are friends
+    pub async fn are_friends(&self, char1_id: i64, char2_id: i64) -> Result<bool, sqlx::Error> {
+        let row = sqlx::query(
+            r#"SELECT id FROM friendships
+               WHERE status = 'accepted'
+                 AND ((requester_id = ? AND recipient_id = ?)
+                   OR (requester_id = ? AND recipient_id = ?))"#
+        )
+        .bind(char1_id)
+        .bind(char2_id)
+        .bind(char2_id)
+        .bind(char1_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.is_some())
+    }
+
+    /// Check if there's a pending request from requester to recipient
+    pub async fn has_pending_request(&self, requester_id: i64, recipient_id: i64) -> Result<bool, sqlx::Error> {
+        let row = sqlx::query(
+            "SELECT id FROM friendships WHERE requester_id = ? AND recipient_id = ? AND status = 'pending'"
+        )
+        .bind(requester_id)
+        .bind(recipient_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.is_some())
     }
 }

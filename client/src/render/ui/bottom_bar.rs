@@ -115,6 +115,11 @@ impl Renderer {
 
             // Draw button with icon
             self.draw_menu_button_icon_scaled(x, y, button_size, *icon_frame, is_hovered, *is_active, scale);
+
+            // Draw notification badge on social button if there are pending requests
+            if *element_id == UiElementId::MenuButtonSocial {
+                self.render_social_badge(state, x, y, scale);
+            }
         }
     }
 

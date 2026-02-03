@@ -31,12 +31,12 @@ use auth::AuthSession;
 // const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - use the development server
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
-const DEV_MODE: bool = false;
+const DEV_MODE: bool = true;
 
 fn window_conf() -> Conf {
     Conf {
@@ -491,6 +491,12 @@ fn run_game_frame(
             InputCommand::StandUp => ClientMessage::StandUp,
             InputCommand::PlantSeed { patch_id, item_id } => ClientMessage::PlantSeed { patch_id: patch_id.clone(), item_id: item_id.clone() },
             InputCommand::HarvestCrop { patch_id } => ClientMessage::HarvestCrop { patch_id: patch_id.clone() },
+            // Friend system commands
+            InputCommand::SendFriendRequest { target_name } => ClientMessage::SendFriendRequest { target_name: target_name.clone() },
+            InputCommand::AcceptFriendRequest { requester_id } => ClientMessage::AcceptFriendRequest { requester_id: *requester_id },
+            InputCommand::DeclineFriendRequest { requester_id } => ClientMessage::DeclineFriendRequest { requester_id: *requester_id },
+            InputCommand::RemoveFriend { friend_id } => ClientMessage::RemoveFriend { friend_id: *friend_id },
+            InputCommand::GetOnlinePlayers => ClientMessage::GetOnlinePlayers,
         };
         network.send(&msg);
     }

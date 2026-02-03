@@ -1,4 +1,4 @@
-use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch};
+use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FriendInfo, PendingRequestInfo, OnlinePlayerInfo};
 use crate::game::npc::{Npc, NpcState};
 use crate::render::OVERWORLD_NAME;
 use super::protocol::{extract_string, extract_f32, extract_i32, extract_u32, extract_u64, extract_array, extract_u8, extract_bool};
@@ -1804,6 +1804,178 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     patch.crop_id = crop_id;
                     patch.growth_stage = growth_stage;
                     patch.owner_id = owner_id;
+                }
+            }
+        }
+
+        // =====================================================================
+        // Friend System Messages
+        // =====================================================================
+
+        "friendsList" => {
+            if let Some(value) = data {
+                if let Some(friends_array) = extract_array(value, "friends") {
+                    state.social_state.friends.clear();
+                    for friend_value in friends_array {
+                        let id = extract_i32(friend_value, "id").unwrap_or(0) as i64;
+                        let name = extract_string(friend_value, "name").unwrap_or_default();
+                        let online = extract_bool(friend_value, "online").unwrap_or(false);
+                        state.social_state.friends.push(crate::game::FriendInfo {
+                            id,
+                            name,
+                            online,
+                        });
+                    }
+                    // Sort: online friends first, then alphabetical
+                    state.social_state.friends.sort_by(|a, b| {
+                        match (a.online, b.online) {
+                            (true, false) => std::cmp::Ordering::Less,
+                            (false, true) => std::cmp::Ordering::Greater,
+                            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                        }
+                    });
+                    log::info!("Received friends list: {} friends", state.social_state.friends.len());
+                }
+            }
+        }
+
+        "pendingFriendRequests" => {
+            if let Some(value) = data {
+                if let Some(requests_array) = extract_array(value, "requests") {
+                    state.social_state.pending_requests.clear();
+                    for req_value in requests_array {
+                        let from_id = extract_i32(req_value, "from_id").unwrap_or(0) as i64;
+                        let from_name = extract_string(req_value, "from_name").unwrap_or_default();
+                        state.social_state.pending_requests.push(crate::game::PendingRequestInfo {
+                            from_id,
+                            from_name,
+                        });
+                    }
+                    state.social_state.pending_request_count = state.social_state.pending_requests.len();
+                    log::info!("Received {} pending friend requests", state.social_state.pending_request_count);
+                }
+            }
+        }
+
+        "onlinePlayersList" => {
+            if let Some(value) = data {
+                if let Some(players_array) = extract_array(value, "players") {
+                    state.social_state.online_players.clear();
+                    for player_value in players_array {
+                        let id = extract_i32(player_value, "id").unwrap_or(0) as i64;
+                        let name = extract_string(player_value, "name").unwrap_or_default();
+                        let is_friend = extract_bool(player_value, "is_friend").unwrap_or(false);
+                        state.social_state.online_players.push(crate::game::OnlinePlayerInfo {
+                            id,
+                            name,
+                            is_friend,
+                        });
+                    }
+                    // Sort alphabetically
+                    state.social_state.online_players.sort_by(|a, b| {
+                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                    });
+                    log::info!("Received online players list: {} players", state.social_state.online_players.len());
+                }
+            }
+        }
+
+        "friendRequestReceived" => {
+            if let Some(value) = data {
+                let from_id = extract_i32(value, "from_id").unwrap_or(0) as i64;
+                let from_name = extract_string(value, "from_name").unwrap_or_default();
+
+                // Add to pending requests if not already there
+                if !state.social_state.pending_requests.iter().any(|r| r.from_id == from_id) {
+                    state.social_state.pending_requests.push(crate::game::PendingRequestInfo {
+                        from_id,
+                        from_name: from_name.clone(),
+                    });
+                    state.social_state.pending_request_count = state.social_state.pending_requests.len();
+                }
+                log::info!("Received friend request from {}", from_name);
+            }
+        }
+
+        "friendRequestAccepted" => {
+            if let Some(value) = data {
+                let friend_id = extract_i32(value, "friend_id").unwrap_or(0) as i64;
+                let friend_name = extract_string(value, "friend_name").unwrap_or_default();
+
+                // Add to friends list if not already there
+                if !state.social_state.friends.iter().any(|f| f.id == friend_id) {
+                    state.social_state.friends.push(crate::game::FriendInfo {
+                        id: friend_id,
+                        name: friend_name.clone(),
+                        online: true, // They just accepted, so they're online
+                    });
+                    // Re-sort friends list
+                    state.social_state.friends.sort_by(|a, b| {
+                        match (a.online, b.online) {
+                            (true, false) => std::cmp::Ordering::Less,
+                            (false, true) => std::cmp::Ordering::Greater,
+                            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                        }
+                    });
+                }
+                log::info!("Friend request accepted by {}", friend_name);
+            }
+        }
+
+        "friendRequestDeclined" => {
+            if let Some(value) = data {
+                let by_id = extract_i32(value, "by_id").unwrap_or(0) as i64;
+                log::info!("Friend request declined by character {}", by_id);
+            }
+        }
+
+        "friendRemoved" => {
+            if let Some(value) = data {
+                let friend_id = extract_i32(value, "friend_id").unwrap_or(0) as i64;
+                state.social_state.friends.retain(|f| f.id != friend_id);
+                log::info!("Friend removed: {}", friend_id);
+            }
+        }
+
+        "friendStatusChanged" => {
+            if let Some(value) = data {
+                let friend_id = extract_i32(value, "friend_id").unwrap_or(0) as i64;
+                let online = extract_bool(value, "online").unwrap_or(false);
+
+                // Update friend's online status
+                if let Some(friend) = state.social_state.friends.iter_mut().find(|f| f.id == friend_id) {
+                    friend.online = online;
+                    log::info!("Friend {} is now {}", friend.name, if online { "online" } else { "offline" });
+                }
+
+                // Re-sort friends list
+                state.social_state.friends.sort_by(|a, b| {
+                    match (a.online, b.online) {
+                        (true, false) => std::cmp::Ordering::Less,
+                        (false, true) => std::cmp::Ordering::Greater,
+                        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                    }
+                });
+            }
+        }
+
+        "friendActionResult" => {
+            if let Some(value) = data {
+                let action = extract_string(value, "action").unwrap_or_default();
+                let success = extract_bool(value, "success").unwrap_or(false);
+                let error = extract_string(value, "error");
+
+                if success {
+                    log::info!("Friend action '{}' succeeded", action);
+                } else if let Some(err) = error {
+                    log::warn!("Friend action '{}' failed: {}", action, err);
+                    // Add error to chat as system message
+                    state.ui_state.chat_messages.push(ChatMessage {
+                        sender_name: "System".to_string(),
+                        text: err,
+                        timestamp: 0.0,
+                        channel: ChatChannel::System,
+                    });
                 }
             }
         }

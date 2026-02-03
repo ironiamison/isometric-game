@@ -489,6 +489,72 @@ pub struct DoubleClickState {
     pub last_click_time: f64,
 }
 
+// ============================================================================
+// Friend System State
+// ============================================================================
+
+/// Friend info for the friends list
+#[derive(Debug, Clone)]
+pub struct FriendInfo {
+    pub id: i64,
+    pub name: String,
+    pub online: bool,
+}
+
+/// Pending friend request info
+#[derive(Debug, Clone)]
+pub struct PendingRequestInfo {
+    pub from_id: i64,
+    pub from_name: String,
+}
+
+/// Online player info for the social panel
+#[derive(Debug, Clone)]
+pub struct OnlinePlayerInfo {
+    pub id: i64,
+    pub name: String,
+    pub is_friend: bool,
+}
+
+/// Social panel tab
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SocialTab {
+    Nearby,
+    Online,
+    Friends,
+}
+
+impl Default for SocialTab {
+    fn default() -> Self {
+        Self::Nearby
+    }
+}
+
+/// Social panel state
+#[derive(Debug, Clone, Default)]
+pub struct SocialState {
+    /// Currently selected tab
+    pub active_tab: SocialTab,
+    /// Friends list (loaded from server)
+    pub friends: Vec<FriendInfo>,
+    /// Pending friend requests (loaded from server)
+    pub pending_requests: Vec<PendingRequestInfo>,
+    /// Online players list (refreshed on demand)
+    pub online_players: Vec<OnlinePlayerInfo>,
+    /// Nearby players (players in same room/instance)
+    pub nearby_players: Vec<OnlinePlayerInfo>,
+    /// Number of pending friend requests (for badge)
+    pub pending_request_count: usize,
+    /// "Add by name" input field text
+    pub add_friend_input: String,
+    /// Whether the add friend input is focused
+    pub add_friend_focused: bool,
+    /// Scroll offset for player list
+    pub list_scroll_offset: f32,
+    /// Scroll offset for friends list
+    pub friends_scroll_offset: f32,
+}
+
 pub struct UiState {
     pub chat_open: bool,
     pub chat_input: String,
@@ -777,6 +843,9 @@ pub struct GameState {
     pub last_portal_check_pos: Option<(i32, i32)>,
     /// Area banner for displaying location names during transitions
     pub area_banner: AreaBanner,
+
+    /// Social/Friends system state
+    pub social_state: SocialState,
 }
 
 impl GameState {
@@ -834,6 +903,7 @@ impl GameState {
             pending_portal_id: None,
             last_portal_check_pos: None,
             area_banner: AreaBanner::default(),
+            social_state: SocialState::default(),
         }
     }
 

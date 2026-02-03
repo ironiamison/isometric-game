@@ -94,7 +94,7 @@ const HAIR_SPRITE_HEIGHT: f32 = 54.0;
 /// Renders at native pixel size (no scaling) for crisp pixel art.
 fn draw_character_preview(
     sprites: &HashMap<String, Texture2D>,
-    hair_sprites: &HashMap<i32, Texture2D>,
+    hair_sprites: &HashMap<String, Texture2D>,
     equipment_sprites: &HashMap<String, Texture2D>,
     gender: &str,
     skin: &str,
@@ -143,7 +143,8 @@ fn draw_character_preview(
 
         // 3. Draw hair
         if let Some(style) = hair_style {
-            if let Some(hair_tex) = hair_sprites.get(&style) {
+            let hair_key = format!("{}_{}", gender, style);
+            if let Some(hair_tex) = hair_sprites.get(&hair_key) {
                 let hair_frame_index = hair_color * 2; // front frame
                 let hair_src_x = hair_frame_index as f32 * HAIR_SPRITE_WIDTH;
                 // Center hair on player: (34 - 28) / 2 = 3, then offset -1
@@ -917,7 +918,7 @@ pub struct CharacterSelectScreen {
     font: BitmapFont,
     confirm_delete: bool,
     player_sprites: HashMap<String, Texture2D>,
-    hair_sprites: HashMap<i32, Texture2D>,
+    hair_sprites: HashMap<String, Texture2D>,
     equipment_sprites: HashMap<String, Texture2D>,
     // Scroll state for character list on small screens
     list_scroll_offset: f32,
@@ -968,12 +969,19 @@ impl CharacterSelectScreen {
     pub async fn load_font(&mut self) {
         self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
         self.player_sprites = load_player_sprites().await;
-        // Load hair sprites
-        for style in 0..3i32 {
+        // Load hair sprites (male and female variants)
+        for style in 0..6i32 {
+            // Male hair sprites
             let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
             if let Ok(tex) = load_texture(&path).await {
                 tex.set_filter(FilterMode::Nearest);
-                self.hair_sprites.insert(style, tex);
+                self.hair_sprites.insert(format!("male_{}", style), tex);
+            }
+            // Female hair sprites
+            let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+            if let Ok(tex) = load_texture(&path).await {
+                tex.set_filter(FilterMode::Nearest);
+                self.hair_sprites.insert(format!("female_{}", style), tex);
             }
         }
         // Load equipment sprites for characters' equipped items
@@ -1634,7 +1642,7 @@ pub struct CharacterCreateScreen {
     font: BitmapFont,
     active_field: CreateField,
     player_sprites: HashMap<String, Texture2D>,
-    hair_sprites: HashMap<i32, Texture2D>,
+    hair_sprites: HashMap<String, Texture2D>,
     scroll_y: f32,
     last_touch_y: Option<f32>,
     touch_detected: bool,
@@ -1680,16 +1688,28 @@ impl CharacterCreateScreen {
     pub async fn load_font(&mut self) {
         self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
         self.player_sprites = load_player_sprites().await;
-        // Load hair sprites
+        // Load hair sprites (male and female variants)
         for style in 0..HAIR_STYLES as i32 {
+            // Male hair sprites
             let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
             match load_texture(&path).await {
                 Ok(tex) => {
                     tex.set_filter(FilterMode::Nearest);
-                    self.hair_sprites.insert(style, tex);
+                    self.hair_sprites.insert(format!("male_{}", style), tex);
                 }
                 Err(e) => {
                     log::warn!("Failed to load hair sprite {}: {}", path, e);
+                }
+            }
+            // Female hair sprites
+            let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+            match load_texture(&path).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    self.hair_sprites.insert(format!("female_{}", style), tex);
+                }
+                Err(e) => {
+                    log::warn!("Failed to load female hair sprite {}: {}", path, e);
                 }
             }
         }
@@ -2246,12 +2266,13 @@ impl Screen for CharacterCreateScreen {
             draw_rectangle_lines(form_x, hair_y + 20.0, half_width, 36.0, 2.0, if hair_style_active { WHITE } else { GRAY });
 
             self.draw_text_sharp("<", form_x + 10.0, hair_y + 44.0, 16.0, if hair_style_active { YELLOW } else { DARKGRAY });
+            let hair_style_string;
             let hair_style_text = match self.hair_style_index {
                 None => "Bald",
-                Some(0) => "Style 1",
-                Some(1) => "Style 2",
-                Some(2) => "Style 3",
-                _ => "?",
+                Some(i) => {
+                    hair_style_string = format!("{}", i + 1);
+                    &hair_style_string
+                }
             };
             let hair_style_width = self.measure_text_sharp(hair_style_text, 16.0).width;
             self.draw_text_sharp(hair_style_text, form_x + half_width / 2.0 - hair_style_width / 2.0, hair_y + 44.0, 16.0, WHITE);

@@ -1458,6 +1458,12 @@ async fn handle_socket(
     // SECURITY: Register this player's sender for unicast messages
     room.register_player_sender(&player_id, tx).await;
 
+    // Send friends list and pending requests (must be after sender is registered)
+    room.send_friends_data(&player_id, &state.online_characters).await;
+
+    // Notify friends that this player came online
+    room.broadcast_friend_status(&player_id, true).await;
+
     // If player was in an instance when they disconnected, auto-re-enter it
     if let Some(ref map_id) = current_map {
         info!("Auto-re-entering instance '{}' for reconnecting player {}", map_id, player_id);
@@ -1605,6 +1611,9 @@ async fn handle_socket(
 
     // SECURITY: Unregister player sender before cleanup
     room.unregister_player_sender(&player_id).await;
+
+    // Notify friends that this player went offline
+    room.broadcast_friend_status(&player_id, false).await;
 
     // Mark character as offline
     state.online_characters.remove(&character_id);
@@ -2322,6 +2331,22 @@ async fn handle_client_message(
         }
         ClientMessage::HarvestCrop { patch_id } => {
             room.handle_harvest_crop(player_id, &patch_id).await;
+        }
+        // Friend system messages
+        ClientMessage::SendFriendRequest { target_name } => {
+            room.handle_send_friend_request(player_id, &target_name).await;
+        }
+        ClientMessage::AcceptFriendRequest { requester_id } => {
+            room.handle_accept_friend_request(player_id, requester_id).await;
+        }
+        ClientMessage::DeclineFriendRequest { requester_id } => {
+            room.handle_decline_friend_request(player_id, requester_id).await;
+        }
+        ClientMessage::RemoveFriend { friend_id } => {
+            room.handle_remove_friend(player_id, friend_id).await;
+        }
+        ClientMessage::GetOnlinePlayers => {
+            room.handle_get_online_players(player_id).await;
         }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
