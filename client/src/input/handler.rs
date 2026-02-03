@@ -1875,7 +1875,7 @@ impl InputHandler {
                             AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
                         )
                     });
-                    if !attack_anim {
+                    if !attack_anim && !state.is_sitting {
                         let dir = self.prev_dir.to_direction_u8();
                         log::info!("[INPUT] Sending Face command: direction={} (prev_dir={:?})", dir, self.prev_dir);
                         commands.push(InputCommand::Face { direction: dir });
@@ -1913,7 +1913,7 @@ impl InputHandler {
                         AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
                     )
                 });
-                if !attack_anim {
+                if !attack_anim && !state.is_sitting {
                     let dir = dpad_released.to_direction_u8();
                     log::info!("[INPUT] D-pad tap - sending Face command: direction={} (hold={:.0}ms)", dir, hold_duration * 1000.0);
                     commands.push(InputCommand::Face { direction: dir });
@@ -1973,9 +1973,17 @@ impl InputHandler {
 
             if past_threshold {
                 // Past threshold - check if target tile is walkable before sending movement
-                // Skip client-side check when sitting (server handles direction-validated stand-up)
+                // When sitting, only allow movement in the chair's facing direction (to stand up)
                 let can_move = if state.is_sitting {
-                    true
+                    // Allow standing up by moving in the chair's facing direction
+                    // The player's direction matches the chair's direction when sitting
+                    if let Some(player) = state.get_local_player() {
+                        let move_dir = new_dir.to_direction_u8();
+                        let chair_dir = player.direction as u8;
+                        move_dir == chair_dir
+                    } else {
+                        false
+                    }
                 } else if let Some(player) = state.get_local_player() {
                     let player_x = player.x.round() as i32;
                     let player_y = player.y.round() as i32;
@@ -2018,7 +2026,7 @@ impl InputHandler {
                         self.move_sent = false;
                         self.touch_controls.set_dpad_move_sent(false);
                     }
-                    if should_send {
+                    if should_send && !state.is_sitting {
                         let face_dir = new_dir.to_direction_u8();
                         commands.push(InputCommand::Face { direction: face_dir });
                         self.last_dx = dx;

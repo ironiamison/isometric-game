@@ -118,7 +118,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                             // If local player recently sent a Face command, preserve local direction
                             // (prevents stale server stateSyncs from undoing the face direction)
-                            let dir = if is_local_player {
+                            // Exception: when sitting, always use server direction (chair controls it)
+                            let is_sitting = matches!(player.animation.state,
+                                crate::render::animation::AnimationState::SittingChair |
+                                crate::render::animation::AnimationState::SittingGround);
+                            let dir = if is_local_player && !is_sitting {
                                 let elapsed = macroquad::time::get_time() - state.last_face_command_time;
                                 if elapsed < 0.5 {
                                     player.direction // keep local direction
@@ -182,6 +186,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     player.y = player.target_y;
                                     player.server_x = player.target_x;
                                     player.server_y = player.target_y;
+                                }
+                                // Force direction to match chair direction from server
+                                // (bypass the face command grace period when sitting)
+                                if let Some(d) = direction {
+                                    let chair_dir = Direction::from_u8(d as u8);
+                                    player.direction = chair_dir;
+                                    player.animation.direction = chair_dir;
                                 }
                                 player.sit_chair();
                                 if is_local_player {

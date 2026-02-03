@@ -849,15 +849,20 @@ impl GameState {
         let visual_delta = self.frame_timings.smoothed_delta;
 
         // Update local player facing immediately when stationary (responsive feel)
+        // Skip when sitting - chair controls direction
         if let Some(local_id) = &self.local_player_id {
             if let Some(player) = self.players.get_mut(local_id) {
-                // Only update direction from input when stationary and not attacking
+                // Only update direction from input when stationary and not attacking/sitting
                 let is_stationary = !player.is_moving && player.vel_x == 0.0 && player.vel_y == 0.0;
                 let is_attacking = matches!(
                     player.animation.state,
                     AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
                 );
-                if is_stationary && !is_attacking && (input_dx != 0.0 || input_dy != 0.0) {
+                let is_sitting = matches!(
+                    player.animation.state,
+                    AnimationState::SittingChair | AnimationState::SittingGround
+                );
+                if is_stationary && !is_attacking && !is_sitting && (input_dx != 0.0 || input_dy != 0.0) {
                     let new_dir = super::entities::Direction::from_velocity(input_dx, input_dy);
                     player.direction = new_dir;
                     player.animation.direction = new_dir;
