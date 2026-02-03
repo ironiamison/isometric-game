@@ -1183,8 +1183,8 @@ pub fn get_hair_offset(state: AnimationState, direction: Direction, anim_frame: 
         Gender::Female => {
             // Female hair needs adjustment for left and up directions
             match direction {
-                Direction::Left => 3.0,  // Move 3px to the right
-                Direction::Up => -3.0,   // Mirror: move 3px to the left (since sprite is flipped)
+                Direction::Left => 4.0,  // Move 4px to the right
+                Direction::Up => -4.0,   // Mirror: move 4px to the left (since sprite is flipped)
                 _ => 0.0,
             }
         }
