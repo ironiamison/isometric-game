@@ -91,6 +91,8 @@ pub enum UiElementId {
     ChatSendButton,
     ChatCloseButton,
     ChatPanelBackground,
+    ChatMessageArea,
+    ChatLogArea,
 }
 
 /// A single interactive UI element with its bounds

@@ -718,6 +718,7 @@ impl InputHandler {
                         state.ui_state.chat_panel_open = !state.ui_state.chat_panel_open;
                         if state.ui_state.chat_panel_open {
                             state.ui_state.chat_active_tab = ChatChannel::Local;
+                            state.ui_state.chat_message_scroll = 0;
                             // Close other panels
                             state.ui_state.inventory_open = false;
                             state.ui_state.character_panel_open = false;
@@ -728,14 +729,17 @@ impl InputHandler {
                     UiElementId::ChatTabLocal => {
                         audio.play_sfx("enter");
                         state.ui_state.chat_active_tab = ChatChannel::Local;
+                        state.ui_state.chat_message_scroll = 0;
                     }
                     UiElementId::ChatTabGlobal => {
                         audio.play_sfx("enter");
                         state.ui_state.chat_active_tab = ChatChannel::Global;
+                        state.ui_state.chat_message_scroll = 0;
                     }
                     UiElementId::ChatTabSystem => {
                         audio.play_sfx("enter");
                         state.ui_state.chat_active_tab = ChatChannel::System;
+                        state.ui_state.chat_message_scroll = 0;
                     }
                     UiElementId::ChatSendButton => {
                         let text = state.ui_state.chat_input.trim().to_string();
@@ -1764,8 +1768,18 @@ impl InputHandler {
             }
         }
 
-        // Block game-world input when chat panel is open (mobile)
+        // Handle chat panel scrolling and block game-world input
         if state.ui_state.chat_panel_open {
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                const SCROLL_SPEED: f32 = 3.0;
+                let delta = (wheel_y * SCROLL_SPEED) as isize;
+                if delta > 0 {
+                    state.ui_state.chat_message_scroll = state.ui_state.chat_message_scroll.saturating_add(delta as usize);
+                } else {
+                    state.ui_state.chat_message_scroll = state.ui_state.chat_message_scroll.saturating_sub((-delta) as usize);
+                }
+            }
             return commands;
         }
 
@@ -2543,6 +2557,26 @@ impl InputHandler {
                 state.ui_state.character_panel_open = false;
                                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
+            }
+        }
+
+        // Chat log scrolling (mouse wheel on desktop)
+        if state.ui_state.chat_log_visible {
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                let over_chat = matches!(
+                    &state.ui_state.hovered_element,
+                    Some(UiElementId::ChatLogArea)
+                );
+                if over_chat {
+                    const SCROLL_SPEED: f32 = 3.0;
+                    let delta = (wheel_y * SCROLL_SPEED) as isize;
+                    if delta > 0 {
+                        state.ui_state.chat_message_scroll = state.ui_state.chat_message_scroll.saturating_add(delta as usize);
+                    } else {
+                        state.ui_state.chat_message_scroll = state.ui_state.chat_message_scroll.saturating_sub((-delta) as usize);
+                    }
+                }
             }
         }
 

@@ -383,7 +383,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     channel: ChatChannel::Local,
                 });
 
-                if state.ui_state.chat_messages.len() > 100 {
+                if state.ui_state.chat_messages.len() > 75 {
                     state.ui_state.chat_messages.remove(0);
                 }
 

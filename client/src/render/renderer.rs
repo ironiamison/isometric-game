@@ -4101,7 +4101,7 @@ impl Renderer {
             let chat_x = 10.0;
             let (_, chat_sh) = virtual_screen_size();
             // In classic mode, push chat log up above the always-visible chat input box
-            let chat_y = if state.ui_state.classic_controls {
+            let chat_bottom_y = if state.ui_state.classic_controls {
                 chat_sh - 58.0
             } else {
                 chat_sh - 20.0
@@ -4109,22 +4109,45 @@ impl Renderer {
             let line_height = 18.0;
             let max_chat_width = 400.0;
             let font_size = 16.0;
+            let max_visible_lines: usize = 12;
+            let chat_area_h = max_visible_lines as f32 * line_height;
+            let chat_top_y = chat_bottom_y - chat_area_h + line_height;
 
-            let mut current_y = chat_y;
-            for msg in state.ui_state.chat_messages.iter().rev().take(5) {
-                // Channel-specific formatting and colors
+            // Build all wrapped lines
+            let mut all_lines: Vec<(String, Color)> = Vec::new();
+            for msg in state.ui_state.chat_messages.iter() {
                 let (color, text) = match msg.channel {
                     ChatChannel::Local => (WHITE, format!("{}: {}", msg.sender_name, msg.text)),
                     ChatChannel::Global => (SKYBLUE, format!("[G] {}: {}", msg.sender_name, msg.text)),
                     ChatChannel::System => (YELLOW, format!("{} {}", msg.sender_name, msg.text)),
                 };
                 let wrapped_lines = self.wrap_text(&text, max_chat_width, font_size);
-
-                // Draw lines from bottom to top (reversed)
-                for line in wrapped_lines.iter().rev() {
-                    self.draw_text_sharp(line, chat_x, current_y, font_size, color);
-                    current_y -= line_height;
+                for line in wrapped_lines {
+                    all_lines.push((line, color));
                 }
+            }
+
+            // Apply scroll offset (clamp so we never scroll past all content)
+            let total_lines = all_lines.len();
+            let max_scroll = total_lines.saturating_sub(max_visible_lines);
+            let scroll = state.ui_state.chat_message_scroll.min(max_scroll);
+            let end = total_lines - scroll;
+            let start = end.saturating_sub(max_visible_lines);
+
+            let mut current_y = chat_bottom_y;
+            for i in (start..end).rev() {
+                if current_y < chat_top_y {
+                    break;
+                }
+                let (ref line, color) = all_lines[i];
+                self.draw_text_sharp(line, chat_x, current_y, font_size, color);
+                current_y -= line_height;
+            }
+
+            // Show scroll indicator if there are older messages
+            if start > 0 {
+                let indicator = format!("▲ {} more", start);
+                self.draw_text_sharp(&indicator, chat_x, chat_top_y - 2.0, 13.0, Color::from_rgba(180, 180, 180, 160));
             }
         }
 
@@ -4456,6 +4479,23 @@ impl Renderer {
         // Render escape menu on top of everything
         if state.ui_state.escape_menu_open {
             self.render_escape_menu(state, &mut layout);
+        }
+
+        // Register chat log hit area for desktop scroll detection
+        if state.ui_state.chat_log_visible {
+            let (_, chat_sh) = virtual_screen_size();
+            let chat_bottom_y = if state.ui_state.classic_controls {
+                chat_sh - 58.0
+            } else {
+                chat_sh - 20.0
+            };
+            let line_height = 18.0;
+            let max_visible_lines: usize = 12;
+            let chat_area_h = max_visible_lines as f32 * line_height;
+            let chat_top_y = chat_bottom_y - chat_area_h + line_height;
+            layout.add(UiElementId::ChatLogArea, macroquad::prelude::Rect::new(
+                10.0, chat_top_y, 400.0, chat_area_h,
+            ));
         }
 
         // Chat panel (fullscreen overlay, on top of everything)

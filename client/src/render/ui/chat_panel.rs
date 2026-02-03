@@ -112,6 +112,12 @@ impl Renderer {
         draw_rectangle(panel_x + FRAME_THICKNESS, messages_y,
                       panel_w - FRAME_THICKNESS * 2.0, messages_h, PANEL_BG_DARK);
 
+        // Register message area for scroll input
+        layout.add(UiElementId::ChatMessageArea, macroquad::prelude::Rect::new(
+            panel_x + FRAME_THICKNESS, messages_y,
+            panel_w - FRAME_THICKNESS * 2.0, messages_h,
+        ));
+
         // Filter and render messages
         let font_size = 16.0;
         let line_height = 20.0;
@@ -121,30 +127,44 @@ impl Renderer {
             .filter(|m| std::mem::discriminant(&m.channel) == std::mem::discriminant(&state.ui_state.chat_active_tab))
             .collect();
 
-        // Render from bottom up, newest messages at bottom
-        let mut y = messages_y + messages_h - line_height;
-        let mut lines_drawn = 0;
-
-        for msg in filtered.iter().rev() {
-            if lines_drawn >= max_lines {
-                break;
-            }
-
+        // Build all wrapped lines with their colors
+        let mut all_lines: Vec<(String, Color)> = Vec::new();
+        for msg in filtered.iter() {
             let (color, text) = match msg.channel {
                 ChatChannel::Local => (WHITE, format!("{}: {}", msg.sender_name, msg.text)),
                 ChatChannel::Global => (SKYBLUE, format!("[G] {}: {}", msg.sender_name, msg.text)),
                 ChatChannel::System => (Color::from_rgba(255, 220, 100, 255), format!("{} {}", msg.sender_name, msg.text)),
             };
-
             let wrapped = self.wrap_text(&text, messages_w, font_size);
-            for line in wrapped.iter().rev() {
-                if lines_drawn >= max_lines || y < messages_y {
-                    break;
-                }
-                self.draw_text_sharp(line, messages_x, y, font_size, color);
-                y -= line_height;
-                lines_drawn += 1;
+            for line in wrapped {
+                all_lines.push((line, color));
             }
+        }
+
+        // Apply scroll offset (clamp so we never scroll past all content)
+        let total_lines = all_lines.len();
+        let max_scroll = total_lines.saturating_sub(max_lines);
+        let scroll = state.ui_state.chat_message_scroll.min(max_scroll);
+        let end = total_lines - scroll;
+        let start = end.saturating_sub(max_lines);
+
+        let mut y = messages_y + messages_h - line_height;
+        for i in (start..end).rev() {
+            if y < messages_y {
+                break;
+            }
+            let (ref line, color) = all_lines[i];
+            self.draw_text_sharp(line, messages_x, y, font_size, color);
+            y -= line_height;
+        }
+
+        // Draw scroll indicator if there are messages above
+        if start > 0 {
+            let indicator = format!("▲ {} more lines", start);
+            let ind_w = self.measure_text_sharp(&indicator, 14.0).width;
+            self.draw_text_sharp(&indicator,
+                messages_x + (messages_w - ind_w) / 2.0,
+                messages_y + 14.0, 14.0, TEXT_DIM);
         }
 
         // === INPUT BAR (hidden on System tab) ===
