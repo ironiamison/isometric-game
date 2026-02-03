@@ -154,7 +154,7 @@ pub struct Renderer {
     tileset: Option<Texture2D>,
     /// Player sprite sheets by appearance key (e.g., "male_tan")
     player_sprites: HashMap<String, Texture2D>,
-    /// Hair sprite sheets by style index (0, 1, 2)
+    /// Hair sprite sheets by style index (0-5)
     hair_sprites: HashMap<i32, Texture2D>,
     /// Equipment sprite sheets by item ID (e.g., "peasant_suit")
     equipment_sprites: HashMap<String, Texture2D>,
@@ -283,7 +283,7 @@ impl Renderer {
         set_loading!("Loading hair sprites...");
 
         let mut hair_sprites = HashMap::new();
-        for style in 0..3 {
+        for style in 0..6 {
             let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
             match load_texture(&path).await {
                 Ok(tex) => {

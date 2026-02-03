@@ -1642,7 +1642,7 @@ pub struct CharacterCreateScreen {
     loading: bool,
 }
 
-const HAIR_STYLES: usize = 3;  // 0, 1, 2
+const HAIR_STYLES: usize = 6;  // 0-5
 const HAIR_COLORS: usize = 10; // 0-9 (20 frames / 2 front-back pairs)
 
 #[derive(PartialEq, Clone, Copy)]
