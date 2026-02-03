@@ -395,15 +395,6 @@ async fn register_account(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<RegisterRequest>,
 ) -> impl IntoResponse {
-    // Signups are temporarily disabled
-    return Json(AuthResponse {
-        success: false,
-        token: None,
-        username: None,
-        error: Some("Sign ups are temporarily disabled. Join our Discord for more details!".to_string()),
-    });
-
-    #[allow(unreachable_code)]
     let client_ip = addr.ip().to_string();
 
     if !state.auth_rate_limiter.check(&client_ip) {

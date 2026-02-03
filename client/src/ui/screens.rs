@@ -496,15 +496,11 @@ impl Screen for LoginScreen {
                 }
             }
 
-            // Toggle mode button (right side, same row) - registration disabled
+            // Toggle mode button (right side, same row)
             let toggle_x = box_x + login_btn_w + spacing;
             if point_in_rect(mx, my, toggle_x, buttons_y, login_btn_w, btn_height) {
-                if self.mode == LoginMode::Register {
-                    self.mode = LoginMode::Login;
-                    self.error_message = None;
-                } else {
-                    self.error_message = Some("Sign ups coming soon! Ask in Discord for details.".to_string());
-                }
+                self.mode = if self.mode == LoginMode::Register { LoginMode::Login } else { LoginMode::Register };
+                self.error_message = None;
             }
         }
 
@@ -524,14 +520,10 @@ impl Screen for LoginScreen {
             self.error_message = None;
         }
 
-        // Toggle between login/register - registration disabled
+        // Toggle between login/register
         if is_key_pressed(KeyCode::F1) {
-            if self.mode == LoginMode::Register {
-                self.mode = LoginMode::Login;
-                self.error_message = None;
-            } else {
-                self.error_message = Some("Sign ups coming soon! Ask in Discord for details.".to_string());
-            }
+            self.mode = if self.mode == LoginMode::Register { LoginMode::Login } else { LoginMode::Register };
+            self.error_message = None;
         }
 
         // Submit on Enter
