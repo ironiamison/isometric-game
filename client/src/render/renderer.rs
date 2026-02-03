@@ -11,7 +11,7 @@ use crate::game::tilemap::get_tile_color;
 use crate::ui::{UiElementId, UiLayout};
 use super::ui::common::{SlotState, CORNER_ACCENT_SIZE};
 use super::isometric::{world_to_screen, world_to_screen_exact, TILE_WIDTH, TILE_HEIGHT, calculate_depth};
-use super::animation::{SPRITE_WIDTH, SPRITE_HEIGHT, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT, NpcAnimation, get_weapon_frame, get_weapon_offset, get_boot_frame, get_boot_offset, get_body_armor_frame, get_body_armor_offset, get_head_frame, get_head_offset, get_back_static_frame, get_back_static_offset, get_offhand_frame, get_offhand_offset, AnimationState};
+use super::animation::{SPRITE_WIDTH, SPRITE_HEIGHT, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT, NpcAnimation, get_weapon_frame, get_weapon_offset, get_boot_frame, get_boot_offset, get_body_armor_frame, get_body_armor_offset, get_head_frame, get_head_offset, get_back_static_frame, get_back_static_offset, get_offhand_frame, get_offhand_offset, get_hair_offset, AnimationState, Gender};
 use super::font::BitmapFont;
 use super::shaders;
 
@@ -2196,6 +2196,9 @@ impl Renderer {
             let draw_x = screen_x - scaled_sprite_width / 2.0;
             let draw_y = screen_y - scaled_sprite_height + 8.0 * zoom + sit_offset_y; // Offset to align feet with tile
 
+            // Get player gender for gender-specific offsets
+            let player_gender = Gender::from_str(&player.gender);
+
             // Calculate weapon frame info if weapon is equipped (hidden when sitting)
             let is_sitting = matches!(player.animation.state,
                 crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
@@ -2203,7 +2206,7 @@ impl Renderer {
                 self.weapon_sprites.get(weapon_id).map(|ws| {
                     let anim_frame = player.animation.frame as u32;
                     let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
-                    let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame);
+                    let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
                     (&ws.texture, weapon_frame, offset_x, offset_y, ws.frame_width, ws.frame_height)
                 })
             });
@@ -2241,7 +2244,7 @@ impl Renderer {
                         let anim_frame = player.animation.frame as u32;
                         let back_frame = get_back_static_frame(player.animation.direction);
                         if back_frame.render_behind {
-                            let (back_offset_x, back_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame);
+                            let (back_offset_x, back_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
                             let back_src_x = back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
                             let scaled_back_width = BACK_STATIC_SPRITE_WIDTH * zoom;
                             let scaled_back_height = BACK_STATIC_SPRITE_HEIGHT * zoom;
@@ -2280,10 +2283,6 @@ impl Renderer {
             );
 
             // Draw hair and head equipment (after base sprite, before body armor)
-            // Hair sprites are 28x54, smaller than player sprites (34x78)
-            const HAIR_SPRITE_WIDTH: f32 = 28.0;
-            const HAIR_SPRITE_HEIGHT: f32 = 54.0;
-
             // Check if player has head equipment that we can render with shader
             let head_sprite = player.equipped_head.as_ref()
                 .and_then(|head_item_id| self.equipment_sprites.get(head_item_id));
@@ -2301,45 +2300,26 @@ impl Renderer {
                             let frame_index = color * 2 + if is_back { 1 } else { 0 };
                             let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
 
-                            // Calculate hair offsets
-                            let is_attack_frame_2 = player.animation.state == AnimationState::Attacking && (player.animation.frame as u32 % 2) == 1;
-                            let is_shooting_bow = player.animation.state == AnimationState::ShootingBow;
-                            let (hair_offset_x, hair_offset_y) = if is_attack_frame_2 {
-                                let y_offset = if is_back { -2.0 } else { 2.0 };
-                                let x_offset = if is_back {
-                                    if coords.flip_h { 5.0 } else { -5.0 }
-                                } else {
-                                    if coords.flip_h { 6.0 } else { -6.0 }
-                                };
-                                (x_offset, y_offset)
-                            } else if is_shooting_bow {
-                                let x_offset = if is_back {
-                                    if coords.flip_h { 1.0 } else { -1.0 }
-                                } else {
-                                    if coords.flip_h { 2.0 } else { -2.0 }
-                                };
-                                (x_offset, -3.0)
-                            } else {
-                                let x_offset = if is_back {
-                                    if coords.flip_h { 2.0 } else { -2.0 }
-                                } else {
-                                    if coords.flip_h { 1.0 } else { -1.0 }
-                                };
-                                (x_offset, -3.0)
-                            };
+                            // Calculate hair offsets using gender-aware function
+                            let anim_frame = player.animation.frame as u32;
+                            let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                                player_gender,
+                                coords.flip_h,
+                            );
 
                             // Calculate head frame info
-                            let anim_frame = player.animation.frame as u32;
                             let head_frame = get_head_frame(player.animation.direction);
-                            let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame);
+                            let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
                             let head_src_x = head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
 
                             // Calculate pixel offset from head origin to hair origin (in unscaled pixels)
                             // Hair is centered: hair_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2 + hair_offset_x = 3 + hair_offset_x
                             // Head uses head_offset_x directly
                             let hair_base_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 + hair_offset_x;
-                            let hair_sit_offset_shader = if player.animation.state == AnimationState::SittingChair { 7.0 } else { 0.0 };
-                            let hair_base_y = hair_offset_y + hair_sit_offset_shader;
+                            let hair_base_y = hair_offset_y; // sit offset already included in get_hair_offset
                             let delta_x = hair_base_x - head_offset_x;
                             let delta_y = hair_base_y - head_offset_y;
 
@@ -2413,7 +2393,7 @@ impl Renderer {
                         // No hair, just draw head normally
                         let anim_frame = player.animation.frame as u32;
                         let head_frame = get_head_frame(player.animation.direction);
-                        let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame);
+                        let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
                         let head_src_x = head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
                         let scaled_head_width = HEAD_SPRITE_WIDTH * zoom;
                         let scaled_head_height = HEAD_SPRITE_HEIGHT * zoom;
@@ -2445,35 +2425,18 @@ impl Renderer {
                             let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
                             let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
 
-                            let is_attack_frame_2 = player.animation.state == AnimationState::Attacking && (player.animation.frame as u32 % 2) == 1;
-                            let is_shooting_bow = player.animation.state == AnimationState::ShootingBow;
-                            let (hair_offset_x, hair_offset_y) = if is_attack_frame_2 {
-                                let y_offset = if is_back { -2.0 } else { 2.0 };
-                                let x_offset = if is_back {
-                                    if coords.flip_h { 5.0 } else { -5.0 }
-                                } else {
-                                    if coords.flip_h { 6.0 } else { -6.0 }
-                                };
-                                (x_offset, y_offset)
-                            } else if is_shooting_bow {
-                                let x_offset = if is_back {
-                                    if coords.flip_h { 1.0 } else { -1.0 }
-                                } else {
-                                    if coords.flip_h { 2.0 } else { -2.0 }
-                                };
-                                (x_offset, -3.0)
-                            } else {
-                                let x_offset = if is_back {
-                                    if coords.flip_h { 2.0 } else { -2.0 }
-                                } else {
-                                    if coords.flip_h { 1.0 } else { -1.0 }
-                                };
-                                (x_offset, -3.0)
-                            };
+                            // Calculate hair offsets using gender-aware function
+                            let anim_frame = player.animation.frame as u32;
+                            let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                                player_gender,
+                                coords.flip_h,
+                            );
 
-                            let hair_sit_offset_fb = if player.animation.state == AnimationState::SittingChair { 7.0 } else { 0.0 };
                             let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                            let hair_draw_y = draw_y + (hair_offset_y + hair_sit_offset_fb) * zoom;
+                            let hair_draw_y = draw_y + hair_offset_y * zoom;
 
                             draw_texture_ex(
                                 hair_tex,
@@ -2493,7 +2456,7 @@ impl Renderer {
                     // Then draw head on top
                     let anim_frame = player.animation.frame as u32;
                     let head_frame = get_head_frame(player.animation.direction);
-                    let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame);
+                    let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
                     let head_src_x = head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
                     let scaled_head_width = HEAD_SPRITE_WIDTH * zoom;
                     let scaled_head_height = HEAD_SPRITE_HEIGHT * zoom;
@@ -2524,35 +2487,18 @@ impl Renderer {
                         let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
                         let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
 
-                        let is_attack_frame_2 = player.animation.state == AnimationState::Attacking && (player.animation.frame as u32 % 2) == 1;
-                        let is_shooting_bow = player.animation.state == AnimationState::ShootingBow;
-                        let (hair_offset_x, hair_offset_y) = if is_attack_frame_2 {
-                            let y_offset = if is_back { -2.0 } else { 2.0 };
-                            let x_offset = if is_back {
-                                if coords.flip_h { 5.0 } else { -5.0 }
-                            } else {
-                                if coords.flip_h { 6.0 } else { -6.0 }
-                            };
-                            (x_offset, y_offset)
-                        } else if is_shooting_bow {
-                            let x_offset = if is_back {
-                                if coords.flip_h { 1.0 } else { -1.0 }
-                            } else {
-                                if coords.flip_h { 2.0 } else { -2.0 }
-                            };
-                            (x_offset, -3.0)
-                        } else {
-                            let x_offset = if is_back {
-                                if coords.flip_h { 2.0 } else { -2.0 }
-                            } else {
-                                if coords.flip_h { 1.0 } else { -1.0 }
-                            };
-                            (x_offset, -3.0)
-                        };
+                        // Calculate hair offsets using gender-aware function
+                        let anim_frame = player.animation.frame as u32;
+                        let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                            coords.flip_h,
+                        );
 
-                        let hair_sit_offset = if player.animation.state == AnimationState::SittingChair { 7.0 } else { 0.0 };
                         let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                        let hair_draw_y = draw_y + (hair_offset_y + hair_sit_offset) * zoom;
+                        let hair_draw_y = draw_y + hair_offset_y * zoom;
 
                         draw_texture_ex(
                             hair_tex,
@@ -2581,7 +2527,7 @@ impl Renderer {
                         // New single-row body armor format
                         let anim_frame = player.animation.frame as u32;
                         let armor_frame = get_body_armor_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (armor_offset_x, armor_offset_y) = get_body_armor_offset(player.animation.state, player.animation.direction, anim_frame);
+                        let (armor_offset_x, armor_offset_y) = get_body_armor_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
                         let armor_src_x = armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
                         let scaled_armor_width = BODY_ARMOR_SPRITE_WIDTH * zoom;
@@ -2630,7 +2576,7 @@ impl Renderer {
                         // New single-row boot format
                         let anim_frame = player.animation.frame as u32;
                         let boot_frame = get_boot_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (boot_offset_x, boot_offset_y) = get_boot_offset(player.animation.state, player.animation.direction, anim_frame);
+                        let (boot_offset_x, boot_offset_y) = get_boot_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
                         let boot_src_x = boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
                         let scaled_boot_width = BOOT_SPRITE_WIDTH * zoom;
@@ -2681,7 +2627,7 @@ impl Renderer {
                         // 16-frame offhand item (shield)
                         let anim_frame = player.animation.frame as u32;
                         let offhand_frame = get_offhand_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (offhand_offset_x, offhand_offset_y) = get_offhand_offset(player.animation.state, player.animation.direction, anim_frame);
+                        let (offhand_offset_x, offhand_offset_y) = get_offhand_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
                         let offhand_src_x = offhand_frame.frame as f32 * OFFHAND_SPRITE_WIDTH;
                         let scaled_offhand_width = OFFHAND_SPRITE_WIDTH * zoom;
@@ -2710,7 +2656,7 @@ impl Renderer {
                         // Only render here if visible and NOT rendering behind player
                         // (behind rendering happens before player sprite)
                         if back_frame.visible && !back_frame.render_behind {
-                            let (back_offset_x, back_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame);
+                            let (back_offset_x, back_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
                             let back_src_x = back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
                             let scaled_back_width = BACK_STATIC_SPRITE_WIDTH * zoom;
@@ -2839,6 +2785,9 @@ impl Renderer {
             let draw_x = screen_x - scaled_sprite_width / 2.0;
             let draw_y = screen_y - scaled_sprite_height + 8.0 * zoom;
 
+            // Get player gender for gender-specific offsets
+            let player_gender = Gender::from_str(&player.gender);
+
             // Calculate weapon frame info if weapon is equipped (hidden when sitting)
             let is_sitting_sil = matches!(player.animation.state,
                 crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
@@ -2846,7 +2795,7 @@ impl Renderer {
                 self.weapon_sprites.get(weapon_id).map(|ws| {
                     let anim_frame = player.animation.frame as u32;
                     let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
-                    let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame);
+                    let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
                     (&ws.texture, weapon_frame, offset_x, offset_y, ws.frame_width, ws.frame_height)
                 })
             });
@@ -2892,8 +2841,6 @@ impl Renderer {
             }
 
             // Draw hair silhouette (skip if head slot is equipped - helmet covers hair)
-            const HAIR_SPRITE_WIDTH: f32 = 28.0;
-            const HAIR_SPRITE_HEIGHT: f32 = 54.0;
             if player.equipped_head.is_none() {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
@@ -2905,14 +2852,17 @@ impl Renderer {
                         let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
                         let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
 
-                        // Hair offset based on direction (silhouette uses normal offsets)
-                        let x_offset = if is_back {
-                            if coords.flip_h { 2.0 } else { -2.0 }  // Back directions: left 2
-                        } else {
-                            if coords.flip_h { 1.0 } else { -1.0 }  // Front directions: left 1
-                        };
-                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + x_offset * zoom;
-                        let hair_draw_y = draw_y - 3.0 * zoom;
+                        // Calculate hair offsets using gender-aware function
+                        let anim_frame = player.animation.frame as u32;
+                        let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                            coords.flip_h,
+                        );
+                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
+                        let hair_draw_y = draw_y + hair_offset_y * zoom;
 
                         draw_texture_ex(
                             hair_tex,
@@ -2939,7 +2889,7 @@ impl Renderer {
                         // New single-row body armor format
                         let anim_frame = player.animation.frame as u32;
                         let armor_frame = get_body_armor_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (armor_offset_x, armor_offset_y) = get_body_armor_offset(player.animation.state, player.animation.direction, anim_frame);
+                        let (armor_offset_x, armor_offset_y) = get_body_armor_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
                         let armor_src_x = armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
                         let scaled_armor_width = BODY_ARMOR_SPRITE_WIDTH * zoom;
@@ -2987,7 +2937,7 @@ impl Renderer {
                         // New single-row boot format
                         let anim_frame = player.animation.frame as u32;
                         let boot_frame = get_boot_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (boot_offset_x, boot_offset_y) = get_boot_offset(player.animation.state, player.animation.direction, anim_frame);
+                        let (boot_offset_x, boot_offset_y) = get_boot_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
                         let boot_src_x = boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
                         let scaled_boot_width = BOOT_SPRITE_WIDTH * zoom;
@@ -3360,7 +3310,7 @@ impl Renderer {
     /// Render a fishing line from the player's rod tip to a landing point in the water
     fn render_fishing_line(&self, player: &Player, camera: &Camera) {
         use crate::game::Direction;
-        use super::animation::{get_weapon_offset, get_weapon_frame, should_flip_horizontal};
+        use super::animation::{get_weapon_offset, get_weapon_frame, should_flip_horizontal, Gender};
 
         let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
         let zoom = camera.zoom;
@@ -3370,8 +3320,11 @@ impl Renderer {
         let draw_x = screen_x - SPRITE_WIDTH * zoom / 2.0;
         let draw_y = screen_y - SPRITE_HEIGHT * zoom + 8.0 * zoom;
 
+        // Get player gender for gender-specific offsets
+        let player_gender = Gender::from_str(&player.gender);
+
         let anim_frame = player.animation.frame as u32;
-        let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame);
+        let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
         let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
         let flip = weapon_frame.flip_h;
 

@@ -463,16 +463,6 @@ impl Renderer {
                 let name_color = if friend.online { TEXT_NORMAL } else { TEXT_DIM };
                 self.draw_text_sharp(&friend.name, name_x, row_y + (row_height + 10.0) / 2.0, SOCIAL_FONT_SIZE, name_color);
 
-                // Remove button (X) - show on hover
-                if is_hovered && row_y >= list_start_y && row_y + row_height <= list_start_y + friends_area_height {
-                    let remove_x = x + width - padding - 20.0;
-                    let remove_bounds = Rect::new(remove_x, row_y + 4.0, 18.0 * scale, 18.0 * scale);
-                    layout.add(UiElementId::SocialRemoveFriend(i), remove_bounds);
-                    let remove_hovered = matches!(hovered, Some(UiElementId::SocialRemoveFriend(idx)) if *idx == i);
-                    let remove_color = if remove_hovered { Color::new(0.8, 0.2, 0.2, 1.0) } else { TEXT_DIM };
-                    self.draw_text_sharp("X", remove_x + 3.0, row_y + (row_height + 10.0) / 2.0, SOCIAL_FONT_SIZE, remove_color);
-                }
-
                 row_y += row_height;
             }
 

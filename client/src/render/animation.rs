@@ -1,4 +1,22 @@
 use crate::game::Direction;
+
+/// Gender enum for gender-specific offsets
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Gender {
+    #[default]
+    Male,
+    Female,
+}
+
+impl Gender {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "female" => Gender::Female,
+            _ => Gender::Male,
+        }
+    }
+}
+
 pub const SPRITE_WIDTH: f32 = 34.0;
 pub const SPRITE_HEIGHT: f32 = 78.0;
 
@@ -435,9 +453,10 @@ pub fn get_weapon_frame(state: AnimationState, direction: Direction, anim_frame:
 /// Returns (x_offset, y_offset) to adjust weapon position based on animation state and direction.
 /// These offsets account for the difference in sprite sizes (weapon: 68x84, player: 34x78)
 /// and align the weapon with the player's hand position.
+/// Gender parameter allows for different positioning based on character model.
 ///
 /// Initial values are conservative defaults - tune visually during testing.
-pub fn get_weapon_offset(state: AnimationState, direction: Direction, anim_frame: u32) -> (f32, f32) {
+pub fn get_weapon_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset to center the larger weapon sprite over the player
@@ -575,7 +594,8 @@ pub fn get_boot_frame(state: AnimationState, direction: Direction, anim_frame: u
 ///
 /// Boots are positioned at the player's feet. These offsets adjust the boot sprite
 /// to align properly with the player's foot position in each animation frame.
-pub fn get_boot_offset(state: AnimationState, direction: Direction, anim_frame: u32) -> (f32, f32) {
+/// Gender parameter allows for different positioning based on character model.
+pub fn get_boot_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: boots are 34 wide (same as player), so center them
@@ -719,7 +739,8 @@ pub fn get_body_armor_frame(state: AnimationState, direction: Direction, anim_fr
 ///
 /// Body armor covers the torso and should align with the player's body in each animation frame.
 /// These offsets are similar to boots but positioned higher to cover the torso.
-pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_frame: u32) -> (f32, f32) {
+/// Gender parameter allows for different positioning based on character model.
+pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: body armor is 34 wide (same as player's 34)
@@ -804,7 +825,8 @@ pub fn get_head_frame(direction: Direction) -> HeadFrameResult {
 ///
 /// Head equipment is positioned at the top of the player sprite and follows the same
 /// offset patterns as hair during animations.
-pub fn get_head_offset(state: AnimationState, direction: Direction, anim_frame: u32) -> (f32, f32) {
+/// Gender parameter allows for different positioning based on character model.
+pub fn get_head_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: head is 30 wide, player is 34, center it
@@ -927,7 +949,8 @@ pub fn get_back_static_frame(direction: Direction) -> BackStaticFrameResult {
 ///
 /// Back items sit on the player's back/shoulder area. These offsets align the item
 /// with the player's back position in each animation frame.
-pub fn get_back_static_offset(state: AnimationState, direction: Direction, anim_frame: u32) -> (f32, f32) {
+/// Gender parameter allows for different positioning based on character model.
+pub fn get_back_static_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
     // Base offset: position varies by direction
     // Quiver is 50 wide, 63 tall
     // Right/Up show on left side (mirrored), Down/Left show on right side
@@ -1046,7 +1069,8 @@ pub fn get_offhand_frame(state: AnimationState, direction: Direction, anim_frame
 ///
 /// Offhand items (shields) are held on the off-hand side. These offsets align the item
 /// with the player's off-hand position in each animation frame.
-pub fn get_offhand_offset(state: AnimationState, direction: Direction, anim_frame: u32) -> (f32, f32) {
+/// Gender parameter allows for different positioning based on character model.
+pub fn get_offhand_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: position on off-hand side
@@ -1105,4 +1129,66 @@ pub fn get_offhand_offset(state: AnimationState, direction: Direction, anim_fram
     };
 
     (base_x + adjusted_state_x, base_y + state_y)
+}
+
+// ============================================================================
+// Hair Offset System (gender-aware)
+// ============================================================================
+
+/// Hair sprite dimensions
+pub const HAIR_SPRITE_WIDTH: f32 = 28.0;
+pub const HAIR_SPRITE_HEIGHT: f32 = 54.0;
+
+/// Get the pixel offset for hair positioning relative to the player sprite
+///
+/// Hair is positioned at the top of the player sprite. These offsets adjust the hair
+/// to align properly with the player's head in each animation frame.
+/// Gender-specific offsets allow for different head shapes/positions.
+pub fn get_hair_offset(state: AnimationState, direction: Direction, anim_frame: u32, gender: Gender, flip_h: bool) -> (f32, f32) {
+    let is_back = is_up_or_left_direction(direction);
+    let is_attack_frame_2 = state == AnimationState::Attacking && (anim_frame % 2) == 1;
+    let is_shooting_bow = state == AnimationState::ShootingBow;
+    let is_sitting_chair = state == AnimationState::SittingChair;
+
+    // Base y offset for sitting
+    let sit_offset_y = if is_sitting_chair { 7.0 } else { 0.0 };
+
+    let (base_x, base_y) = if is_attack_frame_2 {
+        let y_offset = if is_back { -2.0 } else { 2.0 };
+        let x_offset = if is_back {
+            if flip_h { 5.0 } else { -5.0 }
+        } else {
+            if flip_h { 6.0 } else { -6.0 }
+        };
+        (x_offset, y_offset)
+    } else if is_shooting_bow {
+        let x_offset = if is_back {
+            if flip_h { 1.0 } else { -1.0 }
+        } else {
+            if flip_h { 2.0 } else { -2.0 }
+        };
+        (x_offset, -3.0)
+    } else {
+        let x_offset = if is_back {
+            if flip_h { 2.0 } else { -2.0 }
+        } else {
+            if flip_h { 1.0 } else { -1.0 }
+        };
+        (x_offset, -3.0)
+    };
+
+    // Apply gender-specific adjustments
+    let gender_adjust_x = match gender {
+        Gender::Male => 0.0,
+        Gender::Female => {
+            // Female hair needs adjustment for left and up directions
+            match direction {
+                Direction::Left => 3.0,  // Move 3px to the right
+                Direction::Up => -3.0,   // Mirror: move 3px to the left (since sprite is flipped)
+                _ => 0.0,
+            }
+        }
+    };
+
+    (base_x + gender_adjust_x, base_y + sit_offset_y)
 }
