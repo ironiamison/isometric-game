@@ -684,6 +684,17 @@ async fn create_character(
             }),
         );
     }
+    // Only allow alphanumeric characters and spaces
+    if !name.chars().all(|c| c.is_alphanumeric() || c == ' ') {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(CreateCharacterResponse {
+                success: false,
+                character: None,
+                error: Some("Character name can only contain letters, numbers, and spaces".to_string()),
+            }),
+        );
+    }
 
     // Check character limit
     match state.db.count_characters_for_account(account_id).await {

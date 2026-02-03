@@ -14,8 +14,6 @@ const SPRITE_WIDTH: f32 = 34.0;
 const SPRITE_HEIGHT: f32 = 78.0;
 
 // Equipment sprite constants (matching renderer)
-const HEAD_SPRITE_WIDTH: f32 = 30.0;
-const HEAD_SPRITE_HEIGHT: f32 = 34.0;
 const BODY_ARMOR_SPRITE_WIDTH: f32 = 34.0;
 const BODY_ARMOR_SPRITE_HEIGHT: f32 = 77.0;
 const BOOT_SPRITE_WIDTH: f32 = 34.0;
@@ -92,8 +90,8 @@ fn point_in_rect(px: f32, py: f32, rx: f32, ry: f32, rw: f32, rh: f32) -> bool {
 const HAIR_SPRITE_WIDTH: f32 = 28.0;
 const HAIR_SPRITE_HEIGHT: f32 = 54.0;
 
-/// Draw a character preview sprite at the given position
-/// Uses the idle frame (row 0, column 0) facing down
+/// Draw a character preview sprite at the given position.
+/// Renders at native pixel size (no scaling) for crisp pixel art.
 fn draw_character_preview(
     sprites: &HashMap<String, Texture2D>,
     hair_sprites: &HashMap<i32, Texture2D>,
@@ -102,34 +100,27 @@ fn draw_character_preview(
     skin: &str,
     hair_style: Option<i32>,
     hair_color: i32,
-    equipped_head: Option<&str>,
     equipped_body: Option<&str>,
     equipped_back: Option<&str>,
     equipped_feet: Option<&str>,
     x: f32,
     y: f32,
-    scale: f32,
 ) {
     let key = format!("{}_{}", gender, skin);
     if let Some(texture) = sprites.get(&key) {
-        let dest_w = SPRITE_WIDTH * scale;
-        let dest_h = SPRITE_HEIGHT * scale;
-
-        // 1. Draw back items behind player (quiver/cape - frame 1 for "down" direction, render_behind=true)
+        // 1. Draw back items behind player (quiver/cape - frame 1 for "down" direction)
         if let Some(back_id) = equipped_back {
             if let Some(equip_sprite) = equipment_sprites.get(back_id) {
                 let is_offhand = equip_sprite.width() > equip_sprite.height() * 8.0;
                 if !is_offhand {
-                    // Static back item (quiver) - frame 1 for down direction, flip_h=true
                     let back_src_x = 1.0 * BACK_STATIC_SPRITE_WIDTH;
                     draw_texture_ex(
                         equip_sprite,
-                        x + 0.0 * scale,
-                        y + (-15.0) * scale,
+                        x,
+                        y - 15.0,
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(back_src_x, 0.0, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
-                            dest_size: Some(Vec2::new(BACK_STATIC_SPRITE_WIDTH * scale, BACK_STATIC_SPRITE_HEIGHT * scale)),
                             flip_x: true,
                             ..Default::default()
                         },
@@ -138,7 +129,7 @@ fn draw_character_preview(
             }
         }
 
-        // 2. Draw base character sprite
+        // 2. Draw base character sprite (idle frame 0,0)
         draw_texture_ex(
             texture,
             x,
@@ -146,7 +137,6 @@ fn draw_character_preview(
             WHITE,
             DrawTextureParams {
                 source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
-                dest_size: Some(Vec2::new(dest_w, dest_h)),
                 ..Default::default()
             },
         );
@@ -156,12 +146,9 @@ fn draw_character_preview(
             if let Some(hair_tex) = hair_sprites.get(&style) {
                 let hair_frame_index = hair_color * 2; // front frame
                 let hair_src_x = hair_frame_index as f32 * HAIR_SPRITE_WIDTH;
-                let hair_dest_w = HAIR_SPRITE_WIDTH * scale;
-                let hair_dest_h = HAIR_SPRITE_HEIGHT * scale;
-                let hair_offset_x = -1.0 * scale;
-                let hair_offset_y = -3.0 * scale;
-                let hair_x = x + (dest_w - hair_dest_w) / 2.0 + hair_offset_x;
-                let hair_y = y + hair_offset_y;
+                // Center hair on player: (34 - 28) / 2 = 3, then offset -1
+                let hair_x = x + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 - 1.0;
+                let hair_y = y - 3.0;
 
                 draw_texture_ex(
                     hair_tex,
@@ -170,32 +157,13 @@ fn draw_character_preview(
                     WHITE,
                     DrawTextureParams {
                         source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
-                        dest_size: Some(Vec2::new(hair_dest_w, hair_dest_h)),
                         ..Default::default()
                     },
                 );
             }
         }
 
-        // 4. Draw head equipment (frame 0 for down direction)
-        if let Some(head_id) = equipped_head {
-            if let Some(equip_sprite) = equipment_sprites.get(head_id) {
-                let head_src_x = 0.0; // frame 0 for front/down
-                draw_texture_ex(
-                    equip_sprite,
-                    x + 2.0 * scale,
-                    y + (-7.0) * scale,
-                    WHITE,
-                    DrawTextureParams {
-                        source: Some(Rect::new(head_src_x, 0.0, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
-                        dest_size: Some(Vec2::new(HEAD_SPRITE_WIDTH * scale, HEAD_SPRITE_HEIGHT * scale)),
-                        ..Default::default()
-                    },
-                );
-            }
-        }
-
-        // 5. Draw body armor (frame 0 for idle/down)
+        // 4. Draw body armor (frame 0 for idle/down)
         if let Some(body_id) = equipped_body {
             if let Some(equip_sprite) = equipment_sprites.get(body_id) {
                 let is_single_row = equip_sprite.width() > equip_sprite.height() * 2.0;
@@ -207,7 +175,6 @@ fn draw_character_preview(
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(0.0, 0.0, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
-                            dest_size: Some(Vec2::new(BODY_ARMOR_SPRITE_WIDTH * scale, BODY_ARMOR_SPRITE_HEIGHT * scale)),
                             ..Default::default()
                         },
                     );
@@ -220,7 +187,6 @@ fn draw_character_preview(
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
-                            dest_size: Some(Vec2::new(dest_w, dest_h)),
                             ..Default::default()
                         },
                     );
@@ -236,16 +202,14 @@ fn draw_character_preview(
                     draw_texture_ex(
                         equip_sprite,
                         x,
-                        y + 46.0 * scale,
+                        y + 46.0,
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(0.0, 0.0, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
-                            dest_size: Some(Vec2::new(BOOT_SPRITE_WIDTH * scale, BOOT_SPRITE_HEIGHT * scale)),
                             ..Default::default()
                         },
                     );
                 } else {
-                    // Old grid-style format
                     draw_texture_ex(
                         equip_sprite,
                         x,
@@ -253,7 +217,6 @@ fn draw_character_preview(
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
-                            dest_size: Some(Vec2::new(dest_w, dest_h)),
                             ..Default::default()
                         },
                     );
@@ -268,12 +231,11 @@ fn draw_character_preview(
                 if is_offhand {
                     draw_texture_ex(
                         equip_sprite,
-                        x + (-2.0) * scale,
-                        y + 20.0 * scale,
+                        x - 2.0,
+                        y + 20.0,
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(0.0, 0.0, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT)),
-                            dest_size: Some(Vec2::new(OFFHAND_SPRITE_WIDTH * scale, OFFHAND_SPRITE_HEIGHT * scale)),
                             ..Default::default()
                         },
                     );
@@ -281,9 +243,7 @@ fn draw_character_preview(
             }
         }
     } else {
-        let dest_w = SPRITE_WIDTH * scale;
-        let dest_h = SPRITE_HEIGHT * scale;
-        draw_rectangle(x, y, dest_w, dest_h, Color::from_rgba(100, 100, 100, 255));
+        draw_rectangle(x, y, SPRITE_WIDTH, SPRITE_HEIGHT, Color::from_rgba(100, 100, 100, 255));
     }
 }
 
@@ -1433,10 +1393,8 @@ impl Screen for CharacterSelectScreen {
                     draw_rectangle_lines(list_x, y, list_w, item_height - 5.0, 1.0, GRAY);
                 }
 
-                // Character preview sprite (scale to fit in the row)
-                let preview_scale = 1.0;
-                let preview_h = SPRITE_HEIGHT * preview_scale;
-                let preview_y = y + (item_height - 5.0 - preview_h) / 2.0;
+                // Character preview sprite
+                let preview_y = y + (item_height - 5.0 - SPRITE_HEIGHT) / 2.0;
                 draw_character_preview(
                     &self.player_sprites,
                     &self.hair_sprites,
@@ -1445,13 +1403,11 @@ impl Screen for CharacterSelectScreen {
                     &character.skin,
                     character.hair_style,
                     character.hair_color.unwrap_or(0),
-                    character.equipped_head.as_deref(),
                     character.equipped_body.as_deref(),
                     character.equipped_back.as_deref(),
                     character.equipped_feet.as_deref(),
                     list_x + 10.0,
                     preview_y,
-                    preview_scale,
                 );
 
                 // Character info (shifted right to make room for preview)
@@ -2151,12 +2107,9 @@ impl Screen for CharacterCreateScreen {
         draw_line(frame_x, frame_y + frame_h - accent_size, frame_x + accent_size, frame_y + frame_h, 2.0, accent_color);
         draw_line(frame_x + frame_w - accent_size, frame_y + frame_h, frame_x + frame_w, frame_y + frame_h - accent_size, 2.0, accent_color);
 
-        // Draw character sprite preview (scaled up for visibility)
-        let preview_scale = 1.5;
-        let sprite_w = SPRITE_WIDTH * preview_scale;
-        let sprite_h = SPRITE_HEIGHT * preview_scale;
-        let sprite_x = content_x + (preview_w - sprite_w) / 2.0;
-        let sprite_y = fixed_y + (preview_h - sprite_h) / 2.0 - 10.0;
+        // Draw character sprite preview (native pixel size)
+        let sprite_x = content_x + (preview_w - SPRITE_WIDTH) / 2.0;
+        let sprite_y = fixed_y + (preview_h - SPRITE_HEIGHT) / 2.0 - 10.0;
         draw_character_preview(
             &self.player_sprites,
             &self.hair_sprites,
@@ -2168,10 +2121,8 @@ impl Screen for CharacterCreateScreen {
             None,
             None,
             None,
-            None,
             sprite_x,
             sprite_y,
-            preview_scale,
         );
 
         // Preview label below character
