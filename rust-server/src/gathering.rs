@@ -3,6 +3,7 @@ use std::path::Path;
 use rand::Rng;
 use serde::Deserialize;
 use tracing::info;
+use crate::chunk::CHUNK_SIZE;
 
 // ---------------------------------------------------------------------------
 // TOML deserialization structures
@@ -408,10 +409,17 @@ impl GatheringSystem {
                 .insert(zone_id.clone(), current_time);
 
             // Pick a random marker in this zone to spawn a bonus tile near
+            // Only spawn bonus tiles in chunk 0,0 of the overworld
             let zone_markers: Vec<&GatheringMarker> = self
                 .markers
                 .iter()
-                .filter(|m| m.zone_id == *zone_id)
+                .filter(|m| {
+                    m.zone_id == *zone_id
+                        && m.x >= 0
+                        && m.x < CHUNK_SIZE as i32
+                        && m.y >= 0
+                        && m.y < CHUNK_SIZE as i32
+                })
                 .collect();
 
             if zone_markers.is_empty() {

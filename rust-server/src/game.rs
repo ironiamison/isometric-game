@@ -5405,15 +5405,16 @@ impl GameRoom {
                 reason: "inventory_full".to_string(),
             }).await;
         }
+        // Bonus tiles only appear in chunk 0,0 of the overworld (not in instances)
         for event in bonus_events {
             match event {
                 crate::gathering::BonusTileEvent::Spawned { x, y, zone_id } => {
-                    self.broadcast(ServerMessage::BonusTileSpawned {
+                    self.broadcast_overworld(ServerMessage::BonusTileSpawned {
                         x, y, zone_id, telegraph_duration: 5000,
-                    }).await;
+                    }, None).await;
                 }
                 crate::gathering::BonusTileEvent::Expired { x, y } => {
-                    self.broadcast(ServerMessage::BonusTileExpired { x, y }).await;
+                    self.broadcast_overworld(ServerMessage::BonusTileExpired { x, y }, None).await;
                 }
             }
         }
