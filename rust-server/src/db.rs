@@ -293,10 +293,6 @@ impl Database {
         .await?;
 
         // Farming patches table - per-player instanced patch state
-        // Drop old schema if it exists (migrated from single-player to per-player)
-        sqlx::query("DROP TABLE IF EXISTS farming_patches")
-            .execute(pool)
-            .await?;
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS farming_patches (
