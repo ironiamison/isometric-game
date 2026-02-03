@@ -1412,8 +1412,9 @@ impl Screen for CharacterSelectScreen {
                     draw_rectangle_lines(list_x, y, list_w, item_height - 5.0, 1.0, GRAY);
                 }
 
-                // Character preview sprite
-                let preview_y = y + (item_height - 5.0 - SPRITE_HEIGHT) / 2.0;
+                // Character preview sprite (floor to avoid subpixel stretching)
+                let preview_x = (list_x + 10.0).floor();
+                let preview_y = (y + (item_height - 5.0 - SPRITE_HEIGHT) / 2.0).floor();
                 draw_character_preview(
                     &self.player_sprites,
                     &self.hair_sprites,
@@ -1425,7 +1426,7 @@ impl Screen for CharacterSelectScreen {
                     character.equipped_body.as_deref(),
                     character.equipped_back.as_deref(),
                     character.equipped_feet.as_deref(),
-                    list_x + 10.0,
+                    preview_x,
                     preview_y,
                 );
 
@@ -2126,9 +2127,9 @@ impl Screen for CharacterCreateScreen {
         draw_line(frame_x, frame_y + frame_h - accent_size, frame_x + accent_size, frame_y + frame_h, 2.0, accent_color);
         draw_line(frame_x + frame_w - accent_size, frame_y + frame_h, frame_x + frame_w, frame_y + frame_h - accent_size, 2.0, accent_color);
 
-        // Draw character sprite preview (native pixel size)
-        let sprite_x = content_x + (preview_w - SPRITE_WIDTH) / 2.0;
-        let sprite_y = fixed_y + (preview_h - SPRITE_HEIGHT) / 2.0 - 10.0;
+        // Draw character sprite preview (native pixel size, floor to avoid subpixel stretching)
+        let sprite_x = (content_x + (preview_w - SPRITE_WIDTH) / 2.0).floor();
+        let sprite_y = (fixed_y + (preview_h - SPRITE_HEIGHT) / 2.0 - 10.0).floor();
         draw_character_preview(
             &self.player_sprites,
             &self.hair_sprites,
