@@ -553,6 +553,11 @@ pub struct SocialState {
     pub list_scroll_offset: f32,
     /// Scroll offset for friends list
     pub friends_scroll_offset: f32,
+    /// Touch scroll tracking
+    pub touch_scroll_id: Option<u64>,
+    pub touch_last_y: f32,
+    pub touch_start_y: f32,
+    pub touch_dragged: bool,
 }
 
 pub struct UiState {

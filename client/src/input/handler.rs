@@ -778,6 +778,10 @@ impl InputHandler {
                         #[cfg(target_os = "android")]
                         macroquad::miniquad::window::show_keyboard(false);
                     }
+                    // Social panel scroll area - handle touch scrolling
+                    UiElementId::SocialScrollArea => {
+                        // Touch scroll handled below, just suppress click
+                    }
                     // Social panel handlers
                     UiElementId::SocialTabNearby => {
                         audio.play_sfx("enter");
@@ -1724,6 +1728,76 @@ impl InputHandler {
 
             // Don't process other input while crafting is open
             return commands;
+        }
+
+        // Handle social panel touch scrolling
+        if state.ui_state.social_open {
+            let all_touches: Vec<Touch> = touches();
+
+            // Handle ongoing touch drag
+            if let Some(tracking_id) = state.social_state.touch_scroll_id {
+                if let Some(touch) = all_touches.iter().find(|t| t.id == tracking_id) {
+                    match touch.phase {
+                        TouchPhase::Moved | TouchPhase::Stationary => {
+                            let (_, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
+                            let dy = state.social_state.touch_last_y - vy;
+                            if !state.social_state.touch_dragged {
+                                let total_dy = (state.social_state.touch_start_y - vy).abs();
+                                if total_dy > 8.0 {
+                                    state.social_state.touch_dragged = true;
+                                }
+                            }
+                            if state.social_state.touch_dragged {
+                                // Update scroll offset based on active tab
+                                match state.social_state.active_tab {
+                                    crate::game::SocialTab::Nearby | crate::game::SocialTab::Online => {
+                                        state.social_state.list_scroll_offset = (state.social_state.list_scroll_offset + dy).max(0.0);
+                                    }
+                                    crate::game::SocialTab::Friends => {
+                                        state.social_state.friends_scroll_offset = (state.social_state.friends_scroll_offset + dy).max(0.0);
+                                    }
+                                }
+                            }
+                            state.social_state.touch_last_y = vy;
+                        }
+                        TouchPhase::Ended | TouchPhase::Cancelled => {
+                            state.social_state.touch_scroll_id = None;
+                        }
+                        _ => {}
+                    }
+                } else {
+                    state.social_state.touch_scroll_id = None;
+                }
+            } else {
+                // Start new touch drag on scroll area
+                for touch in &all_touches {
+                    if touch.phase == TouchPhase::Started {
+                        let (vx, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
+                        let hit = layout.hit_test(vx, vy);
+                        if matches!(hit, Some(UiElementId::SocialScrollArea) | Some(UiElementId::SocialPlayerRow(_)) | Some(UiElementId::SocialFriendRow(_))) {
+                            state.social_state.touch_scroll_id = Some(touch.id);
+                            state.social_state.touch_last_y = vy;
+                            state.social_state.touch_start_y = vy;
+                            state.social_state.touch_dragged = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Handle mouse wheel scrolling
+            let (_, wheel_y) = mouse_wheel();
+            if wheel_y.abs() > 0.1 {
+                let scroll_speed = 30.0;
+                match state.social_state.active_tab {
+                    crate::game::SocialTab::Nearby | crate::game::SocialTab::Online => {
+                        state.social_state.list_scroll_offset = (state.social_state.list_scroll_offset - wheel_y * scroll_speed).max(0.0);
+                    }
+                    crate::game::SocialTab::Friends => {
+                        state.social_state.friends_scroll_offset = (state.social_state.friends_scroll_offset - wheel_y * scroll_speed).max(0.0);
+                    }
+                }
+            }
         }
 
         // Handle add friend input when focused

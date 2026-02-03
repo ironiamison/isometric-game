@@ -164,24 +164,42 @@ impl Renderer {
             return;
         }
 
-        let mut row_y = y;
-        for (i, player) in nearby.iter().enumerate() {
-            if row_y + row_height > y + height {
+        // Add scroll area for touch detection
+        let scroll_area = Rect::new(x, y, width, height);
+        layout.add(UiElementId::SocialScrollArea, scroll_area);
+
+        // Calculate scroll bounds
+        let total_content_height = nearby.len() as f32 * row_height;
+        let max_scroll = (total_content_height - height).max(0.0);
+        let scroll_offset = state.social_state.list_scroll_offset.clamp(0.0, max_scroll);
+
+        // Calculate visible range
+        let first_visible = (scroll_offset / row_height).floor() as usize;
+        let visible_count = (height / row_height).ceil() as usize + 1;
+        let last_visible = (first_visible + visible_count).min(nearby.len());
+
+        let mut row_y = y - (scroll_offset % row_height);
+        for i in first_visible..last_visible {
+            if row_y + row_height < y {
+                row_y += row_height;
+                continue;
+            }
+            if row_y > y + height {
                 break;
             }
 
-            let bounds = Rect::new(x + padding, row_y, width - padding * 2.0, row_height);
-            layout.add(UiElementId::SocialPlayerRow(i), bounds);
+            let player = &nearby[i];
+
+            // Only add clickable bounds if row is fully visible
+            if row_y >= y && row_y + row_height <= y + height {
+                let bounds = Rect::new(x + padding, row_y, width - padding * 2.0, row_height);
+                layout.add(UiElementId::SocialPlayerRow(i), bounds);
+            }
 
             let is_hovered = matches!(hovered, Some(UiElementId::SocialPlayerRow(idx)) if *idx == i);
             let bg_color = if is_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
 
             draw_rectangle(x + padding, row_y, width - padding * 2.0, row_height - 2.0, bg_color);
-
-            // Player icon (simple circle)
-            let icon_x = x + padding + 8.0;
-            let icon_y = row_y + row_height / 2.0;
-            draw_circle(icon_x, icon_y, 6.0 * scale, TEXT_DIM);
 
             // Check if this player is a friend
             let player_char_id = player.id.strip_prefix("char_")
@@ -190,17 +208,32 @@ impl Renderer {
                 .map(|id| state.social_state.friends.iter().any(|f| f.id == id))
                 .unwrap_or(false);
 
-            // Player name
-            let name_x = icon_x + 14.0 * scale;
+            // Player name (no icon for nearby - they're all here)
+            let name_x = x + padding + 8.0;
             self.draw_text_sharp(&player.name, name_x, row_y + (row_height + 10.0) / 2.0, SOCIAL_FONT_SIZE, TEXT_NORMAL);
 
-            // Friend indicator
+            // Friend indicator (heart on the right)
             if is_friend {
                 let heart_x = x + width - padding - 16.0;
                 self.draw_text_sharp("♥", heart_x, row_y + (row_height + 10.0) / 2.0, SOCIAL_FONT_SIZE, FRIEND_ICON_COLOR);
             }
 
             row_y += row_height;
+        }
+
+        // Draw scrollbar if needed
+        if max_scroll > 0.0 {
+            let scrollbar_width = 4.0 * scale;
+            let scrollbar_x = x + width - scrollbar_width - 2.0;
+            let scrollbar_height = height;
+            let thumb_size = (height / total_content_height).min(1.0);
+            let thumb_height = scrollbar_height * thumb_size;
+            let thumb_y = y + (scrollbar_height - thumb_height) * (scroll_offset / max_scroll);
+
+            // Track
+            draw_rectangle(scrollbar_x, y, scrollbar_width, scrollbar_height, Color::new(0.1, 0.1, 0.12, 0.5));
+            // Thumb
+            draw_rectangle(scrollbar_x, thumb_y, scrollbar_width, thumb_height, Color::new(0.4, 0.4, 0.45, 0.8));
         }
     }
 
@@ -223,14 +256,39 @@ impl Renderer {
             return;
         }
 
-        let mut row_y = y;
-        for (i, player) in state.social_state.online_players.iter().enumerate() {
-            if row_y + row_height > y + height {
+        // Add scroll area for touch detection
+        let scroll_area = Rect::new(x, y, width, height);
+        layout.add(UiElementId::SocialScrollArea, scroll_area);
+
+        let total_items = state.social_state.online_players.len();
+
+        // Calculate scroll bounds
+        let total_content_height = total_items as f32 * row_height;
+        let max_scroll = (total_content_height - height).max(0.0);
+        let scroll_offset = state.social_state.list_scroll_offset.clamp(0.0, max_scroll);
+
+        // Calculate visible range
+        let first_visible = (scroll_offset / row_height).floor() as usize;
+        let visible_count = (height / row_height).ceil() as usize + 1;
+        let last_visible = (first_visible + visible_count).min(total_items);
+
+        let mut row_y = y - (scroll_offset % row_height);
+        for i in first_visible..last_visible {
+            if row_y + row_height < y {
+                row_y += row_height;
+                continue;
+            }
+            if row_y > y + height {
                 break;
             }
 
-            let bounds = Rect::new(x + padding, row_y, width - padding * 2.0, row_height);
-            layout.add(UiElementId::SocialPlayerRow(i), bounds);
+            let player = &state.social_state.online_players[i];
+
+            // Only add clickable bounds if row is fully visible
+            if row_y >= y && row_y + row_height <= y + height {
+                let bounds = Rect::new(x + padding, row_y, width - padding * 2.0, row_height);
+                layout.add(UiElementId::SocialPlayerRow(i), bounds);
+            }
 
             let is_hovered = matches!(hovered, Some(UiElementId::SocialPlayerRow(idx)) if *idx == i);
             let bg_color = if is_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
@@ -253,6 +311,21 @@ impl Renderer {
             }
 
             row_y += row_height;
+        }
+
+        // Draw scrollbar if needed
+        if max_scroll > 0.0 {
+            let scrollbar_width = 4.0 * scale;
+            let scrollbar_x = x + width - scrollbar_width - 2.0;
+            let scrollbar_height = height;
+            let thumb_size = (height / total_content_height).min(1.0);
+            let thumb_height = scrollbar_height * thumb_size;
+            let thumb_y = y + (scrollbar_height - thumb_height) * (scroll_offset / max_scroll);
+
+            // Track
+            draw_rectangle(scrollbar_x, y, scrollbar_width, scrollbar_height, Color::new(0.1, 0.1, 0.12, 0.5));
+            // Thumb
+            draw_rectangle(scrollbar_x, thumb_y, scrollbar_width, thumb_height, Color::new(0.4, 0.4, 0.45, 0.8));
         }
     }
 
@@ -314,10 +387,10 @@ impl Renderer {
                 let decline_bg = if decline_hovered { Color::new(0.9, 0.25, 0.25, 1.0) } else { Color::new(0.5, 0.18, 0.18, 1.0) };
                 draw_rectangle(decline_bounds.x, decline_bounds.y, decline_bounds.w, decline_bounds.h, decline_bg);
                 // Center the X
-                let x_dims = self.measure_text_sharp("✕", SOCIAL_FONT_SIZE);
+                let x_dims = self.measure_text_sharp("X", SOCIAL_FONT_SIZE);
                 let x_icon_x = decline_x + (btn_size - x_dims.width) / 2.0;
                 let x_icon_y = btn_y + (btn_size + x_dims.height) / 2.0;
-                self.draw_text_sharp("✕", x_icon_x, x_icon_y, SOCIAL_FONT_SIZE, WHITE);
+                self.draw_text_sharp("X", x_icon_x, x_icon_y, SOCIAL_FONT_SIZE, WHITE);
 
                 current_y += row_height;
             }
@@ -333,45 +406,89 @@ impl Renderer {
         self.draw_text_sharp(&friends_label, x + padding, current_y + 14.0, SOCIAL_FONT_SIZE, TEXT_TITLE);
         current_y += 20.0;
 
-        // Friends list
+        // Friends list (scrollable)
         if state.social_state.friends.is_empty() {
             self.draw_text_sharp("No friends yet", x + padding, current_y + 14.0, SOCIAL_FONT_SIZE, TEXT_DIM);
         } else {
-            for (i, friend) in state.social_state.friends.iter().enumerate() {
-                if current_y + row_height > y + height - input_height - padding * 2.0 {
+            // Available height for friends list
+            let friends_area_height = y + height - input_height - padding * 2.0 - current_y;
+
+            // Add scroll area for touch detection
+            let scroll_area = Rect::new(x, current_y, width, friends_area_height);
+            layout.add(UiElementId::SocialScrollArea, scroll_area);
+
+            let total_items = state.social_state.friends.len();
+            let total_content_height = total_items as f32 * row_height;
+            let max_scroll = (total_content_height - friends_area_height).max(0.0);
+            let scroll_offset = state.social_state.friends_scroll_offset.clamp(0.0, max_scroll);
+
+            // Calculate visible range
+            let first_visible = (scroll_offset / row_height).floor() as usize;
+            let visible_count = (friends_area_height / row_height).ceil() as usize + 1;
+            let last_visible = (first_visible + visible_count).min(total_items);
+
+            let list_start_y = current_y;
+            let mut row_y = current_y - (scroll_offset % row_height);
+
+            for i in first_visible..last_visible {
+                if row_y + row_height < list_start_y {
+                    row_y += row_height;
+                    continue;
+                }
+                if row_y > list_start_y + friends_area_height {
                     break;
                 }
 
-                let bounds = Rect::new(x + padding, current_y, width - padding * 2.0, row_height);
-                layout.add(UiElementId::SocialFriendRow(i), bounds);
+                let friend = &state.social_state.friends[i];
+
+                // Only add clickable bounds if row is fully visible
+                if row_y >= list_start_y && row_y + row_height <= list_start_y + friends_area_height {
+                    let bounds = Rect::new(x + padding, row_y, width - padding * 2.0, row_height);
+                    layout.add(UiElementId::SocialFriendRow(i), bounds);
+                }
 
                 let is_hovered = matches!(hovered, Some(UiElementId::SocialFriendRow(idx)) if *idx == i);
                 let bg_color = if is_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
 
-                draw_rectangle(x + padding, current_y, width - padding * 2.0, row_height - 2.0, bg_color);
+                draw_rectangle(x + padding, row_y, width - padding * 2.0, row_height - 2.0, bg_color);
 
                 // Online status dot
                 let dot_x = x + padding + 8.0;
-                let dot_y = current_y + row_height / 2.0;
+                let dot_y = row_y + row_height / 2.0;
                 let dot_color = if friend.online { STATUS_ONLINE } else { STATUS_OFFLINE };
                 draw_circle(dot_x, dot_y, 4.0 * scale, dot_color);
 
                 // Friend name
                 let name_x = dot_x + 12.0 * scale;
                 let name_color = if friend.online { TEXT_NORMAL } else { TEXT_DIM };
-                self.draw_text_sharp(&friend.name, name_x, current_y + (row_height + 10.0) / 2.0, SOCIAL_FONT_SIZE, name_color);
+                self.draw_text_sharp(&friend.name, name_x, row_y + (row_height + 10.0) / 2.0, SOCIAL_FONT_SIZE, name_color);
 
                 // Remove button (X) - show on hover
-                if is_hovered {
+                if is_hovered && row_y >= list_start_y && row_y + row_height <= list_start_y + friends_area_height {
                     let remove_x = x + width - padding - 20.0;
-                    let remove_bounds = Rect::new(remove_x, current_y + 4.0, 18.0 * scale, 18.0 * scale);
+                    let remove_bounds = Rect::new(remove_x, row_y + 4.0, 18.0 * scale, 18.0 * scale);
                     layout.add(UiElementId::SocialRemoveFriend(i), remove_bounds);
                     let remove_hovered = matches!(hovered, Some(UiElementId::SocialRemoveFriend(idx)) if *idx == i);
                     let remove_color = if remove_hovered { Color::new(0.8, 0.2, 0.2, 1.0) } else { TEXT_DIM };
-                    self.draw_text_sharp("✗", remove_x + 3.0, current_y + (row_height + 10.0) / 2.0, SOCIAL_FONT_SIZE, remove_color);
+                    self.draw_text_sharp("X", remove_x + 3.0, row_y + (row_height + 10.0) / 2.0, SOCIAL_FONT_SIZE, remove_color);
                 }
 
-                current_y += row_height;
+                row_y += row_height;
+            }
+
+            // Draw scrollbar if needed
+            if max_scroll > 0.0 {
+                let scrollbar_width = 4.0 * scale;
+                let scrollbar_x = x + width - scrollbar_width - 2.0;
+                let scrollbar_height = friends_area_height;
+                let thumb_size = (friends_area_height / total_content_height).min(1.0);
+                let thumb_height = scrollbar_height * thumb_size;
+                let thumb_y = list_start_y + (scrollbar_height - thumb_height) * (scroll_offset / max_scroll);
+
+                // Track
+                draw_rectangle(scrollbar_x, list_start_y, scrollbar_width, scrollbar_height, Color::new(0.1, 0.1, 0.12, 0.5));
+                // Thumb
+                draw_rectangle(scrollbar_x, thumb_y, scrollbar_width, thumb_height, Color::new(0.4, 0.4, 0.45, 0.8));
             }
         }
 
@@ -434,19 +551,22 @@ impl Renderer {
         }
 
         // Draw red notification dot in top-right corner of button
-        let badge_x = button_x + MENU_BUTTON_SIZE * scale - 6.0 * scale;
-        let badge_y = button_y + 6.0 * scale;
-        let badge_radius = 6.0 * scale;
+        let badge_radius = 10.0 * scale;
+        let badge_x = button_x + MENU_BUTTON_SIZE * scale - badge_radius + 2.0;
+        let badge_y = button_y + badge_radius - 2.0;
 
-        // Badge background
-        draw_circle(badge_x, badge_y, badge_radius, Color::new(0.8, 0.15, 0.15, 1.0));
-        draw_circle(badge_x, badge_y, badge_radius - 1.0, Color::new(0.95, 0.2, 0.2, 1.0));
+        // Badge background (darker outer, brighter inner)
+        draw_circle(badge_x, badge_y, badge_radius, Color::new(0.6, 0.1, 0.1, 1.0));
+        draw_circle(badge_x, badge_y, badge_radius - 1.5, Color::new(0.9, 0.15, 0.15, 1.0));
 
-        // Badge number (only if small enough)
+        // Badge number with 16pt font, centered
         if pending_count <= 9 {
             let count_text = pending_count.to_string();
-            let text_dims = self.measure_text_sharp(&count_text, 10.0);
-            self.draw_text_sharp(&count_text, badge_x - text_dims.width / 2.0, badge_y + 4.0, 10.0, WHITE);
+            let text_dims = self.measure_text_sharp(&count_text, 16.0);
+            // Center text both horizontally and vertically in the badge
+            let text_x = badge_x - text_dims.width / 2.0;
+            let text_y = badge_y + 6.0; // Adjust for baseline
+            self.draw_text_sharp(&count_text, text_x, text_y, 16.0, WHITE);
         }
     }
 }
