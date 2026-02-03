@@ -79,6 +79,10 @@ pub struct Npc {
     pub speech_interval_max_ms: u64,
     /// Timestamp when this NPC should next speak
     pub next_speech_at: u64,
+    /// Best distance achieved toward current wander target (for stuck detection)
+    wander_best_distance: i32,
+    /// Number of move attempts without getting closer to wander target
+    wander_stuck_count: u8,
 }
 
 impl Npc {
@@ -137,6 +141,8 @@ impl Npc {
             speech_interval_min_ms: prototype.speech.as_ref().map(|s| s.interval_min_ms).unwrap_or(15000),
             speech_interval_max_ms: prototype.speech.as_ref().map(|s| s.interval_max_ms).unwrap_or(45000),
             next_speech_at: 0,
+            wander_best_distance: i32::MAX,
+            wander_stuck_count: 0,
             stats,
         }
     }
@@ -434,6 +440,8 @@ impl Npc {
                     // Only wander if target is different from current position
                     if target.0 != self.x || target.1 != self.y {
                         self.wander_target = Some(target);
+                        self.wander_best_distance = Self::grid_distance(self.x, self.y, target.0, target.1);
+                        self.wander_stuck_count = 0;
                         self.state = NpcState::Wandering;
                     } else {
                         // Pick another pause if we'd wander to same spot
@@ -468,9 +476,33 @@ impl Npc {
                         // Reached target, go idle with random pause
                         self.state = NpcState::Idle;
                         self.wander_target = None;
+                        self.wander_best_distance = i32::MAX;
+                        self.wander_stuck_count = 0;
                         self.set_random_idle_pause(current_time);
                     } else {
-                        self.try_move_toward(tx, ty, current_time, other_npc_positions, walkable_check);
+                        let moved = self.try_move_toward(tx, ty, current_time, other_npc_positions, walkable_check);
+
+                        if moved {
+                            // Check if we made progress toward target
+                            let current_dist = Self::grid_distance(self.x, self.y, tx, ty);
+                            if current_dist < self.wander_best_distance {
+                                // Making progress - reset stuck counter
+                                self.wander_best_distance = current_dist;
+                                self.wander_stuck_count = 0;
+                            } else {
+                                // Moved but didn't get closer (sidestep or backtrack)
+                                self.wander_stuck_count += 1;
+
+                                // If stuck for too many moves, abandon this target
+                                if self.wander_stuck_count >= 4 {
+                                    self.state = NpcState::Idle;
+                                    self.wander_target = None;
+                                    self.wander_best_distance = i32::MAX;
+                                    self.wander_stuck_count = 0;
+                                    self.set_random_idle_pause(current_time);
+                                }
+                            }
+                        }
                     }
                 } else {
                     // No target, go idle

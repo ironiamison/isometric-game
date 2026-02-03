@@ -4487,6 +4487,9 @@ impl GameRoom {
             }
         };
 
+        // Cancel any active gathering (fishing, etc.)
+        self.handle_stop_gathering(player_id).await;
+
         {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
@@ -5409,12 +5412,12 @@ impl GameRoom {
         for event in bonus_events {
             match event {
                 crate::gathering::BonusTileEvent::Spawned { x, y, zone_id } => {
-                    self.broadcast_overworld(ServerMessage::BonusTileSpawned {
+                    self.send_to_overworld_players(ServerMessage::BonusTileSpawned {
                         x, y, zone_id, telegraph_duration: 5000,
                     }, None).await;
                 }
                 crate::gathering::BonusTileEvent::Expired { x, y } => {
-                    self.broadcast_overworld(ServerMessage::BonusTileExpired { x, y }, None).await;
+                    self.send_to_overworld_players(ServerMessage::BonusTileExpired { x, y }, None).await;
                 }
             }
         }
