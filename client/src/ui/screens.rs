@@ -7,11 +7,23 @@ use crate::auth::{AuthClient, AuthSession, CharacterInfo};
 use crate::auth::AuthResult;
 use crate::audio::AudioManager;
 use crate::render::BitmapFont;
-use crate::util::{asset_path, virtual_screen_size};
+use crate::util::{asset_path, virtual_screen_size, SpriteManifest};
 
 // Sprite sheet constants for character preview
 const SPRITE_WIDTH: f32 = 34.0;
 const SPRITE_HEIGHT: f32 = 78.0;
+
+// Equipment sprite constants (matching renderer)
+const HEAD_SPRITE_WIDTH: f32 = 30.0;
+const HEAD_SPRITE_HEIGHT: f32 = 34.0;
+const BODY_ARMOR_SPRITE_WIDTH: f32 = 34.0;
+const BODY_ARMOR_SPRITE_HEIGHT: f32 = 77.0;
+const BOOT_SPRITE_WIDTH: f32 = 34.0;
+const BOOT_SPRITE_HEIGHT: f32 = 47.0;
+const BACK_STATIC_SPRITE_WIDTH: f32 = 50.0;
+const BACK_STATIC_SPRITE_HEIGHT: f32 = 63.0;
+const OFFHAND_SPRITE_WIDTH: f32 = 38.5;
+const OFFHAND_SPRITE_HEIGHT: f32 = 38.0;
 
 /// Convert screen coordinates to virtual coordinates (for Android scaling)
 fn screen_to_virtual(x: f32, y: f32) -> (f32, f32) {
@@ -85,52 +97,69 @@ const HAIR_SPRITE_HEIGHT: f32 = 54.0;
 fn draw_character_preview(
     sprites: &HashMap<String, Texture2D>,
     hair_sprites: &HashMap<i32, Texture2D>,
+    equipment_sprites: &HashMap<String, Texture2D>,
     gender: &str,
     skin: &str,
     hair_style: Option<i32>,
     hair_color: i32,
+    equipped_head: Option<&str>,
+    equipped_body: Option<&str>,
+    equipped_back: Option<&str>,
+    equipped_feet: Option<&str>,
     x: f32,
     y: f32,
     scale: f32,
 ) {
     let key = format!("{}_{}", gender, skin);
     if let Some(texture) = sprites.get(&key) {
-        // Idle frame is at row 0, column 0
-        let src_x = 0.0;
-        let src_y = 0.0;
-
         let dest_w = SPRITE_WIDTH * scale;
         let dest_h = SPRITE_HEIGHT * scale;
 
-        // Draw base character sprite
+        // 1. Draw back items behind player (quiver/cape - frame 1 for "down" direction, render_behind=true)
+        if let Some(back_id) = equipped_back {
+            if let Some(equip_sprite) = equipment_sprites.get(back_id) {
+                let is_offhand = equip_sprite.width() > equip_sprite.height() * 8.0;
+                if !is_offhand {
+                    // Static back item (quiver) - frame 1 for down direction, flip_h=true
+                    let back_src_x = 1.0 * BACK_STATIC_SPRITE_WIDTH;
+                    draw_texture_ex(
+                        equip_sprite,
+                        x + 0.0 * scale,
+                        y + (-15.0) * scale,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(back_src_x, 0.0, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
+                            dest_size: Some(Vec2::new(BACK_STATIC_SPRITE_WIDTH * scale, BACK_STATIC_SPRITE_HEIGHT * scale)),
+                            flip_x: true,
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+        }
+
+        // 2. Draw base character sprite
         draw_texture_ex(
             texture,
             x,
             y,
             WHITE,
             DrawTextureParams {
-                source: Some(Rect::new(src_x, src_y, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
                 dest_size: Some(Vec2::new(dest_w, dest_h)),
                 ..Default::default()
             },
         );
 
-        // Draw hair if selected
+        // 3. Draw hair
         if let Some(style) = hair_style {
             if let Some(hair_tex) = hair_sprites.get(&style) {
-                // Front frame for preview (facing down)
                 let hair_frame_index = hair_color * 2; // front frame
                 let hair_src_x = hair_frame_index as f32 * HAIR_SPRITE_WIDTH;
-
-                // Scale hair sprite
                 let hair_dest_w = HAIR_SPRITE_WIDTH * scale;
                 let hair_dest_h = HAIR_SPRITE_HEIGHT * scale;
-
-                // Hair offset: 3 pixels up, 1 pixel left (facing down, not flipped)
                 let hair_offset_x = -1.0 * scale;
                 let hair_offset_y = -3.0 * scale;
-
-                // Center hair horizontally on player, apply offsets
                 let hair_x = x + (dest_w - hair_dest_w) / 2.0 + hair_offset_x;
                 let hair_y = y + hair_offset_y;
 
@@ -147,8 +176,111 @@ fn draw_character_preview(
                 );
             }
         }
+
+        // 4. Draw head equipment (frame 0 for down direction)
+        if let Some(head_id) = equipped_head {
+            if let Some(equip_sprite) = equipment_sprites.get(head_id) {
+                let head_src_x = 0.0; // frame 0 for front/down
+                draw_texture_ex(
+                    equip_sprite,
+                    x + 2.0 * scale,
+                    y + (-7.0) * scale,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(head_src_x, 0.0, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
+                        dest_size: Some(Vec2::new(HEAD_SPRITE_WIDTH * scale, HEAD_SPRITE_HEIGHT * scale)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        // 5. Draw body armor (frame 0 for idle/down)
+        if let Some(body_id) = equipped_body {
+            if let Some(equip_sprite) = equipment_sprites.get(body_id) {
+                let is_single_row = equip_sprite.width() > equip_sprite.height() * 2.0;
+                if is_single_row {
+                    draw_texture_ex(
+                        equip_sprite,
+                        x,
+                        y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(0.0, 0.0, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
+                            dest_size: Some(Vec2::new(BODY_ARMOR_SPRITE_WIDTH * scale, BODY_ARMOR_SPRITE_HEIGHT * scale)),
+                            ..Default::default()
+                        },
+                    );
+                } else {
+                    // Old grid-style format - same layout as player sprite
+                    draw_texture_ex(
+                        equip_sprite,
+                        x,
+                        y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                            dest_size: Some(Vec2::new(dest_w, dest_h)),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+        }
+
+        // 6. Draw boots (frame 0 for idle/down)
+        if let Some(feet_id) = equipped_feet {
+            if let Some(equip_sprite) = equipment_sprites.get(feet_id) {
+                let is_single_row = equip_sprite.width() > equip_sprite.height();
+                if is_single_row {
+                    draw_texture_ex(
+                        equip_sprite,
+                        x,
+                        y + 46.0 * scale,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(0.0, 0.0, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
+                            dest_size: Some(Vec2::new(BOOT_SPRITE_WIDTH * scale, BOOT_SPRITE_HEIGHT * scale)),
+                            ..Default::default()
+                        },
+                    );
+                } else {
+                    // Old grid-style format
+                    draw_texture_ex(
+                        equip_sprite,
+                        x,
+                        y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                            dest_size: Some(Vec2::new(dest_w, dest_h)),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+        }
+
+        // 7. Draw back items in front of player (offhand/shield - frame 0 for idle/down)
+        if let Some(back_id) = equipped_back {
+            if let Some(equip_sprite) = equipment_sprites.get(back_id) {
+                let is_offhand = equip_sprite.width() > equip_sprite.height() * 8.0;
+                if is_offhand {
+                    draw_texture_ex(
+                        equip_sprite,
+                        x + (-2.0) * scale,
+                        y + 20.0 * scale,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(0.0, 0.0, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT)),
+                            dest_size: Some(Vec2::new(OFFHAND_SPRITE_WIDTH * scale, OFFHAND_SPRITE_HEIGHT * scale)),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+        }
     } else {
-        // Fallback: draw a colored rectangle if sprite not found
         let dest_w = SPRITE_WIDTH * scale;
         let dest_h = SPRITE_HEIGHT * scale;
         draw_rectangle(x, y, dest_w, dest_h, Color::from_rgba(100, 100, 100, 255));
@@ -826,6 +958,7 @@ pub struct CharacterSelectScreen {
     confirm_delete: bool,
     player_sprites: HashMap<String, Texture2D>,
     hair_sprites: HashMap<i32, Texture2D>,
+    equipment_sprites: HashMap<String, Texture2D>,
     // Scroll state for character list on small screens
     list_scroll_offset: f32,
     touch_scroll_id: Option<u64>,
@@ -856,6 +989,7 @@ impl CharacterSelectScreen {
             confirm_delete: false,
             player_sprites: HashMap::new(),
             hair_sprites: HashMap::new(),
+            equipment_sprites: HashMap::new(),
             list_scroll_offset: 0.0,
             touch_scroll_id: None,
             touch_scroll_last_y: 0.0,
@@ -876,6 +1010,43 @@ impl CharacterSelectScreen {
             if let Ok(tex) = load_texture(&path).await {
                 tex.set_filter(FilterMode::Nearest);
                 self.hair_sprites.insert(style, tex);
+            }
+        }
+        // Load equipment sprites for characters' equipped items
+        self.load_equipment_sprites().await;
+    }
+
+    async fn load_equipment_sprites(&mut self) {
+        // Collect all unique equipped item IDs from characters
+        let mut item_ids: Vec<String> = Vec::new();
+        for c in &self.characters {
+            for slot in [&c.equipped_head, &c.equipped_body, &c.equipped_weapon, &c.equipped_back, &c.equipped_feet] {
+                if let Some(id) = slot {
+                    if !item_ids.contains(id) && !self.equipment_sprites.contains_key(id) {
+                        item_ids.push(id.clone());
+                    }
+                }
+            }
+        }
+
+        if item_ids.is_empty() {
+            return;
+        }
+
+        // Load manifest to find sprite paths
+        let manifest = SpriteManifest::load().await;
+        for item_id in &item_ids {
+            // Find the matching manifest entry (e.g. "equipment/head/iron_helm")
+            for entry in &manifest.equipment {
+                let key = entry.rsplit('/').next().unwrap_or(entry);
+                if key == item_id {
+                    let path = asset_path(&format!("assets/sprites/{}.png", entry));
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        self.equipment_sprites.insert(item_id.clone(), tex);
+                    }
+                    break;
+                }
             }
         }
     }
@@ -1269,10 +1440,15 @@ impl Screen for CharacterSelectScreen {
                 draw_character_preview(
                     &self.player_sprites,
                     &self.hair_sprites,
+                    &self.equipment_sprites,
                     &character.gender,
                     &character.skin,
                     character.hair_style,
                     character.hair_color.unwrap_or(0),
+                    character.equipped_head.as_deref(),
+                    character.equipped_body.as_deref(),
+                    character.equipped_back.as_deref(),
+                    character.equipped_feet.as_deref(),
                     list_x + 10.0,
                     preview_y,
                     preview_scale,
@@ -1984,10 +2160,15 @@ impl Screen for CharacterCreateScreen {
         draw_character_preview(
             &self.player_sprites,
             &self.hair_sprites,
+            &HashMap::new(),
             GENDERS[self.gender_index],
             SKINS[self.skin_index],
             self.hair_style_index.map(|i| i as i32),
             self.hair_color_index as i32,
+            None,
+            None,
+            None,
+            None,
             sprite_x,
             sprite_y,
             preview_scale,

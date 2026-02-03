@@ -538,6 +538,16 @@ struct CharacterInfo {
     hair_color: Option<i32>,
     #[serde(rename = "playedTime")]
     played_time: i64,
+    #[serde(rename = "equippedHead")]
+    equipped_head: Option<String>,
+    #[serde(rename = "equippedBody")]
+    equipped_body: Option<String>,
+    #[serde(rename = "equippedWeapon")]
+    equipped_weapon: Option<String>,
+    #[serde(rename = "equippedBack")]
+    equipped_back: Option<String>,
+    #[serde(rename = "equippedFeet")]
+    equipped_feet: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -595,13 +605,18 @@ async fn list_characters(
         Ok(chars) => {
             let char_infos: Vec<CharacterInfo> = chars.into_iter().map(|c| CharacterInfo {
                 id: c.id,
-                name: c.name,
+                name: c.name.clone(),
                 level: c.skills.combat_level(),
                 gender: c.gender,
                 skin: c.skin,
                 hair_style: c.hair_style,
                 hair_color: c.hair_color,
                 played_time: c.played_time,
+                equipped_head: c.equipped_head,
+                equipped_body: c.equipped_body,
+                equipped_weapon: c.equipped_weapon,
+                equipped_back: c.equipped_back,
+                equipped_feet: c.equipped_feet,
             }).collect();
 
             (
@@ -713,6 +728,11 @@ async fn create_character(
                         hair_style: char_data.hair_style,
                         hair_color: char_data.hair_color,
                         played_time: char_data.played_time,
+                        equipped_head: char_data.equipped_head,
+                        equipped_body: char_data.equipped_body,
+                        equipped_weapon: char_data.equipped_weapon,
+                        equipped_back: char_data.equipped_back,
+                        equipped_feet: char_data.equipped_feet,
                     }),
                     error: None,
                 }),

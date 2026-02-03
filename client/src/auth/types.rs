@@ -44,6 +44,16 @@ pub struct CharacterInfo {
     pub hair_color: Option<i32>,
     #[serde(rename = "playedTime")]
     pub played_time: i64,
+    #[serde(rename = "equippedHead", default)]
+    pub equipped_head: Option<String>,
+    #[serde(rename = "equippedBody", default)]
+    pub equipped_body: Option<String>,
+    #[serde(rename = "equippedWeapon", default)]
+    pub equipped_weapon: Option<String>,
+    #[serde(rename = "equippedBack", default)]
+    pub equipped_back: Option<String>,
+    #[serde(rename = "equippedFeet", default)]
+    pub equipped_feet: Option<String>,
 }
 
 #[derive(Deserialize)]
