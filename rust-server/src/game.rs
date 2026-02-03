@@ -3894,6 +3894,17 @@ impl GameRoom {
 
         tracing::info!("Player {} equipped {} to {} slot", player_id, item_id, slot_type_str);
 
+        // If equipping a non-fishing-rod weapon while gathering, stop gathering
+        if equip_slot == EquipmentSlot::Weapon && item_id != "fishing_rod" {
+            let is_gathering = {
+                let gathering = self.gathering.read().await;
+                gathering.is_gathering(player_id)
+            };
+            if is_gathering {
+                self.handle_stop_gathering(player_id).await;
+            }
+        }
+
         // Send success result
         self.send_to_player(player_id, ServerMessage::EquipResult {
             success: true,
@@ -4033,6 +4044,17 @@ impl GameRoom {
         };
 
         tracing::info!("Player {} unequipped {} from {} slot", player_id, item_id, slot_type);
+
+        // If unequipping weapon while gathering, stop gathering
+        if slot_type == "weapon" {
+            let is_gathering = {
+                let gathering = self.gathering.read().await;
+                gathering.is_gathering(player_id)
+            };
+            if is_gathering {
+                self.handle_stop_gathering(player_id).await;
+            }
+        }
 
         // Send success result
         self.send_to_player(player_id, ServerMessage::EquipResult {
