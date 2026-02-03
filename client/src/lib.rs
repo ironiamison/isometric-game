@@ -403,8 +403,9 @@ async fn async_main() {
                             }
                             AuthResult::Matchmake(Err(e)) => {
                                 log::error!("Matchmaking failed: {}", e);
-                                // Go back to character select
+                                // Go back to character select with error message
                                 let mut char_screen = CharacterSelectScreen::new(session.clone(), SERVER_URL);
+                                char_screen.set_error(format!("{}", e));
                                 char_screen.load_font().await;
                                 app_state = WasmAppState::CharacterSelect(char_screen);
                             }

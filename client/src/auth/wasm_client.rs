@@ -322,6 +322,9 @@ impl AuthClient {
         if http_status == 401 {
             return Err(AuthError::Unauthorized);
         }
+        if http_status == 409 {
+            return Err(AuthError::CharacterAlreadyOnline);
+        }
 
         let resp: MatchmakeResponse =
             serde_json::from_str(body).map_err(|e| AuthError::NetworkError(e.to_string()))?;

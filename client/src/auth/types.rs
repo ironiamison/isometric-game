@@ -7,6 +7,7 @@ pub enum AuthError {
     UsernameTaken,
     CharacterNameTaken,
     CharacterLimitReached,
+    CharacterAlreadyOnline,
     Unauthorized,
     ServerError(String),
 }
@@ -19,6 +20,7 @@ impl std::fmt::Display for AuthError {
             AuthError::UsernameTaken => write!(f, "Username already taken"),
             AuthError::CharacterNameTaken => write!(f, "Character name already taken"),
             AuthError::CharacterLimitReached => write!(f, "Character limit reached (max 3)"),
+            AuthError::CharacterAlreadyOnline => write!(f, "This character is already logged in"),
             AuthError::Unauthorized => write!(f, "Not logged in"),
             AuthError::ServerError(e) => write!(f, "Server error: {}", e),
         }

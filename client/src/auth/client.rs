@@ -207,6 +207,9 @@ impl AuthClient {
                 if let ureq::Error::Status(401, _) = &e {
                     return AuthError::Unauthorized;
                 }
+                if let ureq::Error::Status(409, _) = &e {
+                    return AuthError::CharacterAlreadyOnline;
+                }
                 AuthError::NetworkError(e.to_string())
             })?;
 

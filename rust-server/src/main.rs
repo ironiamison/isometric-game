@@ -8,7 +8,7 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use futures::{SinkExt, StreamExt};
@@ -99,6 +99,8 @@ struct AppState {
     player_entrance_positions: Arc<RwLock<HashMap<String, (i32, i32)>>>,
     /// Character ID -> last time played_time was flushed to DB (for incremental play time tracking)
     play_time_anchors: Arc<DashMap<i64, std::time::Instant>>,
+    /// Character IDs currently online (prevents duplicate sessions)
+    online_characters: Arc<DashSet<i64>>,
 }
 
 impl AppState {
@@ -188,6 +190,7 @@ impl AppState {
             player_instances: Arc::new(RwLock::new(HashMap::new())),
             player_entrance_positions: Arc::new(RwLock::new(HashMap::new())),
             play_time_anchors: Arc::new(DashMap::new()),
+            online_characters: Arc::new(DashSet::new()),
         }
     }
 
@@ -938,12 +941,24 @@ async fn matchmake_join_or_create(
         }
     };
 
+    // Check if character is already online
+    if state.online_characters.contains(&character_id) {
+        warn!("Matchmaking rejected: Character {} is already online", character_id);
+        return (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({ "error": "This character is already logged in from another session" }))
+        ).into_response();
+    }
+
     let room = state.get_or_create_room(&room_name).await;
     let room_id = room.id.clone();
 
     // Create session for this character
     let session_id = Uuid::new_v4().to_string();
     let player_id = format!("char_{}", character_id);
+
+    // Mark character as online
+    state.online_characters.insert(character_id);
 
     // Reserve the session with character info
     state.sessions.insert(
@@ -1282,7 +1297,7 @@ async fn handle_socket(
     player_id: String,
     session_id: String,
     character_name: String,
-    _character_id: i64,  // Used for future persistence binding
+    character_id: i64,
     current_map: Option<String>,  // Interior map to auto-enter on reconnect
 ) {
     let (mut sender, mut receiver) = socket.split();
@@ -1590,6 +1605,9 @@ async fn handle_socket(
 
     // SECURITY: Unregister player sender before cleanup
     room.unregister_player_sender(&player_id).await;
+
+    // Mark character as offline
+    state.online_characters.remove(&character_id);
 
     state.sessions.remove(&session_id);
     room.remove_player(&player_id).await;

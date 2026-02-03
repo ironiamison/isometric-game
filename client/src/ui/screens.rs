@@ -163,7 +163,7 @@ fn draw_character_preview(
             }
         }
 
-        // 4. Draw body armor (frame 0 for idle/down)
+        // 4. Draw body armor (frame 0 for idle/down, offset y=-3)
         if let Some(body_id) = equipped_body {
             if let Some(equip_sprite) = equipment_sprites.get(body_id) {
                 let is_single_row = equip_sprite.width() > equip_sprite.height() * 2.0;
@@ -171,7 +171,7 @@ fn draw_character_preview(
                     draw_texture_ex(
                         equip_sprite,
                         x,
-                        y,
+                        y - 3.0,
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(0.0, 0.0, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
@@ -1009,6 +1009,11 @@ impl CharacterSelectScreen {
                 }
             }
         }
+    }
+
+    /// Set an error message to display
+    pub fn set_error(&mut self, message: String) {
+        self.error_message = Some(message);
     }
 
     /// Refresh the character list from the server
