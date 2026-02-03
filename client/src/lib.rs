@@ -319,6 +319,7 @@ async fn async_main() {
                 WasmAppState::CharacterSelect(screen) => {
                     let result = screen.update(&audio);
                     screen.render();
+                    screen.load_equipment_if_needed().await;
 
                     match result {
                         ScreenState::StartGame { session, character_id, character_name } => {

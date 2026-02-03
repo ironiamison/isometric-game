@@ -927,6 +927,8 @@ pub struct CharacterSelectScreen {
     loading: bool,
     #[cfg(target_arch = "wasm32")]
     needs_initial_load: bool,
+    #[cfg(target_arch = "wasm32")]
+    needs_equipment_load: bool,
 }
 
 impl CharacterSelectScreen {
@@ -957,6 +959,8 @@ impl CharacterSelectScreen {
             loading: false,
             #[cfg(target_arch = "wasm32")]
             needs_initial_load: true,
+            #[cfg(target_arch = "wasm32")]
+            needs_equipment_load: false,
         }
     }
 
@@ -1011,6 +1015,15 @@ impl CharacterSelectScreen {
         }
     }
 
+    /// Load equipment sprites if characters have been loaded (WASM only)
+    #[cfg(target_arch = "wasm32")]
+    pub async fn load_equipment_if_needed(&mut self) {
+        if self.needs_equipment_load {
+            self.needs_equipment_load = false;
+            self.load_equipment_sprites().await;
+        }
+    }
+
     /// Set an error message to display
     pub fn set_error(&mut self, message: String) {
         self.error_message = Some(message);
@@ -1062,6 +1075,7 @@ impl Screen for CharacterSelectScreen {
                         if self.selected_index >= self.characters.len() && !self.characters.is_empty() {
                             self.selected_index = self.characters.len() - 1;
                         }
+                        self.needs_equipment_load = true;
                     }
                     AuthResult::Characters(Err(e)) => {
                         self.error_message = Some(e.to_string());
