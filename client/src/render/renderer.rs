@@ -33,7 +33,7 @@ const TILESET_COLUMNS: u32 = 32;
 
 /// Available player appearance options
 pub const GENDERS: &[&str] = &["male", "female"];
-pub const SKINS: &[&str] = &["tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"];
+pub const SKINS: &[&str] = &["tan", "pale", "brown", "fish", "orc", "panda", "skeleton"];
 
 /// Objects tileset firstgid from objects.tsx (used to map gids to sprite filenames)
 const OBJECTS_FIRSTGID: u32 = 1249;

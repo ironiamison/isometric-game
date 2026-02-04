@@ -57,7 +57,7 @@ pub struct CharacterData {
 
 // Available appearance options
 pub const GENDERS: &[&str] = &["male", "female"];
-pub const SKINS: &[&str] = &["tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"];
+pub const SKINS: &[&str] = &["tan", "pale", "brown", "fish", "orc", "panda", "skeleton"];
 
 /// Arena stats data from the database
 #[derive(Debug, Clone, sqlx::FromRow)]

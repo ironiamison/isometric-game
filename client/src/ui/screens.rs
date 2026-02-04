@@ -65,10 +65,9 @@ fn get_input_state() -> (Vec2, bool, bool) {
 async fn load_player_sprites() -> HashMap<String, Texture2D> {
     let mut sprites = HashMap::new();
     let genders = ["male", "female"];
-    let skins = ["tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"];
 
     for gender in &genders {
-        for skin in &skins {
+        for skin in &SKINS {
             let path = asset_path(&format!("assets/sprites/players/player_{}_{}.png", gender, skin));
             if let Ok(texture) = load_texture(&path).await {
                 texture.set_filter(FilterMode::Nearest);
@@ -1628,7 +1627,7 @@ impl Screen for CharacterSelectScreen {
 
 const GENDERS: [&str; 2] = ["male", "female"];
 
-const SKINS: [&str; 7] = ["tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"];
+const SKINS: [&str; 7] = ["tan", "pale", "brown", "fish", "orc", "panda", "skeleton"];
 
 pub struct CharacterCreateScreen {
     session: AuthSession,
