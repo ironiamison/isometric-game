@@ -2268,10 +2268,8 @@ async fn handle_client_message(
             room.handle_use_item(player_id, slot_index).await;
         }
         ClientMessage::RequestChunk { chunk_x, chunk_y } => {
-            // Chunk data is sent back via the broadcast channel for now
-            // In a production system, you'd send directly to requesting client
             if let Some(chunk_msg) = room.handle_chunk_request(chunk_x, chunk_y).await {
-                room.broadcast(chunk_msg).await;
+                room.send_to_player(player_id, chunk_msg).await;
             }
         }
         ClientMessage::Interact { npc_id } => {

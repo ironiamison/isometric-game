@@ -35,6 +35,65 @@ const ATTACK_COOLDOWN_MS: u64 = 700; // Slightly shorter than client (800ms) to 
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
 const REGEN_INTERVAL_MS: u64 = 30000;
 
+// View distance for StateSync culling (Chebyshev distance in tiles)
+const VIEW_DISTANCE: i32 = 40;
+
+// ============================================================================
+// NPC Speech Helper
+// ============================================================================
+
+/// Check NPC speech timer and collect recipients in a single pass.
+/// Replaces the duplicated O(n²) pattern used for overworld/public/private instances.
+fn check_npc_speech(
+    npc: &mut Npc,
+    nearby_players: &[(&str, i32, i32)],
+    current_time: u64,
+    speech_events: &mut Vec<(String, String, String)>,
+) {
+    let messages = match npc.speech_messages {
+        Some(ref m) if !m.is_empty() && npc.is_alive() => m,
+        _ => return,
+    };
+
+    // Single pass: collect players within speech radius
+    let radius = npc.speech_radius;
+    let npc_x = npc.x;
+    let npc_y = npc.y;
+    let recipients: Vec<&str> = nearby_players
+        .iter()
+        .filter(|(_, px, py)| {
+            let dx = (npc_x - px).abs();
+            let dy = (npc_y - py).abs();
+            dx.max(dy) <= radius
+        })
+        .map(|(pid, _, _)| *pid)
+        .collect();
+
+    if recipients.is_empty() {
+        // No players nearby — reset timer
+        npc.next_speech_at = 0;
+        return;
+    }
+
+    if npc.next_speech_at == 0 {
+        // First time a player is nearby — set initial timer
+        let delay = npc.speech_interval_min_ms
+            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+        npc.next_speech_at = current_time + delay;
+    } else if current_time >= npc.next_speech_at {
+        // Time to speak!
+        let idx = rand::random::<usize>() % messages.len();
+        let message = &messages[idx];
+        let npc_id = &npc.id;
+        for pid in &recipients {
+            speech_events.push((pid.to_string(), npc_id.clone(), message.clone()));
+        }
+        let delay = npc.speech_interval_min_ms
+            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+        npc.next_speech_at = current_time + delay;
+    }
+}
+
 // ============================================================================
 // Player Save Data (for database persistence)
 // ============================================================================
@@ -4995,6 +5054,17 @@ impl GameRoom {
                 .collect()
         };
 
+        // Build spatial index: chunk coord -> players in that chunk (for NPC speech lookups)
+        let mut players_by_chunk: HashMap<(i32, i32), Vec<(&str, i32, i32)>> = HashMap::new();
+        {
+            use crate::chunk::CHUNK_SIZE;
+            for (pid, px, py, _) in &player_positions {
+                let cx = px.div_euclid(CHUNK_SIZE as i32);
+                let cy = py.div_euclid(CHUNK_SIZE as i32);
+                players_by_chunk.entry((cx, cy)).or_default().push((pid.as_str(), *px, *py));
+            }
+        }
+
         let mut npc_updates = Vec::new();
         let mut respawned_npcs = Vec::new();
         let mut npc_attacks: Vec<(String, String, i32, i32)> = Vec::new(); // (npc_id, target_id, npc_level, max_hit)
@@ -5056,50 +5126,21 @@ impl GameRoom {
                 // Apply HP regen
                 npc.apply_regen(current_time);
 
-                // Check NPC speech
-                if let Some(ref messages) = npc.speech_messages {
-                    if !messages.is_empty() && npc.is_alive() {
-                        // Check if any player is within speech radius
-                        let has_nearby_player = player_positions.iter().any(|(_, px, py, _)| {
-                            let dx = (npc.x - px).abs();
-                            let dy = (npc.y - py).abs();
-                            dx.max(dy) <= npc.speech_radius
-                        });
-
-                        if has_nearby_player {
-                            if npc.next_speech_at == 0 {
-                                // First time a player is nearby — set initial timer
-                                let delay = npc.speech_interval_min_ms
-                                    + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
-                                npc.next_speech_at = current_time + delay;
-                            } else if current_time >= npc.next_speech_at {
-                                // Time to speak!
-                                let idx = rand::random::<usize>() % messages.len();
-                                let message = messages[idx].clone();
-                                let npc_id = npc.id.clone();
-                                let radius = npc.speech_radius;
-                                let npc_x = npc.x;
-                                let npc_y = npc.y;
-
-                                // Collect nearby player IDs to send speech to
-                                for (pid, px, py, _) in &player_positions {
-                                    let dx = (npc_x - px).abs();
-                                    let dy = (npc_y - py).abs();
-                                    if dx.max(dy) <= radius {
-                                        npc_speech_events.push((pid.clone(), npc_id.clone(), message.clone()));
-                                    }
-                                }
-
-                                // Reset timer
-                                let delay = npc.speech_interval_min_ms
-                                    + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
-                                npc.next_speech_at = current_time + delay;
+                // Check NPC speech using spatial index
+                {
+                    use crate::chunk::CHUNK_SIZE;
+                    let chunk_radius = (npc.speech_radius as f32 / CHUNK_SIZE as f32).ceil() as i32;
+                    let npc_cx = npc.x.div_euclid(CHUNK_SIZE as i32);
+                    let npc_cy = npc.y.div_euclid(CHUNK_SIZE as i32);
+                    let mut nearby: Vec<(&str, i32, i32)> = Vec::new();
+                    for dx in -chunk_radius..=chunk_radius {
+                        for dy in -chunk_radius..=chunk_radius {
+                            if let Some(players) = players_by_chunk.get(&(npc_cx + dx, npc_cy + dy)) {
+                                nearby.extend_from_slice(players);
                             }
-                        } else {
-                            // No players nearby — reset timer
-                            npc.next_speech_at = 0;
                         }
                     }
+                    check_npc_speech(npc, &nearby, current_time, &mut npc_speech_events);
                 }
 
                 // Add to updates (all NPCs including dead ones for client awareness)
@@ -5118,7 +5159,6 @@ impl GameRoom {
         // Process NPC speech for instance NPCs (interiors)
         {
             let players = self.players.read().await;
-            // Collect instance player positions: instance_id -> Vec<(player_id, x, y)>
             let mut instance_players: HashMap<String, Vec<(String, i32, i32)>> = HashMap::new();
             let player_inst = self.player_instances.read().await;
             for (pid, inst_id) in player_inst.iter() {
@@ -5133,84 +5173,18 @@ impl GameRoom {
 
             let mut instance_speech_events: Vec<(String, String, String)> = Vec::new();
 
-            // Check public instances
-            for entry in self.instance_manager.public_instances.iter() {
-                let instance = entry.value();
-                if let Some(inst_players) = instance_players.get(&instance.id) {
-                    let mut npcs = instance.npcs.write().await;
+            // Check public and private instances using shared helper
+            for entry in self.instance_manager.public_instances.iter()
+                .map(|e| e.value().clone())
+                .chain(self.instance_manager.private_instances.iter().map(|e| e.value().clone()))
+            {
+                if let Some(inst_players) = instance_players.get(&entry.id) {
+                    let as_refs: Vec<(&str, i32, i32)> = inst_players.iter()
+                        .map(|(pid, x, y)| (pid.as_str(), *x, *y))
+                        .collect();
+                    let mut npcs = entry.npcs.write().await;
                     for npc in npcs.values_mut() {
-                        if let Some(ref messages) = npc.speech_messages {
-                            if !messages.is_empty() && npc.is_alive() {
-                                let has_nearby = inst_players.iter().any(|(_, px, py)| {
-                                    let dx = (npc.x - px).abs();
-                                    let dy = (npc.y - py).abs();
-                                    dx.max(dy) <= npc.speech_radius
-                                });
-                                if has_nearby {
-                                    if npc.next_speech_at == 0 {
-                                        let delay = npc.speech_interval_min_ms
-                                            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
-                                        npc.next_speech_at = current_time + delay;
-                                    } else if current_time >= npc.next_speech_at {
-                                        let idx = rand::random::<usize>() % messages.len();
-                                        let message = messages[idx].clone();
-                                        for (pid, px, py) in inst_players {
-                                            let dx = (npc.x - px).abs();
-                                            let dy = (npc.y - py).abs();
-                                            if dx.max(dy) <= npc.speech_radius {
-                                                instance_speech_events.push((pid.clone(), npc.id.clone(), message.clone()));
-                                            }
-                                        }
-                                        let delay = npc.speech_interval_min_ms
-                                            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
-                                        npc.next_speech_at = current_time + delay;
-                                    }
-                                } else {
-                                    npc.next_speech_at = 0;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Check private instances
-            for entry in self.instance_manager.private_instances.iter() {
-                let instance = entry.value();
-                if let Some(inst_players) = instance_players.get(&instance.id) {
-                    let mut npcs = instance.npcs.write().await;
-                    for npc in npcs.values_mut() {
-                        if let Some(ref messages) = npc.speech_messages {
-                            if !messages.is_empty() && npc.is_alive() {
-                                let has_nearby = inst_players.iter().any(|(_, px, py)| {
-                                    let dx = (npc.x - px).abs();
-                                    let dy = (npc.y - py).abs();
-                                    dx.max(dy) <= npc.speech_radius
-                                });
-                                if has_nearby {
-                                    if npc.next_speech_at == 0 {
-                                        let delay = npc.speech_interval_min_ms
-                                            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
-                                        npc.next_speech_at = current_time + delay;
-                                    } else if current_time >= npc.next_speech_at {
-                                        let idx = rand::random::<usize>() % messages.len();
-                                        let message = messages[idx].clone();
-                                        for (pid, px, py) in inst_players {
-                                            let dx = (npc.x - px).abs();
-                                            let dy = (npc.y - py).abs();
-                                            if dx.max(dy) <= npc.speech_radius {
-                                                instance_speech_events.push((pid.clone(), npc.id.clone(), message.clone()));
-                                            }
-                                        }
-                                        let delay = npc.speech_interval_min_ms
-                                            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
-                                        npc.next_speech_at = current_time + delay;
-                                    }
-                                } else {
-                                    npc.next_speech_at = 0;
-                                }
-                            }
-                        }
+                        check_npc_speech(npc, &as_refs, current_time, &mut instance_speech_events);
                     }
                 }
             }
@@ -5449,52 +5423,89 @@ impl GameRoom {
             }
         }
 
-        // Send state sync to each player, filtering players and NPCs by instance
-        // Optimization: group players by instance and pre-encode shared NPC data
+        // Send state sync to each player, filtering by instance and view distance
         let tick = *self.tick.read().await;
         let player_instances = self.player_instances.read().await;
         let senders = self.player_senders.read().await;
 
-        // Group senders by instance (None = overworld)
-        let mut instance_groups: std::collections::HashMap<Option<&String>, Vec<(&String, &tokio::sync::mpsc::Sender<Vec<u8>>)>> = std::collections::HashMap::new();
+        // Build position lookup for O(1) access during culling
+        let player_pos_map: HashMap<&str, (i32, i32)> = player_updates.iter()
+            .map(|p| (p.id.as_str(), (p.x, p.y)))
+            .collect();
+
+        // Separate overworld vs instance senders
+        let mut instance_groups: HashMap<&String, Vec<(&String, &tokio::sync::mpsc::Sender<Vec<u8>>)>> = HashMap::new();
+        let mut overworld_senders: Vec<(&String, &tokio::sync::mpsc::Sender<Vec<u8>>)> = Vec::new();
         for (player_id, sender) in senders.iter() {
-            let instance = player_instances.get(player_id);
-            instance_groups.entry(instance).or_default().push((player_id, sender));
+            match player_instances.get(player_id) {
+                Some(inst_id) => instance_groups.entry(inst_id).or_default().push((player_id, sender)),
+                None => overworld_senders.push((player_id, sender)),
+            }
         }
 
         // Pre-filter player updates by instance
-        let mut players_by_instance: std::collections::HashMap<Option<&String>, Vec<&PlayerUpdate>> = std::collections::HashMap::new();
+        let mut players_by_instance: HashMap<&String, Vec<&PlayerUpdate>> = HashMap::new();
+        let mut overworld_players: Vec<&PlayerUpdate> = Vec::new();
         for p in &player_updates {
-            let instance = player_instances.get(&p.id);
-            players_by_instance.entry(instance).or_default().push(p);
+            match player_instances.get(&p.id) {
+                Some(inst_id) => players_by_instance.entry(inst_id).or_default().push(p),
+                None => overworld_players.push(p),
+            }
         }
 
-        // For each instance group, encode once and send to all players in that group
-        for (instance, group_senders) in &instance_groups {
+        // Instance groups: encode once per instance, send to all players in that instance
+        for (inst_id, group_senders) in &instance_groups {
             let players_for_group: Vec<PlayerUpdate> = players_by_instance
-                .get(instance)
+                .get(*inst_id)
                 .map(|ps| ps.iter().map(|p| (*p).clone()).collect())
                 .unwrap_or_default();
-
-            let npcs_for_group = if instance.is_some() {
-                // Players in instances don't receive world NPCs
-                Vec::new()
-            } else {
-                // Overworld players share the same NPC list (no clone per player)
-                npc_updates.clone()
-            };
 
             let msg = ServerMessage::StateSync {
                 tick,
                 players: players_for_group,
-                npcs: npcs_for_group,
+                npcs: Vec::new(), // Instance players don't receive world NPCs
             };
 
-            // Encode once for this entire group
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
                 for (_player_id, sender) in group_senders {
                     let _ = sender.try_send(bytes.clone());
                 }
+            }
+        }
+
+        // Overworld: per-player view-distance culling
+        for (player_id, sender) in &overworld_senders {
+            let (px, py) = match player_pos_map.get(player_id.as_str()) {
+                Some(pos) => *pos,
+                None => continue,
+            };
+
+            let nearby_players: Vec<PlayerUpdate> = overworld_players.iter()
+                .filter(|p| {
+                    let dx = (p.x - px).abs();
+                    let dy = (p.y - py).abs();
+                    dx.max(dy) <= VIEW_DISTANCE
+                })
+                .map(|p| (*p).clone())
+                .collect();
+
+            let nearby_npcs: Vec<NpcUpdate> = npc_updates.iter()
+                .filter(|n| {
+                    let dx = (n.x - px).abs();
+                    let dy = (n.y - py).abs();
+                    dx.max(dy) <= VIEW_DISTANCE
+                })
+                .cloned()
+                .collect();
+
+            let msg = ServerMessage::StateSync {
+                tick,
+                players: nearby_players,
+                npcs: nearby_npcs,
+            };
+
+            if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+                let _ = sender.try_send(bytes);
             }
         }
 
