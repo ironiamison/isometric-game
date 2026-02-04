@@ -154,6 +154,11 @@ pub fn run_game_frame(
     network.poll(game_state);
     let network_ms = (get_time() - network_start) * 1000.0;
 
+    // 1.5. Play any pending sound effects queued by message handlers
+    for sfx_name in game_state.pending_sfx.drain(..) {
+        audio.play_sfx(&sfx_name);
+    }
+
     // 2. Render and get UI layout for hit detection
     clear_background(Color::from_rgba(30, 30, 40, 255));
     let (layout, render_timings) = renderer.render(game_state);

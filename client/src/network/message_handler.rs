@@ -1294,6 +1294,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     text,
                     time: macroquad::time::get_time(),
                 });
+                state.pending_sfx.push("announce".to_string());
             }
         }
 

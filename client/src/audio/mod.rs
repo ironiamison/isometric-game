@@ -52,6 +52,7 @@ impl AudioManager {
             ("buy", "assets/audio/sfx/menu/buy.wav"),
             ("login_success", "assets/audio/sfx/menu/login_success.wav"),
             ("level_up", "assets/audio/sfx/menu/level_up.wav"),
+            ("announce", "assets/audio/sfx/misc/announce.wav"),
             ("unarmed", "assets/audio/sfx/attack/unarmed.wav"),
         ];
 

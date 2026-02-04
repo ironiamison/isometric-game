@@ -795,6 +795,8 @@ pub struct GameState {
     // Combat feedback
     pub damage_events: Vec<DamageEvent>,
     pub level_up_events: Vec<LevelUpEvent>,
+    /// Pending sound effects to play (queued by message handler, played by main loop)
+    pub pending_sfx: Vec<String>,
     pub firework_particles: Vec<FireworkParticle>,
     pub skill_xp_events: Vec<SkillXpEvent>,
     pub xp_globes: XpGlobesManager,
@@ -885,6 +887,7 @@ impl GameState {
             selected_entity_id: None,
             damage_events: Vec::new(),
             level_up_events: Vec::new(),
+            pending_sfx: Vec::new(),
             firework_particles: Vec::new(),
             skill_xp_events: Vec::new(),
             xp_globes: XpGlobesManager::new(),
