@@ -9,6 +9,9 @@ display_name = "Scrap Leather"
 description = "Tan piglet hides with slime core into crude leather."
 category = "smithing"
 level_required = 1
+station = "anvil"
+craft_time_ms = 1500
+xp = 10
 
 [[scrap_leather.ingredients]]
 item_id = "piglet"
@@ -27,6 +30,9 @@ display_name = "Bone Fragment"
 description = "Bind shell and spine into hardened bone fragments."
 category = "smithing"
 level_required = 1
+station = "anvil"
+craft_time_ms = 1500
+xp = 10
 
 [[bone_fragment.ingredients]]
 item_id = "snail_shell"
@@ -45,6 +51,9 @@ display_name = "Crude Binding"
 description = "Weave worm segments and spider silk into binding material."
 category = "smithing"
 level_required = 1
+station = "anvil"
+craft_time_ms = 1500
+xp = 10
 
 [[crude_binding.ingredients]]
 item_id = "worm_segment"
@@ -63,6 +72,9 @@ display_name = "Shell Plate"
 description = "Fuse snail shells into a hardened plate."
 category = "smithing"
 level_required = 1
+station = "anvil"
+craft_time_ms = 1500
+xp = 10
 
 [[shell_plate.ingredients]]
 item_id = "snail_shell"
@@ -77,6 +89,9 @@ display_name = "Blade Shard"
 description = "Shape hedgehog spines into a crude blade edge."
 category = "smithing"
 level_required = 1
+station = "anvil"
+craft_time_ms = 1500
+xp = 10
 
 [[blade_shard.ingredients]]
 item_id = "hedgehog_spine"
@@ -95,6 +110,9 @@ display_name = "Bow Stave"
 description = "Bend spring coils into a flexible bow frame."
 category = "smithing"
 level_required = 1
+station = "workbench"
+craft_time_ms = 1500
+xp = 10
 
 [[bow_stave.ingredients]]
 item_id = "spring_coil"
@@ -117,6 +135,9 @@ display_name = "Bone Arrow"
 description = "Craft bone-tipped arrows with crow feather fletching."
 category = "smithing"
 level_required = 1
+station = "workbench"
+craft_time_ms = 1500
+xp = 5
 
 [[bone_arrow.ingredients]]
 item_id = "hedgehog_spine"
@@ -139,6 +160,9 @@ display_name = "Scavenger Vest"
 description = "Assemble leather and shell into a crude vest."
 category = "smithing"
 level_required = 1
+station = "anvil"
+craft_time_ms = 5000
+xp = 35
 
 [[scavenger_vest.ingredients]]
 item_id = "scrap_leather"
@@ -161,6 +185,9 @@ display_name = "Scavenger Boots"
 description = "Stitch leather scraps into sturdy boots."
 category = "smithing"
 level_required = 1
+station = "anvil"
+craft_time_ms = 3000
+xp = 20
 
 [[scavenger_boots.ingredients]]
 item_id = "scrap_leather"
@@ -183,6 +210,9 @@ display_name = "Bone Ring"
 description = "Carve a ring from bone fragments."
 category = "smithing"
 level_required = 5
+station = "workbench"
+craft_time_ms = 3000
+xp = 25
 
 [[bone_ring.ingredients]]
 item_id = "bone_fragment"
@@ -197,6 +227,9 @@ display_name = "Shell Pendant"
 description = "Polish and bind shell plates into a pendant."
 category = "smithing"
 level_required = 5
+station = "workbench"
+craft_time_ms = 3000
+xp = 25
 
 [[shell_pendant.ingredients]]
 item_id = "shell_plate"
@@ -219,6 +252,10 @@ display_name = "Spine Blade"
 description = "Fashion a crude blade from sharpened spines and bone."
 category = "smithing"
 level_required = 5
+station = "anvil"
+craft_time_ms = 5000
+xp = 40
+requires_discovery = true
 
 [[spine_blade.ingredients]]
 item_id = "blade_shard"
@@ -237,6 +274,10 @@ display_name = "Scavenger Bow"
 description = "String a bow stave with binding and feathers."
 category = "smithing"
 level_required = 5
+station = "workbench"
+craft_time_ms = 5000
+xp = 45
+requires_discovery = true
 
 [[scavenger_bow.ingredients]]
 item_id = "bow_stave"
