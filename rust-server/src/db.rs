@@ -625,7 +625,7 @@ impl Database {
 
         // Starting equipment for new characters (Tier 0 Cursed Lands gear)
         let starting_weapon = "chain";
-        let starting_body = "torn_clothes";
+        let starting_body = if gender == "female" { "peasant_suit_female" } else { "peasant_suit" };
         let starting_feet = "worn_sandals";
         let starting_gold = 25;
 
@@ -742,6 +742,15 @@ impl Database {
             .execute(&self.pool)
             .await?;
         sqlx::query("DELETE FROM character_quest_availability WHERE character_id = ?")
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM arena_stats WHERE character_id = ?")
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM friendships WHERE requester_id = ? OR recipient_id = ?")
+            .bind(character_id)
             .bind(character_id)
             .execute(&self.pool)
             .await?;
