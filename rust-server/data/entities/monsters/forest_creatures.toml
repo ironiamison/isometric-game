@@ -233,6 +233,12 @@ drop_chance = 0.20
 quantity_min = 1
 quantity_max = 1
 
+[[springs.loot]]
+item_id = "recipe_scavenger_bow"
+drop_chance = 0.03
+quantity_min = 1
+quantity_max = 1
+
 [springs.behaviors]
 hostile = true
 wander_enabled = true
