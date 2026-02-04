@@ -126,6 +126,7 @@ class StorageManager {
             mapObjects: stored.mapObjects || [],
             walls: stored.walls || [],
             portals: stored.portals || [],
+            gatheringZones: stored.gatheringZones || [],
             dirty: stored.dirty,
           };
           chunks.set(stored.key, chunk);

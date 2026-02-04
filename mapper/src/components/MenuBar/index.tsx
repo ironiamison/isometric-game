@@ -231,27 +231,12 @@ export function MenuBar() {
       // Clear ChunkManager cache
       chunkManager.clear();
 
-      // Reload chunks from server
-      const knownChunks = [
-        { cx: 0, cy: 0 },
-        { cx: 0, cy: -1 },
-        { cx: 1, cy: 0 },
-        { cx: -1, cy: 0 },
-        { cx: -1, cy: -1 },
-        { cx: -2, cy: 0 },
-      ];
+      // Load all chunks from server API
+      const serverChunks = await storage.loadAllChunksFromServer();
 
-      for (const coord of knownChunks) {
-        try {
-          const chunk = await chunkManager.loadChunk(
-            `/maps/chunk_${coord.cx}_${coord.cy}.json`,
-            coord
-          );
-          if (chunk) {
-            chunkManager.addChunk(chunk);
-          }
-        } catch {
-          // Chunk doesn't exist
+      if (serverChunks && serverChunks.size > 0) {
+        for (const [, chunk] of serverChunks) {
+          chunkManager.addChunk(chunk);
         }
       }
 

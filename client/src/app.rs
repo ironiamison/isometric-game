@@ -393,6 +393,7 @@ pub fn run_game_frame(
         || game_state.ui_state.crafting_open
         || game_state.ui_state.shop_data.is_some()
         || game_state.ui_state.quest_log_open
+        || game_state.ui_state.social_open
         || game_state.ui_state.chat_panel_open
         || in_dialogue;
     let hide_direction_controls = game_state.ui_state.escape_menu_open

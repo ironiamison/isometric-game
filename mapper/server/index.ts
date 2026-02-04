@@ -288,6 +288,107 @@ app.post('/api/map/import', async (req, res) => {
   }
 });
 
+// --- Sync from Game Server ---
+
+// Convert base64-encoded collision bitset to array
+function base64ToCollision(base64: string, size: number): number[] {
+  const binary = Buffer.from(base64, 'base64').toString('binary');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return Array.from(bytes);
+}
+
+// Convert game server chunk format to mapper format
+function convertChunkToMapperFormat(gameChunk: Record<string, unknown>): Record<string, unknown> {
+  const size = gameChunk.size as number || 32;
+
+  // Convert collision from base64 to array
+  let collisionArray: number[] = [];
+  if (typeof gameChunk.collision === 'string') {
+    collisionArray = base64ToCollision(gameChunk.collision, size * size);
+  } else if (Array.isArray(gameChunk.collision)) {
+    collisionArray = gameChunk.collision;
+  }
+
+  return {
+    coord: gameChunk.coord,
+    width: size,
+    height: size,
+    layers: gameChunk.layers,
+    collision: collisionArray,
+    entities: gameChunk.entities || [],
+    mapObjects: gameChunk.mapObjects || [],
+    walls: gameChunk.walls || [],
+    portals: gameChunk.portals || [],
+    gatheringZones: gameChunk.gatheringZones || [],
+  };
+}
+
+// Sync maps FROM game server TO mapper (reverse of deploy)
+app.post('/api/sync-from-game-server', async (_req, res) => {
+  try {
+    // Ensure mapper data directories exist
+    await fs.mkdir(CHUNKS_DIR, { recursive: true });
+    await fs.mkdir(INTERIORS_DIR, { recursive: true });
+
+    let chunksSynced = 0;
+    let interiorsSynced = 0;
+
+    // Convert and copy chunks (game server format -> mapper format)
+    try {
+      const chunkFiles = await fs.readdir(GAME_CHUNKS_DIR);
+      for (const file of chunkFiles) {
+        if (!file.endsWith('.json') || !file.startsWith('chunk_')) continue;
+        const srcPath = path.join(GAME_CHUNKS_DIR, file);
+
+        // Read and convert chunk
+        const data = await fs.readFile(srcPath, 'utf-8');
+        const gameChunk = JSON.parse(data);
+        const mapperChunk = convertChunkToMapperFormat(gameChunk);
+
+        // Write to mapper without chunk_ prefix
+        const destFilename = file.replace('chunk_', '');
+        const destPath = path.join(CHUNKS_DIR, destFilename);
+        await fs.writeFile(destPath, JSON.stringify(mapperChunk, null, 2));
+        chunksSynced++;
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw err;
+      }
+    }
+
+    // Copy interiors
+    try {
+      const interiorFiles = await fs.readdir(GAME_INTERIORS_DIR);
+      for (const file of interiorFiles) {
+        if (!file.endsWith('.json')) continue;
+        const srcPath = path.join(GAME_INTERIORS_DIR, file);
+        const destPath = path.join(INTERIORS_DIR, file);
+        await fs.copyFile(srcPath, destPath);
+        interiorsSynced++;
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw err;
+      }
+    }
+
+    console.log(`Synced ${chunksSynced} chunks and ${interiorsSynced} interiors from game server`);
+    res.json({
+      success: true,
+      chunksSynced,
+      interiorsSynced,
+      source: GAME_SERVER_DIR
+    });
+  } catch (err) {
+    console.error('Sync from game server failed:', err);
+    res.status(500).json({ error: `Sync failed: ${(err as Error).message}` });
+  }
+});
+
 // --- Deploy to Game Server ---
 
 // Convert collision array to base64-encoded bitset

@@ -191,6 +191,8 @@ impl InputHandler {
             || state.ui_state.crafting_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.quest_log_open
+            || state.ui_state.social_open
+            || state.ui_state.chat_panel_open
             || in_dialogue;
         let hide_action_buttons = any_panel_open;
         let hide_direction_controls = state.ui_state.escape_menu_open
