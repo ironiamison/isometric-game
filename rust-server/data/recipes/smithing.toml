@@ -1,0 +1,255 @@
+# Smithing recipes - Scavenger Set crafting
+
+# =============================================================================
+# Components (Level 1)
+# =============================================================================
+
+[scrap_leather]
+display_name = "Scrap Leather"
+description = "Tan piglet hides with slime core into crude leather."
+category = "smithing"
+level_required = 1
+
+[[scrap_leather.ingredients]]
+item_id = "piglet"
+count = 3
+
+[[scrap_leather.ingredients]]
+item_id = "slime_core"
+count = 2
+
+[[scrap_leather.results]]
+item_id = "scrap_leather"
+count = 1
+
+[bone_fragment]
+display_name = "Bone Fragment"
+description = "Bind shell and spine into hardened bone fragments."
+category = "smithing"
+level_required = 1
+
+[[bone_fragment.ingredients]]
+item_id = "snail_shell"
+count = 4
+
+[[bone_fragment.ingredients]]
+item_id = "hedgehog_spine"
+count = 2
+
+[[bone_fragment.results]]
+item_id = "bone_fragment"
+count = 1
+
+[crude_binding]
+display_name = "Crude Binding"
+description = "Weave worm segments and spider silk into binding material."
+category = "smithing"
+level_required = 1
+
+[[crude_binding.ingredients]]
+item_id = "worm_segment"
+count = 3
+
+[[crude_binding.ingredients]]
+item_id = "spider_silk"
+count = 2
+
+[[crude_binding.results]]
+item_id = "crude_binding"
+count = 1
+
+[shell_plate]
+display_name = "Shell Plate"
+description = "Fuse snail shells into a hardened plate."
+category = "smithing"
+level_required = 1
+
+[[shell_plate.ingredients]]
+item_id = "snail_shell"
+count = 5
+
+[[shell_plate.results]]
+item_id = "shell_plate"
+count = 1
+
+[blade_shard]
+display_name = "Blade Shard"
+description = "Shape hedgehog spines into a crude blade edge."
+category = "smithing"
+level_required = 1
+
+[[blade_shard.ingredients]]
+item_id = "hedgehog_spine"
+count = 4
+
+[[blade_shard.ingredients]]
+item_id = "spring_coil"
+count = 1
+
+[[blade_shard.results]]
+item_id = "blade_shard"
+count = 1
+
+[bow_stave]
+display_name = "Bow Stave"
+description = "Bend spring coils into a flexible bow frame."
+category = "smithing"
+level_required = 1
+
+[[bow_stave.ingredients]]
+item_id = "spring_coil"
+count = 3
+
+[[bow_stave.ingredients]]
+item_id = "worm_segment"
+count = 2
+
+[[bow_stave.results]]
+item_id = "bow_stave"
+count = 1
+
+# =============================================================================
+# Ammunition (Level 1)
+# =============================================================================
+
+[bone_arrow]
+display_name = "Bone Arrow"
+description = "Craft bone-tipped arrows with crow feather fletching."
+category = "smithing"
+level_required = 1
+
+[[bone_arrow.ingredients]]
+item_id = "hedgehog_spine"
+count = 1
+
+[[bone_arrow.ingredients]]
+item_id = "crow_feather"
+count = 3
+
+[[bone_arrow.results]]
+item_id = "bone_arrow"
+count = 15
+
+# =============================================================================
+# Armor (Level 1)
+# =============================================================================
+
+[scavenger_vest]
+display_name = "Scavenger Vest"
+description = "Assemble leather and shell into a crude vest."
+category = "smithing"
+level_required = 1
+
+[[scavenger_vest.ingredients]]
+item_id = "scrap_leather"
+count = 2
+
+[[scavenger_vest.ingredients]]
+item_id = "shell_plate"
+count = 1
+
+[[scavenger_vest.ingredients]]
+item_id = "crude_binding"
+count = 1
+
+[[scavenger_vest.results]]
+item_id = "scavenger_vest"
+count = 1
+
+[scavenger_boots]
+display_name = "Scavenger Boots"
+description = "Stitch leather scraps into sturdy boots."
+category = "smithing"
+level_required = 1
+
+[[scavenger_boots.ingredients]]
+item_id = "scrap_leather"
+count = 1
+
+[[scavenger_boots.ingredients]]
+item_id = "crude_binding"
+count = 1
+
+[[scavenger_boots.results]]
+item_id = "scavenger_boots"
+count = 1
+
+# =============================================================================
+# Accessories (Level 5)
+# =============================================================================
+
+[bone_ring]
+display_name = "Bone Ring"
+description = "Carve a ring from bone fragments."
+category = "smithing"
+level_required = 5
+
+[[bone_ring.ingredients]]
+item_id = "bone_fragment"
+count = 1
+
+[[bone_ring.results]]
+item_id = "bone_ring"
+count = 1
+
+[shell_pendant]
+display_name = "Shell Pendant"
+description = "Polish and bind shell plates into a pendant."
+category = "smithing"
+level_required = 5
+
+[[shell_pendant.ingredients]]
+item_id = "shell_plate"
+count = 1
+
+[[shell_pendant.ingredients]]
+item_id = "crude_binding"
+count = 1
+
+[[shell_pendant.results]]
+item_id = "shell_pendant"
+count = 1
+
+# =============================================================================
+# Weapons (Level 5)
+# =============================================================================
+
+[spine_blade]
+display_name = "Spine Blade"
+description = "Fashion a crude blade from sharpened spines and bone."
+category = "smithing"
+level_required = 5
+
+[[spine_blade.ingredients]]
+item_id = "blade_shard"
+count = 1
+
+[[spine_blade.ingredients]]
+item_id = "bone_fragment"
+count = 1
+
+[[spine_blade.results]]
+item_id = "spine_blade"
+count = 1
+
+[scavenger_bow]
+display_name = "Scavenger Bow"
+description = "String a bow stave with binding and feathers."
+category = "smithing"
+level_required = 5
+
+[[scavenger_bow.ingredients]]
+item_id = "bow_stave"
+count = 1
+
+[[scavenger_bow.ingredients]]
+item_id = "crude_binding"
+count = 1
+
+[[scavenger_bow.ingredients]]
+item_id = "crow_feather"
+count = 3
+
+[[scavenger_bow.results]]
+item_id = "scavenger_bow"
+count = 1
