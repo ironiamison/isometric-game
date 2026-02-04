@@ -304,8 +304,16 @@ impl Renderer {
 
                 let text_color = if is_selected { TEXT_TITLE } else if is_hovered { TEXT_NORMAL } else { TEXT_DIM };
 
+                // Draw small sprite preview of the result item
+                let sprite_size = 24.0;
+                let sprite_x = list_x + 8.0;
+                let sprite_y = y + (line_height - 2.0 - sprite_size) / 2.0;
+                if let Some(result) = recipe.results.first() {
+                    self.draw_item_icon(&result.item_id, sprite_x, sprite_y, sprite_size, sprite_size, state, false);
+                }
+
                 let prefix = if is_selected { "> " } else { "  " };
-                self.draw_text_sharp(&format!("{}{}", prefix, recipe.display_name), list_x + 8.0, y + 19.0, 16.0, text_color);
+                self.draw_text_sharp(&format!("{}{}", prefix, recipe.display_name), list_x + 8.0 + sprite_size + 4.0, y + 19.0, 16.0, text_color);
 
                 if recipe.level_required > 1 {
                     let level_text = format!("Lv{}", recipe.level_required);
@@ -356,21 +364,31 @@ impl Renderer {
         }
 
         if let Some(recipe) = discovered_recipes.get(state.ui_state.crafting_selected_recipe) {
-            self.draw_text_sharp(&recipe.display_name, detail_x + 12.0, detail_y + 24.0, 16.0, TEXT_TITLE);
+            // Draw larger sprite preview of the result item in the header area
+            let header_icon_size = 48.0;
+            let header_icon_x = detail_x + 12.0;
+            let header_icon_y = detail_y + 6.0;
+            if let Some(result) = recipe.results.first() {
+                self.draw_item_icon(&result.item_id, header_icon_x, header_icon_y, header_icon_size, header_icon_size, state, true);
+            }
 
-            draw_line(detail_x + 10.0, detail_y + 32.0, detail_x + detail_width - 10.0, detail_y + 32.0, 1.0, HEADER_BORDER);
+            let text_offset_x = header_icon_size + 8.0;
+            self.draw_text_sharp(&recipe.display_name, detail_x + 12.0 + text_offset_x, detail_y + 24.0, 16.0, TEXT_TITLE);
+
+            let desc_start_y = detail_y + 6.0 + header_icon_size + 4.0;
+            draw_line(detail_x + 10.0, desc_start_y - 4.0, detail_x + detail_width - 10.0, desc_start_y - 4.0, 1.0, HEADER_BORDER);
 
             let desc_height = self.draw_text_wrapped(
                 &recipe.description,
                 detail_x + 12.0,
-                detail_y + 48.0,
+                desc_start_y + 8.0,
                 16.0,
                 TEXT_NORMAL,
                 detail_width - 24.0,
                 20.0,
             );
 
-            let mut section_y = detail_y + 48.0 + desc_height + 10.0;
+            let mut section_y = desc_start_y + 8.0 + desc_height + 10.0;
 
             if recipe.level_required > 1 {
                 let (level_color, level_icon) = if let Some(player) = state.get_local_player() {
@@ -434,10 +452,16 @@ impl Renderer {
                     ("[-]", Color::new(0.784, 0.314, 0.314, 1.0))
                 };
 
+                // Draw ingredient sprite icon
+                let ing_icon_size = 24.0;
+                let ing_icon_x = detail_x + 20.0;
+                let ing_icon_y = section_y - ing_icon_size + 4.0;
+                self.draw_item_icon(&ingredient.item_id, ing_icon_x, ing_icon_y, ing_icon_size, ing_icon_size, state, false);
+
                 let display_name = state.item_registry.get_display_name(&ingredient.item_id);
                 let text = format!("{} {} ({}/{})", marker, display_name, have_count, need_count);
-                self.draw_text_sharp(&text, detail_x + 20.0, section_y, 16.0, color);
-                section_y += 20.0;
+                self.draw_text_sharp(&text, detail_x + 20.0 + ing_icon_size + 4.0, section_y, 16.0, color);
+                section_y += 26.0;
             }
 
             section_y += 12.0;
@@ -445,10 +469,16 @@ impl Renderer {
             section_y += 22.0;
 
             for result in &recipe.results {
+                // Draw result item sprite icon
+                let res_icon_size = 24.0;
+                let res_icon_x = detail_x + 20.0;
+                let res_icon_y = section_y - res_icon_size + 4.0;
+                self.draw_item_icon(&result.item_id, res_icon_x, res_icon_y, res_icon_size, res_icon_size, state, false);
+
                 let display_name = state.item_registry.get_display_name(&result.item_id);
                 let text = format!("  {} x{}", display_name, result.count);
-                self.draw_text_sharp(&text, detail_x + 20.0, section_y, 16.0, CATEGORY_EQUIPMENT);
-                section_y += 20.0;
+                self.draw_text_sharp(&text, detail_x + 20.0 + res_icon_size + 4.0, section_y, 16.0, CATEGORY_EQUIPMENT);
+                section_y += 26.0;
             }
 
             // ===== CRAFT BUTTON =====
@@ -508,10 +538,18 @@ impl Renderer {
         let text_x = detail_x + (detail_width - crafting_dims.width) / 2.0;
         self.draw_text_sharp(dots, text_x, detail_y + 40.0, 16.0, TEXT_TITLE);
 
-        // Show the result item name if we can find the recipe
+        // Show the result item name and sprite if we can find the recipe
         if let Some(ref recipe_id) = state.ui_state.crafting_recipe_id {
             if let Some(recipe) = state.recipe_definitions.iter().find(|r| &r.id == recipe_id) {
-                // Recipe name
+                // Draw a centered result item sprite (48x48) below the CRAFTING text
+                let progress_icon_size = 48.0;
+                if let Some(result) = recipe.results.first() {
+                    let icon_x = detail_x + (detail_width - progress_icon_size) / 2.0;
+                    let icon_y = detail_y + 50.0;
+                    self.draw_item_icon(&result.item_id, icon_x, icon_y, progress_icon_size, progress_icon_size, state, true);
+                }
+
+                // Recipe name below the sprite
                 let name_dims = self.measure_text_sharp(&recipe.display_name, 16.0);
                 let name_x = detail_x + (detail_width - name_dims.width) / 2.0;
                 // Pulsing effect on the item name
@@ -522,7 +560,7 @@ impl Renderer {
                     CATEGORY_EQUIPMENT.b * pulse,
                     1.0,
                 );
-                self.draw_text_sharp(&recipe.display_name, name_x, detail_y + 70.0, 16.0, pulse_color);
+                self.draw_text_sharp(&recipe.display_name, name_x, detail_y + 50.0 + progress_icon_size + 16.0, 16.0, pulse_color);
 
                 // Show what it creates
                 if let Some(result) = recipe.results.first() {
@@ -530,7 +568,7 @@ impl Renderer {
                     let result_text = format!("Creating: {} x{}", result_name, result.count);
                     let result_dims = self.measure_text_sharp(&result_text, 16.0);
                     let result_x = detail_x + (detail_width - result_dims.width) / 2.0;
-                    self.draw_text_sharp(&result_text, result_x, detail_y + 95.0, 16.0, TEXT_NORMAL);
+                    self.draw_text_sharp(&result_text, result_x, detail_y + 50.0 + progress_icon_size + 36.0, 16.0, TEXT_NORMAL);
                 }
             }
         }
