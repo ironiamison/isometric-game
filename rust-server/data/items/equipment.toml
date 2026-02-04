@@ -970,3 +970,99 @@ defence_level_required = 30
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 25
+
+# =============================================================================
+# SCAVENGER SET (Craftable early-game gear)
+# =============================================================================
+
+[scavenger_vest]
+display_name = "Scavenger Vest"
+sprite = "scavenger_vest"
+description = "Cobbled-together armor from forest creature scraps."
+category = "equipment"
+max_stack = 1
+base_price = 45
+sellable = true
+[scavenger_vest.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 3
+
+[scavenger_boots]
+display_name = "Scavenger Boots"
+sprite = "scavenger_boots"
+description = "Sturdy boots patched together from leather scraps."
+category = "equipment"
+max_stack = 1
+base_price = 25
+sellable = true
+[scavenger_boots.equipment]
+slot_type = "feet"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 2
+
+[bone_ring]
+display_name = "Bone Ring"
+sprite = "bone_ring"
+description = "A ring carved from creature bones."
+category = "equipment"
+max_stack = 1
+base_price = 35
+sellable = true
+[bone_ring.equipment]
+slot_type = "ring"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 1
+defence_bonus = 1
+
+[shell_pendant]
+display_name = "Shell Pendant"
+sprite = "shell_pendant"
+description = "A pendant made from polished shell plates."
+category = "equipment"
+max_stack = 1
+base_price = 40
+sellable = true
+[shell_pendant.equipment]
+slot_type = "necklace"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 3
+
+[spine_blade]
+display_name = "Spine Blade"
+sprite = "spine_blade"
+description = "A crude blade fashioned from hedgehog spines."
+category = "equipment"
+max_stack = 1
+base_price = 55
+sellable = true
+[spine_blade.equipment]
+slot_type = "weapon"
+attack_level_required = 1
+attack_bonus = 4
+strength_bonus = 6
+defence_bonus = 0
+
+[scavenger_bow]
+display_name = "Scavenger Bow"
+sprite = "scavenger_bow"
+description = "A makeshift bow cobbled together from springy materials."
+category = "equipment"
+max_stack = 1
+base_price = 65
+sellable = true
+[scavenger_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 6
+attack_level_required = 1
+attack_bonus = 8
+strength_bonus = 5
+defence_bonus = 0
