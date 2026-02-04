@@ -278,14 +278,47 @@ impl Renderer {
         self.draw_text_sharp("Blueprints", list_x + 8.0, list_y + 18.0, 16.0, TEXT_TITLE);
         draw_line(list_x + 6.0, list_y + 24.0, list_x + list_width - 6.0, list_y + 24.0, 1.0, HEADER_BORDER);
 
-        let line_height = 28.0;
-        let mut y = list_y + 32.0;
+        let line_height = 36.0;
+        let list_content_y = list_y + 30.0;
+        let list_content_height = list_height - 34.0;
+
+        // Calculate total content height and clamp scroll offset
+        let total_content = visible_recipes.len() as f32 * line_height;
+        let max_scroll = (total_content - list_content_height).max(0.0);
+        let scroll_offset = state.ui_state.crafting_scroll_offset.clamp(0.0, max_scroll);
+
+        // Scissor rect for clipping the recipe list
+        let physical_w = screen_width();
+        let physical_h = screen_height();
+        let (vw, _vh) = virtual_screen_size();
+        let scale_x = physical_w / vw;
+        let scale_y = physical_h / _vh;
+        {
+            let mut gl = unsafe { get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(Some((
+                ((list_x + 2.0) * scale_x) as i32,
+                ((list_content_y) * scale_y) as i32,
+                ((list_width - 4.0) * scale_x) as i32,
+                ((list_content_height) * scale_y) as i32,
+            )));
+        }
+
+        let mut y = list_content_y - scroll_offset;
 
         // Track the index of selectable recipes (discovered only)
         let mut selectable_index = 0usize;
         for (_orig_idx, recipe, is_discovered) in &visible_recipes {
-            if y > list_y + list_height - line_height {
-                break;
+            let item_bottom = y + line_height;
+            let item_top = y;
+
+            // Skip items fully above or below the visible area
+            if item_bottom < list_content_y || item_top > list_content_y + list_content_height {
+                if *is_discovered {
+                    selectable_index += 1;
+                }
+                y += line_height;
+                continue;
             }
 
             if *is_discovered {
@@ -304,8 +337,8 @@ impl Renderer {
 
                 let text_color = if is_selected { TEXT_TITLE } else if is_hovered { TEXT_NORMAL } else { TEXT_DIM };
 
-                // Draw small sprite preview of the result item
-                let sprite_size = 24.0;
+                // Draw sprite preview of the result item
+                let sprite_size = 28.0;
                 let sprite_x = list_x + 8.0;
                 let sprite_y = y + (line_height - 2.0 - sprite_size) / 2.0;
                 if let Some(result) = recipe.results.first() {
@@ -313,21 +346,47 @@ impl Renderer {
                 }
 
                 let prefix = if is_selected { "> " } else { "  " };
-                self.draw_text_sharp(&format!("{}{}", prefix, recipe.display_name), list_x + 8.0 + sprite_size + 4.0, y + 19.0, 16.0, text_color);
+                let text_y = y + (line_height - 2.0) / 2.0 + 5.0;
+                self.draw_text_sharp(&format!("{}{}", prefix, recipe.display_name), list_x + 8.0 + sprite_size + 6.0, text_y, 16.0, text_color);
 
                 if recipe.level_required > 1 {
                     let level_text = format!("Lv{}", recipe.level_required);
                     let level_width = self.measure_text_sharp(&level_text, 16.0).width;
-                    self.draw_text_sharp(&level_text, list_x + list_width - level_width - 12.0, y + 17.0, 16.0, FRAME_MID);
+                    self.draw_text_sharp(&level_text, list_x + list_width - level_width - 12.0, text_y, 16.0, FRAME_MID);
                 }
 
                 selectable_index += 1;
             } else {
                 // Undiscovered recipe - show grayed out "????" (non-selectable)
-                self.draw_text_sharp("  ????", list_x + 8.0, y + 19.0, 16.0, Color::new(0.35, 0.35, 0.4, 1.0));
+                let text_y = y + (line_height - 2.0) / 2.0 + 5.0;
+                self.draw_text_sharp("  ????", list_x + 8.0, text_y, 16.0, Color::new(0.35, 0.35, 0.4, 1.0));
             }
 
             y += line_height;
+        }
+
+        // Disable scissor clipping
+        {
+            let mut gl = unsafe { get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(None);
+        }
+
+        // Draw scroll indicator if content overflows
+        if max_scroll > 0.0 {
+            let scrollbar_track_h = list_content_height - 4.0;
+            let scrollbar_x = list_x + list_width - 8.0;
+            let scrollbar_y = list_content_y + 2.0;
+
+            // Track
+            draw_rectangle(scrollbar_x, scrollbar_y, 4.0, scrollbar_track_h, Color::new(0.1, 0.1, 0.13, 1.0));
+
+            // Thumb
+            let visible_ratio = (list_content_height / total_content).min(1.0);
+            let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0);
+            let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+            let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
+            draw_rectangle(scrollbar_x, thumb_y, 4.0, thumb_h, FRAME_MID);
         }
 
         // Build the list of discovered (selectable) recipes for detail panel
@@ -453,32 +512,15 @@ impl Renderer {
                 };
 
                 // Draw ingredient sprite icon
-                let ing_icon_size = 24.0;
+                let ing_icon_size = 28.0;
                 let ing_icon_x = detail_x + 20.0;
-                let ing_icon_y = section_y - ing_icon_size + 4.0;
+                let ing_icon_y = section_y - 14.0;
                 self.draw_item_icon(&ingredient.item_id, ing_icon_x, ing_icon_y, ing_icon_size, ing_icon_size, state, false);
 
                 let display_name = state.item_registry.get_display_name(&ingredient.item_id);
                 let text = format!("{} {} ({}/{})", marker, display_name, have_count, need_count);
-                self.draw_text_sharp(&text, detail_x + 20.0 + ing_icon_size + 4.0, section_y, 16.0, color);
-                section_y += 26.0;
-            }
-
-            section_y += 12.0;
-            self.draw_text_sharp("Creates:", detail_x + 12.0, section_y, 16.0, FRAME_INNER);
-            section_y += 22.0;
-
-            for result in &recipe.results {
-                // Draw result item sprite icon
-                let res_icon_size = 24.0;
-                let res_icon_x = detail_x + 20.0;
-                let res_icon_y = section_y - res_icon_size + 4.0;
-                self.draw_item_icon(&result.item_id, res_icon_x, res_icon_y, res_icon_size, res_icon_size, state, false);
-
-                let display_name = state.item_registry.get_display_name(&result.item_id);
-                let text = format!("  {} x{}", display_name, result.count);
-                self.draw_text_sharp(&text, detail_x + 20.0 + res_icon_size + 4.0, section_y, 16.0, CATEGORY_EQUIPMENT);
-                section_y += 26.0;
+                self.draw_text_sharp(&text, detail_x + 20.0 + ing_icon_size + 6.0, section_y + 2.0, 16.0, color);
+                section_y += 32.0;
             }
 
             // ===== CRAFT BUTTON =====

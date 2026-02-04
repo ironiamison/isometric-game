@@ -975,15 +975,30 @@ defence_bonus = 25
 # SCAVENGER SET (Craftable early-game gear)
 # =============================================================================
 
-[scavenger_vest]
-display_name = "Scavenger Vest"
-sprite = "scavenger_vest"
+[scavenger_tunic]
+display_name = "Scavenger Tunic"
+sprite = "scavenger_tunic"
 description = "Cobbled-together armor from forest creature scraps."
 category = "equipment"
 max_stack = 1
 base_price = 45
 sellable = true
-[scavenger_vest.equipment]
+[scavenger_tunic.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 3
+
+[scavenger_tunic_female]
+display_name = "Scavenger Tunic (F)"
+sprite = "scavenger_tunic_female"
+description = "Cobbled-together armor from forest creature scraps."
+category = "equipment"
+max_stack = 1
+base_price = 45
+sellable = true
+[scavenger_tunic_female.equipment]
 slot_type = "body"
 defence_level_required = 1
 attack_bonus = 0

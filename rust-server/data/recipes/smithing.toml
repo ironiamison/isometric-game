@@ -155,29 +155,54 @@ count = 15
 # Armor (Level 1)
 # =============================================================================
 
-[scavenger_vest]
-display_name = "Scavenger Vest"
-description = "Assemble leather and shell into a crude vest."
+[scavenger_tunic]
+display_name = "Scavenger Tunic"
+description = "Assemble leather and shell into a crude tunic."
 category = "smithing"
 level_required = 1
 station = "anvil"
 craft_time_ms = 5000
 xp = 35
 
-[[scavenger_vest.ingredients]]
+[[scavenger_tunic.ingredients]]
 item_id = "scrap_leather"
 count = 2
 
-[[scavenger_vest.ingredients]]
+[[scavenger_tunic.ingredients]]
 item_id = "shell_plate"
 count = 1
 
-[[scavenger_vest.ingredients]]
+[[scavenger_tunic.ingredients]]
 item_id = "crude_binding"
 count = 1
 
-[[scavenger_vest.results]]
-item_id = "scavenger_vest"
+[[scavenger_tunic.results]]
+item_id = "scavenger_tunic"
+count = 1
+
+[scavenger_tunic_female]
+display_name = "Scavenger Tunic (F)"
+description = "Assemble leather and shell into a crude tunic."
+category = "smithing"
+level_required = 1
+station = "anvil"
+craft_time_ms = 5000
+xp = 35
+
+[[scavenger_tunic_female.ingredients]]
+item_id = "scrap_leather"
+count = 2
+
+[[scavenger_tunic_female.ingredients]]
+item_id = "shell_plate"
+count = 1
+
+[[scavenger_tunic_female.ingredients]]
+item_id = "crude_binding"
+count = 1
+
+[[scavenger_tunic_female.results]]
+item_id = "scavenger_tunic_female"
 count = 1
 
 [scavenger_boots]

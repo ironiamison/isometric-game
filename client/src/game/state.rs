@@ -579,6 +579,7 @@ pub struct UiState {
     pub crafting_open: bool,
     pub crafting_selected_category: usize,
     pub crafting_selected_recipe: usize,
+    pub crafting_scroll_offset: f32,
     pub crafting_npc_id: Option<String>,
     // Crafting progress state (timed crafting)
     pub crafting_in_progress: bool,
@@ -682,6 +683,7 @@ impl Default for UiState {
             crafting_open: false,
             crafting_selected_category: 0,
             crafting_selected_recipe: 0,
+            crafting_scroll_offset: 0.0,
             crafting_npc_id: None,
             crafting_in_progress: false,
             crafting_recipe_id: None,

@@ -1395,6 +1395,7 @@ impl InputHandler {
                             if *idx != state.ui_state.crafting_selected_category {
                                 state.ui_state.crafting_selected_category = *idx;
                                 state.ui_state.crafting_selected_recipe = 0;
+                                state.ui_state.crafting_scroll_offset = 0.0;
                             }
                         }
                         return commands;
@@ -1614,12 +1615,14 @@ impl InputHandler {
                         if state.ui_state.crafting_selected_category > 0 {
                             state.ui_state.crafting_selected_category -= 1;
                             state.ui_state.crafting_selected_recipe = 0;
+                            state.ui_state.crafting_scroll_offset = 0.0;
                         }
                     }
                     if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
                         if state.ui_state.crafting_selected_category < categories.len().saturating_sub(1) {
                             state.ui_state.crafting_selected_category += 1;
                             state.ui_state.crafting_selected_recipe = 0;
+                            state.ui_state.crafting_scroll_offset = 0.0;
                         }
                     }
 
@@ -1640,14 +1643,34 @@ impl InputHandler {
                         .collect();
 
                     // Up/Down navigate recipes
+                    let mut key_navigated = false;
                     if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
                         if state.ui_state.crafting_selected_recipe > 0 {
                             state.ui_state.crafting_selected_recipe -= 1;
+                            key_navigated = true;
                         }
                     }
                     if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
                         if state.ui_state.crafting_selected_recipe < recipes_in_category.len().saturating_sub(1) {
                             state.ui_state.crafting_selected_recipe += 1;
+                            key_navigated = true;
+                        }
+                    }
+
+                    // Only auto-scroll when keyboard navigated, not every frame
+                    if key_navigated {
+                        let craft_line_h = 36.0_f32;
+                        let sel = state.ui_state.crafting_selected_recipe as f32;
+                        let item_top = sel * craft_line_h;
+                        let item_bottom = item_top + craft_line_h;
+                        if item_top < state.ui_state.crafting_scroll_offset {
+                            state.ui_state.crafting_scroll_offset = item_top;
+                        }
+                        let (_, sh) = crate::util::virtual_screen_size();
+                        let panel_h = (450.0_f32).min(sh - 16.0);
+                        let visible_h = panel_h - 140.0;
+                        if item_bottom > state.ui_state.crafting_scroll_offset + visible_h {
+                            state.ui_state.crafting_scroll_offset = item_bottom - visible_h;
                         }
                     }
 
@@ -1664,6 +1687,29 @@ impl InputHandler {
                         commands.push(InputCommand::CancelCraft);
                         return commands;
                     }
+                }
+
+                // Mouse wheel scrolling for crafting recipe list (same logic as shop tab)
+                let (_wheel_x, wheel_y) = mouse_wheel();
+                if wheel_y != 0.0 {
+                    const SCROLL_SPEED: f32 = 30.0;
+                    let line_height = 36.0;
+                    // Count all recipes in category (discovered + undiscovered) to match renderer
+                    let sel_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
+                    let cur_cat = categories.get(sel_idx).map(|s| s.as_str()).unwrap_or("supplies");
+                    let total_visible: usize = state.recipe_definitions.iter()
+                        .filter(|r| if cur_cat == "supplies" { r.category == "consumables" || r.category == "materials" } else { r.category == cur_cat })
+                        .count();
+                    // Match renderer: list_content_height = list_height - 34, list_height = content_height - tab_height - 20
+                    // content_height = panel_height - FRAME*2 - HEADER - FOOTER - 12, tab_height = 28
+                    let (_, sh) = crate::util::virtual_screen_size();
+                    let panel_height = (450.0_f32).min(sh - 16.0);
+                    let content_height = panel_height - 8.0 - 32.0 - 28.0 - 12.0; // FRAME*2=8, HEADER=32, FOOTER=28
+                    let list_height = content_height - 28.0 - 20.0; // tab_height=28
+                    let list_content_height = list_height - 34.0;
+                    let total_content = total_visible as f32 * line_height;
+                    let max_scroll = (total_content - list_content_height).max(0.0);
+                    state.ui_state.crafting_scroll_offset = (state.ui_state.crafting_scroll_offset - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
                 }
             } else if state.ui_state.shop_main_tab == 1 {
                 // Shop tab - side-by-side Buy/Sell layout
