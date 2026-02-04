@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use serde::Serialize;
 use rand::Rng;
 use crate::game::Direction;
@@ -307,7 +308,7 @@ impl Npc {
         target_x: i32,
         target_y: i32,
         current_time: u64,
-        occupied_tiles: &[(i32, i32)],
+        occupied_tiles: &HashSet<(i32, i32)>,
         walkable_check: &dyn Fn(i32, i32) -> bool,
     ) -> bool {
         // Check movement cooldown
@@ -369,8 +370,8 @@ impl Npc {
                 continue; // Tile has collision
             }
 
-            // Check if tile is occupied by another NPC
-            if occupied_tiles.iter().any(|(ox, oy)| *ox == new_x && *oy == new_y) {
+            // Check if tile is occupied by another NPC or player
+            if occupied_tiles.contains(&(new_x, new_y)) {
                 continue; // Try next candidate
             }
 
@@ -394,7 +395,7 @@ impl Npc {
         &mut self,
         _delta: f32, // Not used for grid movement
         players: &[(String, i32, i32, i32)], // (id, x, y, hp) - grid positions
-        other_npc_positions: &[(i32, i32)],  // positions of other NPCs (excluding self)
+        other_npc_positions: &HashSet<(i32, i32)>,  // positions of other NPCs and players (excluding self)
         current_time: u64,
         walkable_check: &dyn Fn(i32, i32) -> bool,
     ) -> Option<(String, i32)> {

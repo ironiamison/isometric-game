@@ -1477,7 +1477,7 @@ async fn handle_socket(
     }
 
     // Create channel for sending messages to this client
-    let (tx, mut rx) = mpsc::channel::<Vec<u8>>(32);
+    let (tx, mut rx) = mpsc::channel::<Vec<u8>>(256);
 
     // SECURITY: Register this player's sender for unicast messages
     room.register_player_sender(&player_id, tx).await;

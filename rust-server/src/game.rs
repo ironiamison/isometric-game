@@ -5644,43 +5644,36 @@ impl GameRoom {
                 }
             };
 
-            // Collect NPC positions for collision detection (only alive NPCs)
-            let mut npc_positions: std::collections::HashMap<String, (i32, i32)> = npcs
+            // Build shared occupied tiles set once: all alive NPC positions + player positions
+            let mut occupied_tiles: std::collections::HashSet<(i32, i32)> = npcs
                 .values()
                 .filter(|n| n.is_alive())
-                .map(|n| (n.id.clone(), (n.x, n.y)))
+                .map(|n| (n.x, n.y))
                 .collect();
+            for (_, px, py, _) in &player_positions {
+                occupied_tiles.insert((*px, *py));
+            }
 
             for npc in npcs.values_mut() {
                 // Check for respawn
                 if npc.ready_to_respawn(current_time) {
                     npc.respawn();
                     respawned_npcs.push((npc.id.clone(), npc.x, npc.y));
-                    // Update position in collision map
-                    npc_positions.insert(npc.id.clone(), (npc.x, npc.y));
+                    occupied_tiles.insert((npc.x, npc.y));
                 }
 
-                // Get positions of other NPCs (excluding self) for collision detection
-                let mut occupied_tiles: Vec<(i32, i32)> = npc_positions
-                    .iter()
-                    .filter(|(id, _)| *id != &npc.id)
-                    .map(|(_, pos)| *pos)
-                    .collect();
-
-                // Add player positions to occupied tiles so NPCs avoid walking into players
-                for (_, px, py, _) in &player_positions {
-                    occupied_tiles.push((*px, *py));
-                }
+                // Temporarily remove this NPC's position so it doesn't collide with itself
+                let old_pos = (npc.x, npc.y);
+                occupied_tiles.remove(&old_pos);
 
                 // Run NPC AI update
                 if let Some((target_id, max_hit)) = npc.update(delta_time, &player_positions, &occupied_tiles, current_time, &walkable_check) {
-                    // Store NPC level and max hit for hit/miss calculation during attack processing
                     npc_attacks.push((npc.id.clone(), target_id, npc.level, max_hit));
                 }
 
-                // Update position in collision map after movement
+                // Re-insert updated position
                 if npc.is_alive() {
-                    npc_positions.insert(npc.id.clone(), (npc.x, npc.y));
+                    occupied_tiles.insert((npc.x, npc.y));
                 }
 
                 // Apply HP regen
@@ -5989,9 +5982,21 @@ impl GameRoom {
         }
 
         // Send state sync to each player, filtering by instance and view distance
+        // Snapshot lock data quickly, then release locks before expensive encoding
         let tick = *self.tick.read().await;
-        let player_instances = self.player_instances.read().await;
-        let senders = self.player_senders.read().await;
+
+        let (instance_snapshot, senders_snapshot) = {
+            let player_instances = self.player_instances.read().await;
+            let senders = self.player_senders.read().await;
+
+            // Snapshot instance assignments: player_id -> instance_id
+            let inst: HashMap<String, String> = player_instances.clone();
+            // Snapshot senders (mpsc::Sender is cheap to clone)
+            let send: HashMap<String, mpsc::Sender<Vec<u8>>> = senders.clone();
+
+            (inst, send)
+            // Both read locks released here
+        };
 
         // Build position lookup for O(1) access during culling
         let player_pos_map: HashMap<&str, (i32, i32)> = player_updates.iter()
@@ -5999,21 +6004,21 @@ impl GameRoom {
             .collect();
 
         // Separate overworld vs instance senders
-        let mut instance_groups: HashMap<&String, Vec<(&String, &tokio::sync::mpsc::Sender<Vec<u8>>)>> = HashMap::new();
-        let mut overworld_senders: Vec<(&String, &tokio::sync::mpsc::Sender<Vec<u8>>)> = Vec::new();
-        for (player_id, sender) in senders.iter() {
-            match player_instances.get(player_id) {
-                Some(inst_id) => instance_groups.entry(inst_id).or_default().push((player_id, sender)),
+        let mut instance_groups: HashMap<&str, Vec<(&String, &mpsc::Sender<Vec<u8>>)>> = HashMap::new();
+        let mut overworld_senders: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = Vec::new();
+        for (player_id, sender) in senders_snapshot.iter() {
+            match instance_snapshot.get(player_id) {
+                Some(inst_id) => instance_groups.entry(inst_id.as_str()).or_default().push((player_id, sender)),
                 None => overworld_senders.push((player_id, sender)),
             }
         }
 
         // Pre-filter player updates by instance
-        let mut players_by_instance: HashMap<&String, Vec<&PlayerUpdate>> = HashMap::new();
+        let mut players_by_instance: HashMap<&str, Vec<&PlayerUpdate>> = HashMap::new();
         let mut overworld_players: Vec<&PlayerUpdate> = Vec::new();
         for p in &player_updates {
-            match player_instances.get(&p.id) {
-                Some(inst_id) => players_by_instance.entry(inst_id).or_default().push(p),
+            match instance_snapshot.get(&p.id) {
+                Some(inst_id) => players_by_instance.entry(inst_id.as_str()).or_default().push(p),
                 None => overworld_players.push(p),
             }
         }
@@ -6021,19 +6026,21 @@ impl GameRoom {
         // Instance groups: encode once per instance, send to all players in that instance
         for (inst_id, group_senders) in &instance_groups {
             let players_for_group: Vec<PlayerUpdate> = players_by_instance
-                .get(*inst_id)
+                .get(inst_id)
                 .map(|ps| ps.iter().map(|p| (*p).clone()).collect())
                 .unwrap_or_default();
 
             let msg = ServerMessage::StateSync {
                 tick,
                 players: players_for_group,
-                npcs: Vec::new(), // Instance players don't receive world NPCs
+                npcs: Vec::new(),
             };
 
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-                for (_player_id, sender) in group_senders {
-                    let _ = sender.try_send(bytes.clone());
+                for (pid, sender) in group_senders {
+                    if let Err(e) = sender.try_send(bytes.clone()) {
+                        tracing::debug!("StateSync drop for {}: {}", pid, e);
+                    }
                 }
             }
         }
@@ -6070,7 +6077,9 @@ impl GameRoom {
             };
 
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-                let _ = sender.try_send(bytes);
+                if let Err(e) = sender.try_send(bytes) {
+                    tracing::debug!("StateSync drop for {}: {}", player_id, e);
+                }
             }
         }
 
