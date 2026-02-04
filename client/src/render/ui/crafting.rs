@@ -6,7 +6,35 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use super::super::Renderer;
 use super::common::*;
-use super::shop;
+
+/// Helper to build the category list from recipes, grouping materials/consumables into "supplies"
+fn build_categories(recipes: &[RecipeDefinition]) -> Vec<String> {
+    let mut cats: Vec<String> = recipes.iter()
+        .map(|r| {
+            if r.category == "materials" || r.category == "consumables" {
+                "supplies".to_string()
+            } else {
+                r.category.clone()
+            }
+        })
+        .collect();
+    cats.sort();
+    cats.dedup();
+    cats
+}
+
+/// Helper to filter recipes for a given category (matching the supplies grouping)
+fn recipes_for_category<'a>(recipes: &'a [RecipeDefinition], category: &str) -> Vec<&'a RecipeDefinition> {
+    recipes.iter()
+        .filter(|r| {
+            if category == "supplies" {
+                r.category == "consumables" || r.category == "materials"
+            } else {
+                r.category == category
+            }
+        })
+        .collect()
+}
 
 impl Renderer {
     pub(crate) fn render_crafting(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
@@ -141,25 +169,23 @@ impl Renderer {
         draw_line(footer_x + 10.0, footer_y, footer_x + footer_w - 10.0, footer_y, 1.0, HEADER_BORDER);
 
         if state.ui_state.shop_main_tab == 0 {
-            // Recipes tab controls
-            self.draw_text_sharp("[Q] Tab", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            
-            let has_multiple_categories = {
-                let mut cats: Vec<String> = state.recipe_definitions.iter()
-                    .map(|r| if r.category == "materials" || r.category == "consumables" { "supplies".to_string() } else { r.category.clone() })
-                    .collect();
-                cats.sort();
-                cats.dedup();
-                cats.len() > 1
-            };
-
-            if has_multiple_categories {
-                self.draw_text_sharp("[A/D] Category", footer_x + 100.0, footer_y + 20.0, 16.0, TEXT_DIM);
-                self.draw_text_sharp("[W/S] Select", footer_x + 230.0, footer_y + 20.0, 16.0, TEXT_DIM);
-                self.draw_text_sharp("[C] Craft", footer_x + 340.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            if state.ui_state.crafting_in_progress {
+                // Show cancel hint while crafting
+                self.draw_text_sharp("[Esc] Cancel", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
             } else {
-                self.draw_text_sharp("[W/S] Select", footer_x + 100.0, footer_y + 20.0, 16.0, TEXT_DIM);
-                self.draw_text_sharp("[C] Craft", footer_x + 210.0, footer_y + 20.0, 16.0, TEXT_DIM);
+                // Recipes tab controls
+                self.draw_text_sharp("[Q] Tab", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
+
+                let has_multiple_categories = build_categories(&state.recipe_definitions).len() > 1;
+
+                if has_multiple_categories {
+                    self.draw_text_sharp("[A/D] Category", footer_x + 100.0, footer_y + 20.0, 16.0, TEXT_DIM);
+                    self.draw_text_sharp("[W/S] Select", footer_x + 230.0, footer_y + 20.0, 16.0, TEXT_DIM);
+                    self.draw_text_sharp("[C] Craft", footer_x + 340.0, footer_y + 20.0, 16.0, TEXT_DIM);
+                } else {
+                    self.draw_text_sharp("[W/S] Select", footer_x + 100.0, footer_y + 20.0, 16.0, TEXT_DIM);
+                    self.draw_text_sharp("[C] Craft", footer_x + 210.0, footer_y + 20.0, 16.0, TEXT_DIM);
+                }
             }
         } else {
             // Shop tab controls
@@ -171,21 +197,7 @@ impl Renderer {
     }
 
     fn render_recipes_tab(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout, panel_x: f32, content_y: f32, content_width: f32, content_height: f32) {
-        // Group consumables and materials into "supplies"
-        let categories: Vec<String> = {
-            let mut cats: Vec<String> = state.recipe_definitions.iter()
-                .map(|r| {
-                    if r.category == "materials" || r.category == "consumables" {
-                        "supplies".to_string()
-                    } else {
-                        r.category.clone()
-                    }
-                })
-                .collect();
-            cats.sort();
-            cats.dedup();
-            cats
-        };
+        let categories = build_categories(&state.recipe_definitions);
 
         if categories.is_empty() {
             self.draw_text_sharp("No recipes available", panel_x + FRAME_THICKNESS + 20.0, content_y + 40.0, 16.0, TEXT_DIM);
@@ -202,7 +214,10 @@ impl Renderer {
         if show_tabs {
             for (i, category) in categories.iter().enumerate() {
                 let is_selected = i == state.ui_state.crafting_selected_category;
-                let tab_width = self.measure_text_sharp(category, 16.0).width + 24.0;
+                let display_name: String = category.chars().enumerate()
+                    .map(|(idx, c)| if idx == 0 { c.to_ascii_uppercase() } else { c })
+                    .collect();
+                let tab_width = self.measure_text_sharp(&display_name, 16.0).width + 24.0;
 
                 let bounds = Rect::new(tab_x, tab_y, tab_width, tab_height);
                 layout.add(UiElementId::CraftingCategoryTab(i), bounds);
@@ -225,10 +240,6 @@ impl Renderer {
                     draw_line(tab_x + 2.0, tab_y + 2.0, tab_x + 2.0, tab_y + tab_height - 2.0, 1.0, FRAME_INNER);
                 }
 
-                let display_name: String = category.chars().enumerate()
-                    .map(|(idx, c)| if idx == 0 { c.to_ascii_uppercase() } else { c })
-                    .collect();
-
                 let text_color = if is_selected { TEXT_TITLE } else if is_hovered { TEXT_NORMAL } else { TEXT_DIM };
                 self.draw_text_sharp(&display_name, tab_x + 12.0, tab_y + 19.0, 16.0, text_color);
 
@@ -238,14 +249,17 @@ impl Renderer {
 
         let selected_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
         let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
-        
-        let recipes: Vec<&RecipeDefinition> = state.recipe_definitions.iter()
-            .filter(|r| {
-                if current_category == "supplies" {
-                    r.category == "consumables" || r.category == "materials"
-                } else {
-                    r.category == current_category
-                }
+
+        // Get all recipes for this category
+        let all_recipes = recipes_for_category(&state.recipe_definitions, current_category);
+
+        // Task 15: Filter recipes by discovery status
+        // - requires_discovery = false: always show
+        // - requires_discovery = true: show only if discovered, otherwise show as "????"
+        let visible_recipes: Vec<(usize, &RecipeDefinition, bool)> = all_recipes.iter().enumerate()
+            .map(|(i, r)| {
+                let is_discovered = !r.requires_discovery || state.discovered_recipes.contains(&r.id);
+                (i, *r, is_discovered)
             })
             .collect();
 
@@ -267,37 +281,52 @@ impl Renderer {
         let line_height = 28.0;
         let mut y = list_y + 32.0;
 
-        for (i, recipe) in recipes.iter().enumerate() {
+        // Track the index of selectable recipes (discovered only)
+        let mut selectable_index = 0usize;
+        for (_orig_idx, recipe, is_discovered) in &visible_recipes {
             if y > list_y + list_height - line_height {
                 break;
             }
 
-            let is_selected = i == state.ui_state.crafting_selected_recipe;
+            if *is_discovered {
+                let is_selected = selectable_index == state.ui_state.crafting_selected_recipe;
 
-            let item_bounds = Rect::new(list_x + 4.0, y, list_width - 8.0, line_height - 2.0);
-            layout.add(UiElementId::CraftingRecipeItem(i), item_bounds);
+                let item_bounds = Rect::new(list_x + 4.0, y, list_width - 8.0, line_height - 2.0);
+                layout.add(UiElementId::CraftingRecipeItem(selectable_index), item_bounds);
 
-            let is_hovered = matches!(hovered, Some(UiElementId::CraftingRecipeItem(idx)) if *idx == i);
+                let is_hovered = matches!(hovered, Some(UiElementId::CraftingRecipeItem(idx)) if *idx == selectable_index);
 
-            if is_selected {
-                draw_rectangle(list_x + 4.0, y, list_width - 8.0, line_height - 2.0, SLOT_HOVER_BG);
-            } else if is_hovered {
-                draw_rectangle(list_x + 4.0, y, list_width - 8.0, line_height - 2.0, Color::new(0.125, 0.125, 0.173, 1.0));
-            }
+                if is_selected {
+                    draw_rectangle(list_x + 4.0, y, list_width - 8.0, line_height - 2.0, SLOT_HOVER_BG);
+                } else if is_hovered {
+                    draw_rectangle(list_x + 4.0, y, list_width - 8.0, line_height - 2.0, Color::new(0.125, 0.125, 0.173, 1.0));
+                }
 
-            let text_color = if is_selected { TEXT_TITLE } else if is_hovered { TEXT_NORMAL } else { TEXT_DIM };
+                let text_color = if is_selected { TEXT_TITLE } else if is_hovered { TEXT_NORMAL } else { TEXT_DIM };
 
-            let prefix = if is_selected { "> " } else { "  " };
-            self.draw_text_sharp(&format!("{}{}", prefix, recipe.display_name), list_x + 8.0, y + 19.0, 16.0, text_color);
+                let prefix = if is_selected { "> " } else { "  " };
+                self.draw_text_sharp(&format!("{}{}", prefix, recipe.display_name), list_x + 8.0, y + 19.0, 16.0, text_color);
 
-            if recipe.level_required > 1 {
-                let level_text = format!("Lv{}", recipe.level_required);
-                let level_width = self.measure_text_sharp(&level_text, 16.0).width;
-                self.draw_text_sharp(&level_text, list_x + list_width - level_width - 12.0, y + 17.0, 16.0, FRAME_MID);
+                if recipe.level_required > 1 {
+                    let level_text = format!("Lv{}", recipe.level_required);
+                    let level_width = self.measure_text_sharp(&level_text, 16.0).width;
+                    self.draw_text_sharp(&level_text, list_x + list_width - level_width - 12.0, y + 17.0, 16.0, FRAME_MID);
+                }
+
+                selectable_index += 1;
+            } else {
+                // Undiscovered recipe - show grayed out "????" (non-selectable)
+                self.draw_text_sharp("  ????", list_x + 8.0, y + 19.0, 16.0, Color::new(0.35, 0.35, 0.4, 1.0));
             }
 
             y += line_height;
         }
+
+        // Build the list of discovered (selectable) recipes for detail panel
+        let discovered_recipes: Vec<&RecipeDefinition> = visible_recipes.iter()
+            .filter(|(_, _, discovered)| *discovered)
+            .map(|(_, r, _)| *r)
+            .collect();
 
         // ===== DETAIL PANEL (right side) =====
         let detail_x = list_x + list_width + 12.0;
@@ -311,7 +340,22 @@ impl Renderer {
         draw_line(detail_x + 2.0, detail_y + 2.0, detail_x + detail_width - 2.0, detail_y + 2.0, 2.0, SLOT_INNER_SHADOW);
         draw_line(detail_x + 2.0, detail_y + 2.0, detail_x + 2.0, detail_y + detail_height - 2.0, 2.0, SLOT_INNER_SHADOW);
 
-        if let Some(recipe) = recipes.get(state.ui_state.crafting_selected_recipe) {
+        // Task 14: If crafting is in progress, show progress overlay instead of normal detail
+        if state.ui_state.crafting_in_progress {
+            self.render_crafting_progress(state, hovered, layout, detail_x, detail_y, detail_width, detail_height);
+            return;
+        }
+
+        // Task 20: If completion animation is active, show it overlaid
+        if let Some((ref recipe_id, timer)) = state.ui_state.crafting_complete_animation {
+            if timer < 1.0 {
+                self.render_crafting_complete(state, recipe_id, timer, detail_x, detail_y, detail_width, detail_height);
+                // Still show normal detail panel underneath, but render overlay on top
+                // (the overlay is semi-transparent at the end, so we render both)
+            }
+        }
+
+        if let Some(recipe) = discovered_recipes.get(state.ui_state.crafting_selected_recipe) {
             self.draw_text_sharp(&recipe.display_name, detail_x + 12.0, detail_y + 24.0, 16.0, TEXT_TITLE);
 
             draw_line(detail_x + 10.0, detail_y + 32.0, detail_x + detail_width - 10.0, detail_y + 32.0, 1.0, HEADER_BORDER);
@@ -339,7 +383,35 @@ impl Renderer {
                     (TEXT_DIM, "[??]")
                 };
                 self.draw_text_sharp(&format!("{} Requires Level {}", level_icon, recipe.level_required), detail_x + 12.0, section_y, 16.0, level_color);
-                section_y += 25.0;
+                section_y += 22.0;
+            }
+
+            // Task 16: Show station requirement
+            if let Some(ref station) = recipe.station {
+                let station_display: String = station.chars().enumerate()
+                    .map(|(idx, c)| if idx == 0 { c.to_ascii_uppercase() } else { c })
+                    .collect();
+                // For now, just show the text - station proximity checking comes later
+                self.draw_text_sharp(&format!("Requires: {}", station_display), detail_x + 12.0, section_y, 16.0, TEXT_NORMAL);
+                section_y += 20.0;
+            }
+
+            // Task 16: Show crafting time
+            if recipe.craft_time_ms > 0 {
+                let seconds = recipe.craft_time_ms as f32 / 1000.0;
+                let time_text = if seconds == seconds.floor() {
+                    format!("Craft time: {}s", seconds as u32)
+                } else {
+                    format!("Craft time: {:.1}s", seconds)
+                };
+                self.draw_text_sharp(&time_text, detail_x + 12.0, section_y, 16.0, TEXT_DIM);
+                section_y += 20.0;
+            }
+
+            // Task 16: Show XP reward
+            if recipe.xp > 0 {
+                self.draw_text_sharp(&format!("XP: {}", recipe.xp), detail_x + 12.0, section_y, 16.0, TEXT_GOLD);
+                section_y += 22.0;
             }
 
             self.draw_text_sharp("Materials Required:", detail_x + 12.0, section_y, 16.0, FRAME_INNER);
@@ -417,6 +489,140 @@ impl Renderer {
             }
         } else {
             self.draw_text_sharp("Select a recipe", detail_x + 12.0, detail_y + 24.0, 16.0, TEXT_DIM);
+        }
+    }
+
+    /// Task 14: Render crafting progress overlay on the detail panel
+    fn render_crafting_progress(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout, detail_x: f32, detail_y: f32, detail_width: f32, detail_height: f32) {
+        let progress = state.ui_state.crafting_progress;
+
+        // "CRAFTING..." text centered, with pulsing ellipsis
+        let time = get_time() as f32;
+        let dots = match ((time * 2.0) as i32) % 4 {
+            0 => "CRAFTING",
+            1 => "CRAFTING.",
+            2 => "CRAFTING..",
+            _ => "CRAFTING...",
+        };
+        let crafting_dims = self.measure_text_sharp(dots, 16.0);
+        let text_x = detail_x + (detail_width - crafting_dims.width) / 2.0;
+        self.draw_text_sharp(dots, text_x, detail_y + 40.0, 16.0, TEXT_TITLE);
+
+        // Show the result item name if we can find the recipe
+        if let Some(ref recipe_id) = state.ui_state.crafting_recipe_id {
+            if let Some(recipe) = state.recipe_definitions.iter().find(|r| &r.id == recipe_id) {
+                // Recipe name
+                let name_dims = self.measure_text_sharp(&recipe.display_name, 16.0);
+                let name_x = detail_x + (detail_width - name_dims.width) / 2.0;
+                // Pulsing effect on the item name
+                let pulse = (time * 3.0).sin() * 0.15 + 0.85;
+                let pulse_color = Color::new(
+                    CATEGORY_EQUIPMENT.r * pulse,
+                    CATEGORY_EQUIPMENT.g * pulse,
+                    CATEGORY_EQUIPMENT.b * pulse,
+                    1.0,
+                );
+                self.draw_text_sharp(&recipe.display_name, name_x, detail_y + 70.0, 16.0, pulse_color);
+
+                // Show what it creates
+                if let Some(result) = recipe.results.first() {
+                    let result_name = state.item_registry.get_display_name(&result.item_id);
+                    let result_text = format!("Creating: {} x{}", result_name, result.count);
+                    let result_dims = self.measure_text_sharp(&result_text, 16.0);
+                    let result_x = detail_x + (detail_width - result_dims.width) / 2.0;
+                    self.draw_text_sharp(&result_text, result_x, detail_y + 95.0, 16.0, TEXT_NORMAL);
+                }
+            }
+        }
+
+        // Progress bar
+        let bar_width = detail_width - 40.0;
+        let bar_height = 20.0;
+        let bar_x = detail_x + 20.0;
+        let bar_y = detail_y + detail_height / 2.0 - bar_height / 2.0 + 10.0;
+
+        // Bar background
+        draw_rectangle(bar_x, bar_y, bar_width, bar_height, SLOT_BORDER);
+        draw_rectangle(bar_x + 1.0, bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, SLOT_BG_EMPTY);
+        draw_line(bar_x + 2.0, bar_y + 2.0, bar_x + bar_width - 2.0, bar_y + 2.0, 1.0, SLOT_INNER_SHADOW);
+
+        // Bar fill
+        let fill_width = (bar_width - 4.0) * progress;
+        if fill_width > 0.0 {
+            // Gradient-like fill using two rectangles
+            let fill_x = bar_x + 2.0;
+            let fill_y = bar_y + 2.0;
+            let fill_h = bar_height - 4.0;
+
+            draw_rectangle(fill_x, fill_y, fill_width, fill_h, Color::new(0.15, 0.4, 0.15, 1.0));
+            // Brighter top half
+            draw_rectangle(fill_x, fill_y, fill_width, fill_h / 2.0, Color::new(0.2, 0.55, 0.2, 1.0));
+            // Highlight line at top
+            draw_line(fill_x, fill_y, fill_x + fill_width, fill_y, 1.0, Color::new(0.35, 0.75, 0.35, 1.0));
+        }
+
+        // Percentage text below bar
+        let pct_text = format!("{}%", (progress * 100.0) as i32);
+        let pct_dims = self.measure_text_sharp(&pct_text, 16.0);
+        let pct_x = detail_x + (detail_width - pct_dims.width) / 2.0;
+        self.draw_text_sharp(&pct_text, pct_x, bar_y + bar_height + 20.0, 16.0, TEXT_NORMAL);
+
+        // CANCEL button
+        let cancel_btn_width = 120.0;
+        let cancel_btn_height = 28.0;
+        let cancel_btn_x = detail_x + (detail_width - cancel_btn_width) / 2.0;
+        let cancel_btn_y = detail_y + detail_height - 42.0;
+
+        let cancel_bounds = Rect::new(cancel_btn_x, cancel_btn_y, cancel_btn_width, cancel_btn_height);
+        layout.add(UiElementId::CraftingCancelButton, cancel_bounds);
+
+        let is_cancel_hovered = matches!(hovered, Some(UiElementId::CraftingCancelButton));
+        let (cancel_bg, cancel_border) = if is_cancel_hovered {
+            (Color::new(0.45, 0.15, 0.15, 1.0), Color::new(0.6, 0.2, 0.2, 1.0))
+        } else {
+            (Color::new(0.35, 0.12, 0.12, 1.0), Color::new(0.5, 0.18, 0.18, 1.0))
+        };
+
+        draw_rectangle(cancel_btn_x, cancel_btn_y, cancel_btn_width, cancel_btn_height, cancel_border);
+        draw_rectangle(cancel_btn_x + 1.0, cancel_btn_y + 1.0, cancel_btn_width - 2.0, cancel_btn_height - 2.0, cancel_bg);
+
+        let cancel_text = "[ CANCEL ]";
+        let cancel_text_w = self.measure_text_sharp(cancel_text, 16.0).width;
+        let cancel_text_color = if is_cancel_hovered { WHITE } else { Color::new(0.85, 0.6, 0.6, 1.0) };
+        self.draw_text_sharp(cancel_text, cancel_btn_x + (cancel_btn_width - cancel_text_w) / 2.0, cancel_btn_y + 19.0, 16.0, cancel_text_color);
+    }
+
+    /// Task 20: Render crafting completion animation overlay
+    fn render_crafting_complete(&self, state: &GameState, recipe_id: &str, timer: f32, detail_x: f32, detail_y: f32, detail_width: f32, detail_height: f32) {
+        // timer goes from 0.0 to 1.0 over ~1 second
+        let alpha = 1.0 - timer; // fade out
+
+        // "Crafted!" text with scale-up pop effect
+        let scale = if timer < 0.2 {
+            // Pop in: scale from 0.5 to 1.2
+            0.5 + (timer / 0.2) * 0.7
+        } else if timer < 0.35 {
+            // Settle: scale from 1.2 to 1.0
+            1.2 - ((timer - 0.2) / 0.15) * 0.2
+        } else {
+            1.0
+        };
+
+        let crafted_text = "Crafted!";
+        let font_size = 16.0 * scale;
+        let crafted_dims = self.measure_text_sharp(crafted_text, font_size);
+        let crafted_x = detail_x + (detail_width - crafted_dims.width) / 2.0;
+        let crafted_y = detail_y + detail_height / 2.0 - 20.0;
+
+        let text_color = Color::new(0.392, 0.784, 0.392, alpha);
+        self.draw_text_sharp(crafted_text, crafted_x, crafted_y, font_size, text_color);
+
+        // Show the item name below
+        if let Some(recipe) = state.recipe_definitions.iter().find(|r| r.id == recipe_id) {
+            let name_dims = self.measure_text_sharp(&recipe.display_name, 16.0);
+            let name_x = detail_x + (detail_width - name_dims.width) / 2.0;
+            let name_color = Color::new(CATEGORY_EQUIPMENT.r, CATEGORY_EQUIPMENT.g, CATEGORY_EQUIPMENT.b, alpha);
+            self.draw_text_sharp(&recipe.display_name, name_x, crafted_y + 25.0, 16.0, name_color);
         }
     }
 }
