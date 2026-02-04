@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use uuid::Uuid;
@@ -34,6 +34,20 @@ const ATTACK_RANGE: i32 = 1; // Maximum distance to attack (in tiles)
 const ATTACK_COOLDOWN_MS: u64 = 700; // Slightly shorter than client (800ms) to account for network latency
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
 const REGEN_INTERVAL_MS: u64 = 30000;
+
+// ============================================================================
+// Crafting State (for timed crafting)
+// ============================================================================
+
+/// Tracks an active timed crafting operation
+#[derive(Debug, Clone)]
+pub struct CraftingState {
+    pub recipe_id: String,
+    pub started_at: std::time::Instant,
+    pub duration_ms: u64,
+    /// Materials consumed at start (for refund on cancel/interrupt)
+    pub consumed_materials: Vec<(String, i32)>,
+}
 
 // ============================================================================
 // Player Save Data (for database persistence)
@@ -165,6 +179,10 @@ pub struct Player {
     pub last_regen_time: u64,
     /// Tile coordinates of chair player is sitting on (None if not sitting)
     pub sitting_at: Option<(i32, i32)>,
+    /// Recipes this player has discovered (for requires_discovery recipes)
+    pub discovered_recipes: HashSet<String>,
+    /// Active timed crafting operation (None if not crafting)
+    pub crafting_state: Option<CraftingState>,
 }
 
 const PLAYER_RESPAWN_TIME_MS: u64 = 5000; // 5 seconds to respawn
@@ -208,6 +226,8 @@ impl Player {
             is_god_mode: false,
             last_regen_time: 0,
             sitting_at: None,
+            discovered_recipes: HashSet::new(),
+            crafting_state: None,
         }
     }
 
@@ -1039,6 +1059,32 @@ impl GameRoom {
     pub async fn get_player_quest_state(&self, player_id: &str) -> Option<PlayerQuestState> {
         let quest_states = self.player_quest_states.read().await;
         quest_states.get(player_id).cloned()
+    }
+
+    /// Set discovered recipes for a player (called on connect after loading from DB)
+    pub async fn set_player_discovered_recipes(&self, player_id: &str, recipes: HashSet<String>) {
+        let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            player.discovered_recipes = recipes;
+        }
+    }
+
+    /// Get discovered recipes for a player (for saving to DB)
+    pub async fn get_player_discovered_recipes(&self, player_id: &str) -> HashSet<String> {
+        let players = self.players.read().await;
+        players.get(player_id)
+            .map(|p| p.discovered_recipes.clone())
+            .unwrap_or_default()
+    }
+
+    /// Discover a new recipe for a player, returns true if newly discovered
+    pub async fn discover_recipe(&self, player_id: &str, recipe_id: &str) -> bool {
+        let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            player.discovered_recipes.insert(recipe_id.to_string())
+        } else {
+            false
+        }
     }
 
     /// Get QuestAccepted messages for all active quests (for syncing on login)
@@ -2156,6 +2202,11 @@ impl GameRoom {
                     }
                 }
             }
+        }
+
+        // Interrupt crafting if target is a player who took damage
+        if !is_npc && actual_damage > 0 {
+            self.cancel_crafting(&target_id, "interrupted").await;
         }
 
         // Handle death
@@ -3415,6 +3466,278 @@ impl GameRoom {
             },
         )
         .await;
+    }
+
+    /// Handle start craft - supports both instant and timed crafting
+    pub async fn handle_start_craft(&self, player_id: &str, recipe_id: &str) {
+        use crate::crafting::definition::RecipeCategory;
+
+        // Get recipe definition
+        let recipe = match self.crafting_registry.get(recipe_id) {
+            Some(r) => r.clone(),
+            None => {
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftingCancelled {
+                        reason: "Recipe not found".to_string(),
+                    },
+                )
+                .await;
+                return;
+            }
+        };
+
+        // Get player and perform all checks
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        // Check if already crafting
+        if player.crafting_state.is_some() {
+            drop(players);
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: "Already crafting".to_string(),
+                },
+            )
+            .await;
+            return;
+        }
+
+        // Check level requirement - smithing recipes check smithing level, others use combat level
+        let level_check_passed = if recipe.category == RecipeCategory::Smithing {
+            player.skills.smithing.level >= recipe.level_required
+        } else {
+            player.combat_level() >= recipe.level_required
+        };
+
+        if !level_check_passed {
+            let skill_name = if recipe.category == RecipeCategory::Smithing {
+                "smithing"
+            } else {
+                "combat"
+            };
+            drop(players);
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: format!("Requires {} level {}", skill_name, recipe.level_required),
+                },
+            )
+            .await;
+            return;
+        }
+
+        // Check recipe discovery requirement
+        if recipe.requires_discovery && !player.discovered_recipes.contains(recipe_id) {
+            drop(players);
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: "Recipe not yet discovered".to_string(),
+                },
+            )
+            .await;
+            return;
+        }
+
+        // Check all ingredients
+        for ingredient in &recipe.ingredients {
+            if !player.inventory.has_item(&ingredient.item_id, ingredient.count) {
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftingCancelled {
+                        reason: "Missing ingredients".to_string(),
+                    },
+                )
+                .await;
+                return;
+            }
+        }
+
+        // Check inventory space for results
+        for result in &recipe.results {
+            if !player.inventory.has_space_for(&result.item_id, result.count, &self.item_registry) {
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftingCancelled {
+                        reason: "Inventory full".to_string(),
+                    },
+                )
+                .await;
+                return;
+            }
+        }
+
+        // All checks passed - consume ingredients
+        let mut consumed_materials = Vec::new();
+        for ingredient in &recipe.ingredients {
+            player.inventory.remove_item(&ingredient.item_id, ingredient.count);
+            consumed_materials.push((ingredient.item_id.clone(), ingredient.count));
+        }
+
+        if recipe.craft_time_ms == 0 {
+            // Instant craft - add results immediately
+            let mut items_gained = Vec::new();
+            for result in &recipe.results {
+                player.inventory.add_item(&result.item_id, result.count, &self.item_registry);
+                items_gained.push((result.item_id.clone(), result.count as u32));
+            }
+
+            // Award smithing XP if applicable
+            let xp_gained = recipe.xp;
+            let mut xp_results = Vec::new();
+            if xp_gained > 0 && recipe.category == RecipeCategory::Smithing {
+                let leveled = player.skills.smithing.add_xp(xp_gained as i64);
+                xp_results.push((
+                    SkillType::Smithing,
+                    xp_gained as i64,
+                    player.skills.smithing.xp,
+                    player.skills.smithing.level,
+                    leveled,
+                ));
+            }
+
+            let inventory_update = player.inventory.to_update();
+            let gold = player.inventory.gold;
+            drop(players);
+
+            tracing::info!(
+                "Player {} instant-crafted {} (gained {:?})",
+                player_id, recipe_id, items_gained
+            );
+
+            // Send crafting completed
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCompleted {
+                    recipe_id: recipe_id.to_string(),
+                    items_gained,
+                    xp_gained,
+                },
+            )
+            .await;
+
+            // Send inventory update
+            self.send_to_player(
+                player_id,
+                ServerMessage::InventoryUpdate {
+                    player_id: player_id.to_string(),
+                    slots: inventory_update,
+                    gold,
+                },
+            )
+            .await;
+
+            // Send XP updates
+            for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
+                self.send_to_player(player_id, ServerMessage::SkillXp {
+                    player_id: player_id.to_string(),
+                    skill: skill_type.as_str().to_string(),
+                    xp_gained: xp_amount,
+                    total_xp,
+                    level,
+                }).await;
+
+                if leveled_up {
+                    tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
+                    self.broadcast(ServerMessage::SkillLevelUp {
+                        player_id: player_id.to_string(),
+                        skill: skill_type.as_str().to_string(),
+                        new_level: level,
+                    }).await;
+                }
+            }
+        } else {
+            // Timed craft - set crafting state, materials already consumed
+            player.crafting_state = Some(CraftingState {
+                recipe_id: recipe_id.to_string(),
+                started_at: std::time::Instant::now(),
+                duration_ms: recipe.craft_time_ms,
+                consumed_materials,
+            });
+
+            let inventory_update = player.inventory.to_update();
+            let gold = player.inventory.gold;
+            drop(players);
+
+            tracing::info!(
+                "Player {} started timed craft {} ({}ms)",
+                player_id, recipe_id, recipe.craft_time_ms
+            );
+
+            // Send inventory update (materials consumed)
+            self.send_to_player(
+                player_id,
+                ServerMessage::InventoryUpdate {
+                    player_id: player_id.to_string(),
+                    slots: inventory_update,
+                    gold,
+                },
+            )
+            .await;
+
+            // Send crafting started
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingStarted {
+                    recipe_id: recipe_id.to_string(),
+                    duration_ms: recipe.craft_time_ms,
+                },
+            )
+            .await;
+        }
+    }
+
+    /// Cancel an active timed craft, refunding materials
+    pub async fn handle_cancel_craft(&self, player_id: &str) {
+        self.cancel_crafting(player_id, "cancelled").await;
+    }
+
+    /// Internal helper to cancel crafting with a reason, refunding materials
+    pub async fn cancel_crafting(&self, player_id: &str, reason: &str) {
+        let refund_result = {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                if let Some(crafting) = player.crafting_state.take() {
+                    // Refund consumed materials
+                    for (item_id, count) in &crafting.consumed_materials {
+                        player.inventory.add_item(item_id, *count, &self.item_registry);
+                    }
+                    Some((player.inventory.to_update(), player.inventory.gold))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        if let Some((inv_update, gold)) = refund_result {
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: reason.to_string(),
+                },
+            )
+            .await;
+
+            // Send inventory update (materials refunded)
+            self.send_to_player(
+                player_id,
+                ServerMessage::InventoryUpdate {
+                    player_id: player_id.to_string(),
+                    slots: inv_update,
+                    gold,
+                },
+            )
+            .await;
+        }
     }
 
     /// Handle shop buy transaction
@@ -4983,6 +5306,140 @@ impl GameRoom {
             }
         }
 
+        // Cancel crafting for any player who moved
+        {
+            let crafting_to_cancel: Vec<String> = {
+                let players = self.players.read().await;
+                moved_players.iter()
+                    .filter(|id| players.get(*id).map_or(false, |p| p.crafting_state.is_some()))
+                    .cloned()
+                    .collect()
+            };
+            for id in crafting_to_cancel {
+                self.cancel_crafting(&id, "interrupted").await;
+            }
+        }
+
+        // Check timed crafting completions
+        {
+            use crate::crafting::definition::RecipeCategory;
+
+            // Phase 1: Collect completed crafts (read lock)
+            struct CraftCompletion {
+                pid: String,
+                recipe_id: String,
+                items_gained: Vec<(String, u32)>,
+                xp_gained: u32,
+                is_smithing: bool,
+                inv_update: Vec<crate::item::InventorySlotUpdate>,
+                gold: i32,
+                smithing_xp: i64,
+                smithing_total_xp: i64,
+                smithing_level: i32,
+                smithing_leveled: bool,
+            }
+
+            let completions = {
+                let mut players = self.players.write().await;
+                let mut completions: Vec<CraftCompletion> = Vec::new();
+
+                let player_ids: Vec<String> = players.keys().cloned().collect();
+                for pid in player_ids {
+                    let player = players.get_mut(&pid).unwrap();
+                    if !player.active || player.is_dead {
+                        continue;
+                    }
+
+                    let should_complete = player.crafting_state.as_ref().map_or(false, |cs| {
+                        cs.started_at.elapsed().as_millis() as u64 >= cs.duration_ms
+                    });
+
+                    if !should_complete {
+                        continue;
+                    }
+
+                    let crafting = player.crafting_state.take().unwrap();
+                    let recipe = match self.crafting_registry.get(&crafting.recipe_id) {
+                        Some(r) => r.clone(),
+                        None => continue,
+                    };
+
+                    // Add results to inventory
+                    let mut items_gained = Vec::new();
+                    for result in &recipe.results {
+                        player.inventory.add_item(&result.item_id, result.count, &self.item_registry);
+                        items_gained.push((result.item_id.clone(), result.count as u32));
+                    }
+
+                    // Award smithing XP if applicable
+                    let xp_gained = recipe.xp;
+                    let is_smithing = recipe.category == RecipeCategory::Smithing;
+                    let (smithing_xp, smithing_total_xp, smithing_level, smithing_leveled) =
+                        if xp_gained > 0 && is_smithing {
+                            let leveled = player.skills.smithing.add_xp(xp_gained as i64);
+                            (xp_gained as i64, player.skills.smithing.xp, player.skills.smithing.level, leveled)
+                        } else {
+                            (0, 0, 0, false)
+                        };
+
+                    completions.push(CraftCompletion {
+                        pid: pid.clone(),
+                        recipe_id: crafting.recipe_id,
+                        items_gained,
+                        xp_gained,
+                        is_smithing,
+                        inv_update: player.inventory.to_update(),
+                        gold: player.inventory.gold,
+                        smithing_xp,
+                        smithing_total_xp,
+                        smithing_level,
+                        smithing_leveled,
+                    });
+                }
+                completions
+            };
+
+            // Phase 2: Send messages (no locks held)
+            for comp in completions {
+                tracing::info!(
+                    "Player {} completed timed craft {} (gained {:?})",
+                    comp.pid, comp.recipe_id, comp.items_gained
+                );
+
+                self.send_to_player(&comp.pid, ServerMessage::CraftingCompleted {
+                    recipe_id: comp.recipe_id,
+                    items_gained: comp.items_gained,
+                    xp_gained: comp.xp_gained,
+                }).await;
+
+                self.send_to_player(&comp.pid, ServerMessage::InventoryUpdate {
+                    player_id: comp.pid.clone(),
+                    slots: comp.inv_update,
+                    gold: comp.gold,
+                }).await;
+
+                // Send smithing XP if applicable
+                if comp.is_smithing && comp.smithing_xp > 0 {
+                    self.send_to_player(&comp.pid, ServerMessage::SkillXp {
+                        player_id: comp.pid.clone(),
+                        skill: "smithing".to_string(),
+                        xp_gained: comp.smithing_xp,
+                        total_xp: comp.smithing_total_xp,
+                        level: comp.smithing_level,
+                    }).await;
+
+                    if comp.smithing_leveled {
+                        tracing::info!("Player {} leveled up smithing to {}", comp.pid, comp.smithing_level);
+                        self.broadcast(ServerMessage::SkillLevelUp {
+                            player_id: comp.pid.clone(),
+                            skill: "smithing".to_string(),
+                            new_level: comp.smithing_level,
+                        }).await;
+                    }
+                }
+            }
+        }
+
         // Get player positions for NPC AI (only alive players, grid positions)
         let player_positions: Vec<(String, i32, i32, i32)> = {
             let players = self.players.read().await;
@@ -5288,6 +5745,11 @@ impl GameRoom {
                 target_y,
                 projectile: None,
             }).await;
+
+            // Interrupt crafting if player took damage
+            if damage > 0 {
+                self.cancel_crafting(&target_id, "interrupted").await;
+            }
 
             // Handle player death
             if died {

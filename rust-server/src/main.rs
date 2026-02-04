@@ -1026,6 +1026,21 @@ async fn matchmake_join_or_create(
         }
     }
 
+    // Load discovered recipes from database
+    match state.db.load_discovered_recipes(character_id).await {
+        Ok(recipes) => {
+            let count = recipes.len();
+            let recipe_set: std::collections::HashSet<String> = recipes.into_iter().collect();
+            room.set_player_discovered_recipes(&player_id, recipe_set).await;
+            if count > 0 {
+                info!("Loaded {} discovered recipes for {}", count, character_data.name);
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to load discovered recipes for character {}: {}", character_id, e);
+        }
+    }
+
     let client_count = room.player_count().await;
 
     // Generate signed session token for WebSocket upgrade
@@ -1344,6 +1359,15 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send discovered recipes
+    let discovered = room.get_player_discovered_recipes(&player_id).await;
+    let discovered_msg = ServerMessage::DiscoveredRecipes {
+        recipes: discovered.into_iter().collect(),
+    };
+    if let Ok(bytes) = protocol::encode_server_message(&discovered_msg) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Send gathering marker positions
     let gathering_markers = room.get_gathering_markers_message().await;
     if let Ok(bytes) = protocol::encode_server_message(&gathering_markers) {
@@ -1585,6 +1609,19 @@ async fn handle_socket(
                     info!("Saved quest state for {}: {} active, {} completed",
                         character_name, quest_state.active_quests.len(), quest_state.completed_quests.len());
                 }
+            }
+        }
+
+        // Save discovered recipes to database
+        if character_id > 0 {
+            let discovered = room.get_player_discovered_recipes(&player_id).await;
+            for recipe_id in &discovered {
+                if let Err(e) = state.db.save_discovered_recipe(character_id, recipe_id).await {
+                    error!("Failed to save discovered recipe {} for {}: {}", recipe_id, character_name, e);
+                }
+            }
+            if !discovered.is_empty() {
+                info!("Saved {} discovered recipes for {}", discovered.len(), character_name);
             }
         }
     } else {
@@ -2290,6 +2327,12 @@ async fn handle_client_message(
         ClientMessage::Craft { recipe_id } => {
             room.handle_craft(player_id, &recipe_id).await;
         }
+        ClientMessage::StartCraft { recipe_id } => {
+            room.handle_start_craft(player_id, &recipe_id).await;
+        }
+        ClientMessage::CancelCraft => {
+            room.handle_cancel_craft(player_id).await;
+        }
         ClientMessage::Equip { slot_index } => {
             room.handle_equip(player_id, slot_index).await;
         }
@@ -2407,6 +2450,7 @@ async fn main() {
                 if let Some(room) = save_state.rooms.get(&session_data.room_id) {
                     let save_data = room.get_player_save_data(&session_data.player_id).await;
                     let quest_state = room.get_player_quest_state(&session_data.player_id).await;
+                    let discovered_recipes = room.get_player_discovered_recipes(&session_data.player_id).await;
 
                     if let Some(mut save_data) = save_data {
                         // Compute played time delta and reset anchor
@@ -2425,7 +2469,7 @@ async fn main() {
                             }
                         }
 
-                        snapshots.push((character_id, character_name, save_data, quest_state, played_time_delta));
+                        snapshots.push((character_id, character_name, save_data, quest_state, played_time_delta, discovered_recipes));
                     }
                 }
             }
@@ -2435,7 +2479,7 @@ async fn main() {
                 let save_count = snapshots.len();
                 let mut save_tasks = Vec::with_capacity(save_count);
 
-                for (character_id, character_name, save_data, quest_state, played_time_delta) in snapshots {
+                for (character_id, character_name, save_data, quest_state, played_time_delta, discovered_recipes) in snapshots {
                     let db = save_state.db.clone();
                     save_tasks.push(tokio::spawn(async move {
                         if let Err(e) = db.save_character(
@@ -2465,6 +2509,11 @@ async fn main() {
 
                         if let Some(quest_state) = quest_state {
                             let _ = db.save_character_quest_state(character_id, &quest_state).await;
+                        }
+
+                        // Save discovered recipes
+                        for recipe_id in &discovered_recipes {
+                            let _ = db.save_discovered_recipe(character_id, recipe_id).await;
                         }
                     }));
                 }
