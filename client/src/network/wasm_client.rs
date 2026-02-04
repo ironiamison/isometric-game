@@ -183,7 +183,10 @@ impl NetworkClient {
                 should_disconnect = true;
             }
 
-            // Drain received messages
+            // Drain received messages, deduplicating stateSyncs to prevent teleporting after lag
+            let mut other_messages: Vec<Vec<u8>> = Vec::new();
+            let mut latest_state_sync: Option<(u64, Vec<u8>)> = None;
+
             loop {
                 let obj = ws_try_recv();
                 if obj.is_nil() {
@@ -191,6 +194,32 @@ impl NetworkClient {
                 }
                 let mut buf = Vec::new();
                 obj.to_byte_buffer(&mut buf);
+
+                // Check if this is a stateSync and extract tick
+                if let Some(tick) = self.extract_state_sync_tick(&buf) {
+                    match &latest_state_sync {
+                        Some((existing_tick, _)) if tick <= *existing_tick => {
+                            // Skip older or same tick
+                        }
+                        _ => {
+                            latest_state_sync = Some((tick, buf));
+                        }
+                    }
+                } else {
+                    other_messages.push(buf);
+                }
+            }
+
+            // Process non-stateSync messages first
+            for buf in other_messages {
+                self.handle_binary_message(&buf, state);
+            }
+
+            // Process only the latest stateSync
+            if let Some((tick, buf)) = latest_state_sync {
+                if tick > state.server_tick + 1 {
+                    log::debug!("Catching up: jumping from tick {} to {}", state.server_tick, tick);
+                }
                 self.handle_binary_message(&buf, state);
             }
         }
@@ -229,6 +258,21 @@ impl NetworkClient {
             Err(e) => {
                 log::error!("Failed to decode message: {}", e);
             }
+        }
+    }
+
+    /// Check if message is a stateSync and extract its tick number.
+    /// Returns None if not a stateSync or couldn't parse.
+    fn extract_state_sync_tick(&self, data: &[u8]) -> Option<u64> {
+        match protocol::decode_message(data) {
+            Ok(protocol::DecodedMessage::RoomData { msg_type, data }) => {
+                if msg_type == "stateSync" {
+                    data.as_ref().and_then(|v| protocol::extract_u64(v, "tick"))
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 

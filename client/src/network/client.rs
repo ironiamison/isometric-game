@@ -307,6 +307,12 @@ impl NetworkClient {
         }
 
         let mut should_disconnect = false;
+
+        // Collect binary messages and find the latest stateSync to avoid processing stale ones
+        // This prevents "teleporting" when catching up after network latency
+        let mut other_messages: Vec<Vec<u8>> = Vec::new();
+        let mut latest_state_sync: Option<(u64, Vec<u8>)> = None; // (tick, data)
+
         for event in events {
             match event {
                 WsEvent::Opened => {
@@ -320,7 +326,21 @@ impl NetworkClient {
                 }
 
                 WsEvent::Message(WsMessage::Binary(bytes)) => {
-                    self.handle_binary_message(&bytes, state);
+                    // Check if this is a stateSync message and extract its tick
+                    if let Some(tick) = self.extract_state_sync_tick(&bytes) {
+                        // Keep only the stateSync with the highest tick
+                        match &latest_state_sync {
+                            Some((existing_tick, _)) if tick <= *existing_tick => {
+                                // Skip older or same tick
+                            }
+                            _ => {
+                                latest_state_sync = Some((tick, bytes));
+                            }
+                        }
+                    } else {
+                        // Not a stateSync - process normally
+                        other_messages.push(bytes);
+                    }
                 }
 
                 WsEvent::Message(WsMessage::Text(text)) => {
@@ -345,6 +365,20 @@ impl NetworkClient {
 
                 _ => {}
             }
+        }
+
+        // Process all non-stateSync messages first
+        for bytes in other_messages {
+            self.handle_binary_message(&bytes, state);
+        }
+
+        // Process only the latest stateSync (if any)
+        if let Some((tick, bytes)) = latest_state_sync {
+            // Log if we skipped stale syncs (useful for debugging lag)
+            if tick > state.server_tick + 1 {
+                log::debug!("Catching up: jumping from tick {} to {}", state.server_tick, tick);
+            }
+            self.handle_binary_message(&bytes, state);
         }
 
         if should_disconnect {
@@ -390,6 +424,21 @@ impl NetworkClient {
 
     fn handle_room_data(&self, msg_type: &str, data: Option<&rmpv::Value>, state: &mut GameState) {
         super::message_handler::handle_room_data(msg_type, data, state);
+    }
+
+    /// Check if message is a stateSync and extract its tick number.
+    /// Returns None if not a stateSync or couldn't parse.
+    fn extract_state_sync_tick(&self, data: &[u8]) -> Option<u64> {
+        match protocol::decode_message(data) {
+            Ok(DecodedMessage::RoomData { msg_type, data }) => {
+                if msg_type == "stateSync" {
+                    data.as_ref().and_then(|v| protocol::extract_u64(v, "tick"))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 
     pub fn send(&mut self, msg: &ClientMessage) {
