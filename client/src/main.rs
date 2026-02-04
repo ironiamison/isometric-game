@@ -480,7 +480,8 @@ fn run_game_frame(
                 continue;
             },
             // Crafting command
-            InputCommand::Craft { recipe_id } => ClientMessage::Craft { recipe_id: recipe_id.clone() },
+            InputCommand::Craft { recipe_id } => ClientMessage::StartCraft { recipe_id: recipe_id.clone() },
+            InputCommand::CancelCraft => ClientMessage::CancelCraft,
             // Equipment commands
             InputCommand::Equip { slot_index } => ClientMessage::Equip { slot_index: *slot_index },
             InputCommand::Unequip { slot_type, target_slot } => ClientMessage::Unequip { slot_type: slot_type.clone(), target_slot: *target_slot },
