@@ -1659,16 +1659,40 @@ impl InputHandler {
 
                     // Only auto-scroll when keyboard navigated, not every frame
                     if key_navigated {
-                        let craft_line_h = 36.0_f32;
-                        let sel = state.ui_state.crafting_selected_recipe as f32;
-                        let item_top = sel * craft_line_h;
+                        let craft_line_h = 28.0_f32;
+                        // Count the actual row position including undiscovered "????" entries
+                        // The renderer shows ALL recipes (discovered + undiscovered) in order,
+                        // but selection index only counts discovered ones
+                        let all_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
+                            .filter(|r| {
+                                if current_category == "supplies" {
+                                    r.category == "consumables" || r.category == "materials"
+                                } else {
+                                    r.category == current_category
+                                }
+                            })
+                            .collect();
+                        let mut row = 0usize;
+                        let mut discovered_idx = 0usize;
+                        for r in &all_in_category {
+                            let is_disc = !r.requires_discovery || state.discovered_recipes.contains(&r.id);
+                            if is_disc {
+                                if discovered_idx == state.ui_state.crafting_selected_recipe {
+                                    break;
+                                }
+                                discovered_idx += 1;
+                            }
+                            row += 1;
+                        }
+                        let item_top = row as f32 * craft_line_h;
                         let item_bottom = item_top + craft_line_h;
                         if item_top < state.ui_state.crafting_scroll_offset {
                             state.ui_state.crafting_scroll_offset = item_top;
                         }
+                        // Match renderer: list_content_height = panel_height - 172
                         let (_, sh) = crate::util::virtual_screen_size();
                         let panel_h = (450.0_f32).min(sh - 16.0);
-                        let visible_h = panel_h - 140.0;
+                        let visible_h = panel_h - 172.0;
                         if item_bottom > state.ui_state.crafting_scroll_offset + visible_h {
                             state.ui_state.crafting_scroll_offset = item_bottom - visible_h;
                         }
@@ -1693,7 +1717,7 @@ impl InputHandler {
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
                     const SCROLL_SPEED: f32 = 30.0;
-                    let line_height = 36.0;
+                    let line_height = 28.0;
                     // Count all recipes in category (discovered + undiscovered) to match renderer
                     let sel_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
                     let cur_cat = categories.get(sel_idx).map(|s| s.as_str()).unwrap_or("supplies");

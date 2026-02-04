@@ -278,7 +278,7 @@ impl Renderer {
         self.draw_text_sharp("Blueprints", list_x + 8.0, list_y + 18.0, 16.0, TEXT_TITLE);
         draw_line(list_x + 6.0, list_y + 24.0, list_x + list_width - 6.0, list_y + 24.0, 1.0, HEADER_BORDER);
 
-        let line_height = 36.0;
+        let line_height = 28.0;
         let list_content_y = list_y + 30.0;
         let list_content_height = list_height - 34.0;
 
@@ -337,17 +337,9 @@ impl Renderer {
 
                 let text_color = if is_selected { TEXT_TITLE } else if is_hovered { TEXT_NORMAL } else { TEXT_DIM };
 
-                // Draw sprite preview of the result item
-                let sprite_size = 28.0;
-                let sprite_x = list_x + 8.0;
-                let sprite_y = y + (line_height - 2.0 - sprite_size) / 2.0;
-                if let Some(result) = recipe.results.first() {
-                    self.draw_item_icon(&result.item_id, sprite_x, sprite_y, sprite_size, sprite_size, state, false);
-                }
-
                 let prefix = if is_selected { "> " } else { "  " };
                 let text_y = y + (line_height - 2.0) / 2.0 + 5.0;
-                self.draw_text_sharp(&format!("{}{}", prefix, recipe.display_name), list_x + 8.0 + sprite_size + 6.0, text_y, 16.0, text_color);
+                self.draw_text_sharp(&format!("{}{}", prefix, recipe.display_name), list_x + 8.0, text_y, 16.0, text_color);
 
                 if recipe.level_required > 1 {
                     let level_text = format!("Lv{}", recipe.level_required);
@@ -431,8 +423,43 @@ impl Renderer {
                 self.draw_item_icon(&result.item_id, header_icon_x, header_icon_y, header_icon_size, header_icon_size, state, true);
             }
 
+            // Item name next to icon — vertically centered with icon top half
             let text_offset_x = header_icon_size + 8.0;
-            self.draw_text_sharp(&recipe.display_name, detail_x + 12.0 + text_offset_x, detail_y + 24.0, 16.0, TEXT_TITLE);
+            let icon_center_y = header_icon_y + header_icon_size / 2.0;
+            let name_y = icon_center_y - 6.0;
+            self.draw_text_sharp(&recipe.display_name, detail_x + 12.0 + text_offset_x, name_y, 16.0, TEXT_TITLE);
+
+            // Station requirement top-right, aligned with name
+            if let Some(ref station) = recipe.station {
+                let station_display: String = station.chars().enumerate()
+                    .map(|(idx, c)| if idx == 0 { c.to_ascii_uppercase() } else { c })
+                    .collect();
+                let station_w = self.measure_text_sharp(&station_display, 16.0).width;
+                self.draw_text_sharp(&station_display, detail_x + detail_width - station_w - 12.0, name_y, 16.0, TEXT_DIM);
+            }
+
+            // Craft time + XP on same line below name
+            let info_y = icon_center_y + 10.0;
+            let info_x = detail_x + 12.0 + text_offset_x;
+            let mut cursor_x = info_x;
+            if recipe.craft_time_ms > 0 {
+                let seconds = recipe.craft_time_ms as f32 / 1000.0;
+                let time_text = if seconds == seconds.floor() {
+                    format!("{}s", seconds as u32)
+                } else {
+                    format!("{:.1}s", seconds)
+                };
+                self.draw_text_sharp(&time_text, cursor_x, info_y, 16.0, TEXT_DIM);
+                cursor_x += self.measure_text_sharp(&time_text, 16.0).width;
+                if recipe.xp > 0 {
+                    self.draw_text_sharp(" | ", cursor_x, info_y, 16.0, TEXT_DIM);
+                    cursor_x += self.measure_text_sharp(" | ", 16.0).width;
+                }
+            }
+            if recipe.xp > 0 {
+                let xp_text = format!("{} XP", recipe.xp);
+                self.draw_text_sharp(&xp_text, cursor_x, info_y, 16.0, TEXT_GOLD);
+            }
 
             let desc_start_y = detail_y + 6.0 + header_icon_size + 4.0;
             draw_line(detail_x + 10.0, desc_start_y - 4.0, detail_x + detail_width - 10.0, desc_start_y - 4.0, 1.0, HEADER_BORDER);
@@ -440,14 +467,14 @@ impl Renderer {
             let desc_height = self.draw_text_wrapped(
                 &recipe.description,
                 detail_x + 12.0,
-                desc_start_y + 8.0,
+                desc_start_y + 14.0,
                 16.0,
                 TEXT_NORMAL,
                 detail_width - 24.0,
                 20.0,
             );
 
-            let mut section_y = desc_start_y + 8.0 + desc_height + 10.0;
+            let mut section_y = desc_start_y + 14.0 + desc_height + 12.0;
 
             if recipe.level_required > 1 {
                 let (level_color, level_icon) = if let Some(player) = state.get_local_player() {
@@ -460,34 +487,6 @@ impl Renderer {
                     (TEXT_DIM, "[??]")
                 };
                 self.draw_text_sharp(&format!("{} Requires Level {}", level_icon, recipe.level_required), detail_x + 12.0, section_y, 16.0, level_color);
-                section_y += 22.0;
-            }
-
-            // Task 16: Show station requirement
-            if let Some(ref station) = recipe.station {
-                let station_display: String = station.chars().enumerate()
-                    .map(|(idx, c)| if idx == 0 { c.to_ascii_uppercase() } else { c })
-                    .collect();
-                // For now, just show the text - station proximity checking comes later
-                self.draw_text_sharp(&format!("Requires: {}", station_display), detail_x + 12.0, section_y, 16.0, TEXT_NORMAL);
-                section_y += 20.0;
-            }
-
-            // Task 16: Show crafting time
-            if recipe.craft_time_ms > 0 {
-                let seconds = recipe.craft_time_ms as f32 / 1000.0;
-                let time_text = if seconds == seconds.floor() {
-                    format!("Craft time: {}s", seconds as u32)
-                } else {
-                    format!("Craft time: {:.1}s", seconds)
-                };
-                self.draw_text_sharp(&time_text, detail_x + 12.0, section_y, 16.0, TEXT_DIM);
-                section_y += 20.0;
-            }
-
-            // Task 16: Show XP reward
-            if recipe.xp > 0 {
-                self.draw_text_sharp(&format!("XP: {}", recipe.xp), detail_x + 12.0, section_y, 16.0, TEXT_GOLD);
                 section_y += 22.0;
             }
 

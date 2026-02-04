@@ -120,24 +120,25 @@ impl Renderer {
                 };
 
                 // Draw label just above the clickable area
-                let label_width = self.measure_text_sharp(&label, 16.0).width;
+                let font_size = 16.0 * zoom;
+                let label_width = self.measure_text_sharp(&label, font_size).width;
                 let label_x = screen_x - label_width / 2.0;
                 // Gold piles sit lower, so offset label down by 12px
-                let gold_offset = if item.item_id == "gold" { 22.0 } else { 0.0 };
-                let label_y = screen_y - click_height - 16.0 + gold_offset;
+                let gold_offset = if item.item_id == "gold" { 22.0 * zoom } else { 0.0 };
+                let label_y = screen_y - click_height - 16.0 * zoom + gold_offset;
 
                 // Background for readability
-                let padding = 4.0;
+                let padding = 4.0 * zoom;
                 draw_rectangle(
                     label_x - padding,
-                    label_y - 14.0,
+                    label_y - 14.0 * zoom,
                     label_width + padding * 2.0,
-                    18.0,
+                    18.0 * zoom,
                     Color::from_rgba(0, 0, 0, 180),
                 );
 
                 // Label text
-                self.draw_text_sharp(&label, label_x, label_y, 16.0, WHITE);
+                self.draw_text_sharp(&label, label_x, label_y, font_size, WHITE);
             }
         }
     }

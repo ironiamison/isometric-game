@@ -31,12 +31,15 @@ use auth::AuthSession;
 // const WS_URL: &str = "wss://aeven.xyz";
 
 // Production mode - use the production server.
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+// const SERVER_URL: &str = "https://aeven.xyz";
+// const WS_URL: &str = "wss://aeven.xyz";
+
+// Local development
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
-// Set to false for production builds
-const DEV_MODE: bool = false;
+const DEV_MODE: bool = true;
 
 fn window_conf() -> Conf {
     Conf {
