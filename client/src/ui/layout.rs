@@ -13,6 +13,7 @@ pub enum UiElementId {
     CraftingCategoryTab(usize),
     CraftingRecipeItem(usize),
     CraftingButton,
+    CraftingCancelButton,
     MainTab(usize), // 0=Recipes, 1=Shop
 
     // Inventory & Quick Slots

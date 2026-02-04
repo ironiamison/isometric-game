@@ -141,6 +141,10 @@ impl CraftingRegistry {
                         }
                     })
                     .collect(),
+                station: recipe.station.clone(),
+                craft_time_ms: recipe.craft_time_ms,
+                xp: recipe.xp,
+                requires_discovery: recipe.requires_discovery,
             })
             .collect();
 

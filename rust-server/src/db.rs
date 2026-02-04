@@ -338,6 +338,21 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Discovered recipes table - tracks which recipes a player has discovered
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS discovered_recipes (
+                character_id INTEGER NOT NULL,
+                recipe_id TEXT NOT NULL,
+                discovered_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (character_id, recipe_id),
+                FOREIGN KEY (character_id) REFERENCES characters(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -1068,6 +1083,41 @@ impl Database {
         }).collect();
 
         Ok(patches)
+    }
+
+    // =========================================================================
+    // Discovered Recipes Functions
+    // =========================================================================
+
+    /// Load discovered recipes for a character
+    pub async fn load_discovered_recipes(&self, character_id: i64) -> Result<Vec<String>, sqlx::Error> {
+        let rows = sqlx::query(
+            "SELECT recipe_id FROM discovered_recipes WHERE character_id = ?"
+        )
+        .bind(character_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.iter().map(|row| row.get("recipe_id")).collect())
+    }
+
+    /// Save a newly discovered recipe for a character
+    pub async fn save_discovered_recipe(
+        &self,
+        character_id: i64,
+        recipe_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO discovered_recipes (character_id, recipe_id)
+            VALUES (?, ?)
+            "#,
+        )
+        .bind(character_id)
+        .bind(recipe_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     // =========================================================================

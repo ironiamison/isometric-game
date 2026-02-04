@@ -56,9 +56,17 @@ pub enum ClientMessage {
     #[serde(rename = "abandonQuest")]
     AbandonQuest { quest_id: String },
 
-    /// Player requests to craft an item
+    /// Player requests to craft an item (legacy instant craft)
     #[serde(rename = "craft")]
     Craft { recipe_id: String },
+
+    /// Player starts a timed craft
+    #[serde(rename = "startCraft")]
+    StartCraft { recipe_id: String },
+
+    /// Player cancels an active craft
+    #[serde(rename = "cancelCraft")]
+    CancelCraft,
 
     /// Equip item from inventory slot
     #[serde(rename = "equip")]
@@ -530,6 +538,32 @@ pub enum ServerMessage {
         success: bool,
         error: Option<String>,
     },
+
+    // ===== Crafting System Messages =====
+
+    /// Sent on connect: player's discovered recipe IDs
+    DiscoveredRecipes {
+        recipes: Vec<String>,
+    },
+    /// Sent when a new recipe is discovered
+    RecipeDiscovered {
+        recipe_id: String,
+    },
+    /// Timed crafting has started
+    CraftingStarted {
+        recipe_id: String,
+        duration_ms: u64,
+    },
+    /// Timed crafting was cancelled or interrupted
+    CraftingCancelled {
+        reason: String,
+    },
+    /// Timed crafting completed successfully
+    CraftingCompleted {
+        recipe_id: String,
+        items_gained: Vec<(String, u32)>,
+        xp_gained: u32,
+    },
 }
 
 /// Farming patch data for client synchronization
@@ -699,6 +733,10 @@ pub struct ClientRecipeDef {
     pub level_required: i32,
     pub ingredients: Vec<RecipeIngredient>,
     pub results: Vec<RecipeResult>,
+    pub station: Option<String>,
+    pub craft_time_ms: u64,
+    pub xp: u32,
+    pub requires_discovery: bool,
 }
 
 /// Shop data for client synchronization
@@ -794,6 +832,12 @@ impl ServerMessage {
             ServerMessage::OnlinePlayersList { .. } => "onlinePlayersList",
             ServerMessage::FriendStatusChanged { .. } => "friendStatusChanged",
             ServerMessage::FriendActionResult { .. } => "friendActionResult",
+            // Crafting system messages
+            ServerMessage::DiscoveredRecipes { .. } => "discoveredRecipes",
+            ServerMessage::RecipeDiscovered { .. } => "recipeDiscovered",
+            ServerMessage::CraftingStarted { .. } => "craftingStarted",
+            ServerMessage::CraftingCancelled { .. } => "craftingCancelled",
+            ServerMessage::CraftingCompleted { .. } => "craftingCompleted",
         }
     }
 }
@@ -1611,6 +1655,15 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     }).collect();
                     rmap.push((Value::String("results".into()), Value::Array(result_values)));
 
+                    // Extended recipe fields
+                    match &r.station {
+                        Some(s) => rmap.push((Value::String("station".into()), Value::String(s.clone().into()))),
+                        None => rmap.push((Value::String("station".into()), Value::Nil)),
+                    }
+                    rmap.push((Value::String("craft_time_ms".into()), Value::Integer((r.craft_time_ms as i64).into())));
+                    rmap.push((Value::String("xp".into()), Value::Integer((r.xp as i64).into())));
+                    rmap.push((Value::String("requires_discovery".into()), Value::Boolean(r.requires_discovery)));
+
                     Value::Map(rmap)
                 })
                 .collect();
@@ -2134,6 +2187,44 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             }
             Value::Map(map)
         }
+        // Crafting system messages
+        ServerMessage::DiscoveredRecipes { recipes } => {
+            let mut map = Vec::new();
+            let recipe_values: Vec<Value> = recipes.iter()
+                .map(|r| Value::String(r.clone().into()))
+                .collect();
+            map.push((Value::String("recipes".into()), Value::Array(recipe_values)));
+            Value::Map(map)
+        }
+        ServerMessage::RecipeDiscovered { recipe_id } => {
+            let mut map = Vec::new();
+            map.push((Value::String("recipe_id".into()), Value::String(recipe_id.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::CraftingStarted { recipe_id, duration_ms } => {
+            let mut map = Vec::new();
+            map.push((Value::String("recipe_id".into()), Value::String(recipe_id.clone().into())));
+            map.push((Value::String("duration_ms".into()), Value::Integer((*duration_ms as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::CraftingCancelled { reason } => {
+            let mut map = Vec::new();
+            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::CraftingCompleted { recipe_id, items_gained, xp_gained } => {
+            let mut map = Vec::new();
+            map.push((Value::String("recipe_id".into()), Value::String(recipe_id.clone().into())));
+            let item_values: Vec<Value> = items_gained.iter().map(|(item_id, count)| {
+                let mut imap = Vec::new();
+                imap.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
+                imap.push((Value::String("count".into()), Value::Integer((*count as i64).into())));
+                Value::Map(imap)
+            }).collect();
+            map.push((Value::String("items_gained".into()), Value::Array(item_values)));
+            map.push((Value::String("xp_gained".into()), Value::Integer((*xp_gained as i64).into())));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -2255,6 +2346,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let recipe_id = extract_string(msg_data, "recipe_id").unwrap_or_default();
             Ok(ClientMessage::Craft { recipe_id })
         }
+        "startCraft" => {
+            let recipe_id = extract_string(msg_data, "recipe_id").unwrap_or_default();
+            Ok(ClientMessage::StartCraft { recipe_id })
+        }
+        "cancelCraft" => Ok(ClientMessage::CancelCraft),
         "equip" => {
             let slot_index = msg_data.as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("slot_index")))

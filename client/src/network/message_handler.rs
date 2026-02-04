@@ -1165,6 +1165,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let description = extract_string(recipe_value, "description").unwrap_or_default();
                         let category = extract_string(recipe_value, "category").unwrap_or_else(|| "consumables".to_string());
                         let level_required = extract_i32(recipe_value, "level_required").unwrap_or(1);
+                        let station = extract_string(recipe_value, "station");
+                        let craft_time_ms = extract_u64(recipe_value, "craft_time_ms").unwrap_or(0);
+                        let xp = extract_u32(recipe_value, "xp").unwrap_or(0);
+                        let requires_discovery = extract_bool(recipe_value, "requires_discovery").unwrap_or(false);
 
                         // Parse ingredients
                         let mut ingredients = Vec::new();
@@ -1196,6 +1200,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             level_required,
                             ingredients,
                             results,
+                            station,
+                            craft_time_ms,
+                            xp,
+                            requires_discovery,
                         });
                     }
                 }
@@ -1230,8 +1238,108 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     // Inventory update will come separately
                 } else {
                     log::warn!("Crafting failed: {} - {:?}", recipe_id, error);
-                    // TODO: Show error message in UI
+                    if let Some(err) = error {
+                        state.ui_state.chat_messages.push(ChatMessage::system(
+                            format!("Crafting failed: {}", err)
+                        ));
+                    }
                 }
+            }
+        }
+
+        "discoveredRecipes" => {
+            if let Some(value) = data {
+                if let Some(recipes_arr) = extract_array(value, "recipes") {
+                    state.discovered_recipes.clear();
+                    for recipe_value in recipes_arr {
+                        if let Some(recipe_id) = recipe_value.as_str() {
+                            state.discovered_recipes.insert(recipe_id.to_string());
+                        }
+                    }
+                    log::info!("Received {} discovered recipes", state.discovered_recipes.len());
+                }
+            }
+        }
+
+        "recipeDiscovered" => {
+            if let Some(value) = data {
+                let recipe_id = extract_string(value, "recipe_id").unwrap_or_default();
+                if !recipe_id.is_empty() {
+                    state.discovered_recipes.insert(recipe_id.clone());
+
+                    // Look up display name from recipe definitions
+                    let display_name = state.recipe_definitions.iter()
+                        .find(|r| r.id == recipe_id)
+                        .map(|r| r.display_name.clone())
+                        .unwrap_or_else(|| recipe_id.clone());
+
+                    state.ui_state.chat_messages.push(ChatMessage::system(
+                        format!("Recipe learned: {}", display_name)
+                    ));
+                    log::info!("Recipe discovered: {}", recipe_id);
+                }
+            }
+        }
+
+        "craftingStarted" => {
+            if let Some(value) = data {
+                let recipe_id = extract_string(value, "recipe_id").unwrap_or_default();
+                let duration_ms = extract_u64(value, "duration_ms").unwrap_or(0);
+
+                log::info!("Crafting started: {} ({}ms)", recipe_id, duration_ms);
+                state.ui_state.crafting_in_progress = true;
+                state.ui_state.crafting_recipe_id = Some(recipe_id);
+                state.ui_state.crafting_duration_ms = duration_ms;
+                state.ui_state.crafting_started_at = Some(std::time::Instant::now());
+                state.ui_state.crafting_progress = 0.0;
+            }
+        }
+
+        "craftingCancelled" => {
+            if let Some(value) = data {
+                let reason = extract_string(value, "reason").unwrap_or_default();
+
+                log::info!("Crafting cancelled: {}", reason);
+                state.ui_state.crafting_in_progress = false;
+                state.ui_state.crafting_recipe_id = None;
+                state.ui_state.crafting_started_at = None;
+                state.ui_state.crafting_progress = 0.0;
+
+                if !reason.is_empty() {
+                    state.ui_state.chat_messages.push(ChatMessage::system(
+                        format!("Crafting cancelled: {}", reason)
+                    ));
+                }
+            }
+        }
+
+        "craftingCompleted" => {
+            if let Some(value) = data {
+                let recipe_id = extract_string(value, "recipe_id").unwrap_or_default();
+                let xp_gained = extract_u32(value, "xp_gained").unwrap_or(0);
+
+                log::info!("Crafting completed: {} (+{}xp)", recipe_id, xp_gained);
+
+                // Clear crafting progress state
+                state.ui_state.crafting_in_progress = false;
+                state.ui_state.crafting_recipe_id = None;
+                state.ui_state.crafting_started_at = None;
+                state.ui_state.crafting_progress = 0.0;
+
+                // Trigger completion animation (starts at 0.0, ticks up to 1.0)
+                state.ui_state.crafting_complete_animation = Some((recipe_id.clone(), 0.0));
+
+                // Look up display name from recipe definitions
+                let display_name = state.recipe_definitions.iter()
+                    .find(|r| r.id == recipe_id)
+                    .map(|r| r.display_name.clone())
+                    .unwrap_or_else(|| recipe_id.clone());
+
+                state.ui_state.chat_messages.push(ChatMessage::system(
+                    format!("Crafted: {}", display_name)
+                ));
+
+                // Inventory update and XP will come via separate messages
             }
         }
 

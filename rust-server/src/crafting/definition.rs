@@ -13,6 +13,7 @@ pub enum RecipeCategory {
     Materials,
     Equipment,
     Tools,
+    Smithing,
 }
 
 impl Default for RecipeCategory {
@@ -28,6 +29,7 @@ impl RecipeCategory {
             RecipeCategory::Materials => "materials",
             RecipeCategory::Equipment => "equipment",
             RecipeCategory::Tools => "tools",
+            RecipeCategory::Smithing => "smithing",
         }
     }
 }
@@ -69,6 +71,10 @@ pub struct RawRecipeDefinition {
     pub ingredients: Vec<RawIngredient>,
     #[serde(default)]
     pub results: Vec<RawResult>,
+    pub station: Option<String>,
+    pub craft_time_ms: Option<u64>,
+    pub xp: Option<u32>,
+    pub requires_discovery: Option<bool>,
 }
 
 // ============================================================================
@@ -99,6 +105,10 @@ pub struct RecipeDefinition {
     pub level_required: i32,
     pub ingredients: Vec<Ingredient>,
     pub results: Vec<CraftResult>,
+    pub station: Option<String>,
+    pub craft_time_ms: u64,
+    pub xp: u32,
+    pub requires_discovery: bool,
 }
 
 impl RecipeDefinition {
@@ -129,6 +139,10 @@ impl RecipeDefinition {
                     count: r.count,
                 })
                 .collect(),
+            station: raw.station.clone(),
+            craft_time_ms: raw.craft_time_ms.unwrap_or(0),
+            xp: raw.xp.unwrap_or(0),
+            requires_discovery: raw.requires_discovery.unwrap_or(false),
         }
     }
 }

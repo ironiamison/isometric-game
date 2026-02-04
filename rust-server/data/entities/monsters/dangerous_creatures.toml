@@ -44,6 +44,12 @@ drop_chance = 0.05
 quantity_min = 1
 quantity_max = 1
 
+[[spider.loot]]
+item_id = "recipe_spine_blade"
+drop_chance = 0.05
+quantity_min = 1
+quantity_max = 1
+
 [spider.behaviors]
 hostile = true
 wander_enabled = true
@@ -82,6 +88,12 @@ item_id = "crow_feather"
 drop_chance = 0.40
 quantity_min = 1
 quantity_max = 3
+
+[[crow.loot]]
+item_id = "recipe_scavenger_bow"
+drop_chance = 0.03
+quantity_min = 1
+quantity_max = 1
 
 [crow.behaviors]
 hostile = false

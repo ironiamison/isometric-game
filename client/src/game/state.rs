@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use super::entities::Player;
 use super::item::{GroundItem, Inventory, RecipeDefinition};
 use super::item_registry::ItemRegistry;
@@ -579,7 +579,16 @@ pub struct UiState {
     pub crafting_open: bool,
     pub crafting_selected_category: usize,
     pub crafting_selected_recipe: usize,
+    pub crafting_scroll_offset: f32,
     pub crafting_npc_id: Option<String>,
+    // Crafting progress state (timed crafting)
+    pub crafting_in_progress: bool,
+    pub crafting_recipe_id: Option<String>,
+    pub crafting_progress: f32,
+    pub crafting_duration_ms: u64,
+    pub crafting_started_at: Option<std::time::Instant>,
+    // Crafting completion animation: (recipe_id, timer_0_to_1)
+    pub crafting_complete_animation: Option<(String, f32)>,
     // Shop UI state
     pub shop_data: Option<ShopData>,
     pub shop_npc_id: Option<String>,
@@ -674,7 +683,14 @@ impl Default for UiState {
             crafting_open: false,
             crafting_selected_category: 0,
             crafting_selected_recipe: 0,
+            crafting_scroll_offset: 0.0,
             crafting_npc_id: None,
+            crafting_in_progress: false,
+            crafting_recipe_id: None,
+            crafting_progress: 0.0,
+            crafting_duration_ms: 0,
+            crafting_started_at: None,
+            crafting_complete_animation: None,
             shop_data: None,
             shop_npc_id: None,
             shop_sub_tab: ShopSubTab::Buy,
@@ -814,6 +830,7 @@ pub struct GameState {
 
     // Crafting
     pub recipe_definitions: Vec<RecipeDefinition>,
+    pub discovered_recipes: HashSet<String>,
 
     // Camera and UI
     pub camera: Camera,
@@ -897,6 +914,7 @@ impl GameState {
             inventory: Inventory::new(),
             item_registry: ItemRegistry::new(),
             recipe_definitions: Vec::new(),
+            discovered_recipes: HashSet::new(),
             camera: Camera::default(),
             ui_state: UiState::default(),
             server_tick: 0,
@@ -1056,6 +1074,28 @@ impl GameState {
 
         // Clean up old announcements (older than 8 seconds)
         self.ui_state.announcements.retain(|ann| current_time - ann.time < 8.0);
+
+        // Update crafting progress (Task 14)
+        if self.ui_state.crafting_in_progress {
+            if let Some(started) = self.ui_state.crafting_started_at {
+                let elapsed = started.elapsed().as_millis() as f32;
+                let duration = self.ui_state.crafting_duration_ms as f32;
+                if duration > 0.0 {
+                    self.ui_state.crafting_progress = (elapsed / duration).min(1.0);
+                }
+            }
+        }
+
+        // Update crafting completion animation timer (Task 20)
+        if let Some((_, ref mut timer)) = self.ui_state.crafting_complete_animation {
+            *timer += delta; // ~1 second animation
+            if *timer >= 1.0 {
+                // Animation done
+            }
+        }
+        if self.ui_state.crafting_complete_animation.as_ref().map_or(false, |(_, t)| *t >= 1.0) {
+            self.ui_state.crafting_complete_animation = None;
+        }
 
         // Update area banner timer
         self.area_banner.update(delta);

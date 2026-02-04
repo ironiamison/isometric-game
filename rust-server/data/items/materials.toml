@@ -283,3 +283,96 @@ description = "A saltwater shellfish. Might contain a pearl."
 category = "material"
 max_stack = 99
 base_price = 15
+
+# =============================================================================
+# Crafting Components
+# =============================================================================
+
+[scrap_leather]
+display_name = "Scrap Leather"
+sprite = "scrap_leather"
+description = "Crudely tanned leather from forest creatures."
+category = "material"
+max_stack = 99
+base_price = 15
+sellable = true
+
+[bone_fragment]
+display_name = "Bone Fragment"
+sprite = "bone_fragment"
+description = "Bits of shell and bone bound together."
+category = "material"
+max_stack = 99
+base_price = 18
+sellable = true
+
+[crude_binding]
+display_name = "Crude Binding"
+sprite = "crude_binding"
+description = "Fibrous material for holding things together."
+category = "material"
+max_stack = 99
+base_price = 20
+sellable = true
+
+[shell_plate]
+display_name = "Shell Plate"
+sprite = "shell_plate"
+description = "Hardened shell pieces, surprisingly sturdy."
+category = "material"
+max_stack = 99
+base_price = 22
+sellable = true
+
+[blade_shard]
+display_name = "Blade Shard"
+sprite = "blade_shard"
+description = "Sharp spines formed into a crude blade edge."
+category = "material"
+max_stack = 99
+base_price = 25
+sellable = true
+
+[bow_stave]
+display_name = "Bow Stave"
+sprite = "bow_stave"
+description = "A flexible frame ready to be strung."
+category = "material"
+max_stack = 99
+base_price = 25
+sellable = true
+
+# =============================================================================
+# Ammunition
+# =============================================================================
+
+[bone_arrow]
+display_name = "Bone Arrow"
+sprite = "bone_arrow"
+description = "Arrows crafted from bone and feather."
+category = "material"
+max_stack = 999
+base_price = 2
+sellable = true
+
+# =============================================================================
+# Recipe Scrolls
+# =============================================================================
+
+[recipe_spine_blade]
+display_name = "Recipe: Spine Blade"
+sprite = "recipe_scroll"
+description = "Teaches how to craft a Spine Blade."
+category = "material"
+max_stack = 1
+base_price = 50
+sellable = true
+
+[recipe_scavenger_bow]
+display_name = "Recipe: Scavenger Bow"
+sprite = "recipe_scroll"
+description = "Teaches how to craft a Scavenger Bow."
+category = "material"
+max_stack = 1
+base_price = 50
+sellable = true
