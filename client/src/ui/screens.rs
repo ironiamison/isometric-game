@@ -141,30 +141,7 @@ fn draw_character_preview(
             },
         );
 
-        // 3. Draw hair
-        if let Some(style) = hair_style {
-            let hair_key = format!("{}_{}", gender, style);
-            if let Some(hair_tex) = hair_sprites.get(&hair_key) {
-                let hair_frame_index = hair_color * 2; // front frame
-                let hair_src_x = hair_frame_index as f32 * HAIR_SPRITE_WIDTH;
-                // Center hair on player: (34 - 28) / 2 = 3, then offset -1
-                let hair_x = x + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 - 1.0;
-                let hair_y = y - 3.0;
-
-                draw_texture_ex(
-                    hair_tex,
-                    hair_x,
-                    hair_y,
-                    WHITE,
-                    DrawTextureParams {
-                        source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
-                        ..Default::default()
-                    },
-                );
-            }
-        }
-
-        // 4. Draw body armor (frame 0 for idle/down, offset y=-3)
+        // 3. Draw body armor (frame 0 for idle/down, offset y=-3)
         if let Some(body_id) = equipped_body {
             if let Some(equip_sprite) = equipment_sprites.get(body_id) {
                 let is_single_row = equip_sprite.width() > equip_sprite.height() * 2.0;
@@ -195,7 +172,30 @@ fn draw_character_preview(
             }
         }
 
-        // 6. Draw boots (frame 0 for idle/down)
+        // 4. Draw hair (after body armor so it appears on top)
+        if let Some(style) = hair_style {
+            let hair_key = format!("{}_{}", gender, style);
+            if let Some(hair_tex) = hair_sprites.get(&hair_key) {
+                let hair_frame_index = hair_color * 2; // front frame
+                let hair_src_x = hair_frame_index as f32 * HAIR_SPRITE_WIDTH;
+                // Center hair on player: (34 - 28) / 2 = 3, then offset -1
+                let hair_x = x + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 - 1.0;
+                let hair_y = y - 3.0;
+
+                draw_texture_ex(
+                    hair_tex,
+                    hair_x,
+                    hair_y,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        // 5. Draw boots (frame 0 for idle/down)
         if let Some(feet_id) = equipped_feet {
             if let Some(equip_sprite) = equipment_sprites.get(feet_id) {
                 let is_single_row = equip_sprite.width() > equip_sprite.height();
@@ -225,7 +225,7 @@ fn draw_character_preview(
             }
         }
 
-        // 7. Draw back items in front of player (offhand/shield - frame 0 for idle/down)
+        // 6. Draw back items in front of player (offhand/shield - frame 0 for idle/down)
         if let Some(back_id) = equipped_back {
             if let Some(equip_sprite) = equipment_sprites.get(back_id) {
                 let is_offhand = equip_sprite.width() > equip_sprite.height() * 8.0;

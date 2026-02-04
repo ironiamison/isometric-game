@@ -2472,45 +2472,8 @@ impl Renderer {
                         },
                     );
                 }
-            } else {
-                // No head equipment - draw hair normally
-                if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
-                    let hair_key = format!("{}_{}", player.gender, style);
-                    if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
-                        let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
-                        let frame_index = color * 2 + if is_back { 1 } else { 0 };
-                        let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
-                        let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
-                        let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
-
-                        // Calculate hair offsets using gender-aware function
-                        let anim_frame = player.animation.frame as u32;
-                        let (hair_offset_x, hair_offset_y) = get_hair_offset(
-                            player.animation.state,
-                            player.animation.direction,
-                            anim_frame,
-                            player_gender,
-                            coords.flip_h,
-                        );
-
-                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                        let hair_draw_y = draw_y + hair_offset_y * zoom;
-
-                        draw_texture_ex(
-                            hair_tex,
-                            hair_draw_x,
-                            hair_draw_y,
-                            tint,
-                            DrawTextureParams {
-                                source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
-                                dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
-                                flip_x: coords.flip_h,
-                                ..Default::default()
-                            },
-                        );
-                    }
-                }
             }
+            // Hair without head equipment is drawn after body armor (see below)
 
             // Draw equipment overlay (body armor)
             if let Some(ref body_item_id) = player.equipped_body {
@@ -2554,6 +2517,46 @@ impl Renderer {
                             DrawTextureParams {
                                 source: Some(Rect::new(src_x, src_y, src_w, src_h)),
                                 dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
+                                flip_x: coords.flip_h,
+                                ..Default::default()
+                            },
+                        );
+                    }
+                }
+            }
+
+            // Draw hair on top of body armor (when no head equipment)
+            if player.equipped_head.is_none() {
+                if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
+                    let hair_key = format!("{}_{}", player.gender, style);
+                    if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
+                        let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
+                        let frame_index = color * 2 + if is_back { 1 } else { 0 };
+                        let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
+                        let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
+                        let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
+
+                        // Calculate hair offsets using gender-aware function
+                        let anim_frame = player.animation.frame as u32;
+                        let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                            coords.flip_h,
+                        );
+
+                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
+                        let hair_draw_y = draw_y + hair_offset_y * zoom;
+
+                        draw_texture_ex(
+                            hair_tex,
+                            hair_draw_x,
+                            hair_draw_y,
+                            tint,
+                            DrawTextureParams {
+                                source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                                dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },
@@ -2836,45 +2839,7 @@ impl Renderer {
                 );
             }
 
-            // Draw hair silhouette (skip if head slot is equipped - helmet covers hair)
-            if player.equipped_head.is_none() {
-                if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
-                    let hair_key = format!("{}_{}", player.gender, style);
-                    if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
-                        let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
-                        let frame_index = color * 2 + if is_back { 1 } else { 0 };
-                        let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
-
-                        let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
-                        let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
-
-                        // Calculate hair offsets using gender-aware function
-                        let anim_frame = player.animation.frame as u32;
-                        let (hair_offset_x, hair_offset_y) = get_hair_offset(
-                            player.animation.state,
-                            player.animation.direction,
-                            anim_frame,
-                            player_gender,
-                            coords.flip_h,
-                        );
-                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                        let hair_draw_y = draw_y + hair_offset_y * zoom;
-
-                        draw_texture_ex(
-                            hair_tex,
-                            hair_draw_x,
-                            hair_draw_y,
-                            silhouette_tint,
-                            DrawTextureParams {
-                                source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
-                                dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
-                                flip_x: coords.flip_h,
-                                ..Default::default()
-                            },
-                        );
-                    }
-                }
-            }
+            // Hair silhouette is drawn after body armor silhouette (see below)
 
             // Draw equipment silhouette (body armor)
             if let Some(ref body_item_id) = player.equipped_body {
@@ -2916,6 +2881,46 @@ impl Renderer {
                             DrawTextureParams {
                                 source: Some(Rect::new(src_x, src_y, src_w, src_h)),
                                 dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
+                                flip_x: coords.flip_h,
+                                ..Default::default()
+                            },
+                        );
+                    }
+                }
+            }
+
+            // Draw hair silhouette on top of body armor (when no head equipment)
+            if player.equipped_head.is_none() {
+                if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
+                    let hair_key = format!("{}_{}", player.gender, style);
+                    if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
+                        let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
+                        let frame_index = color * 2 + if is_back { 1 } else { 0 };
+                        let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
+
+                        let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
+                        let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
+
+                        // Calculate hair offsets using gender-aware function
+                        let anim_frame = player.animation.frame as u32;
+                        let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                            coords.flip_h,
+                        );
+                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
+                        let hair_draw_y = draw_y + hair_offset_y * zoom;
+
+                        draw_texture_ex(
+                            hair_tex,
+                            hair_draw_x,
+                            hair_draw_y,
+                            silhouette_tint,
+                            DrawTextureParams {
+                                source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                                dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },

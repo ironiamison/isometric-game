@@ -121,6 +121,21 @@ attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 2
 
+[peasant_suit_female]
+display_name = "Peasant Suit (Female)"
+sprite = "peasant_suit_female"
+description = "Basic commoner clothing. Provides minor protection."
+category = "equipment"
+max_stack = 1
+base_price = 25
+sellable = true
+[peasant_suit_female.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 2
+
 [archery_armor]
 display_name = "Archery Armor"
 sprite = "archery_armor"

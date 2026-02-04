@@ -740,7 +740,7 @@ pub fn get_body_armor_frame(state: AnimationState, direction: Direction, anim_fr
 /// Body armor covers the torso and should align with the player's body in each animation frame.
 /// These offsets are similar to boots but positioned higher to cover the torso.
 /// Gender parameter allows for different positioning based on character model.
-pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
+pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_frame: u32, gender: Gender) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: body armor is 34 wide (same as player's 34)
@@ -790,7 +790,23 @@ pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_f
         state_x
     };
 
-    (base_x + adjusted_state_x, base_y + state_y)
+    // Gender-specific adjustments for female body armor
+    let (gender_adjust_x, gender_adjust_y) = match gender {
+        Gender::Male => (0.0, 0.0),
+        Gender::Female => {
+            // Female body armor needs adjustment for up and left directions
+            let x_adj = match direction {
+                Direction::Up => -2.0,   // Move 2px to the left
+                Direction::Left => 2.0,  // Mirror: move 2px to the right (since sprite is flipped)
+                _ => 0.0,
+            };
+            // Female body armor needs to be 2px higher when sitting on chair
+            let y_adj = if state == AnimationState::SittingChair { -2.0 } else { 0.0 };
+            (x_adj, y_adj)
+        }
+    };
+
+    (base_x + adjusted_state_x + gender_adjust_x, base_y + state_y + gender_adjust_y)
 }
 
 // ============================================================================
