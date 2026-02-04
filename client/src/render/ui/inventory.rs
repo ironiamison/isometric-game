@@ -164,7 +164,7 @@ impl Renderer {
         }
 
         // Title text (native font size for crisp rendering)
-        self.draw_text_sharp("INVENTORY", header_x + 8.0, header_y + (header_height + 12.0) / 2.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp("Inventory", header_x + 8.0, header_y + (header_height + 12.0) / 2.0, 16.0, TEXT_TITLE);
 
         // Gold display (right side)
         let gold_text = format!("{}g", state.inventory.gold);

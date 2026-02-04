@@ -78,9 +78,9 @@ impl Renderer {
         // Header text with pending request count badge
         let pending_count = state.social_state.pending_request_count;
         let header_text = if pending_count > 0 {
-            format!("SOCIAL ({})", pending_count)
+            format!("Social ({})", pending_count)
         } else {
-            "SOCIAL".to_string()
+            "Social".to_string()
         };
         let text_dims = self.measure_text_sharp(&header_text, 16.0);
         let text_x = header_x + (header_w - text_dims.width) / 2.0;
