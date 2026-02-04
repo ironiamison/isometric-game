@@ -1289,30 +1289,32 @@ impl Renderer {
 
             let (screen_x, screen_y) = world_to_screen(player.x, player.y, &state.camera);
             let zoom = state.camera.zoom;
+            let font_size = 16.0 * zoom;
             let scaled_sprite_height = SPRITE_HEIGHT * zoom;
             let has_sprite = self.get_player_sprite(&player.gender, &player.skin).is_some();
             let name_y_offset = if has_sprite { scaled_sprite_height - 8.0 * zoom } else { 24.0 * zoom };
 
-            let name_width = self.measure_text_sharp(&player.name, 16.0).width;
-            let gm_width = if player.is_admin { self.measure_text_sharp(" (GM)", 16.0).width - 2.0 } else { 0.0 };
+            let name_width = self.measure_text_sharp(&player.name, font_size).width;
+            let gm_width = if player.is_admin { self.measure_text_sharp(" (GM)", font_size).width - 2.0 * zoom } else { 0.0 };
             let total_width = name_width + gm_width;
             let name_x = screen_x - total_width / 2.0;
-            let name_y = screen_y - name_y_offset + 2.0;
+            let name_y = screen_y - name_y_offset + 2.0 * zoom;
 
-            let padding = 4.0;
+            let padding = 4.0 * zoom;
+            let bar_height = 18.0 * zoom;
             draw_rectangle(
                 name_x - padding,
-                name_y - 14.0,
+                name_y - 14.0 * zoom,
                 total_width + padding * 2.0,
-                18.0,
+                bar_height,
                 Color::from_rgba(0, 0, 0, 180),
             );
 
-            self.draw_text_sharp(&player.name, name_x, name_y, 16.0, WHITE);
+            self.draw_text_sharp(&player.name, name_x, name_y, font_size, WHITE);
 
             if player.is_admin {
                 let gold_color = Color::from_rgba(255, 215, 0, 255);
-                self.draw_text_sharp(" (GM)", name_x + name_width, name_y, 16.0, gold_color);
+                self.draw_text_sharp(" (GM)", name_x + name_width, name_y, font_size, gold_color);
             }
         }
 
@@ -1355,10 +1357,11 @@ impl Renderer {
                 Color::from_rgba(255, 255, 255, 255)
             };
 
+            let font_size = 16.0 * zoom;
             let name = npc.name();
-            let name_width = self.measure_text_sharp(&name, 16.0).width;
+            let name_width = self.measure_text_sharp(&name, font_size).width;
             let name_y = top_y - 5.0 * zoom;
-            let padding = 4.0;
+            let padding = 4.0 * zoom;
 
             let small_icon: Option<&Texture2D> = if npc.is_quest_giver {
                 self.chat_small_icon.as_ref()
@@ -1366,29 +1369,32 @@ impl Renderer {
                 None
             };
 
-            let icon_gap = 4.0;
+            let icon_gap = 4.0 * zoom;
             let (total_width, icon_width) = if let Some(tex) = small_icon {
-                let w = tex.width();
+                let w = tex.width() * zoom;
                 (w + icon_gap + name_width, w)
             } else {
                 (name_width, 0.0)
             };
             let content_x = screen_x - total_width / 2.0;
 
-            let bar_height = 18.0;
+            let bar_height = 18.0 * zoom;
             draw_rectangle(
                 content_x - padding,
-                name_y - 14.0,
+                name_y - 14.0 * zoom,
                 total_width + padding * 2.0,
                 bar_height,
                 Color::from_rgba(0, 0, 0, 180),
             );
 
             if let Some(tex) = small_icon {
-                let icon_h = tex.height();
-                let bar_top = name_y - 14.0;
+                let icon_h = tex.height() * zoom;
+                let bar_top = name_y - 14.0 * zoom;
                 let icon_y = bar_top + (bar_height - icon_h) / 2.0;
-                draw_texture_ex(tex, content_x, icon_y, WHITE, DrawTextureParams::default());
+                draw_texture_ex(tex, content_x, icon_y, WHITE, DrawTextureParams {
+                    dest_size: Some(Vec2::new(tex.width() * zoom, icon_h)),
+                    ..Default::default()
+                });
             }
 
             let text_x = if small_icon.is_some() {
@@ -1397,7 +1403,7 @@ impl Renderer {
                 content_x
             };
 
-            self.draw_text_sharp(&name, text_x, name_y, 16.0, name_color);
+            self.draw_text_sharp(&name, text_x, name_y, font_size, name_color);
         }
     }
 
@@ -1426,14 +1432,15 @@ impl Renderer {
                 255
             };
 
-            // Word wrap the text
-            let max_bubble_width = 220.0;
-            let font_size = 16.0;
-            let line_height = 18.0;
-            let padding_h = 4.0;
-            let padding_v = 1.0;
-            let tail_height = 6.0;
-            let corner_radius = 5.0;
+            // Word wrap the text - scale with zoom for readability
+            let zoom = state.camera.zoom;
+            let font_size = 16.0 * zoom;
+            let line_height = 18.0 * zoom;
+            let max_bubble_width = 220.0 * zoom;
+            let padding_h = 4.0 * zoom;
+            let padding_v = 1.0 * zoom;
+            let tail_height = 6.0 * zoom;
+            let corner_radius = 5.0 * zoom;
 
             let lines = self.wrap_text(&bubble.text, max_bubble_width - padding_h * 2.0, font_size);
             let num_lines = lines.len().max(1);
@@ -1445,18 +1452,17 @@ impl Renderer {
                 max_line_width = max_line_width.max(width);
             }
 
-            let bubble_width = (max_line_width + padding_h * 2.0).max(18.0);
+            let bubble_width = (max_line_width + padding_h * 2.0).max(18.0 * zoom);
             let bubble_height = num_lines as f32 * line_height + padding_v * 2.0;
 
             // Position bubble above player's head
             // Base offset: sprite height (78) minus feet offset (8) = 70, scaled by zoom
-            let zoom = state.camera.zoom;
             let base_offset = (SPRITE_HEIGHT - 8.0) * zoom;
 
             // Check if name tag is showing (hovered or selected) - need extra space
             let is_hovered = state.hovered_entity_id.as_ref() == Some(&bubble.player_id);
             let is_selected = state.selected_entity_id.as_ref() == Some(&bubble.player_id);
-            let name_offset = if is_hovered || is_selected { 16.0 } else { 0.0 };
+            let name_offset = if is_hovered || is_selected { 16.0 * zoom } else { 0.0 };
 
             let bubble_x = screen_x - bubble_width / 2.0;
             let bubble_y = screen_y - base_offset - name_offset - bubble_height - tail_height;
@@ -1486,7 +1492,7 @@ impl Renderer {
             let tail_x = screen_x.floor();
             let tail_top_y = by + bh;
             let tail_bottom_y = tail_top_y + tail_height;
-            let tail_half_width = 4.0;
+            let tail_half_width = 4.0 * zoom;
 
             // Tail border
             draw_triangle(
@@ -1555,14 +1561,15 @@ impl Renderer {
                 255
             };
 
-            // Word wrap the text (same params as player bubbles)
-            let max_bubble_width = 220.0;
-            let font_size = 16.0;
-            let line_height = 18.0;
-            let padding_h = 4.0;
-            let padding_v = 1.0;
-            let tail_height = 6.0;
-            let corner_radius = 5.0;
+            // Word wrap the text (same params as player bubbles) - scale with zoom
+            let zoom = state.camera.zoom;
+            let font_size = 16.0 * zoom;
+            let line_height = 18.0 * zoom;
+            let max_bubble_width = 220.0 * zoom;
+            let padding_h = 4.0 * zoom;
+            let padding_v = 1.0 * zoom;
+            let tail_height = 6.0 * zoom;
+            let corner_radius = 5.0 * zoom;
 
             let lines = self.wrap_text(text, max_bubble_width - padding_h * 2.0, font_size);
             let num_lines = lines.len().max(1);
@@ -1573,16 +1580,15 @@ impl Renderer {
                 max_line_width = max_line_width.max(width);
             }
 
-            let bubble_width = (max_line_width + padding_h * 2.0).max(18.0);
+            let bubble_width = (max_line_width + padding_h * 2.0).max(18.0 * zoom);
             let bubble_height = num_lines as f32 * line_height + padding_v * 2.0;
 
             // Position bubble above NPC's head
-            let zoom = state.camera.zoom;
             let base_offset = (SPRITE_HEIGHT - 8.0) * zoom;
 
             let is_hovered = state.hovered_entity_id.as_ref() == Some(&npc.id);
             let is_selected = state.selected_entity_id.as_ref() == Some(&npc.id);
-            let name_offset = if is_hovered || is_selected { 16.0 } else { 0.0 };
+            let name_offset = if is_hovered || is_selected { 16.0 * zoom } else { 0.0 };
 
             let bubble_x = screen_x - bubble_width / 2.0;
             let bubble_y = screen_y - base_offset - name_offset - bubble_height - tail_height;
@@ -1609,7 +1615,7 @@ impl Renderer {
             let tail_x = screen_x.floor();
             let tail_top_y = by + bh;
             let tail_bottom_y = tail_top_y + tail_height;
-            let tail_half_width = 4.0;
+            let tail_half_width = 4.0 * zoom;
 
             draw_triangle(
                 Vec2::new(tail_x - tail_half_width - 1.0, tail_top_y),
@@ -1769,8 +1775,9 @@ impl Renderer {
 
     fn render_damage_numbers(&self, state: &GameState) {
         let current_time = macroquad::time::get_time();
+        let zoom = state.camera.zoom;
         const DURATION: f32 = 1.2;
-        const FONT_SIZE: f32 = 16.0;
+        let font_size = 16.0 * zoom;
 
         for event in &state.damage_events {
             let age = (current_time - event.time) as f32;
@@ -1780,21 +1787,21 @@ impl Renderer {
 
             let t = age / DURATION;
 
-            // Steady float upward - round to whole pixels for crisp movement
-            let float_offset = (age * 40.0).round();
+            // Steady float upward - round to whole pixels for crisp movement, scale with zoom
+            let float_offset = (age * 40.0 * zoom).round();
 
             // Compute height offset based on entity type and actual sprite size
             let height_offset = if state.players.contains_key(&event.target_id) {
-                (SPRITE_HEIGHT - 8.0) / 2.0 // Center of player sprite
+                (SPRITE_HEIGHT - 8.0) * zoom / 2.0 // Center of player sprite
             } else if let Some(npc) = state.npcs.get(&event.target_id) {
                 // Use actual sprite height if available, otherwise fallback to ellipse size
                 if let Some(sprite) = self.npc_sprites.get(&npc.entity_type) {
-                    sprite.height() / 2.0 // Center of NPC sprite
+                    sprite.height() * zoom / 2.0 // Center of NPC sprite
                 } else {
-                    12.0 // Center of fallback ellipse
+                    12.0 * zoom // Center of fallback ellipse
                 }
             } else {
-                25.0 // Fallback for unknown entities
+                25.0 * zoom // Fallback for unknown entities
             };
 
             let (screen_x, screen_y) = world_to_screen(event.x, event.y, &state.camera);
@@ -1817,17 +1824,18 @@ impl Renderer {
                 ("MISS".to_string(), Color::new(0.6, 0.6, 0.6, alpha))
             };
 
-            let text_dims = self.measure_text_sharp(&text, FONT_SIZE);
+            let text_dims = self.measure_text_sharp(&text, font_size);
             // Round center position to whole pixels
             let draw_x = (screen_x - text_dims.width / 2.0).round();
 
-            // Simple outline
+            // Simple outline - scale offset with zoom
+            let outline_offset = 1.0 * zoom;
             let outline_color = Color::new(0.0, 0.0, 0.0, alpha * 0.9);
-            for &(ox, oy) in &[(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
-                self.draw_text_sharp(&text, draw_x + ox, final_y + oy, FONT_SIZE, outline_color);
+            for &(ox, oy) in &[(-outline_offset, -outline_offset), (outline_offset, -outline_offset), (-outline_offset, outline_offset), (outline_offset, outline_offset)] {
+                self.draw_text_sharp(&text, draw_x + ox, final_y + oy, font_size, outline_color);
             }
 
-            self.draw_text_sharp(&text, draw_x, final_y, FONT_SIZE, base_color);
+            self.draw_text_sharp(&text, draw_x, final_y, font_size, base_color);
         }
     }
 
@@ -2745,18 +2753,18 @@ impl Renderer {
         let show_health_bar = player.hp < player.max_hp && time_since_damage < 3.0;
 
         if show_health_bar {
-            let bar_width = 32.0;
-            let bar_height = 6.0;
+            let bar_width = 32.0 * zoom;
+            let bar_height = 6.0 * zoom;
             let bar_x = screen_x - bar_width / 2.0;
             // Position health bar where name would be if name isn't showing, otherwise above the name
             let bar_y = if show_name {
-                screen_y - name_y_offset - 16.0
+                screen_y - name_y_offset - 16.0 * zoom
             } else {
                 screen_y - name_y_offset
             };
             let hp_ratio = player.hp as f32 / player.max_hp.max(1) as f32;
 
-            self.draw_entity_health_bar(bar_x, bar_y, bar_width, bar_height, hp_ratio, 1.0);
+            self.draw_entity_health_bar(bar_x, bar_y, bar_width, bar_height, hp_ratio, zoom);
         }
     }
 
@@ -3618,22 +3626,25 @@ impl Renderer {
             ),
         };
 
-        let label_width = self.measure_text_sharp(&label, 16.0).width;
+        // Scale text with zoom for readability
+        let font_size = 16.0 * zoom;
+        let label_width = self.measure_text_sharp(&label, font_size).width;
         let label_x = screen_x - label_width / 2.0;
         let label_y = screen_y - 16.0 * zoom;
 
         // Background
-        let padding = 4.0;
+        let padding = 4.0 * zoom;
+        let bar_height = 18.0 * zoom;
         draw_rectangle(
             label_x - padding,
-            label_y - 14.0,
+            label_y - 14.0 * zoom,
             label_width + padding * 2.0,
-            18.0,
+            bar_height,
             Color::from_rgba(0, 0, 0, 180),
         );
 
         // Text
-        self.draw_text_sharp(&label, label_x, label_y, 16.0, color);
+        self.draw_text_sharp(&label, label_x, label_y, font_size, color);
     }
 
     fn render_gathering_markers(&self, state: &GameState) {
@@ -4070,18 +4081,20 @@ impl Renderer {
         }
 
         // Chat messages (bottom-left) with text wrapping - only if visible
+        // Scale with zoom for readability
         if state.ui_state.chat_log_visible {
+            let zoom = state.camera.zoom;
             let chat_x = 10.0;
             let (_, chat_sh) = virtual_screen_size();
             // In classic mode, push chat log up above the always-visible chat input box
             let chat_bottom_y = if state.ui_state.classic_controls {
-                chat_sh - 58.0
+                chat_sh - 58.0 * zoom
             } else {
-                chat_sh - 20.0
+                chat_sh - 20.0 * zoom
             };
-            let line_height = 18.0;
-            let max_chat_width = 400.0;
-            let font_size = 16.0;
+            let line_height = 18.0 * zoom;
+            let max_chat_width = 400.0 * zoom;
+            let font_size = 16.0 * zoom;
             let max_visible_lines: usize = 12;
             let chat_area_h = max_visible_lines as f32 * line_height;
             let chat_top_y = chat_bottom_y - chat_area_h + line_height;
@@ -4120,7 +4133,8 @@ impl Renderer {
             // Show scroll indicator if there are older messages
             if start > 0 {
                 let indicator = format!("▲ {} more", start);
-                self.draw_text_sharp(&indicator, chat_x, chat_top_y - 2.0, 13.0, Color::from_rgba(180, 180, 180, 160));
+                let indicator_size = 13.0 * zoom;
+                self.draw_text_sharp(&indicator, chat_x, chat_top_y - 2.0 * zoom, indicator_size, Color::from_rgba(180, 180, 180, 160));
             }
         }
 
@@ -4224,16 +4238,17 @@ impl Renderer {
             self.render_area_banner(&state.area_banner.text, state.area_banner.opacity());
         }
 
-        // Chat input box (when open)
+        // Chat input box (when open) - scale with zoom for readability
         if state.ui_state.chat_open {
+            let zoom = state.camera.zoom;
             let (_, input_sh) = virtual_screen_size();
             let input_x = 10.0;
-            let input_y = input_sh - 50.0;
-            let input_width = 400.0;
-            let input_height = 24.0;
-            let text_padding = 5.0;
-            let text_area_width = input_width - text_padding * 2.0 - 12.0; // Extra margin for scroll indicators
-            let font_size = 16.0;
+            let input_y = input_sh - 50.0 * zoom;
+            let input_width = 400.0 * zoom;
+            let input_height = 24.0 * zoom;
+            let text_padding = 5.0 * zoom;
+            let text_area_width = input_width - text_padding * 2.0 - 12.0 * zoom; // Extra margin for scroll indicators
+            let font_size = 16.0 * zoom;
 
             // Background
             draw_rectangle(input_x, input_y, input_width, input_height, Color::from_rgba(0, 0, 0, 180));
@@ -4290,14 +4305,15 @@ impl Renderer {
             let visible_end = scroll_offset + visible_char_count;
 
             // Draw visible text
-            self.draw_text_sharp(&visible_text, input_x + text_padding, input_y + 17.0, font_size, WHITE);
+            let text_y_offset = 17.0 * zoom;
+            self.draw_text_sharp(&visible_text, input_x + text_padding, input_y + text_y_offset, font_size, WHITE);
 
             // Draw scroll indicators if text is clipped
             if scroll_offset > 0 {
-                self.draw_text_sharp("<", input_x + 1.0, input_y + 17.0, font_size, GRAY);
+                self.draw_text_sharp("<", input_x + 1.0, input_y + text_y_offset, font_size, GRAY);
             }
             if visible_end < char_count {
-                self.draw_text_sharp(">", input_x + input_width - 10.0, input_y + 17.0, font_size, GRAY);
+                self.draw_text_sharp(">", input_x + input_width - 10.0 * zoom, input_y + text_y_offset, font_size, GRAY);
             }
 
             // Blinking cursor at correct position within visible text
@@ -4308,9 +4324,9 @@ impl Renderer {
                 let cursor_x = self.measure_text_sharp(&text_before_cursor, font_size).width;
                 draw_line(
                     input_x + text_padding + cursor_x + 1.0,
-                    input_y + 4.0,
+                    input_y + 4.0 * zoom,
                     input_x + text_padding + cursor_x + 1.0,
-                    input_y + input_height - 4.0,
+                    input_y + input_height - 4.0 * zoom,
                     1.0,
                     WHITE,
                 );
@@ -4322,7 +4338,7 @@ impl Renderer {
             } else {
                 "Press Enter to send, Escape to cancel"
             };
-            self.draw_text_sharp(hint, input_x, input_y + input_height + 12.0, 16.0, LIGHTGRAY);
+            self.draw_text_sharp(hint, input_x, input_y + input_height + 12.0 * zoom, font_size, LIGHTGRAY);
         }
     }
 
