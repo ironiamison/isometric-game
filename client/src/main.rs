@@ -132,6 +132,14 @@ async fn main() {
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
                             game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            // Load persisted UI settings
+                            let ui_settings = settings::load_ui_settings();
+                            game_state.camera.zoom = ui_settings.zoom;
+                            game_state.ui_state.ui_scale = ui_settings.ui_scale;
+                            game_state.ui_state.shift_drop_enabled = ui_settings.shift_drop_enabled;
+                            game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
+                            game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
+                            game_state.ui_state.use_joystick = ui_settings.use_joystick;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             if !settings::load_control_scheme_chosen() {
                                 game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
@@ -177,6 +185,14 @@ async fn main() {
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
                             game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            // Load persisted UI settings
+                            let ui_settings = settings::load_ui_settings();
+                            game_state.camera.zoom = ui_settings.zoom;
+                            game_state.ui_state.ui_scale = ui_settings.ui_scale;
+                            game_state.ui_state.shift_drop_enabled = ui_settings.shift_drop_enabled;
+                            game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
+                            game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
+                            game_state.ui_state.use_joystick = ui_settings.use_joystick;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             if !settings::load_control_scheme_chosen() {
                                 game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {

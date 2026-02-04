@@ -7,7 +7,21 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::network::messages::ClientMessage;
 use crate::audio::AudioManager;
 use crate::util::virtual_screen_size;
+use crate::settings::{UiSettings, save_ui_settings};
 use super::touch::TouchControls;
+
+/// Save current UI settings to persistent storage
+fn save_current_ui_settings(state: &GameState) {
+    let settings = UiSettings {
+        zoom: state.camera.zoom,
+        ui_scale: state.ui_state.ui_scale,
+        shift_drop_enabled: state.ui_state.shift_drop_enabled,
+        chat_log_visible: state.ui_state.chat_log_visible,
+        tap_to_pathfind: state.ui_state.tap_to_pathfind,
+        use_joystick: state.ui_state.use_joystick,
+    };
+    save_ui_settings(&settings);
+}
 
 /// Convert screen coordinates to virtual coordinates for UI hit detection
 fn screen_to_virtual_coords(x: f32, y: f32) -> (f32, f32) {
@@ -903,18 +917,21 @@ impl InputHandler {
                         UiElementId::EscapeMenuZoom05x => {
                             audio.play_sfx("enter");
                             state.camera.zoom = 0.5;
+                            save_current_ui_settings(state);
                             state.ui_state.escape_menu_open = false;
                             return commands;
                         }
                         UiElementId::EscapeMenuZoom1x => {
                             audio.play_sfx("enter");
                             state.camera.zoom = 1.0;
+                            save_current_ui_settings(state);
                             state.ui_state.escape_menu_open = false;
                             return commands;
                         }
                         UiElementId::EscapeMenuZoom2x => {
                             audio.play_sfx("enter");
                             state.camera.zoom = 2.0;
+                            save_current_ui_settings(state);
                             state.ui_state.escape_menu_open = false;
                             return commands;
                         }
@@ -948,6 +965,7 @@ impl InputHandler {
                                 let normalized = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
                                 // Convert 0.0-1.0 to 0.75-1.25 range
                                 state.ui_state.ui_scale = 0.75 + normalized * 0.5;
+                                save_current_ui_settings(state);
                             }
                             return commands;
                         }
@@ -960,21 +978,25 @@ impl InputHandler {
                         UiElementId::EscapeMenuShiftDropToggle => {
                             audio.play_sfx("enter");
                             state.ui_state.shift_drop_enabled = !state.ui_state.shift_drop_enabled;
+                            save_current_ui_settings(state);
                             return commands;
                         }
                         UiElementId::EscapeMenuChatLogToggle => {
                             audio.play_sfx("enter");
                             state.ui_state.chat_log_visible = !state.ui_state.chat_log_visible;
+                            save_current_ui_settings(state);
                             return commands;
                         }
                         UiElementId::EscapeMenuTapPathfindToggle => {
                             audio.play_sfx("enter");
                             state.ui_state.tap_to_pathfind = !state.ui_state.tap_to_pathfind;
+                            save_current_ui_settings(state);
                             return commands;
                         }
                         UiElementId::EscapeMenuJoystickToggle => {
                             audio.play_sfx("enter");
                             state.ui_state.use_joystick = !state.ui_state.use_joystick;
+                            save_current_ui_settings(state);
                             return commands;
                         }
                         UiElementId::EscapeMenuControlSchemeToggle => {
