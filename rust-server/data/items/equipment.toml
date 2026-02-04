@@ -122,7 +122,7 @@ strength_bonus = 0
 defence_bonus = 2
 
 [peasant_suit_female]
-display_name = "Peasant Suit (Female)"
+display_name = "Torn Clothes (F)"
 sprite = "peasant_suit_female"
 description = "Basic commoner clothing. Provides minor protection."
 category = "equipment"
