@@ -3260,6 +3260,23 @@ impl GameRoom {
             }
         }
 
+        // Check if this is a recipe scroll before the normal use_item path
+        {
+            let players = self.players.read().await;
+            if let Some(player) = players.get(player_id) {
+                if player.is_dead {
+                    return;
+                }
+                if let Some(slot) = player.inventory.slots.get(slot_index as usize).and_then(|s| s.as_ref()) {
+                    if slot.item_id.starts_with("recipe_") {
+                        drop(players);
+                        self.handle_use_recipe_scroll(player_id, slot_index).await;
+                        return;
+                    }
+                }
+            }
+        }
+
         // Get player and try to use item
         let (used_item_id, effect, inventory_update, gold) = {
             let mut players = self.players.write().await;
@@ -3329,6 +3346,92 @@ impl GameRoom {
             };
             self.send_to_player(player_id, inv_msg).await;
         }
+    }
+
+    /// Handle using a recipe scroll item to discover a new recipe
+    async fn handle_use_recipe_scroll(&self, player_id: &str, slot_index: u8) {
+        // Extract item_id, recipe_id, and perform checks
+        let (item_id, recipe_id, inventory_update, gold) = {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) if p.active && !p.is_dead => p,
+                _ => return,
+            };
+
+            // Get item from slot
+            let item_id = match player.inventory.slots.get(slot_index as usize).and_then(|s| s.as_ref()) {
+                Some(slot) => slot.item_id.clone(),
+                None => return,
+            };
+
+            // Extract recipe_id by stripping "recipe_" prefix
+            let recipe_id = match item_id.strip_prefix("recipe_") {
+                Some(id) => id.to_string(),
+                None => return,
+            };
+
+            // Verify the recipe exists in the crafting registry
+            if self.crafting_registry.get(&recipe_id).is_none() {
+                drop(players);
+                self.send_system_message(player_id, "This recipe scroll is for an unknown recipe.").await;
+                return;
+            }
+
+            // Check if already discovered
+            if player.discovered_recipes.contains(&recipe_id) {
+                drop(players);
+                self.send_system_message(player_id, "You already know this recipe.").await;
+                return;
+            }
+
+            // Consume the scroll from inventory
+            if let Some(ref mut slot) = player.inventory.slots[slot_index as usize] {
+                slot.quantity -= 1;
+                if slot.quantity <= 0 {
+                    player.inventory.slots[slot_index as usize] = None;
+                }
+            }
+
+            // Add to discovered recipes
+            player.discovered_recipes.insert(recipe_id.clone());
+
+            let update = player.inventory.to_update();
+            let gold = player.inventory.gold;
+            (item_id, recipe_id, update, gold)
+        };
+
+        let display_name = self.item_registry
+            .get(&item_id)
+            .map(|def| def.display_name.clone())
+            .unwrap_or_else(|| item_id.clone());
+        tracing::info!("Player {} used recipe scroll {} -> discovered recipe {}", player_id, display_name, recipe_id);
+
+        // Save to database
+        if let Some(ref db) = self.db {
+            if let Some(character_id) = Self::parse_character_id(player_id) {
+                if let Err(e) = db.save_discovered_recipe(character_id, &recipe_id).await {
+                    tracing::warn!("Failed to save discovered recipe to DB: {}", e);
+                }
+            }
+        }
+
+        // Send RecipeDiscovered message
+        self.send_to_player(
+            player_id,
+            ServerMessage::RecipeDiscovered {
+                recipe_id: recipe_id.clone(),
+            },
+        ).await;
+
+        // Send inventory update
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold,
+            },
+        ).await;
     }
 
     /// Handle a crafting request from a player
