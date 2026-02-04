@@ -79,6 +79,7 @@ pub enum InputCommand {
     CloseDialogue,
     // Crafting commands
     Craft { recipe_id: String },
+    CancelCraft,
     // Equipment commands
     Equip { slot_index: u8 },
     Unequip { slot_type: String, target_slot: Option<u8> },
@@ -1389,33 +1390,65 @@ impl InputHandler {
                         return commands;
                     }
                     UiElementId::CraftingCategoryTab(idx) => {
-                        if *idx != state.ui_state.crafting_selected_category {
-                            state.ui_state.crafting_selected_category = *idx;
-                            state.ui_state.crafting_selected_recipe = 0;
+                        // Disable category switching during crafting
+                        if !state.ui_state.crafting_in_progress {
+                            if *idx != state.ui_state.crafting_selected_category {
+                                state.ui_state.crafting_selected_category = *idx;
+                                state.ui_state.crafting_selected_recipe = 0;
+                            }
                         }
                         return commands;
                     }
                     UiElementId::CraftingRecipeItem(idx) => {
-                        state.ui_state.crafting_selected_recipe = *idx;
+                        // Disable recipe selection during crafting
+                        if !state.ui_state.crafting_in_progress {
+                            state.ui_state.crafting_selected_recipe = *idx;
+                        }
                         return commands;
                     }
                     UiElementId::CraftingButton => {
-                        // Get unique categories from recipes
-                        let categories: Vec<&str> = {
-                            let mut cats: Vec<&str> = state.recipe_definitions.iter()
-                                .map(|r| r.category.as_str())
+                        // Don't allow crafting while already in progress
+                        if state.ui_state.crafting_in_progress {
+                            return commands;
+                        }
+                        // Get unique categories from recipes (matching renderer grouping)
+                        let categories: Vec<String> = {
+                            let mut cats: Vec<String> = state.recipe_definitions.iter()
+                                .map(|r| {
+                                    if r.category == "materials" || r.category == "consumables" {
+                                        "supplies".to_string()
+                                    } else {
+                                        r.category.clone()
+                                    }
+                                })
                                 .collect();
                             cats.sort();
                             cats.dedup();
                             cats
                         };
-                        let current_category = categories.get(state.ui_state.crafting_selected_category).copied().unwrap_or("consumables");
+                        let selected_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
+                        let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
                         let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
-                            .filter(|r| r.category == current_category)
+                            .filter(|r| {
+                                let cat_match = if current_category == "supplies" {
+                                    r.category == "consumables" || r.category == "materials"
+                                } else {
+                                    r.category == current_category
+                                };
+                                // Only include discovered recipes (matching renderer)
+                                let is_discovered = !r.requires_discovery || state.discovered_recipes.contains(&r.id);
+                                cat_match && is_discovered
+                            })
                             .collect();
                         if let Some(recipe) = recipes_in_category.get(state.ui_state.crafting_selected_recipe) {
                             log::info!("Crafting (click): {}", recipe.id);
                             commands.push(InputCommand::Craft { recipe_id: recipe.id.clone() });
+                        }
+                        return commands;
+                    }
+                    UiElementId::CraftingCancelButton => {
+                        if state.ui_state.crafting_in_progress {
+                            commands.push(InputCommand::CancelCraft);
                         }
                         return commands;
                     }
@@ -1538,8 +1571,12 @@ impl InputHandler {
                 state.ui_state.shop_quantity_hold_element = None;
             }
 
-            // Escape closes crafting/shop menu
+            // Escape: if crafting in progress, cancel craft; otherwise close menu
             if is_key_pressed(KeyCode::Escape) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                    return commands;
+                }
                 state.ui_state.crafting_open = false;
                 state.ui_state.crafting_npc_id = None;
                 state.ui_state.shop_data = None;
@@ -1570,50 +1607,62 @@ impl InputHandler {
                     cats
                 };
 
-                // Left/Right navigate categories
-                if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A) {
-                    if state.ui_state.crafting_selected_category > 0 {
-                        state.ui_state.crafting_selected_category -= 1;
-                        state.ui_state.crafting_selected_recipe = 0;
-                    }
-                }
-                if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
-                    if state.ui_state.crafting_selected_category < categories.len().saturating_sub(1) {
-                        state.ui_state.crafting_selected_category += 1;
-                        state.ui_state.crafting_selected_recipe = 0;
-                    }
-                }
-
-                // Get recipes for current category
-                let selected_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
-                let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
-                let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
-                    .filter(|r| {
-                        if current_category == "supplies" {
-                            r.category == "consumables" || r.category == "materials"
-                        } else {
-                            r.category == current_category
+                // Disable navigation during crafting
+                if !state.ui_state.crafting_in_progress {
+                    // Left/Right navigate categories
+                    if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A) {
+                        if state.ui_state.crafting_selected_category > 0 {
+                            state.ui_state.crafting_selected_category -= 1;
+                            state.ui_state.crafting_selected_recipe = 0;
                         }
-                    })
-                    .collect();
-
-                // Up/Down navigate recipes
-                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                    if state.ui_state.crafting_selected_recipe > 0 {
-                        state.ui_state.crafting_selected_recipe -= 1;
                     }
-                }
-                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                    if state.ui_state.crafting_selected_recipe < recipes_in_category.len().saturating_sub(1) {
-                        state.ui_state.crafting_selected_recipe += 1;
+                    if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
+                        if state.ui_state.crafting_selected_category < categories.len().saturating_sub(1) {
+                            state.ui_state.crafting_selected_category += 1;
+                            state.ui_state.crafting_selected_recipe = 0;
+                        }
                     }
-                }
 
-                // Enter or C crafts selected recipe
-                if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::C) {
-                    if let Some(recipe) = recipes_in_category.get(state.ui_state.crafting_selected_recipe) {
-                        log::info!("Crafting: {}", recipe.id);
-                        commands.push(InputCommand::Craft { recipe_id: recipe.id.clone() });
+                    // Get discovered recipes for current category (matches renderer filtering)
+                    let selected_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
+                    let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
+                    let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
+                        .filter(|r| {
+                            let cat_match = if current_category == "supplies" {
+                                r.category == "consumables" || r.category == "materials"
+                            } else {
+                                r.category == current_category
+                            };
+                            // Only include discovered recipes (matching renderer)
+                            let is_discovered = !r.requires_discovery || state.discovered_recipes.contains(&r.id);
+                            cat_match && is_discovered
+                        })
+                        .collect();
+
+                    // Up/Down navigate recipes
+                    if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                        if state.ui_state.crafting_selected_recipe > 0 {
+                            state.ui_state.crafting_selected_recipe -= 1;
+                        }
+                    }
+                    if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                        if state.ui_state.crafting_selected_recipe < recipes_in_category.len().saturating_sub(1) {
+                            state.ui_state.crafting_selected_recipe += 1;
+                        }
+                    }
+
+                    // Enter or C crafts selected recipe
+                    if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::C) {
+                        if let Some(recipe) = recipes_in_category.get(state.ui_state.crafting_selected_recipe) {
+                            log::info!("Crafting: {}", recipe.id);
+                            commands.push(InputCommand::Craft { recipe_id: recipe.id.clone() });
+                        }
+                    }
+                } else {
+                    // While crafting is in progress, X key cancels
+                    if is_key_pressed(KeyCode::X) {
+                        commands.push(InputCommand::CancelCraft);
+                        return commands;
                     }
                 }
             } else if state.ui_state.shop_main_tab == 1 {
