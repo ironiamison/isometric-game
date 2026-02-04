@@ -301,15 +301,32 @@ impl Player {
 
         if server_moved || stopped || at_tile_center {
             if vel_x != 0.0 || vel_y != 0.0 {
-                self.target_x = x + vel_x;
-                self.target_y = y + vel_y;
+                if server_moved {
+                    // Check if velocity continues the same direction as the move
+                    let move_dx = (x - old_server_x).round() as i32;
+                    let move_dy = (y - old_server_y).round() as i32;
+                    let vel_ix = vel_x as i32;
+                    let vel_iy = vel_y as i32;
+                    if (vel_ix, vel_iy) == (move_dx, move_dy) {
+                        // Same direction — predict next position for smooth movement
+                        self.target_x = x + vel_x;
+                        self.target_y = y + vel_y;
+                    } else {
+                        // Direction changed — go to server position first to avoid diagonal
+                        // Next sync at tile center will apply the new velocity
+                        self.target_x = x;
+                        self.target_y = y;
+                    }
+                } else {
+                    // No server move yet, predict based on velocity
+                    self.target_x = x + vel_x;
+                    self.target_y = y + vel_y;
+                }
             } else {
                 self.target_x = x;
                 self.target_y = y;
             }
         }
-        // If mid-tile with same server pos and new velocity direction,
-        // keep current target - finish current move first
     }
 
     /// Smooth visual interpolation toward target position
