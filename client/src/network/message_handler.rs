@@ -1326,6 +1326,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.crafting_started_at = None;
                 state.ui_state.crafting_progress = 0.0;
 
+                // Trigger completion animation (starts at 0.0, ticks up to 1.0)
+                state.ui_state.crafting_complete_animation = Some((recipe_id.clone(), 0.0));
+
                 // Look up display name from recipe definitions
                 let display_name = state.recipe_definitions.iter()
                     .find(|r| r.id == recipe_id)
