@@ -224,4 +224,8 @@ pub struct RecipeDefinition {
     pub level_required: i32,
     pub ingredients: Vec<RecipeIngredient>,
     pub results: Vec<RecipeResult>,
+    pub station: Option<String>,
+    pub craft_time_ms: u64,
+    pub xp: u32,
+    pub requires_discovery: bool,
 }

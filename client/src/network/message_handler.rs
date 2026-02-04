@@ -1165,6 +1165,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let description = extract_string(recipe_value, "description").unwrap_or_default();
                         let category = extract_string(recipe_value, "category").unwrap_or_else(|| "consumables".to_string());
                         let level_required = extract_i32(recipe_value, "level_required").unwrap_or(1);
+                        let station = extract_string(recipe_value, "station");
+                        let craft_time_ms = extract_u64(recipe_value, "craft_time_ms").unwrap_or(0);
+                        let xp = extract_u32(recipe_value, "xp").unwrap_or(0);
+                        let requires_discovery = extract_bool(recipe_value, "requires_discovery").unwrap_or(false);
 
                         // Parse ingredients
                         let mut ingredients = Vec::new();
@@ -1196,6 +1200,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             level_required,
                             ingredients,
                             results,
+                            station,
+                            craft_time_ms,
+                            xp,
+                            requires_discovery,
                         });
                     }
                 }
