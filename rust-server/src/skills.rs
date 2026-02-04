@@ -1,9 +1,10 @@
 //! Skills system following RuneScape-style mechanics.
 //!
-//! Skills: Hitpoints, Combat, Fishing
+//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Combat: Combined attack/strength/defence skill for all combat
 //! - Fishing: Gathering skill for catching fish
+//! - Smithing: Crafting skill for forging weapons and armor
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,7 @@ pub enum SkillType {
     Combat,
     Fishing,
     Farming,
+    Smithing,
 }
 
 impl SkillType {
@@ -28,6 +30,7 @@ impl SkillType {
             SkillType::Combat => "combat",
             SkillType::Fishing => "fishing",
             SkillType::Farming => "farming",
+            SkillType::Smithing => "smithing",
         }
     }
 }
@@ -131,6 +134,8 @@ pub struct Skills {
     pub fishing: Skill,
     #[serde(default)]
     pub farming: Skill,
+    #[serde(default)]
+    pub smithing: Skill,
 }
 
 impl Default for Skills {
@@ -147,6 +152,7 @@ impl Skills {
             combat: Skill::new(3),
             fishing: Skill::new(1),
             farming: Skill::new(1),
+            smithing: Skill::new(1),
         }
     }
 
@@ -163,6 +169,7 @@ impl Skills {
             SkillType::Combat => &self.combat,
             SkillType::Fishing => &self.fishing,
             SkillType::Farming => &self.farming,
+            SkillType::Smithing => &self.smithing,
         }
     }
 
@@ -173,12 +180,13 @@ impl Skills {
             SkillType::Combat => &mut self.combat,
             SkillType::Fishing => &mut self.fishing,
             SkillType::Farming => &mut self.farming,
+            SkillType::Smithing => &mut self.smithing,
         }
     }
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level
+        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level
     }
 }
 
@@ -204,6 +212,7 @@ impl LegacySkills {
             },
             fishing: Skill::new(1),
             farming: Skill::new(1),
+            smithing: Skill::new(1),
         }
     }
 }
@@ -312,6 +321,7 @@ mod tests {
             combat: Skill::new(99),
             fishing: Skill::new(1),
             farming: Skill::new(1),
+            smithing: Skill::new(1),
         };
         // combat_level = floor((99 + 99) / 2) = 99
         assert_eq!(max_skills.combat_level(), 99);
@@ -320,8 +330,8 @@ mod tests {
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Combat 3 + Fishing 1 + Farming 1 = 15
-        assert_eq!(skills.total_level(), 15);
+        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 = 16
+        assert_eq!(skills.total_level(), 16);
     }
 
     #[test]
