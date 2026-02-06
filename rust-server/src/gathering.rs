@@ -256,6 +256,11 @@ impl GatheringSystem {
         self.player_states.contains_key(player_id)
     }
 
+    /// Returns the set of player IDs currently gathering (for state sync)
+    pub fn gathering_player_ids(&self) -> std::collections::HashSet<String> {
+        self.player_states.keys().cloned().collect()
+    }
+
     pub fn tick_gathering(
         &mut self,
         player_id: &str,

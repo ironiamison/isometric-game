@@ -204,6 +204,23 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     state.is_sitting = false;
                                 }
                             }
+
+                            // Update gathering state (for players who started fishing before we logged in)
+                            let server_is_gathering = extract_bool(player_value, "is_gathering").unwrap_or(false);
+                            if server_is_gathering && !player.is_gathering {
+                                player.is_gathering = true;
+                                player.gathering_started_at = macroquad::time::get_time();
+                                // Don't play attack animation - they're already in gathering pose
+                                if is_local_player {
+                                    state.is_gathering = true;
+                                    state.gathering_started_at = macroquad::time::get_time();
+                                }
+                            } else if !server_is_gathering && player.is_gathering {
+                                player.is_gathering = false;
+                                if is_local_player {
+                                    state.is_gathering = false;
+                                }
+                            }
                         } else if state.local_player_id.as_ref() != Some(&id) && !id.is_empty() {
                             // Player not in our map - create them from stateSync data
                             // This handles players re-appearing after map transitions
@@ -232,6 +249,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
                                 if sitting {
                                     new_player.sit_chair();
+                                }
+                                let is_gathering = extract_bool(player_value, "is_gathering").unwrap_or(false);
+                                if is_gathering {
+                                    new_player.is_gathering = true;
+                                    new_player.gathering_started_at = macroquad::time::get_time();
                                 }
                                 if let Some(hp_val) = hp {
                                     new_player.hp = hp_val;

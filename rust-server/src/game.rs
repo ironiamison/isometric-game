@@ -488,6 +488,7 @@ pub struct PlayerUpdate {
     // Admin status
     pub is_admin: bool,
     pub sitting: bool,
+    pub is_gathering: bool,
 }
 
 // ============================================================================
@@ -5434,6 +5435,13 @@ impl GameRoom {
         let mut player_updates = Vec::new();
         // Track which players moved this tick
         let moved_players: std::collections::HashSet<String> = valid_moves.iter().map(|(id, _, _)| id.clone()).collect();
+
+        // Get set of gathering player IDs for state sync
+        let gathering_player_ids: std::collections::HashSet<String> = {
+            let gathering = self.gathering.read().await;
+            gathering.gathering_player_ids()
+        };
+
         {
             let mut players = self.players.write().await;
 
@@ -5487,6 +5495,7 @@ impl GameRoom {
                     equipped_belt: player.equipped_belt.clone(),
                     is_admin: player.is_admin,
                     sitting: player.sitting_at.is_some(),
+                    is_gathering: gathering_player_ids.contains(&player.id),
                 });
             }
         }
