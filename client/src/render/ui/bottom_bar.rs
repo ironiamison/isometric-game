@@ -23,7 +23,7 @@ const ICON_SIZE: f32 = 32.0;
 impl Renderer {
     /// Returns the Y position where UI below the top bar can start
     pub fn get_top_bar_bottom(&self) -> f32 {
-        EXP_BAR_HEIGHT + EXP_BAR_GAP
+        0.0
     }
 
     /// Render the experience bar at the top of the screen

@@ -1889,7 +1889,7 @@ impl Renderer {
             );
 
             // Align like isometric objects: center on slightly elevated tile position
-            let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25;
+            let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25 - 32.0 * zoom;
 
             draw_texture_ex(
                 texture,
@@ -4273,7 +4273,7 @@ impl Renderer {
         // Local player stats panel (top-right corner) - Name tag + HP bar
         if let Some(player) = state.get_local_player() {
             let margin = 12.0;
-            let base_y = 25.0;
+            let base_y = 8.0;
             let padding = 6.0;
             let font_size = 16.0;
 
@@ -4553,9 +4553,6 @@ impl Renderer {
         // Ground item clickable areas and hover labels (world-space, registered first)
         self.render_ground_item_overlays(state, hovered, &mut layout);
 
-        // Experience bar (at the very bottom, rendered first)
-        self.render_exp_bar(state);
-
         // Inventory UI (when open)
         if state.ui_state.inventory_open {
             self.render_inventory(state, hovered, &mut layout);
@@ -4585,6 +4582,23 @@ impl Renderer {
 
         // Social panel (when open)
         self.render_social_panel(state, hovered, &mut layout);
+
+        // Register chat log hit area for desktop scroll detection (before quick slots so they take priority)
+        if state.ui_state.chat_log_visible {
+            let (_, chat_sh) = virtual_screen_size();
+            let chat_bottom_y = if state.ui_state.classic_controls {
+                chat_sh - 58.0
+            } else {
+                chat_sh - 20.0
+            };
+            let line_height = 18.0;
+            let max_visible_lines: usize = 12;
+            let chat_area_h = max_visible_lines as f32 * line_height;
+            let chat_top_y = chat_bottom_y - chat_area_h + line_height;
+            layout.add(UiElementId::ChatLogArea, macroquad::prelude::Rect::new(
+                10.0, chat_top_y, 400.0, chat_area_h,
+            ));
+        }
 
         // Quick slots and menu buttons - hide on mobile when crafting/shop panel is open
         let hide_bottom_bar = cfg!(target_os = "android") && state.ui_state.crafting_open;
@@ -4677,23 +4691,6 @@ impl Renderer {
         // Render escape menu on top of everything
         if state.ui_state.escape_menu_open {
             self.render_escape_menu(state, &mut layout);
-        }
-
-        // Register chat log hit area for desktop scroll detection
-        if state.ui_state.chat_log_visible {
-            let (_, chat_sh) = virtual_screen_size();
-            let chat_bottom_y = if state.ui_state.classic_controls {
-                chat_sh - 58.0
-            } else {
-                chat_sh - 20.0
-            };
-            let line_height = 18.0;
-            let max_visible_lines: usize = 12;
-            let chat_area_h = max_visible_lines as f32 * line_height;
-            let chat_top_y = chat_bottom_y - chat_area_h + line_height;
-            layout.add(UiElementId::ChatLogArea, macroquad::prelude::Rect::new(
-                10.0, chat_top_y, 400.0, chat_area_h,
-            ));
         }
 
         // Chat panel (fullscreen overlay, on top of everything)

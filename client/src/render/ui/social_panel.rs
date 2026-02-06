@@ -48,11 +48,11 @@ impl Renderer {
         let panel_x = screen_w - panel_width - 8.0;
         let button_area_height = button_size + exp_bar_gap;
 
-        // Calculate the minimum Y the panel can reach (below XP bar)
-        let min_panel_y = EXP_BAR_HEIGHT + 4.0;
+        // Calculate the minimum Y the panel can reach
+        let min_panel_y = 4.0;
         let max_available_height = screen_h - button_area_height - 8.0 - min_panel_y;
 
-        // Clamp panel height if it would overlap the XP bar
+        // Clamp panel height if it would exceed available space
         let panel_height = panel_height_full.min(max_available_height);
         let panel_y = screen_h - button_area_height - panel_height - 8.0;
 
