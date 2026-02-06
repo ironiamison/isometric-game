@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::chunk::ChunkCoord;
 use crate::entity::{EntityPrototype, EntityRegistry};
 use crate::data::ItemRegistry;
+use crate::prayer::PrayerRegistry;
 use crate::data::item_def::WeaponType;
 use crate::skills::{Skills, SkillType, calculate_hit, calculate_max_hit, roll_damage};
 use crate::item::{self, GroundItem, Inventory, GOLD_ITEM_ID};
@@ -34,6 +35,9 @@ const ATTACK_RANGE: i32 = 1; // Maximum distance to attack (in tiles)
 const ATTACK_COOLDOWN_MS: u64 = 700; // Slightly shorter than client (800ms) to account for network latency
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
 const REGEN_INTERVAL_MS: u64 = 30000;
+
+// Prayer drain interval (60 ticks = 3 seconds at 20 ticks/second)
+const PRAYER_DRAIN_INTERVAL_TICKS: u64 = 60;
 
 // View distance for StateSync culling (Chebyshev distance in tiles)
 const VIEW_DISTANCE: i32 = 40;
@@ -549,6 +553,8 @@ pub struct GameRoom {
     crafting_registry: Arc<crate::crafting::CraftingRegistry>,
     /// Item definition registry
     item_registry: Arc<ItemRegistry>,
+    /// Prayer definition registry
+    prayer_registry: Arc<PrayerRegistry>,
     /// Shop registry for merchant NPCs
     shop_registry: RwLock<ShopRegistry>,
     /// Last time shops were restocked
@@ -584,6 +590,7 @@ impl GameRoom {
         quest_registry: Arc<QuestRegistry>,
         crafting_registry: Arc<crate::crafting::CraftingRegistry>,
         item_registry: Arc<ItemRegistry>,
+        prayer_registry: Arc<PrayerRegistry>,
         player_instances: Arc<RwLock<HashMap<String, String>>>,
         instance_manager: Arc<crate::instance::InstanceManager>,
         db: Option<Arc<crate::db::Database>>,
@@ -755,6 +762,7 @@ impl GameRoom {
             player_quest_states: RwLock::new(HashMap::new()),
             crafting_registry,
             item_registry,
+            prayer_registry,
             shop_registry: RwLock::new(shop_registry),
             last_shop_restock: RwLock::new(std::time::Instant::now()),
             player_chunks: RwLock::new(HashMap::new()),
@@ -5446,8 +5454,6 @@ impl GameRoom {
             self.handle_sit_chair(&id, tile_x, tile_y).await;
         }
 
-        // Apply valid moves and collect player updates
-        let mut player_updates = Vec::new();
         // Track which players moved this tick
         let moved_players: std::collections::HashSet<String> = valid_moves.iter().map(|(id, _, _)| id.clone()).collect();
 
@@ -5473,6 +5479,78 @@ impl GameRoom {
             for player in players.values_mut() {
                 player.apply_regen(current_time);
             }
+        }
+
+        // Prayer drain logic (every PRAYER_DRAIN_INTERVAL_TICKS)
+        if current_tick % PRAYER_DRAIN_INTERVAL_TICKS == 0 {
+            // Collect players with active prayers for drain calculation
+            struct PrayerDrainUpdate {
+                player_id: String,
+                new_points: i32,
+                max_points: i32,
+                active_prayers: Vec<String>,
+                depleted: bool, // True if points hit 0 this tick
+            }
+
+            let updates: Vec<PrayerDrainUpdate> = {
+                let mut players = self.players.write().await;
+                let mut updates = Vec::new();
+
+                for player in players.values_mut() {
+                    if !player.active || player.is_dead || player.active_prayers.is_empty() {
+                        continue;
+                    }
+
+                    // Calculate total drain rate from active prayers
+                    let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
+                    let effects = self.prayer_registry.calculate_effects(&active_ids);
+                    let drain_amount = effects.total_drain_rate.ceil() as i32;
+
+                    if drain_amount > 0 {
+                        let old_points = player.prayer_points;
+                        player.prayer_points = (player.prayer_points - drain_amount).max(0);
+
+                        let depleted = player.prayer_points == 0 && old_points > 0;
+
+                        // If points depleted, clear all active prayers
+                        if depleted {
+                            player.active_prayers.clear();
+                            tracing::debug!(
+                                "Player {} ran out of prayer points, all prayers deactivated",
+                                player.id
+                            );
+                        }
+
+                        updates.push(PrayerDrainUpdate {
+                            player_id: player.id.clone(),
+                            new_points: player.prayer_points,
+                            max_points: player.max_prayer_points(),
+                            active_prayers: player.active_prayers.iter().cloned().collect(),
+                            depleted,
+                        });
+                    }
+                }
+                updates
+            };
+
+            // Send prayer state updates to affected players
+            for update in updates {
+                self.send_to_player(&update.player_id, ServerMessage::PrayerStateUpdate {
+                    points: update.new_points,
+                    max_points: update.max_points,
+                    active_prayers: update.active_prayers,
+                }).await;
+
+                if update.depleted {
+                    self.send_system_message(&update.player_id, "You have run out of prayer points").await;
+                }
+            }
+        }
+
+        // Re-acquire players read lock for generating player updates
+        let player_updates = {
+            let players = self.players.read().await;
+            let mut player_updates = Vec::new();
 
             // Generate player updates
             for player in players.values() {
@@ -5513,7 +5591,8 @@ impl GameRoom {
                     is_gathering: gathering_player_ids.contains(&player.id),
                 });
             }
-        }
+            player_updates
+        };
 
         // Stop gathering for any player who moved
         {
@@ -6884,8 +6963,84 @@ impl GameRoom {
 
     /// Handle toggling a prayer on/off
     pub async fn handle_toggle_prayer(&self, player_id: &str, prayer_id: &str) {
-        // TODO: Implement prayer toggle logic (Task #4)
-        tracing::debug!("Player {} toggling prayer: {}", player_id, prayer_id);
+        // Get prayer definition
+        let prayer = match self.prayer_registry.get(prayer_id) {
+            Some(p) => p.clone(),
+            None => {
+                tracing::warn!("Player {} tried to toggle unknown prayer: {}", player_id, prayer_id);
+                return;
+            }
+        };
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) => p,
+            None => return,
+        };
+
+        // Check if player is dead
+        if player.is_dead {
+            return;
+        }
+
+        // If prayer is already active, deactivate it
+        if player.active_prayers.contains(prayer_id) {
+            player.active_prayers.remove(prayer_id);
+            tracing::debug!("Player {} deactivated prayer: {}", player_id, prayer_id);
+        } else {
+            // Check prayer level requirement
+            if player.skills.prayer.level < prayer.level_req {
+                drop(players);
+                self.send_system_message(player_id, &format!(
+                    "You need Prayer level {} to use {}",
+                    prayer.level_req, prayer.name
+                )).await;
+                return;
+            }
+
+            // Check if player has prayer points
+            if player.prayer_points <= 0 {
+                drop(players);
+                self.send_system_message(player_id, "You have no prayer points remaining").await;
+                return;
+            }
+
+            // Check for category conflicts and deactivate conflicting prayer
+            let mut conflicting_prayer: Option<String> = None;
+            for active_id in &player.active_prayers {
+                if let Some(active_prayer) = self.prayer_registry.get(active_id) {
+                    if active_prayer.category == prayer.category {
+                        conflicting_prayer = Some(active_id.clone());
+                        break;
+                    }
+                }
+            }
+
+            // Deactivate conflicting prayer if any
+            if let Some(conflict_id) = conflicting_prayer {
+                player.active_prayers.remove(&conflict_id);
+                tracing::debug!(
+                    "Player {} deactivated conflicting prayer {} to activate {}",
+                    player_id, conflict_id, prayer_id
+                );
+            }
+
+            // Activate the new prayer
+            player.active_prayers.insert(prayer_id.to_string());
+            tracing::debug!("Player {} activated prayer: {}", player_id, prayer_id);
+        }
+
+        // Build and send prayer state update
+        let points = player.prayer_points;
+        let max_points = player.max_prayer_points();
+        let active_prayers: Vec<String> = player.active_prayers.iter().cloned().collect();
+        drop(players);
+
+        self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
+            points,
+            max_points,
+            active_prayers,
+        }).await;
     }
 
     /// Handle burying bones from inventory

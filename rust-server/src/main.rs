@@ -55,6 +55,7 @@ use db::Database;
 use entity::EntityRegistry;
 use instance::InstanceManager;
 use interior_registry::InteriorRegistry;
+use prayer::PrayerRegistry;
 use quest::QuestRegistry;
 use game::{GameRoom, Player, PlayerUpdate};
 use protocol::{ClientMessage, ServerMessage};
@@ -90,6 +91,7 @@ struct AppState {
     // Entity and item registries (loaded from TOML at startup)
     entity_registry: Arc<EntityRegistry>,
     item_registry: Arc<ItemRegistry>,
+    prayer_registry: Arc<PrayerRegistry>,
     quest_registry: Arc<QuestRegistry>,
     crafting_registry: Arc<CraftingRegistry>,
     interior_registry: Arc<InteriorRegistry>,
@@ -122,6 +124,12 @@ impl AppState {
         let mut item_registry = ItemRegistry::new();
         if let Err(e) = item_registry.load_from_directory(data_dir) {
             error!("Failed to load item registry: {}", e);
+        }
+
+        // Load prayer registry from TOML file
+        let mut prayer_registry = PrayerRegistry::new();
+        if let Err(e) = prayer_registry.load_from_directory(data_dir) {
+            error!("Failed to load prayer registry: {}", e);
         }
 
         // Load quest registry from TOML files
@@ -184,6 +192,7 @@ impl AppState {
             token_signer: SessionTokenSigner::new(),
             entity_registry: Arc::new(entity_registry),
             item_registry: Arc::new(item_registry),
+            prayer_registry: Arc::new(prayer_registry),
             quest_registry,
             crafting_registry: Arc::new(crafting_registry),
             interior_registry,
@@ -210,6 +219,7 @@ impl AppState {
             self.quest_registry.clone(),
             self.crafting_registry.clone(),
             self.item_registry.clone(),
+            self.prayer_registry.clone(),
             self.player_instances.clone(),
             self.instance_manager.clone(),
             Some(self.db.clone()),
