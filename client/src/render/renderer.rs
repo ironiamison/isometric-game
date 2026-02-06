@@ -4314,50 +4314,9 @@ impl Renderer {
             let hp_text_w = self.measure_text_sharp(&hp_text, font_size).width;
             self.draw_text_sharp(&hp_text, (hp_bar_x + (bar_width - hp_text_w) / 2.0).floor(), (hp_bar_y + 14.0).floor(), font_size, TEXT_NORMAL);
 
-            // ===== PRAYER POINTS BAR (below HP bar) =====
-            let prayer_bar_x = bar_x;
-            let prayer_bar_y = hp_bar_y + bar_height + 4.0;
-            let prayer_ratio = if state.max_prayer_points > 0 {
-                state.prayer_points as f32 / state.max_prayer_points as f32
-            } else {
-                0.0
-            };
-            let prayer_low = prayer_ratio < 0.2 && state.max_prayer_points > 0;
-
-            // Background with flashing border when low
-            let border_color = if prayer_low {
-                // Flash between normal and red when prayer is low
-                let flash = ((macroquad::time::get_time() * 4.0).sin() * 0.5 + 0.5) as f32;
-                Color::new(0.8 * flash + 0.3, 0.2, 0.2, 1.0)
-            } else {
-                SLOT_INNER_SHADOW
-            };
-            draw_rectangle(prayer_bar_x, prayer_bar_y, bar_width, bar_height, border_color);
-            draw_rectangle(prayer_bar_x + 1.0, prayer_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
-
-            // Prayer fill (cyan/turquoise color)
-            let prayer_fill_w = (bar_width - 4.0) * prayer_ratio;
-            if prayer_fill_w > 0.0 {
-                let prayer_color = Color::new(0.2, 0.7, 0.85, 1.0);
-                draw_rectangle(prayer_bar_x + 2.0, prayer_bar_y + 2.0, prayer_fill_w, bar_height - 4.0, prayer_color);
-                draw_rectangle(prayer_bar_x + 2.0, prayer_bar_y + 2.0, prayer_fill_w, (bar_height - 4.0) / 2.0, Color::new(1.0, 1.0, 1.0, 0.25));
-            }
-
-            // Prayer text
-            let prayer_text = format!("{}/{}", state.prayer_points, state.max_prayer_points);
-            let prayer_text_w = self.measure_text_sharp(&prayer_text, font_size).width;
-            let prayer_text_color = if prayer_low {
-                // Flash text color when low
-                let flash = ((macroquad::time::get_time() * 4.0).sin() * 0.5 + 0.5) as f32;
-                Color::new(1.0, 0.5 + 0.5 * flash, 0.5 + 0.5 * flash, 1.0)
-            } else {
-                TEXT_NORMAL
-            };
-            self.draw_text_sharp(&prayer_text, (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(), (prayer_bar_y + 14.0).floor(), font_size, prayer_text_color);
-
-            // ===== MP BAR (below prayer bar) =====
+            // ===== MP BAR (below HP bar) =====
             let mp_bar_x = bar_x;
-            let mp_bar_y = prayer_bar_y + bar_height + 4.0;
+            let mp_bar_y = hp_bar_y + bar_height + 4.0;
             let (mp, max_mp) = state.get_local_player()
                 .map(|p| (p.mp, p.max_mp))
                 .unwrap_or((0, 12));
@@ -4384,9 +4343,50 @@ impl Renderer {
             let mp_text_w = self.measure_text_sharp(&mp_text, font_size).width;
             self.draw_text_sharp(&mp_text, (mp_bar_x + (bar_width - mp_text_w) / 2.0).floor(), (mp_bar_y + 14.0).floor(), font_size, TEXT_NORMAL);
 
-            // ===== Gathering status indicator (below MP bar) =====
+            // ===== PRAYER POINTS BAR (below MP bar) =====
+            let prayer_bar_x = bar_x;
+            let prayer_bar_y = mp_bar_y + bar_height + 4.0;
+            let prayer_ratio = if state.max_prayer_points > 0 {
+                state.prayer_points as f32 / state.max_prayer_points as f32
+            } else {
+                0.0
+            };
+            let prayer_low = prayer_ratio < 0.2 && state.max_prayer_points > 0;
+
+            // Background with subtle flashing border when low
+            let border_color = if prayer_low {
+                // Subtle flash between normal and slightly red when prayer is low
+                let flash = ((macroquad::time::get_time() * 2.0).sin() * 0.3 + 0.7) as f32;
+                Color::new(0.4 * flash + 0.2, 0.15, 0.15, 1.0)
+            } else {
+                SLOT_INNER_SHADOW
+            };
+            draw_rectangle(prayer_bar_x, prayer_bar_y, bar_width, bar_height, border_color);
+            draw_rectangle(prayer_bar_x + 1.0, prayer_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+
+            // Prayer fill (cyan/turquoise color)
+            let prayer_fill_w = (bar_width - 4.0) * prayer_ratio;
+            if prayer_fill_w > 0.0 {
+                let prayer_color = Color::new(0.2, 0.7, 0.85, 1.0);
+                draw_rectangle(prayer_bar_x + 2.0, prayer_bar_y + 2.0, prayer_fill_w, bar_height - 4.0, prayer_color);
+                draw_rectangle(prayer_bar_x + 2.0, prayer_bar_y + 2.0, prayer_fill_w, (bar_height - 4.0) / 2.0, Color::new(1.0, 1.0, 1.0, 0.25));
+            }
+
+            // Prayer text
+            let prayer_text = format!("{}/{}", state.prayer_points, state.max_prayer_points);
+            let prayer_text_w = self.measure_text_sharp(&prayer_text, font_size).width;
+            let prayer_text_color = if prayer_low {
+                // Subtle flash on text when low
+                let flash = ((macroquad::time::get_time() * 2.0).sin() * 0.15 + 0.85) as f32;
+                Color::new(1.0, 0.7 + 0.3 * flash, 0.7 + 0.3 * flash, 1.0)
+            } else {
+                TEXT_NORMAL
+            };
+            self.draw_text_sharp(&prayer_text, (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(), (prayer_bar_y + 14.0).floor(), font_size, prayer_text_color);
+
+            // ===== Gathering status indicator (below prayer bar) =====
             if state.is_gathering {
-                let gather_y = mp_bar_y + bar_height + 4.0;
+                let gather_y = prayer_bar_y + bar_height + 4.0;
                 let gather_h = 22.0;
                 // Semi-transparent background
                 draw_rectangle(bar_x, gather_y, bar_width, gather_h, Color::new(0.05, 0.15, 0.25, 0.7));
