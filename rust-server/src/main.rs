@@ -789,6 +789,17 @@ async fn delete_character(
         }
     };
 
+    if state.online_characters.contains(&character_id) {
+        warn!("Delete rejected: Character {} is currently online", character_id);
+        return (
+            StatusCode::CONFLICT,
+            Json(DeleteCharacterResponse {
+                success: false,
+                error: Some("Cannot delete a character that is currently logged in".to_string()),
+            }),
+        );
+    }
+
     match state.db.delete_character(character_id, account_id).await {
         Ok(true) => {
             info!("Deleted character {} for account {}", character_id, account_id);
