@@ -25,7 +25,8 @@ impl InteriorRegistry {
             if file_path.extension().map_or(false, |ext| ext == "json") {
                 match InteriorMapDef::load_from_file(file_path.to_str().unwrap()) {
                     Ok(interior) => {
-                        info!("Loaded interior map: {} ({})", interior.id, interior.name);
+                        info!("Loaded interior map: {} ({}) with {} entities",
+                            interior.id, interior.name, interior.entities.len());
                         interiors.insert(interior.id.clone(), interior);
                     }
                     Err(e) => {

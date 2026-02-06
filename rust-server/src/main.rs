@@ -1442,23 +1442,29 @@ async fn handle_socket(
 
     }
 
-    // Notify others about this player joining (uses broadcast so the client also
-    // receives its own PlayerJoined which it needs for initialization)
+    // Notify others about this player joining
     // Instance players will ignore this via state sync filtering
     let (x, y) = room.get_player_position(&player_id).await.unwrap_or((0, 0));
     let (gender, skin) = room.get_player_appearance(&player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
     let (hair_style, hair_color) = room.get_player_hair(&player_id).await.unwrap_or((None, None));
-    room.broadcast(ServerMessage::PlayerJoined {
+    let player_joined_msg = ServerMessage::PlayerJoined {
         id: player_id.clone(),
         name: player_name.clone(),
         x,
         y,
-        gender,
-        skin,
+        gender: gender.clone(),
+        skin: skin.clone(),
         hair_style,
         hair_color,
-    })
-    .await;
+    };
+
+    // Send PlayerJoined directly to this client first (so player exists before skills sync)
+    if let Ok(bytes) = protocol::encode_server_message(&player_joined_msg) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
+    // Notify other overworld players (exclude self to avoid double-receive which overwrites skills)
+    room.send_to_overworld_players(player_joined_msg, Some(&player_id)).await;
 
     // If player was sitting on a chair, send SitResult so client shows sitting animation
     if let Some((sx, sy, direction)) = room.get_player_sitting_info(&player_id).await {
@@ -1483,6 +1489,13 @@ async fn handle_socket(
     // Send initial inventory to this client
     if let Some(inv_msg) = room.get_player_inventory_update(&player_id).await {
         if let Ok(bytes) = protocol::encode_server_message(&inv_msg) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
+    // Send initial skills to this client
+    if let Some(skills_msg) = room.get_player_skills_sync(&player_id).await {
+        if let Ok(bytes) = protocol::encode_server_message(&skills_msg) {
             let _ = sender.send(Message::Binary(bytes)).await;
         }
     }

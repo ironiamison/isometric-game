@@ -676,6 +676,65 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "skillsSync" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                log::info!("skillsSync received for player_id: {}, local_player_id: {:?}, players in state: {:?}",
+                    player_id, state.local_player_id, state.players.keys().collect::<Vec<_>>());
+
+                // Only update skills for the local player
+                if state.local_player_id.as_ref() == Some(&player_id) {
+                    if let Some(player) = state.players.get_mut(&player_id) {
+                        // Update all skills
+                        if let Some(level) = extract_i32(value, "hitpoints_level") {
+                            player.skills.hitpoints.level = level;
+                            player.max_hp = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "hitpoints_xp") {
+                            player.skills.hitpoints.xp = xp as i64;
+                        }
+                        if let Some(level) = extract_i32(value, "combat_level") {
+                            player.skills.combat.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "combat_xp") {
+                            player.skills.combat.xp = xp as i64;
+                        }
+                        if let Some(level) = extract_i32(value, "fishing_level") {
+                            player.skills.fishing.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "fishing_xp") {
+                            player.skills.fishing.xp = xp as i64;
+                        }
+                        if let Some(level) = extract_i32(value, "farming_level") {
+                            player.skills.farming.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "farming_xp") {
+                            player.skills.farming.xp = xp as i64;
+                        }
+                        if let Some(level) = extract_i32(value, "smithing_level") {
+                            player.skills.smithing.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "smithing_xp") {
+                            player.skills.smithing.xp = xp as i64;
+                        }
+
+                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}",
+                            player_id,
+                            player.skills.hitpoints.level,
+                            player.skills.combat.level,
+                            player.skills.fishing.level,
+                            player.skills.farming.level,
+                            player.skills.smithing.level
+                        );
+                    } else {
+                        log::warn!("skillsSync: player {} not found in state.players", player_id);
+                    }
+                } else {
+                    log::warn!("skillsSync: player_id {} doesn't match local_player_id {:?}", player_id, state.local_player_id);
+                }
+            }
+        }
+
         "skillLevelUp" => {
             if let Some(value) = data {
                 let player_id = extract_string(value, "player_id").unwrap_or_default();

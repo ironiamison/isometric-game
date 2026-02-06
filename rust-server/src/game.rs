@@ -1274,6 +1274,24 @@ impl GameRoom {
         })
     }
 
+    /// Get the initial skills sync message for a player (used on connection)
+    pub async fn get_player_skills_sync(&self, player_id: &str) -> Option<ServerMessage> {
+        let players = self.players.read().await;
+        players.get(player_id).map(|p| ServerMessage::SkillsSync {
+            player_id: player_id.to_string(),
+            hitpoints_level: p.skills.hitpoints.level,
+            hitpoints_xp: p.skills.hitpoints.xp,
+            combat_level: p.skills.combat.level,
+            combat_xp: p.skills.combat.xp,
+            fishing_level: p.skills.fishing.level,
+            fishing_xp: p.skills.fishing.xp,
+            farming_level: p.skills.farming.level,
+            farming_xp: p.skills.farming.xp,
+            smithing_level: p.skills.smithing.level,
+            smithing_xp: p.skills.smithing.xp,
+        })
+    }
+
     pub async fn get_all_npcs(&self) -> Vec<Npc> {
         let npcs = self.npcs.read().await;
         npcs.values().cloned().collect()
@@ -6054,10 +6072,17 @@ impl GameRoom {
                 .map(|ps| ps.iter().map(|p| (*p).clone()).collect())
                 .unwrap_or_default();
 
+            // Get NPCs from this instance
+            let instance_npcs = if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                instance.get_npc_updates().await
+            } else {
+                Vec::new()
+            };
+
             let msg = ServerMessage::StateSync {
                 tick,
                 players: players_for_group,
-                npcs: Vec::new(),
+                npcs: instance_npcs,
             };
 
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {

@@ -51,8 +51,12 @@ impl Instance {
         entities: &[crate::interior::InteriorEntitySpawn],
         entity_registry: &crate::entity::registry::EntityRegistry,
     ) {
+        info!("spawn_npcs called for instance {} with {} entity definitions",
+            self.id, entities.len());
+
         let mut spawned = self.npcs_spawned.write().await;
         if *spawned {
+            info!("NPCs already spawned for instance {}, skipping", self.id);
             return; // Already spawned
         }
 
@@ -173,6 +177,23 @@ impl InstanceManager {
         }
         for entry in self.private_instances.iter() {
             if entry.value().has_player(player_id).await {
+                return Some(entry.value().clone());
+            }
+        }
+        None
+    }
+
+    /// Get an instance by its instance ID (not map_id)
+    pub fn get_by_instance_id(&self, instance_id: &str) -> Option<Arc<Instance>> {
+        // Check public instances
+        for entry in self.public_instances.iter() {
+            if entry.value().id == instance_id {
+                return Some(entry.value().clone());
+            }
+        }
+        // Check private instances
+        for entry in self.private_instances.iter() {
+            if entry.value().id == instance_id {
                 return Some(entry.value().clone());
             }
         }

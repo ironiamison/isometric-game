@@ -235,6 +235,20 @@ pub enum ServerMessage {
         skill: String,
         new_level: i32,
     },
+    /// Sync all skills for a player (sent on login)
+    SkillsSync {
+        player_id: String,
+        hitpoints_level: i32,
+        hitpoints_xp: i64,
+        combat_level: i32,
+        combat_xp: i64,
+        fishing_level: i32,
+        fishing_xp: i64,
+        farming_level: i32,
+        farming_xp: i64,
+        smithing_level: i32,
+        smithing_xp: i64,
+    },
     ItemDropped {
         id: String,
         item_id: String,
@@ -776,6 +790,7 @@ impl ServerMessage {
             ServerMessage::PlayerRespawned { .. } => "playerRespawned",
             ServerMessage::SkillXp { .. } => "skillXp",
             ServerMessage::SkillLevelUp { .. } => "skillLevelUp",
+            ServerMessage::SkillsSync { .. } => "skillsSync",
             ServerMessage::ItemDropped { .. } => "itemDropped",
             ServerMessage::ItemPickedUp { .. } => "itemPickedUp",
             ServerMessage::ItemDespawned { .. } => "itemDespawned",
@@ -1256,6 +1271,66 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("new_level".into()),
                 Value::Integer((*new_level as i64).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::SkillsSync {
+            player_id,
+            hitpoints_level,
+            hitpoints_xp,
+            combat_level,
+            combat_xp,
+            fishing_level,
+            fishing_xp,
+            farming_level,
+            farming_xp,
+            smithing_level,
+            smithing_xp,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("hitpoints_level".into()),
+                Value::Integer((*hitpoints_level as i64).into()),
+            ));
+            map.push((
+                Value::String("hitpoints_xp".into()),
+                Value::Integer((*hitpoints_xp).into()),
+            ));
+            map.push((
+                Value::String("combat_level".into()),
+                Value::Integer((*combat_level as i64).into()),
+            ));
+            map.push((
+                Value::String("combat_xp".into()),
+                Value::Integer((*combat_xp).into()),
+            ));
+            map.push((
+                Value::String("fishing_level".into()),
+                Value::Integer((*fishing_level as i64).into()),
+            ));
+            map.push((
+                Value::String("fishing_xp".into()),
+                Value::Integer((*fishing_xp).into()),
+            ));
+            map.push((
+                Value::String("farming_level".into()),
+                Value::Integer((*farming_level as i64).into()),
+            ));
+            map.push((
+                Value::String("farming_xp".into()),
+                Value::Integer((*farming_xp).into()),
+            ));
+            map.push((
+                Value::String("smithing_level".into()),
+                Value::Integer((*smithing_level as i64).into()),
+            ));
+            map.push((
+                Value::String("smithing_xp".into()),
+                Value::Integer((*smithing_xp).into()),
             ));
             Value::Map(map)
         }
