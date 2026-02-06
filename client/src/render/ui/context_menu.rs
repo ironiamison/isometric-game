@@ -27,11 +27,16 @@ impl Renderer {
                 "Gold"
             }
             ContextMenuTarget::InventorySlot(slot_index) => {
-                // Check if item is equippable
+                // Check if item is equippable or is bones
                 if let Some(slot) = state.inventory.slots.get(*slot_index).and_then(|s| s.as_ref()) {
                     let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
                     if item_def.equipment.is_some() {
                         options.push(("Equip", UiElementId::ContextMenuOption(0)));
+                    }
+                    // Check if item is bones (for burying)
+                    let is_bones = slot.item_id.contains("bones");
+                    if is_bones {
+                        options.push(("Bury", UiElementId::ContextMenuOption(options.len())));
                     }
                 }
                 options.push(("Drop", UiElementId::ContextMenuOption(options.len())));

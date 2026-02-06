@@ -109,6 +109,7 @@ pub enum InputCommand {
     GetOnlinePlayers,
     // Prayer commands
     TogglePrayer { prayer_id: String },
+    BuryBones { slot: u8 },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -557,14 +558,17 @@ impl InputHandler {
                 ContextMenuTarget::EquipmentSlot(_) => 1, // Unequip only
                 ContextMenuTarget::Gold => 1, // Drop only
                 ContextMenuTarget::InventorySlot(slot_index) => {
-                    let is_equippable = state.inventory.slots.get(*slot_index)
+                    let (is_equippable, is_bones) = state.inventory.slots.get(*slot_index)
                         .and_then(|s| s.as_ref())
                         .map(|slot| {
                             let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
-                            item_def.equipment.is_some()
+                            let equippable = item_def.equipment.is_some();
+                            let bones = slot.item_id.contains("bones");
+                            (equippable, bones)
                         })
-                        .unwrap_or(false);
-                    if is_equippable { 2 } else { 1 } // Equip+Drop or just Drop
+                        .unwrap_or((false, false));
+                    // [Equip?] [Bury?] Drop
+                    1 + if is_equippable { 1 } else { 0 } + if is_bones { 1 } else { 0 }
                 }
             };
 
@@ -627,32 +631,30 @@ impl InputHandler {
                                 }
                                 ContextMenuTarget::InventorySlot(slot_index) => {
                                     // Inventory slot context menu
-                                    // Check if item is equippable to determine option indices
-                                    let is_equippable = state.inventory.slots.get(*slot_index)
+                                    // Determine menu options based on item type
+                                    let (is_equippable, is_bones) = state.inventory.slots.get(*slot_index)
                                         .and_then(|s| s.as_ref())
                                         .map(|slot| {
                                             let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
-                                            item_def.equipment.is_some()
+                                            let equippable = item_def.equipment.is_some();
+                                            let bones = slot.item_id.contains("bones");
+                                            (equippable, bones)
                                         })
-                                        .unwrap_or(false);
+                                        .unwrap_or((false, false));
 
-                                    if is_equippable {
-                                        // Options: Equip (0), Drop (1)
-                                        match option_idx {
-                                            0 => commands.push(InputCommand::Equip { slot_index: *slot_index as u8 }),
-                                            1 => {
-                                                if let Some(slot) = state.inventory.slots.get(*slot_index).and_then(|s| s.as_ref()) {
-                                                    commands.push(InputCommand::DropItem { slot_index: *slot_index as u8, quantity: slot.quantity as u32, target_x: None, target_y: None });
-                                                }
-                                            }
-                                            _ => {}
-                                        }
-                                    } else {
-                                        // Options: Drop (0) only
-                                        if *option_idx == 0 {
-                                            if let Some(slot) = state.inventory.slots.get(*slot_index).and_then(|s| s.as_ref()) {
-                                                commands.push(InputCommand::DropItem { slot_index: *slot_index as u8, quantity: slot.quantity as u32, target_x: None, target_y: None });
-                                            }
+                                    // Build option index mapping: [Equip?] [Bury?] Drop
+                                    let mut current_idx = 0usize;
+                                    let equip_idx = if is_equippable { let idx = current_idx; current_idx += 1; Some(idx) } else { None };
+                                    let bury_idx = if is_bones { let idx = current_idx; current_idx += 1; Some(idx) } else { None };
+                                    let drop_idx = current_idx;
+
+                                    if Some(*option_idx) == equip_idx {
+                                        commands.push(InputCommand::Equip { slot_index: *slot_index as u8 });
+                                    } else if Some(*option_idx) == bury_idx {
+                                        commands.push(InputCommand::BuryBones { slot: *slot_index as u8 });
+                                    } else if *option_idx == drop_idx {
+                                        if let Some(slot) = state.inventory.slots.get(*slot_index).and_then(|s| s.as_ref()) {
+                                            commands.push(InputCommand::DropItem { slot_index: *slot_index as u8, quantity: slot.quantity as u32, target_x: None, target_y: None });
                                         }
                                     }
                                 }

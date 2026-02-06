@@ -512,6 +512,7 @@ fn run_game_frame(
             InputCommand::GetOnlinePlayers => ClientMessage::GetOnlinePlayers,
             // Prayer commands
             InputCommand::TogglePrayer { prayer_id } => ClientMessage::TogglePrayer { prayer_id: prayer_id.clone() },
+            InputCommand::BuryBones { slot } => ClientMessage::BuryBones { slot: *slot as usize },
         };
         network.send(&msg);
     }

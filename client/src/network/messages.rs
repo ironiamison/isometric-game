@@ -125,6 +125,9 @@ pub enum ClientMessage {
     // Prayer commands
     #[serde(rename = "togglePrayer")]
     TogglePrayer { prayer_id: String },
+
+    #[serde(rename = "buryBones")]
+    BuryBones { slot: usize },
 }
 
 impl ClientMessage {
@@ -295,6 +298,10 @@ impl ClientMessage {
             ClientMessage::TogglePrayer { prayer_id } => {
                 data.insert("prayer_id".into(), Value::String(prayer_id.clone().into()));
                 "togglePrayer"
+            }
+            ClientMessage::BuryBones { slot } => {
+                data.insert("slot".into(), Value::Integer((*slot as i64).into()));
+                "buryBones"
             }
         };
 
