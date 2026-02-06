@@ -155,6 +155,14 @@ pub enum ClientMessage {
     /// Bury bones from inventory slot
     #[serde(rename = "buryBones")]
     BuryBones { slot: usize },
+
+    /// Use bones at an altar for bonus XP
+    #[serde(rename = "offerBones")]
+    OfferBones { slot: usize, altar_id: String },
+
+    /// Pray at an altar to restore prayer points
+    #[serde(rename = "prayAtAltar")]
+    PrayAtAltar { altar_id: String },
 }
 
 // ============================================================================

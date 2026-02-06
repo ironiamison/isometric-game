@@ -2938,6 +2938,57 @@ impl GameRoom {
             return;
         }
 
+        // Altar interaction - show pray option and prayer point restoration
+        let is_altar = self.entity_registry.get(&entity_type)
+            .map(|p| p.behaviors.altar)
+            .unwrap_or(false);
+
+        if is_altar {
+            // Get player's current prayer points
+            let (current_points, max_points) = {
+                let players = self.players.read().await;
+                match players.get(player_id) {
+                    Some(p) => (p.prayer_points, p.max_prayer_points()),
+                    None => return,
+                }
+            };
+
+            let altar_name = self.entity_registry.get(&entity_type)
+                .map(|p| p.display_name.clone())
+                .unwrap_or_else(|| "Altar".to_string());
+
+            let text = if current_points < max_points {
+                format!(
+                    "You stand before the sacred altar.\n\nPrayer Points: {}/{}\n\nWould you like to pray and restore your prayer points?",
+                    current_points, max_points
+                )
+            } else {
+                format!(
+                    "You stand before the sacred altar.\n\nPrayer Points: {}/{}\n\nYour prayer is already full. You may offer bones here for enhanced experience.",
+                    current_points, max_points
+                )
+            };
+
+            // Use a special quest_id format "altar:{npc_id}" to identify altar dialogues
+            self.send_to_player(player_id, ServerMessage::ShowDialogue {
+                quest_id: format!("altar:{}", npc_id),
+                npc_id: npc_id.to_string(),
+                speaker: altar_name,
+                text,
+                choices: vec![
+                    crate::protocol::DialogueChoice {
+                        id: "pray".to_string(),
+                        text: "Pray".to_string(),
+                    },
+                    crate::protocol::DialogueChoice {
+                        id: "close".to_string(),
+                        text: "Close".to_string(),
+                    },
+                ],
+            }).await;
+            return;
+        }
+
         // Check entity prototype for behaviors
         let prototype = self.entity_registry.get(&entity_type);
 
@@ -3234,6 +3285,16 @@ impl GameRoom {
         // Non-quest dialogues (e.g. leaderboard) just close
         if quest_id.is_empty() {
             self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+            return;
+        }
+
+        // Handle altar dialogue choices (format: "altar:{altar_id}")
+        if let Some(altar_id) = quest_id.strip_prefix("altar:") {
+            self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+            if choice_id == "pray" {
+                self.handle_pray_at_altar(player_id, altar_id).await;
+            }
+            // "close" choice just closes the dialogue (already sent DialogueClosed above)
             return;
         }
 
@@ -7154,6 +7215,316 @@ impl GameRoom {
 
         // Send chat message
         self.send_system_message(player_id, &format!("You bury the {}.", item_name.to_lowercase())).await;
+
+        // Send inventory update
+        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: inv_update.0,
+            gold: inv_update.1,
+        }).await;
+
+        // Send XP update
+        self.send_to_player(player_id, ServerMessage::SkillXp {
+            player_id: player_id.to_string(),
+            skill: "prayer".to_string(),
+            xp_gained: xp_result.0,
+            total_xp: xp_result.1,
+            level: xp_result.2,
+        }).await;
+
+        // Broadcast level up if applicable
+        if xp_result.3 {
+            tracing::info!("Player {} leveled up Prayer to {}", player_id, xp_result.2);
+            self.broadcast(ServerMessage::SkillLevelUp {
+                player_id: player_id.to_string(),
+                skill: "prayer".to_string(),
+                new_level: xp_result.2,
+            }).await;
+
+            // Send updated prayer state with new max points
+            let (points, max_points, active_prayers) = {
+                let players = self.players.read().await;
+                if let Some(player) = players.get(player_id) {
+                    (
+                        player.prayer_points,
+                        player.max_prayer_points(),
+                        player.active_prayers.iter().cloned().collect::<Vec<_>>(),
+                    )
+                } else {
+                    return;
+                }
+            };
+
+            self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
+                points,
+                max_points,
+                active_prayers,
+            }).await;
+        }
+    }
+
+    /// Handle praying at an altar to restore prayer points
+    pub async fn handle_pray_at_altar(&self, player_id: &str, altar_id: &str) {
+        tracing::debug!("Player {} praying at altar: {}", player_id, altar_id);
+
+        // Get player position
+        let player_pos = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => (p.x, p.y),
+                _ => return,
+            }
+        };
+
+        // Check if player is in an instance
+        let instance_id = {
+            let instances = self.player_instances.read().await;
+            instances.get(player_id).cloned()
+        };
+
+        // Get altar info and validate it's an altar
+        let altar_info = if let Some(ref _inst_id) = instance_id {
+            // Check instance NPCs
+            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
+                let npcs = instance.npcs.read().await;
+                npcs.get(altar_id).map(|npc| {
+                    let dx = (npc.x - player_pos.0) as f32;
+                    let dy = (npc.y - player_pos.1) as f32;
+                    let distance = (dx * dx + dy * dy).sqrt();
+                    (npc.prototype_id.clone(), distance)
+                })
+            } else {
+                None
+            }
+        } else {
+            // Check overworld NPCs
+            let npcs = self.npcs.read().await;
+            npcs.get(altar_id).map(|npc| {
+                let dx = (npc.x - player_pos.0) as f32;
+                let dy = (npc.y - player_pos.1) as f32;
+                let distance = (dx * dx + dy * dy).sqrt();
+                (npc.prototype_id.clone(), distance)
+            })
+        };
+
+        let (entity_type, distance) = match altar_info {
+            Some(info) => info,
+            None => {
+                self.send_system_message(player_id, "Altar not found.").await;
+                return;
+            }
+        };
+
+        // Check distance
+        if distance > 2.5 {
+            self.send_system_message(player_id, "You need to be closer to the altar.").await;
+            return;
+        }
+
+        // Validate it's actually an altar
+        let is_altar = self.entity_registry.get(&entity_type)
+            .map(|proto| proto.behaviors.altar)
+            .unwrap_or(false);
+
+        if !is_altar {
+            self.send_system_message(player_id, "That's not an altar.").await;
+            return;
+        }
+
+        // Restore prayer points
+        let (restored, points, max_points, active_prayers) = {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+
+            let max_points = player.max_prayer_points();
+            let old_points = player.prayer_points;
+
+            if player.prayer_points >= max_points {
+                (0, max_points, max_points, player.active_prayers.iter().cloned().collect::<Vec<_>>())
+            } else {
+                player.prayer_points = max_points;
+                let restored = max_points - old_points;
+                (restored, max_points, max_points, player.active_prayers.iter().cloned().collect::<Vec<_>>())
+            }
+        };
+
+        if restored > 0 {
+            self.send_system_message(player_id, &format!(
+                "You pray at the altar. Your prayer points have been restored. (+{} points)",
+                restored
+            )).await;
+        } else {
+            self.send_system_message(player_id, "You pray at the altar. Your prayer is already full.").await;
+        }
+
+        // Send prayer state update
+        self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
+            points,
+            max_points,
+            active_prayers,
+        }).await;
+    }
+
+    /// Handle offering bones at an altar for bonus XP
+    pub async fn handle_offer_bones(&self, player_id: &str, slot: usize, altar_id: &str) {
+        tracing::debug!("Player {} offering bones at altar {} from slot {}", player_id, altar_id, slot);
+
+        // Get player position
+        let player_pos = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => (p.x, p.y),
+                _ => return,
+            }
+        };
+
+        // Check if player is in an instance
+        let instance_id = {
+            let instances = self.player_instances.read().await;
+            instances.get(player_id).cloned()
+        };
+
+        // Get altar info and validate it's an altar
+        let altar_info = if let Some(ref _inst_id) = instance_id {
+            // Check instance NPCs
+            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
+                let npcs = instance.npcs.read().await;
+                npcs.get(altar_id).map(|npc| {
+                    let dx = (npc.x - player_pos.0) as f32;
+                    let dy = (npc.y - player_pos.1) as f32;
+                    let distance = (dx * dx + dy * dy).sqrt();
+                    (npc.prototype_id.clone(), distance)
+                })
+            } else {
+                None
+            }
+        } else {
+            // Check overworld NPCs
+            let npcs = self.npcs.read().await;
+            npcs.get(altar_id).map(|npc| {
+                let dx = (npc.x - player_pos.0) as f32;
+                let dy = (npc.y - player_pos.1) as f32;
+                let distance = (dx * dx + dy * dy).sqrt();
+                (npc.prototype_id.clone(), distance)
+            })
+        };
+
+        let (entity_type, distance) = match altar_info {
+            Some(info) => info,
+            None => {
+                self.send_system_message(player_id, "Altar not found.").await;
+                return;
+            }
+        };
+
+        // Check distance
+        if distance > 2.5 {
+            self.send_system_message(player_id, "You need to be closer to the altar.").await;
+            return;
+        }
+
+        // Validate it's actually an altar
+        let is_altar = self.entity_registry.get(&entity_type)
+            .map(|proto| proto.behaviors.altar)
+            .unwrap_or(false);
+
+        if !is_altar {
+            self.send_system_message(player_id, "That's not an altar.").await;
+            return;
+        }
+
+        // Get item info and validate it's bones
+        let (item_id, item_name, base_prayer_xp) = {
+            let players = self.players.read().await;
+            let player = match players.get(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+
+            // Check if slot is valid and has an item
+            let slot_item = match player.inventory.slots.get(slot).and_then(|s| s.as_ref()) {
+                Some(item) => item,
+                None => {
+                    drop(players);
+                    self.send_system_message(player_id, "There's nothing in that slot.").await;
+                    return;
+                }
+            };
+
+            let item_id = slot_item.item_id.clone();
+
+            // Get item definition
+            let item_def = match self.item_registry.get(&item_id) {
+                Some(def) => def,
+                None => {
+                    drop(players);
+                    self.send_system_message(player_id, "Unknown item.").await;
+                    return;
+                }
+            };
+
+            // Check if it's bones (has prayer_xp > 0)
+            if !item_def.is_bones() {
+                drop(players);
+                self.send_system_message(player_id, "You can only offer bones at the altar.").await;
+                return;
+            }
+
+            (item_id, item_def.display_name.clone(), item_def.prayer_xp)
+        };
+
+        // Calculate altar XP bonus (~2.5x normal bury XP)
+        // Regular bones: 5 -> 12, Big bones: 15 -> 37, Dragon bones: 72 -> 180
+        let altar_xp = match item_id.as_str() {
+            "regular_bones" => 12,
+            "big_bones" => 37,
+            "dragon_bones" => 180,
+            _ => (base_prayer_xp as f32 * 2.5) as i32, // Fallback for other bone types
+        };
+
+        // Remove bones from inventory and award XP
+        let (inv_update, xp_result) = {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+
+            // Remove one bone from the slot
+            if let Some(ref mut slot_item) = player.inventory.slots[slot] {
+                slot_item.quantity -= 1;
+                if slot_item.quantity <= 0 {
+                    player.inventory.slots[slot] = None;
+                }
+            }
+
+            // Award Prayer XP (altar bonus)
+            let leveled = player.skills.prayer.add_xp(altar_xp as i64);
+            let xp_result = (
+                altar_xp as i64,
+                player.skills.prayer.xp,
+                player.skills.prayer.level,
+                leveled,
+            );
+
+            // If leveled up, update max prayer points
+            if leveled {
+                player.prayer_points = player.max_prayer_points();
+            }
+
+            let inv_update = (player.inventory.to_update(), player.inventory.gold);
+
+            (inv_update, xp_result)
+        };
+
+        // Send chat message
+        self.send_system_message(player_id, &format!(
+            "The gods are pleased with your offering. (+{} Prayer XP)",
+            altar_xp
+        )).await;
 
         // Send inventory update
         self.send_to_player(player_id, ServerMessage::InventoryUpdate {

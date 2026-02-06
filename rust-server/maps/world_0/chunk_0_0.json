@@ -3098,6 +3098,13 @@
       "x": 26,
       "y": 5,
       "level": 1
+    },
+    {
+      "entityId": "altar",
+      "x": 18,
+      "y": 6,
+      "level": 1,
+      "uniqueId": "village_altar"
     }
   ],
   "mapObjects": [

@@ -2432,6 +2432,12 @@ async fn handle_client_message(
         ClientMessage::BuryBones { slot } => {
             room.handle_bury_bones(player_id, slot).await;
         }
+        ClientMessage::OfferBones { slot, altar_id } => {
+            room.handle_offer_bones(player_id, slot, &altar_id).await;
+        }
+        ClientMessage::PrayAtAltar { altar_id } => {
+            room.handle_pray_at_altar(player_id, &altar_id).await;
+        }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
     }

@@ -83,6 +83,8 @@ pub struct RawEntityBehaviors {
     #[serde(default)]
     pub teleporter: bool,
     #[serde(default)]
+    pub altar: bool,
+    #[serde(default)]
     pub wander_enabled: bool,
     pub wander_radius: Option<i32>,
     pub wander_pause_min_ms: Option<u64>,
@@ -248,6 +250,7 @@ pub struct EntityBehaviors {
     pub banker: bool,
     pub craftsman: bool,
     pub teleporter: bool,
+    pub altar: bool,
     pub wander_enabled: bool,
     pub wander_radius: i32,
     pub wander_pause_min_ms: u64,
@@ -263,6 +266,7 @@ impl Default for EntityBehaviors {
             banker: false,
             craftsman: false,
             teleporter: false,
+            altar: false,
             wander_enabled: false,
             wander_radius: 3,
             wander_pause_min_ms: 2000,
@@ -280,6 +284,7 @@ impl From<&RawEntityBehaviors> for EntityBehaviors {
             banker: raw.banker,
             craftsman: raw.craftsman,
             teleporter: raw.teleporter,
+            altar: raw.altar,
             wander_enabled: raw.wander_enabled,
             wander_radius: raw.wander_radius.unwrap_or(3),
             wander_pause_min_ms: raw.wander_pause_min_ms.unwrap_or(2000),
@@ -321,5 +326,6 @@ impl EntityPrototype {
             || self.behaviors.banker
             || self.behaviors.craftsman
             || self.behaviors.teleporter
+            || self.behaviors.altar
     }
 }
