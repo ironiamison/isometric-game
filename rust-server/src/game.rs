@@ -2239,7 +2239,7 @@ impl GameRoom {
             None
         };
 
-        // Broadcast damage event to all clients
+        // Broadcast damage event to players in the same zone (instance or overworld)
         let damage_msg = ServerMessage::DamageEvent {
             source_id: player_id.to_string(),
             target_id: target_id.clone(),
@@ -2249,7 +2249,7 @@ impl GameRoom {
             target_y,
             projectile,
         };
-        self.broadcast(damage_msg).await;
+        self.broadcast_to_zone(player_id, damage_msg).await;
 
         // Send success result to attacker
         let result_msg = ServerMessage::AttackResult {
@@ -5856,8 +5856,8 @@ impl GameRoom {
                 }
             };
 
-            // Broadcast damage event
-            self.broadcast(ServerMessage::DamageEvent {
+            // Broadcast damage event to players in the same zone
+            self.broadcast_to_zone(&target_id, ServerMessage::DamageEvent {
                 source_id: npc_id.clone(),
                 target_id: target_id.clone(),
                 damage,
