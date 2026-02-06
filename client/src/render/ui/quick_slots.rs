@@ -136,11 +136,21 @@ impl Renderer {
                 self.draw_inventory_slot(x, y, slot_size, true, slot_state);
 
                 // Try to draw spell icon texture, fallback to colored rect with letter
-                let icon_key = format!("spell_{}", spell_def.effect_sprite);
-                let has_icon = self.item_sprites.get(&icon_key).is_some();
-
-                if has_icon {
-                    self.draw_item_icon(&icon_key, x, y, slot_size, slot_size, state, false);
+                if let Some(texture) = self.spell_icons.get(spell_def.id) {
+                    // Draw icon centered in slot
+                    let icon_size = slot_size - 8.0;
+                    let icon_x = (x + (slot_size - icon_size) / 2.0).floor();
+                    let icon_y = (y + (slot_size - icon_size) / 2.0).floor();
+                    draw_texture_ex(
+                        texture,
+                        icon_x,
+                        icon_y,
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some(Vec2::new(icon_size, icon_size)),
+                            ..Default::default()
+                        },
+                    );
                 } else {
                     // Fallback: colored rectangle with spell's first letter
                     let color = match spell_def.spell_type {

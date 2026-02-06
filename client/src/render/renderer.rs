@@ -1888,15 +1888,13 @@ impl Renderer {
                 frame_h,
             );
 
-            // Offset so the effect is centered on the tile
-            // world_to_screen returns the top vertex of the isometric diamond;
-            // the visual tile center is TILE_HEIGHT/2 (16px) below that
-            let tile_center_offset = (TILE_HEIGHT / 2.0) * zoom;
+            // Align like isometric objects: center on slightly elevated tile position
+            let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25;
 
             draw_texture_ex(
                 texture,
                 screen_x - draw_w / 2.0,
-                screen_y - draw_h / 2.0 + tile_center_offset,
+                elevated_y - draw_h / 2.0,
                 WHITE,
                 DrawTextureParams {
                     source: Some(source_rect),
