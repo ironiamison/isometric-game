@@ -413,7 +413,10 @@ impl Player {
         self.is_dead && (current_time - self.death_time >= PLAYER_RESPAWN_TIME_MS)
     }
 
-    pub fn respawn(&mut self) {
+    /// Respawns the player, returning the chair coordinates they were sitting at (if any)
+    /// so the caller can free the chair
+    pub fn respawn(&mut self) -> Option<(i32, i32)> {
+        let chair_to_free = self.sitting_at.take();
         self.x = self.spawn_x;
         self.y = self.spawn_y;
         self.hp = self.max_hp(); // Use method since max_hp is now derived from skills
@@ -421,6 +424,7 @@ impl Player {
         self.death_time = 0;
         self.target_id = None;
         self.last_regen_time = 0;
+        chair_to_free
     }
 
     /// Apply passive HP regeneration
@@ -5270,6 +5274,7 @@ impl GameRoom {
 
         // Handle player respawns
         let mut respawned_players = Vec::new();
+        let mut chairs_to_free = Vec::new();
         {
             let mut players = self.players.write().await;
             for player in players.values_mut() {
@@ -5278,8 +5283,22 @@ impl GameRoom {
                 }
 
                 if player.ready_to_respawn(current_time) {
-                    player.respawn();
+                    if let Some(chair_coords) = player.respawn() {
+                        chairs_to_free.push((player.id.clone(), chair_coords));
+                    }
                     respawned_players.push((player.id.clone(), player.x, player.y, player.hp));
+                }
+            }
+        }
+
+        // Free any chairs that respawning players were sitting in
+        if !chairs_to_free.is_empty() {
+            let mut chairs = self.chairs.write().await;
+            for (player_id, (tx, ty)) in chairs_to_free {
+                if let Some(chair) = chairs.get_mut(&(tx, ty)) {
+                    if chair.occupied_by.as_deref() == Some(&player_id) {
+                        chair.occupied_by = None;
+                    }
                 }
             }
         }

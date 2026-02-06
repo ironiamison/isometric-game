@@ -248,6 +248,8 @@ impl Player {
         self.server_y = y;
         self.target_x = x;
         self.target_y = y;
+        // Reset animation to standing (in case player died while sitting)
+        self.animation.state = AnimationState::Idle;
     }
 
     /// Set server-authoritative position (convenience method for stopped state)

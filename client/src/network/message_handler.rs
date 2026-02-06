@@ -602,6 +602,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.respawn(x, y, hp);
                 }
+
+                // Clear sitting state if local player respawned
+                if state.local_player_id.as_ref() == Some(&player_id) {
+                    state.is_sitting = false;
+                }
             }
         }
 
