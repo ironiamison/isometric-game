@@ -448,8 +448,8 @@ impl Player {
         chair_to_free
     }
 
-    /// Apply passive HP regeneration
-    pub fn apply_regen(&mut self, current_time: u64) {
+    /// Apply passive HP regeneration with optional prayer multiplier
+    pub fn apply_regen(&mut self, current_time: u64, hp_regen_multiplier: f32) {
         if self.is_dead {
             return;
         }
@@ -462,7 +462,9 @@ impl Player {
             self.last_regen_time = current_time;
             let max_hp = self.max_hp();
             if self.hp < max_hp && self.hp > 0 {
-                let regen = ((max_hp as f32 * PLAYER_HP_REGEN_PERCENT) / 100.0).ceil().max(1.0) as i32;
+                // Base regen calculation with prayer multiplier
+                let base_regen = ((max_hp as f32 * PLAYER_HP_REGEN_PERCENT) / 100.0).ceil().max(1.0);
+                let regen = (base_regen * hp_regen_multiplier).ceil() as i32;
                 self.hp = (self.hp + regen).min(max_hp);
             }
         }
@@ -2038,8 +2040,15 @@ impl GameRoom {
                 return;
             }
 
-            let atk_bonus = player.attack_bonus(&self.item_registry);
-            let str_bonus = player.strength_bonus(&self.item_registry);
+            let base_atk_bonus = player.attack_bonus(&self.item_registry);
+            let base_str_bonus = player.strength_bonus(&self.item_registry);
+
+            // Apply prayer bonuses to attack and strength
+            let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
+            let prayer_effects = self.prayer_registry.calculate_effects(&active_ids);
+            let atk_bonus = prayer_effects.apply_attack_bonus(base_atk_bonus);
+            let str_bonus = prayer_effects.apply_strength_bonus(base_str_bonus);
+
             (
                 player.name.clone(),
                 player.x, player.y, player.direction,
@@ -2219,7 +2228,12 @@ impl GameRoom {
 
                 // Get target's defence stats (uses combat level for defence)
                 let target_combat_level = target.skills.combat.level;
-                let target_defence_bonus = target.defence_bonus(&self.item_registry);
+                let base_defence_bonus = target.defence_bonus(&self.item_registry);
+
+                // Apply prayer bonuses to target's defence
+                let target_active_ids: Vec<String> = target.active_prayers.iter().cloned().collect();
+                let target_prayer_effects = self.prayer_registry.calculate_effects(&target_active_ids);
+                let target_defence_bonus = target_prayer_effects.apply_defence_bonus(base_defence_bonus);
 
                 // Check if attack hits
                 if !calculate_hit(combat_level, attack_bonus, target_combat_level, target_defence_bonus) {
@@ -2233,7 +2247,9 @@ impl GameRoom {
                 } else {
                     // Hit - calculate and apply damage
                     let max_hit = calculate_max_hit(combat_level, strength_bonus);
-                    let damage = roll_damage(max_hit);
+                    let raw_damage = roll_damage(max_hit);
+                    // Apply prayer damage reduction
+                    let damage = target_prayer_effects.apply_damage_reduction(raw_damage);
                     target.hp = (target.hp - damage).max(0);
                     let name = target.name.clone();
                     let died = target.hp <= 0;
@@ -2241,8 +2257,8 @@ impl GameRoom {
                         target.die(current_time);
                     }
                     tracing::info!(
-                        "{} hits {} for {} damage (max: {}, HP: {})",
-                        attacker_name, name, damage, max_hit, target.hp
+                        "{} hits {} for {} damage (max: {}, raw: {}, HP: {})",
+                        attacker_name, name, damage, max_hit, raw_damage, target.hp
                     );
                     (target.hp, name, died, damage)
                 }
@@ -5475,9 +5491,11 @@ impl GameRoom {
                 }
             }
 
-            // Apply HP regen to all players
+            // Apply HP regen to all players with prayer multiplier
             for player in players.values_mut() {
-                player.apply_regen(current_time);
+                let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
+                let prayer_effects = self.prayer_registry.calculate_effects(&active_ids);
+                player.apply_regen(current_time, prayer_effects.hp_regen_multiplier);
             }
         }
 
@@ -5921,7 +5939,12 @@ impl GameRoom {
 
                     // Player uses their combat skill level and equipment bonus
                     let player_defence_level = target.skills.combat.level;
-                    let player_defence_bonus = target.defence_bonus(&self.item_registry);
+                    let base_defence_bonus = target.defence_bonus(&self.item_registry);
+
+                    // Apply prayer bonuses to player's defence
+                    let active_ids: Vec<String> = target.active_prayers.iter().cloned().collect();
+                    let prayer_effects = self.prayer_registry.calculate_effects(&active_ids);
+                    let player_defence_bonus = prayer_effects.apply_defence_bonus(base_defence_bonus);
 
                     // Roll hit/miss
                     if !calculate_hit(npc_attack_level, npc_attack_bonus, player_defence_level, player_defence_bonus) {
@@ -5932,16 +5955,17 @@ impl GameRoom {
                         );
                         (target.hp, target.x as f32, target.y as f32, false, 0)
                     } else {
-                        // Hit - roll damage and apply
-                        let damage = roll_damage(max_hit);
+                        // Hit - roll damage and apply with prayer damage reduction
+                        let raw_damage = roll_damage(max_hit);
+                        let damage = prayer_effects.apply_damage_reduction(raw_damage);
                         target.hp = (target.hp - damage).max(0);
                         let died = target.hp <= 0;
                         if died {
                             target.die(current_time);
                         }
                         tracing::debug!(
-                            "NPC {} hits {} for {} damage (max: {}, HP: {})",
-                            npc_id, target_id, damage, max_hit, target.hp
+                            "NPC {} hits {} for {} damage (max: {}, raw: {}, HP: {})",
+                            npc_id, target_id, damage, max_hit, raw_damage, target.hp
                         );
                         (target.hp, target.x as f32, target.y as f32, died, damage)
                     }
@@ -6020,8 +6044,14 @@ impl GameRoom {
             let mut inv_full: Vec<String> = Vec::new();
 
             for pid in &gatherer_ids {
-                let fishing_level = players.get(pid).map(|p| p.skills.fishing.level).unwrap_or(1);
-                if let Some(result) = gathering.tick_gathering(pid, fishing_level, current_time) {
+                let (fishing_level, prayer_speed_multiplier) = players.get(pid)
+                    .map(|p| {
+                        let active_ids: Vec<String> = p.active_prayers.iter().cloned().collect();
+                        let effects = self.prayer_registry.calculate_effects(&active_ids);
+                        (p.skills.fishing.level, effects.gather_speed_multiplier())
+                    })
+                    .unwrap_or((1, 1.0));
+                if let Some(result) = gathering.tick_gathering(pid, fishing_level, current_time, prayer_speed_multiplier) {
                     if let Some(player) = players.get_mut(pid) {
                         let leftover = player.inventory.add_item(&result.item_id, 1, &self.item_registry);
                         if leftover > 0 {
