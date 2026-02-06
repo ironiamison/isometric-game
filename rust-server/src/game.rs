@@ -274,7 +274,7 @@ impl Player {
             last_move_tick: 0,
             direction: Direction::Down,
             hp: skills.hitpoints.level, // HP = Hitpoints level
-            prayer_points: skills.prayer.level, // Prayer points = Prayer level
+            prayer_points: skills.prayer.level.max(10), // Prayer points = Prayer level (min 10)
             skills,
             active: false,
             target_id: None,
@@ -310,9 +310,9 @@ impl Player {
         self.skills.hitpoints.level
     }
 
-    /// Max prayer points is determined by Prayer skill level
+    /// Max prayer points is determined by Prayer skill level (minimum 10)
     pub fn max_prayer_points(&self) -> i32 {
-        self.skills.prayer.level
+        self.skills.prayer.level.max(10)
     }
 
     /// Combat level calculated from all combat skills

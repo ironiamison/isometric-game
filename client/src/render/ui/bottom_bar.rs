@@ -8,12 +8,13 @@ use super::super::Renderer;
 use super::common::*;
 
 /// Menu button icon frame indices in background_icons.png
-/// Order: inventory, character, settings, skills, social
+/// Order: inventory, character, settings, skills, social, prayer
 const ICON_INVENTORY: usize = 0;
 const ICON_CHARACTER: usize = 1;
 const ICON_SETTINGS: usize = 2;
 const ICON_SKILLS: usize = 3;
 const ICON_SOCIAL: usize = 4;
+const ICON_PRAYER: usize = 5;
 
 /// Icon dimensions in the sprite sheet (160x32 total, 5 icons = 32x32 each)
 const ICON_SIZE: f32 = 32.0;
@@ -85,8 +86,8 @@ impl Renderer {
         // Floor to integer pixels for crisp pixel art
         let button_y = (screen_h - exp_bar_gap - button_size).floor();
 
-        // 5 buttons: Inventory, Character, Skills, Social, Settings
-        let num_buttons = 5;
+        // 6 buttons: Inventory, Character, Skills, Prayer, Social, Settings
+        let num_buttons = 6;
         let total_width = num_buttons as f32 * button_size + (num_buttons - 1) as f32 * button_spacing;
 
         // Right-aligned with padding, floor to integer pixels
@@ -97,6 +98,7 @@ impl Renderer {
             (UiElementId::MenuButtonInventory, ICON_INVENTORY, state.ui_state.inventory_open),
             (UiElementId::MenuButtonCharacter, ICON_CHARACTER, state.ui_state.character_panel_open),
             (UiElementId::MenuButtonSkills, ICON_SKILLS, state.ui_state.skills_open),
+            (UiElementId::MenuButtonPrayer, ICON_PRAYER, state.ui_state.prayer_book_open),
             (UiElementId::MenuButtonSocial, ICON_SOCIAL, state.ui_state.social_open),
             (UiElementId::MenuButtonSettings, ICON_SETTINGS, state.ui_state.escape_menu_open),
         ];
@@ -190,7 +192,7 @@ impl Renderer {
             );
         } else {
             // Fallback: draw text label if texture not loaded (native font size)
-            let labels = ["I", "C", "K", "S", "O"]; // Inventory, Character, sKills, Social, Options
+            let labels = ["I", "C", "K", "P", "S", "O"]; // Inventory, Character, sKills, Prayer, Social, Options
             let label = labels.get(icon_frame).unwrap_or(&"?");
 
             let text_dims = self.measure_text_sharp(label, 16.0);

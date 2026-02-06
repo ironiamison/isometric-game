@@ -113,7 +113,7 @@ impl Renderer {
             let is_locked = prayer_level < prayer.level_req;
             let has_points = state.prayer_points > 0;
 
-            self.draw_prayer_slot(slot_x, slot_y, slot_size, prayer, is_locked, is_active, is_hovered, has_points, scale);
+            self.draw_prayer_slot(slot_x, slot_y, slot_size, prayer, i, is_locked, is_active, is_hovered, has_points, scale);
         }
 
         // Prayer points bar
@@ -129,6 +129,7 @@ impl Renderer {
         y: f32,
         size: f32,
         prayer: &PrayerDef,
+        prayer_index: usize,
         is_locked: bool,
         is_active: bool,
         is_hovered: bool,
@@ -178,7 +179,7 @@ impl Renderer {
             );
         }
 
-        // Draw prayer icon (category symbol for now)
+        // Draw prayer icon from sprite sheet
         let icon_size = 20.0 * scale;
         let icon_x = x + (size - icon_size) / 2.0;
         let icon_y = y + (size - icon_size) / 2.0;
@@ -191,8 +192,8 @@ impl Renderer {
             Color::new(0.7, 0.7, 0.7, 1.0)
         };
 
-        // Draw a simple symbol based on category
-        self.draw_prayer_icon(icon_x, icon_y, icon_size, prayer.category, icon_color);
+        // Draw icon from ui_icons sprite sheet
+        self.draw_prayer_icon(icon_x, icon_y, icon_size, prayer_index, icon_color);
 
         // Level requirement in corner (if locked)
         if is_locked {
@@ -208,46 +209,57 @@ impl Renderer {
         }
     }
 
-    /// Draw prayer icon based on category
-    fn draw_prayer_icon(&self, x: f32, y: f32, size: f32, category: PrayerCategory, color: Color) {
-        let cx = x + size / 2.0;
-        let cy = y + size / 2.0;
-        let s = size * 0.4;
+    /// Draw prayer icon from ui_icons sprite sheet
+    /// Each prayer gets a unique icon from the sprite sheet grid
+    fn draw_prayer_icon(&self, x: f32, y: f32, size: f32, prayer_index: usize, color: Color) {
+        const UI_ICON_SIZE: f32 = 24.0;
 
-        match category {
-            PrayerCategory::Attack => {
-                // Sword/blade shape
-                draw_rectangle(cx - s * 0.15, cy - s, s * 0.3, s * 1.6, color);
-                draw_rectangle(cx - s * 0.5, cy + s * 0.3, s, s * 0.25, color);
-            }
-            PrayerCategory::Defence => {
-                // Shield shape
-                draw_rectangle(cx - s * 0.5, cy - s * 0.6, s, s * 1.2, color);
-                draw_rectangle(cx - s * 0.3, cy + s * 0.4, s * 0.6, s * 0.3, color);
-            }
-            PrayerCategory::Strength => {
-                // Fist/arm shape
-                draw_rectangle(cx - s * 0.4, cy - s * 0.3, s * 0.8, s * 0.6, color);
-                draw_rectangle(cx + s * 0.1, cy - s * 0.6, s * 0.3, s * 0.4, color);
-            }
-            PrayerCategory::Gathering => {
-                // Pickaxe shape
-                draw_rectangle(cx - s * 0.15, cy - s * 0.7, s * 0.3, s * 1.4, color);
-                draw_rectangle(cx - s * 0.5, cy - s * 0.7, s * 0.7, s * 0.3, color);
-            }
-            PrayerCategory::HpRegen => {
-                // Heart/cross shape
-                draw_rectangle(cx - s * 0.15, cy - s * 0.5, s * 0.3, s, color);
-                draw_rectangle(cx - s * 0.5, cy - s * 0.15, s, s * 0.3, color);
-            }
-            PrayerCategory::Protection => {
-                // Circle/holy symbol
-                let r = s * 0.5;
-                // Draw a simple diamond
-                draw_rectangle(cx - r * 0.2, cy - r, r * 0.4, r * 0.8, color);
-                draw_rectangle(cx - r, cy - r * 0.2, r * 2.0, r * 0.4, color);
-                draw_rectangle(cx - r * 0.2, cy + r * 0.2, r * 0.4, r * 0.8, color);
-            }
+        // Map each prayer to a unique icon position in the ui_icons sprite sheet (10 cols)
+        // Using various icons from the sprite sheet for visual variety
+        let icon_positions: [(i32, i32); 14] = [
+            (0, 0), // clarity - top left area
+            (1, 0), // thick_skin
+            (2, 0), // burst_of_strength
+            (3, 0), // improved_clarity
+            (4, 0), // rock_skin
+            (0, 1), // superhuman_strength
+            (1, 1), // resourcefulness
+            (2, 1), // rapid_heal
+            (3, 1), // steel_skin
+            (4, 1), // incredible_clarity
+            (0, 2), // ultimate_strength
+            (1, 2), // protection
+            (2, 2), // greater_resourcefulness
+            (3, 2), // greater_protection
+        ];
+
+        let (icon_col, icon_row) = if prayer_index < icon_positions.len() {
+            icon_positions[prayer_index]
+        } else {
+            (0, 0) // fallback
+        };
+
+        if let Some(ref texture) = self.ui_icons {
+            let src_x = icon_col as f32 * UI_ICON_SIZE;
+            let src_y = icon_row as f32 * UI_ICON_SIZE;
+            let src_rect = Rect::new(src_x, src_y, UI_ICON_SIZE, UI_ICON_SIZE);
+
+            draw_texture_ex(
+                texture,
+                x,
+                y,
+                color,
+                DrawTextureParams {
+                    source: Some(src_rect),
+                    dest_size: Some(Vec2::new(size, size)),
+                    ..Default::default()
+                },
+            );
+        } else {
+            // Fallback: draw first letter of prayer category
+            let cx = x + size / 2.0;
+            let cy = y + size / 2.0;
+            self.draw_text_sharp("?", cx - 4.0, cy + 4.0, 14.0, color);
         }
     }
 

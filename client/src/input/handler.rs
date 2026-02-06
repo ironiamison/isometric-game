@@ -742,6 +742,20 @@ impl InputHandler {
                         }
                         return commands;
                     }
+                    UiElementId::MenuButtonPrayer => {
+                        audio.play_sfx("enter");
+                        // Toggle prayer book, close others if opening
+                        if state.ui_state.prayer_book_open {
+                            state.ui_state.prayer_book_open = false;
+                        } else {
+                            state.ui_state.prayer_book_open = true;
+                            state.ui_state.inventory_open = false;
+                            state.ui_state.character_panel_open = false;
+                            state.ui_state.social_open = false;
+                            state.ui_state.skills_open = false;
+                        }
+                        return commands;
+                    }
                     UiElementId::MenuButtonSettings => {
                         audio.play_sfx("enter");
                         // Toggle escape/settings menu
