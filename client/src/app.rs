@@ -271,6 +271,8 @@ pub fn run_game_frame(
             InputCommand::DeclineFriendRequest { requester_id } => ClientMessage::DeclineFriendRequest { requester_id: *requester_id },
             InputCommand::RemoveFriend { friend_id } => ClientMessage::RemoveFriend { friend_id: *friend_id },
             InputCommand::GetOnlinePlayers => ClientMessage::GetOnlinePlayers,
+            // Prayer commands
+            InputCommand::TogglePrayer { prayer_id } => ClientMessage::TogglePrayer { prayer_id: prayer_id.clone() },
         };
         network.send(&msg);
     }
@@ -391,6 +393,7 @@ pub fn run_game_frame(
     let any_panel_open = game_state.ui_state.inventory_open
         || game_state.ui_state.character_panel_open
         || game_state.ui_state.skills_open
+        || game_state.ui_state.prayer_book_open
         || game_state.ui_state.escape_menu_open
         || game_state.ui_state.crafting_open
         || game_state.ui_state.shop_data.is_some()

@@ -4372,6 +4372,9 @@ impl Renderer {
         // Skills panel (when open)
         self.render_skills_panel(state, hovered, &mut layout);
 
+        // Prayer book panel (when open)
+        self.render_prayer_panel(state, hovered, &mut layout);
+
         // Gathering buff timer indicator
         self.render_gathering_buff(state);
 
@@ -4439,6 +4442,7 @@ impl Renderer {
             // Only render tooltips if context menu is not open
             self.render_item_tooltip(state);
             self.render_skill_tooltip(state, hovered);
+            self.render_prayer_tooltip(state, hovered);
 
             // XP globe tooltip (calculate position to match render_ui exactly)
             if let Some(player) = state.get_local_player() {

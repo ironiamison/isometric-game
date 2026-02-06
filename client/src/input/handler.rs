@@ -107,6 +107,8 @@ pub enum InputCommand {
     DeclineFriendRequest { requester_id: i64 },
     RemoveFriend { friend_id: i64 },
     GetOnlinePlayers,
+    // Prayer commands
+    TogglePrayer { prayer_id: String },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -188,6 +190,7 @@ impl InputHandler {
         let any_panel_open = state.ui_state.inventory_open
             || state.ui_state.character_panel_open
             || state.ui_state.skills_open
+            || state.ui_state.prayer_book_open
             || state.ui_state.escape_menu_open
             || state.ui_state.crafting_open
             || state.ui_state.shop_data.is_some()
@@ -688,6 +691,7 @@ impl InputHandler {
                             state.ui_state.character_panel_open = false;
                             state.ui_state.social_open = false;
                             state.ui_state.skills_open = false;
+                            state.ui_state.prayer_book_open = false;
                         }
                         return commands;
                     }
@@ -701,6 +705,7 @@ impl InputHandler {
                             state.ui_state.inventory_open = false;
                             state.ui_state.social_open = false;
                             state.ui_state.skills_open = false;
+                            state.ui_state.prayer_book_open = false;
                         }
                         return commands;
                     }
@@ -715,6 +720,7 @@ impl InputHandler {
                             state.ui_state.inventory_open = false;
                             state.ui_state.character_panel_open = false;
                             state.ui_state.skills_open = false;
+                            state.ui_state.prayer_book_open = false;
                             // Request online players list when opening panel
                             commands.push(InputCommand::GetOnlinePlayers);
                         }
@@ -729,7 +735,8 @@ impl InputHandler {
                             state.ui_state.skills_open = true;
                             state.ui_state.inventory_open = false;
                             state.ui_state.character_panel_open = false;
-                                                        state.ui_state.social_open = false;
+                            state.ui_state.social_open = false;
+                            state.ui_state.prayer_book_open = false;
                         }
                         return commands;
                     }
@@ -750,6 +757,7 @@ impl InputHandler {
                             state.ui_state.character_panel_open = false;
                             state.ui_state.skills_open = false;
                             state.ui_state.social_open = false;
+                            state.ui_state.prayer_book_open = false;
                         }
                     }
                     UiElementId::ChatTabLocal => {
@@ -898,6 +906,42 @@ impl InputHandler {
                         state.social_state.add_friend_focused = true;
                         #[cfg(target_os = "android")]
                         macroquad::miniquad::window::show_keyboard(true);
+                    }
+                    // Skills panel - clicking Prayer skill opens prayer book
+                    UiElementId::SkillSlot(5) => {
+                        // Index 5 is Prayer skill - open prayer book
+                        audio.play_sfx("enter");
+                        state.ui_state.prayer_book_open = !state.ui_state.prayer_book_open;
+                        if state.ui_state.prayer_book_open {
+                            // Close skills panel when opening prayer book
+                            state.ui_state.skills_open = false;
+                        }
+                    }
+                    // Prayer panel handlers
+                    UiElementId::PrayerSlot(slot_idx) => {
+                        // Toggle prayer at this slot
+                        if *slot_idx < crate::game::prayer::PRAYERS.len() {
+                            let prayer = &crate::game::prayer::PRAYERS[*slot_idx];
+                            let prayer_level = state.get_local_player()
+                                .map(|p| p.skills.prayer.level)
+                                .unwrap_or(1);
+
+                            // Check if player meets level requirement
+                            if prayer_level >= prayer.level_req {
+                                // Check if we have prayer points (can only activate if we have points)
+                                let is_active = state.active_prayers.contains(&prayer.id.to_string());
+                                if is_active || state.prayer_points > 0 {
+                                    audio.play_sfx("enter");
+                                    commands.push(InputCommand::TogglePrayer { prayer_id: prayer.id.to_string() });
+                                } else {
+                                    // No prayer points, play error sound
+                                    audio.play_sfx("error");
+                                }
+                            } else {
+                                // Level too low, play error sound
+                                audio.play_sfx("error");
+                            }
+                        }
                     }
                     _ => {
                         // Clicking elsewhere unfocuses the add friend input
@@ -2917,12 +2961,14 @@ impl InputHandler {
         if is_key_pressed(KeyCode::Escape) {
             // Check if any panel is open and close it
             if state.ui_state.inventory_open || state.ui_state.character_panel_open
-                || state.ui_state.social_open || state.ui_state.skills_open {
+                || state.ui_state.social_open || state.ui_state.skills_open
+                || state.ui_state.prayer_book_open {
                 audio.play_sfx("enter");
                 state.ui_state.inventory_open = false;
                 state.ui_state.character_panel_open = false;
                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
+                state.ui_state.prayer_book_open = false;
                 // Reset social panel input state
                 state.social_state.add_friend_focused = false;
             } else if state.selected_entity_id.is_some() {
@@ -2943,8 +2989,9 @@ impl InputHandler {
             } else {
                 state.ui_state.inventory_open = true;
                 state.ui_state.character_panel_open = false;
-                                state.ui_state.social_open = false;
+                state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
+                state.ui_state.prayer_book_open = false;
             }
         }
 
@@ -3056,7 +3103,22 @@ impl InputHandler {
             } else {
                 state.ui_state.character_panel_open = true;
                 state.ui_state.inventory_open = false;
-                                state.ui_state.social_open = false;
+                state.ui_state.social_open = false;
+                state.ui_state.skills_open = false;
+                state.ui_state.prayer_book_open = false;
+            }
+        }
+
+        // Toggle prayer book (P key) with mutual exclusivity
+        if !classic && is_key_pressed(KeyCode::P) {
+            audio.play_sfx("enter");
+            if state.ui_state.prayer_book_open {
+                state.ui_state.prayer_book_open = false;
+            } else {
+                state.ui_state.prayer_book_open = true;
+                state.ui_state.inventory_open = false;
+                state.ui_state.character_panel_open = false;
+                state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
             }
         }

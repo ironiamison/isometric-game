@@ -121,6 +121,10 @@ pub enum ClientMessage {
 
     #[serde(rename = "getOnlinePlayers")]
     GetOnlinePlayers,
+
+    // Prayer commands
+    #[serde(rename = "togglePrayer")]
+    TogglePrayer { prayer_id: String },
 }
 
 impl ClientMessage {
@@ -288,6 +292,10 @@ impl ClientMessage {
                 "removeFriend"
             }
             ClientMessage::GetOnlinePlayers => "getOnlinePlayers",
+            ClientMessage::TogglePrayer { prayer_id } => {
+                data.insert("prayer_id".into(), Value::String(prayer_id.clone().into()));
+                "togglePrayer"
+            }
         };
 
         (msg_type, data)

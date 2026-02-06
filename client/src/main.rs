@@ -510,6 +510,8 @@ fn run_game_frame(
             InputCommand::DeclineFriendRequest { requester_id } => ClientMessage::DeclineFriendRequest { requester_id: *requester_id },
             InputCommand::RemoveFriend { friend_id } => ClientMessage::RemoveFriend { friend_id: *friend_id },
             InputCommand::GetOnlinePlayers => ClientMessage::GetOnlinePlayers,
+            // Prayer commands
+            InputCommand::TogglePrayer { prayer_id } => ClientMessage::TogglePrayer { prayer_id: prayer_id.clone() },
         };
         network.send(&msg);
     }

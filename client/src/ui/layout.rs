@@ -72,6 +72,9 @@ pub enum UiElementId {
     // Skills Panel
     SkillSlot(usize),
 
+    // Prayer Panel
+    PrayerSlot(usize),
+
     // Gold Display (inventory header)
     GoldDisplay,
 
