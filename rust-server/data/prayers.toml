@@ -1,0 +1,163 @@
+# Prayer definitions
+# Each prayer provides temporary buffs at the cost of draining prayer points.
+# Only one prayer per category can be active at a time.
+
+# ============================================================================
+# Tier 1 Prayers (Level 1-9)
+# ============================================================================
+
+[clarity]
+name = "Clarity"
+description = "Clears the mind, providing a slight boost to combat accuracy."
+level_req = 1
+category = "attack"
+effect_type = "attack_bonus"
+effect_value = 5.0
+drain_rate = 1.0
+icon = "prayer_clarity"
+
+[thick_skin]
+name = "Thick Skin"
+description = "Hardens the skin, providing a slight boost to defence."
+level_req = 1
+category = "defence"
+effect_type = "defence_bonus"
+effect_value = 5.0
+drain_rate = 1.0
+icon = "prayer_thick_skin"
+
+[burst_of_strength]
+name = "Burst of Strength"
+description = "Channels inner power for a slight boost to melee damage."
+level_req = 4
+category = "strength"
+effect_type = "strength_bonus"
+effect_value = 5.0
+drain_rate = 1.0
+icon = "prayer_burst_of_strength"
+
+# ============================================================================
+# Tier 2 Prayers (Level 10-20)
+# ============================================================================
+
+[improved_clarity]
+name = "Improved Clarity"
+description = "A deeper focus grants a moderate boost to combat accuracy."
+level_req = 10
+category = "attack"
+effect_type = "attack_bonus"
+effect_value = 10.0
+drain_rate = 2.0
+icon = "prayer_improved_clarity"
+
+[rock_skin]
+name = "Rock Skin"
+description = "Toughens the body like stone, providing a moderate defence boost."
+level_req = 10
+category = "defence"
+effect_type = "defence_bonus"
+effect_value = 10.0
+drain_rate = 2.0
+icon = "prayer_rock_skin"
+
+[superhuman_strength]
+name = "Superhuman Strength"
+description = "Unlocks hidden reserves of power for a moderate damage boost."
+level_req = 13
+category = "strength"
+effect_type = "strength_bonus"
+effect_value = 10.0
+drain_rate = 2.0
+icon = "prayer_superhuman_strength"
+
+[resourcefulness]
+name = "Resourcefulness"
+description = "Blesses your hands with nimbleness, improving gathering speed."
+level_req = 16
+category = "gathering"
+effect_type = "gather_speed_bonus"
+effect_value = 10.0
+drain_rate = 2.0
+icon = "prayer_resourcefulness"
+
+# ============================================================================
+# Tier 3 Prayers (Level 21-35)
+# ============================================================================
+
+[rapid_heal]
+name = "Rapid Heal"
+description = "Accelerates natural healing, doubling HP regeneration rate."
+level_req = 22
+category = "hp_regen"
+effect_type = "hp_regen_multiplier"
+effect_value = 2.0
+drain_rate = 2.0
+icon = "prayer_rapid_heal"
+
+[steel_skin]
+name = "Steel Skin"
+description = "Fortifies the body with iron will, granting significant defence."
+level_req = 28
+category = "defence"
+effect_type = "defence_bonus"
+effect_value = 15.0
+drain_rate = 4.0
+icon = "prayer_steel_skin"
+
+[incredible_clarity]
+name = "Incredible Clarity"
+description = "Achieves perfect mental focus for a significant accuracy boost."
+level_req = 31
+category = "attack"
+effect_type = "attack_bonus"
+effect_value = 15.0
+drain_rate = 4.0
+icon = "prayer_incredible_clarity"
+
+[ultimate_strength]
+name = "Ultimate Strength"
+description = "Channels the full might of devotion for a significant damage boost."
+level_req = 31
+category = "strength"
+effect_type = "strength_bonus"
+effect_value = 15.0
+drain_rate = 4.0
+icon = "prayer_ultimate_strength"
+
+# ============================================================================
+# Tier 4 Prayers (Level 36-50)
+# ============================================================================
+
+[protection]
+name = "Protection"
+description = "Divine protection reduces incoming damage by a quarter."
+level_req = 37
+category = "protection"
+effect_type = "damage_reduction"
+effect_value = 25.0
+drain_rate = 6.0
+icon = "prayer_protection"
+
+[greater_resourcefulness]
+name = "Greater Resourcefulness"
+description = "Greatly blesses your gathering, significantly improving speed."
+level_req = 40
+category = "gathering"
+effect_type = "gather_speed_bonus"
+effect_value = 20.0
+drain_rate = 4.0
+icon = "prayer_greater_resourcefulness"
+
+# ============================================================================
+# Tier 5 Prayers (Level 51+)
+# ============================================================================
+
+[greater_protection]
+name = "Greater Protection"
+description = "Powerful divine protection reduces incoming damage substantially."
+level_req = 55
+category = "protection"
+effect_type = "damage_reduction"
+effect_value = 40.0
+drain_rate = 10.0
+icon = "prayer_greater_protection"

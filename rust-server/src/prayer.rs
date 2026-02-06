@@ -639,4 +639,60 @@ drain_rate = 1.0
         assert!(prayer.can_use(10));
         assert!(prayer.can_use(99));
     }
+
+    #[test]
+    fn test_load_real_prayers_toml() {
+        // Test loading the actual prayers.toml from data directory
+        let data_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/prayers.toml");
+
+        let mut registry = PrayerRegistry::new();
+        registry.load_from_file(&data_path).expect("Failed to load prayers.toml");
+
+        // Verify we have all 14 prayers
+        assert_eq!(registry.len(), 14, "Expected 14 prayers in prayers.toml");
+
+        // Verify specific prayers exist
+        assert!(registry.contains("clarity"), "Missing clarity prayer");
+        assert!(registry.contains("thick_skin"), "Missing thick_skin prayer");
+        assert!(registry.contains("burst_of_strength"), "Missing burst_of_strength prayer");
+        assert!(registry.contains("improved_clarity"), "Missing improved_clarity prayer");
+        assert!(registry.contains("rock_skin"), "Missing rock_skin prayer");
+        assert!(registry.contains("superhuman_strength"), "Missing superhuman_strength prayer");
+        assert!(registry.contains("resourcefulness"), "Missing resourcefulness prayer");
+        assert!(registry.contains("rapid_heal"), "Missing rapid_heal prayer");
+        assert!(registry.contains("steel_skin"), "Missing steel_skin prayer");
+        assert!(registry.contains("incredible_clarity"), "Missing incredible_clarity prayer");
+        assert!(registry.contains("ultimate_strength"), "Missing ultimate_strength prayer");
+        assert!(registry.contains("protection"), "Missing protection prayer");
+        assert!(registry.contains("greater_resourcefulness"), "Missing greater_resourcefulness prayer");
+        assert!(registry.contains("greater_protection"), "Missing greater_protection prayer");
+
+        // Verify categories have correct prayers
+        let attack_prayers = registry.get_by_category(PrayerCategory::Attack);
+        assert_eq!(attack_prayers.len(), 3, "Expected 3 attack prayers");
+
+        let defence_prayers = registry.get_by_category(PrayerCategory::Defence);
+        assert_eq!(defence_prayers.len(), 3, "Expected 3 defence prayers");
+
+        let strength_prayers = registry.get_by_category(PrayerCategory::Strength);
+        assert_eq!(strength_prayers.len(), 3, "Expected 3 strength prayers");
+
+        let protection_prayers = registry.get_by_category(PrayerCategory::Protection);
+        assert_eq!(protection_prayers.len(), 2, "Expected 2 protection prayers");
+
+        let hp_regen_prayers = registry.get_by_category(PrayerCategory::HPRegen);
+        assert_eq!(hp_regen_prayers.len(), 1, "Expected 1 HP regen prayer");
+
+        let gathering_prayers = registry.get_by_category(PrayerCategory::Gathering);
+        assert_eq!(gathering_prayers.len(), 2, "Expected 2 gathering prayers");
+
+        // Verify a specific prayer's properties
+        let protection = registry.get("protection").unwrap();
+        assert_eq!(protection.name, "Protection");
+        assert_eq!(protection.level_req, 37);
+        assert_eq!(protection.category, PrayerCategory::Protection);
+        assert_eq!(protection.effect_type, PrayerEffectType::DamageReduction);
+        assert_eq!(protection.effect_value, 25.0);
+        assert_eq!(protection.drain_rate, 6.0);
+    }
 }
