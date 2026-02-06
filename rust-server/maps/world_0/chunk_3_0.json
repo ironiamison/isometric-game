@@ -1,12 +1,30 @@
 {
   "version": 2,
   "coord": {
-    "cx": -2,
+    "cx": 3,
     "cy": 0
   },
   "size": 32,
   "layers": {
     "ground": [
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
+      666,
       418,
       418,
       418,
@@ -21,7 +39,10 @@
       418,
       418,
       418,
+      666,
       418,
+      666,
+      666,
       418,
       418,
       418,
@@ -1005,27 +1026,6 @@
       418,
       418,
       418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      455,
       418,
       418,
       418,
@@ -3087,7 +3087,85 @@
   },
   "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [],
-  "mapObjects": [],
+  "mapObjects": [
+    {
+      "gid": 1747,
+      "x": 30,
+      "y": 0,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 26,
+      "y": 3,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 22,
+      "y": 3,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 18,
+      "y": 6,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 20,
+      "y": 2,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 9,
+      "y": 7,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 5,
+      "y": 5,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 2,
+      "y": 3,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 15,
+      "y": 6,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 8,
+      "y": 3,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 8,
+      "y": 4,
+      "width": 29,
+      "height": 23
+    }
+  ],
   "walls": [],
   "portals": [],
   "gatheringZones": []

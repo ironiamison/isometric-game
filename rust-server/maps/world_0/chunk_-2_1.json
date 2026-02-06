@@ -3097,5 +3097,6 @@
     }
   ],
   "walls": [],
-  "portals": []
+  "portals": [],
+  "gatheringZones": []
 }

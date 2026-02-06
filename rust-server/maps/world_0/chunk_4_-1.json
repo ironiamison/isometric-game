@@ -1,8 +1,8 @@
 {
   "version": 2,
   "coord": {
-    "cx": -2,
-    "cy": 0
+    "cx": 4,
+    "cy": -1
   },
   "size": 32,
   "layers": {
@@ -1025,7 +1025,7 @@
       418,
       418,
       418,
-      455,
+      418,
       418,
       418,
       418,
@@ -3087,7 +3087,29 @@
   },
   "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [],
-  "mapObjects": [],
+  "mapObjects": [
+    {
+      "gid": 1747,
+      "x": 0,
+      "y": 13,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 2,
+      "y": 15,
+      "width": 29,
+      "height": 23
+    },
+    {
+      "gid": 1747,
+      "x": 1,
+      "y": 13,
+      "width": 29,
+      "height": 23
+    }
+  ],
   "walls": [],
   "portals": [],
   "gatheringZones": []

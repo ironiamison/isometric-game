@@ -773,7 +773,7 @@
       382,
       382,
       382,
-      442,
+      382,
       382,
       382,
       456,
@@ -806,7 +806,7 @@
       382,
       382,
       382,
-      442,
+      0,
       382,
       382,
       382,
@@ -836,9 +836,9 @@
       382,
       382,
       382,
-      234,
-      234,
-      234,
+      0,
+      382,
+      0,
       109,
       109,
       109,
@@ -868,9 +868,9 @@
       109,
       109,
       109,
-      234,
-      234,
-      234,
+      0,
+      0,
+      0,
       114,
       114,
       114,
@@ -900,9 +900,9 @@
       114,
       114,
       418,
-      234,
-      234,
-      234,
+      0,
+      0,
+      0,
       114,
       114,
       114,
@@ -933,8 +933,8 @@
       114,
       114,
       234,
-      234,
-      234,
+      0,
+      0,
       114,
       114,
       114,
@@ -966,7 +966,7 @@
       114,
       234,
       234,
-      234,
+      0,
       114,
       114,
       114,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "ABQEMCoAAAKACJUQAIAAAAAQAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8fAAAAGAAAAAAAAAAQAAEAEP///x8=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3566,5 +3566,6 @@
       "edge": "down"
     }
   ],
-  "portals": []
+  "portals": [],
+  "gatheringZones": []
 }
