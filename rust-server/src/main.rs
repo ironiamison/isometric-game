@@ -41,6 +41,7 @@ mod interior;
 mod interior_registry;
 mod item;
 mod npc;
+mod prayer;
 mod protocol;
 mod quest;
 mod shop;
