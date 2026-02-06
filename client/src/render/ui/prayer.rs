@@ -309,19 +309,14 @@ impl Renderer {
 
         // Mana cost in bottom-right corner
         let cost_text = format!("{}", spell.mana_cost);
-        let cost_dims = self.measure_text_sharp(&cost_text, 12.0);
+        let cost_color = Color::new(0.4, 0.5, 0.9, 1.0);
+        let cost_dims = self.measure_text_sharp(&cost_text, 16.0);
         let cost_x = x + size - cost_dims.width - 2.0;
         let cost_y = y + size - 2.0;
 
         // Shadow
-        self.draw_text_sharp(&cost_text, cost_x + 1.0, cost_y + 1.0, 12.0, Color::new(0.0, 0.0, 0.0, 0.8));
-        // Mana cost (blue for available, red for locked)
-        let cost_color = if is_locked {
-            Color::new(0.8, 0.3, 0.3, 1.0)
-        } else {
-            Color::new(0.4, 0.5, 0.9, 1.0)
-        };
-        self.draw_text_sharp(&cost_text, cost_x, cost_y, 12.0, cost_color);
+        self.draw_text_sharp(&cost_text, cost_x + 1.0, cost_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+        self.draw_text_sharp(&cost_text, cost_x, cost_y, 16.0, cost_color);
 
         // Level requirement in top-left corner (if locked)
         if is_locked {

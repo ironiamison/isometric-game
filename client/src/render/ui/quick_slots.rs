@@ -267,6 +267,31 @@ impl Renderer {
             font_size,
             label_color,
         );
+
+        // Tooltip on hover
+        if is_hovered {
+            let tooltip_text = if state.ui_state.spell_bar_active {
+                "Spell Bar (click to switch to Items)"
+            } else {
+                "Item Bar (click to switch to Spells)"
+            };
+            let padding = 6.0;
+            let tip_dims = self.measure_text_sharp(tooltip_text, 16.0);
+            let tip_w = (tip_dims.width + padding * 2.0).floor();
+            let tip_h = (18.0 + padding * 2.0).floor();
+            let tip_x = (btn_x + btn_w / 2.0 - tip_w / 2.0).floor();
+            let tip_y = (btn_y - tip_h - 4.0).floor();
+
+            draw_rectangle(tip_x - 1.0, tip_y - 1.0, tip_w + 2.0, tip_h + 2.0, SLOT_BORDER);
+            draw_rectangle(tip_x, tip_y, tip_w, tip_h, SLOT_BG_FILLED);
+            self.draw_text_sharp(
+                tooltip_text,
+                (tip_x + padding).floor(),
+                (tip_y + padding + 14.0).floor(),
+                16.0,
+                TEXT_NORMAL,
+            );
+        }
     }
 
     pub(crate) fn render_ground_item_overlays(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
