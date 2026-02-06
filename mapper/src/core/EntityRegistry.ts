@@ -57,6 +57,8 @@ export class EntityRegistryLoader {
     const entityFiles = [
       // NPCs
       `${basePath}/npcs/villagers.toml`,
+      `${basePath}/npcs/altar.toml`,
+      `${basePath}/npcs/arena.toml`,
       `${basePath}/npcs/merchants.toml`,
       `${basePath}/npcs/quest_givers.toml`,
       // Monsters
@@ -121,13 +123,20 @@ export class EntityRegistryLoader {
     };
 
     for (const entity of this.registry.entities.values()) {
+      let categorized = false;
       if (entity.behaviors.hostile) {
         this.registry.byType.hostile.push(entity);
-      } else if (entity.behaviors.questGiver) {
+        categorized = true;
+      }
+      if (entity.behaviors.questGiver) {
         this.registry.byType.questGiver.push(entity);
-      } else if (entity.behaviors.merchant) {
+        categorized = true;
+      }
+      if (entity.behaviors.merchant) {
         this.registry.byType.merchant.push(entity);
-      } else {
+        categorized = true;
+      }
+      if (!categorized) {
         this.registry.byType.other.push(entity);
       }
     }
