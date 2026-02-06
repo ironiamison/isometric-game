@@ -141,6 +141,9 @@ pub struct RawItemDefinition {
     pub use_effect: Option<UseEffect>,
     /// Equipment-specific stats (only for equipment items)
     pub equipment: Option<EquipmentStats>,
+    /// Prayer XP granted when burying bones (only for bone items)
+    #[serde(default)]
+    pub prayer_xp: i32,
 }
 
 fn default_true() -> bool { true }
@@ -163,6 +166,8 @@ pub struct ItemDefinition {
     pub use_effect: Option<UseEffect>,
     /// Equipment-specific stats (only for equipment items)
     pub equipment: Option<EquipmentStats>,
+    /// Prayer XP granted when burying bones (only for bone items)
+    pub prayer_xp: i32,
 }
 
 impl ItemDefinition {
@@ -181,7 +186,13 @@ impl ItemDefinition {
             sellable: raw.sellable,
             use_effect: raw.use_effect.clone(),
             equipment: raw.equipment.clone(),
+            prayer_xp: raw.prayer_xp,
         }
+    }
+
+    /// Check if this item is bones that can be buried
+    pub fn is_bones(&self) -> bool {
+        self.prayer_xp > 0
     }
 
     /// Check if this item can be used (has a use effect)

@@ -50,6 +50,12 @@ drop_chance = 0.05
 quantity_min = 1
 quantity_max = 1
 
+[[spider.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
 [spider.behaviors]
 hostile = true
 wander_enabled = true
@@ -145,6 +151,12 @@ item_id = "health_potion"
 drop_chance = 0.50
 quantity_min = 1
 quantity_max = 2
+
+[[reaper.loot]]
+item_id = "big_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
 
 [reaper.behaviors]
 hostile = true

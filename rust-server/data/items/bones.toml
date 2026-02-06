@@ -1,0 +1,32 @@
+# Bone items - can be buried for Prayer XP
+# Each bone type has a prayer_xp value that determines XP gained when buried
+
+[regular_bones]
+display_name = "Bones"
+sprite = "bones"
+description = "The bones of a creature. Can be buried for Prayer experience."
+category = "material"
+max_stack = 99
+base_price = 5
+sellable = true
+prayer_xp = 5
+
+[big_bones]
+display_name = "Big bones"
+sprite = "big_bones"
+description = "Large bones from a powerful creature. Grants more Prayer experience when buried."
+category = "material"
+max_stack = 99
+base_price = 25
+sellable = true
+prayer_xp = 15
+
+[dragon_bones]
+display_name = "Dragon bones"
+sprite = "dragon_bones"
+description = "The remains of a dragon. Highly valued for Prayer training."
+category = "material"
+max_stack = 99
+base_price = 150
+sellable = true
+prayer_xp = 72

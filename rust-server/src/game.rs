@@ -7075,7 +7075,130 @@ impl GameRoom {
 
     /// Handle burying bones from inventory
     pub async fn handle_bury_bones(&self, player_id: &str, slot: usize) {
-        // TODO: Implement bone burying logic (Task #6)
         tracing::debug!("Player {} burying bones from slot: {}", player_id, slot);
+
+        // Get item info and validate it's bones
+        let (item_id, item_name, prayer_xp) = {
+            let players = self.players.read().await;
+            let player = match players.get(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+
+            // Check if slot is valid and has an item
+            let slot_item = match player.inventory.slots.get(slot).and_then(|s| s.as_ref()) {
+                Some(item) => item,
+                None => {
+                    drop(players);
+                    self.send_system_message(player_id, "There's nothing in that slot.").await;
+                    return;
+                }
+            };
+
+            let item_id = slot_item.item_id.clone();
+
+            // Get item definition
+            let item_def = match self.item_registry.get(&item_id) {
+                Some(def) => def,
+                None => {
+                    drop(players);
+                    self.send_system_message(player_id, "Unknown item.").await;
+                    return;
+                }
+            };
+
+            // Check if it's bones (has prayer_xp > 0)
+            if !item_def.is_bones() {
+                drop(players);
+                self.send_system_message(player_id, "You can only bury bones.").await;
+                return;
+            }
+
+            (item_id, item_def.display_name.clone(), item_def.prayer_xp)
+        };
+
+        // Remove bones from inventory and award XP
+        let (inv_update, xp_result) = {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+
+            // Remove one bone from the slot
+            if let Some(ref mut slot_item) = player.inventory.slots[slot] {
+                slot_item.quantity -= 1;
+                if slot_item.quantity <= 0 {
+                    player.inventory.slots[slot] = None;
+                }
+            }
+
+            // Award Prayer XP
+            let leveled = player.skills.prayer.add_xp(prayer_xp as i64);
+            let xp_result = (
+                prayer_xp as i64,
+                player.skills.prayer.xp,
+                player.skills.prayer.level,
+                leveled,
+            );
+
+            // If leveled up, update max prayer points
+            if leveled {
+                player.prayer_points = player.max_prayer_points();
+            }
+
+            let inv_update = (player.inventory.to_update(), player.inventory.gold);
+
+            (inv_update, xp_result)
+        };
+
+        // Send chat message
+        self.send_system_message(player_id, &format!("You bury the {}.", item_name.to_lowercase())).await;
+
+        // Send inventory update
+        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: inv_update.0,
+            gold: inv_update.1,
+        }).await;
+
+        // Send XP update
+        self.send_to_player(player_id, ServerMessage::SkillXp {
+            player_id: player_id.to_string(),
+            skill: "prayer".to_string(),
+            xp_gained: xp_result.0,
+            total_xp: xp_result.1,
+            level: xp_result.2,
+        }).await;
+
+        // Broadcast level up if applicable
+        if xp_result.3 {
+            tracing::info!("Player {} leveled up Prayer to {}", player_id, xp_result.2);
+            self.broadcast(ServerMessage::SkillLevelUp {
+                player_id: player_id.to_string(),
+                skill: "prayer".to_string(),
+                new_level: xp_result.2,
+            }).await;
+
+            // Send updated prayer state with new max points
+            let (points, max_points, active_prayers) = {
+                let players = self.players.read().await;
+                if let Some(player) = players.get(player_id) {
+                    (
+                        player.prayer_points,
+                        player.max_prayer_points(),
+                        player.active_prayers.iter().cloned().collect::<Vec<_>>(),
+                    )
+                } else {
+                    return;
+                }
+            };
+
+            self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
+                points,
+                max_points,
+                active_prayers,
+            }).await;
+        }
     }
 }
