@@ -163,6 +163,12 @@ pub enum ClientMessage {
     /// Pray at an altar to restore prayer points
     #[serde(rename = "prayAtAltar")]
     PrayAtAltar { altar_id: String },
+
+    // ===== Spell System Messages =====
+
+    /// Cast a spell
+    #[serde(rename = "castSpell")]
+    CastSpell { spell_id: String },
 }
 
 // ============================================================================
@@ -268,6 +274,8 @@ pub enum ServerMessage {
         smithing_xp: i64,
         prayer_level: i32,
         prayer_xp: i64,
+        magic_level: i32,
+        magic_xp: i64,
     },
     ItemDropped {
         id: String,
@@ -607,6 +615,22 @@ pub enum ServerMessage {
         max_points: i32,
         active_prayers: Vec<String>,
     },
+
+    // ===== Spell System Messages =====
+
+    /// Spell visual effect notification
+    SpellEffect {
+        caster_id: String,
+        target_id: Option<String>,
+        spell_id: String,
+        target_x: i32,
+        target_y: i32,
+    },
+    /// Spell cast result (sent only on failure)
+    SpellResult {
+        success: bool,
+        reason: Option<String>,
+    },
 }
 
 /// Farming patch data for client synchronization
@@ -884,6 +908,9 @@ impl ServerMessage {
             ServerMessage::CraftingCompleted { .. } => "craftingCompleted",
             // Prayer system messages
             ServerMessage::PrayerStateUpdate { .. } => "prayerStateUpdate",
+            // Spell system messages
+            ServerMessage::SpellEffect { .. } => "spellEffect",
+            ServerMessage::SpellResult { .. } => "spellResult",
         }
     }
 }
@@ -1059,6 +1086,18 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     pmap.push((
                         Value::String("sitting".into()),
                         Value::Boolean(p.sitting),
+                    ));
+                    pmap.push((
+                        Value::String("is_gathering".into()),
+                        Value::Boolean(p.is_gathering),
+                    ));
+                    pmap.push((
+                        Value::String("mp".into()),
+                        Value::Integer((p.mp as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("maxMp".into()),
+                        Value::Integer((p.max_mp as i64).into()),
                     ));
                     Value::Map(pmap)
                 })
@@ -1319,6 +1358,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             smithing_xp,
             prayer_level,
             prayer_xp,
+            magic_level,
+            magic_xp,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -1372,6 +1413,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("prayer_xp".into()),
                 Value::Integer((*prayer_xp).into()),
+            ));
+            map.push((
+                Value::String("magic_level".into()),
+                Value::Integer((*magic_level as i64).into()),
+            ));
+            map.push((
+                Value::String("magic_xp".into()),
+                Value::Integer((*magic_xp).into()),
             ));
             Value::Map(map)
         }
@@ -2351,6 +2400,27 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("active_prayers".into()), Value::Array(prayer_values)));
             Value::Map(map)
         }
+        ServerMessage::SpellEffect { caster_id, target_id, spell_id, target_x, target_y } => {
+            let mut map = Vec::new();
+            map.push((Value::String("caster_id".into()), Value::String(caster_id.clone().into())));
+            match target_id {
+                Some(tid) => map.push((Value::String("target_id".into()), Value::String(tid.clone().into()))),
+                None => map.push((Value::String("target_id".into()), Value::Nil)),
+            }
+            map.push((Value::String("spell_id".into()), Value::String(spell_id.clone().into())));
+            map.push((Value::String("target_x".into()), Value::Integer((*target_x as i64).into())));
+            map.push((Value::String("target_y".into()), Value::Integer((*target_y as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::SpellResult { success, reason } => {
+            let mut map = Vec::new();
+            map.push((Value::String("success".into()), Value::Boolean(*success)));
+            match reason {
+                Some(r) => map.push((Value::String("reason".into()), Value::String(r.clone().into()))),
+                None => map.push((Value::String("reason".into()), Value::Nil)),
+            }
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -2583,6 +2653,20 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "buryBones" => {
             let slot = extract_i64(msg_data, "slot").unwrap_or(0) as usize;
             Ok(ClientMessage::BuryBones { slot })
+        }
+        "offerBones" => {
+            let slot = extract_i64(msg_data, "slot").unwrap_or(0) as usize;
+            let altar_id = extract_string(msg_data, "altar_id").unwrap_or_default();
+            Ok(ClientMessage::OfferBones { slot, altar_id })
+        }
+        "prayAtAltar" => {
+            let altar_id = extract_string(msg_data, "altar_id").unwrap_or_default();
+            Ok(ClientMessage::PrayAtAltar { altar_id })
+        }
+        // Spell system messages
+        "castSpell" => {
+            let spell_id = extract_string(msg_data, "spell_id").unwrap_or_default();
+            Ok(ClientMessage::CastSpell { spell_id })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }

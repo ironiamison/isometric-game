@@ -190,6 +190,8 @@ pub struct Renderer {
     farming_sprites: HashMap<String, Texture2D>,
     /// Prayer icons by prayer id (e.g., "clarity" -> Texture2D)
     pub(crate) prayer_icons: HashMap<String, Texture2D>,
+    /// Spell effect sprite sheets by effect name (e.g., "dark_hand" -> Texture2D)
+    spell_effect_textures: HashMap<String, Texture2D>,
     /// Material for head+hair composite rendering (shader-based)
     head_hair_material: Option<Material>,
     /// Material for animated water tile rendering (shader-based)
@@ -605,6 +607,17 @@ impl Renderer {
         }
         log::info!("Loaded {} prayer icons", prayer_icons.len());
 
+        // Load spell effect sprite sheets
+        let mut spell_effect_textures: HashMap<String, Texture2D> = HashMap::new();
+        for name in &["dark_hand", "dark_eater", "self_heal", "bubbles_warp"] {
+            let path = format!("assets/sprites/effects/{}.png", name);
+            if let Ok(tex) = load_texture(&asset_path(&path)).await {
+                tex.set_filter(FilterMode::Nearest);
+                spell_effect_textures.insert(name.to_string(), tex);
+            }
+        }
+        log::info!("Loaded {} spell effect textures", spell_effect_textures.len());
+
         set_loading!("Loading shaders...");
 
         // Load head+hair composite shader material
@@ -713,6 +726,7 @@ impl Renderer {
             coin_small_icon,
             farming_sprites,
             prayer_icons,
+            spell_effect_textures,
             head_hair_material,
             water_material,
             water_overlay_material,
@@ -1104,6 +1118,9 @@ impl Renderer {
 
         // 7.5. Render projectiles
         self.render_projectiles(state);
+
+        // 7.6. Render spell effects (animated sprite sheets)
+        self.render_spell_effects(state);
         timings.effects_ms = (get_time() - t3) * 1000.0;
 
         // 8. Render UI (non-interactive elements)
@@ -1792,6 +1809,73 @@ impl Renderer {
                 Vec2::new(fletch_base_x - perp_x * shaft_width / 2.0, fletch_base_y - perp_y * shaft_width / 2.0),
                 Vec2::new(back_x - perp_x * fletch_width, back_y - perp_y * fletch_width),
                 fletch_color,
+            );
+        }
+    }
+
+    fn render_spell_effects(&self, state: &GameState) {
+        let current_time = macroquad::time::get_time();
+
+        for effect in &state.spell_effects {
+            let elapsed = current_time - effect.time;
+
+            // Look up the effect sprite based on spell_id
+            let sprite_name = match effect.spell_id.as_str() {
+                "dark_hand" => "dark_hand",
+                "dark_eater" => "dark_eater",
+                "heal" => "self_heal",
+                "teleport" => "bubbles_warp",
+                _ => continue,
+            };
+
+            let texture = match self.spell_effect_textures.get(sprite_name) {
+                Some(t) => t,
+                None => continue,
+            };
+
+            // Calculate frame info from texture (horizontal strip, 5 frames)
+            let tex_w = texture.width();
+            let tex_h = texture.height();
+            let frame_count = 5usize;
+            let frame_w = tex_w / frame_count as f32;
+            let frame_h = tex_h;
+            let fps = 10.0_f64;
+            let total_duration = frame_count as f64 / fps;
+
+            if elapsed > total_duration {
+                continue; // Animation finished
+            }
+
+            let frame_idx = ((elapsed * fps) as usize).min(frame_count - 1);
+
+            // Calculate screen position from world coordinates
+            let (screen_x, screen_y) = world_to_screen(
+                effect.target_x as f32,
+                effect.target_y as f32,
+                &state.camera,
+            );
+
+            // Draw the current frame, centered on the tile
+            let zoom = state.camera.zoom;
+            let draw_w = frame_w * zoom;
+            let draw_h = frame_h * zoom;
+            let source_rect = Rect::new(
+                frame_idx as f32 * frame_w,
+                0.0,
+                frame_w,
+                frame_h,
+            );
+
+            draw_texture_ex(
+                texture,
+                screen_x - draw_w / 2.0,
+                screen_y - draw_h, // Above the tile center
+                WHITE,
+                DrawTextureParams {
+                    source: Some(source_rect),
+                    dest_size: Some(Vec2::new(draw_w, draw_h)),
+                    ..Default::default()
+                },
             );
         }
     }
@@ -4266,9 +4350,38 @@ impl Renderer {
             };
             self.draw_text_sharp(&prayer_text, (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(), (prayer_bar_y + 14.0).floor(), font_size, prayer_text_color);
 
-            // ===== Gathering status indicator (below prayer bar) =====
+            // ===== MP BAR (below prayer bar) =====
+            let mp_bar_x = bar_x;
+            let mp_bar_y = prayer_bar_y + bar_height + 4.0;
+            let (mp, max_mp) = state.get_local_player()
+                .map(|p| (p.mp, p.max_mp))
+                .unwrap_or((0, 12));
+            let mp_ratio = if max_mp > 0 {
+                mp as f32 / max_mp as f32
+            } else {
+                0.0
+            };
+
+            // Background
+            draw_rectangle(mp_bar_x, mp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
+            draw_rectangle(mp_bar_x + 1.0, mp_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+
+            // MP fill (blue/purple color)
+            let mp_fill_w = (bar_width - 4.0) * mp_ratio;
+            if mp_fill_w > 0.0 {
+                let mp_color = Color::new(0.3, 0.2, 0.8, 1.0);
+                draw_rectangle(mp_bar_x + 2.0, mp_bar_y + 2.0, mp_fill_w, bar_height - 4.0, mp_color);
+                draw_rectangle(mp_bar_x + 2.0, mp_bar_y + 2.0, mp_fill_w, (bar_height - 4.0) / 2.0, Color::new(0.5, 0.4, 0.95, 1.0));
+            }
+
+            // MP text
+            let mp_text = format!("{}/{}", mp, max_mp);
+            let mp_text_w = self.measure_text_sharp(&mp_text, font_size).width;
+            self.draw_text_sharp(&mp_text, (mp_bar_x + (bar_width - mp_text_w) / 2.0).floor(), (mp_bar_y + 14.0).floor(), font_size, TEXT_NORMAL);
+
+            // ===== Gathering status indicator (below MP bar) =====
             if state.is_gathering {
-                let gather_y = prayer_bar_y + bar_height + 4.0;
+                let gather_y = mp_bar_y + bar_height + 4.0;
                 let gather_h = 22.0;
                 // Semi-transparent background
                 draw_rectangle(bar_x, gather_y, bar_width, gather_h, Color::new(0.05, 0.15, 0.25, 0.7));
@@ -4285,11 +4398,11 @@ impl Renderer {
             let globe_stats_y = tag_y + tag_height / 2.0 + 8.0; // Slightly below name tag center
             self.render_xp_globes(&state.xp_globes, bar_x, globe_stats_y);
 
-            // XP Drop Feed (below gathering status or prayer bar)
+            // XP Drop Feed (below gathering status or MP bar)
             let drop_start_y = if state.is_gathering {
-                prayer_bar_y + bar_height + 4.0 + 22.0 + 110.0 // ~100px below gathering box
+                mp_bar_y + bar_height + 4.0 + 22.0 + 110.0 // ~100px below gathering box
             } else {
-                prayer_bar_y + bar_height + 110.0
+                mp_bar_y + bar_height + 110.0
             };
             self.render_xp_drop_feed(&state.xp_drop_feed, bar_x, bar_width, drop_start_y);
         }

@@ -128,6 +128,10 @@ pub enum ClientMessage {
 
     #[serde(rename = "buryBones")]
     BuryBones { slot: usize },
+
+    // Spell system commands
+    #[serde(rename = "castSpell")]
+    CastSpell { spell_id: String },
 }
 
 impl ClientMessage {
@@ -302,6 +306,10 @@ impl ClientMessage {
             ClientMessage::BuryBones { slot } => {
                 data.insert("slot".into(), Value::Integer((*slot as i64).into()));
                 "buryBones"
+            }
+            ClientMessage::CastSpell { spell_id } => {
+                data.insert("spell_id".into(), Value::String(spell_id.clone().into()));
+                "castSpell"
             }
         };
 

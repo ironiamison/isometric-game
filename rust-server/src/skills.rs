@@ -1,11 +1,12 @@
 //! Skills system following RuneScape-style mechanics.
 //!
-//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer
+//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Combat: Combined attack/strength/defence skill for all combat
 //! - Fishing: Gathering skill for catching fish
 //! - Smithing: Crafting skill for forging weapons and armor
 //! - Prayer: Max prayer points (1 point per level, starts at 1)
+//! - Magic: Spell casting skill for damage and healing spells
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,7 @@ pub enum SkillType {
     Farming,
     Smithing,
     Prayer,
+    Magic,
 }
 
 impl SkillType {
@@ -34,6 +36,7 @@ impl SkillType {
             SkillType::Farming => "farming",
             SkillType::Smithing => "smithing",
             SkillType::Prayer => "prayer",
+            SkillType::Magic => "magic",
         }
     }
 }
@@ -141,6 +144,8 @@ pub struct Skills {
     pub smithing: Skill,
     #[serde(default)]
     pub prayer: Skill,
+    #[serde(default)]
+    pub magic: Skill,
 }
 
 impl Default for Skills {
@@ -159,6 +164,7 @@ impl Skills {
             farming: Skill::new(1),
             smithing: Skill::new(1),
             prayer: Skill::new(1),
+            magic: Skill::new(1),
         }
     }
 
@@ -177,6 +183,7 @@ impl Skills {
             SkillType::Farming => &self.farming,
             SkillType::Smithing => &self.smithing,
             SkillType::Prayer => &self.prayer,
+            SkillType::Magic => &self.magic,
         }
     }
 
@@ -189,12 +196,13 @@ impl Skills {
             SkillType::Farming => &mut self.farming,
             SkillType::Smithing => &mut self.smithing,
             SkillType::Prayer => &mut self.prayer,
+            SkillType::Magic => &mut self.magic,
         }
     }
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level
+        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level + self.magic.level
     }
 }
 
@@ -222,6 +230,7 @@ impl LegacySkills {
             farming: Skill::new(1),
             smithing: Skill::new(1),
             prayer: Skill::new(1),
+            magic: Skill::new(1),
         }
     }
 }
@@ -278,6 +287,10 @@ pub fn roll_damage(max_hit: i32) -> i32 {
 pub const COMBAT_XP_PER_DAMAGE: f64 = 4.0;
 pub const HITPOINTS_XP_PER_DAMAGE: f64 = 1.33;
 
+/// Magic XP constants
+pub const MAGIC_XP_PER_DAMAGE: f64 = 4.0;
+pub const MAGIC_XP_PER_HEAL: f64 = 2.0;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,6 +345,7 @@ mod tests {
             farming: Skill::new(1),
             smithing: Skill::new(1),
             prayer: Skill::new(1),
+            magic: Skill::new(1),
         };
         // combat_level = floor((99 + 99) / 2) = 99
         assert_eq!(max_skills.combat_level(), 99);
@@ -340,8 +354,8 @@ mod tests {
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 = 17
-        assert_eq!(skills.total_level(), 17);
+        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 = 18
+        assert_eq!(skills.total_level(), 18);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FriendInfo, PendingRequestInfo, OnlinePlayerInfo};
+use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FriendInfo, PendingRequestInfo, OnlinePlayerInfo, SpellEffect};
 use crate::game::npc::{Npc, NpcState};
 use crate::render::OVERWORLD_NAME;
 use super::protocol::{extract_string, extract_f32, extract_i32, extract_u32, extract_u64, extract_array, extract_u8, extract_bool};
@@ -88,6 +88,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let direction = extract_i32(player_value, "direction");
                         let hp = extract_i32(player_value, "hp");
                         let max_hp = extract_i32(player_value, "maxHp");
+                        let mp = extract_i32(player_value, "mp");
+                        let max_mp = extract_i32(player_value, "maxMp");
                         // Skill levels (consolidated combat system)
                         let hitpoints_level = extract_i32(player_value, "hitpointsLevel");
                         let combat_skill_level = extract_i32(player_value, "combatSkillLevel");
@@ -154,6 +156,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             }
                             if let Some(max_hp) = max_hp {
                                 player.max_hp = max_hp;
+                            }
+                            if let Some(mp) = mp {
+                                player.mp = mp;
+                            }
+                            if let Some(max_mp) = max_mp {
+                                player.max_mp = max_mp;
                             }
                             // Update skill levels
                             if let Some(level) = hitpoints_level {
@@ -260,6 +268,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 }
                                 if let Some(max_hp_val) = max_hp {
                                     new_player.max_hp = max_hp_val;
+                                }
+                                if let Some(mp_val) = mp {
+                                    new_player.mp = mp_val;
+                                }
+                                if let Some(max_mp_val) = max_mp {
+                                    new_player.max_mp = max_mp_val;
                                 }
                                 if let Some(dir) = direction {
                                     let new_dir = Direction::from_u8(dir as u8);
@@ -745,15 +759,22 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(xp) = extract_i32(value, "prayer_xp") {
                             player.skills.prayer.xp = xp as i64;
                         }
+                        if let Some(level) = extract_i32(value, "magic_level") {
+                            player.skills.magic.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "magic_xp") {
+                            player.skills.magic.xp = xp as i64;
+                        }
 
-                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}",
+                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}",
                             player_id,
                             player.skills.hitpoints.level,
                             player.skills.combat.level,
                             player.skills.fishing.level,
                             player.skills.farming.level,
                             player.skills.smithing.level,
-                            player.skills.prayer.level
+                            player.skills.prayer.level,
+                            player.skills.magic.level
                         );
                     } else {
                         log::warn!("skillsSync: player {} not found in state.players", player_id);
@@ -2207,6 +2228,51 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.prayer_points = points;
                 state.max_prayer_points = max_points;
                 state.active_prayers = active_prayers;
+            }
+        }
+
+        "spellEffect" => {
+            if let Some(value) = data {
+                let caster_id = extract_string(value, "caster_id").unwrap_or_default();
+                let target_id = extract_string(value, "target_id");
+                let spell_id = extract_string(value, "spell_id").unwrap_or_default();
+                let target_x = extract_i32(value, "target_x").unwrap_or(0);
+                let target_y = extract_i32(value, "target_y").unwrap_or(0);
+
+                log::info!("Spell effect: {} cast {} at ({}, {}), target: {:?}",
+                    caster_id, spell_id, target_x, target_y, target_id);
+
+                // Trigger casting animation on caster
+                if let Some(player) = state.players.get_mut(&caster_id) {
+                    player.play_cast();
+                }
+
+                // Store for rendering (Task 9)
+                state.spell_effects.push(SpellEffect {
+                    caster_id,
+                    target_id,
+                    spell_id,
+                    target_x,
+                    target_y,
+                    time: macroquad::time::get_time(),
+                });
+            }
+        }
+
+        "spellResult" => {
+            if let Some(value) = data {
+                let success = extract_bool(value, "success").unwrap_or(false);
+                let reason = extract_string(value, "reason");
+
+                if !success {
+                    if let Some(reason) = &reason {
+                        log::info!("Spell cast failed: {}", reason);
+                        // Add system chat message for failure feedback
+                        state.ui_state.chat_messages.push(ChatMessage::system(
+                            format!("Spell failed: {}", reason)
+                        ));
+                    }
+                }
             }
         }
 

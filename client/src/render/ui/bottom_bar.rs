@@ -8,15 +8,16 @@ use super::super::Renderer;
 use super::common::*;
 
 /// Menu button icon frame indices in background_icons.png
-/// Order: inventory, character, settings, skills, social, prayer
+/// Order: inventory, character, settings, skills, social, prayer, magic
 const ICON_INVENTORY: usize = 0;
 const ICON_CHARACTER: usize = 1;
 const ICON_SETTINGS: usize = 2;
 const ICON_SKILLS: usize = 3;
 const ICON_SOCIAL: usize = 4;
 const ICON_PRAYER: usize = 5;
+const ICON_MAGIC: usize = 6;
 
-/// Icon dimensions in the sprite sheet (160x32 total, 5 icons = 32x32 each)
+/// Icon dimensions in the sprite sheet (7 icons, 32x32 each)
 const ICON_SIZE: f32 = 32.0;
 
 impl Renderer {
@@ -98,7 +99,7 @@ impl Renderer {
             (UiElementId::MenuButtonInventory, ICON_INVENTORY, state.ui_state.inventory_open),
             (UiElementId::MenuButtonCharacter, ICON_CHARACTER, state.ui_state.character_panel_open),
             (UiElementId::MenuButtonSkills, ICON_SKILLS, state.ui_state.skills_open),
-            (UiElementId::MenuButtonPrayer, ICON_PRAYER, state.ui_state.prayer_book_open),
+            (UiElementId::MenuButtonPrayer, if state.ui_state.prayer_spell_tab == 1 { ICON_MAGIC } else { ICON_PRAYER }, state.ui_state.prayer_book_open),
             (UiElementId::MenuButtonSocial, ICON_SOCIAL, state.ui_state.social_open),
             (UiElementId::MenuButtonSettings, ICON_SETTINGS, state.ui_state.escape_menu_open),
         ];

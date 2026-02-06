@@ -20,6 +20,19 @@ impl Renderer {
                 }
             }
             Some(UiElementId::QuickSlot(idx)) => {
+                if state.ui_state.spell_bar_active {
+                    // Show spell tooltip
+                    let magic_level = state.get_local_player()
+                        .map(|p| p.skills.magic.level).unwrap_or(1);
+                    let unlocked: Vec<_> = crate::game::spell::SPELLS.iter()
+                        .filter(|s| magic_level >= s.magic_level_req)
+                        .collect();
+                    if let Some(spell_def) = unlocked.get(*idx) {
+                        self.render_quick_slot_spell_tooltip(spell_def, state);
+                    }
+                    return;
+                }
+                // Item mode: tooltip from inventory slot
                 if let Some(slot) = state.inventory.slots.get(*idx).and_then(|s| s.as_ref()) {
                     (slot.item_id.clone(), slot.quantity)
                 } else {
@@ -272,6 +285,125 @@ impl Renderer {
                 let req_color = if meets_req { stat_green } else { stat_red };
                 let req_text = format!("Requires {} Combat", level_required);
                 self.draw_text_sharp(&req_text, tooltip_x + padding, y, small_font_size, req_color);
+            }
+        }
+    }
+
+    /// Render a spell tooltip near the mouse cursor (for quick slot spell bar)
+    fn render_quick_slot_spell_tooltip(&self, spell_def: &crate::game::spell::SpellDef, state: &GameState) {
+        let (mouse_x, mouse_y) = mouse_position();
+        let padding = 10.0;
+        let line_height = 20.0;
+        let font_size = 16.0;
+        let max_tooltip_width = 220.0;
+        let text_width_limit = max_tooltip_width - padding * 2.0;
+
+        // Prepare text lines
+        let name_text = spell_def.name.to_string();
+        let mana_text = format!("Mana: {}", spell_def.mana_cost);
+        let cooldown_text = format!("Cooldown: {:.1}s", spell_def.cooldown_ms as f64 / 1000.0);
+        let req_text = format!("Requires {} Magic", spell_def.magic_level_req);
+        let desc_lines = if !spell_def.description.is_empty() {
+            self.wrap_text(spell_def.description, text_width_limit, font_size)
+        } else {
+            vec![]
+        };
+
+        // Calculate width
+        let mut max_w = self.measure_text_sharp(&name_text, font_size).width;
+        max_w = max_w.max(self.measure_text_sharp(&mana_text, font_size).width);
+        max_w = max_w.max(self.measure_text_sharp(&cooldown_text, font_size).width);
+        max_w = max_w.max(self.measure_text_sharp(&req_text, font_size).width);
+        for line in &desc_lines {
+            max_w = max_w.max(self.measure_text_sharp(line, font_size).width);
+        }
+        let tooltip_width = (max_w + padding * 2.0).ceil().min(max_tooltip_width);
+
+        // Calculate height: name + type badge + mana + cooldown + req + description
+        let mut total_h = padding * 2.0;
+        total_h += line_height; // Name
+        total_h += line_height; // Type badge
+        total_h += line_height; // Mana cost
+        total_h += line_height; // Cooldown
+        total_h += line_height; // Requirement
+        if !desc_lines.is_empty() {
+            total_h += 2.0;
+            total_h += desc_lines.len() as f32 * line_height;
+        }
+        let tooltip_height = total_h.ceil();
+
+        // Position tooltip near cursor, keep on screen
+        let (sw, sh) = virtual_screen_size();
+        let mut tooltip_x = (mouse_x + 16.0).floor();
+        let mut tooltip_y = (mouse_y + 16.0).floor();
+        if tooltip_x + tooltip_width > sw {
+            tooltip_x = (mouse_x - tooltip_width - 8.0).floor();
+        }
+        if tooltip_y + tooltip_height > sh {
+            tooltip_y = (mouse_y - tooltip_height - 8.0).floor();
+        }
+
+        // Draw tooltip frame
+        draw_rectangle(tooltip_x + 2.0, tooltip_y + 2.0, tooltip_width, tooltip_height,
+                       Color::new(0.0, 0.0, 0.0, 0.4));
+        draw_rectangle(tooltip_x - 1.0, tooltip_y - 1.0, tooltip_width + 2.0, tooltip_height + 2.0,
+                       TOOLTIP_FRAME);
+        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
+        draw_line(tooltip_x + 1.0, tooltip_y + 1.0, tooltip_x + tooltip_width - 1.0, tooltip_y + 1.0,
+                  1.0, Color::new(0.227, 0.227, 0.267, 1.0));
+
+        let mut y = tooltip_y + padding + 12.0;
+
+        // Spell name
+        self.draw_text_sharp(&name_text, tooltip_x + padding, y, font_size, TEXT_NORMAL);
+        y += line_height;
+
+        // Type badge
+        let type_text = match spell_def.spell_type {
+            crate::game::spell::SpellType::Damage => "DAMAGE",
+            crate::game::spell::SpellType::Heal => "HEAL",
+        };
+        let type_color = match spell_def.spell_type {
+            crate::game::spell::SpellType::Damage => Color::new(0.824, 0.345, 0.345, 1.0),
+            crate::game::spell::SpellType::Heal => Color::new(0.392, 0.784, 0.392, 1.0),
+        };
+        let badge_w = self.measure_text_sharp(type_text, 16.0).width + 10.0;
+        let badge_h = 20.0;
+        let badge_x = tooltip_x + padding;
+        let badge_y = y - 14.0;
+        let badge_bg = Color::new(type_color.r, type_color.g, type_color.b, 0.2);
+        draw_rectangle(badge_x, badge_y, badge_w, badge_h, badge_bg);
+        draw_rectangle_lines(badge_x, badge_y, badge_w, badge_h, 1.0, type_color);
+        self.draw_text_sharp(type_text, badge_x + 5.0, y, 16.0, type_color);
+        y += line_height;
+
+        // Mana cost
+        let mana_color = Color::new(0.4, 0.6, 1.0, 1.0);
+        self.draw_text_sharp(&mana_text, tooltip_x + padding, y, font_size, mana_color);
+        y += line_height;
+
+        // Cooldown
+        self.draw_text_sharp(&cooldown_text, tooltip_x + padding, y, font_size, TEXT_DIM);
+        y += line_height;
+
+        // Requirement
+        let magic_level = state.get_local_player()
+            .map(|p| p.skills.magic.level).unwrap_or(1);
+        let meets_req = magic_level >= spell_def.magic_level_req;
+        let req_color = if meets_req {
+            Color::new(0.392, 0.784, 0.392, 1.0)
+        } else {
+            Color::new(1.0, 0.392, 0.392, 1.0)
+        };
+        self.draw_text_sharp(&req_text, tooltip_x + padding, y, font_size, req_color);
+        y += line_height;
+
+        // Description
+        if !desc_lines.is_empty() {
+            y += 2.0;
+            for line in &desc_lines {
+                self.draw_text_sharp(line, tooltip_x + padding, y, font_size, TEXT_DIM);
+                y += line_height;
             }
         }
     }

@@ -3,12 +3,13 @@
 //! This is a simplified version that tracks skill data received from the server.
 //! All calculations happen server-side.
 //!
-//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer
+//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Combat: Combined attack/strength/defence skill for all combat
 //! - Fishing: Gathering skill for catching fish
 //! - Smithing: Crafting skill for forging weapons and armor
 //! - Prayer: Enables prayer abilities that provide combat buffs
+//! - Magic: Spellcasting skill for magic attacks and utility spells
 
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +26,7 @@ pub enum SkillType {
     Farming,
     Smithing,
     Prayer,
+    Magic,
 }
 
 impl SkillType {
@@ -36,6 +38,7 @@ impl SkillType {
             SkillType::Farming => "farming",
             SkillType::Smithing => "smithing",
             SkillType::Prayer => "prayer",
+            SkillType::Magic => "magic",
         }
     }
 
@@ -47,6 +50,7 @@ impl SkillType {
             "farming" => Some(SkillType::Farming),
             "smithing" => Some(SkillType::Smithing),
             "prayer" => Some(SkillType::Prayer),
+            "magic" => Some(SkillType::Magic),
             _ => None,
         }
     }
@@ -59,6 +63,7 @@ impl SkillType {
             SkillType::Farming => "Farming",
             SkillType::Smithing => "Smithing",
             SkillType::Prayer => "Prayer",
+            SkillType::Magic => "Magic",
         }
     }
 }
@@ -131,6 +136,8 @@ pub struct Skills {
     pub smithing: Skill,
     #[serde(default)]
     pub prayer: Skill,
+    #[serde(default)]
+    pub magic: Skill,
 }
 
 impl Default for Skills {
@@ -140,7 +147,7 @@ impl Default for Skills {
 }
 
 impl Skills {
-    /// Create new skills with starting values (HP 10, Combat 3, Fishing 1, Prayer 1)
+    /// Create new skills with starting values (HP 10, Combat 3, Fishing 1, Prayer 1, Magic 1)
     pub fn new() -> Self {
         Self {
             hitpoints: Skill::new(10),
@@ -149,6 +156,7 @@ impl Skills {
             farming: Skill::new(1),
             smithing: Skill::new(1),
             prayer: Skill::new(1),
+            magic: Skill::new(1),
         }
     }
 
@@ -167,6 +175,7 @@ impl Skills {
             SkillType::Farming => &self.farming,
             SkillType::Smithing => &self.smithing,
             SkillType::Prayer => &self.prayer,
+            SkillType::Magic => &self.magic,
         }
     }
 
@@ -179,6 +188,7 @@ impl Skills {
             SkillType::Farming => &mut self.farming,
             SkillType::Smithing => &mut self.smithing,
             SkillType::Prayer => &mut self.prayer,
+            SkillType::Magic => &mut self.magic,
         }
     }
 
@@ -191,6 +201,6 @@ impl Skills {
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level
+        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level + self.magic.level
     }
 }

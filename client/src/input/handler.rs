@@ -110,6 +110,8 @@ pub enum InputCommand {
     // Prayer commands
     TogglePrayer { prayer_id: String },
     BuryBones { slot: u8 },
+    // Spell commands
+    CastSpell { spell_id: String },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -284,7 +286,7 @@ impl InputHandler {
                 // Drag completed - check if we're over a valid drop target
                 if let Some(ref element) = clicked_element {
                     match element {
-                        UiElementId::InventorySlot(to_idx) | UiElementId::QuickSlot(to_idx) => {
+                        UiElementId::InventorySlot(to_idx) => {
                             match &drag.source {
                                 DragSource::Inventory(from_idx) => {
                                     // Swap inventory slots if dropping on a different slot
@@ -331,6 +333,10 @@ impl InputHandler {
                                     });
                                 }
                             }
+                        }
+                        UiElementId::QuickSlot(_slot_idx) => {
+                            // Quick slots are now fixed to inventory positions or spell bar;
+                            // no drag-drop assignment needed.
                         }
                         UiElementId::EquipmentSlot(target_slot_type) => {
                             match &drag.source {
@@ -461,7 +467,7 @@ impl InputHandler {
         if mouse_clicked && state.ui_state.drag_state.is_none() {
             if let Some(ref element) = clicked_element {
                 match element {
-                    UiElementId::InventorySlot(idx) | UiElementId::QuickSlot(idx) => {
+                    UiElementId::InventorySlot(idx) => {
                         // Check if slot has an item
                         if let Some(Some(slot)) = state.inventory.slots.get(*idx) {
                             // Check for shift+click to drop (if enabled)
@@ -514,6 +520,36 @@ impl InputHandler {
                                 return commands;
                             }
                         }
+                    }
+                    UiElementId::QuickSlot(idx) => {
+                        // In item mode, quick slots map directly to inventory slots 0-4
+                        if !state.ui_state.spell_bar_active {
+                            let inv_idx = *idx;
+                            if let Some(Some(slot)) = state.inventory.slots.get(inv_idx) {
+                                // Check for shift+click to drop (if enabled)
+                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                if shift_held && state.ui_state.shift_drop_enabled {
+                                    commands.push(InputCommand::DropItem {
+                                        slot_index: inv_idx as u8,
+                                        quantity: slot.quantity as u32,
+                                        target_x: None,
+                                        target_y: None,
+                                    });
+                                    audio.play_sfx("item_put");
+                                    return commands;
+                                }
+
+                                // Start drag from the inventory slot
+                                state.ui_state.drag_state = Some(DragState {
+                                    source: DragSource::Inventory(inv_idx),
+                                    item_id: slot.item_id.clone(),
+                                    quantity: slot.quantity,
+                                });
+                                audio.play_sfx("item_grab");
+                                return commands;
+                            }
+                        }
+                        // In spell mode, no drag from spell bar
                     }
                     UiElementId::EquipmentSlot(slot_type) => {
                         // Check if equipment slot has an item
@@ -925,13 +961,36 @@ impl InputHandler {
                     }
                     // Skills panel - clicking Prayer skill opens prayer book
                     UiElementId::SkillSlot(5) => {
-                        // Index 5 is Prayer skill - open prayer book
+                        // Index 5 is Prayer skill - open prayer book on Prayers tab
                         audio.play_sfx("enter");
                         state.ui_state.prayer_book_open = !state.ui_state.prayer_book_open;
                         if state.ui_state.prayer_book_open {
-                            // Close skills panel when opening prayer book
+                            state.ui_state.prayer_spell_tab = 0; // Open to prayers tab
                             state.ui_state.skills_open = false;
                         }
+                    }
+                    UiElementId::SkillSlot(6) => {
+                        // Index 6 is Magic skill - open prayer/spell panel on Spells tab
+                        audio.play_sfx("enter");
+                        state.ui_state.prayer_book_open = !state.ui_state.prayer_book_open;
+                        if state.ui_state.prayer_book_open {
+                            state.ui_state.prayer_spell_tab = 1; // Open to spells tab
+                            state.ui_state.skills_open = false;
+                        }
+                    }
+                    // Prayer/Spell tab switching
+                    UiElementId::PrayerSpellTab(tab_idx) => {
+                        audio.play_sfx("enter");
+                        state.ui_state.prayer_spell_tab = *tab_idx;
+                    }
+                    // Spell slot handlers (spell panel — info only, no drag)
+                    UiElementId::SpellSlot(_slot_idx) => {
+                        audio.play_sfx("enter");
+                    }
+                    // Spell/Item bar toggle button
+                    UiElementId::SpellBarToggle => {
+                        audio.play_sfx("enter");
+                        state.ui_state.spell_bar_active = !state.ui_state.spell_bar_active;
                     }
                     // Prayer panel handlers
                     UiElementId::PrayerSlot(slot_idx) => {
@@ -2644,15 +2703,42 @@ impl InputHandler {
             match element {
                 UiElementId::QuickSlot(idx) => {
                     if mouse_clicked {
-                        commands.push(InputCommand::UseItem { slot_index: *idx as u8 });
+                        if state.ui_state.spell_bar_active {
+                            // Spell mode: cast the spell at this index
+                            let magic_level = state.get_local_player()
+                                .map(|p| p.skills.magic.level)
+                                .unwrap_or(1);
+                            let unlocked_spells: Vec<_> = crate::game::spell::SPELLS.iter()
+                                .filter(|s| magic_level >= s.magic_level_req)
+                                .collect();
+                            if let Some(spell_def) = unlocked_spells.get(*idx) {
+                                commands.push(InputCommand::CastSpell { spell_id: spell_def.id.to_string() });
+                                let cooldown_end = macroquad::time::get_time() + (spell_def.cooldown_ms as f64 / 1000.0);
+                                state.spell_cooldowns.insert(spell_def.id.to_string(), cooldown_end);
+                            }
+                        } else {
+                            // Item mode: use/equip item at inventory slot idx
+                            let slot_idx = *idx;
+                            if let Some(Some(slot)) = state.inventory.slots.get(slot_idx) {
+                                let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
+                                if item_def.equipment.is_some() {
+                                    commands.push(InputCommand::Equip { slot_index: slot_idx as u8 });
+                                } else {
+                                    commands.push(InputCommand::UseItem { slot_index: slot_idx as u8 });
+                                }
+                            }
+                        }
                     } else if mouse_right_clicked {
-                        // Right-click on quick slot opens context menu (if item exists)
-                        if state.inventory.slots.get(*idx).and_then(|s| s.as_ref()).is_some() {
-                            state.ui_state.context_menu = Some(ContextMenu {
-                                target: ContextMenuTarget::InventorySlot(*idx),
-                                x: mx,
-                                y: my,
-                            });
+                        // Right-click on quick slot opens context menu (item mode only)
+                        if !state.ui_state.spell_bar_active {
+                            let inv_idx = *idx;
+                            if state.inventory.slots.get(inv_idx).and_then(|s| s.as_ref()).is_some() {
+                                state.ui_state.context_menu = Some(ContextMenu {
+                                    target: ContextMenuTarget::InventorySlot(inv_idx),
+                                    x: mx,
+                                    y: my,
+                                });
+                            }
                         }
                     }
                     return commands;
@@ -3139,7 +3225,7 @@ impl InputHandler {
             }
         }
 
-        // Use/equip items (1-5 keys for quick slots, disabled in classic mode)
+        // Use/equip items or cast spells (1-5 keys for quick slots, disabled in classic mode)
         let quick_slot_keys = [
             (KeyCode::Key1, 0usize),
             (KeyCode::Key2, 1usize),
@@ -3149,14 +3235,28 @@ impl InputHandler {
         ];
         for (key, slot_idx) in quick_slot_keys {
             if !classic && is_key_pressed(key) {
-                if let Some(Some(slot)) = state.inventory.slots.get(slot_idx) {
-                    let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
-                    if item_def.equipment.is_some() {
-                        // Equippable item - equip it
-                        commands.push(InputCommand::Equip { slot_index: slot_idx as u8 });
-                    } else {
-                        // Not equippable - use it (e.g., consume potion)
-                        commands.push(InputCommand::UseItem { slot_index: slot_idx as u8 });
+                if state.ui_state.spell_bar_active {
+                    // Spell mode: cast the spell at this index
+                    let magic_level = state.get_local_player()
+                        .map(|p| p.skills.magic.level)
+                        .unwrap_or(1);
+                    let unlocked_spells: Vec<_> = crate::game::spell::SPELLS.iter()
+                        .filter(|s| magic_level >= s.magic_level_req)
+                        .collect();
+                    if let Some(spell_def) = unlocked_spells.get(slot_idx) {
+                        commands.push(InputCommand::CastSpell { spell_id: spell_def.id.to_string() });
+                        let cooldown_end = macroquad::time::get_time() + (spell_def.cooldown_ms as f64 / 1000.0);
+                        state.spell_cooldowns.insert(spell_def.id.to_string(), cooldown_end);
+                    }
+                } else {
+                    // Item mode: use/equip from inventory slot directly
+                    if let Some(Some(slot)) = state.inventory.slots.get(slot_idx) {
+                        let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
+                        if item_def.equipment.is_some() {
+                            commands.push(InputCommand::Equip { slot_index: slot_idx as u8 });
+                        } else {
+                            commands.push(InputCommand::UseItem { slot_index: slot_idx as u8 });
+                        }
                     }
                 }
             }

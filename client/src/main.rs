@@ -513,6 +513,8 @@ fn run_game_frame(
             // Prayer commands
             InputCommand::TogglePrayer { prayer_id } => ClientMessage::TogglePrayer { prayer_id: prayer_id.clone() },
             InputCommand::BuryBones { slot } => ClientMessage::BuryBones { slot: *slot as usize },
+            // Spell commands
+            InputCommand::CastSpell { spell_id } => ClientMessage::CastSpell { spell_id: spell_id.clone() },
         };
         network.send(&msg);
     }

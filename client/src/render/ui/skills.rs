@@ -27,13 +27,14 @@ const UI_ICON_SIZE: f32 = 24.0;
 const UI_ICON_COLS: usize = 10;
 
 /// Active skills in display order
-const ACTIVE_SKILLS: [SkillType; 6] = [
+const ACTIVE_SKILLS: [SkillType; 7] = [
     SkillType::Hitpoints,
     SkillType::Combat,
     SkillType::Fishing,
     SkillType::Farming,
     SkillType::Smithing,
     SkillType::Prayer,
+    SkillType::Magic,
 ];
 
 impl Renderer {
@@ -160,6 +161,7 @@ impl Renderer {
                 SkillType::Farming => (4, 6),
                 SkillType::Smithing => (5, 6),
                 SkillType::Prayer => (3, 6),
+                SkillType::Magic => (6, 6),
             };
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
@@ -185,6 +187,7 @@ impl Renderer {
                 SkillType::Farming => "Fm",
                 SkillType::Smithing => "Sm",
                 SkillType::Prayer => "Pr",
+                SkillType::Magic => "Mg",
             };
             let icon_color = self.get_skill_icon_color(skill_type);
             let letter_dims = self.measure_text_sharp(letter, 16.0);
@@ -237,6 +240,7 @@ impl Renderer {
             SkillType::Farming => Color::new(0.3, 0.75, 0.3, 1.0),  // Green
             SkillType::Smithing => Color::new(0.7, 0.5, 0.2, 1.0),  // Bronze/brown
             SkillType::Prayer => Color::new(0.9, 0.9, 0.5, 1.0),    // Light yellow (holy)
+            SkillType::Magic => Color::new(0.4, 0.3, 0.9, 1.0),     // Purple (arcane)
         }
     }
 

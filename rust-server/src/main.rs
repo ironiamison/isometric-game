@@ -46,6 +46,7 @@ mod protocol;
 mod quest;
 mod shop;
 mod skills;
+mod spell;
 mod tilemap;
 mod world;
 
@@ -2437,6 +2438,10 @@ async fn handle_client_message(
         }
         ClientMessage::PrayAtAltar { altar_id } => {
             room.handle_pray_at_altar(player_id, &altar_id).await;
+        }
+        // Spell system messages
+        ClientMessage::CastSpell { spell_id } => {
+            room.handle_cast_spell(player_id, &spell_id).await;
         }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}

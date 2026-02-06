@@ -243,6 +243,16 @@ pub struct DamageEvent {
     pub projectile: Option<String>,
 }
 
+/// Pending spell effect received from server (to be rendered by Task 9)
+pub struct SpellEffect {
+    pub caster_id: String,
+    pub target_id: Option<String>,
+    pub spell_id: String,
+    pub target_x: i32,
+    pub target_y: i32,
+    pub time: f64,
+}
+
 /// Active projectile for ranged attack visualization
 pub struct Projectile {
     pub sprite: String,
@@ -663,6 +673,10 @@ pub struct UiState {
     pub inventory_scrollbar_drag_last_y: f32,
     // Control scheme: false = Modern (WASD+Space+Enter), true = Classic (Arrows+Ctrl+always-on chat)
     pub classic_controls: bool,
+    /// Active tab in the prayer/spell panel: 0 = Prayers, 1 = Spells
+    pub prayer_spell_tab: usize,
+    /// Whether the spell bar is active (true) or item bar (false)
+    pub spell_bar_active: bool,
 }
 
 impl Default for UiState {
@@ -756,6 +770,8 @@ impl Default for UiState {
             inventory_scrollbar_dragging: false,
             inventory_scrollbar_drag_last_y: 0.0,
             classic_controls: false,
+            prayer_spell_tab: 0,
+            spell_bar_active: false,
         }
     }
 }
@@ -873,6 +889,12 @@ pub struct GameState {
     /// Social/Friends system state
     pub social_state: SocialState,
 
+    // Spell system state
+    /// Active spell effects for rendering
+    pub spell_effects: Vec<SpellEffect>,
+    /// Spell cooldowns tracked on client for UI feedback
+    pub spell_cooldowns: std::collections::HashMap<String, f64>,  // spell_id -> time when cooldown expires
+
     // Prayer system state
     /// Current prayer points
     pub prayer_points: i32,
@@ -940,6 +962,8 @@ impl GameState {
             last_portal_check_pos: None,
             area_banner: AreaBanner::default(),
             social_state: SocialState::default(),
+            spell_effects: Vec::new(),
+            spell_cooldowns: std::collections::HashMap::new(),
             prayer_points: 0,
             max_prayer_points: 1,
             active_prayers: Vec::new(),
@@ -1081,6 +1105,12 @@ impl GameState {
 
         // Clean up completed projectiles
         self.projectiles.retain(|p| !p.is_complete(current_time));
+
+        // Clean up finished spell effects (max 3 seconds as fallback)
+        self.spell_effects.retain(|effect| {
+            let elapsed = current_time - effect.time;
+            elapsed < 3.0
+        });
 
         // Clean up old quest completion events (older than 4 seconds)
         self.ui_state.quest_completed_events.retain(|event| current_time - event.time < 4.0);

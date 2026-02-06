@@ -9,8 +9,9 @@ pub mod pathfinding;
 pub mod shop;
 pub mod skills;
 pub mod prayer;
+pub mod spell;
 
-pub use state::{GameState, Camera, ConnectionStatus, ChatChannel, ChatMessage, ChatBubble, UiState, DamageEvent, LevelUpEvent, SkillXpEvent, XpDropFeed, DialogueChoice, ActiveDialogue, QuestObjective, ActiveQuest, QuestCompletedEvent, ContextMenu, ContextMenuTarget, GoldDropDialog, DragState, DragSource, DoubleClickState, Announcement, FrameTimings, Projectile, TransitionState, MapTransition, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FriendInfo, PendingRequestInfo, OnlinePlayerInfo, SocialTab, SocialState};
+pub use state::{GameState, Camera, ConnectionStatus, ChatChannel, ChatMessage, ChatBubble, UiState, DamageEvent, LevelUpEvent, SkillXpEvent, XpDropFeed, DialogueChoice, ActiveDialogue, QuestObjective, ActiveQuest, QuestCompletedEvent, ContextMenu, ContextMenuTarget, GoldDropDialog, DragState, DragSource, DoubleClickState, Announcement, FrameTimings, Projectile, TransitionState, MapTransition, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FriendInfo, PendingRequestInfo, OnlinePlayerInfo, SocialTab, SocialState, SpellEffect};
 pub use entities::{Player, Direction};
 pub use tilemap::{Tilemap, TilemapLayer, LayerType};
 pub use npc::{Npc, NpcState};

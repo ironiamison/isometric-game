@@ -290,6 +290,7 @@ impl Renderer {
                 SkillType::Farming => (4, 6),
                 SkillType::Smithing => (4, 6),
                 SkillType::Prayer => (3, 6),
+                SkillType::Magic => (6, 6),
             };
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
@@ -312,6 +313,7 @@ impl Renderer {
                 SkillType::Farming => "Fm",
                 SkillType::Smithing => "Sm",
                 SkillType::Prayer => "Pr",
+                SkillType::Magic => "Mg",
             };
             let color = self.get_xp_globe_skill_color(skill_type);
             let dims = self.measure_text_sharp(letter, 18.0);
@@ -333,6 +335,7 @@ impl Renderer {
             SkillType::Farming => Color::new(0.3, 0.75, 0.3, 1.0),
             SkillType::Smithing => Color::new(0.7, 0.5, 0.2, 1.0),
             SkillType::Prayer => Color::new(0.9, 0.9, 0.5, 1.0),
+            SkillType::Magic => Color::new(0.4, 0.3, 0.9, 1.0),
         }
     }
 
