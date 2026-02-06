@@ -23,6 +23,15 @@ import { chunkKey, worldToChunk, worldToLocal, localToIndex } from '@/core/coord
 import { BitSet } from '@/core/BitSet';
 import { history } from '@/core/History';
 import { chunkManager } from '@/core/ChunkManager';
+
+// Helper to set a collision bit in a chunk's collision bitset
+function setCollisionBit(chunk: Chunk, localX: number, localY: number, value: boolean): Uint8Array {
+  const index = localY * chunk.width + localX;
+  const bitset = new BitSet(chunk.width * chunk.height);
+  bitset.setRaw(chunk.collision);
+  bitset.set(index, value);
+  return bitset.getRaw();
+}
 import { objectLoader } from '@/core/ObjectLoader';
 import { storage } from '@/core/Storage';
 import { interiorStorage } from '@/core/InteriorStorage';
@@ -859,19 +868,30 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     history.push({
       type: 'addMapObject',
       description: `Add map object ${objectId}`,
-      undo: () => get().removeMapObject(chunkCoord, newObject.id),
+      undo: () => {
+        // Remove object and clear collision
+        get().updateChunk(chunkCoord, (c) => ({
+          ...c,
+          mapObjects: c.mapObjects.filter((o) => o.id !== newObject.id),
+          collision: setCollisionBit(c, local.lx, local.ly, false),
+          dirty: true,
+        }));
+      },
       redo: () => {
         get().updateChunk(chunkCoord, (c) => ({
           ...c,
           mapObjects: [...c.mapObjects, newObject],
+          collision: setCollisionBit(c, local.lx, local.ly, true),
           dirty: true,
         }));
       },
     });
 
+    // Add object and auto-set collision
     get().updateChunk(chunkCoord, (c) => ({
       ...c,
       mapObjects: [...c.mapObjects, newObject],
+      collision: setCollisionBit(c, local.lx, local.ly, true),
       dirty: true,
     }));
 
@@ -885,6 +905,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     const obj = chunk.mapObjects.find((o) => o.id === objectSpawnId);
     if (!obj) return;
 
+    const shouldClearCollision = !obj.noCollision;
+
     history.push({
       type: 'removeMapObject',
       description: `Remove map object`,
@@ -892,6 +914,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         get().updateChunk(chunkCoord, (c) => ({
           ...c,
           mapObjects: [...c.mapObjects, obj],
+          collision: shouldClearCollision ? setCollisionBit(c, obj.x, obj.y, true) : c.collision,
           dirty: true,
         }));
       },
@@ -901,6 +924,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     get().updateChunk(chunkCoord, (c) => ({
       ...c,
       mapObjects: c.mapObjects.filter((o) => o.id !== objectSpawnId),
+      collision: shouldClearCollision ? setCollisionBit(c, obj.x, obj.y, false) : c.collision,
       dirty: true,
     }));
   },
@@ -915,6 +939,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     const oldObject = { ...chunk.mapObjects[objectIndex] };
     const newObject = { ...oldObject, ...updates };
 
+    // If noCollision is being toggled, update the collision bitset
+    const collisionChanged = 'noCollision' in updates && updates.noCollision !== oldObject.noCollision;
+
     history.push({
       type: 'updateMapObject',
       description: `Update map object`,
@@ -925,6 +952,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     get().updateChunk(chunkCoord, (c) => ({
       ...c,
       mapObjects: c.mapObjects.map((o, i) => (i === objectIndex ? newObject : o)),
+      collision: collisionChanged
+        ? setCollisionBit(c, oldObject.x, oldObject.y, !newObject.noCollision)
+        : c.collision,
       dirty: true,
     }));
   },
@@ -944,6 +974,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       // Remove existing wall (toggle off)
       const removedWall = chunk.walls[existingIdx];
 
+      // Only clear collision if no other wall remains at this tile
+      const otherWallAtTile = chunk.walls.some(
+        (w, i) => i !== existingIdx && w.x === local.lx && w.y === local.ly
+      );
+
       history.push({
         type: 'removeWall',
         description: `Remove wall at ${world.wx},${world.wy} (${edge})`,
@@ -951,13 +986,19 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
           get().updateChunk(chunkCoord, (c) => ({
             ...c,
             walls: [...c.walls, removedWall],
+            collision: setCollisionBit(c, local.lx, local.ly, true),
             dirty: true,
           }));
         },
         redo: () => {
+          const c = get().getChunk(chunkCoord);
+          const stillHasWall = c?.walls.some(
+            (w) => w.id !== removedWall.id && w.x === local.lx && w.y === local.ly
+          );
           get().updateChunk(chunkCoord, (c) => ({
             ...c,
             walls: c.walls.filter((w) => w.id !== removedWall.id),
+            collision: !stillHasWall ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
             dirty: true,
           }));
         },
@@ -966,6 +1007,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       get().updateChunk(chunkCoord, (c) => ({
         ...c,
         walls: c.walls.filter((_, i) => i !== existingIdx),
+        collision: !otherWallAtTile ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
         dirty: true,
       }));
     } else {
@@ -982,9 +1024,14 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         type: 'addWall',
         description: `Add wall at ${world.wx},${world.wy} (${edge})`,
         undo: () => {
+          const c = get().getChunk(chunkCoord);
+          const stillHasWall = c?.walls.some(
+            (w) => w.id !== newWall.id && w.x === local.lx && w.y === local.ly
+          );
           get().updateChunk(chunkCoord, (c) => ({
             ...c,
             walls: c.walls.filter((w) => w.id !== newWall.id),
+            collision: !stillHasWall ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
             dirty: true,
           }));
         },
@@ -992,6 +1039,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
           get().updateChunk(chunkCoord, (c) => ({
             ...c,
             walls: [...c.walls, newWall],
+            collision: setCollisionBit(c, local.lx, local.ly, true),
             dirty: true,
           }));
         },
@@ -1000,6 +1048,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       get().updateChunk(chunkCoord, (c) => ({
         ...c,
         walls: [...c.walls, newWall],
+        collision: setCollisionBit(c, local.lx, local.ly, true),
         dirty: true,
       }));
     }

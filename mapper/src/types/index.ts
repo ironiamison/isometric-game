@@ -131,6 +131,7 @@ export interface MapObject {
   y: number; // Local tile Y within chunk
   width: number; // Sprite width in pixels
   height: number; // Sprite height in pixels
+  noCollision?: boolean; // If true, don't auto-place collision
 }
 
 // Chunk types
@@ -277,6 +278,7 @@ export interface SimplifiedMapObject {
   y: number; // Local tile Y
   width: number;
   height: number;
+  noCollision?: boolean;
 }
 
 // Wall types (edge-aligned walls)

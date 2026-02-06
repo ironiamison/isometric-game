@@ -32,6 +32,7 @@ export function PropertiesPanel() {
     updateEntity,
     removeEntity,
     removeMapObject,
+    updateMapObject,
     updatePortal,
     removePortal,
     removeGatheringZone,
@@ -536,6 +537,10 @@ export function PropertiesPanel() {
       setSelectedMapObject(null);
     };
 
+    const handleToggleCollision = (noCollision: boolean) => {
+      updateMapObject(chunkCoord, object.id, { noCollision });
+    };
+
     return (
       <div className={styles.panel}>
         <div className={styles.title}>Object Properties</div>
@@ -548,6 +553,17 @@ export function PropertiesPanel() {
           <div className={styles.field}>
             <label className={styles.label}>Size</label>
             <div className={styles.value}>{object.width} x {object.height} px</div>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={object.noCollision ?? false}
+                onChange={(e) => handleToggleCollision(e.target.checked)}
+              />
+              No Collision
+            </label>
           </div>
 
           <div className={styles.info}>

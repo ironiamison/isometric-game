@@ -220,6 +220,7 @@ export class ChunkManager {
         y: o.y,
         width: o.width,
         height: o.height,
+        noCollision: o.noCollision,
       })),
       walls: (data.walls || []).map((w, i) => ({
         id: `wall_${i}`,
@@ -386,6 +387,7 @@ export class ChunkManager {
       y: o.y,
       width: o.width,
       height: o.height,
+      ...(o.noCollision ? { noCollision: true } : {}),
     }));
 
     const walls: SimplifiedWall[] = chunk.walls.map((w) => ({
