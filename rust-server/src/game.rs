@@ -427,6 +427,8 @@ impl Player {
         self.move_dx = 0;
         self.move_dy = 0;
         self.target_id = None;
+        // Deactivate all prayers on death
+        self.active_prayers.clear();
     }
 
     pub fn ready_to_respawn(&self, current_time: u64) -> bool {
@@ -441,6 +443,7 @@ impl Player {
         self.x = WORLD_SPAWN_X;
         self.y = WORLD_SPAWN_Y;
         self.hp = self.max_hp(); // Use method since max_hp is now derived from skills
+        self.prayer_points = self.max_prayer_points(); // Restore prayer points on respawn
         self.is_dead = false;
         self.death_time = 0;
         self.target_id = None;
@@ -1709,16 +1712,15 @@ impl GameRoom {
                 let target_name = parts[1];
 
                 let killed = {
+                    let current_time = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
                     let mut players = self.players.write().await;
                     if let Some(player) = players.values_mut().find(|p| p.name.eq_ignore_ascii_case(target_name)) {
                         let id = player.id.clone();
                         let name = player.name.clone();
-                        player.hp = 0;
-                        player.is_dead = true;
-                        player.death_time = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_millis() as u64;
+                        player.die(current_time);
                         Some((id, name))
                     } else {
                         None
@@ -2590,6 +2592,21 @@ impl GameRoom {
                         killer_id: player_id.to_string(),
                     };
                     self.broadcast(death_msg).await;
+
+                    // Send prayer state update to dying player (prayers cleared on death)
+                    let (points, max_points) = {
+                        let players = self.players.read().await;
+                        if let Some(p) = players.get(&target_id) {
+                            (p.prayer_points, p.max_prayer_points())
+                        } else {
+                            (0, 1)
+                        }
+                    };
+                    self.send_to_player(&target_id, ServerMessage::PrayerStateUpdate {
+                        points,
+                        max_points,
+                        active_prayers: vec![],  // Cleared on death
+                    }).await;
                 }
             }
         }
@@ -5419,7 +5436,14 @@ impl GameRoom {
                     if let Some(chair_coords) = player.respawn() {
                         chairs_to_free.push((player.id.clone(), chair_coords));
                     }
-                    respawned_players.push((player.id.clone(), player.x, player.y, player.hp));
+                    respawned_players.push((
+                        player.id.clone(),
+                        player.x,
+                        player.y,
+                        player.hp,
+                        player.prayer_points,
+                        player.max_prayer_points(),
+                    ));
                 }
             }
         }
@@ -5437,9 +5461,16 @@ impl GameRoom {
         }
 
         // Broadcast respawns
-        for (id, x, y, hp) in respawned_players {
+        for (id, x, y, hp, prayer_points, max_prayer_points) in respawned_players {
             tracing::info!("Player {} respawned at ({}, {})", id, x, y);
-            self.broadcast(ServerMessage::PlayerRespawned { id, x, y, hp }).await;
+            self.broadcast(ServerMessage::PlayerRespawned { id: id.clone(), x, y, hp }).await;
+
+            // Send prayer state update with restored prayer points
+            self.send_to_player(&id, ServerMessage::PrayerStateUpdate {
+                points: prayer_points,
+                max_points: max_prayer_points,
+                active_prayers: vec![],  // No active prayers after respawn
+            }).await;
         }
 
         // Collect pending moves (id, target_x, target_y)
@@ -6066,6 +6097,21 @@ impl GameRoom {
                 self.broadcast(ServerMessage::PlayerDied {
                     id: target_id.clone(),
                     killer_id: npc_id.clone(),
+                }).await;
+
+                // Send prayer state update to dying player (prayers cleared on death)
+                let (points, max_points) = {
+                    let players = self.players.read().await;
+                    if let Some(p) = players.get(&target_id) {
+                        (p.prayer_points, p.max_prayer_points())
+                    } else {
+                        (0, 1)
+                    }
+                };
+                self.send_to_player(&target_id, ServerMessage::PrayerStateUpdate {
+                    points,
+                    max_points,
+                    active_prayers: vec![],  // Cleared on death
                 }).await;
             }
         }
