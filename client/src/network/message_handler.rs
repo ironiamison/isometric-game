@@ -739,14 +739,21 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(xp) = extract_i32(value, "smithing_xp") {
                             player.skills.smithing.xp = xp as i64;
                         }
+                        if let Some(level) = extract_i32(value, "prayer_level") {
+                            player.skills.prayer.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "prayer_xp") {
+                            player.skills.prayer.xp = xp as i64;
+                        }
 
-                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}",
+                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}",
                             player_id,
                             player.skills.hitpoints.level,
                             player.skills.combat.level,
                             player.skills.fishing.level,
                             player.skills.farming.level,
-                            player.skills.smithing.level
+                            player.skills.smithing.level,
+                            player.skills.prayer.level
                         );
                     } else {
                         log::warn!("skillsSync: player {} not found in state.players", player_id);
@@ -2172,6 +2179,34 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         channel: ChatChannel::System,
                     });
                 }
+            }
+        }
+
+        // =====================================================================
+        // Prayer System Messages
+        // =====================================================================
+
+        "prayerStateUpdate" => {
+            if let Some(value) = data {
+                let points = extract_i32(value, "points").unwrap_or(0);
+                let max_points = extract_i32(value, "max_points").unwrap_or(1);
+
+                // Parse active prayers array
+                let mut active_prayers = Vec::new();
+                if let Some(prayers_arr) = extract_array(value, "active_prayers") {
+                    for prayer_value in prayers_arr {
+                        if let Some(prayer_id) = prayer_value.as_str() {
+                            active_prayers.push(prayer_id.to_string());
+                        }
+                    }
+                }
+
+                log::info!("Prayer state update: {}/{} points, {} active prayers",
+                    points, max_points, active_prayers.len());
+
+                state.prayer_points = points;
+                state.max_prayer_points = max_points;
+                state.active_prayers = active_prayers;
             }
         }
 

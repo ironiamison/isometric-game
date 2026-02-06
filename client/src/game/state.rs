@@ -870,6 +870,14 @@ pub struct GameState {
 
     /// Social/Friends system state
     pub social_state: SocialState,
+
+    // Prayer system state
+    /// Current prayer points
+    pub prayer_points: i32,
+    /// Maximum prayer points (based on prayer level)
+    pub max_prayer_points: i32,
+    /// Currently active prayers (by prayer ID)
+    pub active_prayers: Vec<String>,
 }
 
 impl GameState {
@@ -930,6 +938,9 @@ impl GameState {
             last_portal_check_pos: None,
             area_banner: AreaBanner::default(),
             social_state: SocialState::default(),
+            prayer_points: 0,
+            max_prayer_points: 1,
+            active_prayers: Vec::new(),
         }
     }
 
