@@ -246,6 +246,10 @@ pub struct Player {
     pub discovered_recipes: HashSet<String>,
     /// Active timed crafting operation (None if not crafting)
     pub crafting_state: Option<CraftingState>,
+    /// Current prayer points (drained by active prayers)
+    pub prayer_points: i32,
+    /// Set of currently active prayer IDs
+    pub active_prayers: HashSet<String>,
 }
 
 const PLAYER_RESPAWN_TIME_MS: u64 = 5000; // 5 seconds to respawn
@@ -265,6 +269,7 @@ impl Player {
             last_move_tick: 0,
             direction: Direction::Down,
             hp: skills.hitpoints.level, // HP = Hitpoints level
+            prayer_points: skills.prayer.level, // Prayer points = Prayer level
             skills,
             active: false,
             target_id: None,
@@ -291,12 +296,18 @@ impl Player {
             sitting_at: None,
             discovered_recipes: HashSet::new(),
             crafting_state: None,
+            active_prayers: HashSet::new(),
         }
     }
 
     /// Max HP is determined by Hitpoints skill level
     pub fn max_hp(&self) -> i32 {
         self.skills.hitpoints.level
+    }
+
+    /// Max prayer points is determined by Prayer skill level
+    pub fn max_prayer_points(&self) -> i32 {
+        self.skills.prayer.level
     }
 
     /// Combat level calculated from all combat skills
