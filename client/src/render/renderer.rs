@@ -188,6 +188,8 @@ pub struct Renderer {
     pub(crate) coin_small_icon: Option<Texture2D>,
     /// Farming crop sprite sheets by crop name (e.g., "potato" -> Texture2D)
     farming_sprites: HashMap<String, Texture2D>,
+    /// Prayer icons by prayer id (e.g., "clarity" -> Texture2D)
+    pub(crate) prayer_icons: HashMap<String, Texture2D>,
     /// Material for head+hair composite rendering (shader-based)
     head_hair_material: Option<Material>,
     /// Material for animated water tile rendering (shader-based)
@@ -583,6 +585,26 @@ impl Renderer {
         }
         log::info!("Loaded {} farming sprites", farming_sprites.len());
 
+        // Load prayer icons
+        let prayer_names = [
+            "clarity", "thick_skin", "burst_of_strength", "improved_clarity",
+            "rock_skin", "superhuman_strength", "resourcefulness", "rapid_heal",
+            "steel_skin", "incredible_clarity", "ultimate_strength", "protection",
+            "greater_resourcefulness", "greater_protection",
+        ];
+        let mut prayer_icons = HashMap::new();
+        for prayer in &prayer_names {
+            let path = asset_path(&format!("assets/ui/prayers/{}.png", prayer));
+            match load_texture(&path).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    prayer_icons.insert(prayer.to_string(), tex);
+                }
+                Err(_) => {}
+            }
+        }
+        log::info!("Loaded {} prayer icons", prayer_icons.len());
+
         set_loading!("Loading shaders...");
 
         // Load head+hair composite shader material
@@ -690,6 +712,7 @@ impl Renderer {
             chat_small_icon,
             coin_small_icon,
             farming_sprites,
+            prayer_icons,
             head_hair_material,
             water_material,
             water_overlay_material,

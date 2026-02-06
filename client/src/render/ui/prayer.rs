@@ -113,7 +113,7 @@ impl Renderer {
             let is_locked = prayer_level < prayer.level_req;
             let has_points = state.prayer_points > 0;
 
-            self.draw_prayer_slot(slot_x, slot_y, slot_size, prayer, i, is_locked, is_active, is_hovered, has_points, scale);
+            self.draw_prayer_slot(slot_x, slot_y, slot_size, prayer, is_locked, is_active, is_hovered, has_points, scale);
         }
 
         // Prayer points bar
@@ -129,7 +129,6 @@ impl Renderer {
         y: f32,
         size: f32,
         prayer: &PrayerDef,
-        prayer_index: usize,
         is_locked: bool,
         is_active: bool,
         is_hovered: bool,
@@ -192,74 +191,41 @@ impl Renderer {
             Color::new(0.7, 0.7, 0.7, 1.0)
         };
 
-        // Draw icon from ui_icons sprite sheet
-        self.draw_prayer_icon(icon_x, icon_y, icon_size, prayer_index, icon_color);
+        // Draw prayer icon from individual texture
+        self.draw_prayer_icon(icon_x, icon_y, icon_size, prayer.id, icon_color);
 
         // Level requirement in corner (if locked)
         if is_locked {
             let level_text = format!("{}", prayer.level_req);
-            let text_dims = self.measure_text_sharp(&level_text, 12.0);
+            let text_dims = self.measure_text_sharp(&level_text, 16.0);
             let level_x = x + size - text_dims.width - 2.0;
             let level_y = y + size - 2.0;
 
             // Shadow
-            self.draw_text_sharp(&level_text, level_x + 1.0, level_y + 1.0, 12.0, Color::new(0.0, 0.0, 0.0, 0.8));
+            self.draw_text_sharp(&level_text, level_x + 1.0, level_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
             // Text (red for locked)
-            self.draw_text_sharp(&level_text, level_x, level_y, 12.0, Color::new(0.8, 0.3, 0.3, 1.0));
+            self.draw_text_sharp(&level_text, level_x, level_y, 16.0, Color::new(0.8, 0.3, 0.3, 1.0));
         }
     }
 
-    /// Draw prayer icon from ui_icons sprite sheet
-    /// Each prayer gets a unique icon from the sprite sheet grid
-    fn draw_prayer_icon(&self, x: f32, y: f32, size: f32, prayer_index: usize, color: Color) {
-        const UI_ICON_SIZE: f32 = 24.0;
-
-        // Map each prayer to a unique icon position in the ui_icons sprite sheet (10 cols)
-        // Using various icons from the sprite sheet for visual variety
-        let icon_positions: [(i32, i32); 14] = [
-            (0, 0), // clarity - top left area
-            (1, 0), // thick_skin
-            (2, 0), // burst_of_strength
-            (3, 0), // improved_clarity
-            (4, 0), // rock_skin
-            (0, 1), // superhuman_strength
-            (1, 1), // resourcefulness
-            (2, 1), // rapid_heal
-            (3, 1), // steel_skin
-            (4, 1), // incredible_clarity
-            (0, 2), // ultimate_strength
-            (1, 2), // protection
-            (2, 2), // greater_resourcefulness
-            (3, 2), // greater_protection
-        ];
-
-        let (icon_col, icon_row) = if prayer_index < icon_positions.len() {
-            icon_positions[prayer_index]
-        } else {
-            (0, 0) // fallback
-        };
-
-        if let Some(ref texture) = self.ui_icons {
-            let src_x = icon_col as f32 * UI_ICON_SIZE;
-            let src_y = icon_row as f32 * UI_ICON_SIZE;
-            let src_rect = Rect::new(src_x, src_y, UI_ICON_SIZE, UI_ICON_SIZE);
-
+    /// Draw prayer icon from individual texture file
+    fn draw_prayer_icon(&self, x: f32, y: f32, size: f32, prayer_id: &str, color: Color) {
+        if let Some(texture) = self.prayer_icons.get(prayer_id) {
             draw_texture_ex(
                 texture,
                 x,
                 y,
                 color,
                 DrawTextureParams {
-                    source: Some(src_rect),
                     dest_size: Some(Vec2::new(size, size)),
                     ..Default::default()
                 },
             );
         } else {
-            // Fallback: draw first letter of prayer category
+            // Fallback: draw "?" if texture not found
             let cx = x + size / 2.0;
             let cy = y + size / 2.0;
-            self.draw_text_sharp("?", cx - 4.0, cy + 4.0, 14.0, color);
+            self.draw_text_sharp("?", cx - 4.0, cy + 4.0, 16.0, color);
         }
     }
 
@@ -339,10 +305,10 @@ impl Renderer {
 
         // Calculate tooltip size
         let padding = 8.0;
-        let line_height = 18.0;
-        let font_size = 14.0;
+        let line_height = 20.0;
+        let font_size = 16.0;
 
-        let name_dims = self.measure_text_sharp(name, 16.0);
+        let name_dims = self.measure_text_sharp(name, font_size);
         let level_dims = self.measure_text_sharp(&level_text, font_size);
         let desc_dims = self.measure_text_sharp(prayer.description, font_size);
         let status_dims = self.measure_text_sharp(&status_text, font_size);
@@ -365,11 +331,11 @@ impl Renderer {
         draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
 
         // Draw text
-        let mut text_y = tooltip_y + padding + 12.0;
+        let mut text_y = tooltip_y + padding + 14.0;
 
         // Prayer name (colored by category)
         let name_color = if is_locked { TEXT_DIM } else { category_color(prayer.category) };
-        self.draw_text_sharp(name, tooltip_x + padding, text_y, 16.0, name_color);
+        self.draw_text_sharp(name, tooltip_x + padding, text_y, font_size, name_color);
         text_y += line_height;
 
         // Level
