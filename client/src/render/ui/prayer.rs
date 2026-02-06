@@ -279,7 +279,7 @@ impl Renderer {
         draw_line(x + 2.0, y + 2.0, x + size - 2.0, y + 2.0, 2.0, SLOT_INNER_SHADOW);
         draw_line(x + 2.0, y + 2.0, x + 2.0, y + size - 2.0, 2.0, SLOT_INNER_SHADOW);
 
-        // Draw spell icon - colored square with initials as fallback
+        // Draw spell icon from texture
         let icon_size = 20.0 * scale;
         let icon_x = x + (size - icon_size) / 2.0;
         let icon_y = y + (size - icon_size) / 2.0;
@@ -287,25 +287,31 @@ impl Renderer {
         let icon_color = if is_locked {
             Color::new(0.3, 0.28, 0.35, 1.0)
         } else {
-            SPELL_COLOR
+            WHITE
         };
 
-        // Draw colored square background for the icon
-        let icon_bg = if is_locked {
-            Color::new(0.08, 0.07, 0.12, 1.0)
+        // Draw spell icon from texture or fallback to initials
+        if let Some(texture) = self.spell_icons.get(spell.id) {
+            draw_texture_ex(
+                texture,
+                icon_x,
+                icon_y,
+                icon_color,
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(icon_size, icon_size)),
+                    ..Default::default()
+                },
+            );
         } else {
-            Color::new(0.15, 0.10, 0.30, 1.0)
-        };
-        draw_rectangle(icon_x, icon_y, icon_size, icon_size, icon_bg);
-
-        // Draw the spell's initials as icon
-        let initials: String = spell.name.split_whitespace()
-            .map(|w| w.chars().next().unwrap_or('?'))
-            .collect();
-        let initial_dims = self.measure_text_sharp(&initials, 14.0);
-        let initial_x = icon_x + (icon_size - initial_dims.width) / 2.0;
-        let initial_y = icon_y + (icon_size + 10.0) / 2.0;
-        self.draw_text_sharp(&initials, initial_x, initial_y, 14.0, icon_color);
+            // Fallback: draw initials if texture not found
+            let initials: String = spell.name.split_whitespace()
+                .map(|w| w.chars().next().unwrap_or('?'))
+                .collect();
+            let initial_dims = self.measure_text_sharp(&initials, 14.0);
+            let initial_x = icon_x + (icon_size - initial_dims.width) / 2.0;
+            let initial_y = icon_y + (icon_size + 10.0) / 2.0;
+            self.draw_text_sharp(&initials, initial_x, initial_y, 14.0, icon_color);
+        }
 
         // Mana cost in bottom-right corner
         let cost_text = format!("{}", spell.mana_cost);

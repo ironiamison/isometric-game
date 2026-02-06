@@ -190,6 +190,8 @@ pub struct Renderer {
     farming_sprites: HashMap<String, Texture2D>,
     /// Prayer icons by prayer id (e.g., "clarity" -> Texture2D)
     pub(crate) prayer_icons: HashMap<String, Texture2D>,
+    /// Spell icons by spell id (e.g., "dark_hand" -> Texture2D)
+    pub(crate) spell_icons: HashMap<String, Texture2D>,
     /// Spell effect sprite sheets by effect name (e.g., "dark_hand" -> Texture2D)
     spell_effect_textures: HashMap<String, Texture2D>,
     /// Material for head+hair composite rendering (shader-based)
@@ -607,6 +609,25 @@ impl Renderer {
         }
         log::info!("Loaded {} prayer icons", prayer_icons.len());
 
+        // Load spell icons (spell_id -> icon_filename mapping)
+        let spell_icon_mappings = [
+            ("dark_hand", "dark_hand"),
+            ("dark_eater", "dark_eater"),
+            ("heal", "self_heal"),
+        ];
+        let mut spell_icons = HashMap::new();
+        for (spell_id, icon_name) in &spell_icon_mappings {
+            let path = asset_path(&format!("assets/ui/spells/{}.png", icon_name));
+            match load_texture(&path).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    spell_icons.insert(spell_id.to_string(), tex);
+                }
+                Err(_) => {}
+            }
+        }
+        log::info!("Loaded {} spell icons", spell_icons.len());
+
         // Load spell effect sprite sheets
         let mut spell_effect_textures: HashMap<String, Texture2D> = HashMap::new();
         for name in &["dark_hand", "dark_eater", "self_heal", "bubbles_warp"] {
@@ -726,6 +747,7 @@ impl Renderer {
             coin_small_icon,
             farming_sprites,
             prayer_icons,
+            spell_icons,
             spell_effect_textures,
             head_hair_material,
             water_material,
