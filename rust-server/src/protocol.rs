@@ -145,6 +145,16 @@ pub enum ClientMessage {
     /// Request list of all online players
     #[serde(rename = "getOnlinePlayers")]
     GetOnlinePlayers,
+
+    // ===== Prayer System Messages =====
+
+    /// Toggle a prayer on/off
+    #[serde(rename = "togglePrayer")]
+    TogglePrayer { prayer_id: String },
+
+    /// Bury bones from inventory slot
+    #[serde(rename = "buryBones")]
+    BuryBones { slot: usize },
 }
 
 // ============================================================================
@@ -248,6 +258,8 @@ pub enum ServerMessage {
         farming_xp: i64,
         smithing_level: i32,
         smithing_xp: i64,
+        prayer_level: i32,
+        prayer_xp: i64,
     },
     ItemDropped {
         id: String,
@@ -578,6 +590,15 @@ pub enum ServerMessage {
         items_gained: Vec<(String, u32)>,
         xp_gained: u32,
     },
+
+    // ===== Prayer System Messages =====
+
+    /// Update client on prayer state (points and active prayers)
+    PrayerStateUpdate {
+        points: i32,
+        max_points: i32,
+        active_prayers: Vec<String>,
+    },
 }
 
 /// Farming patch data for client synchronization
@@ -853,6 +874,8 @@ impl ServerMessage {
             ServerMessage::CraftingStarted { .. } => "craftingStarted",
             ServerMessage::CraftingCancelled { .. } => "craftingCancelled",
             ServerMessage::CraftingCompleted { .. } => "craftingCompleted",
+            // Prayer system messages
+            ServerMessage::PrayerStateUpdate { .. } => "prayerStateUpdate",
         }
     }
 }
@@ -1286,6 +1309,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             farming_xp,
             smithing_level,
             smithing_xp,
+            prayer_level,
+            prayer_xp,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -1331,6 +1356,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("smithing_xp".into()),
                 Value::Integer((*smithing_xp).into()),
+            ));
+            map.push((
+                Value::String("prayer_level".into()),
+                Value::Integer((*prayer_level as i64).into()),
+            ));
+            map.push((
+                Value::String("prayer_xp".into()),
+                Value::Integer((*prayer_xp).into()),
             ));
             Value::Map(map)
         }
@@ -2300,6 +2333,16 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("xp_gained".into()), Value::Integer((*xp_gained as i64).into())));
             Value::Map(map)
         }
+        ServerMessage::PrayerStateUpdate { points, max_points, active_prayers } => {
+            let mut map = Vec::new();
+            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
+            map.push((Value::String("max_points".into()), Value::Integer((*max_points as i64).into())));
+            let prayer_values: Vec<Value> = active_prayers.iter()
+                .map(|p| Value::String(p.clone().into()))
+                .collect();
+            map.push((Value::String("active_prayers".into()), Value::Array(prayer_values)));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -2524,6 +2567,15 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::RemoveFriend { friend_id })
         }
         "getOnlinePlayers" => Ok(ClientMessage::GetOnlinePlayers),
+        // Prayer system messages
+        "togglePrayer" => {
+            let prayer_id = extract_string(msg_data, "prayer_id").unwrap_or_default();
+            Ok(ClientMessage::TogglePrayer { prayer_id })
+        }
+        "buryBones" => {
+            let slot = extract_i64(msg_data, "slot").unwrap_or(0) as usize;
+            Ok(ClientMessage::BuryBones { slot })
+        }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }

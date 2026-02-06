@@ -1303,6 +1303,8 @@ impl GameRoom {
             farming_xp: p.skills.farming.xp,
             smithing_level: p.skills.smithing.level,
             smithing_xp: p.skills.smithing.xp,
+            prayer_level: p.skills.prayer.level,
+            prayer_xp: p.skills.prayer.xp,
         })
     }
 
@@ -6874,5 +6876,21 @@ impl GameRoom {
                 }).await;
             }
         }
+    }
+
+    // =========================================================================
+    // Prayer System
+    // =========================================================================
+
+    /// Handle toggling a prayer on/off
+    pub async fn handle_toggle_prayer(&self, player_id: &str, prayer_id: &str) {
+        // TODO: Implement prayer toggle logic (Task #4)
+        tracing::debug!("Player {} toggling prayer: {}", player_id, prayer_id);
+    }
+
+    /// Handle burying bones from inventory
+    pub async fn handle_bury_bones(&self, player_id: &str, slot: usize) {
+        // TODO: Implement bone burying logic (Task #6)
+        tracing::debug!("Player {} burying bones from slot: {}", player_id, slot);
     }
 }

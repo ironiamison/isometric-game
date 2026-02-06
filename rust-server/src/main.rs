@@ -2415,6 +2415,13 @@ async fn handle_client_message(
         ClientMessage::GetOnlinePlayers => {
             room.handle_get_online_players(player_id).await;
         }
+        // Prayer system messages
+        ClientMessage::TogglePrayer { prayer_id } => {
+            room.handle_toggle_prayer(player_id, &prayer_id).await;
+        }
+        ClientMessage::BuryBones { slot } => {
+            room.handle_bury_bones(player_id, slot).await;
+        }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
     }
