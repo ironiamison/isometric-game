@@ -589,9 +589,9 @@ impl Database {
         }).collect())
     }
 
-    /// Check if a character name is already taken (globally unique)
+    /// Check if a character name is already taken (case-insensitive, globally unique)
     pub async fn is_character_name_taken(&self, name: &str) -> Result<bool, sqlx::Error> {
-        let row = sqlx::query("SELECT COUNT(*) as count FROM characters WHERE name = ?")
+        let row = sqlx::query("SELECT COUNT(*) as count FROM characters WHERE LOWER(name) = LOWER(?)")
             .bind(name)
             .fetch_one(&self.pool)
             .await?;
@@ -636,6 +636,13 @@ impl Database {
             if color < 0 || color > 9 {
                 return Err(format!("Invalid hair color: {} (must be 0-9)", color));
             }
+        }
+
+        // Check if name is already taken (case-insensitive)
+        match self.is_character_name_taken(name).await {
+            Ok(true) => return Err("Character name already exists".to_string()),
+            Ok(false) => {}
+            Err(e) => return Err(format!("Database error checking name: {}", e)),
         }
 
         // Starting equipment for new characters (Tier 0 Cursed Lands gear)
