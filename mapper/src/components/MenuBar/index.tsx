@@ -45,6 +45,7 @@ export function MenuBar() {
   } = useEditorStore();
 
   const importInputRef = useRef<HTMLInputElement>(null);
+  const importChunkInputRef = useRef<HTMLInputElement>(null);
 
   // Store the directory handle for reuse
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -438,6 +439,96 @@ export function MenuBar() {
     switchToOverworld();
   };
 
+  const handleImportChunk = () => {
+    importChunkInputRef.current?.click();
+  };
+
+  const handleImportChunkFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Try to extract coord from the data or filename
+      let coord: { cx: number; cy: number } | null = null;
+
+      // Check if data has coord embedded
+      if (data.coord && typeof data.coord.cx === 'number' && typeof data.coord.cy === 'number') {
+        coord = { cx: data.coord.cx, cy: data.coord.cy };
+      }
+
+      // Try to extract from filename (e.g., "chunk_1_-2.json" or "1_-2.json")
+      if (!coord) {
+        const match = file.name.match(/(?:chunk_)?(-?\d+)_(-?\d+)\.json$/);
+        if (match) {
+          coord = { cx: parseInt(match[1]), cy: parseInt(match[2]) };
+        }
+      }
+
+      if (!coord) {
+        const input = window.prompt(
+          'Could not detect chunk coordinates from file.\n\nEnter coordinates as "cx,cy" (e.g., "0,0" or "-1,2"):'
+        );
+        if (!input) {
+          e.target.value = '';
+          return;
+        }
+        const parts = input.split(',').map((s) => parseInt(s.trim()));
+        if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+          alert('Invalid coordinates. Expected format: cx,cy');
+          e.target.value = '';
+          return;
+        }
+        coord = { cx: parts[0], cy: parts[1] };
+      }
+
+      const existingChunk = chunks.get(`${coord.cx},${coord.cy}`);
+      const action = existingChunk ? 'replace' : 'add';
+
+      const confirmed = window.confirm(
+        `This will ${action} chunk (${coord.cx}, ${coord.cy}).\n\nContinue?`
+      );
+      if (!confirmed) {
+        e.target.value = '';
+        return;
+      }
+
+      // Parse chunk data
+      const chunk = chunkManager.parseChunkFromData(data, coord);
+      chunk.dirty = true;
+
+      // Update the store
+      const newChunks = new Map(chunks);
+      newChunks.set(`${coord.cx},${coord.cy}`, chunk);
+      setChunks(newChunks, false);
+
+      // Recalculate bounds
+      let minCx = Infinity, maxCx = -Infinity;
+      let minCy = Infinity, maxCy = -Infinity;
+      for (const c of newChunks.values()) {
+        minCx = Math.min(minCx, c.coord.cx);
+        maxCx = Math.max(maxCx, c.coord.cx);
+        minCy = Math.min(minCy, c.coord.cy);
+        maxCy = Math.max(maxCy, c.coord.cy);
+      }
+      setWorldBounds({
+        minCx: minCx === Infinity ? 0 : minCx,
+        maxCx: maxCx === -Infinity ? 0 : maxCx,
+        minCy: minCy === Infinity ? 0 : minCy,
+        maxCy: maxCy === -Infinity ? 0 : maxCy,
+      });
+
+      alert(`Imported chunk (${coord.cx}, ${coord.cy}) successfully.`);
+    } catch (err) {
+      console.error('Chunk import failed:', err);
+      alert(`Import failed: ${(err as Error).message}`);
+    }
+
+    e.target.value = '';
+  };
+
   const handleResizeInterior = () => {
     if (currentInterior) {
       setResizeWidth(currentInterior.width);
@@ -469,6 +560,13 @@ export function MenuBar() {
         style={{ display: 'none' }}
         onChange={handleImportFile}
       />
+      <input
+        ref={importChunkInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={handleImportChunkFile}
+      />
       <div className={styles.menu}>
         <div className={styles.menuItem}>
           <span className={styles.menuTitle}>File</span>
@@ -493,6 +591,9 @@ export function MenuBar() {
                 </button>
                 <button className={styles.dropdownItem} onClick={handleImportMap}>
                   Import Map (JSON)
+                </button>
+                <button className={styles.dropdownItem} onClick={handleImportChunk}>
+                  Import Chunk (JSON)
                 </button>
                 <div className={styles.separator} />
                 <button className={styles.dropdownItem} onClick={handleResetToServer}>

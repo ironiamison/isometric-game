@@ -34,16 +34,19 @@ export class ChunkManager {
       if (!response.ok) return null;
 
       const data = await response.json();
-
-      // Detect format by checking for version field
-      if ('version' in data && data.version >= 2) {
-        return this.parseSimplifiedFormat(data as SimplifiedChunk, coord);
-      } else {
-        return this.parseTiledFormat(data as TiledMap, coord);
-      }
+      return this.parseChunkFromData(data, coord);
     } catch (error) {
       console.warn(`Failed to load chunk at ${path}:`, error);
       return null;
+    }
+  }
+
+  // Parse a chunk from raw JSON data (auto-detects format)
+  parseChunkFromData(data: Record<string, unknown>, coord: ChunkCoord): Chunk {
+    if ('version' in data && (data.version as number) >= 2) {
+      return this.parseSimplifiedFormat(data as unknown as SimplifiedChunk, coord);
+    } else {
+      return this.parseTiledFormat(data as unknown as TiledMap, coord);
     }
   }
 
