@@ -38,6 +38,10 @@ const REGEN_INTERVAL_MS: u64 = 30000;
 // View distance for StateSync culling (Chebyshev distance in tiles)
 const VIEW_DISTANCE: i32 = 40;
 
+// World spawn point (chunk 0,0) - where players respawn after death
+const WORLD_SPAWN_X: i32 = 15;
+const WORLD_SPAWN_Y: i32 = 4;
+
 // ============================================================================
 // NPC Speech Helper
 // ============================================================================
@@ -417,8 +421,9 @@ impl Player {
     /// so the caller can free the chair
     pub fn respawn(&mut self) -> Option<(i32, i32)> {
         let chair_to_free = self.sitting_at.take();
-        self.x = self.spawn_x;
-        self.y = self.spawn_y;
+        // Always respawn at the world spawn point (chunk 0,0), not where they logged in
+        self.x = WORLD_SPAWN_X;
+        self.y = WORLD_SPAWN_Y;
         self.hp = self.max_hp(); // Use method since max_hp is now derived from skills
         self.is_dead = false;
         self.death_time = 0;
