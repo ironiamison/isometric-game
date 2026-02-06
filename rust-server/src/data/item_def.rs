@@ -115,6 +115,7 @@ pub struct EquipmentStats {
 pub enum UseEffect {
     Heal { amount: i32 },
     RestoreMana { amount: i32 },
+    RestorePrayer { amount: i32 },
     Buff {
         stat: String,
         amount: i32,

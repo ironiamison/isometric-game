@@ -3486,6 +3486,15 @@ impl GameRoom {
                                 // Mana not implemented yet
                                 format!("mana:{}", amount)
                             }
+                            Some(UseEffect::RestorePrayer { amount }) => {
+                                // Prayer potion formula: amount + floor(prayer_level / 4)
+                                let prayer_level = player.skills.prayer.level;
+                                let restore_amount = amount + (prayer_level / 4);
+                                let old_points = player.prayer_points;
+                                player.prayer_points = (player.prayer_points + restore_amount).min(player.max_prayer_points());
+                                let actual_restored = player.prayer_points - old_points;
+                                format!("prayer:{}", actual_restored)
+                            }
                             Some(UseEffect::Buff { stat, amount, duration_ms }) => {
                                 // Buffs not implemented yet
                                 format!("buff:{}:{}:{}", stat, amount, duration_ms)

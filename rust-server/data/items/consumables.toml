@@ -80,3 +80,20 @@ amount = 25
 # [mana_potion.use_effect]
 # type = "restore_mana"
 # amount = 20
+
+# ============================================================================
+# Prayer Consumables
+# ============================================================================
+
+[prayer_potion]
+display_name = "Prayer Potion"
+sprite = "item_prayer_potion"
+description = "Restores 7 + floor(level/4) prayer points when consumed."
+category = "consumable"
+max_stack = 10
+base_price = 50
+sellable = true
+
+[prayer_potion.use_effect]
+type = "restore_prayer"
+amount = 7
