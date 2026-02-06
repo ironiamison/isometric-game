@@ -157,7 +157,7 @@ impl Renderer {
                 SkillType::Combat => (2, 6),
                 SkillType::Fishing => (4, 6),
                 SkillType::Farming => (4, 6),
-                SkillType::Smithing => (4, 6),
+                SkillType::Smithing => (5, 6),
             };
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
