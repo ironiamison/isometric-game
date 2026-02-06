@@ -5,24 +5,37 @@ import { interiorStorage } from '@/core/InteriorStorage';
 import type { EntitySpawn, Portal, ExitPortal } from '@/types';
 import styles from './PropertiesPanel.module.css';
 
+const GATHERING_ZONE_TYPES = [
+  { id: 'pond', label: 'Pond (Fishing Lv 1)' },
+  { id: 'river', label: 'River (Fishing Lv 15)' },
+  { id: 'ocean', label: 'Ocean (Fishing Lv 40)' },
+];
+
 export function PropertiesPanel() {
   const {
     chunks,
+    activeTool,
     selectedEntitySpawn,
     selectedMapObject,
     selectedPortal,
+    selectedGatheringZone,
+    selectedGatheringZoneId,
     selectedExitPortal,
     currentInterior,
     availableInteriors,
     setSelectedEntitySpawn,
     setSelectedMapObject,
     setSelectedPortal,
+    setSelectedGatheringZone,
+    setSelectedGatheringZoneId,
     setSelectedExitPortal,
     updateEntity,
     removeEntity,
     removeMapObject,
     updatePortal,
     removePortal,
+    removeGatheringZone,
+    updateGatheringZone,
     updateExitPortal,
     removeExitPortal,
     jumpToPortalTarget,
@@ -73,10 +86,23 @@ export function PropertiesPanel() {
     return portal;
   };
 
+  // Get the actual gathering zone from the selection
+  const getSelectedGatheringZoneData = () => {
+    if (!selectedGatheringZone) return null;
+    const chunk = chunks.get(
+      `${selectedGatheringZone.chunkCoord.cx},${selectedGatheringZone.chunkCoord.cy}`
+    );
+    if (!chunk || !chunk.gatheringZones) return null;
+    const zone = chunk.gatheringZones.find((g) => g.id === selectedGatheringZone.zoneId);
+    if (!zone) return null;
+    return { zone, chunkCoord: selectedGatheringZone.chunkCoord };
+  };
+
   const selectedEntity = getSelectedEntity();
   const selectedObject = getSelectedObject();
   const selectedPortalData = getSelectedPortalData();
   const selectedExitPortalData = getSelectedExitPortalData();
+  const selectedGatheringZoneData = getSelectedGatheringZoneData();
 
   // Delete key handler
   useEffect(() => {
@@ -98,6 +124,10 @@ export function PropertiesPanel() {
           e.preventDefault();
           removePortal(selectedPortalData.chunkCoord, selectedPortalData.portal.id);
           setSelectedPortal(null);
+        } else if (selectedGatheringZoneData) {
+          e.preventDefault();
+          removeGatheringZone(selectedGatheringZoneData.chunkCoord, selectedGatheringZoneData.zone.id);
+          setSelectedGatheringZone(null);
         } else if (selectedExitPortalData) {
           e.preventDefault();
           removeExitPortal(selectedExitPortalData.id);
@@ -108,7 +138,7 @@ export function PropertiesPanel() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity, selectedObject, selectedPortalData, selectedExitPortalData, removeEntity, removeMapObject, removePortal, removeExitPortal, setSelectedEntitySpawn, setSelectedMapObject, setSelectedPortal, setSelectedExitPortal]);
+  }, [selectedEntity, selectedObject, selectedPortalData, selectedGatheringZoneData, selectedExitPortalData, removeEntity, removeMapObject, removePortal, removeGatheringZone, removeExitPortal, setSelectedEntitySpawn, setSelectedMapObject, setSelectedPortal, setSelectedGatheringZone, setSelectedExitPortal]);
 
   // Show portal properties
   if (selectedPortalData) {
@@ -342,6 +372,58 @@ export function PropertiesPanel() {
     );
   }
 
+  // Show gathering zone properties
+  if (selectedGatheringZoneData) {
+    const { zone, chunkCoord } = selectedGatheringZoneData;
+
+    const worldX = chunkCoord.cx * 32 + zone.x;
+    const worldY = chunkCoord.cy * 32 + zone.y;
+
+    const handleZoneTypeChange = (newZoneId: string) => {
+      updateGatheringZone(chunkCoord, zone.id, { zoneId: newZoneId });
+    };
+
+    const handleDeleteZone = () => {
+      removeGatheringZone(chunkCoord, zone.id);
+      setSelectedGatheringZone(null);
+    };
+
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>Gathering Zone</div>
+        <div className={styles.content}>
+          <div className={styles.field}>
+            <label className={styles.label}>Zone Type</label>
+            <select
+              className={styles.select}
+              value={zone.zoneId}
+              onChange={(e) => handleZoneTypeChange(e.target.value)}
+            >
+              {GATHERING_ZONE_TYPES.map((zt) => (
+                <option key={zt.id} value={zt.id}>{zt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.info}>
+            Position: {worldX}, {worldY}
+            <br />
+            Chunk: {chunkCoord.cx}, {chunkCoord.cy}
+            <br />
+            Local: {zone.x}, {zone.y}
+          </div>
+
+          <div className={styles.actions}>
+            <button className={styles.deleteButton} onClick={handleDeleteZone}>
+              Delete Zone
+            </button>
+          </div>
+          <div className={styles.hint}>Press Delete to remove</div>
+        </div>
+      </div>
+    );
+  }
+
   // Show entity properties
   if (selectedEntity) {
     const { spawn, chunkCoord } = selectedEntity;
@@ -480,6 +562,30 @@ export function PropertiesPanel() {
             </button>
           </div>
           <div className={styles.hint}>Press Delete to remove</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show zone type selector when gathering tool is active
+  if (activeTool === 'gatheringZone') {
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>Gathering Zone</div>
+        <div className={styles.content}>
+          <div className={styles.field}>
+            <label className={styles.label}>Place Zone Type</label>
+            <select
+              className={styles.select}
+              value={selectedGatheringZoneId}
+              onChange={(e) => setSelectedGatheringZoneId(e.target.value)}
+            >
+              {GATHERING_ZONE_TYPES.map((zt) => (
+                <option key={zt.id} value={zt.id}>{zt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.hint}>Click tiles to place zones. Click existing zones to edit.</div>
         </div>
       </div>
     );

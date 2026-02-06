@@ -273,6 +273,25 @@ function App() {
         case 'p':
           store.setActiveTool('portal');
           break;
+        case 'f':
+          store.setActiveTool('gatheringZone');
+          break;
+        case 'd':
+          store.setActiveTool('wallDown');
+          break;
+        case 'r':
+          store.setActiveTool('wallRight');
+          break;
+        case 's':
+          if (store.editorMode === 'interior') {
+            store.setActiveTool('spawnPoint');
+          }
+          break;
+        case 'x':
+          if (store.editorMode === 'interior') {
+            store.setActiveTool('exitPortal');
+          }
+          break;
         case 'i':
           store.setActiveTool('eyedropper');
           break;

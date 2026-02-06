@@ -48,6 +48,8 @@ export function Canvas() {
     removeMapObject,
     addPortal,
     toggleGatheringZone,
+    findGatheringZoneAtWorld,
+    setSelectedGatheringZone,
     setSelectedTileId,
     findEntityAtWorld,
     setSelectedEntitySpawn,
@@ -533,7 +535,16 @@ export function Canvas() {
           break;
         }
         case Tool.GatheringZone: {
-          toggleGatheringZone(worldTile);
+          const existingZone = findGatheringZoneAtWorld(worldTile);
+          if (existingZone) {
+            setSelectedGatheringZone({
+              chunkCoord: existingZone.chunkCoord,
+              zoneId: existingZone.zone.id,
+            });
+          } else {
+            toggleGatheringZone(worldTile);
+            setSelectedGatheringZone(null);
+          }
           break;
         }
       }
@@ -558,6 +569,8 @@ export function Canvas() {
       removeMapObject,
       addPortal,
       toggleGatheringZone,
+      findGatheringZoneAtWorld,
+      setSelectedGatheringZone,
       setSelectedTileId,
       findEntityAtWorld,
       setSelectedEntitySpawn,

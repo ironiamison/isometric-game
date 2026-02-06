@@ -74,6 +74,7 @@ interface EditorState {
   selectedEntitySpawn: { chunkCoord: ChunkCoord; spawnId: string } | null;
   selectedMapObject: { chunkCoord: ChunkCoord; objectId: string } | null;
   selectedPortal: { chunkCoord: ChunkCoord; portalId: string } | null;
+  selectedGatheringZone: { chunkCoord: ChunkCoord; zoneId: string } | null;
 
   // Magic wand tile selection
   selectedTiles: Set<string>; // Set of "wx,wy" coordinate strings
@@ -130,9 +131,11 @@ interface EditorActions {
   setSelectedEntitySpawn: (selection: { chunkCoord: ChunkCoord; spawnId: string } | null) => void;
   setSelectedMapObject: (selection: { chunkCoord: ChunkCoord; objectId: string } | null) => void;
   setSelectedPortal: (selection: { chunkCoord: ChunkCoord; portalId: string } | null) => void;
+  setSelectedGatheringZone: (selection: { chunkCoord: ChunkCoord; zoneId: string } | null) => void;
   findEntityAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; entity: EntitySpawn } | null;
   findMapObjectAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; object: MapObject } | null;
   findPortalAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; portal: Portal } | null;
+  findGatheringZoneAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; zone: GatheringZone } | null;
 
   // Tile editing actions
   setTile: (world: WorldCoord, layer: Layer, tileId: number) => void;
@@ -166,6 +169,8 @@ interface EditorActions {
   selectedGatheringZoneId: string;
   toggleGatheringZone: (world: WorldCoord) => void;
   setSelectedGatheringZoneId: (zoneId: string) => void;
+  removeGatheringZone: (chunkCoord: ChunkCoord, zoneId: string) => void;
+  updateGatheringZone: (chunkCoord: ChunkCoord, zoneId: string, updates: Partial<GatheringZone>) => void;
 
   // Asset actions
   setTilesets: (tilesets: Tileset[]) => void;
@@ -281,6 +286,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   selectedEntitySpawn: null,
   selectedMapObject: null,
   selectedPortal: null,
+  selectedGatheringZone: null,
   selectedGatheringZoneId: 'pond',
   selectedTiles: new Set(),
 
@@ -378,6 +384,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   setSelectedEntitySpawn: (selection) => set({ selectedEntitySpawn: selection }),
   setSelectedMapObject: (selection) => set({ selectedMapObject: selection }),
   setSelectedPortal: (selection) => set({ selectedPortal: selection }),
+  setSelectedGatheringZone: (selection) => set({ selectedGatheringZone: selection }),
 
   findEntityAtWorld: (world) => {
     const chunkCoord = worldToChunk(world);
@@ -420,6 +427,19 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     });
     if (portal) {
       return { chunkCoord, portal };
+    }
+    return null;
+  },
+
+  findGatheringZoneAtWorld: (world) => {
+    const chunkCoord = worldToChunk(world);
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk || !chunk.gatheringZones) return null;
+
+    const local = worldToLocal(world);
+    const zone = chunk.gatheringZones.find((g) => g.x === local.lx && g.y === local.ly);
+    if (zone) {
+      return { chunkCoord, zone };
     }
     return null;
   },
@@ -1145,6 +1165,62 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   setSelectedGatheringZoneId: (zoneId) => set({ selectedGatheringZoneId: zoneId }),
 
+  removeGatheringZone: (chunkCoord, zoneId) => {
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk) return;
+
+    const existing = (chunk.gatheringZones || []).find((g) => g.id === zoneId);
+    if (!existing) return;
+
+    history.push({
+      type: 'removeGatheringZone',
+      description: `Remove gathering zone '${existing.zoneId}'`,
+      undo: () => {
+        get().updateChunk(chunkCoord, (c) => ({
+          ...c,
+          gatheringZones: [...(c.gatheringZones || []), existing],
+          dirty: true,
+        }));
+      },
+      redo: () => get().removeGatheringZone(chunkCoord, zoneId),
+    });
+
+    get().updateChunk(chunkCoord, (c) => ({
+      ...c,
+      gatheringZones: (c.gatheringZones || []).filter((g) => g.id !== zoneId),
+      dirty: true,
+    }));
+    set({ selectedGatheringZone: null });
+  },
+
+  updateGatheringZone: (chunkCoord, zoneId, updates) => {
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk) return;
+
+    const existing = (chunk.gatheringZones || []).find((g) => g.id === zoneId);
+    if (!existing) return;
+
+    const oldValues: Partial<GatheringZone> = {};
+    for (const key of Object.keys(updates) as (keyof GatheringZone)[]) {
+      oldValues[key] = existing[key] as never;
+    }
+
+    history.push({
+      type: 'updateGatheringZone',
+      description: `Update gathering zone`,
+      undo: () => get().updateGatheringZone(chunkCoord, zoneId, oldValues),
+      redo: () => get().updateGatheringZone(chunkCoord, zoneId, updates),
+    });
+
+    get().updateChunk(chunkCoord, (c) => ({
+      ...c,
+      gatheringZones: (c.gatheringZones || []).map((g) =>
+        g.id === zoneId ? { ...g, ...updates } : g
+      ),
+      dirty: true,
+    }));
+  },
+
   // Asset actions
   setTilesets: (tilesets) => set({ tilesets }),
   setEntityRegistry: (registry) => set({ entityRegistry: registry }),
@@ -1246,6 +1322,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       availableInteriors: interiorStorage.getInteriorIds(),
       // Clear overworld selections when entering interior
       selectedPortal: null,
+      selectedGatheringZone: null,
       selectedEntitySpawn: null,
       selectedMapObject: null,
       viewport: {
