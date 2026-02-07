@@ -36,9 +36,6 @@
       249,
       249,
       249,
-      382,
-      398,
-      418,
       249,
       249,
       249,
@@ -68,9 +65,6 @@
       249,
       249,
       249,
-      381,
-      382,
-      398,
       249,
       249,
       249,
@@ -100,9 +94,15 @@
       249,
       249,
       249,
-      383,
-      383,
-      383,
+      249,
+      249,
+      249,
+      249,
+      249,
+      249,
+      249,
+      249,
+      249,
       249,
       249,
       249,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAFQAAQiAAAAA1AAAAAAAAAAEAAAABAAAAAQAAAAEAAIAEAAAABwAAAIIAAAABAAAAAQAkAAEAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAIAAAAAAAAAAAgAAABAAAAAQAAAAAAAIA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3591,27 +3591,6 @@
       "y": 23,
       "width": 48,
       "height": 61
-    },
-    {
-      "gid": 1741,
-      "x": 22,
-      "y": 0,
-      "width": 64,
-      "height": 32
-    },
-    {
-      "gid": 1741,
-      "x": 23,
-      "y": 3,
-      "width": 64,
-      "height": 32
-    },
-    {
-      "gid": 1741,
-      "x": 18,
-      "y": 1,
-      "width": 64,
-      "height": 32
     }
   ],
   "walls": [],
