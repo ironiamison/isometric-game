@@ -1577,42 +1577,84 @@ impl GameRoom {
                 }
             }
             "/setlevel" => {
-                // /setlevel <level> - Sets all combat skills to the given level
-                use crate::skills::Skill;
+                // /setlevel <skill> <level> - Sets a specific skill to the given level
+                // /setlevel <level> - Sets all skills to the given level
+                use crate::skills::{Skill, SkillType};
 
                 if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /setlevel <level>").await;
+                    self.send_system_message(player_id, "Usage: /setlevel <skill> <level> or /setlevel <level>").await;
                     return;
                 }
 
-                let level: i32 = match parts[1].parse() {
-                    Ok(l) if l >= 1 && l <= 99 => l,
-                    _ => {
-                        self.send_system_message(player_id, "Level must be between 1 and 99").await;
-                        return;
-                    }
+                let (skill_type, level) = if parts.len() >= 3 {
+                    // /setlevel <skill> <level>
+                    let skill_type = match SkillType::from_str(parts[1]) {
+                        Some(st) => st,
+                        None => {
+                            let valid: Vec<&str> = SkillType::all().iter().map(|s| s.as_str()).collect();
+                            self.send_system_message(player_id, &format!("Unknown skill '{}'. Valid skills: {}", parts[1], valid.join(", "))).await;
+                            return;
+                        }
+                    };
+                    let level: i32 = match parts[2].parse() {
+                        Ok(l) if l >= 1 && l <= 99 => l,
+                        _ => {
+                            self.send_system_message(player_id, "Level must be between 1 and 99").await;
+                            return;
+                        }
+                    };
+                    (Some(skill_type), level)
+                } else {
+                    // /setlevel <level>
+                    let level: i32 = match parts[1].parse() {
+                        Ok(l) if l >= 1 && l <= 99 => l,
+                        _ => {
+                            // Maybe they typed a skill name without a level
+                            if SkillType::from_str(parts[1]).is_some() {
+                                self.send_system_message(player_id, "Usage: /setlevel <skill> <level>").await;
+                            } else {
+                                self.send_system_message(player_id, "Level must be between 1 and 99").await;
+                            }
+                            return;
+                        }
+                    };
+                    (None, level)
                 };
 
-                // Update combat skills and heal to full
                 {
                     let mut players = self.players.write().await;
                     if let Some(player) = players.get_mut(player_id) {
-                        player.skills.hitpoints = Skill::new(level);
-                        player.skills.combat = Skill::new(level);
-                        player.hp = player.max_hp(); // Heal to full
-                        tracing::info!("Player {} set all skills to level {}", player_id, level);
+                        if let Some(st) = skill_type {
+                            *player.skills.get_mut(st) = Skill::new(level);
+                            if st == SkillType::Hitpoints {
+                                player.hp = player.max_hp();
+                            }
+                            tracing::info!("Player {} set {} to level {}", player_id, st.as_str(), level);
+                        } else {
+                            for &st in SkillType::all() {
+                                *player.skills.get_mut(st) = Skill::new(level);
+                            }
+                            player.hp = player.max_hp();
+                            tracing::info!("Player {} set all skills to level {}", player_id, level);
+                        }
                     } else {
                         return;
                     }
                 };
 
-                let combat_level = (level + level) / 2; // (HP + Combat) / 2
-                self.send_system_message(player_id, &format!("Skills set to level {} (Combat Level: {})", level, combat_level)).await;
-                // TODO: Phase 5 will add proper skill level broadcast messages
+                if let Some(st) = skill_type {
+                    self.send_system_message(player_id, &format!("{} set to level {}", st.as_str(), level)).await;
+                } else {
+                    let combat_level = {
+                        let players = self.players.read().await;
+                        players.get(player_id).map(|p| p.skills.combat_level()).unwrap_or(0)
+                    };
+                    self.send_system_message(player_id, &format!("All skills set to level {} (Combat Level: {})", level, combat_level)).await;
+                }
             }
             "/help" => {
                 if is_admin {
-                    self.send_system_message(player_id, "Commands: /give <item> [qty], /setlevel <lvl>, /teleport <x> <y>, /spawn <npc> [x] [y], /heal [player], /kill <player>, /god, /announce <msg>, /items, /help").await;
+                    self.send_system_message(player_id, "Commands: /give <item> [qty], /setlevel [skill] <lvl>, /teleport <x> <y>, /spawn <npc> [x] [y], /heal [player], /kill <player>, /god, /announce <msg>, /items, /help").await;
                 } else {
                     self.send_system_message(player_id, "Commands: /items, /help").await;
                 }
@@ -5942,8 +5984,14 @@ impl GameRoom {
                 let coord = crate::chunk::ChunkCoord::from_world(wx, wy);
                 if let Some(chunk) = chunks_guard.get(&coord) {
                     let (lx, ly) = crate::chunk::world_to_local(wx, wy);
-                    chunk.is_walkable_local(lx, ly)
+                    let walkable = chunk.is_walkable_local(lx, ly);
+                    if !walkable {
+                        tracing::debug!("NPC collision blocked at world ({},{}) -> chunk {:?} local ({},{}) = blocked",
+                            wx, wy, coord, lx, ly);
+                    }
+                    walkable
                 } else {
+                    tracing::warn!("NPC walkable check: chunk {:?} not loaded for world pos ({},{})", coord, wx, wy);
                     false
                 }
             };
