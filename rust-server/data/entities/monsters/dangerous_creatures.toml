@@ -109,6 +109,133 @@ wander_pause_min_ms = 2000
 wander_pause_max_ms = 5000
 
 # =============================================================================
+# Slimes (3 variants, same name, different sprites)
+# =============================================================================
+
+[slime_blue]
+display_name = "Slime"
+sprite = "blob_blue"
+animation_type = "standard"
+description = "A gelatinous blob that oozes through the forest."
+
+[slime_blue.stats]
+level = 1
+max_hp = 12
+damage = 2
+attack_range = 1
+aggro_range = 4
+chase_range = 6
+move_cooldown_ms = 600
+attack_cooldown_ms = 2000
+respawn_time_ms = 10000
+
+[slime_blue.rewards]
+exp_base = 20
+gold_min = 3
+gold_max = 10
+
+[[slime_blue.loot]]
+item_id = "slime_core"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 1
+
+[[slime_blue.loot]]
+item_id = "onion_seed"
+drop_chance = 0.06
+quantity_min = 1
+quantity_max = 1
+
+[slime_blue.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 6000
+
+[slime_green]
+display_name = "Slime"
+sprite = "blob_green"
+animation_type = "standard"
+description = "A gelatinous blob that oozes through the forest."
+
+[slime_green.stats]
+level = 1
+max_hp = 12
+damage = 2
+attack_range = 1
+aggro_range = 4
+chase_range = 6
+move_cooldown_ms = 600
+attack_cooldown_ms = 2000
+respawn_time_ms = 10000
+
+[slime_green.rewards]
+exp_base = 20
+gold_min = 3
+gold_max = 10
+
+[[slime_green.loot]]
+item_id = "slime_core"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 1
+
+[[slime_green.loot]]
+item_id = "onion_seed"
+drop_chance = 0.06
+quantity_min = 1
+quantity_max = 1
+
+[slime_green.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 6000
+
+[slime_pink]
+display_name = "Slime"
+sprite = "blob_pink"
+animation_type = "standard"
+description = "A gelatinous blob that oozes through the forest."
+
+[slime_pink.stats]
+level = 1
+max_hp = 12
+damage = 2
+attack_range = 1
+aggro_range = 4
+chase_range = 6
+move_cooldown_ms = 600
+attack_cooldown_ms = 2000
+respawn_time_ms = 10000
+
+[slime_pink.rewards]
+exp_base = 20
+gold_min = 3
+gold_max = 10
+
+[[slime_pink.loot]]
+item_id = "slime_core"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 1
+
+[[slime_pink.loot]]
+item_id = "onion_seed"
+drop_chance = 0.06
+quantity_min = 1
+quantity_max = 1
+
+[slime_pink.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 6000
+
+# =============================================================================
 # Reaper (Mini-boss)
 # =============================================================================
 

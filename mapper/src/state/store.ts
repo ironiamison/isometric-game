@@ -36,14 +36,32 @@ import { objectLoader } from '@/core/ObjectLoader';
 import { storage } from '@/core/Storage';
 import { interiorStorage } from '@/core/InteriorStorage';
 
-// Debounce helper for auto-save
+// Debounce helper for auto-save (only saves dirty chunks)
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 const debouncedSave = (chunks: Map<string, Chunk>) => {
   if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
-    storage.saveAllChunks(chunks).catch((err) => {
+  saveTimeout = setTimeout(async () => {
+    try {
+      const savedKeys = await storage.saveDirtyChunks(chunks);
+      if (savedKeys.length > 0) {
+        // Mark saved chunks as clean in the store
+        const currentChunks = useEditorStore.getState().chunks;
+        const updated = new Map(currentChunks);
+        let changed = false;
+        for (const key of savedKeys) {
+          const chunk = updated.get(key);
+          if (chunk?.dirty) {
+            updated.set(key, { ...chunk, dirty: false });
+            changed = true;
+          }
+        }
+        if (changed) {
+          useEditorStore.setState({ chunks: updated });
+        }
+      }
+    } catch (err) {
       console.error('Failed to auto-save chunks:', err);
-    });
+    }
   }, 500); // Save 500ms after last change
 };
 
