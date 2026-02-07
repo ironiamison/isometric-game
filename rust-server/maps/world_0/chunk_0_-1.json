@@ -3106,7 +3106,7 @@
       "level": 1
     },
     {
-      "entityId": "farmer_barley",
+      "entityId": "blacksmith",
       "x": 12,
       "y": 6,
       "level": 1
@@ -4303,23 +4303,7 @@
       "y": 24,
       "width": 1,
       "height": 1,
-      "targetMap": "old_house",
-      "targetSpawn": "entrance"
-    },
-    {
-      "x": 4,
-      "y": 10,
-      "width": 1,
-      "height": 1,
-      "targetMap": "old_house",
-      "targetSpawn": "entrance"
-    },
-    {
-      "x": 4,
-      "y": 2,
-      "width": 1,
-      "height": 1,
-      "targetMap": "old_house",
+      "targetMap": "player_house",
       "targetSpawn": "entrance"
     }
   ],
