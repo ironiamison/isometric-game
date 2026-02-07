@@ -1318,15 +1318,14 @@ impl InputHandler {
                     match element {
                         UiElementId::AltarOfferAll(idx) => {
                             let altar_npc_id = state.ui_state.altar_panel.as_ref().unwrap().altar_npc_id.clone();
-                            // Build bone rows to find item_id at index
+                            // Build bone rows to find item_id at index (mirrors renderer logic: dedup by item_id)
                             let mut bone_items: Vec<String> = Vec::new();
-                            let mut seen = std::collections::HashSet::new();
                             for slot in state.inventory.slots.iter().flatten() {
-                                if slot.item_id.contains("bones") && seen.insert(slot.item_id.clone()) {
-                                    let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
-                                    if item_def.prayer_xp > 0 {
-                                        bone_items.push(slot.item_id.clone());
-                                    }
+                                if !slot.item_id.contains("bones") { continue; }
+                                let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
+                                if item_def.prayer_xp <= 0 { continue; }
+                                if !bone_items.contains(&slot.item_id) {
+                                    bone_items.push(slot.item_id.clone());
                                 }
                             }
                             if let Some(item_id) = bone_items.get(*idx) {

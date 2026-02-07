@@ -9,6 +9,7 @@ use super::common::*;
 
 /// Info about a bone type in inventory for display
 struct BoneRow {
+    item_id: String,
     display_name: String,
     quantity: i32,
     xp_per_bone: i32,
@@ -38,11 +39,12 @@ impl Renderer {
             if item_def.prayer_xp <= 0 {
                 continue;
             }
-            // Merge with existing row or create new
-            if let Some(row) = bone_rows.iter_mut().find(|r| r.display_name == item_def.display_name) {
+            // Merge with existing row or create new (dedup by item_id)
+            if let Some(row) = bone_rows.iter_mut().find(|r| r.item_id == slot.item_id) {
                 row.quantity += slot.quantity;
             } else {
                 bone_rows.push(BoneRow {
+                    item_id: slot.item_id.clone(),
                     display_name: item_def.display_name.clone(),
                     quantity: slot.quantity,
                     xp_per_bone: altar_xp_for_bone(&slot.item_id, item_def.prayer_xp),

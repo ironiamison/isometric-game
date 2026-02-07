@@ -8528,6 +8528,26 @@ impl GameRoom {
                 skill: "prayer".to_string(),
                 new_level: xp_result.2,
             }).await;
+
+            // Send updated prayer state with new max points
+            let (points, max_points, active_prayers) = {
+                let players = self.players.read().await;
+                if let Some(player) = players.get(player_id) {
+                    (
+                        player.prayer_points,
+                        player.max_prayer_points(),
+                        player.active_prayers.iter().cloned().collect::<Vec<_>>(),
+                    )
+                } else {
+                    return;
+                }
+            };
+
+            self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
+                points,
+                max_points,
+                active_prayers,
+            }).await;
         }
     }
 }
