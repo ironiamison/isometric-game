@@ -2436,6 +2436,9 @@ async fn handle_client_message(
         ClientMessage::OfferBones { slot, altar_id } => {
             room.handle_offer_bones(player_id, slot, &altar_id).await;
         }
+        ClientMessage::OfferAllBones { item_id, altar_id } => {
+            room.handle_offer_all_bones(player_id, &item_id, &altar_id).await;
+        }
         ClientMessage::PrayAtAltar { altar_id } => {
             room.handle_pray_at_altar(player_id, &altar_id).await;
         }

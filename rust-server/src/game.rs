@@ -8379,4 +8379,155 @@ impl GameRoom {
             }).await;
         }
     }
+
+    pub async fn handle_offer_all_bones(&self, player_id: &str, item_id: &str, altar_id: &str) {
+        tracing::debug!("Player {} offering all {} at altar {}", player_id, item_id, altar_id);
+
+        // Get player position
+        let player_pos = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => (p.x, p.y),
+                _ => return,
+            }
+        };
+
+        // Check if player is in an instance
+        let instance_id = {
+            let instances = self.player_instances.read().await;
+            instances.get(player_id).cloned()
+        };
+
+        // Get altar info and validate it's an altar
+        let altar_info = if let Some(ref _inst_id) = instance_id {
+            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
+                let npcs = instance.npcs.read().await;
+                npcs.get(altar_id).map(|npc| {
+                    let dx = (npc.x - player_pos.0) as f32;
+                    let dy = (npc.y - player_pos.1) as f32;
+                    let distance = (dx * dx + dy * dy).sqrt();
+                    (npc.prototype_id.clone(), distance)
+                })
+            } else {
+                None
+            }
+        } else {
+            let npcs = self.npcs.read().await;
+            npcs.get(altar_id).map(|npc| {
+                let dx = (npc.x - player_pos.0) as f32;
+                let dy = (npc.y - player_pos.1) as f32;
+                let distance = (dx * dx + dy * dy).sqrt();
+                (npc.prototype_id.clone(), distance)
+            })
+        };
+
+        let (entity_type, distance) = match altar_info {
+            Some(info) => info,
+            None => {
+                self.send_system_message(player_id, "Altar not found.").await;
+                return;
+            }
+        };
+
+        if distance > 2.5 {
+            self.send_system_message(player_id, "You need to be closer to the altar.").await;
+            return;
+        }
+
+        let is_altar = self.entity_registry.get(&entity_type)
+            .map(|proto| proto.behaviors.altar)
+            .unwrap_or(false);
+
+        if !is_altar {
+            self.send_system_message(player_id, "That's not an altar.").await;
+            return;
+        }
+
+        // Validate item is bones
+        let (item_name, base_prayer_xp) = match self.item_registry.get(item_id) {
+            Some(def) if def.is_bones() => (def.display_name.clone(), def.prayer_xp),
+            _ => {
+                self.send_system_message(player_id, "You can only offer bones at the altar.").await;
+                return;
+            }
+        };
+
+        // Calculate altar XP per bone (matches handle_offer_bones logic)
+        let altar_xp_per = match item_id {
+            "regular_bones" => 12,
+            "big_bones" => 37,
+            "dragon_bones" => 180,
+            _ => (base_prayer_xp as f32 * 2.5) as i32,
+        };
+
+        // Count and remove all bones of this type, award XP
+        let (total_bones, inv_update, xp_result) = {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+
+            // Count total bones of this type across all slots
+            let mut total = 0i32;
+            for i in 0..player.inventory.slots.len() {
+                if let Some(ref s) = player.inventory.slots[i] {
+                    if s.item_id == item_id {
+                        total += s.quantity;
+                        player.inventory.slots[i] = None;
+                    }
+                }
+            }
+
+            if total == 0 {
+                drop(players);
+                self.send_system_message(player_id, "You don't have any of those bones.").await;
+                return;
+            }
+
+            let total_xp = altar_xp_per as i64 * total as i64;
+            let leveled = player.skills.prayer.add_xp(total_xp);
+            let xp_result = (
+                total_xp,
+                player.skills.prayer.xp,
+                player.skills.prayer.level,
+                leveled,
+            );
+
+            if leveled {
+                player.prayer_points = player.max_prayer_points();
+            }
+
+            let inv_update = (player.inventory.to_update(), player.inventory.gold);
+            (total, inv_update, xp_result)
+        };
+
+        self.send_system_message(player_id, &format!(
+            "The gods are pleased with your offering of {} {}. (+{} Prayer XP)",
+            total_bones, item_name, xp_result.0
+        )).await;
+
+        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: inv_update.0,
+            gold: inv_update.1,
+        }).await;
+
+        self.send_to_player(player_id, ServerMessage::SkillXp {
+            player_id: player_id.to_string(),
+            skill: "prayer".to_string(),
+            xp_gained: xp_result.0,
+            total_xp: xp_result.1,
+            level: xp_result.2,
+        }).await;
+
+        if xp_result.3 {
+            tracing::info!("Player {} leveled up Prayer to {}", player_id, xp_result.2);
+            self.broadcast(ServerMessage::SkillLevelUp {
+                player_id: player_id.to_string(),
+                skill: "prayer".to_string(),
+                new_level: xp_result.2,
+            }).await;
+        }
+    }
 }

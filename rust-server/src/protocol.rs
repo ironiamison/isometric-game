@@ -160,6 +160,10 @@ pub enum ClientMessage {
     #[serde(rename = "offerBones")]
     OfferBones { slot: usize, altar_id: String },
 
+    /// Offer ALL bones of a type at an altar for bonus XP
+    #[serde(rename = "offerAllBones")]
+    OfferAllBones { item_id: String, altar_id: String },
+
     /// Pray at an altar to restore prayer points
     #[serde(rename = "prayAtAltar")]
     PrayAtAltar { altar_id: String },
@@ -2662,6 +2666,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let slot = extract_i64(msg_data, "slot").unwrap_or(0) as usize;
             let altar_id = extract_string(msg_data, "altar_id").unwrap_or_default();
             Ok(ClientMessage::OfferBones { slot, altar_id })
+        }
+        "offerAllBones" => {
+            let item_id = extract_string(msg_data, "item_id").unwrap_or_default();
+            let altar_id = extract_string(msg_data, "altar_id").unwrap_or_default();
+            Ok(ClientMessage::OfferAllBones { item_id, altar_id })
         }
         "prayAtAltar" => {
             let altar_id = extract_string(msg_data, "altar_id").unwrap_or_default();
