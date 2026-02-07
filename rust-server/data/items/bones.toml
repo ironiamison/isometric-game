@@ -3,7 +3,7 @@
 
 [regular_bones]
 display_name = "Bones"
-sprite = "bones"
+sprite = "regular_bones"
 description = "The bones of a creature. Can be buried for Prayer experience."
 category = "material"
 max_stack = 99

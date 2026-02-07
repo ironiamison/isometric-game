@@ -124,6 +124,12 @@ pub enum UiElementId {
     AltarOfferAll(usize),
     AltarPray,
     AltarClose,
+
+    // Prayer/Spell Help
+    PrayerHelpButton,
+    SpellHelpButton,
+    PrayerHelpClose,
+    SpellHelpClose,
 }
 
 /// A single interactive UI element with its bounds

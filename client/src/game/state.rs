@@ -685,6 +685,10 @@ pub struct UiState {
     pub prayer_spell_tab: usize,
     /// Whether the spell bar is active (true) or item bar (false)
     pub spell_bar_active: bool,
+    /// Whether prayer help overlay is open
+    pub prayer_help_open: bool,
+    /// Whether spell help overlay is open
+    pub spell_help_open: bool,
 }
 
 impl Default for UiState {
@@ -781,6 +785,8 @@ impl Default for UiState {
             classic_controls: false,
             prayer_spell_tab: 0,
             spell_bar_active: false,
+            prayer_help_open: false,
+            spell_help_open: false,
         }
     }
 }

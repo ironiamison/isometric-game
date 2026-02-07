@@ -278,6 +278,17 @@ impl Renderer {
             label_color,
         );
 
+        // Pulsing highlight when spell help overlay is open
+        if state.ui_state.spell_help_open {
+            let pulse = 0.5 + 0.5 * (get_time() as f32 * 3.0).sin();
+            let glow_color = Color::new(0.6, 0.4, 0.9, 0.3 + 0.4 * pulse);
+            let border_glow = Color::new(0.7, 0.5, 1.0, 0.6 + 0.4 * pulse);
+            // Outer glow
+            draw_rectangle(btn_x - 3.0, btn_y - 3.0, btn_w + 6.0, btn_h + 6.0, glow_color);
+            // Pulsing border
+            draw_rectangle_lines(btn_x - 2.0, btn_y - 2.0, btn_w + 4.0, btn_h + 4.0, 2.0, border_glow);
+        }
+
         // Tooltip on hover
         if is_hovered {
             let tooltip_text = if state.ui_state.spell_bar_active {

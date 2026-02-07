@@ -37,6 +37,7 @@ pub struct PrototypeStats {
     pub hostile: bool,
     pub is_quest_giver: bool,
     pub is_merchant: bool,
+    pub is_altar: bool,
     pub wander_enabled: bool,
     pub wander_radius: i32,
     pub wander_pause_min_ms: u64,
@@ -110,6 +111,7 @@ impl Npc {
             hostile: prototype.behaviors.hostile,
             is_quest_giver: prototype.behaviors.quest_giver,
             is_merchant: prototype.behaviors.merchant,
+            is_altar: prototype.behaviors.altar,
             wander_enabled: prototype.behaviors.wander_enabled,
             wander_radius: prototype.behaviors.wander_radius,
             wander_pause_min_ms: prototype.behaviors.wander_pause_min_ms,
@@ -189,10 +191,14 @@ impl Npc {
         self.stats.is_merchant
     }
 
+    pub fn is_altar(&self) -> bool {
+        self.stats.is_altar
+    }
+
     /// Returns true if this NPC can be attacked by players.
-    /// Quest givers and merchants cannot be attacked.
+    /// Quest givers, merchants, and altars cannot be attacked.
     pub fn is_attackable(&self) -> bool {
-        !self.stats.is_quest_giver && !self.stats.is_merchant
+        !self.stats.is_quest_giver && !self.stats.is_merchant && !self.stats.is_altar
     }
 
     pub fn name(&self) -> String {
@@ -630,6 +636,8 @@ pub struct NpcUpdate {
     pub is_quest_giver: bool,
     /// Whether this NPC is a merchant
     pub is_merchant: bool,
+    /// Whether this NPC is an altar
+    pub is_altar: bool,
     /// Movement speed in tiles per second (for client interpolation)
     pub move_speed: f32,
     /// True only on the tick when this NPC attacks (for animation sync)
@@ -660,6 +668,7 @@ impl From<&Npc> for NpcUpdate {
             hostile: npc.is_hostile(),
             is_quest_giver: npc.is_quest_giver(),
             is_merchant: npc.is_merchant(),
+            is_altar: npc.is_altar(),
             move_speed,
             just_attacked: npc.just_attacked,
         }

@@ -442,7 +442,7 @@ impl InputHandler {
                                                 // Find altar NPC at this tile
                                                 let mut altar_id = None;
                                                 for (npc_id, npc) in &state.npcs {
-                                                    if npc.entity_type.contains("altar")
+                                                    if npc.is_altar
                                                         && npc.x.round() as i32 == tile_x
                                                         && npc.y.round() as i32 == tile_y
                                                     {
@@ -1009,10 +1009,29 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                         }
                     }
+                    // Prayer/Spell help buttons
+                    UiElementId::PrayerHelpButton => {
+                        audio.play_sfx("enter");
+                        state.ui_state.prayer_help_open = true;
+                    }
+                    UiElementId::SpellHelpButton => {
+                        audio.play_sfx("enter");
+                        state.ui_state.spell_help_open = true;
+                    }
+                    UiElementId::PrayerHelpClose => {
+                        audio.play_sfx("enter");
+                        state.ui_state.prayer_help_open = false;
+                    }
+                    UiElementId::SpellHelpClose => {
+                        audio.play_sfx("enter");
+                        state.ui_state.spell_help_open = false;
+                    }
                     // Prayer/Spell tab switching
                     UiElementId::PrayerSpellTab(tab_idx) => {
                         audio.play_sfx("enter");
                         state.ui_state.prayer_spell_tab = *tab_idx;
+                        state.ui_state.prayer_help_open = false;
+                        state.ui_state.spell_help_open = false;
                     }
                     // Spell slot handlers (spell panel — info only, no drag)
                     UiElementId::SpellSlot(_slot_idx) => {
@@ -2690,7 +2709,7 @@ impl InputHandler {
                     if let Some(ref npc_id) = path_state.interact_target {
                         // Check if target is an altar
                         if let Some(npc) = state.npcs.get(npc_id) {
-                            if npc.entity_type.contains("altar") {
+                            if npc.is_altar {
                                 state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
                                     altar_npc_id: npc_id.clone(),
                                     altar_name: npc.display_name.clone(),
@@ -3003,7 +3022,7 @@ impl InputHandler {
 
                                 if dist_to_player < INTERACT_RANGE {
                                     // Check if NPC is an altar - open altar panel instead of dialogue
-                                    if npc.entity_type.contains("altar") {
+                                    if npc.is_altar {
                                         state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
                                             altar_npc_id: npc_id.clone(),
                                             altar_name: npc.display_name.clone(),
@@ -3455,7 +3474,7 @@ impl InputHandler {
                         log::info!("Interacting with NPC: {}", npc_id);
                         // Check if NPC is an altar - open altar panel instead of dialogue
                         if let Some(npc) = state.npcs.get(&npc_id) {
-                            if npc.entity_type.contains("altar") {
+                            if npc.is_altar {
                                 state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
                                     altar_npc_id: npc_id.clone(),
                                     altar_name: npc.display_name.clone(),

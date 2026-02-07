@@ -3239,7 +3239,12 @@ impl Renderer {
             highlight_color.b *= tint_color.b;
             highlight_color.a *= tint_color.a;
 
-            let wobble = (macroquad::time::get_time() * 4.0 + npc.animation.frame as f64).sin() as f32;
+            // Only animate wobble for hostile/moving NPCs; static NPCs (altars etc.) stay still
+            let wobble = if npc.is_hostile() {
+                (macroquad::time::get_time() * 4.0 + npc.animation.frame as f64).sin() as f32
+            } else {
+                0.0
+            };
             let radius = (10.0 + wobble * 1.5) * zoom;
             let height_offset = (8.0 + wobble * 2.0) * zoom;
 
@@ -4655,6 +4660,9 @@ impl Renderer {
         if let Some(ref panel) = state.ui_state.altar_panel {
             self.render_altar_panel(panel, state, hovered, &mut layout);
         }
+
+        // Prayer/Spell help overlay (on top of panels)
+        self.render_prayer_help_overlay(state, hovered, &mut layout);
 
         // Render context menu on top of everything
         if let Some(ref context_menu) = state.ui_state.context_menu {

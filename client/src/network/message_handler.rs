@@ -359,6 +359,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let hostile = extract_bool(npc_value, "hostile").unwrap_or(true);
                         let is_quest_giver = extract_bool(npc_value, "is_quest_giver").unwrap_or(false);
                         let is_merchant = extract_bool(npc_value, "is_merchant").unwrap_or(false);
+                        let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
                         let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
 
                         if let Some(npc) = state.npcs.get_mut(&id) {
@@ -392,6 +393,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.hostile = hostile;
                             npc.is_quest_giver = is_quest_giver;
                             npc.is_merchant = is_merchant;
+                            npc.is_altar = is_altar;
                             npc.move_speed = move_speed;
                         } else {
                             // New NPC - add to state
@@ -405,6 +407,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.hostile = hostile;
                             npc.is_quest_giver = is_quest_giver;
                             npc.is_merchant = is_merchant;
+                            npc.is_altar = is_altar;
                             npc.move_speed = move_speed;
                             state.npcs.insert(id, npc);
                         }

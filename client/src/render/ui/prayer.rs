@@ -96,6 +96,35 @@ impl Renderer {
         let text_x = header_x + (header_w - text_dims.width) / 2.0;
         self.draw_text_sharp(header_text, text_x, header_y + (header_height + 12.0) / 2.0, 16.0, TEXT_TITLE);
 
+        // Help button (?) in header right side
+        let help_btn_size = (header_height - 4.0).min(18.0 * scale);
+        let help_btn_x = header_x + header_w - help_btn_size - 4.0 * scale;
+        let help_btn_y = header_y + (header_height - help_btn_size) / 2.0;
+        let help_id = if active_tab == 0 { UiElementId::PrayerHelpButton } else { UiElementId::SpellHelpButton };
+        layout.add(help_id.clone(), Rect::new(help_btn_x, help_btn_y, help_btn_size, help_btn_size));
+
+        let help_hovered = matches!(hovered, Some(id) if *id == help_id);
+        let help_bg = if help_hovered {
+            Color::new(0.25, 0.22, 0.30, 1.0)
+        } else {
+            Color::new(0.15, 0.13, 0.18, 1.0)
+        };
+        let help_border = if help_hovered {
+            Color::new(0.6, 0.55, 0.7, 1.0)
+        } else {
+            Color::new(0.35, 0.32, 0.40, 1.0)
+        };
+        draw_rectangle(help_btn_x, help_btn_y, help_btn_size, help_btn_size, help_border);
+        draw_rectangle(help_btn_x + 1.0, help_btn_y + 1.0, help_btn_size - 2.0, help_btn_size - 2.0, help_bg);
+        let q_dims = self.measure_text_sharp("?", 14.0);
+        self.draw_text_sharp(
+            "?",
+            help_btn_x + (help_btn_size - q_dims.width) / 2.0,
+            help_btn_y + (help_btn_size + 10.0) / 2.0,
+            14.0,
+            if help_hovered { TEXT_TITLE } else { TEXT_DIM },
+        );
+
         // Tab bar below header
         let tab_y = header_y + header_height;
         let tab_w = header_w / 2.0;
@@ -628,6 +657,131 @@ impl Renderer {
         // Status
         let status_color = if is_active { Color::new(0.3, 0.8, 0.3, 1.0) } else { TEXT_DIM };
         self.draw_text_sharp(&status_text, (tooltip_x + padding).floor(), text_y, font_size, status_color);
+    }
+
+    /// Render prayer or spell help overlay if open
+    pub(crate) fn render_prayer_help_overlay(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+        if !state.ui_state.prayer_book_open {
+            return;
+        }
+        if state.ui_state.prayer_help_open {
+            self.draw_help_overlay(state, hovered, layout, true);
+        } else if state.ui_state.spell_help_open {
+            self.draw_help_overlay(state, hovered, layout, false);
+        }
+    }
+
+    /// Draw the help overlay panel
+    fn draw_help_overlay(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+        is_prayer: bool,
+    ) {
+        let (screen_w, screen_h) = virtual_screen_size();
+        let scale = state.ui_state.ui_scale;
+
+        let overlay_w = (220.0 * scale).min(screen_w - 20.0);
+        let font_size = 14.0;
+        let line_height = 18.0;
+        let padding = 10.0 * scale;
+        let section_gap = 6.0;
+
+        let lines: Vec<(&str, Color)> = if is_prayer {
+            vec![
+                ("How Prayers Work", TEXT_TITLE),
+                ("", TEXT_NORMAL),
+                ("Activate prayers by clicking them", TEXT_NORMAL),
+                ("in the grid. Active prayers glow.", TEXT_NORMAL),
+                ("", TEXT_NORMAL),
+                ("Prayer Drain", Color::new(0.2, 0.7, 0.8, 1.0)),
+                ("Active prayers drain your prayer", TEXT_NORMAL),
+                ("points over time. Stronger prayers", TEXT_NORMAL),
+                ("drain faster. When points hit 0,", TEXT_NORMAL),
+                ("all prayers deactivate.", TEXT_NORMAL),
+                ("", TEXT_NORMAL),
+                ("Categories", Color::new(0.8, 0.7, 0.2, 1.0)),
+                ("Only one prayer per category can", TEXT_NORMAL),
+                ("be active. Activating a new one", TEXT_NORMAL),
+                ("replaces the old one in that group.", TEXT_NORMAL),
+                ("", TEXT_NORMAL),
+                ("Restoring Points", Color::new(0.3, 0.8, 0.3, 1.0)),
+                ("Pray at an altar or use bone", TEXT_NORMAL),
+                ("offerings to restore prayer points.", TEXT_NORMAL),
+            ]
+        } else {
+            vec![
+                ("How Spells Work", TEXT_TITLE),
+                ("", TEXT_NORMAL),
+                ("Using Spells", SPELL_COLOR),
+                ("Switch to the spell hotkey bar", TEXT_NORMAL),
+                ("using the toggle button (left of", TEXT_NORMAL),
+                ("the hotkey bar). Then press 1-5", TEXT_NORMAL),
+                ("or click a spell to cast it.", TEXT_NORMAL),
+                ("", TEXT_NORMAL),
+                ("Mana", Color::new(0.4, 0.5, 0.9, 1.0)),
+                ("Each spell costs mana to cast.", TEXT_NORMAL),
+                ("Max mana = 10 + Magic level x 2.", TEXT_NORMAL),
+                ("Mana regenerates 1 point every", TEXT_NORMAL),
+                ("3 seconds automatically.", TEXT_NORMAL),
+                ("", TEXT_NORMAL),
+                ("Cooldowns", Color::new(0.8, 0.6, 0.2, 1.0)),
+                ("After casting, spells go on cooldown", TEXT_NORMAL),
+                ("shown as a dark overlay with a timer.", TEXT_NORMAL),
+                ("Slots turn red when you lack mana.", TEXT_NORMAL),
+            ]
+        };
+
+        let content_height = lines.len() as f32 * line_height + section_gap;
+        let close_btn_height = 22.0 * scale;
+        let overlay_h = padding * 2.0 + content_height + close_btn_height + 4.0;
+
+        // Center the overlay on screen
+        let overlay_x = ((screen_w - overlay_w) / 2.0).floor();
+        let overlay_y = ((screen_h - overlay_h) / 2.0).floor();
+
+        // Dim background
+        draw_rectangle(0.0, 0.0, screen_w, screen_h, Color::new(0.0, 0.0, 0.0, 0.5));
+
+        // Panel frame
+        let accent = if is_prayer {
+            Color::new(0.2, 0.7, 0.8, 1.0)
+        } else {
+            SPELL_COLOR
+        };
+        draw_rectangle(overlay_x - 2.0, overlay_y - 2.0, overlay_w + 4.0, overlay_h + 4.0, accent);
+        draw_rectangle(overlay_x - 1.0, overlay_y - 1.0, overlay_w + 2.0, overlay_h + 2.0, TOOLTIP_FRAME);
+        draw_rectangle(overlay_x, overlay_y, overlay_w, overlay_h, TOOLTIP_BG);
+
+        // Draw text lines
+        let mut text_y = overlay_y + padding + 12.0;
+        for (text, color) in &lines {
+            if !text.is_empty() {
+                self.draw_text_sharp(text, (overlay_x + padding).floor(), text_y.floor(), font_size, *color);
+            }
+            text_y += line_height;
+        }
+        text_y += section_gap;
+
+        // Close button
+        let close_text = "Got it!";
+        let close_dims = self.measure_text_sharp(close_text, 14.0);
+        let close_btn_w = (close_dims.width + 20.0 * scale).min(overlay_w - padding * 2.0);
+        let close_btn_x = overlay_x + (overlay_w - close_btn_w) / 2.0;
+        let close_btn_y = text_y;
+
+        let close_id = if is_prayer { UiElementId::PrayerHelpClose } else { UiElementId::SpellHelpClose };
+        layout.add(close_id.clone(), Rect::new(close_btn_x, close_btn_y, close_btn_w, close_btn_height));
+
+        let close_hovered = matches!(hovered, Some(id) if *id == close_id);
+        let close_bg = if close_hovered { accent } else { Color::new(0.15, 0.13, 0.18, 1.0) };
+        let close_text_color = if close_hovered { Color::new(0.05, 0.05, 0.07, 1.0) } else { accent };
+
+        draw_rectangle(close_btn_x, close_btn_y, close_btn_w, close_btn_height, Color::new(0.3, 0.28, 0.35, 1.0));
+        draw_rectangle(close_btn_x + 1.0, close_btn_y + 1.0, close_btn_w - 2.0, close_btn_height - 2.0, close_bg);
+        let close_text_x = close_btn_x + (close_btn_w - close_dims.width) / 2.0;
+        self.draw_text_sharp(close_text, close_text_x.floor(), (close_btn_y + (close_btn_height + 10.0) / 2.0).floor(), 14.0, close_text_color);
     }
 
     /// Render tooltip for a spell slot
