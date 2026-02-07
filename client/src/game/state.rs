@@ -602,7 +602,7 @@ pub struct UiState {
     pub crafting_recipe_id: Option<String>,
     pub crafting_progress: f32,
     pub crafting_duration_ms: u64,
-    pub crafting_started_at: Option<std::time::Instant>,
+    pub crafting_started_at: Option<f64>,
     // Crafting completion animation: (recipe_id, timer_0_to_1)
     pub crafting_complete_animation: Option<(String, f32)>,
     // Shop UI state
@@ -1136,7 +1136,7 @@ impl GameState {
         // Update crafting progress (Task 14)
         if self.ui_state.crafting_in_progress {
             if let Some(started) = self.ui_state.crafting_started_at {
-                let elapsed = started.elapsed().as_millis() as f32;
+                let elapsed = ((macroquad::time::get_time() - started) * 1000.0) as f32;
                 let duration = self.ui_state.crafting_duration_ms as f32;
                 if duration > 0.0 {
                     self.ui_state.crafting_progress = (elapsed / duration).min(1.0);

@@ -1431,7 +1431,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.crafting_in_progress = true;
                 state.ui_state.crafting_recipe_id = Some(recipe_id);
                 state.ui_state.crafting_duration_ms = duration_ms;
-                state.ui_state.crafting_started_at = Some(std::time::Instant::now());
+                state.ui_state.crafting_started_at = Some(macroquad::time::get_time());
                 state.ui_state.crafting_progress = 0.0;
             }
         }
