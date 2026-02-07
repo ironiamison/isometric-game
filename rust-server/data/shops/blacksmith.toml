@@ -29,15 +29,6 @@ max_quantity = 3
 restock_rate = 1
 
 # Existing items
-[[stock]]
-item_id = "goblin_spear"
-max_quantity = 3
-restock_rate = 1
-
-[[stock]]
-item_id = "peasant_suit"
-max_quantity = 10
-restock_rate = 1
 
 [[stock]]
 item_id = "training_gloves"
@@ -45,6 +36,11 @@ max_quantity = 10
 restock_rate = 1
 
 [[stock]]
-item_id = "peasant_boots"
+item_id = "training_boots"
 max_quantity = 4
+restock_rate = 1
+
+[[stock]]
+item_id = "gutter_blade"
+max_quantity = 1
 restock_rate = 1

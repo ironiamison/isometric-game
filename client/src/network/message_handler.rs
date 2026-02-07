@@ -76,6 +76,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.server_tick = tick;
                 }
 
+                // Discard stale StateSyncs from a different map context.
+                // This prevents instance NPCs (e.g. Elder Mara) from appearing
+                // in the overworld when a StateSync races with a map transition.
+                let sync_instance = extract_string(value, "instanceId").unwrap_or_default();
+                let current_instance = state.current_instance.clone().unwrap_or_default();
+                if sync_instance != current_instance {
+                    // Context mismatch — skip this entire StateSync
+                    return;
+                }
+
                 // Update players (grid positions from server)
                 let mut player_regen_events: Vec<(String, f32, f32, i32)> = Vec::new();
                 if let Some(players) = extract_array(value, "players") {

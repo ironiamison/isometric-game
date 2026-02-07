@@ -13,19 +13,19 @@
 # FEET (Defence requirement)
 # =============================================================================
 
-[peasant_boots]
+[training_boots]
 display_name = "Peasant Boots"
 sprite = "peasant_boots"
 description = "Simple leather boots. Provides minor protection."
 category = "equipment"
 max_stack = 1
-base_price = 15
+base_price = 150
 sellable = true
-[peasant_boots.equipment]
+[training_boots.equipment]
 slot_type = "feet"
 defence_level_required = 1
-attack_bonus = 0
-strength_bonus = 0
+attack_bonus = 1
+strength_bonus = 1
 defence_bonus = 1
 
 [rusty_boots]
@@ -345,7 +345,7 @@ sprite = "salvaged_sword"
 description = "A battered but functional blade recovered from the ruins."
 category = "equipment"
 max_stack = 1
-base_price = 75
+base_price = 750
 sellable = true
 [salvaged_sword.equipment]
 slot_type = "weapon"

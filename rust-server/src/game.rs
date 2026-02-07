@@ -6420,6 +6420,7 @@ impl GameRoom {
                 tick,
                 players: players_for_group,
                 npcs: instance_npcs,
+                instance_id: inst_id.to_string(),
             };
 
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
@@ -6460,6 +6461,7 @@ impl GameRoom {
                 tick,
                 players: nearby_players,
                 npcs: nearby_npcs,
+                instance_id: String::new(),
             };
 
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {

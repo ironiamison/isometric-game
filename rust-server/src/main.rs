@@ -1666,12 +1666,34 @@ async fn handle_socket(
     }
 
     // Clean up instance tracking when player disconnects
+    // IMPORTANT: We must notify instance peers BEFORE unregistering the sender,
+    // and use the instance_id directly (not find_player_instance which scans Instance.players
+    // and could race with other operations).
     {
         use crate::interior::InstanceType;
 
-        if let Some(_instance_id) = state.player_instances.write().await.remove(&player_id) {
-            if let Some(instance) = state.instance_manager.find_player_instance(&player_id).await {
+        let removed_instance_id = state.player_instances.write().await.remove(&player_id);
+        if let Some(instance_id) = removed_instance_id {
+            // Use get_by_instance_id (direct lookup) instead of find_player_instance (scan)
+            if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
+                // Get other players BEFORE removing, so we can notify them
+                let other_players: Vec<String> = instance.get_player_ids().await
+                    .into_iter()
+                    .filter(|id| id != &player_id)
+                    .collect();
+
                 let remaining = instance.remove_player(&player_id).await;
+
+                // Notify instance peers that this player left
+                for other_id in &other_players {
+                    room.send_to_player(
+                        other_id,
+                        ServerMessage::PlayerLeft {
+                            id: player_id.to_string(),
+                        },
+                    ).await;
+                }
+
                 if remaining == 0 && instance.instance_type == InstanceType::Private {
                     if let Some(owner_id) = &instance.owner_id {
                         state.instance_manager.remove_private(owner_id, &instance.map_id);
@@ -1679,9 +1701,10 @@ async fn handle_socket(
                 }
             }
         }
-        // Clean up entrance position tracking
-        state.player_entrance_positions.write().await.remove(&player_id);
     }
+
+    // Clean up entrance position tracking
+    state.player_entrance_positions.write().await.remove(&player_id);
 
     // SECURITY: Unregister player sender before cleanup
     room.unregister_player_sender(&player_id).await;
@@ -1695,11 +1718,16 @@ async fn handle_socket(
     state.sessions.remove(&session_id);
     room.remove_player(&player_id).await;
 
-    // Notify others
-    room.broadcast(ServerMessage::PlayerLeft {
-        id: player_id.clone(),
-    })
-    .await;
+    // Notify overworld players that this player left.
+    // If they were in an instance, instance peers were already notified above.
+    // Overworld players still need this in case a stale sprite lingers from
+    // a missed enter-instance PlayerLeft.
+    room.send_to_overworld_players(
+        ServerMessage::PlayerLeft {
+            id: player_id.clone(),
+        },
+        None,
+    ).await;
 }
 
 /// Auto-enter an instance on reconnect (when current_map was saved in DB)
@@ -1892,6 +1920,7 @@ async fn auto_enter_instance(
                 tick: 0,
                 players: vec![],
                 npcs: npc_updates,
+                instance_id: instance.id.clone(),
             },
         ).await;
     }
@@ -1961,8 +1990,17 @@ async fn handle_enter_portal(
                 info!("Found exit portal '{}' targeting '{}' at ({}, {})",
                     portal.id, portal.target_map, portal.target_x, portal.target_y);
 
-                // Remove player from current instance and notify others
-                if let Some(instance) = state.instance_manager.find_player_instance(player_id).await {
+                // Remove player from both tracking systems and notify others.
+                // Use get_by_instance_id (direct lookup by known ID) instead of
+                // find_player_instance (scan that races with concurrent removals).
+                // Remove from player_instances FIRST so StateSync won't group them
+                // into the instance while we clean up Instance.players.
+                {
+                    let mut instances = state.player_instances.write().await;
+                    instances.remove(player_id);
+                }
+
+                if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
                     // Get other players in the instance BEFORE removing this player
                     let other_players: Vec<String> = instance.get_player_ids().await
                         .into_iter()
@@ -1995,12 +2033,6 @@ async fn handle_enter_portal(
                             },
                         ).await;
                     }
-                }
-
-                // Remove from player_instances tracking
-                {
-                    let mut instances = state.player_instances.write().await;
-                    instances.remove(player_id);
                 }
 
                 if portal.target_map == "overworld" {
@@ -2300,6 +2332,7 @@ async fn handle_enter_portal(
                 tick: 0,
                 players: vec![],
                 npcs: npc_updates,
+                instance_id: instance.id.clone(),
             },
         ).await;
     }

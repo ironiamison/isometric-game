@@ -202,6 +202,9 @@ pub enum ServerMessage {
         tick: u64,
         players: Vec<PlayerUpdate>,
         npcs: Vec<NpcUpdate>,
+        /// Instance ID this sync belongs to (empty string = overworld).
+        /// Clients use this to discard stale syncs from a previous map context.
+        instance_id: String,
     },
     ChatMessage {
         #[serde(rename = "senderId")]
@@ -973,9 +976,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("id".into()), Value::String(id.clone().into())));
             Value::Map(map)
         }
-        ServerMessage::StateSync { tick, players, npcs } => {
+        ServerMessage::StateSync { tick, players, npcs, instance_id } => {
             let mut map = Vec::new();
             map.push((Value::String("tick".into()), Value::Integer((*tick).into())));
+            if !instance_id.is_empty() {
+                map.push((Value::String("instanceId".into()), Value::String(instance_id.clone().into())));
+            }
 
             let player_values: Vec<Value> = players
                 .iter()
