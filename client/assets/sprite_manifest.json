@@ -2,6 +2,9 @@
   "enemies": [
     "arena_board",
     "blacksmith",
+    "blob_blue",
+    "blob_green",
+    "blob_pink",
     "crow",
     "elf",
     "farmer_barley",
