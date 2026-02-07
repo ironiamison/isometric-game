@@ -273,6 +273,10 @@ pub fn run_game_frame(
             // Prayer commands
             InputCommand::TogglePrayer { prayer_id } => ClientMessage::TogglePrayer { prayer_id: prayer_id.clone() },
             InputCommand::BuryBones { slot } => ClientMessage::BuryBones { slot: *slot as usize },
+            // Altar commands
+            InputCommand::OfferBones { slot, altar_id } => ClientMessage::OfferBones { slot: *slot as usize, altar_id: altar_id.clone() },
+            InputCommand::OfferAllBones { item_id, altar_id } => ClientMessage::OfferAllBones { item_id: item_id.clone(), altar_id: altar_id.clone() },
+            InputCommand::PrayAtAltar { altar_id } => ClientMessage::PrayAtAltar { altar_id: altar_id.clone() },
             // Spell commands
             InputCommand::CastSpell { spell_id } => ClientMessage::CastSpell { spell_id: spell_id.clone() },
         };

@@ -129,6 +129,16 @@ pub enum ClientMessage {
     #[serde(rename = "buryBones")]
     BuryBones { slot: usize },
 
+    // Altar commands
+    #[serde(rename = "offerBones")]
+    OfferBones { slot: usize, altar_id: String },
+
+    #[serde(rename = "offerAllBones")]
+    OfferAllBones { item_id: String, altar_id: String },
+
+    #[serde(rename = "prayAtAltar")]
+    PrayAtAltar { altar_id: String },
+
     // Spell system commands
     #[serde(rename = "castSpell")]
     CastSpell { spell_id: String },
@@ -306,6 +316,20 @@ impl ClientMessage {
             ClientMessage::BuryBones { slot } => {
                 data.insert("slot".into(), Value::Integer((*slot as i64).into()));
                 "buryBones"
+            }
+            ClientMessage::OfferBones { slot, altar_id } => {
+                data.insert("slot".into(), Value::Integer((*slot as i64).into()));
+                data.insert("altar_id".into(), Value::String(altar_id.clone().into()));
+                "offerBones"
+            }
+            ClientMessage::OfferAllBones { item_id, altar_id } => {
+                data.insert("item_id".into(), Value::String(item_id.clone().into()));
+                data.insert("altar_id".into(), Value::String(altar_id.clone().into()));
+                "offerAllBones"
+            }
+            ClientMessage::PrayAtAltar { altar_id } => {
+                data.insert("altar_id".into(), Value::String(altar_id.clone().into()));
+                "prayAtAltar"
             }
             ClientMessage::CastSpell { spell_id } => {
                 data.insert("spell_id".into(), Value::String(spell_id.clone().into()));

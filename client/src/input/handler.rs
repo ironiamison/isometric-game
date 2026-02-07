@@ -110,6 +110,10 @@ pub enum InputCommand {
     // Prayer commands
     TogglePrayer { prayer_id: String },
     BuryBones { slot: u8 },
+    // Altar commands
+    OfferBones { slot: u8, altar_id: String },
+    OfferAllBones { item_id: String, altar_id: String },
+    PrayAtAltar { altar_id: String },
     // Spell commands
     CastSpell { spell_id: String },
 }
