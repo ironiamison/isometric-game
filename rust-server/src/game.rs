@@ -2095,6 +2095,9 @@ impl GameRoom {
     }
 
     pub async fn handle_attack(&self, player_id: &str) {
+        // Determine attacker's instance context (None = overworld)
+        let attacker_instance = self.player_instances.read().await.get(player_id).cloned();
+
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -2203,8 +2206,8 @@ impl GameRoom {
                 break;
             }
 
-            // Check NPCs at this tile
-            {
+            // Check NPCs at this tile (overworld NPCs only - instance NPCs are separate)
+            if attacker_instance.is_none() {
                 let npcs = self.npcs.read().await;
                 for (npc_id, npc) in npcs.iter() {
                     if npc.is_alive() && npc.is_attackable() && npc.x == check_x && npc.y == check_y {
@@ -2219,11 +2222,17 @@ impl GameRoom {
             }
             if target_id.is_some() { break; }
 
-            // Check players at this tile
+            // Check players at this tile (must be in same instance context)
             {
                 let players = self.players.read().await;
+                let instances = self.player_instances.read().await;
                 for (pid, player) in players.iter() {
                     if pid != player_id && player.active && player.hp > 0 && player.x == check_x && player.y == check_y {
+                        // Only target players in the same context (both overworld, or same instance)
+                        let target_instance = instances.get(pid.as_str()).cloned();
+                        if target_instance != attacker_instance {
+                            continue;
+                        }
                         target_id = Some(pid.clone());
                         is_npc = false;
                         target_tile_x = check_x;
@@ -6019,12 +6028,15 @@ impl GameRoom {
             }
         }
 
-        // Get player positions for NPC AI (only alive players, grid positions)
+        // Get player positions for NPC AI (only alive overworld players, grid positions)
         let player_positions: Vec<(String, i32, i32, i32)> = {
             let players = self.players.read().await;
             let gathering = self.gathering.read().await;
+            let instances = self.player_instances.read().await;
             players.values()
                 .filter(|p| p.active && p.is_alive())
+                // Players in instances are invisible to overworld NPCs
+                .filter(|p| !instances.contains_key(&p.id))
                 // Players in gathering zones are invisible to NPCs
                 .filter(|p| !gathering.is_gathering(&p.id))
                 .map(|p| (p.id.clone(), p.x, p.y, p.hp))
@@ -7676,14 +7688,17 @@ impl GameRoom {
             }
         };
 
+        // Determine caster's instance context (None = overworld)
+        let caster_instance = self.player_instances.read().await.get(player_id).cloned();
+
         // 2. Resolve target: check NPCs first, then players (same pattern as handle_attack)
         let mut is_npc = false;
         let mut target_x: i32 = 0;
         let mut target_y: i32 = 0;
         let mut target_exists = false;
 
-        // Check NPCs
-        {
+        // Check NPCs (overworld NPCs only targetable by overworld casters)
+        if caster_instance.is_none() {
             let npcs = self.npcs.read().await;
             if let Some(npc) = npcs.get(&target_id) {
                 if npc.is_alive() && npc.is_attackable() {
@@ -7695,11 +7710,13 @@ impl GameRoom {
             }
         }
 
-        // Check players if not an NPC
+        // Check players if not an NPC (must be in same instance context)
         if !target_exists {
             let players = self.players.read().await;
+            let instances = self.player_instances.read().await;
+            let target_instance = instances.get(target_id.as_str()).cloned();
             if let Some(target) = players.get(&target_id) {
-                if target.active && target.hp > 0 && !target.is_dead {
+                if target.active && target.hp > 0 && !target.is_dead && target_instance == caster_instance {
                     is_npc = false;
                     target_x = target.x;
                     target_y = target.y;
