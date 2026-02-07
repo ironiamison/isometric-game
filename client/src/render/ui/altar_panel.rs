@@ -56,7 +56,7 @@ impl Renderer {
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
 
         let row_count = bone_rows.len().max(1);
-        let row_height = 36.0;
+        let row_height = 40.0;
         let header_height = 40.0;
         let pray_button_height = 32.0;
         let padding = 12.0;
@@ -99,7 +99,7 @@ impl Renderer {
         let content_width = box_width - FRAME_THICKNESS * 2.0 - padding * 2.0;
 
         if bone_rows.is_empty() {
-            self.draw_text_sharp("You have no bones to offer.", content_x, content_y + 20.0, 14.0, TEXT_DIM);
+            self.draw_text_sharp("You have no bones to offer.", content_x, content_y + 20.0, 16.0, TEXT_DIM);
         } else {
             for (i, row) in bone_rows.iter().enumerate() {
                 let row_y = content_y + (i as f32 * row_height);
@@ -111,16 +111,16 @@ impl Renderer {
 
                 // Bone name and quantity
                 let name_text = format!("{} x{}", row.display_name, row.quantity);
-                self.draw_text_sharp(&name_text, content_x, row_y + 16.0, 14.0, TEXT_NORMAL);
+                self.draw_text_sharp(&name_text, content_x, row_y + 16.0, 16.0, TEXT_NORMAL);
 
                 // XP info
                 let total_xp = row.xp_per_bone as i64 * row.quantity as i64;
                 let xp_text = format!("{}xp ea / {}xp total", row.xp_per_bone, total_xp);
-                self.draw_text_sharp(&xp_text, content_x, row_y + 30.0, 12.0, TEXT_DIM);
+                self.draw_text_sharp(&xp_text, content_x, row_y + 32.0, 16.0, TEXT_DIM);
 
                 // Offer All button (right side)
-                let btn_width = 70.0;
-                let btn_height = 24.0;
+                let btn_width = 76.0;
+                let btn_height = 28.0;
                 let btn_x = content_x + content_width - btn_width;
                 let btn_y = row_y + (row_height - btn_height) / 2.0;
                 let btn_bounds = Rect::new(btn_x, btn_y, btn_width, btn_height);
@@ -138,8 +138,8 @@ impl Renderer {
 
                 let btn_text_color = if btn_hovered { TEXT_TITLE } else { TEXT_NORMAL };
                 let offer_text = "Offer All";
-                let offer_w = self.measure_text_sharp(offer_text, 13.0).width;
-                self.draw_text_sharp(offer_text, btn_x + (btn_width - offer_w) / 2.0, btn_y + 16.0, 13.0, btn_text_color);
+                let offer_w = self.measure_text_sharp(offer_text, 16.0).width;
+                self.draw_text_sharp(offer_text, btn_x + (btn_width - offer_w) / 2.0, btn_y + 18.0, 16.0, btn_text_color);
             }
         }
 
@@ -165,7 +165,7 @@ impl Renderer {
 
         let pray_text_color = if pray_hovered { Color::new(0.7, 0.85, 1.0, 1.0) } else { TEXT_NORMAL };
         let pray_text = "Pray (Restore Prayer Points)";
-        let pray_text_w = self.measure_text_sharp(pray_text, 14.0).width;
-        self.draw_text_sharp(pray_text, content_x + (pray_width - pray_text_w) / 2.0, pray_y + 21.0, 14.0, pray_text_color);
+        let pray_text_w = self.measure_text_sharp(pray_text, 16.0).width;
+        self.draw_text_sharp(pray_text, content_x + (pray_width - pray_text_w) / 2.0, pray_y + 21.0, 16.0, pray_text_color);
     }
 }
