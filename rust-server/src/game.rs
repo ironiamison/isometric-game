@@ -5625,6 +5625,11 @@ impl GameRoom {
             }
         }
 
+        // Stop gathering for respawning players
+        for (id, _, _, _, _, _) in &respawned_players {
+            self.handle_stop_gathering(id).await;
+        }
+
         // Broadcast respawns
         for (id, x, y, hp, prayer_points, max_prayer_points) in respawned_players {
             tracing::info!("Player {} respawned at ({}, {})", id, x, y);
