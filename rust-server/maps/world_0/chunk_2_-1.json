@@ -3085,32 +3085,8 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "CAAAABAAAAAQAAAAIAAAACAAAABAAAAAgAAAAAABAAAAAQAAAAYAAAAMAAAACAAAAPAAAAAAAAAAAAAAAOABAAAgAAAAIAAAACAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABgAAAAIAAAADwAAAAGAAA=",
   "entities": [
-    {
-      "entityId": "slime",
-      "x": 9,
-      "y": 25,
-      "level": 1
-    },
-    {
-      "entityId": "slime",
-      "x": 5,
-      "y": 18,
-      "level": 1
-    },
-    {
-      "entityId": "slime",
-      "x": 4,
-      "y": 13,
-      "level": 1
-    },
-    {
-      "entityId": "slime",
-      "x": 2,
-      "y": 29,
-      "level": 1
-    },
     {
       "entityId": "snail",
       "x": 27,
@@ -3121,6 +3097,24 @@
       "entityId": "snail",
       "x": 26,
       "y": 13,
+      "level": 1
+    },
+    {
+      "entityId": "slime_blue",
+      "x": 6,
+      "y": 28,
+      "level": 1
+    },
+    {
+      "entityId": "slime_green",
+      "x": 5,
+      "y": 22,
+      "level": 1
+    },
+    {
+      "entityId": "slime_pink",
+      "x": 9,
+      "y": 16,
       "level": 1
     }
   ],
