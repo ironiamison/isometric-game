@@ -312,6 +312,74 @@ class StorageManager {
     await this.saveChunkToServer(chunk);
   }
 
+  /**
+   * Save only dirty chunks to server (and locally).
+   * Returns the keys of successfully saved chunks so they can be marked clean.
+   */
+  async saveDirtyChunks(chunks: Map<string, Chunk>): Promise<string[]> {
+    const dirtyEntries: [string, Chunk][] = [];
+    for (const [key, chunk] of chunks) {
+      if (chunk.dirty) {
+        dirtyEntries.push([key, chunk]);
+      }
+    }
+
+    if (dirtyEntries.length === 0) return [];
+
+    // Save dirty chunks locally
+    for (const [, chunk] of dirtyEntries) {
+      await this.saveChunkLocal(chunk);
+    }
+
+    // Save dirty chunks to server (single request)
+    try {
+      const payload: Record<string, object> = {};
+      for (const [key, chunk] of dirtyEntries) {
+        payload[key] = this.chunkToStorable(chunk);
+      }
+
+      const response = await fetch(`${API_BASE}/api/chunks`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
+      this.setConnected(true);
+      return dirtyEntries.map(([key]) => key);
+    } catch (err) {
+      console.error('Failed to save dirty chunks to server:', err);
+      this.setConnected(false);
+      return [];
+    }
+  }
+
+  /**
+   * Sync from game server: pulls data from game server into mapper,
+   * then loads all chunks. Used by "Reset to Server" button.
+   */
+  async syncFromGameServer(): Promise<Map<string, Chunk> | null> {
+    try {
+      const response = await fetch(`${API_BASE}/api/sync-from-game-server`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error(`Sync from game server failed: ${response.status}`);
+      }
+      const result = await response.json();
+      console.log(`Synced ${result.chunksSynced} chunks and ${result.interiorsSynced} interiors from game server`);
+
+      // Now load the freshly synced data
+      return this.loadAllChunksFromServer();
+    } catch (err) {
+      console.error('Failed to sync from game server:', err);
+      return null;
+    }
+  }
+
   // --- Export/Import ---
 
   async exportMapData(): Promise<string> {

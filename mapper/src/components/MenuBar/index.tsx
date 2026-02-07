@@ -221,7 +221,7 @@ export function MenuBar() {
 
   const handleResetToServer = async () => {
     const confirmed = window.confirm(
-      'This will discard all local changes and reload from the server.\n\nAre you sure?'
+      'This will discard all local changes and reload map data from the game server.\n\nAre you sure?'
     );
     if (!confirmed) return;
 
@@ -232,8 +232,8 @@ export function MenuBar() {
       // Clear ChunkManager cache
       chunkManager.clear();
 
-      // Load all chunks from server API
-      const serverChunks = await storage.loadAllChunksFromServer();
+      // Sync from game server and load chunks
+      const serverChunks = await storage.syncFromGameServer();
 
       if (serverChunks && serverChunks.size > 0) {
         for (const [, chunk] of serverChunks) {
@@ -257,7 +257,7 @@ export function MenuBar() {
       // Clear undo history
       history.clear();
 
-      alert('Reset complete. Loaded fresh data from server.');
+      alert('Reset complete. Loaded fresh data from game server.');
     } catch (err) {
       console.error('Reset failed:', err);
       alert(`Reset failed: ${(err as Error).message}`);
@@ -351,11 +351,12 @@ export function MenuBar() {
     }
 
     try {
-      const success = await storage.saveAllChunksToServer(chunks);
-      if (success) {
-        alert(`Synced ${chunks.size} chunks to server.`);
+      const savedKeys = await storage.saveDirtyChunks(chunks);
+      if (savedKeys.length > 0) {
+        markAllClean();
+        alert(`Synced ${savedKeys.length} changed chunk(s) to server.`);
       } else {
-        alert('Failed to sync to server.');
+        alert('No changes to sync.');
       }
     } catch (err) {
       console.error('Sync failed:', err);
@@ -597,7 +598,7 @@ export function MenuBar() {
                 </button>
                 <div className={styles.separator} />
                 <button className={styles.dropdownItem} onClick={handleResetToServer}>
-                  Reset to Server Data
+                  Reset to Game Server
                 </button>
                 <button className={styles.dropdownItem} onClick={handleClearLocalData}>
                   Clear Local Storage
