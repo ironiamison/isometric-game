@@ -5122,10 +5122,10 @@ impl GameRoom {
             .unwrap()
             .as_millis() as u64;
 
-        let (fishing_level, player_x, player_y, player_dir) = {
+        let (fishing_level, player_x, player_y, player_dir, equipped_weapon) = {
             let players = self.players.read().await;
             match players.get(player_id) {
-                Some(p) => (p.skills.fishing.level, p.x, p.y, p.direction),
+                Some(p) => (p.skills.fishing.level, p.x, p.y, p.direction, p.equipped_weapon.clone()),
                 None => return,
             }
         };
@@ -5147,6 +5147,27 @@ impl GameRoom {
                 message: "You must face the gathering spot".to_string(),
             }).await;
             return;
+        }
+
+        // Check equipment requirements before starting
+        {
+            let gathering = self.gathering.read().await;
+            if let Some(zone) = gathering.get_zone_for_marker(marker_x, marker_y) {
+                let required_weapon = match zone.skill.as_str() {
+                    "fishing" => Some("fishing_rod"),
+                    _ => None,
+                };
+                if let Some(required) = required_weapon {
+                    if equipped_weapon.as_deref() != Some(required) {
+                        drop(gathering);
+                        self.send_to_player(player_id, ServerMessage::Error {
+                            code: 400,
+                            message: format!("You need a {} to do that", required.replace('_', " ")),
+                        }).await;
+                        return;
+                    }
+                }
+            }
         }
 
         let mut gathering = self.gathering.write().await;

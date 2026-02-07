@@ -256,6 +256,12 @@ impl GatheringSystem {
         self.player_states.contains_key(player_id)
     }
 
+    /// Get the zone config for a marker at the given position
+    pub fn get_zone_for_marker(&self, x: i32, y: i32) -> Option<&GatheringZoneConfig> {
+        let marker = self.markers.iter().find(|m| m.x == x && m.y == y)?;
+        self.zones.get(&marker.zone_id)
+    }
+
     /// Returns the set of player IDs currently gathering (for state sync)
     pub fn gathering_player_ids(&self) -> std::collections::HashSet<String> {
         self.player_states.keys().cloned().collect()
