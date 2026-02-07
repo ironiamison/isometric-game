@@ -1889,7 +1889,7 @@ impl Renderer {
             );
 
             // Align like isometric objects: center on slightly elevated tile position
-            let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25 - 32.0 * zoom;
+            let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25 - 22.0 * zoom;
 
             draw_texture_ex(
                 texture,

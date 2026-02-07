@@ -5984,14 +5984,8 @@ impl GameRoom {
                 let coord = crate::chunk::ChunkCoord::from_world(wx, wy);
                 if let Some(chunk) = chunks_guard.get(&coord) {
                     let (lx, ly) = crate::chunk::world_to_local(wx, wy);
-                    let walkable = chunk.is_walkable_local(lx, ly);
-                    if !walkable {
-                        tracing::debug!("NPC collision blocked at world ({},{}) -> chunk {:?} local ({},{}) = blocked",
-                            wx, wy, coord, lx, ly);
-                    }
-                    walkable
+                    chunk.is_walkable_local(lx, ly)
                 } else {
-                    tracing::warn!("NPC walkable check: chunk {:?} not loaded for world pos ({},{})", coord, wx, wy);
                     false
                 }
             };
@@ -6021,6 +6015,12 @@ impl GameRoom {
                 // Run NPC AI update
                 if let Some((target_id, max_hit)) = npc.update(delta_time, &player_positions, &occupied_tiles, current_time, &walkable_check) {
                     npc_attacks.push((npc.id.clone(), target_id, npc.level, max_hit));
+                }
+
+                // Verify NPC isn't on a blocked tile (debug check)
+                let new_pos = (npc.x, npc.y);
+                if old_pos != new_pos && !walkable_check(npc.x, npc.y) {
+                    tracing::error!("BUG: NPC {} moved from {:?} to blocked tile {:?}!", npc.id, old_pos, new_pos);
                 }
 
                 // Re-insert updated position

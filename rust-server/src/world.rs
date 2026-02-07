@@ -85,7 +85,8 @@ impl World {
 
                 match result {
                     Ok(chunk) => {
-                        info!("Loaded chunk from {:?}", path);
+                        let blocked_count = chunk.collision.iter().filter(|&&b| b).count();
+                        info!("Loaded chunk {:?} from {:?} - {} blocked tiles", chunk.coord, path, blocked_count);
                         Some(chunk)
                     }
                     Err(e) => {
