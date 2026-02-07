@@ -366,7 +366,10 @@ impl Npc {
             let new_y = self.y + move_y;
 
             // Check if tile is walkable (collision check)
-            if !walkable_check(new_x, new_y) {
+            let is_walkable = walkable_check(new_x, new_y);
+            tracing::debug!("NPC {} at ({},{}) trying move to ({},{}) - walkable: {}",
+                self.id, self.x, self.y, new_x, new_y, is_walkable);
+            if !is_walkable {
                 continue; // Tile has collision
             }
 

@@ -39,6 +39,31 @@ impl SkillType {
             SkillType::Magic => "magic",
         }
     }
+
+    pub fn from_str(s: &str) -> Option<SkillType> {
+        match s.to_lowercase().as_str() {
+            "hitpoints" | "hp" => Some(SkillType::Hitpoints),
+            "combat" => Some(SkillType::Combat),
+            "fishing" => Some(SkillType::Fishing),
+            "farming" => Some(SkillType::Farming),
+            "smithing" => Some(SkillType::Smithing),
+            "prayer" => Some(SkillType::Prayer),
+            "magic" => Some(SkillType::Magic),
+            _ => None,
+        }
+    }
+
+    pub fn all() -> &'static [SkillType] {
+        &[
+            SkillType::Hitpoints,
+            SkillType::Combat,
+            SkillType::Fishing,
+            SkillType::Farming,
+            SkillType::Smithing,
+            SkillType::Prayer,
+            SkillType::Magic,
+        ]
+    }
 }
 
 /// Calculate total XP required to reach a level using RuneScape formula.
