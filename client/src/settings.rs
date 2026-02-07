@@ -11,6 +11,8 @@ pub struct UiSettings {
     pub chat_log_visible: bool,
     pub tap_to_pathfind: bool,
     pub use_joystick: bool,
+    #[serde(default)]
+    pub graphics_low: bool,
 }
 
 impl Default for UiSettings {
@@ -31,6 +33,7 @@ impl Default for UiSettings {
             #[cfg(not(target_os = "android"))]
             tap_to_pathfind: true,
             use_joystick: false,
+            graphics_low: false,
         }
     }
 }

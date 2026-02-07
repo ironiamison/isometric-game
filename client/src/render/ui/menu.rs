@@ -17,7 +17,7 @@ impl Renderer {
 
         // Compact menu sizing - fits on mobile
         let menu_width = 240.0;
-        let menu_height = (sh - 40.0).min(370.0); // Cap height, leave margin
+        let menu_height = (sh - 40.0).min(400.0); // Cap height, leave margin
         let menu_x = ((sw - menu_width) / 2.0).floor();
         let menu_y = ((sh - menu_height) / 2.0).floor();
 
@@ -194,6 +194,16 @@ impl Renderer {
 
         draw_button(ctrl_modern_bounds.x, ctrl_modern_bounds.y, toggle_w, btn_height, "Modern", !state.ui_state.classic_controls, is_hovered(ctrl_modern_bounds), self);
         draw_button(ctrl_classic_bounds.x, ctrl_classic_bounds.y, toggle_w, btn_height, "Classic", state.ui_state.classic_controls, is_hovered(ctrl_classic_bounds), self);
+        y += row_height;
+
+        // Row: Graphics Quality (High / Low)
+        let gfx_high_bounds = Rect::new(content_x, y, toggle_w, btn_height);
+        let gfx_low_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+        layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_high_bounds);
+        layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_low_bounds);
+
+        draw_button(gfx_high_bounds.x, gfx_high_bounds.y, toggle_w, btn_height, "GFX High", !state.ui_state.graphics_low, is_hovered(gfx_high_bounds), self);
+        draw_button(gfx_low_bounds.x, gfx_low_bounds.y, toggle_w, btn_height, "GFX Low", state.ui_state.graphics_low, is_hovered(gfx_low_bounds), self);
         y += row_height;
 
         y += 8.0;

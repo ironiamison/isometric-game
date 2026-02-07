@@ -19,6 +19,7 @@ fn save_current_ui_settings(state: &GameState) {
         chat_log_visible: state.ui_state.chat_log_visible,
         tap_to_pathfind: state.ui_state.tap_to_pathfind,
         use_joystick: state.ui_state.use_joystick,
+        graphics_low: state.ui_state.graphics_low,
     };
     save_ui_settings(&settings);
 }
@@ -1082,6 +1083,44 @@ impl InputHandler {
 
         // Handle escape menu
         if state.ui_state.escape_menu_open {
+            // Handle slider dragging - continue updating while mouse is held
+            if state.ui_state.settings_slider_dragging.is_some() {
+                if is_mouse_button_down(MouseButton::Left) {
+                    let (mouse_x, _) = mouse_position();
+                    match state.ui_state.settings_slider_dragging {
+                        Some(UiElementId::EscapeMenuMusicSlider) => {
+                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuMusicSlider) {
+                                let relative_x = mouse_x - slider_elem.bounds.x;
+                                let volume = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
+                                state.ui_state.audio_volume = volume;
+                                audio.set_music_volume(volume);
+                            }
+                        }
+                        Some(UiElementId::EscapeMenuSfxSlider) => {
+                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuSfxSlider) {
+                                let relative_x = mouse_x - slider_elem.bounds.x;
+                                let volume = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
+                                state.ui_state.audio_sfx_volume = volume;
+                                audio.set_sfx_volume(volume);
+                            }
+                        }
+                        Some(UiElementId::EscapeMenuUiScaleSlider) => {
+                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuUiScaleSlider) {
+                                let relative_x = mouse_x - slider_elem.bounds.x;
+                                let normalized = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
+                                state.ui_state.ui_scale = 0.75 + normalized * 0.5;
+                            }
+                        }
+                        _ => {}
+                    }
+                    return commands;
+                } else {
+                    // Mouse released - stop dragging and save settings
+                    save_current_ui_settings(state);
+                    state.ui_state.settings_slider_dragging = None;
+                }
+            }
+
             // Handle mouse clicks on escape menu elements
             if let Some(ref element) = clicked_element {
                 if mouse_clicked {
@@ -1108,7 +1147,8 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::EscapeMenuMusicSlider => {
-                            // Calculate volume from click position within slider
+                            // Start dragging and set initial value
+                            state.ui_state.settings_slider_dragging = Some(UiElementId::EscapeMenuMusicSlider);
                             if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuMusicSlider) {
                                 let (mouse_x, _) = mouse_position();
                                 let relative_x = mouse_x - slider_elem.bounds.x;
@@ -1119,7 +1159,8 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::EscapeMenuSfxSlider => {
-                            // Calculate SFX volume from click position within slider
+                            // Start dragging and set initial value
+                            state.ui_state.settings_slider_dragging = Some(UiElementId::EscapeMenuSfxSlider);
                             if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuSfxSlider) {
                                 let (mouse_x, _) = mouse_position();
                                 let relative_x = mouse_x - slider_elem.bounds.x;
@@ -1130,14 +1171,13 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::EscapeMenuUiScaleSlider => {
-                            // Calculate UI scale from click position (0.75x to 1.25x range)
+                            // Start dragging and set initial value
+                            state.ui_state.settings_slider_dragging = Some(UiElementId::EscapeMenuUiScaleSlider);
                             if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuUiScaleSlider) {
                                 let (mouse_x, _) = mouse_position();
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let normalized = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
-                                // Convert 0.0-1.0 to 0.75-1.25 range
                                 state.ui_state.ui_scale = 0.75 + normalized * 0.5;
-                                save_current_ui_settings(state);
                             }
                             return commands;
                         }
@@ -1168,6 +1208,12 @@ impl InputHandler {
                         UiElementId::EscapeMenuJoystickToggle => {
                             audio.play_sfx("enter");
                             state.ui_state.use_joystick = !state.ui_state.use_joystick;
+                            save_current_ui_settings(state);
+                            return commands;
+                        }
+                        UiElementId::EscapeMenuGraphicsToggle => {
+                            audio.play_sfx("enter");
+                            state.ui_state.graphics_low = !state.ui_state.graphics_low;
                             save_current_ui_settings(state);
                             return commands;
                         }

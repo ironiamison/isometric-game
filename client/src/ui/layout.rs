@@ -42,6 +42,7 @@ pub enum UiElementId {
     EscapeMenuTapPathfindToggle,
     EscapeMenuJoystickToggle,
     EscapeMenuControlSchemeToggle,
+    EscapeMenuGraphicsToggle,
     EscapeMenuDisconnect,
 
     // World Items

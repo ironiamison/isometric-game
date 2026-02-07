@@ -679,6 +679,8 @@ pub struct UiState {
     pub inventory_touch_last_y: f32,
     pub inventory_scrollbar_dragging: bool,
     pub inventory_scrollbar_drag_last_y: f32,
+    /// Which settings slider is currently being dragged (if any)
+    pub settings_slider_dragging: Option<crate::ui::UiElementId>,
     // Control scheme: false = Modern (WASD+Space+Enter), true = Classic (Arrows+Ctrl+always-on chat)
     pub classic_controls: bool,
     /// Active tab in the prayer/spell panel: 0 = Prayers, 1 = Spells
@@ -689,6 +691,8 @@ pub struct UiState {
     pub prayer_help_open: bool,
     /// Whether spell help overlay is open
     pub spell_help_open: bool,
+    /// Graphics quality: true = low (no water shaders), false = high
+    pub graphics_low: bool,
 }
 
 impl Default for UiState {
@@ -782,11 +786,13 @@ impl Default for UiState {
             inventory_touch_last_y: 0.0,
             inventory_scrollbar_dragging: false,
             inventory_scrollbar_drag_last_y: 0.0,
+            settings_slider_dragging: None,
             classic_controls: false,
             prayer_spell_tab: 0,
             spell_bar_active: false,
             prayer_help_open: false,
             spell_help_open: false,
+            graphics_low: false,
         }
     }
 }

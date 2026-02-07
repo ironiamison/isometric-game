@@ -135,6 +135,7 @@ async fn main() {
                             game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
+                            game_state.ui_state.graphics_low = ui_settings.graphics_low;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             if !settings::load_control_scheme_chosen() {
                                 game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
@@ -188,6 +189,7 @@ async fn main() {
                             game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
+                            game_state.ui_state.graphics_low = ui_settings.graphics_low;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             if !settings::load_control_scheme_chosen() {
                                 game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {

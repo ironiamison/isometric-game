@@ -863,12 +863,12 @@ impl Renderer {
     }
 
     /// Draw a tile sprite from the tileset
-    fn draw_tile_sprite(&self, screen_x: f32, screen_y: f32, tile_id: u32, zoom: f32, world_pos: Option<(f32, f32)>) {
+    fn draw_tile_sprite(&self, screen_x: f32, screen_y: f32, tile_id: u32, zoom: f32, world_pos: Option<(f32, f32)>, water_effects: bool) {
         let scaled_width = TILE_WIDTH * zoom;
         let scaled_height = TILE_HEIGHT * zoom;
 
         // Apply water shader for water tiles (tile ID 418)
-        let is_water = tile_id == 418;
+        let is_water = tile_id == 418 && water_effects;
         if is_water {
             if let Some(ref mat) = self.water_material {
                 mat.set_uniform("Time", get_time() as f32);
@@ -2058,7 +2058,7 @@ impl Renderer {
                             }
 
                             // Draw tile sprite (or fallback to colored tile)
-                            self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom, Some((world_x as f32, world_y as f32)));
+                            self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom, Some((world_x as f32, world_y as f32)), !state.ui_state.graphics_low);
 
                             // Draw collision indicator in debug mode
                             if state.debug_mode && chunk.collision.get(idx).copied().unwrap_or(false) {
@@ -2102,7 +2102,7 @@ impl Renderer {
                     }
 
                     // Draw tile sprite (or fallback to colored tile)
-                    self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom, Some((x as f32, y as f32)));
+                    self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom, Some((x as f32, y as f32)), !state.ui_state.graphics_low);
 
                     // Draw collision indicator in debug mode
                     if state.debug_mode && tilemap.collision.get(idx).copied().unwrap_or(false) {
@@ -2132,7 +2132,7 @@ impl Renderer {
 
         // Draw object tile sprite (slightly elevated)
         let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25;
-        self.draw_tile_sprite(screen_x, elevated_y, tile_id, zoom, None);
+        self.draw_tile_sprite(screen_x, elevated_y, tile_id, zoom, None, false);
     }
 
     fn draw_isometric_tile(&self, screen_x: f32, screen_y: f32, color: Color, zoom: f32) {
