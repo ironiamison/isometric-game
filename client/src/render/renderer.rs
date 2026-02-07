@@ -10,10 +10,20 @@ use crate::game::npc::{Npc, NpcState};
 use crate::game::tilemap::get_tile_color;
 use crate::ui::{UiElementId, UiLayout};
 use super::ui::common::{SlotState, CORNER_ACCENT_SIZE};
-use super::isometric::{world_to_screen, world_to_screen_exact, TILE_WIDTH, TILE_HEIGHT, calculate_depth};
+use super::isometric::{world_to_screen, world_to_screen_exact, screen_to_world, TILE_WIDTH, TILE_HEIGHT, calculate_depth};
 use super::animation::{SPRITE_WIDTH, SPRITE_HEIGHT, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT, NpcAnimation, get_weapon_frame, get_weapon_offset, get_boot_frame, get_boot_offset, get_body_armor_frame, get_body_armor_offset, get_head_frame, get_head_offset, get_back_static_frame, get_back_static_offset, get_offhand_frame, get_offhand_offset, get_hair_offset, AnimationState, Gender};
 use super::font::BitmapFont;
 use super::shaders;
+
+/// Format a u32 into a stack-allocated buffer, returning a &str.
+/// Avoids heap allocation from .to_string() in hot paths.
+fn u32_to_str(n: u32, buf: &mut [u8; 12]) -> &str {
+    use std::io::Write;
+    let mut cursor = std::io::Cursor::new(&mut buf[..]);
+    write!(cursor, "{}", n).unwrap();
+    let len = cursor.position() as usize;
+    std::str::from_utf8(&buf[..len]).unwrap()
+}
 
 /// Timing data from a render pass
 #[derive(Default, Clone)]
@@ -770,8 +780,9 @@ impl Renderer {
         }
         let local_id = gid - OBJECTS_FIRSTGID;
         let sprite_number = local_id + OBJECTS_ID_OFFSET;
-        let key = sprite_number.to_string();
-        self.object_sprites.get(&key)
+        let mut buf = [0u8; 12];
+        let key = u32_to_str(sprite_number, &mut buf);
+        self.object_sprites.get(key)
     }
 
     /// Get the sprite texture for a wall by its gid
@@ -781,8 +792,9 @@ impl Renderer {
             return None;
         }
         let file_id = gid - WALLS_FIRSTGID;
-        let key = file_id.to_string();
-        self.wall_sprites.get(&key)
+        let mut buf = [0u8; 12];
+        let key = u32_to_str(file_id, &mut buf);
+        self.wall_sprites.get(key)
     }
 
     /// Draw text with pixel font for sharp rendering
@@ -995,7 +1007,10 @@ impl Renderer {
         }
 
         // Pre-allocate with estimated capacity to reduce allocations
-        let estimated_capacity = state.players.len() + state.npcs.len() + state.ground_items.len() + 100;
+        let chunk_object_estimate: usize = state.chunk_manager.chunks().values()
+            .map(|c| c.objects.len() + c.walls.len())
+            .sum();
+        let estimated_capacity = state.players.len() + state.npcs.len() + state.ground_items.len() + chunk_object_estimate + 100;
         let mut renderables: Vec<(f32, Renderable)> = Vec::with_capacity(estimated_capacity);
 
         // Add ground items (render below entities)
@@ -1021,25 +1036,35 @@ impl Renderer {
             renderables.push((depth, Renderable::Npc(npc)));
         }
 
-        // Screen bounds for culling renderables
+        // Compute visible world-space AABB from screen corners (avoids per-object world_to_screen)
         let (cull_screen_w, cull_screen_h) = virtual_screen_size();
-        // Large margin for tall objects (trees, walls) that may be rooted off-screen but visible
-        let cull_margin = TILE_WIDTH * 6.0;
+        let corners_world = [
+            screen_to_world(0.0, 0.0, &state.camera),
+            screen_to_world(cull_screen_w, 0.0, &state.camera),
+            screen_to_world(0.0, cull_screen_h, &state.camera),
+            screen_to_world(cull_screen_w, cull_screen_h, &state.camera),
+        ];
+        // Margin in world tiles for tall objects that extend above their tile
+        let world_cull_margin = 8.0;
+        let vis_min_x = corners_world.iter().map(|c| c.0).fold(f32::MAX, f32::min) - world_cull_margin;
+        let vis_max_x = corners_world.iter().map(|c| c.0).fold(f32::MIN, f32::max) + world_cull_margin;
+        let vis_min_y = corners_world.iter().map(|c| c.1).fold(f32::MAX, f32::min) - world_cull_margin;
+        let vis_max_y = corners_world.iter().map(|c| c.1).fold(f32::MIN, f32::max) + world_cull_margin;
 
         // Add object layer tiles (trees, rocks, buildings) from static tilemap
         for layer in &state.tilemap.layers {
             if layer.layer_type == LayerType::Objects {
                 for y in 0..state.tilemap.height {
                     for x in 0..state.tilemap.width {
+                        let wx = x as f32;
+                        let wy = y as f32;
+                        if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
+                            continue;
+                        }
                         let idx = (y * state.tilemap.width + x) as usize;
                         let tile_id = layer.tiles.get(idx).copied().unwrap_or(0);
                         if tile_id > 0 {
-                            let (sx, sy) = world_to_screen(x as f32, y as f32, &state.camera);
-                            if sx < -cull_margin || sx > cull_screen_w + cull_margin
-                                || sy < -cull_margin || sy > cull_screen_h + cull_margin {
-                                continue;
-                            }
-                            let depth = calculate_depth(x as f32, y as f32, 1);
+                            let depth = calculate_depth(wx, wy, 1);
                             renderables.push((depth, Renderable::Tile { x, y, tile_id }));
                         }
                     }
@@ -1047,30 +1072,42 @@ impl Renderer {
             }
         }
 
-        // Add map objects from loaded chunks (trees, rocks, decorations placed in Tiled)
-        for chunk in state.chunk_manager.chunks().values() {
+        // Add map objects and walls from loaded chunks with chunk-level pre-culling
+        let chunk_size = CHUNK_SIZE as f32;
+        for (coord, chunk) in state.chunk_manager.chunks().iter() {
+            // Chunk-level AABB check: skip entire chunk if outside visible area
+            let chunk_min_x = (coord.x * CHUNK_SIZE as i32) as f32;
+            let chunk_min_y = (coord.y * CHUNK_SIZE as i32) as f32;
+            let chunk_max_x = chunk_min_x + chunk_size;
+            let chunk_max_y = chunk_min_y + chunk_size;
+            if chunk_max_x < vis_min_x || chunk_min_x > vis_max_x
+                || chunk_max_y < vis_min_y || chunk_min_y > vis_max_y {
+                continue;
+            }
+
             for obj in &chunk.objects {
-                let (sx, sy) = world_to_screen(obj.tile_x as f32, obj.tile_y as f32, &state.camera);
-                if sx < -cull_margin || sx > cull_screen_w + cull_margin
-                    || sy < -cull_margin || sy > cull_screen_h + cull_margin {
+                let wx = obj.tile_x as f32;
+                let wy = obj.tile_y as f32;
+                if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
                     continue;
                 }
-                let depth = calculate_depth(obj.tile_x as f32, obj.tile_y as f32, 1);
+                let depth = calculate_depth(wx, wy, 1);
                 renderables.push((depth, Renderable::ChunkObject(obj)));
             }
-            // Add walls from chunks
             for wall in &chunk.walls {
-                let (sx, sy) = world_to_screen(wall.tile_x as f32, wall.tile_y as f32, &state.camera);
-                if sx < -cull_margin || sx > cull_screen_w + cull_margin
-                    || sy < -cull_margin || sy > cull_screen_h + cull_margin {
+                let wx = wall.tile_x as f32;
+                let wy = wall.tile_y as f32;
+                if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
                     continue;
                 }
-                let depth = calculate_depth(wall.tile_x as f32, wall.tile_y as f32, 1);
+                let depth = calculate_depth(wx, wy, 1);
                 renderables.push((depth, Renderable::ChunkWall(wall)));
             }
         }
 
         // Sort by depth (painter's algorithm)
+        // Must use stable sort: items at the same depth (e.g. walls on tiles
+        // with equal x+y) must keep a consistent order to avoid flickering.
         renderables.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
         // 3. Render sorted entities
@@ -2033,12 +2070,28 @@ impl Renderer {
                         continue;
                     }
 
+                    // Compute base screen position for chunk origin, then step incrementally
+                    // In isometric: +1 world_x = (+dx, +dy), +1 world_y = (-dx, +dy)
+                    // Use _exact (no rounding) for the base to avoid double-rounding jitter
+                    let zoom = state.camera.zoom;
+                    let dx = (TILE_WIDTH / 2.0) * zoom;
+                    let dy = (TILE_HEIGHT / 2.0) * zoom;
+                    let (base_sx, base_sy) = world_to_screen_exact(chunk_offset_x as f32, chunk_offset_y as f32, &state.camera);
+                    let water_effects = !state.ui_state.graphics_low;
+
+                    // Tile-level culling bounds
+                    let tile_margin = TILE_WIDTH * 2.0;
+                    let cull_left = -tile_margin;
+                    let cull_right = screen_w + tile_margin;
+                    let cull_top = -tile_margin;
+                    let cull_bottom = screen_h + tile_margin;
+
                     // Render tiles in isometric order
                     for local_y in 0..tile_height {
-                        for local_x in 0..tile_width {
-                            let world_x = chunk_offset_x + local_x as i32;
-                            let world_y = chunk_offset_y + local_y as i32;
+                        let row_sx = base_sx - local_y as f32 * dx;
+                        let row_sy = base_sy + local_y as f32 * dy;
 
+                        for local_x in 0..tile_width {
                             let idx = (local_y * tile_width + local_x) as usize;
                             let tile_id = layer.tiles.get(idx).copied().unwrap_or(0);
 
@@ -2046,23 +2099,24 @@ impl Renderer {
                                 continue;
                             }
 
-                            let (screen_x, screen_y) = world_to_screen(world_x as f32, world_y as f32, &state.camera);
+                            let screen_x = (row_sx + local_x as f32 * dx).round();
+                            let screen_y = (row_sy + local_x as f32 * dy).round();
 
                             // Tile-level culling (still needed for partially visible chunks)
-                            let tile_margin = TILE_WIDTH * 2.0;
-                            if screen_x < -tile_margin || screen_x > screen_w + tile_margin {
-                                continue;
-                            }
-                            if screen_y < -tile_margin || screen_y > screen_h + tile_margin {
+                            if screen_x < cull_left || screen_x > cull_right
+                                || screen_y < cull_top || screen_y > cull_bottom {
                                 continue;
                             }
 
+                            let world_x = chunk_offset_x + local_x as i32;
+                            let world_y = chunk_offset_y + local_y as i32;
+
                             // Draw tile sprite (or fallback to colored tile)
-                            self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom, Some((world_x as f32, world_y as f32)), !state.ui_state.graphics_low);
+                            self.draw_tile_sprite(screen_x, screen_y, tile_id, zoom, Some((world_x as f32, world_y as f32)), water_effects);
 
                             // Draw collision indicator in debug mode
                             if state.debug_mode && chunk.collision.get(idx).copied().unwrap_or(false) {
-                                self.draw_collision_indicator(screen_x, screen_y, state.camera.zoom);
+                                self.draw_collision_indicator(screen_x, screen_y, zoom);
                             }
                         }
                     }
@@ -2081,7 +2135,17 @@ impl Renderer {
 
             // Render in isometric order (back to front)
             let (vw, vh) = virtual_screen_size();
+            let zoom = state.camera.zoom;
+            let dx = (TILE_WIDTH / 2.0) * zoom;
+            let dy = (TILE_HEIGHT / 2.0) * zoom;
+            let (base_sx, base_sy) = world_to_screen_exact(0.0, 0.0, &state.camera);
+            let water_effects = !state.ui_state.graphics_low;
+            let margin = TILE_WIDTH * 2.0;
+
             for y in 0..tilemap.height {
+                let row_sx = base_sx - y as f32 * dx;
+                let row_sy = base_sy + y as f32 * dy;
+
                 for x in 0..tilemap.width {
                     let idx = (y * tilemap.width + x) as usize;
                     let tile_id = layer.tiles.get(idx).copied().unwrap_or(0);
@@ -2090,23 +2154,21 @@ impl Renderer {
                         continue; // Skip empty tiles
                     }
 
-                    let (screen_x, screen_y) = world_to_screen(x as f32, y as f32, &state.camera);
+                    let screen_x = (row_sx + x as f32 * dx).round();
+                    let screen_y = (row_sy + x as f32 * dy).round();
 
                     // Culling: skip tiles outside viewport
-                    let margin = TILE_WIDTH * 2.0;
-                    if screen_x < -margin || screen_x > vw + margin {
-                        continue;
-                    }
-                    if screen_y < -margin || screen_y > vh + margin {
+                    if screen_x < -margin || screen_x > vw + margin
+                        || screen_y < -margin || screen_y > vh + margin {
                         continue;
                     }
 
                     // Draw tile sprite (or fallback to colored tile)
-                    self.draw_tile_sprite(screen_x, screen_y, tile_id, state.camera.zoom, Some((x as f32, y as f32)), !state.ui_state.graphics_low);
+                    self.draw_tile_sprite(screen_x, screen_y, tile_id, zoom, Some((x as f32, y as f32)), water_effects);
 
                     // Draw collision indicator in debug mode
                     if state.debug_mode && tilemap.collision.get(idx).copied().unwrap_or(false) {
-                        self.draw_collision_indicator(screen_x, screen_y, state.camera.zoom);
+                        self.draw_collision_indicator(screen_x, screen_y, zoom);
                     }
                 }
             }
