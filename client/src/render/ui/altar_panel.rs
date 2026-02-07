@@ -55,13 +55,13 @@ impl Renderer {
         // Semi-transparent overlay
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
 
-        let row_count = bone_rows.len().max(1);
         let row_height = 40.0;
         let header_height = 40.0;
         let pray_button_height = 32.0;
         let padding = 12.0;
         let box_width = 320.0;
-        let box_height = header_height + (row_count as f32 * row_height) + pray_button_height + padding * 3.0;
+        let content_rows_height = if bone_rows.is_empty() { 24.0 } else { bone_rows.len() as f32 * row_height };
+        let box_height = header_height + content_rows_height + pray_button_height + padding * 3.0;
         let box_x = (sw - box_width) / 2.0;
         let box_y = (sh - box_height) / 2.0;
 
@@ -144,7 +144,7 @@ impl Renderer {
         }
 
         // Pray button at bottom
-        let pray_y = content_y + (row_count as f32 * row_height) + padding;
+        let pray_y = content_y + content_rows_height + padding;
         let pray_width = content_width;
         let pray_bounds = Rect::new(content_x, pray_y, pray_width, pray_button_height);
         layout.add(UiElementId::AltarPray, pray_bounds);
