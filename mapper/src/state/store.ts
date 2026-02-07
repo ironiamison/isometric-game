@@ -38,13 +38,23 @@ import { interiorStorage } from '@/core/InteriorStorage';
 
 // Debounce helper for auto-save (only saves dirty chunks)
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-const debouncedSave = (chunks: Map<string, Chunk>) => {
+const debouncedSave = () => {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
-    storage.saveDirtyChunks(chunks).catch((err) => {
+    // Get current state at save time, not when scheduled
+    const currentChunks = useEditorStore.getState().chunks;
+    storage.saveDirtyChunks(currentChunks).catch((err) => {
       console.error('Failed to auto-save chunks:', err);
     });
   }, 500); // Save 500ms after last change
+};
+
+// Cancel any pending debounced save (call before manual sync)
+export const cancelPendingSave = () => {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
 };
 
 interface EditorState {
@@ -326,7 +336,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     const newChunks = new Map(chunks);
     set({ chunks: newChunks });
     if (!skipAutoSave) {
-      debouncedSave(newChunks);
+      debouncedSave();
     }
   },
 
@@ -337,7 +347,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     if (chunk) {
       chunks.set(key, updater(chunk));
       set({ chunks });
-      debouncedSave(chunks);
+      debouncedSave();
     }
   },
 
@@ -1314,7 +1324,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     const chunks = new Map(get().chunks);
     chunks.set(chunkKey(coord), newChunk);
     set({ chunks });
-    debouncedSave(chunks);
+    debouncedSave();
     return newChunk;
   },
 

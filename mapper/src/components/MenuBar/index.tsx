@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import JSZip from 'jszip';
-import { useEditorStore } from '@/state/store';
+import { useEditorStore, cancelPendingSave } from '@/state/store';
 import { chunkManager } from '@/core/ChunkManager';
 import { chunkKey } from '@/core/coords';
 import { history } from '@/core/History';
@@ -349,6 +349,9 @@ export function MenuBar() {
       alert('Not connected to server. Changes are saved locally.');
       return;
     }
+
+    // Cancel any pending debounced save to prevent it from overwriting after we sync
+    cancelPendingSave();
 
     try {
       const savedKeys = await storage.saveDirtyChunks(chunks);

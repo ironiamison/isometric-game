@@ -198,13 +198,16 @@ function App() {
     return () => unsubscribe();
   }, [setTilesets, setEntityRegistry, setChunks, setWorldBounds, setLoading, setConnected]);
 
-  // Auto-save every 30 seconds
+  // Auto-save every 30 seconds (only dirty chunks)
   useEffect(() => {
     const autoSaveInterval = setInterval(async () => {
       const currentChunks = useEditorStore.getState().chunks;
       if (currentChunks.size > 0) {
-        console.log('Auto-saving...');
-        await storage.saveAllChunks(currentChunks);
+        const dirtyCount = Array.from(currentChunks.values()).filter(c => c.dirty).length;
+        if (dirtyCount > 0) {
+          console.log(`Auto-saving ${dirtyCount} dirty chunks...`);
+          await storage.saveDirtyChunks(currentChunks);
+        }
       }
     }, 30000);
 
