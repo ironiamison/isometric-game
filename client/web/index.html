@@ -99,6 +99,11 @@
     <script src="loading.js"></script>
 
     <script>
+      // Disable browser context menu so the in-game one works on right-click
+      document.getElementById("glcanvas").addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+      });
+
       // Prevent early focus events that cause RefCell double-borrow panic in miniquad.
       // The canvas starts non-focusable; we restore tabindex after WASM init settles.
       document.getElementById("glcanvas").removeAttribute("tabindex");
