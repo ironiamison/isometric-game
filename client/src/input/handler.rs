@@ -3453,7 +3453,19 @@ impl InputHandler {
 
                     if let Some((npc_id, _)) = nearest_npc {
                         log::info!("Interacting with NPC: {}", npc_id);
-                        commands.push(InputCommand::Interact { npc_id });
+                        // Check if NPC is an altar - open altar panel instead of dialogue
+                        if let Some(npc) = state.npcs.get(&npc_id) {
+                            if npc.entity_type.contains("altar") {
+                                state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
+                                    altar_npc_id: npc_id.clone(),
+                                    altar_name: npc.display_name.clone(),
+                                });
+                            } else {
+                                commands.push(InputCommand::Interact { npc_id });
+                            }
+                        } else {
+                            commands.push(InputCommand::Interact { npc_id });
+                        }
                     } else if self.touch_controls.interact_pressed() {
                         // Touch interact fallback: pickup item if no NPC nearby
                         const PICKUP_RANGE: f32 = 2.0;
