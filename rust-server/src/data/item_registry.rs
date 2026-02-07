@@ -135,6 +135,7 @@ impl ItemRegistry {
                         }
                     }),
                     range: item.equipment.as_ref().map(|e| e.range),
+                    prayer_xp: item.prayer_xp,
                 }
             })
             .collect();

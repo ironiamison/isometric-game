@@ -1258,6 +1258,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             equipment,
                             weapon_type,
                             range,
+                            prayer_xp: extract_i32(item_value, "prayer_xp").unwrap_or(0),
                         });
                     }
                 }

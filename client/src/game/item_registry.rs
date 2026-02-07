@@ -29,6 +29,8 @@ pub struct ItemDefinition {
     pub weapon_type: Option<String>,
     /// Attack range in tiles (1 for melee, >1 for ranged)
     pub range: Option<i32>,
+    /// Prayer XP granted when offered at an altar
+    pub prayer_xp: i32,
 }
 
 impl ItemDefinition {
@@ -84,6 +86,7 @@ impl ItemRegistry {
             equipment: None,
             weapon_type: None,
             range: None,
+            prayer_xp: 0,
         })
     }
 

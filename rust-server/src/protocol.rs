@@ -755,6 +755,7 @@ pub struct ClientItemDef {
     pub defence_bonus: Option<i32>,
     pub weapon_type: Option<String>,
     pub range: Option<i32>,
+    pub prayer_xp: i32,
 }
 
 /// A dialogue choice for branching dialogue
@@ -1779,6 +1780,9 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     }
                     if let Some(r) = i.range {
                         imap.push((Value::String("range".into()), Value::Integer((r as i64).into())));
+                    }
+                    if i.prayer_xp > 0 {
+                        imap.push((Value::String("prayer_xp".into()), Value::Integer((i.prayer_xp as i64).into())));
                     }
                     Value::Map(imap)
                 })
