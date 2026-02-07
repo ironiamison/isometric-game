@@ -435,7 +435,34 @@ impl InputHandler {
                                         } else { false }
                                     } else { false };
 
-                                    if !is_seed_on_patch {
+                                    // Check if dropping bones onto an altar NPC
+                                    let is_bones_on_altar = if !is_seed_on_patch {
+                                        if let Some(Some(slot)) = state.inventory.slots.get(*from_idx) {
+                                            if slot.item_id.contains("bones") {
+                                                // Find altar NPC at this tile
+                                                let mut altar_id = None;
+                                                for (npc_id, npc) in &state.npcs {
+                                                    if npc.entity_type.contains("altar")
+                                                        && npc.x.round() as i32 == tile_x
+                                                        && npc.y.round() as i32 == tile_y
+                                                    {
+                                                        altar_id = Some(npc_id.clone());
+                                                        break;
+                                                    }
+                                                }
+                                                if let Some(aid) = altar_id {
+                                                    commands.push(InputCommand::OfferBones {
+                                                        slot: *from_idx as u8,
+                                                        altar_id: aid,
+                                                    });
+                                                    audio.play_sfx("item_put");
+                                                    true
+                                                } else { false }
+                                            } else { false }
+                                        } else { false }
+                                    } else { false };
+
+                                    if !is_seed_on_patch && !is_bones_on_altar {
                                         // Check for Ctrl/Cmd modifier for single item drop
                                         let ctrl_held = is_key_down(KeyCode::LeftControl)
                                             || is_key_down(KeyCode::RightControl)
