@@ -1409,6 +1409,13 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send prayer state
+    if let Some(prayer_state) = room.get_player_prayer_state(&player_id).await {
+        if let Ok(bytes) = protocol::encode_server_message(&prayer_state) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
     // Only send overworld data if the player is NOT reconnecting into an instance
     let reconnecting_to_instance = current_map.is_some();
 

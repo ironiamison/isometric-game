@@ -1337,6 +1337,15 @@ impl GameRoom {
         })
     }
 
+    pub async fn get_player_prayer_state(&self, player_id: &str) -> Option<ServerMessage> {
+        let players = self.players.read().await;
+        players.get(player_id).map(|p| ServerMessage::PrayerStateUpdate {
+            points: p.prayer_points,
+            max_points: p.max_prayer_points(),
+            active_prayers: p.active_prayers.iter().cloned().collect(),
+        })
+    }
+
     pub async fn get_all_npcs(&self) -> Vec<Npc> {
         let npcs = self.npcs.read().await;
         npcs.values().cloned().collect()
@@ -4139,8 +4148,27 @@ impl GameRoom {
             }
         };
 
-        // Get NPC position and prototype ID
-        let npc_info = {
+        // Check if player is in an instance
+        let instance_id = {
+            let instances = self.player_instances.read().await;
+            instances.get(player_id).cloned()
+        };
+
+        // Get NPC position and prototype ID - check instance NPCs first, then overworld
+        let npc_info = if let Some(ref inst_id) = instance_id {
+            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
+                let npcs = instance.npcs.read().await;
+                npcs.get(npc_id).map(|npc| {
+                    let dx = (npc.x - player_x) as f32;
+                    let dy = (npc.y - player_y) as f32;
+                    let distance = (dx * dx + dy * dy).sqrt();
+                    (npc.prototype_id.clone(), distance, npc.is_alive())
+                })
+            } else {
+                tracing::warn!("Player {} in instance {} but instance not found", player_id, inst_id);
+                None
+            }
+        } else {
             let npcs = self.npcs.read().await;
             npcs.get(npc_id).map(|npc| {
                 let dx = (npc.x - player_x) as f32;
@@ -4340,8 +4368,27 @@ impl GameRoom {
             }
         };
 
-        // Get NPC position and prototype ID
-        let npc_info = {
+        // Check if player is in an instance
+        let instance_id = {
+            let instances = self.player_instances.read().await;
+            instances.get(player_id).cloned()
+        };
+
+        // Get NPC position and prototype ID - check instance NPCs first, then overworld
+        let npc_info = if let Some(ref inst_id) = instance_id {
+            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
+                let npcs = instance.npcs.read().await;
+                npcs.get(npc_id).map(|npc| {
+                    let dx = (npc.x - player_x) as f32;
+                    let dy = (npc.y - player_y) as f32;
+                    let distance = (dx * dx + dy * dy).sqrt();
+                    (npc.prototype_id.clone(), distance, npc.is_alive())
+                })
+            } else {
+                tracing::warn!("Player {} in instance {} but instance not found", player_id, inst_id);
+                None
+            }
+        } else {
             let npcs = self.npcs.read().await;
             npcs.get(npc_id).map(|npc| {
                 let dx = (npc.x - player_x) as f32;

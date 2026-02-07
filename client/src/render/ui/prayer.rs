@@ -683,8 +683,8 @@ impl Renderer {
         let scale = state.ui_state.ui_scale;
 
         let overlay_w = (220.0 * scale).min(screen_w - 20.0);
-        let font_size = 14.0;
-        let line_height = 18.0;
+        let font_size = 16.0;
+        let line_height = 20.0;
         let padding = 10.0 * scale;
         let section_gap = 6.0;
 
@@ -766,7 +766,7 @@ impl Renderer {
 
         // Close button
         let close_text = "Got it!";
-        let close_dims = self.measure_text_sharp(close_text, 14.0);
+        let close_dims = self.measure_text_sharp(close_text, 16.0);
         let close_btn_w = (close_dims.width + 20.0 * scale).min(overlay_w - padding * 2.0);
         let close_btn_x = overlay_x + (overlay_w - close_btn_w) / 2.0;
         let close_btn_y = text_y;
@@ -781,7 +781,7 @@ impl Renderer {
         draw_rectangle(close_btn_x, close_btn_y, close_btn_w, close_btn_height, Color::new(0.3, 0.28, 0.35, 1.0));
         draw_rectangle(close_btn_x + 1.0, close_btn_y + 1.0, close_btn_w - 2.0, close_btn_height - 2.0, close_bg);
         let close_text_x = close_btn_x + (close_btn_w - close_dims.width) / 2.0;
-        self.draw_text_sharp(close_text, close_text_x.floor(), (close_btn_y + (close_btn_height + 10.0) / 2.0).floor(), 14.0, close_text_color);
+        self.draw_text_sharp(close_text, close_text_x.floor(), (close_btn_y + (close_btn_height + 12.0) / 2.0).floor(), 16.0, close_text_color);
     }
 
     /// Render tooltip for a spell slot

@@ -88,9 +88,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Update players (grid positions from server)
                 let mut player_regen_events: Vec<(String, f32, f32, i32)> = Vec::new();
+                let mut synced_player_ids: Vec<String> = Vec::new();
                 if let Some(players) = extract_array(value, "players") {
                     for player_value in players {
                         let id = extract_string(player_value, "id").unwrap_or_default();
+                        synced_player_ids.push(id.clone());
                         let name = extract_string(player_value, "name").unwrap_or_default();
                         // Server sends i32 grid positions
                         let x = extract_i32(player_value, "x");
@@ -301,6 +303,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             }
                         }
                     }
+                }
+
+                // Reconcile: remove players who are no longer in this StateSync.
+                // In instances, the server sends ALL players in the group, so anyone
+                // missing has left. This prevents ghost players from lingering when a
+                // PlayerLeft message races with a StateSync that still included them.
+                if !sync_instance.is_empty() {
+                    let local_id = state.local_player_id.clone().unwrap_or_default();
+                    state.players.retain(|id, _| {
+                        *id == local_id || synced_player_ids.contains(id)
+                    });
                 }
 
                 // Check if local player walked onto a portal (auto-trigger)

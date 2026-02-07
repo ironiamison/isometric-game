@@ -14,7 +14,7 @@
 # =============================================================================
 
 [training_boots]
-display_name = "Peasant Boots"
+display_name = "Training Boots"
 sprite = "peasant_boots"
 description = "Simple leather boots. Provides minor protection."
 category = "equipment"
@@ -525,13 +525,13 @@ sprite = "gutter_blade"
 description = "A wicked blade forged in the sewers of the underworld."
 category = "equipment"
 max_stack = 1
-base_price = 450
+base_price = 5000
 sellable = true
 [gutter_blade.equipment]
 slot_type = "weapon"
 attack_level_required = 30
-attack_bonus = 30
-strength_bonus = 35
+attack_bonus = 15
+strength_bonus = 15
 defence_bonus = 0
 
 [long_bow]
