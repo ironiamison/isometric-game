@@ -141,20 +141,29 @@ impl Renderer {
             }
         }
 
-        // Apply scroll offset (clamp so we never scroll past all content)
+        // Apply smooth pixel-based scroll offset
         let total_lines = all_lines.len();
-        let max_scroll = total_lines.saturating_sub(max_lines);
-        let scroll = state.ui_state.chat_message_scroll.min(max_scroll);
-        let end = total_lines - scroll;
-        let start = end.saturating_sub(max_lines);
+        let total_content_height = total_lines as f32 * line_height;
+        let max_scroll_px = (total_content_height - messages_h).max(0.0);
+        let scroll_px = state.ui_state.chat_message_scroll.min(max_scroll_px);
 
-        let mut y = messages_y + messages_h - line_height;
+        // Calculate which lines are visible and the sub-pixel offset
+        let scroll_lines = scroll_px / line_height;
+        let fractional_offset = (scroll_lines.fract()) * line_height;
+        let scroll_lines_int = scroll_lines.floor() as usize;
+
+        // We need one extra line for smooth scrolling (partially visible at top/bottom)
+        let visible_lines = max_lines + 1;
+        let end = total_lines.saturating_sub(scroll_lines_int);
+        let start = end.saturating_sub(visible_lines);
+
+        let mut y = messages_y + messages_h - line_height + fractional_offset;
         for i in (start..end).rev() {
-            if y < messages_y {
-                break;
+            // Only draw if line is within the message area (with some margin for partial visibility)
+            if y >= messages_y - line_height && y <= messages_y + messages_h {
+                let (ref line, color) = all_lines[i];
+                self.draw_text_sharp(line, messages_x, y, font_size, color);
             }
-            let (ref line, color) = all_lines[i];
-            self.draw_text_sharp(line, messages_x, y, font_size, color);
             y -= line_height;
         }
 
