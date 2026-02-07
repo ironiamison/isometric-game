@@ -1306,6 +1306,61 @@ impl InputHandler {
             return commands;
         }
 
+        // Handle altar panel input
+        if state.ui_state.altar_panel.is_some() {
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.altar_panel = None;
+                return commands;
+            }
+
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::AltarOfferAll(idx) => {
+                            let altar_npc_id = state.ui_state.altar_panel.as_ref().unwrap().altar_npc_id.clone();
+                            // Build bone rows to find item_id at index
+                            let mut bone_items: Vec<String> = Vec::new();
+                            let mut seen = std::collections::HashSet::new();
+                            for slot in state.inventory.slots.iter().flatten() {
+                                if slot.item_id.contains("bones") && seen.insert(slot.item_id.clone()) {
+                                    let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
+                                    if item_def.prayer_xp > 0 {
+                                        bone_items.push(slot.item_id.clone());
+                                    }
+                                }
+                            }
+                            if let Some(item_id) = bone_items.get(*idx) {
+                                commands.push(InputCommand::OfferAllBones {
+                                    item_id: item_id.clone(),
+                                    altar_id: altar_npc_id,
+                                });
+                                audio.play_sfx("item_put");
+                                state.ui_state.altar_panel = None;
+                            }
+                        }
+                        UiElementId::AltarPray => {
+                            let altar_npc_id = state.ui_state.altar_panel.as_ref().unwrap().altar_npc_id.clone();
+                            commands.push(InputCommand::PrayAtAltar { altar_id: altar_npc_id });
+                            audio.play_sfx("enter");
+                        }
+                        UiElementId::AltarClose => {
+                            state.ui_state.altar_panel = None;
+                            audio.play_sfx("enter");
+                        }
+                        _ => {
+                            // Click outside panel elements - close
+                            state.ui_state.altar_panel = None;
+                        }
+                    }
+                } else {
+                    // Click with no UI element - close
+                    state.ui_state.altar_panel = None;
+                }
+                return commands;
+            }
+            return commands;
+        }
+
         // Handle dialogue mode - intercept input when dialogue is open
         if let Some(dialogue) = &state.ui_state.active_dialogue {
             // Touch drag scrolling for dialogue choices on mobile
@@ -2634,7 +2689,17 @@ impl InputHandler {
                     }
                     // Handle interact target (NPC)
                     if let Some(ref npc_id) = path_state.interact_target {
-                        if state.npcs.get(npc_id).map(|n| n.is_alive()).unwrap_or(false) {
+                        // Check if target is an altar
+                        if let Some(npc) = state.npcs.get(npc_id) {
+                            if npc.entity_type.contains("altar") {
+                                state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
+                                    altar_npc_id: npc_id.clone(),
+                                    altar_name: npc.display_name.clone(),
+                                });
+                            } else if npc.is_alive() {
+                                commands.push(InputCommand::Interact { npc_id: npc_id.clone() });
+                            }
+                        } else {
                             commands.push(InputCommand::Interact { npc_id: npc_id.clone() });
                         }
                     }
@@ -2938,8 +3003,15 @@ impl InputHandler {
                                 let dist_to_player = (dx * dx + dy * dy).sqrt();
 
                                 if dist_to_player < INTERACT_RANGE {
-                                    // Within range - immediate interact
-                                    commands.push(InputCommand::Interact { npc_id });
+                                    // Check if NPC is an altar - open altar panel instead of dialogue
+                                    if npc.entity_type.contains("altar") {
+                                        state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
+                                            altar_npc_id: npc_id.clone(),
+                                            altar_name: npc.display_name.clone(),
+                                        });
+                                    } else {
+                                        commands.push(InputCommand::Interact { npc_id });
+                                    }
                                 } else {
                                     // Out of range - pathfind to adjacent tile
                                     let player_x = player.x.round() as i32;

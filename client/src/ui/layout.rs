@@ -119,6 +119,11 @@ pub enum UiElementId {
     SocialAddFriendButton,
     SocialPanelClose,
     SocialScrollArea,
+
+    // Altar Panel
+    AltarOfferAll(usize),
+    AltarPray,
+    AltarClose,
 }
 
 /// A single interactive UI element with its bounds

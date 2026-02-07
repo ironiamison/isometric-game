@@ -20,3 +20,4 @@ pub mod chat_panel;
 pub mod xp_drops;
 pub mod social_panel;
 pub mod prayer;
+pub mod altar_panel;

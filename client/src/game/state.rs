@@ -570,6 +570,12 @@ pub struct SocialState {
     pub touch_dragged: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct AltarPanelState {
+    pub altar_npc_id: String,
+    pub altar_name: String,
+}
+
 pub struct UiState {
     pub chat_open: bool,
     pub chat_input: String,
@@ -641,6 +647,8 @@ pub struct UiState {
     pub context_menu: Option<ContextMenu>,
     // Gold drop dialog state
     pub gold_drop_dialog: Option<GoldDropDialog>,
+    // Altar offering panel state
+    pub altar_panel: Option<AltarPanelState>,
     // Drag state for inventory slot rearrangement
     pub drag_state: Option<DragState>,
     // Double-click tracking for equipping items
@@ -740,6 +748,7 @@ impl Default for UiState {
             hovered_element: None,
             context_menu: None,
             gold_drop_dialog: None,
+            altar_panel: None,
             drag_state: None,
             double_click_state: DoubleClickState {
                 last_click_slot: None,

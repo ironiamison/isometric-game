@@ -4651,6 +4651,11 @@ impl Renderer {
             self.render_gold_drop_dialog(dialog, state.inventory.gold, hovered, &mut layout);
         }
 
+        // Altar offering panel (when active)
+        if let Some(ref panel) = state.ui_state.altar_panel {
+            self.render_altar_panel(panel, state, hovered, &mut layout);
+        }
+
         // Render context menu on top of everything
         if let Some(ref context_menu) = state.ui_state.context_menu {
             self.render_context_menu(context_menu, state, &mut layout);
