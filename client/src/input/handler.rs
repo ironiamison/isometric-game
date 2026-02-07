@@ -1718,6 +1718,15 @@ impl InputHandler {
                         state.ui_state.shop_quantity_hold_last_repeat = current_time;
                         return commands;
                     }
+                    UiElementId::ShopSellQuantityMax => {
+                        let inventory_items: Vec<_> = state.inventory.slots.iter()
+                            .filter_map(|slot| slot.as_ref())
+                            .collect();
+                        if let Some(inv_slot) = inventory_items.get(state.ui_state.shop_selected_sell_index) {
+                            state.ui_state.shop_sell_quantity = inv_slot.quantity.max(1);
+                        }
+                        return commands;
+                    }
                     UiElementId::ShopBuyConfirmButton => {
                         if let Some(ref shop_data) = state.ui_state.shop_data {
                             if let Some(ref npc_id) = state.ui_state.shop_npc_id {

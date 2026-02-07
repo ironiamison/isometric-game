@@ -60,6 +60,7 @@ pub enum UiElementId {
     ShopBuyConfirmButton,
     ShopSellQuantityMinus,
     ShopSellQuantityPlus,
+    ShopSellQuantityMax,
     ShopSellConfirmButton,
 
     // Menu Buttons
