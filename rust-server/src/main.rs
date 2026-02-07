@@ -2082,6 +2082,16 @@ async fn handle_enter_portal(
                         },
                     ).await;
 
+                    // Re-send overworld data that was cleared on instance entry
+                    room.send_to_player(
+                        player_id,
+                        room.get_chair_positions_message().await,
+                    ).await;
+                    room.send_to_player(
+                        player_id,
+                        room.get_gathering_markers_message().await,
+                    ).await;
+
                     // Notify overworld players that this player has returned
                     {
                         let player_name = room.get_player_name(player_id).await.unwrap_or_default();

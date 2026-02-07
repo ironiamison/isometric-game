@@ -1779,6 +1779,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.npcs.clear();
                 state.ground_items.clear();
                 state.chair_positions.clear();
+                state.gathering_markers.clear();
                 state.pending_chair_sit = None;
 
                 // Clear other players (keep only local player) to avoid ghost collisions

@@ -2855,25 +2855,37 @@ impl GameRoom {
         };
 
         // Check if item exists and can be picked up
-        let item_info = {
+        let (item_info, protection_remaining) = {
             let items = self.ground_items.read().await;
-            items.get(item_id).map(|item| {
-                // Check distance (must be within 2 tiles)
-                let dx = item.x - player_x;
-                let dy = item.y - player_y;
-                let distance = (dx * dx + dy * dy).sqrt();
+            match items.get(item_id) {
+                Some(item) => {
+                    let dx = item.x - player_x;
+                    let dy = item.y - player_y;
+                    let distance = (dx * dx + dy * dy).sqrt();
 
-                if distance > 2.0 {
-                    return None;
+                    if distance > 2.0 {
+                        (None, None)
+                    } else if !item.can_pickup(player_id, current_time) {
+                        let elapsed = current_time.saturating_sub(item.drop_time);
+                        let remaining_ms = 10000u64.saturating_sub(elapsed);
+                        let remaining_secs = (remaining_ms + 999) / 1000;
+                        (None, Some(remaining_secs))
+                    } else {
+                        (Some((item.item_id.clone(), item.quantity)), None)
+                    }
                 }
-
-                if !item.can_pickup(player_id, current_time) {
-                    return None;
-                }
-
-                Some((item.item_id.clone(), item.quantity))
-            }).flatten()
+                None => (None, None),
+            }
         };
+
+        if let Some(secs) = protection_remaining {
+            self.send_system_message(player_id, &format!(
+                "That item is protected for {} more second{}.",
+                secs,
+                if secs == 1 { "" } else { "s" }
+            )).await;
+            return;
+        }
 
         if let Some((picked_item_id, quantity)) = item_info {
             // Remove item from ground
@@ -5091,6 +5103,11 @@ impl GameRoom {
     }
 
     pub async fn handle_start_gathering(&self, player_id: &str, marker_x: i32, marker_y: i32) {
+        // Gathering zones are overworld-only; reject if player is in an instance
+        if self.player_instances.read().await.contains_key(player_id) {
+            return;
+        }
+
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -5163,6 +5180,11 @@ impl GameRoom {
     }
 
     pub async fn handle_sit_chair(&self, player_id: &str, tile_x: i32, tile_y: i32) {
+        // Chairs are overworld-only; reject if player is in an instance
+        if self.player_instances.read().await.contains_key(player_id) {
+            return;
+        }
+
         // Validate chair exists and is unoccupied
         {
             let chairs = self.chairs.read().await;
@@ -5647,23 +5669,25 @@ impl GameRoom {
             if npc_positions.contains(&(target_x, target_y)) {
                 continue;
             }
-            // Check if target tile is a chair
-            if let Some((occupied_by, chair_dir)) = chair_snapshot.get(&(target_x, target_y)) {
-                // Only allow sitting when approaching from the chair's facing direction
-                // (player walks toward the chair from in front, so move_dir is opposite of chair_dir)
-                let is_approaching_from_front = match chair_dir {
-                    Direction::Down => move_dir == Direction::Up,
-                    Direction::Up => move_dir == Direction::Down,
-                    Direction::Left => move_dir == Direction::Right,
-                    Direction::Right => move_dir == Direction::Left,
-                    _ => false,
-                };
-                if is_approaching_from_front && occupied_by.is_none() {
-                    // Correct direction and unoccupied - auto-sit
-                    auto_sit_requests.push((id, target_x, target_y));
+            // Check if target tile is a chair (overworld only - instances have their own maps)
+            if !players_in_instances.contains(&id) {
+                if let Some((occupied_by, chair_dir)) = chair_snapshot.get(&(target_x, target_y)) {
+                    // Only allow sitting when approaching from the chair's facing direction
+                    // (player walks toward the chair from in front, so move_dir is opposite of chair_dir)
+                    let is_approaching_from_front = match chair_dir {
+                        Direction::Down => move_dir == Direction::Up,
+                        Direction::Up => move_dir == Direction::Down,
+                        Direction::Left => move_dir == Direction::Right,
+                        Direction::Right => move_dir == Direction::Left,
+                        _ => false,
+                    };
+                    if is_approaching_from_front && occupied_by.is_none() {
+                        // Correct direction and unoccupied - auto-sit
+                        auto_sit_requests.push((id, target_x, target_y));
+                    }
+                    // Always block the move (chair is solid from all directions)
+                    continue;
                 }
-                // Always block the move (chair is solid from all directions)
-                continue;
             }
             // Block fighters from leaving the ring during arena fights
             {
