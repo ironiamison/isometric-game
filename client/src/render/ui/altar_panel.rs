@@ -56,9 +56,9 @@ impl Renderer {
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
 
         let row_height = 40.0;
-        let header_height = 40.0;
+        let header_height = 24.0;
         let pray_button_height = 32.0;
-        let padding = 12.0;
+        let padding = 8.0;
         let box_width = 320.0;
         let content_rows_height = if bone_rows.is_empty() { 24.0 } else { bone_rows.len() as f32 * row_height };
         let box_height = header_height + content_rows_height + pray_button_height + padding * 3.0;
