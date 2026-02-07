@@ -192,7 +192,10 @@ class StorageManager {
 
   async loadAllChunksFromServer(): Promise<Map<string, Chunk> | null> {
     try {
-      const response = await fetch(`${API_BASE}/api/chunks/all`);
+      // Add cache-busting to prevent browser from returning stale data
+      const response = await fetch(`${API_BASE}/api/chunks/all?_t=${Date.now()}`, {
+        cache: 'no-store',
+      });
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
       }
@@ -324,6 +327,7 @@ class StorageManager {
       }
     }
 
+    console.log(`[saveDirtyChunks] Found ${dirtyEntries.length} dirty chunks`);
     if (dirtyEntries.length === 0) return [];
 
     // Save dirty chunks locally
@@ -338,6 +342,7 @@ class StorageManager {
         payload[key] = this.chunkToStorable(chunk);
       }
 
+      console.log(`[saveDirtyChunks] Sending PUT /api/chunks with keys:`, Object.keys(payload));
       const response = await fetch(`${API_BASE}/api/chunks`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -347,6 +352,9 @@ class StorageManager {
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
       }
+
+      const result = await response.json();
+      console.log(`[saveDirtyChunks] Server response:`, result);
 
       this.setConnected(true);
       return dirtyEntries.map(([key]) => key);

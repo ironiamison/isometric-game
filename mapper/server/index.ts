@@ -69,6 +69,7 @@ app.get('/api/chunks', async (_req, res) => {
 // Get all chunks in one request
 app.get('/api/chunks/all', async (_req, res) => {
   try {
+    console.log(`[GET /api/chunks/all] Loading from ${CHUNKS_DIR}`);
     const files = await fs.readdir(CHUNKS_DIR);
     const chunks: Record<string, unknown> = {};
 
@@ -80,9 +81,14 @@ app.get('/api/chunks/all', async (_req, res) => {
       chunks[key] = JSON.parse(data);
     }
 
+    console.log(`  Loaded ${Object.keys(chunks).length} chunks`);
+    // Prevent caching of chunk data
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
     res.json(chunks);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      console.log(`  No chunks found (directory doesn't exist)`);
       res.json({});
     } else {
       console.error('Error loading all chunks:', err);
@@ -126,11 +132,13 @@ app.put('/api/chunks/:cx/:cy', async (req, res) => {
 app.put('/api/chunks', async (req, res) => {
   try {
     const chunks = req.body as Record<string, unknown>;
+    console.log(`[PUT /api/chunks] Saving ${Object.keys(chunks).length} chunks to ${CHUNKS_DIR}`);
 
     for (const [key, chunk] of Object.entries(chunks)) {
       const [cx, cy] = key.split(',');
       const filePath = path.join(CHUNKS_DIR, `${cx}_${cy}.json`);
       await fs.writeFile(filePath, JSON.stringify(chunk, null, 2));
+      console.log(`  Saved chunk ${key} to ${filePath}`);
     }
 
     res.json({ success: true, saved: Object.keys(chunks).length });
