@@ -938,8 +938,47 @@
       2,
       2,
       2,
-      1057,
-      1057,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
       2,
       2,
       2,
@@ -968,55 +1007,16 @@
       2,
       2,
       249,
-      1065,
       249,
       249,
       249,
-      1065,
-      386,
-      386,
-      386,
-      386,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
       249,
-      1041,
       249,
-      1075,
       249,
-      1075,
-      1075,
-      429,
-      429,
-      2,
-      429,
-      2,
-      2,
-      429,
-      2,
-      2,
-      429,
-      429,
+      249,
+      249,
+      249,
+      249,
       2,
       2,
       2,
@@ -3085,79 +3085,151 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8=",
   "entities": [],
   "mapObjects": [],
   "walls": [
     {
-      "gid": 1008,
-      "x": 8,
+      "gid": 1011,
+      "x": 31,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1008,
-      "x": 7,
+      "gid": 1009,
+      "x": 29,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1008,
-      "x": 9,
+      "gid": 1009,
+      "x": 30,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1008,
-      "x": 10,
+      "gid": 1009,
+      "x": 28,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1008,
-      "x": 11,
+      "gid": 1009,
+      "x": 27,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1008,
-      "x": 12,
+      "gid": 1009,
+      "x": 26,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1008,
-      "x": 13,
+      "gid": 1009,
+      "x": 25,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1008,
+      "gid": 1009,
+      "x": 24,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 23,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 22,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 21,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 20,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 19,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 18,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 17,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 16,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
       "x": 14,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1008,
-      "x": 15,
+      "gid": 1009,
+      "x": 12,
       "y": 31,
-      "edge": "right"
-    },
-    {
-      "gid": 1015,
-      "x": 16,
-      "y": 30,
       "edge": "down"
     },
     {
-      "gid": 1015,
-      "x": 7,
-      "y": 30,
+      "gid": 1009,
+      "x": 13,
+      "y": 31,
       "edge": "down"
     },
     {
-      "gid": 1013,
-      "x": 7,
+      "gid": 1009,
+      "x": 11,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 10,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 9,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 8,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1009,
+      "x": 15,
       "y": 31,
       "edge": "down"
     }

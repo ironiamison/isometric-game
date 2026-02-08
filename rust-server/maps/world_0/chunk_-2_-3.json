@@ -7,6 +7,13 @@
   "size": 32,
   "layers": {
     "ground": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
       249,
       249,
       249,
@@ -14,8 +21,6 @@
       249,
       249,
       249,
-      408,
-      418,
       249,
       249,
       249,
@@ -34,6 +39,13 @@
       249,
       249,
       249,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
       249,
       249,
       249,
@@ -59,6 +71,13 @@
       249,
       249,
       249,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
       249,
       249,
       249,
@@ -84,32 +103,13 @@
       249,
       249,
       249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
-      249,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
       249,
       249,
       249,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "gAAAAIAAAACAAAAAgAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [
     {
       "entityId": "springs",
@@ -4323,25 +4323,31 @@
       "gid": 1013,
       "x": 7,
       "y": 0,
-      "edge": "down"
+      "edge": "right"
     },
     {
       "gid": 1013,
       "x": 7,
       "y": 1,
-      "edge": "down"
+      "edge": "right"
+    },
+    {
+      "gid": 1013,
+      "x": 7,
+      "y": 3,
+      "edge": "right"
+    },
+    {
+      "gid": 1013,
+      "x": 7,
+      "y": 4,
+      "edge": "right"
     },
     {
       "gid": 1013,
       "x": 7,
       "y": 2,
-      "edge": "down"
-    },
-    {
-      "gid": 1017,
-      "x": 7,
-      "y": 3,
-      "edge": "down"
+      "edge": "right"
     }
   ],
   "portals": [],

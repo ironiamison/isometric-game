@@ -70,7 +70,7 @@
       649,
       649,
       649,
-      649,
+      2,
       649,
       649,
       649,
@@ -102,6 +102,7 @@
       649,
       649,
       649,
+      2,
       649,
       649,
       649,
@@ -133,8 +134,7 @@
       649,
       649,
       649,
-      649,
-      649,
+      2,
       649,
       649,
       649,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AhKQkD0xQMrCJgDAADgAYAAAAIEAAACAAAABgCAAANAAAAAAAAAAwBAAAIAAAQCAAAAAwAAAAIAAAADAACAAgAQEAIAAAADAAAAAQAAAAECAAAmAIAAAQAEAAIAAAACAAAAAQIAAAAAAAACAACAgoAAAAIIAAQCAAAAAwAAAAIA=",
+  "collision": "ghLU8T05UMrCJgDIADgAYAAAAIEAAACAAAABgCAAANAAAAAAAAAAwBAAAIAAAQCAAAAAwAAAAIAAAADAACAAgAQEAIAAAADAAAAAQAAAAECAAAmAIAAAQAEAAIAAAACAAAAAQIAAAAAAAACAACAgoAAAAIIAAQCAAAAAwAAAAIA=",
   "entities": [],
   "mapObjects": [
     {
@@ -4053,6 +4053,69 @@
       "y": 1,
       "width": 48,
       "height": 61
+    },
+    {
+      "gid": 1754,
+      "x": 30,
+      "y": 0,
+      "width": 66,
+      "height": 128
+    },
+    {
+      "gid": 1754,
+      "x": 29,
+      "y": 0,
+      "width": 66,
+      "height": 128
+    },
+    {
+      "gid": 1754,
+      "x": 24,
+      "y": 0,
+      "width": 66,
+      "height": 128
+    },
+    {
+      "gid": 1754,
+      "x": 27,
+      "y": 2,
+      "width": 66,
+      "height": 128
+    },
+    {
+      "gid": 1754,
+      "x": 22,
+      "y": 0,
+      "width": 66,
+      "height": 128
+    },
+    {
+      "gid": 1754,
+      "x": 20,
+      "y": 1,
+      "width": 66,
+      "height": 128
+    },
+    {
+      "gid": 1754,
+      "x": 18,
+      "y": 0,
+      "width": 66,
+      "height": 128
+    },
+    {
+      "gid": 1754,
+      "x": 11,
+      "y": 1,
+      "width": 66,
+      "height": 128
+    },
+    {
+      "gid": 1754,
+      "x": 7,
+      "y": 0,
+      "width": 66,
+      "height": 128
     }
   ],
   "walls": [],
