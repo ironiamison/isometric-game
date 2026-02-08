@@ -7687,7 +7687,7 @@ impl GameRoom {
     /// Cast a damage spell on the player's current target
     async fn cast_damage_spell(&self, player_id: &str, spell_def: &crate::spell::SpellDef, current_time: u64) {
         // 1. Get attacker info and target
-        let (caster_name, caster_x, caster_y, target_id_opt, magic_level) = {
+        let (caster_name, caster_x, caster_y, target_id_opt, magic_level, combat_level) = {
             let players = self.players.read().await;
             let player = match players.get(player_id) {
                 Some(p) if !p.is_dead && p.active => p,
@@ -7699,8 +7699,12 @@ impl GameRoom {
                 player.y,
                 player.target_id.clone(),
                 player.skills.magic.level,
+                player.skills.combat.level,
             )
         };
+
+        // Effective attack level for spells: blend of combat and magic so low-magic is still usable
+        let effective_level = (combat_level + magic_level) / 2;
 
         // Must have a target
         let target_id = match target_id_opt {
@@ -7789,7 +7793,7 @@ impl GameRoom {
             attack_type: "spell".to_string(),
         }).await;
 
-        // 6. Calculate hit/miss using magic level as attacker level
+        // 6. Calculate hit/miss using blended combat+magic level
         let attack_bonus = 0; // Spells don't use equipment attack bonus
         let (target_hp, target_name, target_died, actual_damage) = if is_npc {
             let mut npcs = self.npcs.write().await;
@@ -7797,12 +7801,12 @@ impl GameRoom {
                 let npc_defence_level = npc.level;
                 let npc_defence_bonus = 0;
 
-                if !crate::skills::calculate_hit(magic_level, attack_bonus, npc_defence_level, npc_defence_bonus) {
+                if !crate::skills::calculate_hit(effective_level, attack_bonus, npc_defence_level, npc_defence_bonus) {
                     // Miss
                     let name = npc.name();
                     tracing::info!(
-                        "{} spell misses {} (magic {} vs def {})",
-                        caster_name, name, magic_level, npc_defence_level
+                        "{} spell misses {} (eff {} [cmb{}+mag{}] vs def {})",
+                        caster_name, name, effective_level, combat_level, magic_level, npc_defence_level
                     );
                     (npc.hp, name, false, 0)
                 } else {
@@ -7838,12 +7842,12 @@ impl GameRoom {
                 let target_prayer_effects = self.prayer_registry.calculate_effects(&target_active_ids);
                 let target_defence_bonus = target_prayer_effects.apply_defence_bonus(base_defence_bonus);
 
-                if !crate::skills::calculate_hit(magic_level, attack_bonus, target_combat_level, target_defence_bonus) {
+                if !crate::skills::calculate_hit(effective_level, attack_bonus, target_combat_level, target_defence_bonus) {
                     // Miss
                     let name = target.name.clone();
                     tracing::info!(
-                        "{} spell misses {} (magic {} vs cmb {} + {})",
-                        caster_name, name, magic_level, target_combat_level, target_defence_bonus
+                        "{} spell misses {} (eff {} [cmb{}+mag{}] vs cmb {} + {})",
+                        caster_name, name, effective_level, combat_level, magic_level, target_combat_level, target_defence_bonus
                     );
                     (target.hp, name, false, 0)
                 } else {
