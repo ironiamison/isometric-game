@@ -210,6 +210,11 @@ pub struct Renderer {
     water_material: Option<Material>,
     /// Material for wave overlay drawn on top of water tiles
     water_overlay_material: Option<Material>,
+    /// Exit portal arrow textures for interior maps
+    exit_arrow_up: Option<Texture2D>,
+    exit_arrow_down: Option<Texture2D>,
+    exit_arrow_left: Option<Texture2D>,
+    exit_arrow_right: Option<Texture2D>,
 }
 
 impl Renderer {
@@ -241,8 +246,8 @@ impl Renderer {
         // Load manifest first to compute total sprite count
         let manifest = SpriteManifest::load().await;
 
-        // Fixed assets: 1 tileset + 14 players + 3 hair + 1 font + 8 UI textures + 1 shader = 28
-        const FIXED_ASSETS: usize = 28;
+        // Fixed assets: 1 tileset + 14 players + 3 hair + 1 font + 8 UI textures + 1 shader + 4 arrows = 32
+        const FIXED_ASSETS: usize = 32;
         let manifest_total = manifest.equipment.len()
             + manifest.weapons.len()
             + manifest.inventory.len()
@@ -584,6 +589,48 @@ impl Renderer {
             }
         };
 
+        // Load exit portal arrow textures
+        let exit_arrow_up = match load_texture(&asset_path("assets/ui/up_arrow.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load up_arrow icon: {}", e);
+                None
+            }
+        };
+        let exit_arrow_down = match load_texture(&asset_path("assets/ui/down_arrow.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load down_arrow icon: {}", e);
+                None
+            }
+        };
+        let exit_arrow_left = match load_texture(&asset_path("assets/ui/left_arrow.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load left_arrow icon: {}", e);
+                None
+            }
+        };
+        let exit_arrow_right = match load_texture(&asset_path("assets/ui/right_arrow.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load right_arrow icon: {}", e);
+                None
+            }
+        };
+
         // Load farming crop sprite sheets
         let farming_crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
         let mut farming_sprites = HashMap::new();
@@ -762,6 +809,10 @@ impl Renderer {
             head_hair_material,
             water_material,
             water_overlay_material,
+            exit_arrow_up,
+            exit_arrow_down,
+            exit_arrow_left,
+            exit_arrow_right,
         }
     }
 
@@ -1158,6 +1209,10 @@ impl Renderer {
         // 4. Render overhead layer (always on top)
         let t2 = get_time();
         self.render_tilemap_layer(state, LayerType::Overhead);
+
+        // 4.1. Render exit portal arrows on interior maps
+        self.render_exit_portal_arrows(state);
+
         timings.overhead_ms = (get_time() - t2) * 1000.0;
 
         // 4.5. Render name tags above all map elements (overhead, walls, objects, etc.)
@@ -3920,6 +3975,142 @@ impl Renderer {
             // Draw a star/sparkle icon in the center
             let star_color = Color::new(1.0, 1.0, 0.6, pulse + 0.3);
             draw_circle(screen_x, screen_y, 3.0 * zoom, star_color);
+        }
+    }
+
+    /// Render exit portal arrows on interior map edges
+    fn render_exit_portal_arrows(&self, state: &GameState) {
+        // Only render in interior mode
+        let (width, height) = match state.chunk_manager.get_interior_size() {
+            Some(size) => size,
+            None => return,
+        };
+
+        // Get interior chunk (always at 0,0)
+        let coord = crate::game::ChunkCoord::new(0, 0);
+        let chunk = match state.chunk_manager.chunks().get(&coord) {
+            Some(c) => c,
+            None => return,
+        };
+
+        // Pulsing opacity (70-100%, 2-second cycle)
+        let time = macroquad::time::get_time();
+        let alpha = (0.7 + 0.3 * (time * 3.14).sin() as f32).clamp(0.0, 1.0);
+        let color = Color::new(1.0, 1.0, 1.0, alpha);
+
+        let zoom = state.camera.zoom;
+        let arrow_w = 64.0 * zoom;
+        let arrow_h = 32.0 * zoom;
+
+        // Track min/max positions for portals on each edge
+        // (min_pos, max_pos) where pos is Y for left/right edges, X for top/bottom
+        let mut left_span: Option<(i32, i32)> = None;
+        let mut right_span: Option<(i32, i32)> = None;
+        let mut top_span: Option<(i32, i32)> = None;
+        let mut bottom_span: Option<(i32, i32)> = None;
+
+        // Group portals by edge and find spans
+        // Use else-if to ensure each portal only counts for ONE edge (priority: bottom > top > right > left)
+        for portal in &chunk.portals {
+            if portal.y + portal.height >= height as i32 {
+                // Bottom edge
+                let min_x = portal.x;
+                let max_x = portal.x + portal.width;
+                bottom_span = Some(match bottom_span {
+                    Some((cur_min, cur_max)) => (cur_min.min(min_x), cur_max.max(max_x)),
+                    None => (min_x, max_x),
+                });
+            } else if portal.y == 0 {
+                // Top edge
+                let min_x = portal.x;
+                let max_x = portal.x + portal.width;
+                top_span = Some(match top_span {
+                    Some((cur_min, cur_max)) => (cur_min.min(min_x), cur_max.max(max_x)),
+                    None => (min_x, max_x),
+                });
+            } else if portal.x + portal.width >= width as i32 {
+                // Right edge
+                let min_y = portal.y;
+                let max_y = portal.y + portal.height;
+                right_span = Some(match right_span {
+                    Some((cur_min, cur_max)) => (cur_min.min(min_y), cur_max.max(max_y)),
+                    None => (min_y, max_y),
+                });
+            } else if portal.x == 0 {
+                // Left edge
+                let min_y = portal.y;
+                let max_y = portal.y + portal.height;
+                left_span = Some(match left_span {
+                    Some((cur_min, cur_max)) => (cur_min.min(min_y), cur_max.max(max_y)),
+                    None => (min_y, max_y),
+                });
+            }
+        }
+
+        // Draw arrow for each edge that has portals, centered on the span
+        if let Some((min_y, max_y)) = left_span {
+            if let Some(ref tex) = self.exit_arrow_left {
+                let center_y = (min_y + max_y) as f32 / 2.0;
+                let (sx, sy) = world_to_screen(-0.5, center_y, &state.camera);
+                draw_texture_ex(
+                    tex,
+                    sx - arrow_w / 2.0,
+                    sy - arrow_h / 2.0,
+                    color,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(arrow_w, arrow_h)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+        if let Some((min_y, max_y)) = right_span {
+            if let Some(ref tex) = self.exit_arrow_right {
+                let center_y = (min_y + max_y) as f32 / 2.0;
+                let (sx, sy) = world_to_screen(width as f32 + 0.5, center_y, &state.camera);
+                draw_texture_ex(
+                    tex,
+                    sx - arrow_w / 2.0,
+                    sy - arrow_h / 2.0,
+                    color,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(arrow_w, arrow_h)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+        if let Some((min_x, max_x)) = top_span {
+            if let Some(ref tex) = self.exit_arrow_up {
+                let center_x = (min_x + max_x) as f32 / 2.0;
+                let (sx, sy) = world_to_screen(center_x, -0.5, &state.camera);
+                draw_texture_ex(
+                    tex,
+                    sx - arrow_w / 2.0,
+                    sy - arrow_h / 2.0,
+                    color,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(arrow_w, arrow_h)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+        if let Some((min_x, max_x)) = bottom_span {
+            if let Some(ref tex) = self.exit_arrow_down {
+                let center_x = (min_x + max_x) as f32 / 2.0;
+                let (sx, sy) = world_to_screen(center_x, height as f32 + 0.5, &state.camera);
+                draw_texture_ex(
+                    tex,
+                    sx - arrow_w / 2.0,
+                    sy - arrow_h / 2.0,
+                    color,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(arrow_w, arrow_h)),
+                        ..Default::default()
+                    },
+                );
+            }
         }
     }
 
