@@ -49,6 +49,7 @@
     "equipment/feet/royal_boots",
     "equipment/feet/rusty_boots",
     "equipment/feet/scavenger_boots",
+    "equipment/feet/training_boots",
     "equipment/feet/worn_boots",
     "equipment/feet/worn_sandals",
     "equipment/head/helmet_of_darkness",
@@ -196,6 +197,7 @@
     "tomato",
     "tomato_seed",
     "torn_clothes",
+    "training_boots",
     "training_gloves",
     "trout",
     "twin_blade",
@@ -15189,86 +15191,92 @@
         "w": 46,
         "h": 32
       },
-      "training_gloves": {
+      "training_boots": {
         "x": 966,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "trout": {
+      "training_gloves": {
         "x": 1012,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "twin_blade": {
+      "trout": {
         "x": 1058,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "undead_armor": {
+      "twin_blade": {
         "x": 1104,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "undead_gloves": {
+      "undead_armor": {
         "x": 1150,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "undead_ring": {
+      "undead_gloves": {
         "x": 1196,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "used_belt": {
+      "undead_ring": {
         "x": 1242,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "wheat": {
+      "used_belt": {
         "x": 1288,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "wheat_seed": {
+      "wheat": {
         "x": 1334,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "worm_segment": {
+      "wheat_seed": {
         "x": 1380,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "worn_belt": {
+      "worm_segment": {
         "x": 1426,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "worn_boots": {
+      "worn_belt": {
         "x": 1472,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "worn_sandals": {
+      "worn_boots": {
         "x": 1518,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "gold_1": {
+      "worn_sandals": {
         "x": 1564,
+        "y": 64,
+        "w": 46,
+        "h": 32
+      },
+      "gold_1": {
+        "x": 1610,
         "y": 64,
         "w": 16,
         "h": 16
