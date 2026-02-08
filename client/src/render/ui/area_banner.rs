@@ -105,9 +105,9 @@ impl Renderer {
         let font_size = 32.0;
         let text_dims = self.measure_text_sharp(text, font_size);
 
-        // Banner dimensions
-        let padding_x = 24.0;
-        let padding_y = 12.0;
+        // Banner dimensions - snug fit around text
+        let padding_x = 14.0;
+        let padding_y = 6.0;
         let banner_width = text_dims.width + padding_x * 2.0;
         let banner_height = text_dims.height + padding_y * 2.0;
         let banner_x = ((screen_w - banner_width) / 2.0).floor();
@@ -142,9 +142,9 @@ impl Renderer {
         draw_rectangle(frame_right - corner_len, frame_bottom - thickness, corner_len, thickness, corner_color);
         draw_rectangle(frame_right - thickness, frame_bottom - corner_len, thickness, corner_len, corner_color);
 
-        // Draw text (centered vertically in banner)
-        let text_x = ((screen_w - text_dims.width) / 2.0).floor();
-        let text_y = (banner_y + banner_height / 2.0 + text_dims.height * 0.3).floor();
+        // Draw text (perfectly centered in banner)
+        let text_x = (banner_x + (banner_width - text_dims.width) / 2.0).floor();
+        let text_y = (banner_y + (banner_height + text_dims.height) / 2.0).floor();
         self.draw_text_sharp(text, text_x + 1.0, text_y + 1.0, font_size, shadow_color);
 
         // Draw text
