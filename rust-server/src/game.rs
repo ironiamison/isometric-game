@@ -5654,6 +5654,8 @@ impl GameRoom {
                 .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.direction))
                 .collect()
         };
+        // Track all players with pending moves so we can clear rejected ones
+        let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _)| id.clone()).collect();
 
         // Collect current entity positions for collision checking
         let player_positions: std::collections::HashSet<(i32, i32)> = {
@@ -5761,6 +5763,18 @@ impl GameRoom {
                     player.x = target_x;
                     player.y = target_y;
                     player.last_move_tick = current_tick;
+                }
+            }
+
+            // Clear movement intent for players whose moves were rejected
+            // This prevents broadcasting stale velocity (which causes client-side
+            // prediction into walls) and stops the server from retrying invalid moves
+            for player_id in &pending_player_ids {
+                if !moved_players.contains(player_id) {
+                    if let Some(player) = players.get_mut(player_id) {
+                        player.move_dx = 0;
+                        player.move_dy = 0;
+                    }
                 }
             }
 
