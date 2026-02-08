@@ -361,8 +361,8 @@
       381,
       15,
       15,
-      381,
-      381,
+      987,
+      987,
       294,
       294,
       381,
@@ -393,8 +393,8 @@
       15,
       15,
       15,
-      106,
-      106,
+      987,
+      987,
       294,
       294,
       381,
@@ -425,8 +425,8 @@
       381,
       15,
       15,
-      459,
-      381,
+      987,
+      987,
       294,
       294,
       381,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAcAAAAHAIAABwAAAAUAAAAAAAAAAAAAAAAAAAAAAIAA/AAAAwYBcAMDAnADAQQwAwEYcEMBIHADAkBiAwKA/wACgAEABIABAAiAAQAIgAFAEIABACCAAXBAgAFwgOABcAATATAAFAFwABT/cAAUAHAAFwAAABEAAMARAP9/6P8=",
+  "collision": "AAcAAAAHAIAABwAAAAUAAAAAAAAAAAAAAAAAAAAAAIAA/AAAAwYBcAcDAnADAQQwAQEYcEMBIHAHAkBiAwKA/wACgAEABIABAAiAAQAIgAFAEIABACCAAXBAgAFwgOABcAATATAAFAFwABT/cAAUAHAAFwAAABEAAMARAP9/6P8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3625,13 +3625,6 @@
       "height": 55
     },
     {
-      "gid": 1693,
-      "x": 13,
-      "y": 10,
-      "width": 64,
-      "height": 55
-    },
-    {
       "gid": 1742,
       "x": 26,
       "y": 14,
@@ -3665,6 +3658,20 @@
       "y": 26,
       "width": 64,
       "height": 32
+    },
+    {
+      "gid": 1625,
+      "x": 2,
+      "y": 14,
+      "width": 64,
+      "height": 97
+    },
+    {
+      "gid": 1625,
+      "x": 2,
+      "y": 10,
+      "width": 64,
+      "height": 97
     }
   ],
   "walls": [
