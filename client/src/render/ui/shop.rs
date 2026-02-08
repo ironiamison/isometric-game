@@ -453,8 +453,8 @@ impl Renderer {
         let max_bg = if max_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
         draw_rectangle(cx, btn_y, max_w, btn_size, SLOT_BORDER);
         draw_rectangle(cx + 1.0, btn_y + 1.0, max_w - 2.0, btn_size - 2.0, max_bg);
-        let max_dims = self.measure_text_sharp("Max", 12.0);
-        self.draw_text_sharp("Max", cx + (max_w - max_dims.width) / 2.0, row_y + 4.0, 12.0, TEXT_NORMAL);
+        let max_dims = self.measure_text_sharp("Max", 16.0);
+        self.draw_text_sharp("Max", cx + (max_w - max_dims.width) / 2.0, row_y + 2.0, 16.0, TEXT_NORMAL);
         cx += max_w + 8.0;
 
         // Price with nugget icon
