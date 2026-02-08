@@ -6099,7 +6099,7 @@ impl GameRoom {
                 }
             };
 
-            // Build shared occupied tiles set once: all alive NPC positions + player positions
+            // Build shared occupied tiles set once: all alive NPC positions + player positions + portal tiles
             let mut occupied_tiles: std::collections::HashSet<(i32, i32)> = npcs
                 .values()
                 .filter(|n| n.is_alive())
@@ -6107,6 +6107,18 @@ impl GameRoom {
                 .collect();
             for (_, px, py, _) in &player_positions {
                 occupied_tiles.insert((*px, *py));
+            }
+            // Add portal tiles so NPCs cannot walk onto or path through portals
+            for (coord, chunk) in chunks_guard.iter() {
+                let base_x = coord.x * crate::chunk::CHUNK_SIZE as i32;
+                let base_y = coord.y * crate::chunk::CHUNK_SIZE as i32;
+                for portal in &chunk.portals {
+                    for dx in 0..portal.width {
+                        for dy in 0..portal.height {
+                            occupied_tiles.insert((base_x + portal.x + dx, base_y + portal.y + dy));
+                        }
+                    }
+                }
             }
 
             for npc in npcs.values_mut() {
