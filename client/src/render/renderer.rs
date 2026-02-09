@@ -2572,6 +2572,12 @@ impl Renderer {
     }
 
     fn render_tilemap_layer(&self, state: &GameState, layer_type: LayerType) {
+        // Don't render anything until camera is initialized (player has spawned)
+        // This prevents showing the fallback test tilemap during login
+        if !state.camera.initialized {
+            return;
+        }
+
         // Convert LayerType to ChunkLayerType for chunk rendering
         let chunk_layer_type = match layer_type {
             LayerType::Ground => ChunkLayerType::Ground,

@@ -360,7 +360,19 @@ pub fn run_game_frame(
         };
         renderer.draw_text_sharp(&format!("FPS: {}{} [F4]", get_fps(), fps_cap_str), 10.0, 20.0, 16.0, WHITE);
         renderer.draw_text_sharp(&format!("Players: {}", game_state.players.len()), 10.0, 40.0, 16.0, WHITE);
-        renderer.draw_text_sharp(&format!("Connected: {}", network.is_connected()), 10.0, 60.0, 16.0, WHITE);
+        let ping_str = if game_state.ping_stats.has_data() {
+            let ps = &game_state.ping_stats;
+            format!(" | Ping: {}ms (avg:{} min:{} max:{})",
+                ps.current_ms.round() as i32,
+                ps.avg_ms.round() as i32,
+                ps.min_ms.round() as i32,
+                ps.max_ms.round() as i32)
+        } else if game_state.debug_mode {
+            " | Ping: waiting...".to_string()
+        } else {
+            String::new()
+        };
+        renderer.draw_text_sharp(&format!("Connected: {}{}", network.is_connected(), ping_str), 10.0, 60.0, 16.0, WHITE);
 
         if let Some(player) = game_state.get_local_player() {
             let chunk_x = (player.x / 32.0).floor() as i32;
