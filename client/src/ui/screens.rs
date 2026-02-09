@@ -235,7 +235,7 @@ fn draw_character_preview(
                     draw_texture_ex(
                         equip_sprite,
                         x,
-                        y + 51.0,
+                        y + 46.0,
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(equip_atlas_x, equip_atlas_y, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),

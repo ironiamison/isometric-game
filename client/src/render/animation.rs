@@ -599,9 +599,11 @@ pub fn get_boot_offset(state: AnimationState, direction: Direction, anim_frame: 
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: boots are 34 wide (same as player), so center them
-    // Boots are 27 tall and should align with player's feet (player is 78 tall)
+    // Boot content is ~15px tall within a 27px frame, with 7px padding at top
+    // Player feet are at y=67, boot content bottom is at y=21 within frame
+    // So: base_y = player_feet(67) - boot_content_bottom(21) = 46
     let base_x = 0.0; // Center boots under player
-    let base_y = 51.0; // Position at feet (78 - 27 = 51)
+    let base_y = 46.0; // Align boot content with player feet
 
     // Per-state offsets for alignment
     let (state_x, state_y) = match state {
