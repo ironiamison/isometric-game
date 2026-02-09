@@ -1574,20 +1574,33 @@ async fn handle_socket(
     }
 
     // Spawn task to forward messages to WebSocket
+    let send_player_id = player_id.clone();
     let mut send_task = tokio::spawn(async move {
         loop {
             tokio::select! {
                 // Handle direct messages to this client
                 Some(msg) = rx.recv() => {
+                    let send_start = std::time::Instant::now();
+                    let msg_len = msg.len();
                     if sender.send(Message::Binary(msg)).await.is_err() {
                         break;
+                    }
+                    let send_ms = send_start.elapsed().as_millis();
+                    if send_ms > 50 {
+                        tracing::warn!("Slow WS send (unicast): {}ms, {}B for {}", send_ms, msg_len, send_player_id);
                     }
                 }
                 // Handle broadcast messages
                 Ok(msg) = broadcast_rx.recv() => {
                     if let Ok(bytes) = protocol::encode_server_message(&msg) {
+                        let send_start = std::time::Instant::now();
+                        let msg_len = bytes.len();
                         if sender.send(Message::Binary(bytes)).await.is_err() {
                             break;
+                        }
+                        let send_ms = send_start.elapsed().as_millis();
+                        if send_ms > 50 {
+                            tracing::warn!("Slow WS send (broadcast): {}ms, {}B for {}", send_ms, msg_len, send_player_id);
                         }
                     }
                 }
