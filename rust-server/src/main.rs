@@ -2404,6 +2404,8 @@ async fn handle_client_message(
     data: &[u8],
 ) -> Result<(), String> {
     let msg = protocol::decode_client_message(data)?;
+    let handler_start = std::time::Instant::now();
+    let msg_name = msg.name();
 
     match msg {
         ClientMessage::Move { dx, dy } => {
@@ -2541,6 +2543,11 @@ async fn handle_client_message(
         ClientMessage::Ping { timestamp } => {
             room.send_to_player(player_id, ServerMessage::Pong { timestamp }).await;
         }
+    }
+
+    let handler_duration = handler_start.elapsed();
+    if handler_duration.as_millis() > 20 {
+        tracing::warn!("Slow handler: {} took {}ms for player {}", msg_name, handler_duration.as_millis(), player_id);
     }
 
     Ok(())

@@ -187,6 +187,57 @@ pub enum ClientMessage {
     Ping { timestamp: f64 },
 }
 
+impl ClientMessage {
+    pub fn name(&self) -> &'static str {
+        match self {
+            ClientMessage::Move { .. } => "Move",
+            ClientMessage::Face { .. } => "Face",
+            ClientMessage::Chat { .. } => "Chat",
+            ClientMessage::Attack => "Attack",
+            ClientMessage::Target { .. } => "Target",
+            ClientMessage::Pickup { .. } => "Pickup",
+            ClientMessage::UseItem { .. } => "UseItem",
+            ClientMessage::Auth { .. } => "Auth",
+            ClientMessage::Register { .. } => "Register",
+            ClientMessage::RequestChunk { .. } => "RequestChunk",
+            ClientMessage::Interact { .. } => "Interact",
+            ClientMessage::DialogueChoiceMsg { .. } => "DialogueChoice",
+            ClientMessage::AcceptQuest { .. } => "AcceptQuest",
+            ClientMessage::AbandonQuest { .. } => "AbandonQuest",
+            ClientMessage::Craft { .. } => "Craft",
+            ClientMessage::StartCraft { .. } => "StartCraft",
+            ClientMessage::CancelCraft => "CancelCraft",
+            ClientMessage::Equip { .. } => "Equip",
+            ClientMessage::Unequip { .. } => "Unequip",
+            ClientMessage::DropItem { .. } => "DropItem",
+            ClientMessage::DropGold { .. } => "DropGold",
+            ClientMessage::SwapSlots { .. } => "SwapSlots",
+            ClientMessage::ShopBuy { .. } => "ShopBuy",
+            ClientMessage::ShopSell { .. } => "ShopSell",
+            ClientMessage::EnterPortal { .. } => "EnterPortal",
+            ClientMessage::StartGathering { .. } => "StartGathering",
+            ClientMessage::StopGathering => "StopGathering",
+            ClientMessage::SitChair { .. } => "SitChair",
+            ClientMessage::StandUp => "StandUp",
+            ClientMessage::PlantSeed { .. } => "PlantSeed",
+            ClientMessage::HarvestCrop { .. } => "HarvestCrop",
+            ClientMessage::SendFriendRequest { .. } => "SendFriendRequest",
+            ClientMessage::AcceptFriendRequest { .. } => "AcceptFriendRequest",
+            ClientMessage::DeclineFriendRequest { .. } => "DeclineFriendRequest",
+            ClientMessage::RemoveFriend { .. } => "RemoveFriend",
+            ClientMessage::GetOnlinePlayers => "GetOnlinePlayers",
+            ClientMessage::TogglePrayer { .. } => "TogglePrayer",
+            ClientMessage::BuryBones { .. } => "BuryBones",
+            ClientMessage::OfferBones { .. } => "OfferBones",
+            ClientMessage::OfferAllBones { .. } => "OfferAllBones",
+            ClientMessage::PrayAtAltar { .. } => "PrayAtAltar",
+            ClientMessage::CastSpell { .. } => "CastSpell",
+            ClientMessage::ChopTree { .. } => "ChopTree",
+            ClientMessage::Ping { .. } => "Ping",
+        }
+    }
+}
+
 // ============================================================================
 // Server -> Client Messages
 // ============================================================================
