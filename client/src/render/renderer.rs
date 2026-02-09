@@ -150,6 +150,14 @@ impl SpriteStore {
             }
         }
     }
+
+    /// Returns the number of sprites in this store.
+    pub fn len(&self) -> usize {
+        match self {
+            SpriteStore::Atlas(atlas) => atlas.rects.len(),
+            SpriteStore::Individual(map) => map.len(),
+        }
+    }
 }
 
 pub struct WeaponSprite {
@@ -263,10 +271,12 @@ pub struct Renderer {
     pub(crate) coin_small_icon: Option<Texture2D>,
     /// Farming crop sprite sheets by crop name (e.g., "potato" -> Texture2D)
     farming_sprites: SpritesheetStore,
-    /// Prayer icons by prayer id (e.g., "clarity" -> Texture2D)
-    pub(crate) prayer_icons: HashMap<String, Texture2D>,
-    /// Spell icons by spell id (e.g., "dark_hand" -> Texture2D)
-    pub(crate) spell_icons: HashMap<String, Texture2D>,
+    /// Prayer icons by prayer id (e.g., "clarity" -> Texture2D or atlas rect)
+    pub(crate) prayer_icons: SpriteStore,
+    /// Spell icons by spell id (e.g., "dark_hand" -> Texture2D or atlas rect)
+    pub(crate) spell_icons: SpriteStore,
+    /// Miscellaneous UI icons atlas (quest_complete, arrows, etc.)
+    pub(crate) ui_misc_atlas: Option<SpriteAtlas>,
     /// Spell effect sprite sheets by effect name (e.g., "dark_hand" -> Texture2D)
     spell_effect_textures: SpritesheetStore,
     /// Material for head+hair composite rendering (shader-based)
@@ -855,44 +865,83 @@ impl Renderer {
         // farming_sprites loaded via atlas/manifest in earlier block
         log::info!("Farming sprites loaded: {}", farming_sprites.len());
 
-        // Load prayer icons
-        let prayer_names = [
-            "clarity", "thick_skin", "burst_of_strength", "improved_clarity",
-            "rock_skin", "superhuman_strength", "resourcefulness", "rapid_heal",
-            "steel_skin", "incredible_clarity", "ultimate_strength", "protection",
-            "greater_resourcefulness", "greater_protection",
-        ];
-        let mut prayer_icons = HashMap::new();
-        for prayer in &prayer_names {
-            let path = asset_path(&format!("assets/ui/prayers/{}.png", prayer));
-            match load_texture(&path).await {
-                Ok(tex) => {
-                    tex.set_filter(FilterMode::Nearest);
-                    prayer_icons.insert(prayer.to_string(), tex);
-                }
-                Err(_) => {}
+        // Load prayer icons - atlas on WASM/Android, individual files on desktop
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        let prayer_icons: SpriteStore = if let Some(ref atlas_info) = manifest.prayers_atlas {
+            if let Some(atlas) = load_atlas(atlas_info).await {
+                SpriteStore::Atlas(atlas)
+            } else {
+                SpriteStore::Individual(HashMap::new())
             }
-        }
+        } else {
+            SpriteStore::Individual(HashMap::new())
+        };
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        let prayer_icons: SpriteStore = {
+            let prayer_names = [
+                "clarity", "thick_skin", "burst_of_strength", "improved_clarity",
+                "rock_skin", "superhuman_strength", "resourcefulness", "rapid_heal",
+                "steel_skin", "incredible_clarity", "ultimate_strength", "protection",
+                "greater_resourcefulness", "greater_protection",
+            ];
+            let mut icons = HashMap::new();
+            for prayer in &prayer_names {
+                let path = asset_path(&format!("assets/ui/prayers/{}.png", prayer));
+                match load_texture(&path).await {
+                    Ok(tex) => {
+                        tex.set_filter(FilterMode::Nearest);
+                        icons.insert(prayer.to_string(), tex);
+                    }
+                    Err(_) => {}
+                }
+            }
+            SpriteStore::Individual(icons)
+        };
         log::info!("Loaded {} prayer icons", prayer_icons.len());
 
-        // Load spell icons (spell_id -> icon_filename mapping)
-        let spell_icon_mappings = [
-            ("dark_hand", "dark_hand"),
-            ("dark_eater", "dark_eater"),
-            ("heal", "self_heal"),
-        ];
-        let mut spell_icons = HashMap::new();
-        for (spell_id, icon_name) in &spell_icon_mappings {
-            let path = asset_path(&format!("assets/ui/spells/{}.png", icon_name));
-            match load_texture(&path).await {
-                Ok(tex) => {
-                    tex.set_filter(FilterMode::Nearest);
-                    spell_icons.insert(spell_id.to_string(), tex);
-                }
-                Err(_) => {}
+        // Load spell icons - atlas on WASM/Android, individual files on desktop
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        let spell_icons: SpriteStore = if let Some(ref atlas_info) = manifest.spells_atlas {
+            if let Some(atlas) = load_atlas(atlas_info).await {
+                SpriteStore::Atlas(atlas)
+            } else {
+                SpriteStore::Individual(HashMap::new())
             }
-        }
+        } else {
+            SpriteStore::Individual(HashMap::new())
+        };
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        let spell_icons: SpriteStore = {
+            // spell_id -> icon_filename mapping (spell ids don't always match filenames)
+            let spell_icon_mappings = [
+                ("dark_hand", "dark_hand"),
+                ("dark_eater", "dark_eater"),
+                ("heal", "self_heal"),
+            ];
+            let mut icons = HashMap::new();
+            for (spell_id, icon_name) in &spell_icon_mappings {
+                let path = asset_path(&format!("assets/ui/spells/{}.png", icon_name));
+                match load_texture(&path).await {
+                    Ok(tex) => {
+                        tex.set_filter(FilterMode::Nearest);
+                        icons.insert(spell_id.to_string(), tex);
+                    }
+                    Err(_) => {}
+                }
+            }
+            SpriteStore::Individual(icons)
+        };
         log::info!("Loaded {} spell icons", spell_icons.len());
+
+        // Load miscellaneous UI icons atlas (WASM/Android only)
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        let ui_misc_atlas: Option<SpriteAtlas> = if let Some(ref atlas_info) = manifest.ui_misc_atlas {
+            load_atlas(atlas_info).await
+        } else {
+            None
+        };
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        let ui_misc_atlas: Option<SpriteAtlas> = None;
 
         // spell_effect_textures loaded via atlas/manifest in earlier block
         log::info!("Spell effect textures loaded: {}", spell_effect_textures.len());
@@ -1007,6 +1056,7 @@ impl Renderer {
             farming_sprites,
             prayer_icons,
             spell_icons,
+            ui_misc_atlas,
             spell_effect_textures,
             head_hair_material,
             water_material,

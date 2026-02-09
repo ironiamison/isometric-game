@@ -319,14 +319,15 @@ impl Renderer {
             WHITE
         };
 
-        // Draw spell icon from texture or fallback to initials
-        if let Some(texture) = self.spell_icons.get(spell.id) {
+        // Draw spell icon from texture atlas or fallback to initials
+        if let Some((texture, source_rect)) = self.spell_icons.get(spell.id) {
             draw_texture_ex(
                 texture,
                 icon_x,
                 icon_y,
                 icon_color,
                 DrawTextureParams {
+                    source: source_rect,
                     dest_size: Some(Vec2::new(icon_size, icon_size)),
                     ..Default::default()
                 },
@@ -501,15 +502,16 @@ impl Renderer {
         }
     }
 
-    /// Draw prayer icon from individual texture file
+    /// Draw prayer icon from texture atlas or individual file
     fn draw_prayer_icon(&self, x: f32, y: f32, size: f32, prayer_id: &str, color: Color) {
-        if let Some(texture) = self.prayer_icons.get(prayer_id) {
+        if let Some((texture, source_rect)) = self.prayer_icons.get(prayer_id) {
             draw_texture_ex(
                 texture,
                 x,
                 y,
                 color,
                 DrawTextureParams {
+                    source: source_rect,
                     dest_size: Some(Vec2::new(size, size)),
                     ..Default::default()
                 },

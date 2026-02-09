@@ -19,6 +19,7 @@ from PIL import Image
 
 ASSETS_DIR = Path(__file__).parent.parent / "client" / "assets"
 SPRITES_DIR = ASSETS_DIR / "sprites"
+UI_DIR = ASSETS_DIR / "ui"
 MANIFEST_PATH = ASSETS_DIR / "sprite_manifest.json"
 MAX_ATLAS_SIZE = 4096
 
@@ -178,6 +179,111 @@ def pack_category(category: str, recursive: bool = False, key_transform=None):
         }
 
 
+def pack_ui_category(category: str, key_transform=None):
+    """Pack a UI category (prayers, spells) and return atlas info for manifest."""
+    ui_subdir = UI_DIR / category
+    if not ui_subdir.exists():
+        print(f"  Skipping ui/{category}: directory not found")
+        return None
+
+    sprites = collect_sprites(ui_subdir, recursive=False, key_transform=key_transform)
+    if not sprites:
+        print(f"  Skipping ui/{category}: no sprites found")
+        return None
+
+    print(f"  Packing {len(sprites)} ui/{category} icons...")
+    atlases = pack_atlas(sprites)
+
+    if len(atlases) == 1:
+        atlas_img, rects = atlases[0]
+        atlas_filename = f"{category}_atlas.png"
+        atlas_path = UI_DIR / atlas_filename
+        atlas_img.save(atlas_path, optimize=True)
+        print(f"  -> ui/{atlas_filename}: {atlas_img.width}x{atlas_img.height}, {len(rects)} icons")
+        return {
+            "file": f"ui/{atlas_filename}",
+            "sprites": rects,
+        }
+    else:
+        # Multiple atlases needed (unlikely for small UI icons)
+        all_sprites = {}
+        files = []
+        for i, (atlas_img, rects) in enumerate(atlases):
+            atlas_filename = f"{category}_atlas_{i}.png"
+            atlas_path = UI_DIR / atlas_filename
+            atlas_img.save(atlas_path, optimize=True)
+            print(f"  -> ui/{atlas_filename}: {atlas_img.width}x{atlas_img.height}, {len(rects)} icons")
+            for key, rect in rects.items():
+                rect["atlas"] = i
+                all_sprites[key] = rect
+            files.append(f"ui/{atlas_filename}")
+        return {
+            "files": files,
+            "sprites": all_sprites,
+        }
+
+
+def pack_ui_misc_icons():
+    """Pack miscellaneous UI icons (arrows, small icons) into a single atlas."""
+    # List of individual UI icons to combine
+    icon_files = [
+        "quest_complete.png",
+        "gold_nugget.png",
+        "circular_stone.png",
+        "chat_small.png",
+        "fishing_skill.png",
+        "coin_small.png",
+        "trout.png",
+        "attack_button.png",
+        "up_arrow.png",
+        "down_arrow.png",
+        "left_arrow.png",
+        "right_arrow.png",
+    ]
+
+    sprites = {}
+    for filename in icon_files:
+        path = UI_DIR / filename
+        if path.exists():
+            key = path.stem  # filename without extension
+            sprites[key] = path
+
+    if not sprites:
+        print("  Skipping ui_misc: no icons found")
+        return None
+
+    print(f"  Packing {len(sprites)} miscellaneous UI icons...")
+    atlases = pack_atlas(sprites)
+
+    if len(atlases) == 1:
+        atlas_img, rects = atlases[0]
+        atlas_filename = "ui_misc_atlas.png"
+        atlas_path = UI_DIR / atlas_filename
+        atlas_img.save(atlas_path, optimize=True)
+        print(f"  -> ui/{atlas_filename}: {atlas_img.width}x{atlas_img.height}, {len(rects)} icons")
+        return {
+            "file": f"ui/{atlas_filename}",
+            "sprites": rects,
+        }
+    else:
+        # Multiple atlases (unlikely)
+        all_sprites = {}
+        files = []
+        for i, (atlas_img, rects) in enumerate(atlases):
+            atlas_filename = f"ui_misc_atlas_{i}.png"
+            atlas_path = UI_DIR / atlas_filename
+            atlas_img.save(atlas_path, optimize=True)
+            print(f"  -> ui/{atlas_filename}: {atlas_img.width}x{atlas_img.height}, {len(rects)} icons")
+            for key, rect in rects.items():
+                rect["atlas"] = i
+                all_sprites[key] = rect
+            files.append(f"ui/{atlas_filename}")
+        return {
+            "files": files,
+            "sprites": all_sprites,
+        }
+
+
 def main():
     print("Sprite Atlas Packer")
     print("=" * 40)
@@ -231,6 +337,23 @@ def main():
         atlas_info = pack_category(category, recursive=recursive, key_transform=key_transform)
         if atlas_info:
             manifest[f"{category}_atlas"] = atlas_info
+
+    # Pack UI categories (prayers, spells)
+    print()
+    print("Packing UI icons...")
+    ui_categories = [
+        ("prayers", None),
+        ("spells", None),
+    ]
+    for category, key_transform in ui_categories:
+        atlas_info = pack_ui_category(category, key_transform=key_transform)
+        if atlas_info:
+            manifest[f"{category}_atlas"] = atlas_info
+
+    # Pack miscellaneous UI icons
+    atlas_info = pack_ui_misc_icons()
+    if atlas_info:
+        manifest["ui_misc_atlas"] = atlas_info
 
     # Write updated manifest
     with open(MANIFEST_PATH, "w") as f:

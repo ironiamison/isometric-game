@@ -16127,5 +16127,194 @@
         "h": 65
       }
     }
+  },
+  "prayers_atlas": {
+    "file": "ui/prayers_atlas.png",
+    "sprites": {
+      "burst_of_strength": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "clarity": {
+        "x": 24,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "greater_protection": {
+        "x": 48,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "greater_resourcefulness": {
+        "x": 72,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "improved_clarity": {
+        "x": 96,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "incredible_clarity": {
+        "x": 120,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "protection": {
+        "x": 144,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "rapid_heal": {
+        "x": 168,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "resourcefulness": {
+        "x": 192,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "rock_skin": {
+        "x": 216,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "steel_skin": {
+        "x": 240,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "superhuman_strength": {
+        "x": 264,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "thick_skin": {
+        "x": 288,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "ultimate_strength": {
+        "x": 312,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      }
+    }
+  },
+  "spells_atlas": {
+    "file": "ui/spells_atlas.png",
+    "sprites": {
+      "dark_eater": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "dark_hand": {
+        "x": 32,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "heal": {
+        "x": 64,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      }
+    }
+  },
+  "ui_misc_atlas": {
+    "file": "ui/ui_misc_atlas.png",
+    "sprites": {
+      "quest_complete": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 125
+      },
+      "attack_button": {
+        "x": 256,
+        "y": 0,
+        "w": 80,
+        "h": 80
+      },
+      "circular_stone": {
+        "x": 336,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "up_arrow": {
+        "x": 400,
+        "y": 0,
+        "w": 64,
+        "h": 32
+      },
+      "down_arrow": {
+        "x": 464,
+        "y": 0,
+        "w": 64,
+        "h": 32
+      },
+      "left_arrow": {
+        "x": 528,
+        "y": 0,
+        "w": 64,
+        "h": 32
+      },
+      "right_arrow": {
+        "x": 592,
+        "y": 0,
+        "w": 64,
+        "h": 32
+      },
+      "trout": {
+        "x": 656,
+        "y": 0,
+        "w": 46,
+        "h": 32
+      },
+      "fishing_skill": {
+        "x": 702,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "chat_small": {
+        "x": 734,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "coin_small": {
+        "x": 750,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "gold_nugget": {
+        "x": 766,
+        "y": 0,
+        "w": 12,
+        "h": 12
+      }
+    }
   }
 }

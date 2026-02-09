@@ -112,6 +112,12 @@ pub struct SpriteManifest {
     pub farming_atlas: Option<SpriteAtlasInfo>,
     #[serde(default)]
     pub effects_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub prayers_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub spells_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub ui_misc_atlas: Option<SpriteAtlasInfo>,
     /// Per-weapon frame size overrides: { "weapon_id": [width, height] }
     /// Weapons not listed here use the default 68x84.
     #[serde(default)]

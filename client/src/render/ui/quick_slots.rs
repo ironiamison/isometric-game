@@ -136,7 +136,7 @@ impl Renderer {
                 self.draw_inventory_slot(x, y, slot_size, true, slot_state);
 
                 // Try to draw spell icon texture, fallback to colored rect with letter
-                if let Some(texture) = self.spell_icons.get(spell_def.id) {
+                if let Some((texture, source_rect)) = self.spell_icons.get(spell_def.id) {
                     // Draw icon centered in slot
                     let icon_size = slot_size - 8.0;
                     let icon_x = (x + (slot_size - icon_size) / 2.0).floor();
@@ -147,6 +147,7 @@ impl Renderer {
                         icon_y,
                         WHITE,
                         DrawTextureParams {
+                            source: source_rect,
                             dest_size: Some(Vec2::new(icon_size, icon_size)),
                             ..Default::default()
                         },
