@@ -25,6 +25,7 @@ pub enum SkillType {
     Smithing,
     Prayer,
     Magic,
+    Woodcutting,
 }
 
 impl SkillType {
@@ -37,6 +38,7 @@ impl SkillType {
             SkillType::Smithing => "smithing",
             SkillType::Prayer => "prayer",
             SkillType::Magic => "magic",
+            SkillType::Woodcutting => "woodcutting",
         }
     }
 
@@ -49,6 +51,7 @@ impl SkillType {
             "smithing" => Some(SkillType::Smithing),
             "prayer" => Some(SkillType::Prayer),
             "magic" => Some(SkillType::Magic),
+            "woodcutting" => Some(SkillType::Woodcutting),
             _ => None,
         }
     }
@@ -62,6 +65,7 @@ impl SkillType {
             SkillType::Smithing,
             SkillType::Prayer,
             SkillType::Magic,
+            SkillType::Woodcutting,
         ]
     }
 }
@@ -171,6 +175,8 @@ pub struct Skills {
     pub prayer: Skill,
     #[serde(default)]
     pub magic: Skill,
+    #[serde(default)]
+    pub woodcutting: Skill,
 }
 
 impl Default for Skills {
@@ -190,6 +196,7 @@ impl Skills {
             smithing: Skill::new(1),
             prayer: Skill::new(1),
             magic: Skill::new(1),
+            woodcutting: Skill::new(1),
         }
     }
 
@@ -209,6 +216,7 @@ impl Skills {
             SkillType::Smithing => &self.smithing,
             SkillType::Prayer => &self.prayer,
             SkillType::Magic => &self.magic,
+            SkillType::Woodcutting => &self.woodcutting,
         }
     }
 
@@ -222,12 +230,13 @@ impl Skills {
             SkillType::Smithing => &mut self.smithing,
             SkillType::Prayer => &mut self.prayer,
             SkillType::Magic => &mut self.magic,
+            SkillType::Woodcutting => &mut self.woodcutting,
         }
     }
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level + self.magic.level
+        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level + self.magic.level + self.woodcutting.level
     }
 }
 
@@ -256,6 +265,7 @@ impl LegacySkills {
             smithing: Skill::new(1),
             prayer: Skill::new(1),
             magic: Skill::new(1),
+            woodcutting: Skill::new(1),
         }
     }
 }
@@ -371,6 +381,7 @@ mod tests {
             smithing: Skill::new(1),
             prayer: Skill::new(1),
             magic: Skill::new(1),
+            woodcutting: Skill::new(1),
         };
         // combat_level = floor((99 + 99) / 2) = 99
         assert_eq!(max_skills.combat_level(), 99);
@@ -379,8 +390,8 @@ mod tests {
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 = 18
-        assert_eq!(skills.total_level(), 18);
+        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 = 19
+        assert_eq!(skills.total_level(), 19);
     }
 
     #[test]

@@ -3,13 +3,14 @@
 //! This is a simplified version that tracks skill data received from the server.
 //! All calculations happen server-side.
 //!
-//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic
+//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Combat: Combined attack/strength/defence skill for all combat
 //! - Fishing: Gathering skill for catching fish
 //! - Smithing: Crafting skill for forging weapons and armor
 //! - Prayer: Enables prayer abilities that provide combat buffs
 //! - Magic: Spellcasting skill for magic attacks and utility spells
+//! - Woodcutting: Gathering skill for chopping trees
 
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +28,7 @@ pub enum SkillType {
     Smithing,
     Prayer,
     Magic,
+    Woodcutting,
 }
 
 impl SkillType {
@@ -39,6 +41,7 @@ impl SkillType {
             SkillType::Smithing => "smithing",
             SkillType::Prayer => "prayer",
             SkillType::Magic => "magic",
+            SkillType::Woodcutting => "woodcutting",
         }
     }
 
@@ -51,6 +54,7 @@ impl SkillType {
             "smithing" => Some(SkillType::Smithing),
             "prayer" => Some(SkillType::Prayer),
             "magic" => Some(SkillType::Magic),
+            "woodcutting" => Some(SkillType::Woodcutting),
             _ => None,
         }
     }
@@ -64,6 +68,7 @@ impl SkillType {
             SkillType::Smithing => "Smithing",
             SkillType::Prayer => "Prayer",
             SkillType::Magic => "Magic",
+            SkillType::Woodcutting => "Woodcutting",
         }
     }
 }
@@ -138,6 +143,8 @@ pub struct Skills {
     pub prayer: Skill,
     #[serde(default)]
     pub magic: Skill,
+    #[serde(default)]
+    pub woodcutting: Skill,
 }
 
 impl Default for Skills {
@@ -147,7 +154,7 @@ impl Default for Skills {
 }
 
 impl Skills {
-    /// Create new skills with starting values (HP 10, Combat 3, Fishing 1, Prayer 1, Magic 1)
+    /// Create new skills with starting values (HP 10, Combat 3, others 1)
     pub fn new() -> Self {
         Self {
             hitpoints: Skill::new(10),
@@ -157,6 +164,7 @@ impl Skills {
             smithing: Skill::new(1),
             prayer: Skill::new(1),
             magic: Skill::new(1),
+            woodcutting: Skill::new(1),
         }
     }
 
@@ -176,6 +184,7 @@ impl Skills {
             SkillType::Smithing => &self.smithing,
             SkillType::Prayer => &self.prayer,
             SkillType::Magic => &self.magic,
+            SkillType::Woodcutting => &self.woodcutting,
         }
     }
 
@@ -189,6 +198,7 @@ impl Skills {
             SkillType::Smithing => &mut self.smithing,
             SkillType::Prayer => &mut self.prayer,
             SkillType::Magic => &mut self.magic,
+            SkillType::Woodcutting => &mut self.woodcutting,
         }
     }
 
@@ -201,6 +211,6 @@ impl Skills {
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level + self.magic.level
+        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level + self.magic.level + self.woodcutting.level
     }
 }
