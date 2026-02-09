@@ -17,7 +17,7 @@ const SPRITE_HEIGHT: f32 = 78.0;
 const BODY_ARMOR_SPRITE_WIDTH: f32 = 34.0;
 const BODY_ARMOR_SPRITE_HEIGHT: f32 = 77.0;
 const BOOT_SPRITE_WIDTH: f32 = 34.0;
-const BOOT_SPRITE_HEIGHT: f32 = 47.0;
+const BOOT_SPRITE_HEIGHT: f32 = 27.0;
 const BACK_STATIC_SPRITE_WIDTH: f32 = 50.0;
 const BACK_STATIC_SPRITE_HEIGHT: f32 = 63.0;
 const OFFHAND_SPRITE_WIDTH: f32 = 38.5;
@@ -235,7 +235,7 @@ fn draw_character_preview(
                     draw_texture_ex(
                         equip_sprite,
                         x,
-                        y + 46.0,
+                        y + 51.0,
                         WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(equip_atlas_x, equip_atlas_y, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),

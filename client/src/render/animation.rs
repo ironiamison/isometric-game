@@ -26,7 +26,7 @@ pub const WEAPON_SPRITE_HEIGHT: f32 = 84.0;
 
 // Boot sprite dimensions (single row format, 16 frames per boot)
 pub const BOOT_SPRITE_WIDTH: f32 = 34.0;
-pub const BOOT_SPRITE_HEIGHT: f32 = 47.0;
+pub const BOOT_SPRITE_HEIGHT: f32 = 27.0;
 
 // Body armor sprite dimensions (single row format, 22 frames per armor)
 pub const BODY_ARMOR_SPRITE_WIDTH: f32 = 34.0;  // Same as player sprite width
@@ -599,9 +599,9 @@ pub fn get_boot_offset(state: AnimationState, direction: Direction, anim_frame: 
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: boots are 34 wide (same as player), so center them
-    // Boots are 47 tall and should align with player's feet
+    // Boots are 27 tall and should align with player's feet (player is 78 tall)
     let base_x = 0.0; // Center boots under player
-    let base_y = 46.0; // Position at feet
+    let base_y = 51.0; // Position at feet (78 - 27 = 51)
 
     // Per-state offsets for alignment
     let (state_x, state_y) = match state {
