@@ -610,7 +610,25 @@ fn run_game_frame(
         };
         renderer.draw_text_sharp(&format!("FPS: {}{} [F4]", get_fps(), fps_cap_str), 10.0, 20.0, 16.0, WHITE);
         renderer.draw_text_sharp(&format!("Players: {}", game_state.players.len()), 10.0, 40.0, 16.0, WHITE);
-        renderer.draw_text_sharp(&format!("Connected: {}", network.is_connected()), 10.0, 60.0, 16.0, WHITE);
+        let ping_str = if game_state.ping_stats.has_data() {
+            let ps = &game_state.ping_stats;
+            format!(" | Ping: {}ms (avg:{} min:{} max:{})",
+                ps.current_ms.round() as i32,
+                ps.avg_ms.round() as i32,
+                ps.min_ms.round() as i32,
+                ps.max_ms.round() as i32)
+        } else {
+            " | Ping: waiting...".to_string()
+        };
+        let connected_ping = format!("Connected: {}{}", network.is_connected(), ping_str);
+        let ping_color = if game_state.ping_stats.has_data() && game_state.ping_stats.current_ms > 200.0 {
+            Color::from_rgba(255, 100, 100, 255)
+        } else if game_state.ping_stats.has_data() && game_state.ping_stats.current_ms > 120.0 {
+            Color::from_rgba(255, 200, 100, 255)
+        } else {
+            WHITE
+        };
+        renderer.draw_text_sharp(&connected_ping, 10.0, 60.0, 16.0, ping_color);
 
         // Show position and chunk info
         if let Some(player) = game_state.get_local_player() {
@@ -669,26 +687,6 @@ fn run_game_frame(
         renderer.draw_text_sharp(&format!("Smoothing: {} [F7] (smoothed: {:.1}ms)",
             smooth_str, t.smoothed_delta * 1000.0), 10.0, 430.0, 16.0, timing_color);
 
-        // Ping stats (at bottom of debug overlay)
-        let ping_text = if game_state.ping_stats.has_data() {
-            let ps = &game_state.ping_stats;
-            format!("Ping: {}ms (avg: {} | min: {} | max: {})",
-                ps.current_ms.round() as i32,
-                ps.avg_ms.round() as i32,
-                ps.min_ms.round() as i32,
-                ps.max_ms.round() as i32,
-            )
-        } else {
-            "Ping: waiting...".to_string()
-        };
-        let ping_color = if game_state.ping_stats.has_data() && game_state.ping_stats.current_ms > 200.0 {
-            Color::from_rgba(255, 100, 100, 255)
-        } else if game_state.ping_stats.has_data() && game_state.ping_stats.current_ms > 120.0 {
-            Color::from_rgba(255, 200, 100, 255)
-        } else {
-            Color::from_rgba(100, 255, 150, 255)
-        };
-        renderer.draw_text_sharp(&ping_text, 10.0, 460.0, 16.0, ping_color);
     }
 
     // 6. Render transition overlay (must be last, covers everything)
