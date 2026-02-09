@@ -26,12 +26,12 @@ use ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, CharacterCreat
 #[cfg(not(target_arch = "wasm32"))]
 use auth::AuthSession;
 
-const SERVER_URL: &str = "http://localhost:2567";
-const WS_URL: &str = "ws://localhost:2567";
+const SERVER_URL: &str = "https://aeven.xyz";
+const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
-const DEV_MODE: bool = true;
+const DEV_MODE: bool = false;
 
 fn window_conf() -> Conf {
     Conf {
@@ -388,6 +388,11 @@ fn run_game_frame(
     let network_start = get_time();
     network.poll(game_state);
     let network_ms = (get_time() - network_start) * 1000.0;
+
+    // 1.5. Play any pending sound effects queued by message handlers
+    for sfx_name in game_state.pending_sfx.drain(..) {
+        audio.play_sfx(&sfx_name);
+    }
 
     // 2. Render and get UI layout for hit detection
     clear_background(Color::from_rgba(30, 30, 40, 255));
