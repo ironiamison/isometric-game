@@ -5823,6 +5823,7 @@ impl GameRoom {
     }
 
     pub async fn tick(&self) {
+        let tick_start = std::time::Instant::now();
         let delta_time = 1.0 / TICK_RATE;
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -6061,15 +6062,15 @@ impl GameRoom {
             }
         }
 
-        // Prayer drain logic (every PRAYER_DRAIN_INTERVAL_TICKS)
+        // Prayer drain + mana regen (every 60 ticks / 3 seconds)
+        // Combined into single players.write() to reduce lock contention
         if current_tick % PRAYER_DRAIN_INTERVAL_TICKS == 0 {
-            // Collect players with active prayers for drain calculation
             struct PrayerDrainUpdate {
                 player_id: String,
                 new_points: i32,
                 max_points: i32,
                 active_prayers: Vec<String>,
-                depleted: bool, // True if points hit 0 this tick
+                depleted: bool,
             }
 
             let updates: Vec<PrayerDrainUpdate> = {
@@ -6077,37 +6078,44 @@ impl GameRoom {
                 let mut updates = Vec::new();
 
                 for player in players.values_mut() {
-                    if !player.active || player.is_dead || player.active_prayers.is_empty() {
+                    if !player.active || player.is_dead {
                         continue;
                     }
 
-                    // Calculate total drain rate from active prayers
-                    let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
-                    let effects = self.prayer_registry.calculate_effects(&active_ids);
-                    let drain_amount = effects.total_drain_rate.ceil() as i32;
+                    // Mana regeneration
+                    let max_mp = player.max_mp();
+                    if player.mp < max_mp {
+                        player.mp = (player.mp + 1).min(max_mp);
+                    }
 
-                    if drain_amount > 0 {
-                        let old_points = player.prayer_points;
-                        player.prayer_points = (player.prayer_points - drain_amount).max(0);
+                    // Prayer drain
+                    if !player.active_prayers.is_empty() {
+                        let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
+                        let effects = self.prayer_registry.calculate_effects(&active_ids);
+                        let drain_amount = effects.total_drain_rate.ceil() as i32;
 
-                        let depleted = player.prayer_points == 0 && old_points > 0;
+                        if drain_amount > 0 {
+                            let old_points = player.prayer_points;
+                            player.prayer_points = (player.prayer_points - drain_amount).max(0);
 
-                        // If points depleted, clear all active prayers
-                        if depleted {
-                            player.active_prayers.clear();
-                            tracing::debug!(
-                                "Player {} ran out of prayer points, all prayers deactivated",
-                                player.id
-                            );
+                            let depleted = player.prayer_points == 0 && old_points > 0;
+
+                            if depleted {
+                                player.active_prayers.clear();
+                                tracing::debug!(
+                                    "Player {} ran out of prayer points, all prayers deactivated",
+                                    player.id
+                                );
+                            }
+
+                            updates.push(PrayerDrainUpdate {
+                                player_id: player.id.clone(),
+                                new_points: player.prayer_points,
+                                max_points: player.max_prayer_points(),
+                                active_prayers: player.active_prayers.iter().cloned().collect(),
+                                depleted,
+                            });
                         }
-
-                        updates.push(PrayerDrainUpdate {
-                            player_id: player.id.clone(),
-                            new_points: player.prayer_points,
-                            max_points: player.max_prayer_points(),
-                            active_prayers: player.active_prayers.iter().cloned().collect(),
-                            depleted,
-                        });
                     }
                 }
                 updates
@@ -6123,20 +6131,6 @@ impl GameRoom {
 
                 if update.depleted {
                     self.send_system_message(&update.player_id, "You have run out of prayer points").await;
-                }
-            }
-        }
-
-        // Mana regeneration: 1 MP per 3 seconds (every 60 ticks)
-        if current_tick % 60 == 0 {
-            let mut players = self.players.write().await;
-            for player in players.values_mut() {
-                if !player.active || player.is_dead {
-                    continue;
-                }
-                let max_mp = player.max_mp();
-                if player.mp < max_mp {
-                    player.mp = (player.mp + 1).min(max_mp);
                 }
             }
         }
@@ -6916,6 +6910,12 @@ impl GameRoom {
 
         // Arena tick: zone detection + state machine
         self.arena_tick(current_time).await;
+
+        // Log slow ticks for debugging latency spikes
+        let tick_duration = tick_start.elapsed();
+        if tick_duration.as_millis() > 50 {
+            tracing::warn!("Slow tick {}: {}ms", current_tick, tick_duration.as_millis());
+        }
     }
 
     /// Process arena zone detection and state machine events

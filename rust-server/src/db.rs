@@ -2,7 +2,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteJournalMode};
 use sqlx::Row;
 use crate::quest::state::{PlayerQuestState, QuestProgress, QuestStatus, ObjectiveProgress};
 use std::collections::HashMap;
@@ -83,9 +83,12 @@ impl Database {
     }
 
     pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
+        let options: SqliteConnectOptions = database_url.parse::<SqliteConnectOptions>()?
+            .journal_mode(SqliteJournalMode::Wal);
+
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
-            .connect(database_url)
+            .connect_with(options)
             .await?;
 
         // Run migrations
