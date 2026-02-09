@@ -1,10 +1,17 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
+use serde::Deserialize;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use crate::chunk::{world_to_local, Chunk, ChunkCoord, ChunkLayer, ChunkLayerType, EntitySpawn, GatheringZoneMarker, MapObject, Portal, Wall, WallEdge, CHUNK_SIZE};
+
+#[derive(Deserialize)]
+struct CollisionIgnoreConfig {
+    objects_first_gid: u32,
+    ignore_object_ids: Vec<u32>,
+}
 
 /// World manager that handles loading and caching chunks
 pub struct World {
@@ -12,14 +19,52 @@ pub struct World {
     chunk_dir: String,
     /// If true, generate test chunks for missing files
     generate_missing: bool,
+    /// GIDs whose map objects should not block movement
+    collision_ignore_gids: HashSet<u32>,
 }
 
 impl World {
     pub fn new(chunk_dir: &str) -> Self {
+        let collision_ignore_gids = Self::load_collision_ignores();
+
         Self {
             chunks: RwLock::new(HashMap::new()),
             chunk_dir: chunk_dir.to_string(),
             generate_missing: true, // For development
+            collision_ignore_gids,
+        }
+    }
+
+    /// Load collision ignore list from data/collision_ignore.toml
+    fn load_collision_ignores() -> HashSet<u32> {
+        let path = "data/collision_ignore.toml";
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("No collision_ignore.toml found ({}), no GIDs ignored", e);
+                return HashSet::new();
+            }
+        };
+
+        match toml::from_str::<CollisionIgnoreConfig>(&content) {
+            Ok(config) => {
+                let gids: HashSet<u32> = config
+                    .ignore_object_ids
+                    .iter()
+                    .map(|id| config.objects_first_gid + id)
+                    .collect();
+                info!(
+                    "Loaded {} collision-ignore GIDs (firstGid={}, {} editor IDs)",
+                    gids.len(),
+                    config.objects_first_gid,
+                    config.ignore_object_ids.len()
+                );
+                gids
+            }
+            Err(e) => {
+                warn!("Failed to parse collision_ignore.toml: {}", e);
+                HashSet::new()
+            }
         }
     }
 
@@ -84,7 +129,8 @@ impl World {
                 };
 
                 match result {
-                    Ok(chunk) => {
+                    Ok(mut chunk) => {
+                        self.clear_ignored_collision(&mut chunk);
                         let blocked_count = chunk.collision.iter().filter(|&&b| b).count();
                         info!("Loaded chunk {:?} from {:?} - {} blocked tiles", chunk.coord, path, blocked_count);
                         Some(chunk)
@@ -456,6 +502,24 @@ impl World {
         props?.iter()
             .find(|p| p["name"].as_str() == Some(name))
             .and_then(|p| p["value"].as_bool())
+    }
+
+    /// Clear collision bits for map objects whose GID is in the ignore list
+    fn clear_ignored_collision(&self, chunk: &mut Chunk) {
+        if self.collision_ignore_gids.is_empty() {
+            return;
+        }
+
+        let tiles_to_clear: Vec<(u32, u32)> = chunk
+            .objects
+            .iter()
+            .filter(|obj| self.collision_ignore_gids.contains(&obj.gid))
+            .map(|obj| world_to_local(obj.tile_x, obj.tile_y))
+            .collect();
+
+        for (lx, ly) in tiles_to_clear {
+            chunk.set_collision(lx, ly, false);
+        }
     }
 
     /// Get a snapshot of all currently loaded chunks for synchronous access
