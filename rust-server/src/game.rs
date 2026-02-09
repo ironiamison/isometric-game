@@ -603,6 +603,8 @@ pub struct GameRoom {
     chairs: RwLock<HashMap<(i32, i32), ChairState>>,
     /// Farming system (allotment patches, crop growth)
     farming: RwLock<crate::farming::FarmingSystem>,
+    /// Cached portal tile positions (immutable after init, no lock needed)
+    portal_tiles: std::collections::HashSet<(i32, i32)>,
 }
 
 impl GameRoom {
@@ -697,6 +699,25 @@ impl GameRoom {
         }
         if chunk_marker_count > 0 {
             tracing::info!("Loaded {} gathering markers from chunk data", chunk_marker_count);
+        }
+
+        // Cache portal tile positions (immutable, computed once at startup)
+        let mut portal_tiles = std::collections::HashSet::new();
+        for coord in &chunk_coords {
+            if let Some(chunk) = world.get_or_load_chunk(*coord).await {
+                let base_x = coord.x * crate::chunk::CHUNK_SIZE as i32;
+                let base_y = coord.y * crate::chunk::CHUNK_SIZE as i32;
+                for portal in &chunk.portals {
+                    for dx in 0..portal.width {
+                        for dy in 0..portal.height {
+                            portal_tiles.insert((base_x + portal.x + dx, base_y + portal.y + dy));
+                        }
+                    }
+                }
+            }
+        }
+        if !portal_tiles.is_empty() {
+            tracing::info!("Cached {} portal tiles for NPC collision", portal_tiles.len());
         }
 
         // Load woodcutting system
@@ -812,6 +833,7 @@ impl GameRoom {
             chair_gids,
             chairs: RwLock::new(chairs),
             farming: RwLock::new(farming),
+            portal_tiles,
         }
     }
 
@@ -5892,6 +5914,8 @@ impl GameRoom {
                 .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.direction))
                 .collect()
         };
+        // Track all players with pending moves so we can clear rejected ones
+        let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _)| id.clone()).collect();
 
         // Collect current entity positions for collision checking
         let player_positions: std::collections::HashSet<(i32, i32)> = {
@@ -5990,10 +6014,18 @@ impl GameRoom {
             gathering.gathering_player_ids()
         };
 
-        // Get set of woodcutting player IDs for state sync
-        let woodcutting_player_ids: std::collections::HashSet<String> = {
-            let woodcutting = self.woodcutting.read().await;
-            woodcutting.woodcutting_player_ids()
+        // Get woodcutting player IDs + stop woodcutting for moved players (single lock)
+        let (woodcutting_player_ids, woodcutting_stopped): (std::collections::HashSet<String>, Vec<String>) = {
+            let mut woodcutting = self.woodcutting.write().await;
+            let ids = woodcutting.woodcutting_player_ids();
+            let mut stopped = Vec::new();
+            for id in &moved_players {
+                if woodcutting.is_woodcutting(id) {
+                    woodcutting.stop_woodcutting(id);
+                    stopped.push(id.clone());
+                }
+            }
+            (ids, stopped)
         };
 
         {
@@ -6005,6 +6037,18 @@ impl GameRoom {
                     player.x = target_x;
                     player.y = target_y;
                     player.last_move_tick = current_tick;
+                }
+            }
+
+            // Clear movement intent for players whose moves were rejected
+            // This prevents broadcasting stale velocity (which causes client-side
+            // prediction into walls) and stops the server from retrying invalid moves
+            for player_id in &pending_player_ids {
+                if !moved_players.contains(player_id) {
+                    if let Some(player) = players.get_mut(player_id) {
+                        player.move_dx = 0;
+                        player.move_dy = 0;
+                    }
                 }
             }
 
@@ -6165,23 +6209,12 @@ impl GameRoom {
             }
         }
 
-        // Stop woodcutting for any player who moved
-        {
-            let mut woodcutting = self.woodcutting.write().await;
-            let mut stopped = Vec::new();
-            for id in &moved_players {
-                if woodcutting.is_woodcutting(id) {
-                    woodcutting.stop_woodcutting(id);
-                    stopped.push(id.clone());
-                }
-            }
-            drop(woodcutting);
-            for id in stopped {
-                self.broadcast(ServerMessage::WoodcuttingStopped {
-                    player_id: id.clone(),
-                    reason: "moved".to_string(),
-                }).await;
-            }
+        // Broadcast woodcutting stop for players who moved (lock already released above)
+        for id in woodcutting_stopped {
+            self.broadcast(ServerMessage::WoodcuttingStopped {
+                player_id: id.clone(),
+                reason: "moved".to_string(),
+            }).await;
         }
 
         // Cancel crafting for any player who moved
@@ -6372,18 +6405,8 @@ impl GameRoom {
             for (_, px, py, _) in &player_positions {
                 occupied_tiles.insert((*px, *py));
             }
-            // Add portal tiles so NPCs cannot walk onto or path through portals
-            for (coord, chunk) in chunks_guard.iter() {
-                let base_x = coord.x * crate::chunk::CHUNK_SIZE as i32;
-                let base_y = coord.y * crate::chunk::CHUNK_SIZE as i32;
-                for portal in &chunk.portals {
-                    for dx in 0..portal.width {
-                        for dy in 0..portal.height {
-                            occupied_tiles.insert((base_x + portal.x + dx, base_y + portal.y + dy));
-                        }
-                    }
-                }
-            }
+            // Add cached portal tiles so NPCs cannot walk onto or path through portals
+            occupied_tiles.extend(&self.portal_tiles);
 
             for npc in npcs.values_mut() {
                 // Check for respawn
