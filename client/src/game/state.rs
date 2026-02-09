@@ -1471,6 +1471,17 @@ impl GameState {
         self.local_player_id.as_ref().and_then(|id| self.players.get(id))
     }
 
+    /// Returns true when the world is ready to render (player exists and their chunk is loaded)
+    pub fn is_world_ready(&self) -> bool {
+        if let Some(player) = self.get_local_player() {
+            // Check if the player's current chunk is loaded
+            let chunk_coord = crate::game::chunk::ChunkCoord::from_world_f32(player.x, player.y);
+            self.chunk_manager.chunks().contains_key(&chunk_coord)
+        } else {
+            false
+        }
+    }
+
     /// Update map transition animation
     pub fn update_transition(&mut self, delta: f32) {
         const FADE_DURATION: f32 = 0.25;

@@ -1318,6 +1318,9 @@ impl Renderer {
 
         timings.ground_ms = (get_time() - t0) * 1000.0;
 
+        // Skip entity/world rendering until world is ready
+        let world_ready = state.is_world_ready();
+
         // 2. Collect renderable items (players + NPCs + items + object tiles + map objects) for depth sorting
         let t1 = get_time();
         #[derive(Clone)]
@@ -1339,6 +1342,27 @@ impl Renderer {
             .sum();
         let estimated_capacity = state.players.len() + state.npcs.len() + state.ground_items.len() + chunk_object_estimate + 100;
         let mut renderables: Vec<(f32, Renderable)> = Vec::with_capacity(estimated_capacity);
+
+        // Only collect world entities when world is ready
+        if !world_ready {
+            // Skip to UI rendering
+            timings.entities_ms = (get_time() - t1) * 1000.0;
+            let t2 = get_time();
+            timings.overhead_ms = (get_time() - t2) * 1000.0;
+            let t3 = get_time();
+            timings.effects_ms = (get_time() - t3) * 1000.0;
+
+            // 8. Render UI (non-interactive elements)
+            let t4 = get_time();
+            self.render_ui(state);
+
+            // 9. Render interactive UI elements and return layout for hit detection
+            let layout = self.render_interactive_ui(state);
+            timings.ui_ms = (get_time() - t4) * 1000.0;
+
+            timings.total_ms = (get_time() - render_start) * 1000.0;
+            return (layout, timings);
+        }
 
         // Add ground items (render below entities)
         for item in state.ground_items.values() {
@@ -2572,9 +2596,9 @@ impl Renderer {
     }
 
     fn render_tilemap_layer(&self, state: &GameState, layer_type: LayerType) {
-        // Don't render anything until camera is initialized (player has spawned)
-        // This prevents showing the fallback test tilemap during login
-        if !state.camera.initialized {
+        // Don't render anything until world is ready (player exists and their chunk is loaded)
+        // This prevents showing the fallback test tilemap or empty world during login
+        if !state.is_world_ready() {
             return;
         }
 
