@@ -1127,16 +1127,16 @@ impl GameRoom {
         }
 
         // Free any chair the player was sitting on
-        {
+        // Extract sitting position first, then release players lock before acquiring chairs lock
+        let sitting_pos = {
             let players = self.players.read().await;
-            if let Some(player) = players.get(player_id) {
-                if let Some((tx, ty)) = player.sitting_at {
-                    let mut chairs = self.chairs.write().await;
-                    if let Some(chair) = chairs.get_mut(&(tx, ty)) {
-                        if chair.occupied_by.as_deref() == Some(player_id) {
-                            chair.occupied_by = None;
-                        }
-                    }
+            players.get(player_id).and_then(|p| p.sitting_at)
+        };
+        if let Some((tx, ty)) = sitting_pos {
+            let mut chairs = self.chairs.write().await;
+            if let Some(chair) = chairs.get_mut(&(tx, ty)) {
+                if chair.occupied_by.as_deref() == Some(player_id) {
+                    chair.occupied_by = None;
                 }
             }
         }
@@ -6014,10 +6014,9 @@ impl GameRoom {
             gathering.gathering_player_ids()
         };
 
-        // Get woodcutting player IDs + stop woodcutting for moved players (single lock)
+        // Stop woodcutting for moved players + get remaining IDs for StateSync (single lock)
         let (woodcutting_player_ids, woodcutting_stopped): (std::collections::HashSet<String>, Vec<String>) = {
             let mut woodcutting = self.woodcutting.write().await;
-            let ids = woodcutting.woodcutting_player_ids();
             let mut stopped = Vec::new();
             for id in &moved_players {
                 if woodcutting.is_woodcutting(id) {
@@ -6025,6 +6024,8 @@ impl GameRoom {
                     stopped.push(id.clone());
                 }
             }
+            // Get IDs AFTER stopping, so StateSync reflects accurate state
+            let ids = woodcutting.woodcutting_player_ids();
             (ids, stopped)
         };
 
@@ -6636,7 +6637,7 @@ impl GameRoom {
         }
 
         // Gathering tick: process active gatherers and bonus tiles
-        // Phase 1: Gather results (hold locks)
+        // Split into separate lock phases to avoid holding gathering + players simultaneously
         struct GatherTick {
             pid: String,
             item_id: String,
@@ -6647,52 +6648,73 @@ impl GameRoom {
             inv_update: Vec<crate::item::InventorySlotUpdate>,
             gold: i32,
         }
-        let (gather_ticks, inventory_full_players, bonus_events) = {
-            let mut gathering = self.gathering.write().await;
-            let mut players = self.players.write().await;
 
-            let gatherer_ids: Vec<String> = gathering.player_states.keys().cloned().collect();
-            let mut ticks: Vec<GatherTick> = Vec::new();
-            let mut inv_full: Vec<String> = Vec::new();
-
-            for pid in &gatherer_ids {
-                let (fishing_level, prayer_speed_multiplier) = players.get(pid)
-                    .map(|p| {
+        // Phase 1a: Read player stats for active gatherers (players.read only)
+        let gatherer_stats: HashMap<String, (i32, f32)> = {
+            let players = self.players.read().await;
+            let gathering = self.gathering.read().await;
+            gathering.player_states.keys()
+                .filter_map(|pid| {
+                    players.get(pid).map(|p| {
                         let active_ids: Vec<String> = p.active_prayers.iter().cloned().collect();
                         let effects = self.prayer_registry.calculate_effects(&active_ids);
-                        (p.skills.fishing.level, effects.gather_speed_multiplier())
+                        (pid.clone(), (p.skills.fishing.level, effects.gather_speed_multiplier()))
                     })
-                    .unwrap_or((1, 1.0));
-                if let Some(result) = gathering.tick_gathering(pid, fishing_level, current_time, prayer_speed_multiplier) {
-                    if let Some(player) = players.get_mut(pid) {
-                        let leftover = player.inventory.add_item(&result.item_id, 1, &self.item_registry);
-                        if leftover > 0 {
-                            inv_full.push(pid.clone());
-                            continue;
-                        }
-                        let leveled = player.skills.fishing.add_xp(result.xp_gained);
-                        ticks.push(GatherTick {
-                            pid: pid.clone(),
-                            item_id: result.item_id,
-                            xp_gained: result.xp_gained,
-                            total_xp: player.skills.fishing.xp,
-                            level: player.skills.fishing.level,
-                            leveled,
-                            inv_update: player.inventory.to_update(),
-                            gold: player.inventory.gold,
-                        });
-                    }
+                })
+                .collect()
+        };
+
+        // Phase 1b: Process gathering ticks (gathering.write only)
+        struct GatherResult { pid: String, item_id: String, xp_gained: i64 }
+        let (gather_results, bonus_events) = {
+            let mut gathering = self.gathering.write().await;
+            let mut results: Vec<GatherResult> = Vec::new();
+            let gatherer_ids: Vec<String> = gathering.player_states.keys().cloned().collect();
+            for pid in &gatherer_ids {
+                let (fishing_level, prayer_speed) = gatherer_stats.get(pid).copied().unwrap_or((1, 1.0));
+                if let Some(result) = gathering.tick_gathering(pid, fishing_level, current_time, prayer_speed) {
+                    results.push(GatherResult { pid: pid.clone(), item_id: result.item_id, xp_gained: result.xp_gained });
                 }
             }
+            let bonus_events = gathering.tick_bonus_tiles(current_time);
+            (results, bonus_events)
+        };
 
-            // Stop gathering for inventory-full players
-            for pid in &inv_full {
+        // Phase 1c: Apply results to player inventories (players.write only)
+        let mut inventory_full_players: Vec<String> = Vec::new();
+        let gather_ticks = {
+            let mut players = self.players.write().await;
+            let mut ticks: Vec<GatherTick> = Vec::new();
+            for gr in &gather_results {
+                if let Some(player) = players.get_mut(&gr.pid) {
+                    let leftover = player.inventory.add_item(&gr.item_id, 1, &self.item_registry);
+                    if leftover > 0 {
+                        inventory_full_players.push(gr.pid.clone());
+                        continue;
+                    }
+                    let leveled = player.skills.fishing.add_xp(gr.xp_gained);
+                    ticks.push(GatherTick {
+                        pid: gr.pid.clone(),
+                        item_id: gr.item_id.clone(),
+                        xp_gained: gr.xp_gained,
+                        total_xp: player.skills.fishing.xp,
+                        level: player.skills.fishing.level,
+                        leveled,
+                        inv_update: player.inventory.to_update(),
+                        gold: player.inventory.gold,
+                    });
+                }
+            }
+            ticks
+        };
+
+        // Phase 1d: Stop gathering for inventory-full players (gathering.write only)
+        if !inventory_full_players.is_empty() {
+            let mut gathering = self.gathering.write().await;
+            for pid in &inventory_full_players {
                 gathering.stop_gathering(pid);
             }
-
-            let bonus_events = gathering.tick_bonus_tiles(current_time);
-            (ticks, inv_full, bonus_events)
-        };
+        }
 
         // Phase 2: Send messages (no locks held)
         for tick in gather_ticks {
