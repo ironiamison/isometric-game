@@ -10,6 +10,7 @@ pub mod shop;
 pub mod skills;
 pub mod prayer;
 pub mod spell;
+pub mod tree_types;
 
 pub use state::{GameState, Camera, ConnectionStatus, ChatChannel, ChatMessage, ChatBubble, UiState, DamageEvent, LevelUpEvent, SkillXpEvent, XpDropFeed, DialogueChoice, ActiveDialogue, QuestObjective, ActiveQuest, QuestCompletedEvent, ContextMenu, ContextMenuTarget, GoldDropDialog, DragState, DragSource, DoubleClickState, Announcement, FrameTimings, Projectile, TransitionState, MapTransition, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FriendInfo, PendingRequestInfo, OnlinePlayerInfo, SocialTab, SocialState, SpellEffect, AltarPanelState};
 pub use entities::{Player, Direction};

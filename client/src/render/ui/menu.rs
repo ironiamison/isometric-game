@@ -17,7 +17,7 @@ impl Renderer {
 
         // Compact menu sizing - fits on mobile
         let menu_width = 240.0;
-        let menu_height = (sh - 40.0).min(400.0); // Cap height, leave margin
+        let menu_height = (sh - 40.0).min(430.0); // Cap height, leave margin
         let menu_x = ((sw - menu_width) / 2.0).floor();
         let menu_y = ((sh - menu_height) / 2.0).floor();
 
@@ -163,14 +163,21 @@ impl Renderer {
         draw_button(shift_drop_bounds.x, shift_drop_bounds.y, toggle_w, btn_height, shift_text, state.ui_state.shift_drop_enabled, is_hovered(shift_drop_bounds), self);
         y += row_height;
 
-        // Row 2: Chat Log + Tap Walk
+        // Row 2: Chat Log + ChatBG
         let chat_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-        let tap_walk_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+        let chat_bg_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
         layout.add(UiElementId::EscapeMenuChatLogToggle, chat_bounds);
-        layout.add(UiElementId::EscapeMenuTapPathfindToggle, tap_walk_bounds);
+        layout.add(UiElementId::EscapeMenuChatBgToggle, chat_bg_bounds);
 
         let chat_text = if state.ui_state.chat_log_visible { "Chat" } else { "Chat" };
         draw_button(chat_bounds.x, chat_bounds.y, toggle_w, btn_height, chat_text, state.ui_state.chat_log_visible, is_hovered(chat_bounds), self);
+        draw_button(chat_bg_bounds.x, chat_bg_bounds.y, toggle_w, btn_height, "ChatBG", state.ui_state.chat_log_background, is_hovered(chat_bg_bounds), self);
+        y += row_height;
+
+        // Row 3: Tap Walk
+        let tap_walk_bounds = Rect::new(content_x, y, toggle_w, btn_height);
+        layout.add(UiElementId::EscapeMenuTapPathfindToggle, tap_walk_bounds);
+
         let tap_text = if state.ui_state.tap_to_pathfind { "TapWalk" } else { "TapWalk" };
         draw_button(tap_walk_bounds.x, tap_walk_bounds.y, toggle_w, btn_height, tap_text, state.ui_state.tap_to_pathfind, is_hovered(tap_walk_bounds), self);
         y += row_height;

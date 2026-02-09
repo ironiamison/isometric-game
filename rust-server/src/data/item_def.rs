@@ -85,6 +85,10 @@ pub struct EquipmentStats {
     #[serde(default)]
     pub defence_level_required: i32,
 
+    /// Woodcutting level required to equip (for axes)
+    #[serde(default)]
+    pub woodcutting_level_required: i32,
+
     /// Attack bonus (accuracy) - affects hit chance
     #[serde(default)]
     pub attack_bonus: i32,
@@ -104,6 +108,10 @@ pub struct EquipmentStats {
     /// Attack range in tiles (1 = melee adjacent, higher = ranged)
     #[serde(default = "default_range")]
     pub range: i32,
+
+    /// Chop speed multiplier for axes (1.0 = base speed, higher = faster)
+    #[serde(default)]
+    pub chop_speed_multiplier: f32,
 }
 
 // ============================================================================

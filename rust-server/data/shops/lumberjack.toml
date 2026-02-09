@@ -1,0 +1,33 @@
+id = "lumberjack"
+display_name = "Lumberjack's Trading Post"
+
+# Woodcutting Axes
+[[stock]]
+item_id = "bronze_axe"
+max_quantity = 10
+restock_rate = 2
+
+[[stock]]
+item_id = "iron_axe"
+max_quantity = 5
+restock_rate = 1
+
+[[stock]]
+item_id = "steel_axe"
+max_quantity = 3
+restock_rate = 1
+
+[[stock]]
+item_id = "mithril_axe"
+max_quantity = 2
+restock_rate = 1
+
+[[stock]]
+item_id = "adamant_axe"
+max_quantity = 1
+restock_rate = 1
+
+[[stock]]
+item_id = "rune_axe"
+max_quantity = 1
+restock_rate = 1

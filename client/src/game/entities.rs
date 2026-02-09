@@ -124,6 +124,11 @@ pub struct Player {
     // Gathering state (for fishing line rendering)
     pub is_gathering: bool,
     pub gathering_started_at: f64,
+
+    // Woodcutting state
+    pub is_woodcutting: bool,
+    pub woodcutting_started_at: f64,
+    pub last_woodcutting_anim: f64,
 }
 
 impl Player {
@@ -166,6 +171,9 @@ impl Player {
             last_damage_time: 0.0,
             is_gathering: false,
             gathering_started_at: 0.0,
+            is_woodcutting: false,
+            woodcutting_started_at: 0.0,
+            last_woodcutting_anim: 0.0,
         }
     }
 

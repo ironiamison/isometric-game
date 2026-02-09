@@ -173,6 +173,12 @@ pub enum ClientMessage {
     /// Cast a spell
     #[serde(rename = "castSpell")]
     CastSpell { spell_id: String },
+
+    // ===== Woodcutting System Messages =====
+
+    /// Chop a tree once (player-initiated, one chop per attack)
+    #[serde(rename = "chopTree")]
+    ChopTree { tree_x: i32, tree_y: i32, tree_gid: u32 },
 }
 
 // ============================================================================
@@ -283,6 +289,8 @@ pub enum ServerMessage {
         prayer_xp: i64,
         magic_level: i32,
         magic_xp: i64,
+        woodcutting_level: i32,
+        woodcutting_xp: i64,
     },
     ItemDropped {
         id: String,
@@ -638,6 +646,50 @@ pub enum ServerMessage {
         success: bool,
         reason: Option<String>,
     },
+
+    // ===== Woodcutting System Messages =====
+
+    /// Player started chopping a tree
+    WoodcuttingStarted {
+        player_id: String,
+        tree_x: i32,
+        tree_y: i32,
+        tree_type: String,
+    },
+    /// Player swung their axe (triggers animation, may or may not get a log)
+    WoodcuttingSwing {
+        player_id: String,
+        tree_x: i32,
+        tree_y: i32,
+    },
+    /// Player chopped a log (successful swing)
+    WoodcuttingResult {
+        player_id: String,
+        item_id: String,
+        xp_gained: i64,
+    },
+    /// Player stopped chopping
+    WoodcuttingStopped {
+        player_id: String,
+        reason: String,
+    },
+    /// A tree was chopped down (depleted)
+    TreeDepleted {
+        x: i32,
+        y: i32,
+        gid: u32,
+        respawn_delay_ms: u64,
+    },
+    /// A tree respawned
+    TreeRespawned {
+        x: i32,
+        y: i32,
+        gid: u32,
+    },
+    /// Sync all depleted trees on chunk load
+    DepletedTreesSync {
+        trees: Vec<DepletedTreeData>,
+    },
 }
 
 /// Farming patch data for client synchronization
@@ -650,6 +702,14 @@ pub struct FarmingPatchData {
     pub crop_id: String,
     pub growth_stage: u32,
     pub owner_id: String,
+}
+
+/// Depleted tree data for client synchronization
+#[derive(Debug, Clone, Serialize)]
+pub struct DepletedTreeData {
+    pub x: i32,
+    pub y: i32,
+    pub gid: u32,
 }
 
 /// Friend info for friends list
@@ -757,11 +817,13 @@ pub struct ClientItemDef {
     pub equipment_slot: Option<String>,
     pub attack_level_required: Option<i32>,
     pub defence_level_required: Option<i32>,
+    pub woodcutting_level_required: Option<i32>,
     pub attack_bonus: Option<i32>,
     pub strength_bonus: Option<i32>,
     pub defence_bonus: Option<i32>,
     pub weapon_type: Option<String>,
     pub range: Option<i32>,
+    pub chop_speed_multiplier: Option<f32>,
     pub prayer_xp: i32,
 }
 
@@ -919,6 +981,14 @@ impl ServerMessage {
             // Spell system messages
             ServerMessage::SpellEffect { .. } => "spellEffect",
             ServerMessage::SpellResult { .. } => "spellResult",
+            // Woodcutting system messages
+            ServerMessage::WoodcuttingStarted { .. } => "woodcuttingStarted",
+            ServerMessage::WoodcuttingSwing { .. } => "woodcuttingSwing",
+            ServerMessage::WoodcuttingResult { .. } => "woodcuttingResult",
+            ServerMessage::WoodcuttingStopped { .. } => "woodcuttingStopped",
+            ServerMessage::TreeDepleted { .. } => "treeDepleted",
+            ServerMessage::TreeRespawned { .. } => "treeRespawned",
+            ServerMessage::DepletedTreesSync { .. } => "depletedTreesSync",
         }
     }
 }
@@ -1372,6 +1442,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             prayer_xp,
             magic_level,
             magic_xp,
+            woodcutting_level,
+            woodcutting_xp,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -1433,6 +1505,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("magic_xp".into()),
                 Value::Integer((*magic_xp).into()),
+            ));
+            map.push((
+                Value::String("woodcutting_level".into()),
+                Value::Integer((*woodcutting_level as i64).into()),
+            ));
+            map.push((
+                Value::String("woodcutting_xp".into()),
+                Value::Integer((*woodcutting_xp).into()),
             ));
             Value::Map(map)
         }
@@ -1794,6 +1874,13 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     }
                     if i.prayer_xp > 0 {
                         imap.push((Value::String("prayer_xp".into()), Value::Integer((i.prayer_xp as i64).into())));
+                    }
+                    // Woodcutting-specific fields
+                    if let Some(level) = i.woodcutting_level_required {
+                        imap.push((Value::String("woodcutting_level_required".into()), Value::Integer((level as i64).into())));
+                    }
+                    if let Some(speed) = i.chop_speed_multiplier {
+                        imap.push((Value::String("chop_speed_multiplier".into()), Value::F32(speed)));
                     }
                     Value::Map(imap)
                 })
@@ -2436,6 +2523,62 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             }
             Value::Map(map)
         }
+        // Woodcutting system messages
+        ServerMessage::WoodcuttingStarted { player_id, tree_x, tree_y, tree_type } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("tree_x".into()), Value::Integer((*tree_x as i64).into())));
+            map.push((Value::String("tree_y".into()), Value::Integer((*tree_y as i64).into())));
+            map.push((Value::String("tree_type".into()), Value::String(tree_type.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::WoodcuttingSwing { player_id, tree_x, tree_y } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("tree_x".into()), Value::Integer((*tree_x as i64).into())));
+            map.push((Value::String("tree_y".into()), Value::Integer((*tree_y as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::WoodcuttingResult { player_id, item_id, xp_gained } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
+            map.push((Value::String("xp_gained".into()), Value::Integer((*xp_gained).into())));
+            Value::Map(map)
+        }
+        ServerMessage::WoodcuttingStopped { player_id, reason } => {
+            let mut map = Vec::new();
+            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::TreeDepleted { x, y, gid, respawn_delay_ms } => {
+            let mut map = Vec::new();
+            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
+            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+            map.push((Value::String("gid".into()), Value::Integer((*gid as i64).into())));
+            map.push((Value::String("respawn_delay_ms".into()), Value::Integer((*respawn_delay_ms as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::TreeRespawned { x, y, gid } => {
+            let mut map = Vec::new();
+            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
+            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+            map.push((Value::String("gid".into()), Value::Integer((*gid as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::DepletedTreesSync { trees } => {
+            let tree_values: Vec<Value> = trees.iter().map(|t| {
+                let mut tree_map = Vec::new();
+                tree_map.push((Value::String("x".into()), Value::Integer((t.x as i64).into())));
+                tree_map.push((Value::String("y".into()), Value::Integer((t.y as i64).into())));
+                tree_map.push((Value::String("gid".into()), Value::Integer((t.gid as i64).into())));
+                Value::Map(tree_map)
+            }).collect();
+            let mut map = Vec::new();
+            map.push((Value::String("trees".into()), Value::Array(tree_values)));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -2687,6 +2830,13 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "castSpell" => {
             let spell_id = extract_string(msg_data, "spell_id").unwrap_or_default();
             Ok(ClientMessage::CastSpell { spell_id })
+        }
+        // Woodcutting messages
+        "chopTree" => {
+            let tree_x = extract_i64(msg_data, "tree_x").unwrap_or(0) as i32;
+            let tree_y = extract_i64(msg_data, "tree_y").unwrap_or(0) as i32;
+            let tree_gid = extract_i64(msg_data, "tree_gid").unwrap_or(0) as u32;
+            Ok(ClientMessage::ChopTree { tree_x, tree_y, tree_gid })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }

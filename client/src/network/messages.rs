@@ -92,6 +92,10 @@ pub enum ClientMessage {
     #[serde(rename = "stopGathering")]
     StopGathering,
 
+    // Woodcutting commands
+    #[serde(rename = "chopTree")]
+    ChopTree { tree_x: i32, tree_y: i32, tree_gid: u32 },
+
     // Chair commands
     #[serde(rename = "sitChair")]
     SitChair { tile_x: i32, tile_y: i32 },
@@ -277,6 +281,12 @@ impl ClientMessage {
                 "startGathering"
             }
             ClientMessage::StopGathering => "stopGathering",
+            ClientMessage::ChopTree { tree_x, tree_y, tree_gid } => {
+                data.insert("tree_x".into(), Value::Integer((*tree_x as i64).into()));
+                data.insert("tree_y".into(), Value::Integer((*tree_y as i64).into()));
+                data.insert("tree_gid".into(), Value::Integer((*tree_gid as i64).into()));
+                "chopTree"
+            }
             ClientMessage::SitChair { tile_x, tile_y } => {
                 data.insert("tile_x".into(), Value::Integer((*tile_x as i64).into()));
                 data.insert("tile_y".into(), Value::Integer((*tile_y as i64).into()));

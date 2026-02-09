@@ -10,6 +10,8 @@ pub struct EquipmentStats {
     pub attack_bonus: i32,           // Accuracy
     pub strength_bonus: i32,         // Max hit
     pub defence_bonus: i32,          // Avoid hits
+    pub woodcutting_level_required: i32, // For axes
+    pub chop_speed_multiplier: f32,      // Woodcutting speed (0.0 if not an axe)
 }
 
 /// Item definition received from server

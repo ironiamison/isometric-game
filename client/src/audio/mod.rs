@@ -54,6 +54,7 @@ impl AudioManager {
             ("level_up", "assets/audio/sfx/menu/level_up.wav"),
             ("announce", "assets/audio/sfx/misc/announce.wav"),
             ("unarmed", "assets/audio/sfx/attack/unarmed.wav"),
+            ("woodcut", "assets/audio/sfx/misc/woodcut.ogg"),
         ];
 
         for (name, path) in sfx_files {

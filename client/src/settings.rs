@@ -13,6 +13,8 @@ pub struct UiSettings {
     pub use_joystick: bool,
     #[serde(default)]
     pub graphics_low: bool,
+    #[serde(default)]
+    pub chat_log_background: bool,
 }
 
 impl Default for UiSettings {
@@ -34,6 +36,7 @@ impl Default for UiSettings {
             tap_to_pathfind: true,
             use_joystick: false,
             graphics_low: false,
+            chat_log_background: false,
         }
     }
 }

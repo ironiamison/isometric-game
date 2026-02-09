@@ -413,6 +413,43 @@ impl ChunkManager {
         })
     }
 
+    /// Find a map object at the given world tile position
+    /// This checks exact matches first, then searches for tall objects (like trees)
+    /// that visually cover the target tile based on their height.
+    pub fn get_object_at(&self, tile_x: i32, tile_y: i32) -> Option<&MapObject> {
+        let coord = ChunkCoord::from_world(tile_x, tile_y);
+        let chunk = self.chunks.get(&coord)?;
+
+        // First try exact match
+        if let Some(obj) = chunk.objects.iter().find(|obj| obj.tile_x == tile_x && obj.tile_y == tile_y) {
+            return Some(obj);
+        }
+
+        // For tall objects (trees, etc.), check if target tile is covered by the object's height
+        // Objects are anchored at their base (tile_x, tile_y) and extend upward (smaller Y values)
+        // A tree at (10, 15) with height 96px (3 tiles) covers Y: 13, 14, 15
+        const TILE_HEIGHT_PX: u32 = 32;
+
+        chunk.objects.iter().find(|obj| {
+            if obj.tile_x != tile_x {
+                return false;
+            }
+            // Calculate how many tiles upward this object extends
+            let tiles_high = ((obj.height + TILE_HEIGHT_PX - 1) / TILE_HEIGHT_PX) as i32;
+            // Object covers from (tile_y - tiles_high + 1) to tile_y
+            let min_y = obj.tile_y - tiles_high + 1;
+            tile_y >= min_y && tile_y <= obj.tile_y
+        })
+    }
+
+    /// Get object at exact tile position only (no tall-object extension)
+    /// Use this for UI elements like name tags that should only appear on the object's base tile
+    pub fn get_object_at_exact(&self, tile_x: i32, tile_y: i32) -> Option<&MapObject> {
+        let coord = ChunkCoord::from_world(tile_x, tile_y);
+        let chunk = self.chunks.get(&coord)?;
+        chunk.objects.iter().find(|obj| obj.tile_x == tile_x && obj.tile_y == tile_y)
+    }
+
     /// Load an interior as a single chunk at (0,0)
     pub fn load_interior(&mut self, width: u32, height: u32, layers: Vec<(u8, Vec<u32>)>, collision: &[u8], portals: Vec<Portal>, objects: Vec<MapObject>, walls: Vec<Wall>) {
         // Clear existing chunks

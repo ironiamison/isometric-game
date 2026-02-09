@@ -95,22 +95,24 @@ impl ItemRegistry {
             .values()
             .map(|item| {
                 // Extract equipment stats if present and has valid slot
-                let (equipment_slot, attack_level_required, defence_level_required, attack_bonus, strength_bonus, defence_bonus) =
+                let (equipment_slot, attack_level_required, defence_level_required, woodcutting_level_required, attack_bonus, strength_bonus, defence_bonus, chop_speed_multiplier) =
                     if let Some(ref equip) = item.equipment {
                         if equip.slot_type != EquipmentSlot::None {
                             (
                                 Some(equip.slot_type.as_str().to_string()),
                                 Some(equip.attack_level_required),
                                 Some(equip.defence_level_required),
+                                Some(equip.woodcutting_level_required),
                                 Some(equip.attack_bonus),
                                 Some(equip.strength_bonus),
                                 Some(equip.defence_bonus),
+                                if equip.chop_speed_multiplier > 0.0 { Some(equip.chop_speed_multiplier) } else { None },
                             )
                         } else {
-                            (None, None, None, None, None, None)
+                            (None, None, None, None, None, None, None, None)
                         }
                     } else {
-                        (None, None, None, None, None, None)
+                        (None, None, None, None, None, None, None, None)
                     };
 
                 ClientItemDef {
@@ -125,6 +127,7 @@ impl ItemRegistry {
                     equipment_slot,
                     attack_level_required,
                     defence_level_required,
+                    woodcutting_level_required,
                     attack_bonus,
                     strength_bonus,
                     defence_bonus,
@@ -135,6 +138,7 @@ impl ItemRegistry {
                         }
                     }),
                     range: item.equipment.as_ref().map(|e| e.range),
+                    chop_speed_multiplier,
                     prayer_xp: item.prayer_xp,
                 }
             })

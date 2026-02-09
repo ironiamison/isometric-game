@@ -376,3 +376,43 @@ category = "material"
 max_stack = 1
 base_price = 50
 sellable = true
+
+# =============================================================================
+# Woodcutting Logs
+# =============================================================================
+
+[oak_log]
+display_name = "Oak Logs"
+sprite = "oak_log"
+description = "Logs cut from an oak tree. Useful for crafting and firemaking."
+category = "material"
+max_stack = 99
+base_price = 10
+sellable = true
+
+[willow_log]
+display_name = "Willow Logs"
+sprite = "willow_log"
+description = "Flexible willow logs. Good for bows and arrows."
+category = "material"
+max_stack = 99
+base_price = 25
+sellable = true
+
+[maple_log]
+display_name = "Maple Logs"
+sprite = "maple_log"
+description = "Strong maple logs. Popular with fletchers."
+category = "material"
+max_stack = 99
+base_price = 50
+sellable = true
+
+[yew_log]
+display_name = "Yew Logs"
+sprite = "yew_log"
+description = "Prized yew logs. Essential for the finest bows."
+category = "material"
+max_stack = 99
+base_price = 100
+sellable = true

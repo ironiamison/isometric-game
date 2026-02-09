@@ -16,12 +16,12 @@ use crate::ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, Charact
 #[cfg(not(target_arch = "wasm32"))]
 use crate::auth::AuthSession;
 
-pub const SERVER_URL: &str = "https://aeven.xyz";
-pub const WS_URL: &str = "wss://aeven.xyz";
+pub const SERVER_URL: &str = "http://localhost:2567";
+pub const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
-pub const DEV_MODE: bool = false;
+pub const DEV_MODE: bool = true;
 
 /// Show the control scheme choice dialogue if the player hasn't chosen yet.
 /// Skipped on Android (no keyboard).
@@ -260,6 +260,15 @@ pub fn run_game_frame(
                 ClientMessage::StartGathering { marker_x: *marker_x, marker_y: *marker_y }
             },
             InputCommand::StopGathering => ClientMessage::StopGathering,
+            InputCommand::ChopTree { tree_x, tree_y, tree_gid } => {
+                // Play attack animation for chopping (server will also broadcast this)
+                if let Some(local_id) = &game_state.local_player_id {
+                    if let Some(player) = game_state.players.get_mut(local_id) {
+                        player.play_attack();
+                    }
+                }
+                ClientMessage::ChopTree { tree_x: *tree_x, tree_y: *tree_y, tree_gid: *tree_gid }
+            },
             InputCommand::SitChair { tile_x, tile_y } => ClientMessage::SitChair { tile_x: *tile_x, tile_y: *tile_y },
             InputCommand::StandUp => ClientMessage::StandUp,
             InputCommand::PlantSeed { patch_id, item_id } => ClientMessage::PlantSeed { patch_id: patch_id.clone(), item_id: item_id.clone() },

@@ -26,12 +26,12 @@ use ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, CharacterCreat
 #[cfg(not(target_arch = "wasm32"))]
 use auth::AuthSession;
 
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
-const DEV_MODE: bool = false;
+const DEV_MODE: bool = true;
 
 fn window_conf() -> Conf {
     Conf {
@@ -136,6 +136,7 @@ async fn main() {
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
                             game_state.ui_state.graphics_low = ui_settings.graphics_low;
+                            game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             if !settings::load_control_scheme_chosen() {
                                 game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
@@ -190,6 +191,7 @@ async fn main() {
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
                             game_state.ui_state.graphics_low = ui_settings.graphics_low;
+                            game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             if !settings::load_control_scheme_chosen() {
                                 game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
@@ -501,6 +503,15 @@ fn run_game_frame(
                 ClientMessage::StartGathering { marker_x: *marker_x, marker_y: *marker_y }
             },
             InputCommand::StopGathering => ClientMessage::StopGathering,
+            InputCommand::ChopTree { tree_x, tree_y, tree_gid } => {
+                // Play attack animation for chopping (server will also broadcast this)
+                if let Some(local_id) = &game_state.local_player_id {
+                    if let Some(player) = game_state.players.get_mut(local_id) {
+                        player.play_attack();
+                    }
+                }
+                ClientMessage::ChopTree { tree_x: *tree_x, tree_y: *tree_y, tree_gid: *tree_gid }
+            },
             InputCommand::SitChair { tile_x, tile_y } => ClientMessage::SitChair { tile_x: *tile_x, tile_y: *tile_y },
             InputCommand::StandUp => ClientMessage::StandUp,
             InputCommand::PlantSeed { patch_id, item_id } => ClientMessage::PlantSeed { patch_id: patch_id.clone(), item_id: item_id.clone() },

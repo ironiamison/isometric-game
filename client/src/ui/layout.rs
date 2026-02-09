@@ -39,6 +39,7 @@ pub enum UiElementId {
     EscapeMenuUiScaleSlider,
     EscapeMenuShiftDropToggle,
     EscapeMenuChatLogToggle,
+    EscapeMenuChatBgToggle,
     EscapeMenuTapPathfindToggle,
     EscapeMenuJoystickToggle,
     EscapeMenuControlSchemeToggle,

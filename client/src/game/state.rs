@@ -325,6 +325,194 @@ pub struct SkillXpEvent {
     pub time: f64,
 }
 
+/// Info about a depleted tree for respawn timer display
+pub struct DepletedTreeInfo {
+    pub gid: u32,
+    pub depleted_at: f64,   // Client time when depleted
+    pub respawn_at: f64,    // Client time when it will respawn
+}
+
+/// Tree shake effect when being chopped
+pub struct TreeShakeEffect {
+    pub x: i32,
+    pub y: i32,
+    pub started_at: f64,
+    pub intensity: f32,
+}
+
+impl TreeShakeEffect {
+    pub const DURATION: f64 = 0.25; // seconds
+
+    pub fn new(x: i32, y: i32) -> Self {
+        Self {
+            x,
+            y,
+            started_at: macroquad::time::get_time(),
+            intensity: 1.0,
+        }
+    }
+
+    /// Returns the current horizontal offset for the shake effect
+    pub fn get_offset(&self) -> f32 {
+        let elapsed = macroquad::time::get_time() - self.started_at;
+        if elapsed > Self::DURATION {
+            return 0.0;
+        }
+        let progress = elapsed / Self::DURATION;
+        let decay = 1.0 - progress as f32;
+        let shake = (elapsed * 40.0).sin() as f32; // Fast oscillation
+        shake * decay * self.intensity * 3.0 // Max 3 pixel offset
+    }
+
+    pub fn is_finished(&self) -> bool {
+        macroquad::time::get_time() - self.started_at > Self::DURATION
+    }
+}
+
+/// A falling leaf particle
+pub struct LeafParticle {
+    pub tile_x: f32,       // World tile X position
+    pub tile_y: f32,       // World tile Y position
+    pub height: f32,       // Height above ground in screen pixels (starts high, falls to 0)
+    pub drift_x: f32,      // Horizontal drift velocity
+    pub fall_speed: f32,   // Fall speed in pixels per second
+    pub rotation: f32,
+    pub rotation_speed: f32,
+    pub size: f32,
+    pub color: macroquad::color::Color,
+    pub started_at: f64,
+    pub on_ground: bool,   // True when leaf has landed
+}
+
+impl LeafParticle {
+    pub const DURATION: f64 = 3.0; // seconds (longer so leaves pile up visibly)
+    pub const GROUND_LINGER: f64 = 1.5; // How long leaves stay on ground before fading
+
+    /// Create a new leaf at the top of a tree
+    pub fn new_at_tree(tile_x: i32, tile_y: i32, tree_height: f32) -> Self {
+        use macroquad::rand::gen_range;
+
+        // Random leaf colors (greens, yellows, oranges)
+        let color = match gen_range(0, 5) {
+            0 => macroquad::color::Color::new(0.2, 0.55, 0.2, 0.95), // Dark green
+            1 => macroquad::color::Color::new(0.3, 0.65, 0.25, 0.95), // Green
+            2 => macroquad::color::Color::new(0.5, 0.6, 0.2, 0.95), // Yellow-green
+            3 => macroquad::color::Color::new(0.6, 0.5, 0.15, 0.95), // Orange-brown
+            _ => macroquad::color::Color::new(0.4, 0.55, 0.2, 0.95), // Olive
+        };
+
+        Self {
+            tile_x: tile_x as f32 + gen_range(-0.3, 0.3),
+            tile_y: tile_y as f32 + gen_range(-0.2, 0.2),
+            height: tree_height + gen_range(-10.0, 10.0), // Near top of tree
+            drift_x: gen_range(-15.0, 15.0),
+            fall_speed: gen_range(25.0, 45.0),
+            rotation: gen_range(0.0, std::f32::consts::TAU),
+            rotation_speed: gen_range(-4.0, 4.0),
+            size: gen_range(3.0, 5.0),
+            color,
+            started_at: macroquad::time::get_time(),
+            on_ground: false,
+        }
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        if !self.on_ground {
+            // Gentle swaying while falling
+            let sway = (macroquad::time::get_time() * 4.0 + self.rotation as f64).sin() as f32;
+            self.drift_x += sway * 30.0 * dt;
+            self.drift_x *= 0.95; // Damping
+
+            // Apply drift to tile position (small amount)
+            self.tile_x += self.drift_x * 0.002 * dt;
+
+            // Fall down
+            self.height -= self.fall_speed * dt;
+
+            // Check if landed
+            if self.height <= 0.0 {
+                self.height = 0.0;
+                self.on_ground = true;
+            }
+
+            self.rotation += self.rotation_speed * dt;
+        } else {
+            // On ground - slow down rotation
+            self.rotation_speed *= 0.95;
+            self.rotation += self.rotation_speed * dt;
+        }
+    }
+
+    pub fn get_alpha(&self) -> f32 {
+        let elapsed = macroquad::time::get_time() - self.started_at;
+
+        if self.on_ground {
+            // Fade out after lingering on ground
+            let ground_time = elapsed - (Self::DURATION - Self::GROUND_LINGER);
+            if ground_time > 0.0 {
+                let fade_progress = (ground_time / Self::GROUND_LINGER) as f32;
+                return (1.0 - fade_progress).max(0.0);
+            }
+        }
+        1.0
+    }
+
+    pub fn is_finished(&self) -> bool {
+        macroquad::time::get_time() - self.started_at > Self::DURATION
+    }
+}
+
+/// A tree that's falling down after being chopped
+pub struct FallingTreeEffect {
+    pub x: i32,
+    pub y: i32,
+    pub gid: u32,
+    pub started_at: f64,
+    pub fall_direction: f32, // 1.0 = fall right, -1.0 = fall left
+}
+
+impl FallingTreeEffect {
+    pub const DURATION: f64 = 1.5; // seconds
+
+    pub fn new(x: i32, y: i32, gid: u32) -> Self {
+        // Random fall direction
+        let fall_direction = if macroquad::rand::gen_range(0, 2) == 0 { -1.0 } else { 1.0 };
+        Self {
+            x,
+            y,
+            gid,
+            started_at: macroquad::time::get_time(),
+            fall_direction,
+        }
+    }
+
+    /// Returns (rotation_angle, alpha, y_offset)
+    pub fn get_transform(&self) -> (f32, f32, f32) {
+        let elapsed = macroquad::time::get_time() - self.started_at;
+        let progress = (elapsed / Self::DURATION).min(1.0) as f32;
+
+        // Ease-in rotation (accelerating fall)
+        let ease = progress * progress;
+        let angle = ease * std::f32::consts::FRAC_PI_2 * self.fall_direction * 0.8; // Max ~72 degrees
+
+        // Fade out in second half
+        let alpha = if progress > 0.5 {
+            1.0 - ((progress - 0.5) * 2.0)
+        } else {
+            1.0
+        };
+
+        // Slight downward movement as it falls
+        let y_offset = ease * 10.0;
+
+        (angle, alpha, y_offset)
+    }
+
+    pub fn is_finished(&self) -> bool {
+        macroquad::time::get_time() - self.started_at > Self::DURATION
+    }
+}
+
 /// An XP drop notification that floats up and fades out in the HUD
 pub struct XpDrop {
     pub skill_type: super::SkillType,
@@ -657,6 +845,8 @@ pub struct UiState {
     pub announcements: Vec<Announcement>,
     // Chat log visibility (hidden by default on mobile)
     pub chat_log_visible: bool,
+    // Chat log semi-transparent background
+    pub chat_log_background: bool,
     // Mobile chat panel
     pub chat_panel_open: bool,
     pub chat_active_tab: ChatChannel,
@@ -767,6 +957,7 @@ impl Default for UiState {
             chat_log_visible: false,
             #[cfg(not(target_os = "android"))]
             chat_log_visible: true,
+            chat_log_background: false,
             chat_panel_open: false,
             chat_active_tab: ChatChannel::Local,
             #[cfg(target_os = "android")]
@@ -843,6 +1034,19 @@ pub struct GameState {
     pub bonus_tiles: Vec<BonusTile>,
     /// Active gathering buff on local player
     pub gathering_buff: Option<GatheringBuff>,
+
+    /// Depleted trees (position -> info for respawn timer)
+    pub depleted_trees: HashMap<(i32, i32), DepletedTreeInfo>,
+    /// Whether the local player is currently woodcutting
+    pub is_woodcutting: bool,
+    /// Timestamp when woodcutting started
+    pub woodcutting_started_at: f64,
+    /// Tree shake effects (when being chopped)
+    pub tree_shake_effects: Vec<TreeShakeEffect>,
+    /// Falling leaf particles
+    pub leaf_particles: Vec<LeafParticle>,
+    /// Trees falling down after being chopped
+    pub falling_trees: Vec<FallingTreeEffect>,
 
     // Targeting
     pub selected_entity_id: Option<String>,
@@ -954,6 +1158,12 @@ impl GameState {
             gathering_started_at: 0.0,
             bonus_tiles: Vec::new(),
             gathering_buff: None,
+            depleted_trees: HashMap::new(),
+            is_woodcutting: false,
+            woodcutting_started_at: 0.0,
+            tree_shake_effects: Vec::new(),
+            leaf_particles: Vec::new(),
+            falling_trees: Vec::new(),
             selected_entity_id: None,
             damage_events: Vec::new(),
             level_up_events: Vec::new(),
@@ -1025,6 +1235,7 @@ impl GameState {
         }
 
         // Update all players (smooth interpolation toward server positions)
+        // Note: woodcutting animations are now driven by server WoodcuttingSwing messages
         for player in self.players.values_mut() {
             player.interpolate_visual(visual_delta);
         }
@@ -1060,6 +1271,16 @@ impl GameState {
 
         // Clean up old level up events (older than 2.0 seconds)
         self.level_up_events.retain(|event| current_time - event.time < 1.2);
+
+        // Update tree effects
+        self.tree_shake_effects.retain(|e| !e.is_finished());
+        self.falling_trees.retain(|e| !e.is_finished());
+
+        // Update leaf particles
+        for leaf in &mut self.leaf_particles {
+            leaf.update(delta);
+        }
+        self.leaf_particles.retain(|p| !p.is_finished());
 
         // Update firework particles (screen-pixel physics)
         let mut new_sparks = Vec::new();

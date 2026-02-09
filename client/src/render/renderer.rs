@@ -6,10 +6,11 @@ use macroquad::miniquad::ShaderSource;
 use std::collections::HashMap;
 use crate::util::{asset_path, SpriteManifest, SpriteAtlasInfo, virtual_screen_size};
 use crate::game::{GameState, Player, Camera, ConnectionStatus, LayerType, GroundItem, ChunkLayerType, CHUNK_SIZE, MapObject, ChatChannel, Direction, DragSource, Wall, WallEdge};
+use crate::game::tree_types::get_tree_info;
 use crate::game::npc::{Npc, NpcState};
 use crate::game::tilemap::get_tile_color;
 use crate::ui::{UiElementId, UiLayout};
-use super::ui::common::{SlotState, CORNER_ACCENT_SIZE};
+use super::ui::common::{SlotState, CORNER_ACCENT_SIZE, EXP_BAR_GAP};
 use super::isometric::{world_to_screen, world_to_screen_exact, screen_to_world, TILE_WIDTH, TILE_HEIGHT, calculate_depth};
 use super::animation::{SPRITE_WIDTH, SPRITE_HEIGHT, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT, NpcAnimation, get_weapon_frame, get_weapon_offset, get_boot_frame, get_boot_offset, get_body_armor_frame, get_body_armor_offset, get_head_frame, get_head_offset, get_back_static_frame, get_back_static_offset, get_offhand_frame, get_offhand_offset, get_hair_offset, AnimationState, Gender};
 use super::font::BitmapFont;
@@ -1054,7 +1055,10 @@ impl Renderer {
             Item(&'a GroundItem),
             Tile { x: u32, y: u32, tile_id: u32 },
             ChunkObject(&'a MapObject),
+            ChunkObjectShaking(&'a MapObject, f32), // Object with shake offset
             ChunkWall(&'a Wall),
+            TreeTimer { tile_x: i32, tile_y: i32, progress: f32 },
+            FallingTree { gid: u32, tile_x: i32, tile_y: i32, angle: f32, alpha: f32, y_offset: f32 },
         }
 
         // Pre-allocate with estimated capacity to reduce allocations
@@ -1142,8 +1146,23 @@ impl Renderer {
                 if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
                     continue;
                 }
+                // Skip depleted trees (they're hidden until respawn)
+                if state.depleted_trees.contains_key(&(obj.tile_x, obj.tile_y)) {
+                    continue;
+                }
+                // Skip trees that are currently falling (we render them with the fall animation)
+                let is_falling = state.falling_trees.iter().any(|ft| ft.x == obj.tile_x && ft.y == obj.tile_y);
+                if is_falling {
+                    continue;
+                }
                 let depth = calculate_depth(wx, wy, 1);
-                renderables.push((depth, Renderable::ChunkObject(obj)));
+                // Check if tree is shaking and apply offset
+                if let Some(shake) = state.tree_shake_effects.iter().find(|s| s.x == obj.tile_x && s.y == obj.tile_y) {
+                    let offset = shake.get_offset();
+                    renderables.push((depth, Renderable::ChunkObjectShaking(obj, offset)));
+                } else {
+                    renderables.push((depth, Renderable::ChunkObject(obj)));
+                }
             }
             for wall in &chunk.walls {
                 let wx = wall.tile_x as f32;
@@ -1154,6 +1173,43 @@ impl Renderer {
                 let depth = calculate_depth(wx, wy, 1);
                 renderables.push((depth, Renderable::ChunkWall(wall)));
             }
+        }
+
+        // Add depleted tree respawn timers (depth-sorted with other objects)
+        let current_time = macroquad::time::get_time();
+        for ((tile_x, tile_y), info) in &state.depleted_trees {
+            let wx = *tile_x as f32;
+            let wy = *tile_y as f32;
+            if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
+                continue;
+            }
+            let total_duration = info.respawn_at - info.depleted_at;
+            if total_duration <= 0.0 {
+                continue;
+            }
+            let elapsed = current_time - info.depleted_at;
+            let progress = (elapsed / total_duration).clamp(0.0, 1.0) as f32;
+            let depth = calculate_depth(wx, wy, 1);
+            renderables.push((depth, Renderable::TreeTimer { tile_x: *tile_x, tile_y: *tile_y, progress }));
+        }
+
+        // Add falling trees (trees that were just chopped down)
+        for ft in &state.falling_trees {
+            let wx = ft.x as f32;
+            let wy = ft.y as f32;
+            if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
+                continue;
+            }
+            let (angle, alpha, y_offset) = ft.get_transform();
+            let depth = calculate_depth(wx, wy, 1);
+            renderables.push((depth, Renderable::FallingTree {
+                gid: ft.gid,
+                tile_x: ft.x,
+                tile_y: ft.y,
+                angle,
+                alpha,
+                y_offset,
+            }));
         }
 
         // Sort by depth (painter's algorithm)
@@ -1191,10 +1247,61 @@ impl Renderer {
                 Renderable::ChunkObject(obj) => {
                     self.render_map_object(obj, &state.camera);
                 }
+                Renderable::ChunkObjectShaking(obj, offset) => {
+                    self.render_map_object_shaking(obj, offset, &state.camera);
+                }
                 Renderable::ChunkWall(wall) => {
                     self.render_wall(wall, &state.camera);
                 }
+                Renderable::TreeTimer { tile_x, tile_y, progress } => {
+                    self.render_tree_timer(tile_x, tile_y, progress, &state.camera);
+                }
+                Renderable::FallingTree { gid, tile_x, tile_y, angle, alpha, y_offset } => {
+                    self.render_falling_tree(gid, tile_x, tile_y, angle, alpha, y_offset, &state.camera);
+                }
             }
+        }
+
+        // Render leaf particles (world-space, after depth-sorted objects)
+        for leaf in &state.leaf_particles {
+            // Convert tile coords to screen coords
+            let (screen_x, base_screen_y) = world_to_screen(leaf.tile_x, leaf.tile_y, &state.camera);
+
+            // Offset upward by height (height is in unscaled pixels, apply zoom)
+            let screen_y = base_screen_y - leaf.height * state.camera.zoom;
+
+            let alpha = leaf.get_alpha();
+            let color = Color::new(leaf.color.r, leaf.color.g, leaf.color.b, leaf.color.a * alpha);
+            let size = leaf.size * state.camera.zoom;
+
+            // Draw a simple leaf shape (small rotated diamond)
+            let cos_r = leaf.rotation.cos();
+            let sin_r = leaf.rotation.sin();
+
+            // Draw as a small diamond/leaf shape
+            let hw = size * 0.5;
+            let hh = size * 0.8;
+
+            let points = [
+                (screen_x + cos_r * 0.0 - sin_r * (-hh), screen_y + sin_r * 0.0 + cos_r * (-hh)), // top
+                (screen_x + cos_r * hw - sin_r * 0.0, screen_y + sin_r * hw + cos_r * 0.0),       // right
+                (screen_x + cos_r * 0.0 - sin_r * hh, screen_y + sin_r * 0.0 + cos_r * hh),       // bottom
+                (screen_x + cos_r * (-hw) - sin_r * 0.0, screen_y + sin_r * (-hw) + cos_r * 0.0), // left
+            ];
+
+            // Draw as two triangles
+            draw_triangle(
+                Vec2::new(points[0].0, points[0].1),
+                Vec2::new(points[1].0, points[1].1),
+                Vec2::new(points[2].0, points[2].1),
+                color,
+            );
+            draw_triangle(
+                Vec2::new(points[0].0, points[0].1),
+                Vec2::new(points[2].0, points[2].1),
+                Vec2::new(points[3].0, points[3].1),
+                color,
+            );
         }
 
         // Render subtle local player silhouette (high z-index, visible through trees)
@@ -1217,6 +1324,7 @@ impl Renderer {
 
         // 4.5. Render name tags above all map elements (overhead, walls, objects, etc.)
         self.render_name_tags(state);
+        self.render_tree_name_tag(state);
         self.render_farming_patch_labels(state);
 
         // 5. Render floating damage numbers
@@ -1247,6 +1355,58 @@ impl Renderer {
 
         timings.total_ms = (get_time() - render_start) * 1000.0;
         (layout, timings)
+    }
+
+    /// Render a single pie chart timer for a depleted tree (called during depth-sorted rendering)
+    fn render_tree_timer(&self, tile_x: i32, tile_y: i32, progress: f32, camera: &Camera) {
+        let zoom = camera.zoom;
+
+        // Convert tile position to screen position (center of tile)
+        let (screen_x, mut screen_y) = world_to_screen(
+            tile_x as f32 + 0.5,
+            tile_y as f32 + 0.5,
+            camera,
+        );
+        // Adjust Y to center on tile (world_to_screen gives bottom of tile)
+        screen_y -= 16.0 * zoom;
+
+        // Draw pie chart timer (15% more opaque for visibility)
+        let radius = 12.0 * zoom;
+        let bg_color = Color::new(0.0, 0.0, 0.0, 0.50);
+        let fill_color = Color::new(0.2, 0.8, 0.2, 0.60);
+        let border_color = Color::new(0.1, 0.4, 0.1, 0.75);
+
+        // Draw background circle
+        draw_circle(screen_x, screen_y, radius, bg_color);
+
+        // Draw filled pie slice showing progress
+        if progress > 0.0 {
+            let segments = 32;
+            let start_angle = -std::f32::consts::FRAC_PI_2; // Start from top
+
+            // Draw pie as triangle fan
+            for i in 0..segments {
+                let t1 = i as f32 / segments as f32;
+                let t2 = (i + 1) as f32 / segments as f32;
+                let angle1 = start_angle + t1 * progress * std::f32::consts::TAU;
+                let angle2 = start_angle + t2 * progress * std::f32::consts::TAU;
+
+                let x1 = screen_x + angle1.cos() * radius;
+                let y1 = screen_y + angle1.sin() * radius;
+                let x2 = screen_x + angle2.cos() * radius;
+                let y2 = screen_y + angle2.sin() * radius;
+
+                draw_triangle(
+                    Vec2::new(screen_x, screen_y),
+                    Vec2::new(x1, y1),
+                    Vec2::new(x2, y2),
+                    fill_color,
+                );
+            }
+        }
+
+        // Draw border circle
+        draw_circle_lines(screen_x, screen_y, radius, 2.0, border_color);
     }
 
     fn render_level_up_events(&self, state: &GameState) {
@@ -1559,6 +1719,81 @@ impl Renderer {
 
             self.draw_text_sharp(&name, text_x, name_y, font_size, name_color);
         }
+    }
+
+    /// Render name tag for hovered tree showing name and level requirement
+    fn render_tree_name_tag(&self, state: &GameState) {
+        // Only show if we're hovering over a tile
+        let Some((tile_x, tile_y)) = state.hovered_tile else {
+            return;
+        };
+
+        // Check if this tile is depleted (don't show for stumps)
+        if state.depleted_trees.contains_key(&(tile_x, tile_y)) {
+            return;
+        }
+
+        // Check if there's an object at this exact tile (no tall-object extension)
+        let Some(obj) = state.chunk_manager.get_object_at_exact(tile_x, tile_y) else {
+            return;
+        };
+
+        // Check if this object is a tree (by GID)
+        let Some(tree_info) = get_tree_info(obj.gid) else {
+            return;
+        };
+
+        // Get player's woodcutting level
+        let player_wc_level = state.get_local_player()
+            .map(|p| p.skills.get(crate::game::SkillType::Woodcutting).level)
+            .unwrap_or(1);
+
+        let can_chop = player_wc_level >= tree_info.level_required;
+
+        // Get screen position (center of tile, raised up)
+        let (screen_x, screen_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, &state.camera);
+        let zoom = state.camera.zoom;
+
+        // Get actual sprite height for this tree
+        let sprite_height = if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
+            let tex_height = if let Some(r) = source_rect { r.h } else { texture.height() };
+            tex_height * zoom
+        } else {
+            80.0 * zoom // Fallback if sprite not found
+        };
+
+        // Position the tag above the tree sprite
+        let tag_y = screen_y - sprite_height - 5.0 * zoom;
+
+        // Format text: "Oak Tree (Lvl 1)"
+        let text = format!("{} (Lvl {})", tree_info.name, tree_info.level_required);
+        let font_size = 16.0 * zoom;
+        let text_dims = self.measure_text_sharp(&text, font_size);
+
+        // Choose color based on whether player can chop
+        let level_color = if can_chop {
+            Color::from_rgba(100, 255, 100, 255) // Green
+        } else {
+            Color::from_rgba(255, 100, 100, 255) // Red
+        };
+
+        // Draw background
+        let padding = 4.0 * zoom;
+        let bar_height = 18.0 * zoom;
+        let bar_x = screen_x - text_dims.width / 2.0 - padding;
+        let bar_y = tag_y - 14.0 * zoom;
+
+        draw_rectangle(
+            bar_x,
+            bar_y,
+            text_dims.width + padding * 2.0,
+            bar_height,
+            Color::from_rgba(0, 0, 0, 180),
+        );
+
+        // Draw text
+        let text_x = screen_x - text_dims.width / 2.0;
+        self.draw_text_sharp(&text, text_x, tag_y, font_size, level_color);
     }
 
     /// Render chat bubbles above players' heads
@@ -4340,6 +4575,102 @@ impl Renderer {
         }
     }
 
+    /// Render a map object with a horizontal shake offset (for trees being chopped)
+    fn render_map_object_shaking(&self, obj: &MapObject, shake_offset: f32, camera: &Camera) {
+        let (screen_x, screen_y) = world_to_screen(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, camera);
+        let zoom = camera.zoom;
+
+        if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
+            let (tex_width, tex_height) = if let Some(r) = source_rect {
+                (r.w, r.h)
+            } else {
+                (texture.width(), texture.height())
+            };
+
+            let scaled_width = (tex_width * zoom).round();
+            let scaled_height = (tex_height * zoom).round();
+
+            // Apply shake offset to x position
+            let draw_x = (screen_x - scaled_width / 2.0 + shake_offset * zoom).round();
+            let draw_y = (screen_y - scaled_height).round();
+
+            draw_texture_ex(
+                texture,
+                draw_x,
+                draw_y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(scaled_width, scaled_height)),
+                    source: source_rect,
+                    ..Default::default()
+                },
+            );
+        }
+    }
+
+    /// Render a falling tree (tree that was just chopped down)
+    fn render_falling_tree(&self, gid: u32, tile_x: i32, tile_y: i32, angle: f32, alpha: f32, _y_offset: f32, camera: &Camera) {
+        // The pivot point (tree base) should stay fixed at pivot_x, pivot_y
+        let (pivot_x, pivot_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+        let zoom = camera.zoom;
+
+        if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
+            let (tex_width, tex_height) = if let Some(r) = source_rect {
+                (r.w, r.h)
+            } else {
+                (texture.width(), texture.height())
+            };
+
+            let w = tex_width * zoom;
+            let h = tex_height * zoom;
+
+            // Rotate each corner around the pivot (bottom-center of tree)
+            // Corners relative to pivot: TL, TR, BR, BL
+            let cos_a = angle.cos();
+            let sin_a = angle.sin();
+            let rotate = |rx: f32, ry: f32| -> Vec3 {
+                Vec3::new(
+                    pivot_x + rx * cos_a - ry * sin_a,
+                    pivot_y + rx * sin_a + ry * cos_a,
+                    0.0
+                )
+            };
+
+            let tl = rotate(-w / 2.0, -h);
+            let tr = rotate(w / 2.0, -h);
+            let br = rotate(w / 2.0, 0.0);
+            let bl = rotate(-w / 2.0, 0.0);
+
+            // UV coordinates
+            let (u0, v0, u1, v1) = if let Some(r) = source_rect {
+                (
+                    r.x / texture.width(),
+                    r.y / texture.height(),
+                    (r.x + r.w) / texture.width(),
+                    (r.y + r.h) / texture.height(),
+                )
+            } else {
+                (0.0, 0.0, 1.0, 1.0)
+            };
+
+            let color_arr: [u8; 4] = [255, 255, 255, (alpha * 255.0) as u8];
+
+            // Build mesh with 4 vertices and 2 triangles
+            let mesh = Mesh {
+                vertices: vec![
+                    Vertex { position: tl, uv: Vec2::new(u0, v0), color: color_arr, normal: Vec4::ZERO },
+                    Vertex { position: tr, uv: Vec2::new(u1, v0), color: color_arr, normal: Vec4::ZERO },
+                    Vertex { position: br, uv: Vec2::new(u1, v1), color: color_arr, normal: Vec4::ZERO },
+                    Vertex { position: bl, uv: Vec2::new(u0, v1), color: color_arr, normal: Vec4::ZERO },
+                ],
+                indices: vec![0, 1, 2, 0, 2, 3],
+                texture: Some(texture.clone()),
+            };
+
+            draw_mesh(&mesh);
+        }
+    }
+
     /// Render a wall on a tile edge
     fn render_wall(&self, wall: &Wall, camera: &Camera) {
         let zoom = camera.zoom;
@@ -4474,20 +4805,32 @@ impl Renderer {
         // Scale with zoom for readability
         if state.ui_state.chat_log_visible {
             let zoom = state.camera.zoom;
+            let scale = state.ui_state.ui_scale;
             let chat_x = 10.0;
             let (_, chat_sh) = virtual_screen_size();
-            // In classic mode, push chat log up above the always-visible chat input box
-            let chat_bottom_y = if state.ui_state.classic_controls {
-                chat_sh - 58.0 * zoom
-            } else {
-                chat_sh - 20.0 * zoom
-            };
+            // Align chat box bottom with the bottom of the quick slot bar
+            let bg_padding = 6.0 * zoom;
+            let bar_bottom_offset = EXP_BAR_GAP * scale + 6.0; // distance from screen bottom to hotkey bar bottom + extra margin
+            let box_bottom = chat_sh - bar_bottom_offset; // box bottom edge aligns with hotkey bar bottom
             let line_height = 18.0 * zoom;
             let max_chat_width = 400.0 * zoom;
             let font_size = 16.0 * zoom;
-            let max_visible_lines: usize = 12;
+            let max_visible_lines: usize = 9;
             let chat_area_h = max_visible_lines as f32 * line_height;
+            // chat_bottom_y = Y of the last text line baseline, inside the padding
+            let chat_bottom_y = box_bottom - bg_padding;
             let chat_top_y = chat_bottom_y - chat_area_h + line_height;
+
+            // Semi-transparent background behind chat log
+            let bg_padding = 6.0 * zoom;
+            let clip_x = chat_x - bg_padding;
+            let clip_y = chat_top_y - bg_padding;
+            let clip_w = max_chat_width + bg_padding * 2.0;
+            let clip_h = chat_area_h + bg_padding * 2.0;
+
+            if state.ui_state.chat_log_background {
+                draw_rectangle(clip_x, clip_y, clip_w, clip_h, Color::new(0.0, 0.0, 0.0, 0.45));
+            }
 
             // Build all wrapped lines
             let mut all_lines: Vec<(String, Color)> = Vec::new();
@@ -4519,9 +4862,25 @@ impl Renderer {
             let end = total_lines.saturating_sub(scroll_lines_int);
             let start = end.saturating_sub(visible_lines);
 
+            // Scissor clip text to the background box bounds
+            let physical_w = screen_width();
+            let physical_h = screen_height();
+            let (vw, vh) = virtual_screen_size();
+            let sx = physical_w / vw;
+            let sy = physical_h / vh;
+            {
+                let mut gl = unsafe { get_internal_gl() };
+                gl.flush();
+                gl.quad_gl.scissor(Some((
+                    (clip_x * sx) as i32,
+                    (clip_y * sy) as i32,
+                    (clip_w * sx) as i32,
+                    (clip_h * sy) as i32,
+                )));
+            }
+
             let mut current_y = chat_bottom_y + fractional_offset;
             for i in (start..end).rev() {
-                // Only draw if line is within the chat area
                 if current_y >= chat_top_y - line_height && current_y <= chat_bottom_y + line_height {
                     let (ref line, color) = all_lines[i];
                     self.draw_text_sharp(line, chat_x, current_y, font_size, color);
@@ -4534,6 +4893,13 @@ impl Renderer {
                 let indicator = format!("▲ {} more", start);
                 let indicator_size = 13.0 * zoom;
                 self.draw_text_sharp(&indicator, chat_x, chat_top_y - 2.0 * zoom, indicator_size, Color::from_rgba(180, 180, 180, 160));
+            }
+
+            // Disable scissor clipping
+            {
+                let mut gl = unsafe { get_internal_gl() };
+                gl.flush();
+                gl.quad_gl.scissor(None);
             }
         }
 
@@ -4671,19 +5037,25 @@ impl Renderer {
             };
             self.draw_text_sharp(&prayer_text, (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(), (prayer_bar_y + 14.0).floor(), font_size, prayer_text_color);
 
-            // ===== Gathering status indicator (below prayer bar) =====
-            if state.is_gathering {
+            // ===== Gathering/Woodcutting status indicator (below prayer bar) =====
+            let is_skilling = state.is_gathering || state.is_woodcutting;
+            if is_skilling {
                 let gather_y = prayer_bar_y + bar_height + 4.0;
                 let gather_h = 22.0;
-                // Semi-transparent background
-                draw_rectangle(bar_x, gather_y, bar_width, gather_h, Color::new(0.05, 0.15, 0.25, 0.7));
-                draw_rectangle_lines(bar_x, gather_y, bar_width, gather_h, 1.0, Color::new(0.2, 0.5, 0.7, 0.5));
+                // Semi-transparent background (blue for fishing, brown for woodcutting)
+                let (bg_color, border_color, text_color, action_name) = if state.is_woodcutting {
+                    (Color::new(0.15, 0.10, 0.05, 0.7), Color::new(0.5, 0.35, 0.2, 0.5), Color::new(0.9, 0.7, 0.4, 0.9), "Chopping")
+                } else {
+                    (Color::new(0.05, 0.15, 0.25, 0.7), Color::new(0.2, 0.5, 0.7, 0.5), Color::new(0.4, 0.8, 0.95, 0.9), "Fishing")
+                };
+                draw_rectangle(bar_x, gather_y, bar_width, gather_h, bg_color);
+                draw_rectangle_lines(bar_x, gather_y, bar_width, gather_h, 1.0, border_color);
                 // Animated dots
                 let dot_count = ((macroquad::time::get_time() * 2.0) as usize % 4) as usize;
                 let dots = ".".repeat(dot_count);
-                let label = format!("Fishing{}", dots);
+                let label = format!("{}{}", action_name, dots);
                 let label_w = self.measure_text_sharp(&label, 16.0).width;
-                self.draw_text_sharp(&label, (bar_x + (bar_width - label_w) / 2.0).floor(), (gather_y + 15.0).floor(), 16.0, Color::new(0.4, 0.8, 0.95, 0.9));
+                self.draw_text_sharp(&label, (bar_x + (bar_width - label_w) / 2.0).floor(), (gather_y + 15.0).floor(), 16.0, text_color);
             }
 
             // XP Globes (to the left of player stats)
@@ -4691,7 +5063,7 @@ impl Renderer {
             self.render_xp_globes(&state.xp_globes, bar_x, globe_stats_y);
 
             // XP Drop Feed (below gathering status or MP bar)
-            let drop_start_y = if state.is_gathering {
+            let drop_start_y = if is_skilling {
                 mp_bar_y + bar_height + 4.0 + 22.0 + 110.0 // ~100px below gathering box
             } else {
                 mp_bar_y + bar_height + 110.0
@@ -4850,22 +5222,8 @@ impl Renderer {
         // Social panel (when open)
         self.render_social_panel(state, hovered, &mut layout);
 
-        // Register chat log hit area for desktop scroll detection (before quick slots so they take priority)
-        if state.ui_state.chat_log_visible {
-            let (_, chat_sh) = virtual_screen_size();
-            let chat_bottom_y = if state.ui_state.classic_controls {
-                chat_sh - 58.0
-            } else {
-                chat_sh - 20.0
-            };
-            let line_height = 18.0;
-            let max_visible_lines: usize = 12;
-            let chat_area_h = max_visible_lines as f32 * line_height;
-            let chat_top_y = chat_bottom_y - chat_area_h + line_height;
-            layout.add(UiElementId::ChatLogArea, macroquad::prelude::Rect::new(
-                10.0, chat_top_y, 400.0, chat_area_h,
-            ));
-        }
+        // Chat log area is intentionally NOT registered for hit detection
+        // so that clicks/hovers pass through to the game world beneath it
 
         // Quick slots and menu buttons - hide on mobile when crafting/shop panel is open
         let hide_bottom_bar = cfg!(target_os = "android") && state.ui_state.crafting_open;

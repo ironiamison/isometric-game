@@ -1081,3 +1081,103 @@ attack_level_required = 1
 attack_bonus = 8
 strength_bonus = 5
 defence_bonus = 0
+
+# =============================================================================
+# AXES (Woodcutting requirement)
+# =============================================================================
+
+[bronze_axe]
+display_name = "Bronze Axe"
+sprite = "chopping_axe"
+description = "A basic bronze axe for chopping trees."
+category = "equipment"
+max_stack = 1
+base_price = 50
+sellable = true
+[bronze_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 1
+attack_bonus = 2
+strength_bonus = 3
+defence_bonus = 0
+chop_speed_multiplier = 1.0
+
+[iron_axe]
+display_name = "Iron Axe"
+sprite = "chopping_axe"
+description = "A sturdy iron axe. Chops faster than bronze."
+category = "equipment"
+max_stack = 1
+base_price = 150
+sellable = true
+[iron_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 6
+attack_bonus = 4
+strength_bonus = 5
+defence_bonus = 0
+chop_speed_multiplier = 1.2
+
+[steel_axe]
+display_name = "Steel Axe"
+sprite = "chopping_axe"
+description = "A sharp steel axe. Efficient for most trees."
+category = "equipment"
+max_stack = 1
+base_price = 400
+sellable = true
+[steel_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 11
+attack_bonus = 6
+strength_bonus = 7
+defence_bonus = 0
+chop_speed_multiplier = 1.4
+
+[mithril_axe]
+display_name = "Mithril Axe"
+sprite = "chopping_axe"
+description = "A lightweight mithril axe. Swings with ease."
+category = "equipment"
+max_stack = 1
+base_price = 1000
+sellable = true
+[mithril_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 21
+attack_bonus = 8
+strength_bonus = 9
+defence_bonus = 0
+chop_speed_multiplier = 1.6
+
+[adamant_axe]
+display_name = "Adamant Axe"
+sprite = "chopping_axe"
+description = "A powerful adamant axe. Cuts through hardwood."
+category = "equipment"
+max_stack = 1
+base_price = 2500
+sellable = true
+[adamant_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 31
+attack_bonus = 10
+strength_bonus = 11
+defence_bonus = 0
+chop_speed_multiplier = 1.8
+
+[rune_axe]
+display_name = "Rune Axe"
+sprite = "chopping_axe"
+description = "The finest axe money can buy. Incredibly fast."
+category = "equipment"
+max_stack = 1
+base_price = 7500
+sellable = true
+[rune_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 41
+attack_bonus = 12
+strength_bonus = 13
+defence_bonus = 0
+chop_speed_multiplier = 2.0

@@ -522,6 +522,7 @@ pub struct PlayerUpdate {
     pub is_admin: bool,
     pub sitting: bool,
     pub is_gathering: bool,
+    pub is_woodcutting: bool,
     pub mp: i32,
     pub max_mp: i32,
 }
@@ -592,8 +593,10 @@ pub struct GameRoom {
     arena_manager: RwLock<crate::arena::ArenaManager>,
     /// Database reference for arena stats persistence
     db: Option<Arc<crate::db::Database>>,
-    /// Gathering system (fishing, woodcutting, mining)
+    /// Gathering system (fishing)
     gathering: RwLock<crate::gathering::GatheringSystem>,
+    /// Woodcutting system
+    woodcutting: RwLock<crate::woodcutting::WoodcuttingSystem>,
     /// Chair GID -> direction mapping (loaded from config)
     chair_gids: HashMap<u32, Direction>,
     /// Chair positions on the map: (tile_x, tile_y) -> ChairState
@@ -696,6 +699,18 @@ impl GameRoom {
             tracing::info!("Loaded {} gathering markers from chunk data", chunk_marker_count);
         }
 
+        // Load woodcutting system
+        let woodcutting = match crate::woodcutting::WoodcuttingSystem::load(std::path::Path::new("data")) {
+            Ok(w) => {
+                tracing::info!("Loaded woodcutting system with {} tree types", w.tree_types.len());
+                w
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load woodcutting system: {} (using empty)", e);
+                crate::woodcutting::WoodcuttingSystem::new()
+            }
+        };
+
         // Load farming system
         let mut farming = match crate::farming::FarmingSystem::load(std::path::Path::new("data")) {
             Ok(f) => {
@@ -793,6 +808,7 @@ impl GameRoom {
             arena_manager: RwLock::new(crate::arena::ArenaManager::new(crate::arena::ArenaConfig::default())),
             db,
             gathering: RwLock::new(gathering),
+            woodcutting: RwLock::new(woodcutting),
             chair_gids,
             chairs: RwLock::new(chairs),
             farming: RwLock::new(farming),
@@ -1103,6 +1119,16 @@ impl GameRoom {
             }
         }
 
+        // Stop any active gathering/woodcutting
+        {
+            let mut gathering = self.gathering.write().await;
+            gathering.stop_gathering(player_id);
+        }
+        {
+            let mut woodcutting = self.woodcutting.write().await;
+            woodcutting.stop_woodcutting(player_id);
+        }
+
         let mut players = self.players.write().await;
         players.remove(player_id);
     }
@@ -1334,6 +1360,8 @@ impl GameRoom {
             prayer_xp: p.skills.prayer.xp,
             magic_level: p.skills.magic.level,
             magic_xp: p.skills.magic.xp,
+            woodcutting_level: p.skills.woodcutting.level,
+            woodcutting_xp: p.skills.woodcutting.xp,
         })
     }
 
@@ -2773,6 +2801,51 @@ impl GameRoom {
             {
                 tracing::info!(
                     "Player {} collected quest item objective {} for quest {}: {}/{}",
+                    player_id, objective_id, result.quest_id, current, target
+                );
+
+                if let Some(sender) = self.player_senders.read().await.get(player_id) {
+                    let msg = ServerMessage::QuestObjectiveProgress {
+                        quest_id: result.quest_id.clone(),
+                        objective_id: objective_id.clone(),
+                        current,
+                        target,
+                    };
+                    if let Ok(data) = crate::protocol::encode_server_message(&msg) {
+                        let _ = sender.send(data).await;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Process quest tree depletion event
+    async fn process_quest_tree_deplete(&self, player_id: &str, tree_type: &str, tree_x: i32, tree_y: i32) {
+        tracing::info!(
+            "Processing tree depletion quest event: player={}, tree_type={}, pos=({}, {})",
+            player_id, tree_type, tree_x, tree_y
+        );
+
+        let mut quest_states = self.player_quest_states.write().await;
+        let quest_state = quest_states.entry(player_id.to_string())
+            .or_insert_with(PlayerQuestState::new);
+
+        let event = QuestEvent::TreeDepleted {
+            player_id: player_id.to_string(),
+            tree_type: tree_type.to_string(),
+            x: tree_x,
+            y: tree_y,
+        };
+
+        let results = self.quest_registry.process_event(&event, quest_state).await;
+        tracing::info!("Tree depletion quest event returned {} results", results.len());
+
+        for result in results {
+            if let (Some(objective_id), Some(current), Some(target)) =
+                (&result.objective_id, result.new_progress, result.target)
+            {
+                tracing::info!(
+                    "Player {} depleted tree for quest objective {} in quest {}: {}/{}",
                     player_id, objective_id, result.quest_id, current, target
                 );
 
@@ -5200,6 +5273,171 @@ impl GameRoom {
     }
 
     // ========================================================================
+    // Woodcutting System
+    // ========================================================================
+
+    /// Handle a single chop attempt on a tree (player presses attack while facing tree with axe)
+    pub async fn handle_chop_tree(&self, player_id: &str, tree_x: i32, tree_y: i32, tree_gid: u32) {
+        // Woodcutting is overworld-only; reject if player is in an instance
+        if self.player_instances.read().await.contains_key(player_id) {
+            return;
+        }
+
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let (woodcutting_level, player_x, player_y, player_dir, equipped_weapon) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => (p.skills.woodcutting.level, p.x, p.y, p.direction, p.equipped_weapon.clone()),
+                None => return,
+            }
+        };
+
+        // Check player is adjacent to the tree (within 1 tile)
+        let dx = (player_x - tree_x).abs();
+        let dy = (player_y - tree_y).abs();
+        if dx > 1 || dy > 1 || (dx == 0 && dy == 0) {
+            self.send_to_player(player_id, ServerMessage::Error {
+                code: 400,
+                message: "You need to be next to the tree".to_string(),
+            }).await;
+            return;
+        }
+
+        // Check if player has an axe equipped with sufficient level
+        let has_valid_axe = if let Some(ref weapon_id) = equipped_weapon {
+            if let Some(item_def) = self.item_registry.get(weapon_id) {
+                if let Some(ref equip) = item_def.equipment {
+                    if equip.chop_speed_multiplier > 0.0 {
+                        if equip.woodcutting_level_required > woodcutting_level {
+                            self.send_to_player(player_id, ServerMessage::Error {
+                                code: 400,
+                                message: format!(
+                                    "You need Woodcutting level {} to use this axe",
+                                    equip.woodcutting_level_required
+                                ),
+                            }).await;
+                            return;
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if !has_valid_axe {
+            self.send_to_player(player_id, ServerMessage::Error {
+                code: 400,
+                message: "You need an axe to chop trees".to_string(),
+            }).await;
+            return;
+        }
+
+        // Perform the chop
+        let mut woodcutting = self.woodcutting.write().await;
+        let chop_result = woodcutting.chop_once(tree_x, tree_y, tree_gid, woodcutting_level, current_time);
+        drop(woodcutting);
+
+        match chop_result {
+            Ok(result) => {
+                // Broadcast the swing animation to all players
+                self.broadcast(ServerMessage::WoodcuttingSwing {
+                    player_id: player_id.to_string(),
+                    tree_x,
+                    tree_y,
+                }).await;
+
+                if result.success {
+                    // Add log to inventory
+                    let mut players = self.players.write().await;
+                    if let Some(player) = players.get_mut(player_id) {
+                        let leftover = player.inventory.add_item(&result.log_item_id, 1, &self.item_registry);
+                        if leftover > 0 {
+                            drop(players);
+                            self.send_to_player(player_id, ServerMessage::Error {
+                                code: 400,
+                                message: "Your inventory is full!".to_string(),
+                            }).await;
+                            return;
+                        }
+
+                        // Award XP
+                        let leveled_up = player.skills.woodcutting.add_xp(result.xp_gained);
+                        let new_xp = player.skills.woodcutting.xp;
+                        let new_level = player.skills.woodcutting.level;
+                        let inv_update = player.inventory.to_update();
+                        let gold = player.inventory.gold;
+                        drop(players);
+
+                        // Send inventory update
+                        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                            player_id: player_id.to_string(),
+                            slots: inv_update,
+                            gold,
+                        }).await;
+
+                        // Send XP update
+                        self.send_to_player(player_id, ServerMessage::SkillXp {
+                            player_id: player_id.to_string(),
+                            skill: "woodcutting".to_string(),
+                            xp_gained: result.xp_gained,
+                            total_xp: new_xp,
+                            level: new_level,
+                        }).await;
+
+                        // Send chop result
+                        self.send_to_player(player_id, ServerMessage::WoodcuttingResult {
+                            player_id: player_id.to_string(),
+                            item_id: result.log_item_id.clone(),
+                            xp_gained: result.xp_gained,
+                        }).await;
+
+                        // Handle level up
+                        if leveled_up {
+                            self.broadcast(ServerMessage::SkillLevelUp {
+                                player_id: player_id.to_string(),
+                                skill: "woodcutting".to_string(),
+                                new_level,
+                            }).await;
+                        }
+                    }
+                }
+
+                // Handle tree depletion
+                if result.tree_depleted {
+                    let respawn_delay = result.respawn_delay_ms.unwrap_or(7500);
+                    self.broadcast(ServerMessage::TreeDepleted {
+                        x: tree_x,
+                        y: tree_y,
+                        gid: tree_gid,
+                        respawn_delay_ms: respawn_delay,
+                    }).await;
+
+                    // Process quest event for tree depletion
+                    self.process_quest_tree_deplete(player_id, &result.tree_type_id, tree_x, tree_y).await;
+                }
+            }
+            Err(msg) => {
+                self.send_to_player(player_id, ServerMessage::Error {
+                    code: 400,
+                    message: msg,
+                }).await;
+            }
+        }
+    }
+
+    // ========================================================================
     // Chair System
     // ========================================================================
 
@@ -5752,6 +5990,12 @@ impl GameRoom {
             gathering.gathering_player_ids()
         };
 
+        // Get set of woodcutting player IDs for state sync
+        let woodcutting_player_ids: std::collections::HashSet<String> = {
+            let woodcutting = self.woodcutting.read().await;
+            woodcutting.woodcutting_player_ids()
+        };
+
         {
             let mut players = self.players.write().await;
 
@@ -5894,6 +6138,7 @@ impl GameRoom {
                     is_admin: player.is_admin,
                     sitting: player.sitting_at.is_some(),
                     is_gathering: gathering_player_ids.contains(&player.id),
+                    is_woodcutting: woodcutting_player_ids.contains(&player.id),
                     mp: player.mp,
                     max_mp: player.max_mp(),
                 });
@@ -5914,6 +6159,25 @@ impl GameRoom {
             drop(gathering);
             for id in stopped {
                 self.broadcast(ServerMessage::GatheringStopped {
+                    player_id: id.clone(),
+                    reason: "moved".to_string(),
+                }).await;
+            }
+        }
+
+        // Stop woodcutting for any player who moved
+        {
+            let mut woodcutting = self.woodcutting.write().await;
+            let mut stopped = Vec::new();
+            for id in &moved_players {
+                if woodcutting.is_woodcutting(id) {
+                    woodcutting.stop_woodcutting(id);
+                    stopped.push(id.clone());
+                }
+            }
+            drop(woodcutting);
+            for id in stopped {
+                self.broadcast(ServerMessage::WoodcuttingStopped {
                     player_id: id.clone(),
                     reason: "moved".to_string(),
                 }).await;
@@ -6452,6 +6716,19 @@ impl GameRoom {
                     self.send_to_overworld_players(ServerMessage::BonusTileExpired { x, y }, None).await;
                 }
             }
+        }
+
+        // Tree respawn tick: check for trees that should respawn
+        let tree_respawn_events = {
+            let mut woodcutting = self.woodcutting.write().await;
+            woodcutting.tick_respawns(current_time)
+        };
+        for event in tree_respawn_events {
+            self.broadcast(ServerMessage::TreeRespawned {
+                x: event.x,
+                y: event.y,
+                gid: event.gid,
+            }).await;
         }
 
         // Farming tick: check growth stage transitions (every 5 seconds / ~100 ticks)

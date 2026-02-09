@@ -123,6 +123,7 @@ async fn async_main() {
                             game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
+                            game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             #[cfg(not(target_os = "android"))]
                             app::maybe_show_control_scheme_dialogue(&mut game_state);
@@ -162,6 +163,7 @@ async fn async_main() {
                             game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
+                            game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             #[cfg(not(target_os = "android"))]
                             app::maybe_show_control_scheme_dialogue(&mut game_state);
@@ -322,6 +324,7 @@ async fn async_main() {
                             game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
+                            game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
                             if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                             app::maybe_show_control_scheme_dialogue(&mut game_state);
                             let network = NetworkClient::new_guest(WS_URL);
@@ -407,6 +410,7 @@ async fn async_main() {
                                 game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                                 game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                                 game_state.ui_state.use_joystick = ui_settings.use_joystick;
+                                game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
                                 if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
                                 app::maybe_show_control_scheme_dialogue(&mut game_state);
 

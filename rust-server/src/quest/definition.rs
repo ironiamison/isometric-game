@@ -111,6 +111,8 @@ pub enum ObjectiveType {
     TalkTo,
     /// Reach a specific location
     ReachLocation,
+    /// Deplete X trees of type Y (chop them down completely)
+    DepleteTree,
 }
 
 impl ObjectiveType {
@@ -120,6 +122,7 @@ impl ObjectiveType {
             "collect_item" | "collect" => Some(ObjectiveType::CollectItem),
             "talk_to" | "talk" => Some(ObjectiveType::TalkTo),
             "reach_location" | "reach" | "location" => Some(ObjectiveType::ReachLocation),
+            "deplete_tree" | "chop_tree" | "deplete" => Some(ObjectiveType::DepleteTree),
             _ => None,
         }
     }
@@ -314,6 +317,8 @@ mod tests {
         assert_eq!(ObjectiveType::from_str("collect_item"), Some(ObjectiveType::CollectItem));
         assert_eq!(ObjectiveType::from_str("talk_to"), Some(ObjectiveType::TalkTo));
         assert_eq!(ObjectiveType::from_str("reach_location"), Some(ObjectiveType::ReachLocation));
+        assert_eq!(ObjectiveType::from_str("deplete_tree"), Some(ObjectiveType::DepleteTree));
+        assert_eq!(ObjectiveType::from_str("chop_tree"), Some(ObjectiveType::DepleteTree));
         assert_eq!(ObjectiveType::from_str("invalid"), None);
     }
 }

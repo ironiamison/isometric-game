@@ -236,11 +236,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     state.gathering_started_at = macroquad::time::get_time();
                                 }
                             } else if !server_is_gathering && player.is_gathering {
-                                player.is_gathering = false;
-                                if is_local_player {
-                                    state.is_gathering = false;
+                                // Don't reset if gathering was started very recently (grace period to avoid race condition)
+                                let recently_started = macroquad::time::get_time() - player.gathering_started_at < 1.0;
+                                if !recently_started {
+                                    player.is_gathering = false;
+                                    if is_local_player {
+                                        state.is_gathering = false;
+                                    }
                                 }
                             }
+
                         } else if state.local_player_id.as_ref() != Some(&id) && !id.is_empty() {
                             // Player not in our map - create them from stateSync data
                             // This handles players re-appearing after map transitions
@@ -274,6 +279,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 if is_gathering {
                                     new_player.is_gathering = true;
                                     new_player.gathering_started_at = macroquad::time::get_time();
+                                }
+                                let is_woodcutting = extract_bool(player_value, "is_woodcutting").unwrap_or(false);
+                                if is_woodcutting {
+                                    new_player.is_woodcutting = true;
+                                    new_player.woodcutting_started_at = macroquad::time::get_time();
                                 }
                                 if let Some(hp_val) = hp {
                                     new_player.hp = hp_val;
@@ -1258,6 +1268,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         // Parse equipment stats if present
                         let equipment = extract_string(item_value, "equipment_slot")
                             .map(|slot_type| {
+                                let chop_speed = extract_f32(item_value, "chop_speed_multiplier").unwrap_or(0.0);
+                                if chop_speed > 0.0 {
+                                    log::info!("Loaded item {} with chop_speed_multiplier={}", id, chop_speed);
+                                }
                                 EquipmentStats {
                                     slot_type,
                                     attack_level_required: extract_i32(item_value, "attack_level_required").unwrap_or(1),
@@ -1265,6 +1279,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     attack_bonus: extract_i32(item_value, "attack_bonus").unwrap_or(0),
                                     strength_bonus: extract_i32(item_value, "strength_bonus").unwrap_or(0),
                                     defence_bonus: extract_i32(item_value, "defence_bonus").unwrap_or(0),
+                                    woodcutting_level_required: extract_i32(item_value, "woodcutting_level_required").unwrap_or(1),
+                                    chop_speed_multiplier: chop_speed,
                                 }
                             });
 
@@ -2009,6 +2025,123 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 log::info!("Buff {} expired for player {}", buff_type, player_id);
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.gathering_buff = None;
+                }
+            }
+        }
+
+        // =====================================================================
+        // Woodcutting Messages
+        // =====================================================================
+
+        "woodcuttingSwing" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let tree_x = extract_i32(value, "tree_x").unwrap_or(0);
+                let tree_y = extract_i32(value, "tree_y").unwrap_or(0);
+
+                // Server says player swung - play attack animation
+                if let Some(player) = state.players.get_mut(&player_id) {
+                    player.play_attack();
+                }
+
+                // Play woodcutting sound effect
+                state.pending_sfx.push("woodcut".to_string());
+
+                // Add tree shake effect
+                state.tree_shake_effects.push(
+                    crate::game::state::TreeShakeEffect::new(tree_x, tree_y)
+                );
+
+                // Spawn leaf particles at the top of the tree
+                // Tree sprites are typically ~64-80 pixels tall
+                let tree_height = 60.0;
+                for _ in 0..3 {
+                    state.leaf_particles.push(
+                        crate::game::state::LeafParticle::new_at_tree(tree_x, tree_y, tree_height)
+                    );
+                }
+            }
+        }
+
+        "woodcuttingResult" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let item_id = extract_string(value, "item_id").unwrap_or_default();
+                log::info!("Woodcutting result: player {} got {}", player_id, item_id);
+
+                // XP display is handled by the separate skillXp message
+                // This handler just shows the item feedback
+
+                if state.local_player_id.as_deref() == Some(player_id.as_str()) {
+                    let item_name = state.item_registry.get(&item_id)
+                        .map(|d| d.display_name.clone())
+                        .unwrap_or(item_id.clone());
+
+                    // Add chat message about the chop
+                    state.ui_state.chat_messages.push(ChatMessage::system(
+                        format!("You chopped some {}!", item_name)
+                    ));
+                }
+            }
+        }
+
+        "treeDepleted" => {
+            if let Some(value) = data {
+                let x = extract_i32(value, "x").unwrap_or(0);
+                let y = extract_i32(value, "y").unwrap_or(0);
+                let gid = extract_u32(value, "gid").unwrap_or(0);
+                let respawn_delay_ms = extract_u64(value, "respawn_delay_ms").unwrap_or(7500);
+                let now = macroquad::time::get_time();
+                log::info!("Tree depleted at ({}, {}), respawn in {}ms", x, y, respawn_delay_ms);
+
+                // Add falling tree effect
+                state.falling_trees.push(
+                    crate::game::state::FallingTreeEffect::new(x, y, gid)
+                );
+
+                // Spawn a burst of leaves when tree falls
+                let tree_height = 60.0;
+                for _ in 0..10 {
+                    state.leaf_particles.push(
+                        crate::game::state::LeafParticle::new_at_tree(x, y, tree_height)
+                    );
+                }
+
+                // Mark tree as depleted (hides the static tree, shows respawn timer)
+                state.depleted_trees.insert((x, y), crate::game::state::DepletedTreeInfo {
+                    gid,
+                    depleted_at: now,
+                    respawn_at: now + (respawn_delay_ms as f64 / 1000.0),
+                });
+            }
+        }
+
+        "treeRespawned" => {
+            if let Some(value) = data {
+                let x = extract_i32(value, "x").unwrap_or(0);
+                let y = extract_i32(value, "y").unwrap_or(0);
+                log::info!("Tree respawned at ({}, {})", x, y);
+                state.depleted_trees.remove(&(x, y));
+            }
+        }
+
+        "depletedTreesSync" => {
+            if let Some(value) = data {
+                if let Some(trees_arr) = extract_array(value, "trees") {
+                    state.depleted_trees.clear();
+                    let now = macroquad::time::get_time();
+                    for tree in trees_arr {
+                        let x = extract_i32(tree, "x").unwrap_or(0);
+                        let y = extract_i32(tree, "y").unwrap_or(0);
+                        let gid = extract_u32(tree, "gid").unwrap_or(0);
+                        // For sync, we don't know exact respawn time, use a short default
+                        state.depleted_trees.insert((x, y), crate::game::state::DepletedTreeInfo {
+                            gid,
+                            depleted_at: now,
+                            respawn_at: now + 5.0, // Default 5 seconds remaining
+                        });
+                    }
+                    log::info!("Synced {} depleted trees", state.depleted_trees.len());
                 }
             }
         }

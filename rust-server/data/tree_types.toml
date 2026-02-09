@@ -1,0 +1,56 @@
+# Tree Types Configuration
+# Each tree type defines the GIDs (from objects.tsx tileset), level requirements,
+# XP rewards, and respawn behavior.
+#
+# GID CONVERSION: GID = 1162 + sprite_filename
+# Example: 101.png tree sprite → GID 1263
+
+[trees]
+
+[trees.oak]
+# Oak trees: sprites 101, 102, 103, 286-290, 647, 648, 831
+# GIDs = 1162 + sprite_number
+gids = [1263, 1264, 1265, 1448, 1449, 1450, 1451, 1452, 1809, 1810, 1993]
+level_required = 1
+log_item_id = "oak_log"
+xp_per_log = 25
+success_chance = 0.25  # 25% chance to get a log per swing
+depletion_chance = 0.15  # 15% chance tree depletes on successful chop
+respawn_time_min = 5000  # ms
+respawn_time_max = 10000  # ms
+
+[trees.willow]
+# Willow trees: sprites 528, 529, 530
+# GIDs = 1162 + sprite_number
+gids = [1690, 1691, 1692]
+level_required = 15
+log_item_id = "willow_log"
+xp_per_log = 67
+success_chance = 0.22
+depletion_chance = 0.12
+respawn_time_min = 6000
+respawn_time_max = 12000
+
+[trees.maple]
+# Maple trees: sprites 985-992
+# GIDs = 1162 + sprite_number
+gids = [2147, 2148, 2149, 2150, 2151, 2152, 2153, 2154]
+level_required = 45
+log_item_id = "maple_log"
+xp_per_log = 100
+success_chance = 0.20
+depletion_chance = 0.08
+respawn_time_min = 8000
+respawn_time_max = 15000
+
+[trees.yew]
+# Yew trees: sprites 993-1000
+# GIDs = 1162 + sprite_number
+gids = [2155, 2156, 2157, 2158, 2159, 2160, 2161, 2162]
+level_required = 60
+log_item_id = "yew_log"
+xp_per_log = 175
+success_chance = 0.18
+depletion_chance = 0.05
+respawn_time_min = 10000
+respawn_time_max = 20000

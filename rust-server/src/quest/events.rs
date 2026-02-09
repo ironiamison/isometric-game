@@ -42,6 +42,16 @@ pub enum QuestEvent {
         y: i32,
     },
 
+    /// Player depleted (chopped down) a tree
+    TreeDepleted {
+        player_id: String,
+        /// Tree type ID (e.g., "oak", "willow", "yew")
+        tree_type: String,
+        /// World coordinates where the tree was
+        x: i32,
+        y: i32,
+    },
+
     /// Player accepted a quest (from dialogue)
     QuestAccepted {
         player_id: String,
@@ -70,6 +80,7 @@ impl QuestEvent {
             QuestEvent::ItemCollected { player_id, .. } => player_id,
             QuestEvent::NpcInteraction { player_id, .. } => player_id,
             QuestEvent::LocationReached { player_id, .. } => player_id,
+            QuestEvent::TreeDepleted { player_id, .. } => player_id,
             QuestEvent::QuestAccepted { player_id, .. } => player_id,
             QuestEvent::QuestAbandoned { player_id, .. } => player_id,
             QuestEvent::DialogueChoice { player_id, .. } => player_id,
@@ -83,6 +94,7 @@ impl QuestEvent {
             QuestEvent::ItemCollected { .. } => "item_collected",
             QuestEvent::NpcInteraction { .. } => "npc_interaction",
             QuestEvent::LocationReached { .. } => "location_reached",
+            QuestEvent::TreeDepleted { .. } => "tree_depleted",
             QuestEvent::QuestAccepted { .. } => "quest_accepted",
             QuestEvent::QuestAbandoned { .. } => "quest_abandoned",
             QuestEvent::DialogueChoice { .. } => "dialogue_choice",

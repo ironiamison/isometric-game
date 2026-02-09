@@ -88,6 +88,7 @@ impl Renderer {
                 SkillType::Smithing => (4, 6),
                 SkillType::Prayer => (3, 6),
                 SkillType::Magic => (6, 6),
+                SkillType::Woodcutting => (7, 6),
             };
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
@@ -110,6 +111,7 @@ impl Renderer {
             SkillType::Smithing => "Sm",
             SkillType::Prayer => "Pr",
             SkillType::Magic => "Mg",
+            SkillType::Woodcutting => "Wc",
         };
         self.draw_text_sharp(letter, x, y + 12.0, 16.0, Color::new(color.r, color.g, color.b, opacity));
     }
@@ -123,6 +125,7 @@ impl Renderer {
             SkillType::Smithing => Color::new(0.7, 0.5, 0.2, 1.0),
             SkillType::Prayer => Color::new(0.9, 0.9, 0.5, 1.0),
             SkillType::Magic => Color::new(0.4, 0.3, 0.9, 1.0),
+            SkillType::Woodcutting => Color::new(0.55, 0.35, 0.2, 1.0),
         }
     }
 }

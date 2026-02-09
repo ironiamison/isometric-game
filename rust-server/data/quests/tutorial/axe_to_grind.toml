@@ -1,0 +1,38 @@
+# Axe to Grind - Woodcutting tutorial quest
+# Given by Lumberjack Pete near the forest
+
+[quest]
+id = "axe_to_grind"
+name = "Axe to Grind"
+description = "Lumberjack Pete wants to teach you the basics of woodcutting. Chop down some oak trees to prove your skill."
+giver_npc = "lumberjack_pete"
+level_required = 1
+repeatable = false
+lua_script = "tutorial/axe_to_grind.lua"
+
+[[quest.objectives]]
+id = "chop_oak_trees"
+type = "deplete_tree"
+target = "oak"
+count = 5
+description = "Chop down 5 oak trees"
+
+[[quest.objectives]]
+id = "return_to_pete"
+type = "talk_to"
+target = "lumberjack_pete"
+description = "Return to Lumberjack Pete"
+sequential = true
+
+[quest.rewards]
+exp = 250
+gold = 50
+items = [
+    { id = "iron_axe", count = 1 },
+]
+
+[quest.dialogue]
+offer = "So you want to learn woodcutting, eh? It's honest work - good for the arms and the soul. Tell you what, I'll lend you my old bronze axe. Go chop down five oak trees nearby. Show me you've got what it takes!"
+accept = "Here's a bronze axe to get you started. Equip it, face an oak tree, and keep swinging until it falls! The trees will grow back, so don't worry about chopping 'em all down. Come back when you've felled five oaks!"
+progress = "Still working on those trees? Keep at it! Remember - equip the axe and swing until the tree falls."
+complete = "Five fine oaks! You've got a natural talent for this. Here, take this iron axe - it's sharper and faster than that old bronze one. My shop's always open if you need better gear. Happy chopping!"

@@ -20,6 +20,7 @@ fn save_current_ui_settings(state: &GameState) {
         tap_to_pathfind: state.ui_state.tap_to_pathfind,
         use_joystick: state.ui_state.use_joystick,
         graphics_low: state.ui_state.graphics_low,
+        chat_log_background: state.ui_state.chat_log_background,
     };
     save_ui_settings(&settings);
 }
@@ -96,6 +97,8 @@ pub enum InputCommand {
     // Gathering commands
     StartGathering { marker_x: i32, marker_y: i32 },
     StopGathering,
+    // Woodcutting commands
+    ChopTree { tree_x: i32, tree_y: i32, tree_gid: u32 },
     // Chair commands
     SitChair { tile_x: i32, tile_y: i32 },
     StandUp,
@@ -1196,6 +1199,12 @@ impl InputHandler {
                         UiElementId::EscapeMenuChatLogToggle => {
                             audio.play_sfx("enter");
                             state.ui_state.chat_log_visible = !state.ui_state.chat_log_visible;
+                            save_current_ui_settings(state);
+                            return commands;
+                        }
+                        UiElementId::EscapeMenuChatBgToggle => {
+                            audio.play_sfx("enter");
+                            state.ui_state.chat_log_background = !state.ui_state.chat_log_background;
                             save_current_ui_settings(state);
                             return commands;
                         }
@@ -2823,12 +2832,66 @@ impl InputHandler {
                     None
                 };
 
+                // Check if we should woodcut instead of attack (axe equipped + facing tree)
+                let should_woodcut = if should_gather.is_none() {
+                    if let Some(player) = state.get_local_player() {
+                        // Check if player has an axe equipped (chop_speed_multiplier > 0)
+                        let (has_axe, chop_speed) = if let Some(ref weapon_id) = player.equipped_weapon {
+                            let speed = state.item_registry.get(weapon_id)
+                                .and_then(|item| item.equipment.as_ref())
+                                .map(|eq| eq.chop_speed_multiplier)
+                                .unwrap_or(0.0);
+                            log::info!("Woodcutting check: weapon={} chop_speed={}", weapon_id, speed);
+                            (speed > 0.0, speed)
+                        } else {
+                            log::info!("Woodcutting check: no weapon equipped");
+                            (false, 0.0)
+                        };
+
+                        if has_axe {
+                            let px = player.x.round() as i32;
+                            let py = player.y.round() as i32;
+                            let (fdx, fdy) = player.direction.to_unit_vector();
+                            let face_x = px + fdx as i32;
+                            let face_y = py + fdy as i32;
+
+                            log::info!("Axe detected (speed={}), checking tile ({}, {})", chop_speed, face_x, face_y);
+
+                            // Check if facing tile has a tree object and is not depleted
+                            if !state.depleted_trees.contains_key(&(face_x, face_y)) {
+                                let obj_result = state.chunk_manager.get_object_at(face_x, face_y);
+                                if let Some(obj) = obj_result {
+                                    log::info!("Found object at ({}, {}): gid={}", face_x, face_y, obj.gid);
+                                    Some((face_x, face_y, obj.gid))
+                                } else {
+                                    log::info!("No object found at ({}, {})", face_x, face_y);
+                                    None
+                                }
+                            } else {
+                                log::info!("Tree at ({}, {}) is depleted", face_x, face_y);
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
                 if let Some((marker_x, marker_y)) = should_gather {
                     if !state.is_gathering {
                         log::info!("Fishing rod equipped near fishing spot - sending StartGathering");
                         commands.push(InputCommand::StartGathering { marker_x, marker_y });
                         self.last_attack_time = current_time;
                     }
+                } else if let Some((tree_x, tree_y, tree_gid)) = should_woodcut {
+                    // Send chop command on each attack press when facing a tree with an axe
+                    log::info!("Axe equipped near tree - sending ChopTree");
+                    commands.push(InputCommand::ChopTree { tree_x, tree_y, tree_gid });
+                    self.last_attack_time = current_time;
                 } else {
                     log::info!("Space held - sending Attack command");
                     commands.push(InputCommand::Attack);
@@ -3269,14 +3332,25 @@ impl InputHandler {
             }
         }
 
-        // Chat log scrolling (mouse wheel on desktop)
+        // Chat log scrolling (mouse wheel on desktop) - uses direct bounds check
+        // since chat log is not registered for hit detection (allows click-through)
         if state.ui_state.chat_log_visible {
             let (_wheel_x, wheel_y) = mouse_wheel();
             if wheel_y != 0.0 {
-                let over_chat = matches!(
-                    &state.ui_state.hovered_element,
-                    Some(UiElementId::ChatLogArea)
-                );
+                let (mx, my) = mouse_position();
+                let (vmx, vmy) = screen_to_virtual_coords(mx, my);
+                let (_, chat_sh) = virtual_screen_size();
+                let scale = state.ui_state.ui_scale;
+                let bg_padding = 6.0;
+                let bar_bottom_offset = 8.0 * scale + 6.0; // EXP_BAR_GAP * scale + margin
+                let box_bottom = chat_sh - bar_bottom_offset;
+                let line_height = 18.0;
+                let max_visible_lines: usize = 9;
+                let chat_area_h = max_visible_lines as f32 * line_height;
+                let chat_bottom_y = box_bottom - bg_padding;
+                let chat_top_y = chat_bottom_y - chat_area_h + line_height;
+                let over_chat = vmx >= 10.0 - bg_padding && vmx <= 10.0 + 400.0 + bg_padding
+                    && vmy >= chat_top_y - bg_padding && vmy <= box_bottom;
                 if over_chat {
                     const SCROLL_SPEED: f32 = 40.0; // Pixels per scroll tick
                     let delta = wheel_y * SCROLL_SPEED;
