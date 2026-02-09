@@ -3,8 +3,10 @@
 Sprite atlas packer for WASM fast loading.
 
 Combines individual sprite PNGs into atlas textures with JSON metadata.
-Categories packed: objects, walls, inventory.
-Equipment/weapons/NPCs are kept as individual files (animation spritesheets).
+Categories packed: objects, walls, inventory, players, hair, equipment,
+weapons, enemies, farming, effects.
+
+Each spritesheet is packed as a single unit to preserve animation logic.
 
 Usage: python3 tools/pack_atlases.py
 """
@@ -21,12 +23,32 @@ MANIFEST_PATH = ASSETS_DIR / "sprite_manifest.json"
 MAX_ATLAS_SIZE = 4096
 
 
-def collect_sprites(directory: Path):
-    """Collect all PNGs in a directory, returning {key: path} sorted by height desc."""
+def collect_sprites(directory: Path, recursive: bool = False, base_dir: Path = None, key_transform=None):
+    """Collect all PNGs in a directory, returning {key: path} sorted by height desc.
+
+    If recursive=True, recursively scan subdirectories and use relative paths as keys
+    (e.g., "equipment/back/backpack" for equipment/back/backpack.png).
+
+    key_transform: optional function to transform the key before storing.
+    """
     sprites = {}
-    for png in sorted(directory.glob("*.png")):
-        key = png.stem
-        sprites[key] = png
+    if base_dir is None:
+        base_dir = directory
+
+    if recursive:
+        for png in sorted(directory.rglob("*.png")):
+            # Use relative path from base_dir as key (without .png extension)
+            rel_path = png.relative_to(base_dir)
+            key = str(rel_path.with_suffix(""))
+            if key_transform:
+                key = key_transform(key)
+            sprites[key] = png
+    else:
+        for png in sorted(directory.glob("*.png")):
+            key = png.stem
+            if key_transform:
+                key = key_transform(key)
+            sprites[key] = png
     return sprites
 
 
@@ -107,14 +129,18 @@ def pack_atlas(sprites: dict[str, Path]):
     return atlases
 
 
-def pack_category(category: str):
-    """Pack a single category and return atlas info for manifest."""
+def pack_category(category: str, recursive: bool = False, key_transform=None):
+    """Pack a single category and return atlas info for manifest.
+
+    If recursive=True, recursively scan subdirectories and preserve path keys.
+    key_transform: optional function to transform sprite keys.
+    """
     sprite_dir = SPRITES_DIR / category
     if not sprite_dir.exists():
         print(f"  Skipping {category}: directory not found")
         return None
 
-    sprites = collect_sprites(sprite_dir)
+    sprites = collect_sprites(sprite_dir, recursive=recursive, base_dir=sprite_dir, key_transform=key_transform)
     if not sprites:
         print(f"  Skipping {category}: no sprites found")
         return None
@@ -160,10 +186,49 @@ def main():
     with open(MANIFEST_PATH) as f:
         manifest = json.load(f)
 
-    categories_to_pack = ["objects", "walls", "inventory"]
+    # Key transform for player sprites: "player_male_tan" -> "male_tan"
+    def player_key_transform(key):
+        if key.startswith("player_"):
+            return key[7:]  # Remove "player_" prefix
+        return key
 
-    for category in categories_to_pack:
-        atlas_info = pack_category(category)
+    # Key transform for hair sprites: "hair_0" -> "male_0", "hair_female_0" -> "female_0"
+    def hair_key_transform(key):
+        if key.startswith("hair_female_"):
+            return "female_" + key[12:]
+        elif key.startswith("hair_"):
+            return "male_" + key[5:]
+        return key
+
+    # Key transform for farming sprites: "farming_potato" -> "potato"
+    def farming_key_transform(key):
+        if key.startswith("farming_"):
+            return key[8:]
+        return key
+
+    # Key transform for equipment sprites: "back/quiver" -> "quiver", "body/hero_armor" -> "hero_armor"
+    def equipment_key_transform(key):
+        # Strip subdirectory prefix, keep just the filename
+        if "/" in key:
+            return key.split("/")[-1]
+        return key
+
+    # Categories to pack: (category_name, recursive, key_transform)
+    categories_to_pack = [
+        ("objects", False, None),
+        ("walls", False, None),
+        ("inventory", False, None),
+        ("players", False, player_key_transform),
+        ("hair", False, hair_key_transform),
+        ("equipment", True, equipment_key_transform),  # Equipment has subdirectories (back, body, feet, head)
+        ("weapons", False, None),
+        ("enemies", False, None),
+        ("farming", False, farming_key_transform),
+        ("effects", False, None),
+    ]
+
+    for category, recursive, key_transform in categories_to_pack:
+        atlas_info = pack_category(category, recursive=recursive, key_transform=key_transform)
         if atlas_info:
             manifest[f"{category}_atlas"] = atlas_info
 
