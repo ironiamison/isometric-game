@@ -3065,14 +3065,19 @@ impl Renderer {
 
             let has_shader = self.head_hair_material.is_some();
 
-            if let Some((head_texture, head_offset, head_tex_w, head_tex_h)) = head_sprite_data {
+            if let Some((head_texture, head_offset, _head_rect_w, _head_rect_h)) = head_sprite_data {
                 // Player has head equipment - use shader compositing if available
                 if has_shader {
                     if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                         let hair_key = format!("{}_{}", player.gender, style);
                         if let Some((hair_texture, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
-                            let (hair_tex_w, hair_tex_h) = self.hair_sprites.get_dimensions(&hair_key)
-                                .unwrap_or((hair_texture.width(), hair_texture.height()));
+                            // For UV calculations, we need the FULL texture dimensions, not sprite rect dimensions
+                            // get_dimensions() returns sprite rect size in atlas mode, but UVs need full texture size
+                            let hair_full_tex_w = hair_texture.width();
+                            let hair_full_tex_h = hair_texture.height();
+                            let head_full_tex_w = head_texture.width();
+                            let head_full_tex_h = head_texture.height();
+
                             // Get atlas offsets (0,0 if not using atlas)
                             let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
                             let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
@@ -3107,20 +3112,19 @@ impl Renderer {
 
                             // Compute UV transform for shader
                             // The shader needs to transform head UV to hair UV
-                            // head UV is in full-texture coords, so we need to account for source rects AND atlas offsets
-                            // (head_tex_w, head_tex_h, hair_tex_w, hair_tex_h already extracted above)
+                            // UVs are in full-texture coords [0,1], so we use full texture dimensions
 
                             // Head source rect in normalized UV (including atlas offset)
-                            let head_uv_x = (head_atlas_x + head_src_x) / head_tex_w;
-                            let head_uv_y = head_atlas_y / head_tex_h;
-                            let head_uv_w = HEAD_SPRITE_WIDTH / head_tex_w;
-                            let head_uv_h = HEAD_SPRITE_HEIGHT / head_tex_h;
+                            let head_uv_x = (head_atlas_x + head_src_x) / head_full_tex_w;
+                            let head_uv_y = head_atlas_y / head_full_tex_h;
+                            let head_uv_w = HEAD_SPRITE_WIDTH / head_full_tex_w;
+                            let head_uv_h = HEAD_SPRITE_HEIGHT / head_full_tex_h;
 
                             // Hair source rect in normalized UV (including atlas offset)
-                            let hair_uv_x = (hair_atlas_x + hair_src_x) / hair_tex_w;
-                            let hair_uv_y = hair_atlas_y / hair_tex_h;
-                            let hair_uv_w = HAIR_SPRITE_WIDTH / hair_tex_w;
-                            let hair_uv_h = HAIR_SPRITE_HEIGHT / hair_tex_h;
+                            let hair_uv_x = (hair_atlas_x + hair_src_x) / hair_full_tex_w;
+                            let hair_uv_y = hair_atlas_y / hair_full_tex_h;
+                            let hair_uv_w = HAIR_SPRITE_WIDTH / hair_full_tex_w;
+                            let hair_uv_h = HAIR_SPRITE_HEIGHT / hair_full_tex_h;
 
                             // The transform: given head UV (u, v) in full texture coords
                             // 1. Normalize to head frame: local = (u - head_uv_x) / head_uv_w, (v - head_uv_y) / head_uv_h
@@ -3129,16 +3133,12 @@ impl Renderer {
                             // 4. To hair local: hair_local = hair_pixel / (HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)
                             // 5. To hair UV: hair_uv = hair_uv_x + hair_local.x * hair_uv_w, hair_uv_y + hair_local.y * hair_uv_h
 
-                            // Combining: hair_uv.x = hair_uv_x + ((u - head_uv_x) / head_uv_w * HEAD_SPRITE_WIDTH - delta_x) / HAIR_SPRITE_WIDTH * hair_uv_w
-                            // Simplify: hair_uv.x = hair_uv_x + (u - head_uv_x) * (HEAD_SPRITE_WIDTH / head_uv_w / HAIR_SPRITE_WIDTH) * hair_uv_w - delta_x / HAIR_SPRITE_WIDTH * hair_uv_w
-                            // Since head_uv_w = HEAD_SPRITE_WIDTH / head_tex_w, so HEAD_SPRITE_WIDTH / head_uv_w = head_tex_w
-                            // hair_uv.x = hair_uv_x + (u - head_uv_x) * head_tex_w / HAIR_SPRITE_WIDTH * hair_uv_w - delta_x * hair_uv_w / HAIR_SPRITE_WIDTH
-                            // Let scale_x = head_tex_w * hair_uv_w / HAIR_SPRITE_WIDTH
-                            // Let offset_x = hair_uv_x - head_uv_x * scale_x - delta_x * hair_uv_w / HAIR_SPRITE_WIDTH
-                            // Then: hair_uv.x = offset_x + u * scale_x
+                            // Combining and simplifying (see derivation in comments above):
+                            // hair_uv.x = offset_x + u * scale_x
+                            // hair_uv.y = offset_y + v * scale_y
 
-                            let scale_x = head_tex_w * hair_uv_w / HAIR_SPRITE_WIDTH;
-                            let scale_y = head_tex_h * hair_uv_h / HAIR_SPRITE_HEIGHT;
+                            let scale_x = head_full_tex_w * hair_uv_w / HAIR_SPRITE_WIDTH;
+                            let scale_y = head_full_tex_h * hair_uv_h / HAIR_SPRITE_HEIGHT;
                             let offset_x = hair_uv_x - head_uv_x * scale_x - delta_x * hair_uv_w / HAIR_SPRITE_WIDTH;
                             let offset_y = hair_uv_y - head_uv_y * scale_y - delta_y * hair_uv_h / HAIR_SPRITE_HEIGHT;
 
