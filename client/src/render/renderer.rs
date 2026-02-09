@@ -1270,6 +1270,35 @@ impl Renderer {
         }
     }
 
+    /// Render a loading screen while the world isn't ready yet
+    fn render_loading_screen(&self, state: &GameState) {
+        let sw = screen_width();
+        let sh = screen_height();
+
+        // Determine status message based on connection state
+        let status = if state.connection_status == ConnectionStatus::Disconnected {
+            "Connecting"
+        } else if state.local_player_id.is_none() {
+            "Logging in"
+        } else if state.get_local_player().is_none() {
+            "Loading character"
+        } else {
+            "Loading world"
+        };
+
+        // Animated dots (cycles every 1s)
+        let dot_count = ((get_time() * 3.0) as usize % 4) as usize;
+        let dots = &"..."[..dot_count];
+        let text = format!("{}{}", status, dots);
+
+        let font_size = 16.0;
+        let dims = self.measure_text_sharp(&text, font_size);
+        let x = ((sw - dims.width) / 2.0).floor();
+        let y = ((sh) / 2.0).floor();
+
+        self.draw_text_sharp(&text, x, y, font_size, Color::from_rgba(200, 200, 200, 255));
+    }
+
     pub fn render(&self, state: &GameState) -> (UiLayout, RenderTimings) {
         let render_start = get_time();
         let mut timings = RenderTimings::default();
@@ -1345,12 +1374,10 @@ impl Renderer {
 
         // Only collect world entities when world is ready
         if !world_ready {
-            // Skip to UI rendering
+            // Show loading screen instead of empty world
+            self.render_loading_screen(state);
+
             timings.entities_ms = (get_time() - t1) * 1000.0;
-            let t2 = get_time();
-            timings.overhead_ms = (get_time() - t2) * 1000.0;
-            let t3 = get_time();
-            timings.effects_ms = (get_time() - t3) * 1000.0;
 
             // 8. Render UI (non-interactive elements)
             let t4 = get_time();
