@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Server Logs</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Courier New', monospace; font-size: 13px; }
+  .toolbar { position: sticky; top: 0; background: #16213e; padding: 8px 16px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #0f3460; z-index: 10; }
+  .toolbar label { color: #a0a0c0; font-size: 12px; }
+  .toolbar select, .toolbar input { background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; }
+  .toolbar button { background: #0f3460; color: #e0e0e0; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .toolbar button:hover { background: #1a5276; }
+  .toolbar button.active { background: #1e8449; }
+  #status { margin-left: auto; font-size: 11px; color: #666; }
+  #logs { padding: 8px 16px; }
+  .log-line { padding: 2px 0; white-space: pre-wrap; word-break: break-all; }
+  .log-line:hover { background: rgba(255,255,255,0.03); }
+  .ts { color: #666; }
+  .lvl-ERROR { color: #e74c3c; font-weight: bold; }
+  .lvl-WARN { color: #f39c12; }
+  .lvl-INFO { color: #3498db; }
+  .lvl-DEBUG { color: #7f8c8d; }
+  .lvl-TRACE { color: #555; }
+  .msg-error { color: #e8a0a0; }
+  .msg-warn { color: #e8d0a0; }
+  .search-highlight { background: #f39c12; color: #000; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <label>Level:</label>
+  <select id="levelFilter">
+    <option value="">All</option>
+    <option value="ERROR">ERROR</option>
+    <option value="WARN">WARN</option>
+    <option value="INFO">INFO</option>
+    <option value="DEBUG">DEBUG</option>
+  </select>
+  <label>Search:</label>
+  <input type="text" id="searchBox" placeholder="Filter logs..." style="width:200px">
+  <label>Count:</label>
+  <select id="countSelect">
+    <option value="100">100</option>
+    <option value="200" selected>200</option>
+    <option value="500">500</option>
+    <option value="1000">1000</option>
+  </select>
+  <button id="autoRefreshBtn" onclick="toggleAutoRefresh()">Auto-refresh: OFF</button>
+  <button onclick="fetchLogs()">Refresh</button>
+  <span id="status"></span>
+</div>
+<div id="logs"></div>
+<script>
+let autoRefresh = false;
+let refreshInterval = null;
+
+function toggleAutoRefresh() {
+  autoRefresh = !autoRefresh;
+  const btn = document.getElementById('autoRefreshBtn');
+  if (autoRefresh) {
+    btn.textContent = 'Auto-refresh: ON';
+    btn.classList.add('active');
+    refreshInterval = setInterval(fetchLogs, 2000);
+  } else {
+    btn.textContent = 'Auto-refresh: OFF';
+    btn.classList.remove('active');
+    clearInterval(refreshInterval);
+  }
+}
+
+async function fetchLogs() {
+  const level = document.getElementById('levelFilter').value;
+  const count = document.getElementById('countSelect').value;
+  const search = document.getElementById('searchBox').value.toLowerCase();
+
+  let url = `/api/logs?count=${count}`;
+  if (level) url += `&level=${level}`;
+
+  try {
+    const res = await fetch(url);
+    const logs = await res.json();
+
+    const container = document.getElementById('logs');
+    const wasAtBottom = (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50;
+
+    let html = '';
+    for (const entry of logs) {
+      const msg = entry.message;
+      if (search && !msg.toLowerCase().includes(search) && !entry.level.toLowerCase().includes(search)) continue;
+
+      const levelClass = `lvl-${entry.level}`;
+      const msgClass = entry.level === 'ERROR' ? 'msg-error' : entry.level === 'WARN' ? 'msg-warn' : '';
+      html += `<div class="log-line"><span class="ts">${entry.timestamp}</span> <span class="${levelClass}">${entry.level.padEnd(5)}</span> <span class="${msgClass}">${escapeHtml(msg)}</span></div>`;
+    }
+    container.innerHTML = html;
+    document.getElementById('status').textContent = `${logs.length} entries | ${new Date().toLocaleTimeString()}`;
+
+    if (wasAtBottom) window.scrollTo(0, document.body.scrollHeight);
+  } catch (e) {
+    document.getElementById('status').textContent = `Error: ${e.message}`;
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+fetchLogs();
+</script>
+</body>
+</html>

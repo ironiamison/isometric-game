@@ -48,6 +48,7 @@ mod shop;
 mod skills;
 mod spell;
 mod tilemap;
+mod log_buffer;
 mod woodcutting;
 mod world;
 
@@ -106,10 +107,12 @@ struct AppState {
     play_time_anchors: Arc<DashMap<i64, std::time::Instant>>,
     /// Character IDs currently online (prevents duplicate sessions)
     online_characters: Arc<DashSet<i64>>,
+    /// In-memory log buffer for /api/logs endpoint
+    log_buffer: log_buffer::LogBuffer,
 }
 
 impl AppState {
-    async fn new() -> Self {
+    async fn new(log_buffer: log_buffer::LogBuffer) -> Self {
         // Initialize database
         let db = Database::new("sqlite:game.db?mode=rwc")
             .await
@@ -203,6 +206,7 @@ impl AppState {
             player_entrance_positions: Arc::new(RwLock::new(HashMap::new())),
             play_time_anchors: Arc::new(DashMap::new()),
             online_characters: Arc::new(DashSet::new()),
+            log_buffer,
         }
     }
 
@@ -1268,6 +1272,37 @@ async fn health_check() -> impl IntoResponse {
         "status": "ok",
         "timestamp": chrono::Utc::now().timestamp_millis()
     }))
+}
+
+// ============================================================================
+// Server Logs
+// ============================================================================
+
+#[derive(Deserialize)]
+struct LogsQuery {
+    count: Option<usize>,
+    level: Option<String>,
+}
+
+async fn api_logs(
+    State(state): State<AppState>,
+    Query(params): Query<LogsQuery>,
+) -> impl IntoResponse {
+    let count = params.count.unwrap_or(200).min(1000);
+    let entries = state.log_buffer.recent(count);
+
+    let entries: Vec<_> = if let Some(level_filter) = &params.level {
+        let level_upper = level_filter.to_uppercase();
+        entries.into_iter().filter(|e| e.level == level_upper).collect()
+    } else {
+        entries
+    };
+
+    Json(entries)
+}
+
+async fn logs_page() -> impl IntoResponse {
+    axum::response::Html(include_str!("logs.html"))
 }
 
 // ============================================================================
@@ -2517,15 +2552,23 @@ async fn handle_client_message(
 
 #[tokio::main]
 async fn main() {
-    // Initialize logging
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("isometric_server=info".parse().unwrap()),
-        )
-        .init();
+    // Initialize logging with in-memory buffer for /api/logs endpoint
+    let log_buffer = log_buffer::LogBuffer::new();
+    {
+        use tracing_subscriber::layer::SubscriberExt;
+        use tracing_subscriber::util::SubscriberInitExt;
 
-    let state = AppState::new().await;
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::from_default_env()
+                    .add_directive("isometric_server=info".parse().unwrap()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .with(log_buffer::LogBufferLayer::new(log_buffer.clone()))
+            .init();
+    }
+
+    let state = AppState::new(log_buffer).await;
 
     // Spawn game tick loop
     let tick_state = state.clone();
@@ -2665,6 +2708,9 @@ async fn main() {
         .route("/api/stats/online", get(stats_online))
         .route("/api/stats/leaderboard", get(stats_leaderboard))
         .route("/api/stats/items", get(stats_items))
+        // Server logs (admin)
+        .route("/api/logs", get(api_logs))
+        .route("/logs", get(logs_page))
         // In development, you may want CorsLayer::permissive()
         // For production, specify allowed origins explicitly
         .layer(
