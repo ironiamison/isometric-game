@@ -3070,9 +3070,13 @@ impl Renderer {
                 if has_shader {
                     if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                         let hair_key = format!("{}_{}", player.gender, style);
-                        if let Some((hair_texture, hair_offset)) = self.hair_sprites.get(&hair_key) {
+                        if let Some((hair_texture, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
                             let (hair_tex_w, hair_tex_h) = self.hair_sprites.get_dimensions(&hair_key)
                                 .unwrap_or((hair_texture.width(), hair_texture.height()));
+                            // Get atlas offsets (0,0 if not using atlas)
+                            let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
+                            let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
+
                             // Calculate hair frame info
                             let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                             let frame_index = color * 2 + if is_back { 1 } else { 0 };
@@ -3080,7 +3084,7 @@ impl Renderer {
 
                             // Calculate hair offsets using gender-aware function
                             let anim_frame = player.animation.frame as u32;
-                            let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                            let (hair_pos_x, hair_pos_y) = get_hair_offset(
                                 player.animation.state,
                                 player.animation.direction,
                                 anim_frame,
@@ -3090,38 +3094,40 @@ impl Renderer {
 
                             // Calculate head frame info
                             let head_frame = get_head_frame(player.animation.direction);
-                            let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                            let (head_pos_x, head_pos_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
                             let head_src_x = head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
 
                             // Calculate pixel offset from head origin to hair origin (in unscaled pixels)
-                            // Hair is centered: hair_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2 + hair_offset_x = 3 + hair_offset_x
-                            // Head uses head_offset_x directly
-                            let hair_base_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 + hair_offset_x;
-                            let hair_base_y = hair_offset_y; // sit offset already included in get_hair_offset
-                            let delta_x = hair_base_x - head_offset_x;
-                            let delta_y = hair_base_y - head_offset_y;
+                            // Hair is centered: hair_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2 + hair_pos_x = 3 + hair_pos_x
+                            // Head uses head_pos_x directly
+                            let hair_base_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 + hair_pos_x;
+                            let hair_base_y = hair_pos_y; // sit offset already included in get_hair_offset
+                            let delta_x = hair_base_x - head_pos_x;
+                            let delta_y = hair_base_y - head_pos_y;
 
                             // Compute UV transform for shader
                             // The shader needs to transform head UV to hair UV
-                            // head UV is in full-texture coords, so we need to account for source rects
+                            // head UV is in full-texture coords, so we need to account for source rects AND atlas offsets
                             // (head_tex_w, head_tex_h, hair_tex_w, hair_tex_h already extracted above)
 
-                            // Head source rect in normalized UV
-                            let head_uv_x = head_src_x / head_tex_w;
+                            // Head source rect in normalized UV (including atlas offset)
+                            let head_uv_x = (head_atlas_x + head_src_x) / head_tex_w;
+                            let head_uv_y = head_atlas_y / head_tex_h;
                             let head_uv_w = HEAD_SPRITE_WIDTH / head_tex_w;
                             let head_uv_h = HEAD_SPRITE_HEIGHT / head_tex_h;
 
-                            // Hair source rect in normalized UV
-                            let hair_uv_x = hair_src_x / hair_tex_w;
+                            // Hair source rect in normalized UV (including atlas offset)
+                            let hair_uv_x = (hair_atlas_x + hair_src_x) / hair_tex_w;
+                            let hair_uv_y = hair_atlas_y / hair_tex_h;
                             let hair_uv_w = HAIR_SPRITE_WIDTH / hair_tex_w;
                             let hair_uv_h = HAIR_SPRITE_HEIGHT / hair_tex_h;
 
                             // The transform: given head UV (u, v) in full texture coords
-                            // 1. Normalize to head frame: local = (u - head_uv_x) / head_uv_w, (v - 0) / head_uv_h
+                            // 1. Normalize to head frame: local = (u - head_uv_x) / head_uv_w, (v - head_uv_y) / head_uv_h
                             // 2. To pixels: pixel = local * (HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)
                             // 3. Offset: hair_pixel = pixel - (delta_x, delta_y)
                             // 4. To hair local: hair_local = hair_pixel / (HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)
-                            // 5. To hair UV: hair_uv = hair_uv_x + hair_local.x * hair_uv_w, hair_local.y * hair_uv_h
+                            // 5. To hair UV: hair_uv = hair_uv_x + hair_local.x * hair_uv_w, hair_uv_y + hair_local.y * hair_uv_h
 
                             // Combining: hair_uv.x = hair_uv_x + ((u - head_uv_x) / head_uv_w * HEAD_SPRITE_WIDTH - delta_x) / HAIR_SPRITE_WIDTH * hair_uv_w
                             // Simplify: hair_uv.x = hair_uv_x + (u - head_uv_x) * (HEAD_SPRITE_WIDTH / head_uv_w / HAIR_SPRITE_WIDTH) * hair_uv_w - delta_x / HAIR_SPRITE_WIDTH * hair_uv_w
@@ -3134,7 +3140,7 @@ impl Renderer {
                             let scale_x = head_tex_w * hair_uv_w / HAIR_SPRITE_WIDTH;
                             let scale_y = head_tex_h * hair_uv_h / HAIR_SPRITE_HEIGHT;
                             let offset_x = hair_uv_x - head_uv_x * scale_x - delta_x * hair_uv_w / HAIR_SPRITE_WIDTH;
-                            let offset_y = -delta_y * hair_uv_h / HAIR_SPRITE_HEIGHT;
+                            let offset_y = hair_uv_y - head_uv_y * scale_y - delta_y * hair_uv_h / HAIR_SPRITE_HEIGHT;
 
                             // Set up shader
                             let material = self.head_hair_material.as_ref().unwrap();
@@ -3146,11 +3152,9 @@ impl Renderer {
                             // Draw head with shader active
                             let scaled_head_width = HEAD_SPRITE_WIDTH * zoom;
                             let scaled_head_height = HEAD_SPRITE_HEIGHT * zoom;
-                            let head_draw_x = draw_x + head_offset_x * zoom;
-                            let head_draw_y = draw_y + head_offset_y * zoom;
+                            let head_draw_x = draw_x + head_pos_x * zoom;
+                            let head_draw_y = draw_y + head_pos_y * zoom;
 
-                            // Apply atlas offset for head texture
-                            let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
                             draw_texture_ex(
                                 head_texture,
                                 head_draw_x,
