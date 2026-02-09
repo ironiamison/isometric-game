@@ -37,6 +37,7 @@ impl AuthClient {
             Ok(AuthSession {
                 token: auth_resp.token.unwrap_or_default(),
                 username: auth_resp.username.unwrap_or_default(),
+                characters: auth_resp.characters.unwrap_or_default(),
             })
         } else {
             let error = auth_resp.error.unwrap_or_else(|| "Unknown error".to_string());
@@ -73,6 +74,7 @@ impl AuthClient {
             Ok(AuthSession {
                 token: auth_resp.token.unwrap_or_default(),
                 username: auth_resp.username.unwrap_or_default(),
+                characters: auth_resp.characters.unwrap_or_default(),
             })
         } else {
             let error = auth_resp.error.unwrap_or_else(|| "Unknown error".to_string());

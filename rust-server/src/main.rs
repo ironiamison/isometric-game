@@ -407,6 +407,7 @@ struct AuthResponse {
     success: bool,
     token: Option<String>,
     username: Option<String>,
+    characters: Option<Vec<CharacterInfo>>,
     error: Option<String>,
 }
 
@@ -423,6 +424,7 @@ async fn register_account(
             success: false,
             token: None,
             username: None,
+            characters: None,
             error: Some("Too many requests. Please try again later.".to_string()),
         });
     }
@@ -433,6 +435,7 @@ async fn register_account(
             success: false,
             token: None,
             username: None,
+            characters: None,
             error: Some("Username must be at least 3 characters".to_string()),
         });
     }
@@ -441,6 +444,7 @@ async fn register_account(
             success: false,
             token: None,
             username: None,
+            characters: None,
             error: Some("Password must be at least 6 characters".to_string()),
         });
     }
@@ -457,6 +461,7 @@ async fn register_account(
                 success: true,
                 token: Some(token),
                 username: Some(req.username),
+                characters: Some(vec![]), // New accounts have no characters
                 error: None,
             })
         }
@@ -465,6 +470,7 @@ async fn register_account(
                 success: false,
                 token: None,
                 username: None,
+                characters: None,
                 error: Some(e),
             })
         }
@@ -484,6 +490,7 @@ async fn login_account(
             success: false,
             token: None,
             username: None,
+            characters: None,
             error: Some("Too many login attempts. Please try again later.".to_string()),
         });
     }
@@ -496,10 +503,34 @@ async fn login_account(
 
             info!("Account logged in: {} (id: {}) from {}", req.username, account.id, client_ip);
 
+            // Fetch characters for this account to include in response
+            let characters = match state.db.get_characters_for_account(account.id).await {
+                Ok(chars) => Some(chars.into_iter().map(|c| CharacterInfo {
+                    id: c.id,
+                    name: c.name.clone(),
+                    level: c.skills.combat_level(),
+                    gender: c.gender,
+                    skin: c.skin,
+                    hair_style: c.hair_style,
+                    hair_color: c.hair_color,
+                    played_time: c.played_time,
+                    equipped_head: c.equipped_head,
+                    equipped_body: c.equipped_body,
+                    equipped_weapon: c.equipped_weapon,
+                    equipped_back: c.equipped_back,
+                    equipped_feet: c.equipped_feet,
+                }).collect()),
+                Err(e) => {
+                    warn!("Failed to fetch characters for account {}: {}", account.id, e);
+                    None
+                }
+            };
+
             Json(AuthResponse {
                 success: true,
                 token: Some(token),
                 username: Some(req.username),
+                characters,
                 error: None,
             })
         }
@@ -511,6 +542,7 @@ async fn login_account(
                 success: false,
                 token: None,
                 username: None,
+                characters: None,
                 error: Some("Invalid username or password".to_string()),
             })
         }
@@ -2752,5 +2784,8 @@ async fn main() {
     info!("Game server listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        .tcp_nodelay(true)
+        .await
+        .unwrap();
 }

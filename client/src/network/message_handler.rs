@@ -2441,10 +2441,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             // Handle ping response - calculate and display latency
             if let Some(sent_at) = state.ping_sent_at.take() {
                 let now = macroquad::time::get_time();
-                let latency_ms = ((now - sent_at) * 1000.0).round() as i32;
-                state.ui_state.chat_messages.push(
-                    ChatMessage::system(format!("Ping: {}ms", latency_ms))
-                );
+                let latency_ms = (now - sent_at) * 1000.0;
+                state.ping_stats.record(latency_ms);
+                // Only show in chat if it was a manual /ping (not auto-ping)
+                if !state.debug_mode {
+                    state.ui_state.chat_messages.push(
+                        ChatMessage::system(format!("Ping: {}ms", latency_ms.round() as i32))
+                    );
+                }
             }
         }
 

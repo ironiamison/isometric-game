@@ -6,7 +6,7 @@ use crate::auth::{AuthClient, AuthSession, CharacterInfo};
 #[cfg(target_arch = "wasm32")]
 use crate::auth::AuthResult;
 use crate::audio::AudioManager;
-use crate::render::BitmapFont;
+use crate::render::{BitmapFont, SpritesheetStore};
 use crate::util::{asset_path, virtual_screen_size, SpriteManifest};
 
 // Sprite sheet constants for character preview
@@ -61,8 +61,9 @@ fn get_input_state() -> (Vec2, bool, bool) {
     (vec2(vx, vy), clicked, false)
 }
 
-/// Load all player sprite textures (gender x skin combinations)
-async fn load_player_sprites() -> HashMap<String, Texture2D> {
+/// Load all player sprite textures (gender x skin combinations) as individual files
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+async fn load_player_sprites() -> SpritesheetStore {
     let mut sprites = HashMap::new();
     let genders = ["male", "female"];
 
@@ -77,7 +78,27 @@ async fn load_player_sprites() -> HashMap<String, Texture2D> {
         }
     }
 
-    sprites
+    SpritesheetStore::Individual(sprites)
+}
+
+/// Load a spritesheet atlas texture and return the texture + rect mappings
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+async fn load_spritesheet_atlas(atlas_info: &crate::util::SpriteAtlasInfo) -> Option<(Texture2D, HashMap<String, Rect>)> {
+    let path = asset_path(&format!("assets/{}", atlas_info.file));
+    match load_texture(&path).await {
+        Ok(tex) => {
+            tex.set_filter(FilterMode::Nearest);
+            let rects = atlas_info.sprites.iter().map(|(key, sr)| {
+                (key.clone(), Rect::new(sr.x as f32, sr.y as f32, sr.w as f32, sr.h as f32))
+            }).collect();
+            log::info!("Loaded spritesheet atlas {} ({}x{}, {} sprites)", atlas_info.file, tex.width(), tex.height(), atlas_info.sprites.len());
+            Some((tex, rects))
+        }
+        Err(e) => {
+            log::warn!("Failed to load spritesheet atlas {}: {}", path, e);
+            None
+        }
+    }
 }
 
 /// Check if a point is inside a rectangle
@@ -92,9 +113,9 @@ const HAIR_SPRITE_HEIGHT: f32 = 54.0;
 /// Draw a character preview sprite at the given position.
 /// Renders at native pixel size (no scaling) for crisp pixel art.
 fn draw_character_preview(
-    sprites: &HashMap<String, Texture2D>,
-    hair_sprites: &HashMap<String, Texture2D>,
-    equipment_sprites: &HashMap<String, Texture2D>,
+    sprites: &SpritesheetStore,
+    hair_sprites: &SpritesheetStore,
+    equipment_sprites: &SpritesheetStore,
     gender: &str,
     skin: &str,
     hair_style: Option<i32>,
@@ -106,20 +127,25 @@ fn draw_character_preview(
     y: f32,
 ) {
     let key = format!("{}_{}", gender, skin);
-    if let Some(texture) = sprites.get(&key) {
+    if let Some((texture, player_offset)) = sprites.get(&key) {
+        let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
+
         // 1. Draw back items behind player (quiver/cape - frame 1 for "down" direction)
         if let Some(back_id) = equipped_back {
-            if let Some(equip_sprite) = equipment_sprites.get(back_id) {
-                let is_offhand = equip_sprite.width() > equip_sprite.height() * 8.0;
+            if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(back_id) {
+                let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
+                let (equip_w, _equip_h) = equipment_sprites.get_dimensions(back_id)
+                    .unwrap_or((equip_sprite.width(), equip_sprite.height()));
+                let is_offhand = equip_w > 8.0 * BACK_STATIC_SPRITE_WIDTH;
                 if !is_offhand {
-                    let back_src_x = 1.0 * BACK_STATIC_SPRITE_WIDTH;
+                    let back_src_x = equip_atlas_x + 1.0 * BACK_STATIC_SPRITE_WIDTH;
                     draw_texture_ex(
                         equip_sprite,
                         x,
                         y - 15.0,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(back_src_x, 0.0, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(back_src_x, equip_atlas_y, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
                             flip_x: true,
                             ..Default::default()
                         },
@@ -135,15 +161,18 @@ fn draw_character_preview(
             y,
             WHITE,
             DrawTextureParams {
-                source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                source: Some(Rect::new(player_atlas_x, player_atlas_y, SPRITE_WIDTH, SPRITE_HEIGHT)),
                 ..Default::default()
             },
         );
 
         // 3. Draw body armor (frame 0 for idle/down, offset y=-3)
         if let Some(body_id) = equipped_body {
-            if let Some(equip_sprite) = equipment_sprites.get(body_id) {
-                let is_single_row = equip_sprite.width() > equip_sprite.height() * 2.0;
+            if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(body_id) {
+                let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
+                let (equip_w, equip_h) = equipment_sprites.get_dimensions(body_id)
+                    .unwrap_or((equip_sprite.width(), equip_sprite.height()));
+                let is_single_row = equip_w > equip_h * 2.0;
                 if is_single_row {
                     draw_texture_ex(
                         equip_sprite,
@@ -151,7 +180,7 @@ fn draw_character_preview(
                         y - 3.0,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(0.0, 0.0, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
                             ..Default::default()
                         },
                     );
@@ -163,7 +192,7 @@ fn draw_character_preview(
                         y,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, SPRITE_WIDTH, SPRITE_HEIGHT)),
                             ..Default::default()
                         },
                     );
@@ -174,9 +203,10 @@ fn draw_character_preview(
         // 4. Draw hair (after body armor so it appears on top)
         if let Some(style) = hair_style {
             let hair_key = format!("{}_{}", gender, style);
-            if let Some(hair_tex) = hair_sprites.get(&hair_key) {
+            if let Some((hair_tex, hair_offset)) = hair_sprites.get(&hair_key) {
+                let (hair_atlas_x, hair_atlas_y) = hair_offset.unwrap_or((0.0, 0.0));
                 let hair_frame_index = hair_color * 2; // front frame
-                let hair_src_x = hair_frame_index as f32 * HAIR_SPRITE_WIDTH;
+                let hair_src_x = hair_atlas_x + hair_frame_index as f32 * HAIR_SPRITE_WIDTH;
                 // Center hair on player: (34 - 28) / 2 = 3, then offset -1
                 let hair_x = x + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 - 1.0;
                 let hair_y = y - 3.0;
@@ -187,7 +217,7 @@ fn draw_character_preview(
                     hair_y,
                     WHITE,
                     DrawTextureParams {
-                        source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                        source: Some(Rect::new(hair_src_x, hair_atlas_y, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
                         ..Default::default()
                     },
                 );
@@ -196,8 +226,11 @@ fn draw_character_preview(
 
         // 5. Draw boots (frame 0 for idle/down)
         if let Some(feet_id) = equipped_feet {
-            if let Some(equip_sprite) = equipment_sprites.get(feet_id) {
-                let is_single_row = equip_sprite.width() > equip_sprite.height();
+            if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(feet_id) {
+                let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
+                let (equip_w, equip_h) = equipment_sprites.get_dimensions(feet_id)
+                    .unwrap_or((equip_sprite.width(), equip_sprite.height()));
+                let is_single_row = equip_w > equip_h;
                 if is_single_row {
                     draw_texture_ex(
                         equip_sprite,
@@ -205,7 +238,7 @@ fn draw_character_preview(
                         y + 46.0,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(0.0, 0.0, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
                             ..Default::default()
                         },
                     );
@@ -216,7 +249,7 @@ fn draw_character_preview(
                         y,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(0.0, 0.0, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, SPRITE_WIDTH, SPRITE_HEIGHT)),
                             ..Default::default()
                         },
                     );
@@ -226,8 +259,11 @@ fn draw_character_preview(
 
         // 6. Draw back items in front of player (offhand/shield - frame 0 for idle/down)
         if let Some(back_id) = equipped_back {
-            if let Some(equip_sprite) = equipment_sprites.get(back_id) {
-                let is_offhand = equip_sprite.width() > equip_sprite.height() * 8.0;
+            if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(back_id) {
+                let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
+                let (equip_w, _equip_h) = equipment_sprites.get_dimensions(back_id)
+                    .unwrap_or((equip_sprite.width(), equip_sprite.height()));
+                let is_offhand = equip_w > 8.0 * BACK_STATIC_SPRITE_WIDTH;
                 if is_offhand {
                     draw_texture_ex(
                         equip_sprite,
@@ -235,7 +271,7 @@ fn draw_character_preview(
                         y + 20.0,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(0.0, 0.0, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT)),
                             ..Default::default()
                         },
                     );
@@ -360,9 +396,24 @@ impl LoginScreen {
         }
     }
 
+    /// Use pre-loaded font from the renderer (avoids duplicate loading on WASM/Android)
+    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+    pub fn use_renderer_font(&mut self, font: BitmapFont) {
+        self.font = font;
+    }
+
     /// Load font and logo asynchronously - call this after creating the screen
     pub async fn load_font(&mut self) {
-        self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+        // On WASM/Android, font should be set via use_renderer_font() before this call
+        // Only load the font if not already set (check if fonts map is empty)
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        let font_already_loaded = !self.font.is_empty();
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        let font_already_loaded = false;
+
+        if !font_already_loaded {
+            self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+        }
 
         // Load logo texture
         if let Ok(texture) = load_texture(&asset_path("assets/ui/logo.png")).await {
@@ -916,9 +967,9 @@ pub struct CharacterSelectScreen {
     auth_client: AuthClient,
     font: BitmapFont,
     confirm_delete: bool,
-    player_sprites: HashMap<String, Texture2D>,
-    hair_sprites: HashMap<String, Texture2D>,
-    equipment_sprites: HashMap<String, Texture2D>,
+    player_sprites: SpritesheetStore,
+    hair_sprites: SpritesheetStore,
+    equipment_sprites: SpritesheetStore,
     // Scroll state for character list on small screens
     list_scroll_offset: f32,
     touch_scroll_id: Option<u64>,
@@ -935,11 +986,8 @@ impl CharacterSelectScreen {
     pub fn new(session: AuthSession, server_url: &str) -> Self {
         let auth_client = AuthClient::new(server_url);
 
-        // Load characters (native: blocking, WASM: deferred via polling)
-        #[cfg(not(target_arch = "wasm32"))]
-        let characters = auth_client.get_characters(&session.token).unwrap_or_default();
-        #[cfg(target_arch = "wasm32")]
-        let characters = Vec::new();
+        // Use characters from login response (no separate request needed)
+        let characters = session.characters.clone();
 
         Self {
             session,
@@ -949,9 +997,9 @@ impl CharacterSelectScreen {
             auth_client,
             font: BitmapFont::default(),
             confirm_delete: false,
-            player_sprites: HashMap::new(),
-            hair_sprites: HashMap::new(),
-            equipment_sprites: HashMap::new(),
+            player_sprites: SpritesheetStore::Individual(HashMap::new()),
+            hair_sprites: SpritesheetStore::Individual(HashMap::new()),
+            equipment_sprites: SpritesheetStore::Individual(HashMap::new()),
             list_scroll_offset: 0.0,
             touch_scroll_id: None,
             touch_scroll_last_y: 0.0,
@@ -964,70 +1012,141 @@ impl CharacterSelectScreen {
         }
     }
 
-    /// Load font and sprites asynchronously - call this after creating the screen
-    pub async fn load_font(&mut self) {
-        self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
-        self.player_sprites = load_player_sprites().await;
-        // Load hair sprites (male and female variants)
-        for style in 0..6i32 {
-            // Male hair sprites
-            let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
-            if let Ok(tex) = load_texture(&path).await {
-                tex.set_filter(FilterMode::Nearest);
-                self.hair_sprites.insert(format!("male_{}", style), tex);
-            }
-            // Female hair sprites
-            let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
-            if let Ok(tex) = load_texture(&path).await {
-                tex.set_filter(FilterMode::Nearest);
-                self.hair_sprites.insert(format!("female_{}", style), tex);
-            }
-        }
-        // Load equipment sprites for characters' equipped items
-        self.load_equipment_sprites().await;
+    /// Use pre-loaded assets from the renderer (avoids duplicate loading on WASM/Android)
+    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+    pub fn use_renderer_assets(&mut self, font: BitmapFont, player: SpritesheetStore, hair: SpritesheetStore, equipment: SpritesheetStore) {
+        self.font = font;
+        self.player_sprites = player;
+        self.hair_sprites = hair;
+        self.equipment_sprites = equipment;
     }
 
-    async fn load_equipment_sprites(&mut self) {
-        // Collect all unique equipped item IDs from characters
-        let mut item_ids: Vec<String> = Vec::new();
-        for c in &self.characters {
-            for slot in [&c.equipped_head, &c.equipped_body, &c.equipped_weapon, &c.equipped_back, &c.equipped_feet] {
-                if let Some(id) = slot {
-                    if !item_ids.contains(id) && !self.equipment_sprites.contains_key(id) {
-                        item_ids.push(id.clone());
-                    }
+    /// Load font and sprites asynchronously - call this after creating the screen
+    pub async fn load_font(&mut self) {
+        // On WASM/Android, font and sprites should be set via use_renderer_assets() before this call
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        {
+            if self.player_sprites.len() > 0 {
+                // Assets already set from renderer, skip loading entirely
+                return;
+            }
+        }
+
+        self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+
+        // On WASM/Android, sprites should be set via use_renderer_sprites() before this call
+        // to avoid duplicate network requests. Skip loading if already set.
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        {
+            if self.player_sprites.len() > 0 {
+                // Sprites already set from renderer, skip loading
+                return;
+            }
+
+            // Fallback: load from atlas if not set
+            let manifest = SpriteManifest::load().await;
+            if let Some(ref atlas_info) = manifest.players_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    self.player_sprites = SpritesheetStore::Atlas { texture: tex, rects };
+                }
+            }
+            if let Some(ref atlas_info) = manifest.hair_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    self.hair_sprites = SpritesheetStore::Atlas { texture: tex, rects };
+                }
+            }
+            self.load_equipment_sprites(&manifest).await;
+        }
+
+        // Desktop: always load individually
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        {
+            let manifest = SpriteManifest::load().await;
+            self.player_sprites = load_player_sprites().await;
+
+            let mut hair_map = HashMap::new();
+            for style in 0..6i32 {
+                // Male hair sprites
+                let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
+                if let Ok(tex) = load_texture(&path).await {
+                    tex.set_filter(FilterMode::Nearest);
+                    hair_map.insert(format!("male_{}", style), tex);
+                }
+                // Female hair sprites
+                let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+                if let Ok(tex) = load_texture(&path).await {
+                    tex.set_filter(FilterMode::Nearest);
+                    hair_map.insert(format!("female_{}", style), tex);
+                }
+            }
+            self.hair_sprites = SpritesheetStore::Individual(hair_map);
+
+            // Load equipment sprites for characters' equipped items
+            self.load_equipment_sprites(&manifest).await;
+        }
+    }
+
+    async fn load_equipment_sprites(&mut self, manifest: &SpriteManifest) {
+        // On WASM/Android, load from atlas
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        {
+            if let Some(ref atlas_info) = manifest.equipment_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    self.equipment_sprites = SpritesheetStore::Atlas { texture: tex, rects };
+                    return;
                 }
             }
         }
 
-        if item_ids.is_empty() {
-            return;
-        }
-
-        // Load manifest to find sprite paths
-        let manifest = SpriteManifest::load().await;
-        for item_id in &item_ids {
-            // Find the matching manifest entry (e.g. "equipment/head/iron_helm")
-            for entry in &manifest.equipment {
-                let key = entry.rsplit('/').next().unwrap_or(entry);
-                if key == item_id {
-                    let path = asset_path(&format!("assets/sprites/{}.png", entry));
-                    if let Ok(tex) = load_texture(&path).await {
-                        tex.set_filter(FilterMode::Nearest);
-                        self.equipment_sprites.insert(item_id.clone(), tex);
+        // Desktop fallback: load individual equipment sprites
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        {
+            let mut item_ids: Vec<String> = Vec::new();
+            for c in &self.characters {
+                for slot in [&c.equipped_head, &c.equipped_body, &c.equipped_weapon, &c.equipped_back, &c.equipped_feet] {
+                    if let Some(id) = slot {
+                        if !item_ids.contains(id) && !self.equipment_sprites.contains(id) {
+                            item_ids.push(id.clone());
+                        }
                     }
-                    break;
                 }
             }
+
+            if item_ids.is_empty() {
+                return;
+            }
+
+            let mut equip_map = HashMap::new();
+            for item_id in &item_ids {
+                // Find the matching manifest entry (e.g. "equipment/head/iron_helm")
+                for entry in &manifest.equipment {
+                    let key = entry.rsplit('/').next().unwrap_or(entry);
+                    if key == item_id {
+                        let path = asset_path(&format!("assets/sprites/{}.png", entry));
+                        if let Ok(tex) = load_texture(&path).await {
+                            tex.set_filter(FilterMode::Nearest);
+                            equip_map.insert(item_id.clone(), tex);
+                        }
+                        break;
+                    }
+                }
+            }
+            self.equipment_sprites = SpritesheetStore::Individual(equip_map);
         }
     }
 
     /// Load equipment sprites if characters have been loaded (WASM only)
     #[cfg(target_arch = "wasm32")]
     pub async fn load_equipment_if_needed(&mut self) {
+        // Skip if equipment already loaded from renderer
+        if self.equipment_sprites.len() > 0 {
+            self.needs_equipment_load = false;
+            return;
+        }
         if self.needs_equipment_load {
             self.needs_equipment_load = false;
-            self.load_equipment_sprites().await;
+            let manifest = SpriteManifest::load().await;
+            self.load_equipment_sprites(&manifest).await;
         }
     }
 
@@ -1066,13 +1185,12 @@ impl CharacterSelectScreen {
 
 impl Screen for CharacterSelectScreen {
     fn update(&mut self, _audio: &AudioManager) -> ScreenState {
-        // WASM: poll pending requests and handle initial character load
+        // WASM: poll pending requests (characters now come with login response)
         #[cfg(target_arch = "wasm32")]
         {
-            if self.needs_initial_load && !self.auth_client.is_busy() {
+            // Skip initial load - characters are included in login response
+            if self.needs_initial_load {
                 self.needs_initial_load = false;
-                self.loading = true;
-                self.auth_client.start_get_characters(&self.session.token);
             }
             if let Some(result) = self.auth_client.poll() {
                 self.loading = false;
@@ -1640,8 +1758,8 @@ pub struct CharacterCreateScreen {
     auth_client: AuthClient,
     font: BitmapFont,
     active_field: CreateField,
-    player_sprites: HashMap<String, Texture2D>,
-    hair_sprites: HashMap<String, Texture2D>,
+    player_sprites: SpritesheetStore,
+    hair_sprites: SpritesheetStore,
     scroll_y: f32,
     last_touch_y: Option<f32>,
     touch_detected: bool,
@@ -1674,8 +1792,8 @@ impl CharacterCreateScreen {
             auth_client: AuthClient::new(server_url),
             font: BitmapFont::default(),
             active_field: CreateField::Name,
-            player_sprites: HashMap::new(),
-            hair_sprites: HashMap::new(),
+            player_sprites: SpritesheetStore::Individual(HashMap::new()),
+            hair_sprites: SpritesheetStore::Individual(HashMap::new()),
             scroll_y: 0.0,
             last_touch_y: None,
             touch_detected: false,
@@ -1684,33 +1802,69 @@ impl CharacterCreateScreen {
         }
     }
 
+    /// Use pre-loaded assets from the renderer (avoids duplicate loading on WASM/Android)
+    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+    pub fn use_renderer_assets(&mut self, font: BitmapFont, player: SpritesheetStore, hair: SpritesheetStore) {
+        self.font = font;
+        self.player_sprites = player;
+        self.hair_sprites = hair;
+    }
+
     pub async fn load_font(&mut self) {
-        self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
-        self.player_sprites = load_player_sprites().await;
-        // Load hair sprites (male and female variants)
-        for style in 0..HAIR_STYLES as i32 {
-            // Male hair sprites
-            let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
-            match load_texture(&path).await {
-                Ok(tex) => {
-                    tex.set_filter(FilterMode::Nearest);
-                    self.hair_sprites.insert(format!("male_{}", style), tex);
-                }
-                Err(e) => {
-                    log::warn!("Failed to load hair sprite {}: {}", path, e);
+        // On WASM/Android, font and sprites should be set via use_renderer_assets() before this call
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        {
+            if self.player_sprites.len() > 0 {
+                // Assets already set from renderer, skip loading entirely
+                return;
+            }
+
+            // Fallback: load from atlas if not set
+            let manifest = SpriteManifest::load().await;
+            if let Some(ref atlas_info) = manifest.players_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    self.player_sprites = SpritesheetStore::Atlas { texture: tex, rects };
                 }
             }
-            // Female hair sprites
-            let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
-            match load_texture(&path).await {
-                Ok(tex) => {
-                    tex.set_filter(FilterMode::Nearest);
-                    self.hair_sprites.insert(format!("female_{}", style), tex);
-                }
-                Err(e) => {
-                    log::warn!("Failed to load female hair sprite {}: {}", path, e);
+            if let Some(ref atlas_info) = manifest.hair_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    self.hair_sprites = SpritesheetStore::Atlas { texture: tex, rects };
                 }
             }
+        }
+
+        // Desktop: always load individually
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        {
+            self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+            self.player_sprites = load_player_sprites().await;
+
+            let mut hair_map = HashMap::new();
+            for style in 0..HAIR_STYLES as i32 {
+                // Male hair sprites
+                let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
+                match load_texture(&path).await {
+                    Ok(tex) => {
+                        tex.set_filter(FilterMode::Nearest);
+                        hair_map.insert(format!("male_{}", style), tex);
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to load hair sprite {}: {}", path, e);
+                    }
+                }
+                // Female hair sprites
+                let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+                match load_texture(&path).await {
+                    Ok(tex) => {
+                        tex.set_filter(FilterMode::Nearest);
+                        hair_map.insert(format!("female_{}", style), tex);
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to load female hair sprite {}: {}", path, e);
+                    }
+                }
+            }
+            self.hair_sprites = SpritesheetStore::Individual(hair_map);
         }
     }
 
@@ -2149,10 +2303,11 @@ impl Screen for CharacterCreateScreen {
         // Draw character sprite preview (native pixel size, floor to avoid subpixel stretching)
         let sprite_x = (content_x + (preview_w - SPRITE_WIDTH) / 2.0).floor();
         let sprite_y = (fixed_y + (preview_h - SPRITE_HEIGHT) / 2.0 - 10.0).floor();
+        let empty_equip = SpritesheetStore::Individual(HashMap::new());
         draw_character_preview(
             &self.player_sprites,
             &self.hair_sprites,
-            &HashMap::new(),
+            &empty_equip,
             GENDERS[self.gender_index],
             SKINS[self.skin_index],
             self.hair_style_index.map(|i| i as i32),

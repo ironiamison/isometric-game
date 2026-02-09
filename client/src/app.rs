@@ -306,6 +306,16 @@ pub fn run_game_frame(
         network.send(&crate::network::messages::ClientMessage::EnterPortal { portal_id });
     }
 
+    // Auto-ping every 2 seconds when debug mode is active
+    if game_state.debug_mode && network.is_connected() && game_state.ping_sent_at.is_none() {
+        let now = get_time();
+        if now - game_state.ping_stats.last_auto_ping >= 2.0 {
+            game_state.ping_stats.last_auto_ping = now;
+            game_state.ping_sent_at = Some(now);
+            network.send(&crate::network::messages::ClientMessage::Ping { timestamp: now });
+        }
+    }
+
     // Record delta for diagnostics
     game_state.frame_timings.record_delta(delta as f64 * 1000.0);
 

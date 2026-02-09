@@ -158,19 +158,83 @@ pub struct WeaponSprite {
     pub frame_height: f32,
 }
 
+/// Storage for spritesheet atlases: each "sprite" is itself a spritesheet (animation strip).
+/// When retrieving a sprite, we get the texture and the position within the atlas where the
+/// full spritesheet is located. Animation frame calculation happens on top of this offset.
+#[derive(Clone)]
+pub enum SpritesheetStore {
+    /// Atlas mode: one texture contains multiple spritesheets, each identified by key
+    Atlas {
+        texture: Texture2D,
+        /// Maps sprite key -> rect in atlas where the full spritesheet is located
+        rects: HashMap<String, Rect>,
+    },
+    /// Individual mode: each spritesheet is a separate texture
+    Individual(HashMap<String, Texture2D>),
+}
+
+impl SpritesheetStore {
+    /// Look up a spritesheet by key.
+    /// Returns (texture, atlas_offset) where:
+    /// - texture: the texture to draw from
+    /// - atlas_offset: if Some((x, y)), these values should be added to all source rect coordinates.
+    pub fn get(&self, key: &str) -> Option<(&Texture2D, Option<(f32, f32)>)> {
+        match self {
+            SpritesheetStore::Atlas { texture, rects } => {
+                rects.get(key).map(|r| (texture, Some((r.x, r.y))))
+            }
+            SpritesheetStore::Individual(map) => {
+                map.get(key).map(|tex| (tex, None))
+            }
+        }
+    }
+
+    /// Get the spritesheet dimensions for a given key.
+    /// For individual textures, returns the texture size.
+    /// For atlas, returns the rect dimensions (the spritesheet size within the atlas).
+    pub fn get_dimensions(&self, key: &str) -> Option<(f32, f32)> {
+        match self {
+            SpritesheetStore::Atlas { rects, .. } => {
+                rects.get(key).map(|r| (r.w, r.h))
+            }
+            SpritesheetStore::Individual(map) => {
+                map.get(key).map(|tex| (tex.width(), tex.height()))
+            }
+        }
+    }
+
+    /// Check if a key exists in this store.
+    pub fn contains(&self, key: &str) -> bool {
+        match self {
+            SpritesheetStore::Atlas { rects, .. } => rects.contains_key(key),
+            SpritesheetStore::Individual(map) => map.contains_key(key),
+        }
+    }
+
+    /// Get count of sprites in this store.
+    pub fn len(&self) -> usize {
+        match self {
+            SpritesheetStore::Atlas { rects, .. } => rects.len(),
+            SpritesheetStore::Individual(map) => map.len(),
+        }
+    }
+}
+
 pub struct Renderer {
     player_color: Color,
     local_player_color: Color,
     /// Loaded tileset texture
     tileset: Option<Texture2D>,
     /// Player sprite sheets by appearance key (e.g., "male_tan")
-    player_sprites: HashMap<String, Texture2D>,
+    player_sprites: SpritesheetStore,
     /// Hair sprite sheets by gender and style (e.g., "male_0", "female_0")
-    hair_sprites: HashMap<String, Texture2D>,
+    hair_sprites: SpritesheetStore,
     /// Equipment sprite sheets by item ID (e.g., "peasant_suit")
-    equipment_sprites: HashMap<String, Texture2D>,
+    equipment_sprites: SpritesheetStore,
     /// Weapon sprite sheets by item ID (e.g., "goblin_axe")
-    weapon_sprites: HashMap<String, WeaponSprite>,
+    weapon_sprites: SpritesheetStore,
+    /// Per-weapon frame size overrides: { "weapon_id": (width, height) }
+    weapon_frame_sizes: HashMap<String, (f32, f32)>,
     /// Item inventory sprites by item ID
     pub(crate) item_sprites: SpriteStore,
     /// Map object sprites by filename number (e.g., "101")
@@ -178,7 +242,7 @@ pub struct Renderer {
     /// Wall sprites by filename number (e.g., "101")
     wall_sprites: SpriteStore,
     /// NPC sprites by entity type (e.g., "pig" -> Texture2D)
-    npc_sprites: HashMap<String, Texture2D>,
+    npc_sprites: SpritesheetStore,
     /// Multi-size pixel font for sharp text rendering at various sizes
     font: BitmapFont,
     /// Quest complete banner texture
@@ -198,13 +262,13 @@ pub struct Renderer {
     /// Small coin icon for merchant name tags
     pub(crate) coin_small_icon: Option<Texture2D>,
     /// Farming crop sprite sheets by crop name (e.g., "potato" -> Texture2D)
-    farming_sprites: HashMap<String, Texture2D>,
+    farming_sprites: SpritesheetStore,
     /// Prayer icons by prayer id (e.g., "clarity" -> Texture2D)
     pub(crate) prayer_icons: HashMap<String, Texture2D>,
     /// Spell icons by spell id (e.g., "dark_hand" -> Texture2D)
     pub(crate) spell_icons: HashMap<String, Texture2D>,
     /// Spell effect sprite sheets by effect name (e.g., "dark_hand" -> Texture2D)
-    spell_effect_textures: HashMap<String, Texture2D>,
+    spell_effect_textures: SpritesheetStore,
     /// Material for head+hair composite rendering (shader-based)
     head_hair_material: Option<Material>,
     /// Material for animated water tile rendering (shader-based)
@@ -243,12 +307,12 @@ impl Renderer {
         unsafe { loading_hide(); }
     }
 
-    pub async fn new() -> Self {
+    pub async fn new(audio: &mut crate::audio::AudioManager) -> Self {
         // Load manifest first to compute total sprite count
         let manifest = SpriteManifest::load().await;
 
-        // Fixed assets: 1 tileset + 14 players + 3 hair + 1 font + 8 UI textures + 1 shader + 4 arrows = 32
-        const FIXED_ASSETS: usize = 32;
+        // Fixed assets: 1 tileset + 14 players + 3 hair + 1 font + 8 UI textures + 1 shader + 4 arrows + 2 music = 34
+        const FIXED_ASSETS: usize = 34;
         let manifest_total = manifest.equipment.len()
             + manifest.weapons.len()
             + manifest.inventory.len()
@@ -266,6 +330,11 @@ impl Renderer {
             };
         }
 
+        // Preload audio first (music + SFX)
+        set_loading!("Loading audio...");
+        audio.preload_all().await;
+        loaded += 2; // menu.ogg + start.ogg
+
         set_loading!("Loading tileset...");
 
         let tileset = match load_texture(&asset_path("assets/sprites/tiles.png")).await {
@@ -280,59 +349,114 @@ impl Renderer {
         };
         loaded += 1;
 
+        // Load player sprites - atlas on WASM/Android, individual on desktop
         set_loading!("Loading player sprites...");
-
-        let mut player_sprites = HashMap::new();
-        for gender in GENDERS {
-            for skin in SKINS {
-                let key = format!("{}_{}", gender, skin);
-                let path = asset_path(&format!("assets/sprites/players/player_{}_{}.png", gender, skin));
-                match load_texture(&path).await {
-                    Ok(tex) => {
-                        tex.set_filter(FilterMode::Nearest);
-                        player_sprites.insert(key, tex);
-                    }
-                    Err(e) => {
-                        log::warn!("Failed to load player sprite {}: {}", path, e);
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        let player_sprites: SpritesheetStore = if let Some(ref atlas_info) = manifest.players_atlas {
+            if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                SpritesheetStore::Atlas { texture: tex, rects }
+            } else {
+                let mut sprites = HashMap::new();
+                for gender in GENDERS {
+                    for skin in SKINS {
+                        let key = format!("{}_{}", gender, skin);
+                        let path = asset_path(&format!("assets/sprites/players/player_{}_{}.png", gender, skin));
+                        if let Ok(tex) = load_texture(&path).await {
+                            tex.set_filter(FilterMode::Nearest);
+                            sprites.insert(key, tex);
+                        }
                     }
                 }
-                loaded += 1;
-                set_loading!("Loading player sprites...");
+                SpritesheetStore::Individual(sprites)
             }
-        }
+        } else {
+            let mut sprites = HashMap::new();
+            for gender in GENDERS {
+                for skin in SKINS {
+                    let key = format!("{}_{}", gender, skin);
+                    let path = asset_path(&format!("assets/sprites/players/player_{}_{}.png", gender, skin));
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(key, tex);
+                    }
+                }
+            }
+            SpritesheetStore::Individual(sprites)
+        };
+
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        let player_sprites: SpritesheetStore = {
+            let mut sprites = HashMap::new();
+            for gender in GENDERS {
+                for skin in SKINS {
+                    let key = format!("{}_{}", gender, skin);
+                    let path = format!("assets/sprites/players/player_{}_{}.png", gender, skin);
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(key, tex);
+                    }
+                }
+            }
+            SpritesheetStore::Individual(sprites)
+        };
         log::info!("Loaded {} player sprite variants", player_sprites.len());
 
+        // Load hair sprites - atlas on WASM/Android, individual on desktop
         set_loading!("Loading hair sprites...");
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        let hair_sprites: SpritesheetStore = if let Some(ref atlas_info) = manifest.hair_atlas {
+            if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                SpritesheetStore::Atlas { texture: tex, rects }
+            } else {
+                let mut sprites = HashMap::new();
+                for style in 0..6 {
+                    let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(format!("male_{}", style), tex);
+                    }
+                    let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(format!("female_{}", style), tex);
+                    }
+                }
+                SpritesheetStore::Individual(sprites)
+            }
+        } else {
+            let mut sprites = HashMap::new();
+            for style in 0..6 {
+                let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
+                if let Ok(tex) = load_texture(&path).await {
+                    tex.set_filter(FilterMode::Nearest);
+                    sprites.insert(format!("male_{}", style), tex);
+                }
+                let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+                if let Ok(tex) = load_texture(&path).await {
+                    tex.set_filter(FilterMode::Nearest);
+                    sprites.insert(format!("female_{}", style), tex);
+                }
+            }
+            SpritesheetStore::Individual(sprites)
+        };
 
-        let mut hair_sprites = HashMap::new();
-        // Load male hair sprites (hair_0.png through hair_5.png)
-        for style in 0..6 {
-            let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
-            match load_texture(&path).await {
-                Ok(tex) => {
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        let hair_sprites: SpritesheetStore = {
+            let mut sprites = HashMap::new();
+            for style in 0..6 {
+                let path = format!("assets/sprites/hair/hair_{}.png", style);
+                if let Ok(tex) = load_texture(&path).await {
                     tex.set_filter(FilterMode::Nearest);
-                    hair_sprites.insert(format!("male_{}", style), tex);
+                    sprites.insert(format!("male_{}", style), tex);
                 }
-                Err(e) => {
-                    log::warn!("Failed to load hair sprite {}: {}", path, e);
+                let path = format!("assets/sprites/hair/hair_female_{}.png", style);
+                if let Ok(tex) = load_texture(&path).await {
+                    tex.set_filter(FilterMode::Nearest);
+                    sprites.insert(format!("female_{}", style), tex);
                 }
             }
-            loaded += 1;
-        }
-        // Load female hair sprites (hair_female_0.png through hair_female_5.png)
-        for style in 0..6 {
-            let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
-            match load_texture(&path).await {
-                Ok(tex) => {
-                    tex.set_filter(FilterMode::Nearest);
-                    hair_sprites.insert(format!("female_{}", style), tex);
-                }
-                Err(e) => {
-                    log::warn!("Failed to load female hair sprite {}: {}", path, e);
-                }
-            }
-            loaded += 1;
-        }
+            SpritesheetStore::Individual(sprites)
+        };
         log::info!("Loaded {} hair sprite variants", hair_sprites.len());
 
         // Helper to load an atlas texture and build a SpriteStore
@@ -349,6 +473,25 @@ impl Renderer {
                 }
                 Err(e) => {
                     log::warn!("Failed to load atlas {}: {}", path, e);
+                    None
+                }
+            }
+        }
+
+        // Helper to load a spritesheet atlas (for animation spritesheets)
+        async fn load_spritesheet_atlas(atlas_info: &SpriteAtlasInfo) -> Option<(Texture2D, HashMap<String, Rect>)> {
+            let path = asset_path(&format!("assets/{}", atlas_info.file));
+            match load_texture(&path).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    let rects = atlas_info.sprites.iter().map(|(key, sr)| {
+                        (key.clone(), Rect::new(sr.x as f32, sr.y as f32, sr.w as f32, sr.h as f32))
+                    }).collect();
+                    log::info!("Loaded spritesheet atlas {} ({}x{}, {} sprites)", atlas_info.file, tex.width(), tex.height(), atlas_info.sprites.len());
+                    Some((tex, rects))
+                }
+                Err(e) => {
+                    log::warn!("Failed to load spritesheet atlas {}: {}", path, e);
                     None
                 }
             }
@@ -383,23 +526,43 @@ impl Renderer {
             sprites
         }
 
-        // On WASM/Android, load sprite categories - use atlases for objects/walls/inventory.
+        // On WASM/Android, load sprite categories - use atlases when available.
         // On desktop, use the fast directory-scanning loader.
         #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-        let (equipment_sprites, weapon_sprites, item_sprites, object_sprites, wall_sprites, npc_sprites) = {
-            // Load equipment (individual - animation spritesheets)
+        let (equipment_sprites, weapon_sprites, weapon_frame_sizes, item_sprites, object_sprites, wall_sprites, npc_sprites, farming_sprites, spell_effect_textures) = {
+            // Load equipment - atlas if available
             set_loading!("Loading equipment...");
-            let equipment = load_individual_sprites(&manifest.equipment, "assets/sprites", &mut loaded, total, "Loading equipment...").await;
+            let equipment: SpritesheetStore = if let Some(ref atlas_info) = manifest.equipment_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    loaded += manifest.equipment.len();
+                    #[cfg(target_arch = "wasm32")]
+                    Self::update_loading(loaded, total, "Loading equipment...");
+                    SpritesheetStore::Atlas { texture: tex, rects }
+                } else {
+                    SpritesheetStore::Individual(load_individual_sprites(&manifest.equipment, "assets/sprites", &mut loaded, total, "Loading equipment...").await)
+                }
+            } else {
+                SpritesheetStore::Individual(load_individual_sprites(&manifest.equipment, "assets/sprites", &mut loaded, total, "Loading equipment...").await)
+            };
 
-            // Load weapons (individual - animation spritesheets)
+            // Load weapons - atlas if available
             set_loading!("Loading weapons...");
-            let weapon_textures = load_individual_sprites(&manifest.weapons, "assets/sprites/weapons", &mut loaded, total, "Loading weapons...").await;
-            let weapons: HashMap<String, WeaponSprite> = weapon_textures.into_iter().map(|(id, texture)| {
-                let (fw, fh) = manifest.weapon_frame_sizes.get(&id)
-                    .map(|s| (s[0], s[1]))
-                    .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
-                (id, WeaponSprite { texture, frame_width: fw, frame_height: fh })
-            }).collect();
+            let weapons: SpritesheetStore = if let Some(ref atlas_info) = manifest.weapons_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    loaded += manifest.weapons.len();
+                    #[cfg(target_arch = "wasm32")]
+                    Self::update_loading(loaded, total, "Loading weapons...");
+                    SpritesheetStore::Atlas { texture: tex, rects }
+                } else {
+                    SpritesheetStore::Individual(load_individual_sprites(&manifest.weapons, "assets/sprites/weapons", &mut loaded, total, "Loading weapons...").await)
+                }
+            } else {
+                SpritesheetStore::Individual(load_individual_sprites(&manifest.weapons, "assets/sprites/weapons", &mut loaded, total, "Loading weapons...").await)
+            };
+            // Build weapon frame sizes map
+            let wf_sizes: HashMap<String, (f32, f32)> = manifest.weapon_frame_sizes.iter()
+                .map(|(k, v)| (k.clone(), (v[0], v[1])))
+                .collect();
 
             // Load items - atlas if available
             set_loading!("Loading items...");
@@ -418,18 +581,6 @@ impl Renderer {
 
             // Load objects - atlas if available
             set_loading!("Loading objects...");
-            #[cfg(target_arch = "wasm32")]
-            {
-                use sapp_jsutils::JsObject;
-                let msg = if manifest.objects_atlas.is_some() {
-                    "ATLAS: objects_atlas IS present in manifest"
-                } else {
-                    "ATLAS: objects_atlas is NOT present in manifest"
-                };
-                let js_msg = JsObject::string(msg);
-                extern "C" { fn console_log(msg: JsObject); }
-                unsafe { console_log(js_msg); }
-            }
             let objects: SpriteStore = if let Some(ref atlas_info) = manifest.objects_atlas {
                 if let Some(atlas) = load_atlas(atlas_info).await {
                     loaded += manifest.objects.len();
@@ -458,30 +609,99 @@ impl Renderer {
                 SpriteStore::Individual(load_individual_sprites(&manifest.walls, "assets/sprites/walls", &mut loaded, total, "Loading walls...").await)
             };
 
-            // Load NPCs (individual - animation spritesheets)
+            // Load NPCs/enemies - atlas if available
             set_loading!("Loading NPCs...");
-            let npcs = load_individual_sprites(&manifest.enemies, "assets/sprites/enemies", &mut loaded, total, "Loading NPCs...").await;
+            let npcs: SpritesheetStore = if let Some(ref atlas_info) = manifest.enemies_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    loaded += manifest.enemies.len();
+                    #[cfg(target_arch = "wasm32")]
+                    Self::update_loading(loaded, total, "Loading NPCs...");
+                    SpritesheetStore::Atlas { texture: tex, rects }
+                } else {
+                    SpritesheetStore::Individual(load_individual_sprites(&manifest.enemies, "assets/sprites/enemies", &mut loaded, total, "Loading NPCs...").await)
+                }
+            } else {
+                SpritesheetStore::Individual(load_individual_sprites(&manifest.enemies, "assets/sprites/enemies", &mut loaded, total, "Loading NPCs...").await)
+            };
 
-            (equipment, weapons, items, objects, walls, npcs)
+            // Load farming sprites - atlas if available
+            set_loading!("Loading farming...");
+            let farming: SpritesheetStore = if let Some(ref atlas_info) = manifest.farming_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    SpritesheetStore::Atlas { texture: tex, rects }
+                } else {
+                    let crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
+                    let mut sprites = HashMap::new();
+                    for crop in &crop_names {
+                        let path = asset_path(&format!("assets/sprites/farming/farming_{}.png", crop));
+                        if let Ok(tex) = load_texture(&path).await {
+                            tex.set_filter(FilterMode::Nearest);
+                            sprites.insert(crop.to_string(), tex);
+                        }
+                    }
+                    SpritesheetStore::Individual(sprites)
+                }
+            } else {
+                let crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
+                let mut sprites = HashMap::new();
+                for crop in &crop_names {
+                    let path = asset_path(&format!("assets/sprites/farming/farming_{}.png", crop));
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(crop.to_string(), tex);
+                    }
+                }
+                SpritesheetStore::Individual(sprites)
+            };
+
+            // Load spell effects - atlas if available
+            set_loading!("Loading effects...");
+            let effects: SpritesheetStore = if let Some(ref atlas_info) = manifest.effects_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    SpritesheetStore::Atlas { texture: tex, rects }
+                } else {
+                    let mut sprites = HashMap::new();
+                    for name in &["dark_hand", "dark_eater", "self_heal", "bubbles_warp"] {
+                        let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
+                        if let Ok(tex) = load_texture(&path).await {
+                            tex.set_filter(FilterMode::Nearest);
+                            sprites.insert(name.to_string(), tex);
+                        }
+                    }
+                    SpritesheetStore::Individual(sprites)
+                }
+            } else {
+                let mut sprites = HashMap::new();
+                for name in &["dark_hand", "dark_eater", "self_heal", "bubbles_warp"] {
+                    let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(name.to_string(), tex);
+                    }
+                }
+                SpritesheetStore::Individual(sprites)
+            };
+
+            (equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects)
         };
 
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        let (equipment_sprites, weapon_sprites, item_sprites, object_sprites, wall_sprites, npc_sprites) = {
+        let (equipment_sprites, weapon_sprites, weapon_frame_sizes, item_sprites, object_sprites, wall_sprites, npc_sprites, farming_sprites, spell_effect_textures) = {
             use crate::util::load_sprites_from_dir_or_manifest;
 
-            let equipment = load_sprites_from_dir_or_manifest("assets/sprites/equipment", &manifest.equipment, "assets/sprites").await;
-            let weapon_textures = load_sprites_from_dir_or_manifest("assets/sprites/weapons", &manifest.weapons, "assets/sprites/weapons").await;
-            let weapons: HashMap<String, WeaponSprite> = weapon_textures.into_iter().map(|(id, texture)| {
-                let (fw, fh) = manifest.weapon_frame_sizes.get(&id)
-                    .map(|s| (s[0], s[1]))
-                    .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
-                (id, WeaponSprite { texture, frame_width: fw, frame_height: fh })
-            }).collect();
+            let equipment = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/equipment", &manifest.equipment, "assets/sprites").await);
+            let weapons = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/weapons", &manifest.weapons, "assets/sprites/weapons").await);
+            // Build weapon frame sizes map
+            let wf_sizes: HashMap<String, (f32, f32)> = manifest.weapon_frame_sizes.iter()
+                .map(|(k, v)| (k.clone(), (v[0], v[1])))
+                .collect();
             let items = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/inventory", &manifest.inventory, "assets/sprites/inventory").await);
             let objects = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/objects", &manifest.objects, "assets/sprites/objects").await);
             let walls = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/walls", &manifest.walls, "assets/sprites/walls").await);
-            let npcs = load_sprites_from_dir_or_manifest("assets/sprites/enemies", &manifest.enemies, "assets/sprites/enemies").await;
-            (equipment, weapons, items, objects, walls, npcs)
+            let npcs = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/enemies", &manifest.enemies, "assets/sprites/enemies").await);
+            let farming = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/farming", &[], "assets/sprites/farming").await);
+            let effects = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/effects", &[], "assets/sprites/effects").await);
+            (equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects)
         };
 
         set_loading!("Loading fonts...");
@@ -632,20 +852,8 @@ impl Renderer {
             }
         };
 
-        // Load farming crop sprite sheets
-        let farming_crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
-        let mut farming_sprites = HashMap::new();
-        for crop in &farming_crop_names {
-            let path = asset_path(&format!("assets/sprites/farming/farming_{}.png", crop));
-            match load_texture(&path).await {
-                Ok(tex) => {
-                    tex.set_filter(FilterMode::Nearest);
-                    farming_sprites.insert(crop.to_string(), tex);
-                }
-                Err(_) => {}
-            }
-        }
-        log::info!("Loaded {} farming sprites", farming_sprites.len());
+        // farming_sprites loaded via atlas/manifest in earlier block
+        log::info!("Farming sprites loaded: {}", farming_sprites.len());
 
         // Load prayer icons
         let prayer_names = [
@@ -686,16 +894,8 @@ impl Renderer {
         }
         log::info!("Loaded {} spell icons", spell_icons.len());
 
-        // Load spell effect sprite sheets
-        let mut spell_effect_textures: HashMap<String, Texture2D> = HashMap::new();
-        for name in &["dark_hand", "dark_eater", "self_heal", "bubbles_warp"] {
-            let path = format!("assets/sprites/effects/{}.png", name);
-            if let Ok(tex) = load_texture(&asset_path(&path)).await {
-                tex.set_filter(FilterMode::Nearest);
-                spell_effect_textures.insert(name.to_string(), tex);
-            }
-        }
-        log::info!("Loaded {} spell effect textures", spell_effect_textures.len());
+        // spell_effect_textures loaded via atlas/manifest in earlier block
+        log::info!("Spell effect textures loaded: {}", spell_effect_textures.len());
 
         set_loading!("Loading shaders...");
 
@@ -790,6 +990,7 @@ impl Renderer {
             hair_sprites,
             equipment_sprites,
             weapon_sprites,
+            weapon_frame_sizes,
             item_sprites,
             object_sprites,
             wall_sprites,
@@ -818,7 +1019,8 @@ impl Renderer {
     }
 
     /// Get the sprite texture for a given player appearance
-    fn get_player_sprite(&self, gender: &str, skin: &str) -> Option<&Texture2D> {
+    /// Returns (texture, atlas_offset) where atlas_offset is Some((x, y)) if from atlas
+    fn get_player_sprite(&self, gender: &str, skin: &str) -> Option<(&Texture2D, Option<(f32, f32)>)> {
         let key = format!("{}_{}", gender, skin);
         self.player_sprites.get(&key)
             // Fallback to male_tan if sprite not found
@@ -854,6 +1056,26 @@ impl Renderer {
     pub fn draw_text_sharp(&self, text: &str, x: f32, y: f32, font_size: f32, color: Color) {
         // Round to integer pixels for crisp rendering
         self.font.draw_text(text, x.floor(), y.floor(), font_size, color);
+    }
+
+    /// Get reference to player sprites for sharing with UI screens
+    pub fn player_sprites(&self) -> &SpritesheetStore {
+        &self.player_sprites
+    }
+
+    /// Get reference to hair sprites for sharing with UI screens
+    pub fn hair_sprites(&self) -> &SpritesheetStore {
+        &self.hair_sprites
+    }
+
+    /// Get reference to equipment sprites for sharing with UI screens
+    pub fn equipment_sprites(&self) -> &SpritesheetStore {
+        &self.equipment_sprites
+    }
+
+    /// Get reference to font for sharing with UI screens
+    pub fn font(&self) -> &BitmapFont {
+        &self.font
     }
 
     /// Measure text with pixel font
@@ -1648,9 +1870,8 @@ impl Renderer {
             let zoom = state.camera.zoom;
 
             // Compute sprite height to find top_y
-            let sprite_height = if let Some(sprite) = self.npc_sprites.get(&npc.entity_type) {
-                let frame_height = sprite.height();
-                (frame_height * zoom).round()
+            let sprite_height = if let Some((_, h)) = self.npc_sprites.get_dimensions(&npc.entity_type) {
+                (h * zoom).round()
             } else {
                 // Fallback ellipse sizing
                 let time = macroquad::time::get_time() as f32;
@@ -2177,14 +2398,14 @@ impl Renderer {
                 _ => continue,
             };
 
-            let texture = match self.spell_effect_textures.get(sprite_name) {
+            let (texture, atlas_offset) = match self.spell_effect_textures.get(sprite_name) {
                 Some(t) => t,
                 None => continue,
             };
 
-            // Calculate frame info from texture (horizontal strip, 5 frames)
-            let tex_w = texture.width();
-            let tex_h = texture.height();
+            // Get sprite dimensions (from atlas rect or texture size)
+            let (tex_w, tex_h) = self.spell_effect_textures.get_dimensions(sprite_name)
+                .unwrap_or((texture.width(), texture.height()));
             let frame_count = 5usize;
             let frame_w = tex_w / frame_count as f32;
             let frame_h = tex_h;
@@ -2208,9 +2429,11 @@ impl Renderer {
             let zoom = state.camera.zoom;
             let draw_w = frame_w * zoom;
             let draw_h = frame_h * zoom;
+            // Apply atlas offset if present
+            let (offset_x, offset_y) = atlas_offset.unwrap_or((0.0, 0.0));
             let source_rect = Rect::new(
-                frame_idx as f32 * frame_w,
-                0.0,
+                offset_x + frame_idx as f32 * frame_w,
+                offset_y,
                 frame_w,
                 frame_h,
             );
@@ -2254,8 +2477,8 @@ impl Renderer {
                 (SPRITE_HEIGHT - 8.0) * zoom / 2.0 // Center of player sprite
             } else if let Some(npc) = state.npcs.get(&event.target_id) {
                 // Use actual sprite height if available, otherwise fallback to ellipse size
-                if let Some(sprite) = self.npc_sprites.get(&npc.entity_type) {
-                    sprite.height() * zoom / 2.0 // Center of NPC sprite
+                if let Some((_, h)) = self.npc_sprites.get_dimensions(&npc.entity_type) {
+                    h * zoom / 2.0 // Center of NPC sprite
                 } else {
                     12.0 * zoom // Center of fallback ellipse
                 }
@@ -2669,8 +2892,9 @@ impl Renderer {
         draw_ellipse(screen_x, screen_y, 16.0 * zoom, 7.0 * zoom, 0.0, Color::from_rgba(0, 0, 0, 60));
 
         // Try to render sprite based on player's appearance, fall back to colored circle
-        if let Some(sprite) = self.get_player_sprite(&player.gender, &player.skin) {
+        if let Some((player_texture, player_offset)) = self.get_player_sprite(&player.gender, &player.skin) {
             let coords = player.animation.get_sprite_coords();
+            let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
             let (src_x, src_y, src_w, src_h) = coords.to_source_rect();
 
             // Tint for local player distinction (slight green tint)
@@ -2691,22 +2915,27 @@ impl Renderer {
             let is_sitting = matches!(player.animation.state,
                 crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
             let weapon_info = player.equipped_weapon.as_ref().filter(|_| !is_sitting).and_then(|weapon_id| {
-                self.weapon_sprites.get(weapon_id).map(|ws| {
+                self.weapon_sprites.get(weapon_id).map(|(tex, atlas_offset)| {
                     let anim_frame = player.animation.frame as u32;
                     let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
                     let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
-                    (&ws.texture, weapon_frame, offset_x, offset_y, ws.frame_width, ws.frame_height)
+                    // Get weapon frame size from manifest, fallback to default
+                    let (fw, fh) = self.weapon_frame_sizes.get(weapon_id)
+                        .copied()
+                        .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                    (tex, atlas_offset, weapon_frame, offset_x, offset_y, fw, fh)
                 })
             });
 
             // Scaled weapon dimensions (per-weapon)
             let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info.as_ref()
-                .map(|(_, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
+                .map(|(_, _, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
                 .unwrap_or((WEAPON_SPRITE_WIDTH * zoom, WEAPON_SPRITE_HEIGHT * zoom, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
 
             // Draw weapon under-layer (before player sprite)
-            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
-                let weapon_src_x = weapon_frame.frame_under as f32 * wf_width;
+            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+                let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
+                let weapon_src_x = atlas_x + weapon_frame.frame_under as f32 * wf_width;
                 let weapon_draw_x = draw_x + offset_x * zoom;
                 let weapon_draw_y = draw_y + offset_y * zoom;
 
@@ -2716,7 +2945,7 @@ impl Renderer {
                     weapon_draw_y,
                     tint,
                     DrawTextureParams {
-                        source: Some(Rect::new(weapon_src_x, 0.0, wf_width, wf_height)),
+                        source: Some(Rect::new(weapon_src_x, atlas_y, wf_width, wf_height)),
                         dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
                         flip_x: weapon_frame.flip_h,
                         ..Default::default()
@@ -2726,26 +2955,30 @@ impl Renderer {
 
             // Draw back static items BEHIND player (for down/right directions - tip peeks out)
             if let Some(ref back_item_id) = player.equipped_back {
-                if let Some(equip_sprite) = self.equipment_sprites.get(back_item_id) {
-                    let is_offhand = equip_sprite.width() > equip_sprite.height() * 8.0;
+                if let Some((equip_texture, equip_offset)) = self.equipment_sprites.get(back_item_id) {
+                    // Check if this is an offhand item based on dimensions
+                    let (equip_w, equip_h) = self.equipment_sprites.get_dimensions(back_item_id)
+                        .unwrap_or((equip_texture.width(), equip_texture.height()));
+                    let is_offhand = equip_w > equip_h * 8.0;
                     if !is_offhand {
                         let anim_frame = player.animation.frame as u32;
                         let back_frame = get_back_static_frame(player.animation.direction);
                         if back_frame.render_behind {
                             let (back_offset_x, back_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
-                            let back_src_x = back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
+                            let (atlas_x, atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
+                            let back_src_x = atlas_x + back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
                             let scaled_back_width = BACK_STATIC_SPRITE_WIDTH * zoom;
                             let scaled_back_height = BACK_STATIC_SPRITE_HEIGHT * zoom;
                             let back_draw_x = draw_x + back_offset_x * zoom;
                             let back_draw_y = draw_y + back_offset_y * zoom;
 
                             draw_texture_ex(
-                                equip_sprite,
+                                equip_texture,
                                 back_draw_x,
                                 back_draw_y,
                                 tint,
                                 DrawTextureParams {
-                                    source: Some(Rect::new(back_src_x, 0.0, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
+                                    source: Some(Rect::new(back_src_x, atlas_y, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
                                     dest_size: Some(Vec2::new(scaled_back_width, scaled_back_height)),
                                     flip_x: back_frame.flip_h,
                                     ..Default::default()
@@ -2758,12 +2991,12 @@ impl Renderer {
 
             // Draw player sprite
             draw_texture_ex(
-                sprite,
+                player_texture,
                 draw_x,
                 draw_y,
                 tint,
                 DrawTextureParams {
-                    source: Some(Rect::new(src_x, src_y, src_w, src_h)),
+                    source: Some(Rect::new(player_atlas_x + src_x, player_atlas_y + src_y, src_w, src_h)),
                     dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
                     flip_x: coords.flip_h,
                     ..Default::default()
@@ -2772,17 +3005,24 @@ impl Renderer {
 
             // Draw hair and head equipment (after base sprite, before body armor)
             // Check if player has head equipment that we can render with shader
-            let head_sprite = player.equipped_head.as_ref()
-                .and_then(|head_item_id| self.equipment_sprites.get(head_item_id));
+            let head_item_id_ref = player.equipped_head.as_ref();
+            let head_sprite_data = head_item_id_ref
+                .and_then(|head_item_id| {
+                    let (tex, offset) = self.equipment_sprites.get(head_item_id)?;
+                    let (w, h) = self.equipment_sprites.get_dimensions(head_item_id)?;
+                    Some((tex, offset, w, h))
+                });
 
             let has_shader = self.head_hair_material.is_some();
 
-            if let Some(head_sprite) = head_sprite {
+            if let Some((head_texture, head_offset, head_tex_w, head_tex_h)) = head_sprite_data {
                 // Player has head equipment - use shader compositing if available
                 if has_shader {
                     if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                         let hair_key = format!("{}_{}", player.gender, style);
-                        if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
+                        if let Some((hair_texture, hair_offset)) = self.hair_sprites.get(&hair_key) {
+                            let (hair_tex_w, hair_tex_h) = self.hair_sprites.get_dimensions(&hair_key)
+                                .unwrap_or((hair_texture.width(), hair_texture.height()));
                             // Calculate hair frame info
                             let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                             let frame_index = color * 2 + if is_back { 1 } else { 0 };
@@ -2814,10 +3054,7 @@ impl Renderer {
                             // Compute UV transform for shader
                             // The shader needs to transform head UV to hair UV
                             // head UV is in full-texture coords, so we need to account for source rects
-                            let head_tex_w = head_sprite.width();
-                            let head_tex_h = head_sprite.height();
-                            let hair_tex_w = hair_tex.width();
-                            let hair_tex_h = hair_tex.height();
+                            // (head_tex_w, head_tex_h, hair_tex_w, hair_tex_h already extracted above)
 
                             // Head source rect in normalized UV
                             let head_uv_x = head_src_x / head_tex_w;
@@ -2851,7 +3088,7 @@ impl Renderer {
 
                             // Set up shader
                             let material = self.head_hair_material.as_ref().unwrap();
-                            material.set_texture("HairTexture", hair_tex.clone());
+                            material.set_texture("HairTexture", hair_texture.clone());
                             material.set_uniform("HairUvTransform", [offset_x, offset_y, scale_x, scale_y]);
                             material.set_uniform("Tint", [1.0f32, 1.0f32, 1.0f32, 1.0f32]);
                             gl_use_material(material);
@@ -2862,13 +3099,15 @@ impl Renderer {
                             let head_draw_x = draw_x + head_offset_x * zoom;
                             let head_draw_y = draw_y + head_offset_y * zoom;
 
+                            // Apply atlas offset for head texture
+                            let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
                             draw_texture_ex(
-                                &head_sprite,
+                                head_texture,
                                 head_draw_x,
                                 head_draw_y,
                                 tint,
                                 DrawTextureParams {
-                                    source: Some(Rect::new(head_src_x, 0.0, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
+                                    source: Some(Rect::new(head_atlas_x + head_src_x, head_atlas_y, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
                                     dest_size: Some(Vec2::new(scaled_head_width, scaled_head_height)),
                                     flip_x: head_frame.flip_h,
                                     ..Default::default()
@@ -2881,20 +3120,21 @@ impl Renderer {
                         // No hair, just draw head normally
                         let anim_frame = player.animation.frame as u32;
                         let head_frame = get_head_frame(player.animation.direction);
-                        let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                        let (head_pos_offset_x, head_pos_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                        let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
                         let head_src_x = head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
                         let scaled_head_width = HEAD_SPRITE_WIDTH * zoom;
                         let scaled_head_height = HEAD_SPRITE_HEIGHT * zoom;
-                        let head_draw_x = draw_x + head_offset_x * zoom;
-                        let head_draw_y = draw_y + head_offset_y * zoom;
+                        let head_draw_x = draw_x + head_pos_offset_x * zoom;
+                        let head_draw_y = draw_y + head_pos_offset_y * zoom;
 
                         draw_texture_ex(
-                            &head_sprite,
+                            head_texture,
                             head_draw_x,
                             head_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(head_src_x, 0.0, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(head_atlas_x + head_src_x, head_atlas_y, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
                                 dest_size: Some(Vec2::new(scaled_head_width, scaled_head_height)),
                                 flip_x: head_frame.flip_h,
                                 ..Default::default()
@@ -2906,16 +3146,17 @@ impl Renderer {
                     // Draw hair first
                     if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                         let hair_key = format!("{}_{}", player.gender, style);
-                        if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
+                        if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
                             let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                             let frame_index = color * 2 + if is_back { 1 } else { 0 };
-                            let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
+                            let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
+                            let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
                             let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
                             let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
 
                             // Calculate hair offsets using gender-aware function
                             let anim_frame = player.animation.frame as u32;
-                            let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                            let (hair_pos_offset_x, hair_pos_offset_y) = get_hair_offset(
                                 player.animation.state,
                                 player.animation.direction,
                                 anim_frame,
@@ -2923,8 +3164,8 @@ impl Renderer {
                                 coords.flip_h,
                             );
 
-                            let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                            let hair_draw_y = draw_y + hair_offset_y * zoom;
+                            let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_pos_offset_x * zoom;
+                            let hair_draw_y = draw_y + hair_pos_offset_y * zoom;
 
                             draw_texture_ex(
                                 hair_tex,
@@ -2932,7 +3173,7 @@ impl Renderer {
                                 hair_draw_y,
                                 tint,
                                 DrawTextureParams {
-                                    source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                                    source: Some(Rect::new(hair_src_x, hair_atlas_y, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
                                     dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
                                     flip_x: coords.flip_h,
                                     ..Default::default()
@@ -2944,20 +3185,21 @@ impl Renderer {
                     // Then draw head on top
                     let anim_frame = player.animation.frame as u32;
                     let head_frame = get_head_frame(player.animation.direction);
-                    let (head_offset_x, head_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
-                    let head_src_x = head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
+                    let (head_pos_offset_x, head_pos_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                    let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
+                    let head_src_x = head_atlas_x + head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
                     let scaled_head_width = HEAD_SPRITE_WIDTH * zoom;
                     let scaled_head_height = HEAD_SPRITE_HEIGHT * zoom;
-                    let head_draw_x = draw_x + head_offset_x * zoom;
-                    let head_draw_y = draw_y + head_offset_y * zoom;
+                    let head_draw_x = draw_x + head_pos_offset_x * zoom;
+                    let head_draw_y = draw_y + head_pos_offset_y * zoom;
 
                     draw_texture_ex(
-                        &head_sprite,
+                        head_texture,
                         head_draw_x,
                         head_draw_y,
                         tint,
                         DrawTextureParams {
-                            source: Some(Rect::new(head_src_x, 0.0, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(head_src_x, head_atlas_y, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
                             dest_size: Some(Vec2::new(scaled_head_width, scaled_head_height)),
                             flip_x: head_frame.flip_h,
                             ..Default::default()
@@ -2969,10 +3211,13 @@ impl Renderer {
 
             // Draw equipment overlay (body armor)
             if let Some(ref body_item_id) = player.equipped_body {
-                if let Some(equip_sprite) = self.equipment_sprites.get(body_item_id) {
+                if let Some((body_texture, body_atlas_offset)) = self.equipment_sprites.get(body_item_id) {
                     // Check if this is a new-style single-row body armor sprite (width > height * 2)
                     // Body armor sprites are wider (16 frames) so use a more aggressive ratio check
-                    let is_single_row = equip_sprite.width() > equip_sprite.height() * 2.0;
+                    let (body_w, body_h) = self.equipment_sprites.get_dimensions(body_item_id)
+                        .unwrap_or((body_texture.width(), body_texture.height()));
+                    let is_single_row = body_w > body_h * 2.0;
+                    let (body_atlas_x, body_atlas_y) = body_atlas_offset.unwrap_or((0.0, 0.0));
 
                     if is_single_row {
                         // New single-row body armor format
@@ -2980,7 +3225,7 @@ impl Renderer {
                         let armor_frame = get_body_armor_frame(player.animation.state, player.animation.direction, anim_frame);
                         let (armor_offset_x, armor_offset_y) = get_body_armor_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
-                        let armor_src_x = armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
+                        let armor_src_x = body_atlas_x + armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
                         let scaled_armor_width = BODY_ARMOR_SPRITE_WIDTH * zoom;
                         let scaled_armor_height = BODY_ARMOR_SPRITE_HEIGHT * zoom;
 
@@ -2988,12 +3233,12 @@ impl Renderer {
                         let armor_draw_y = draw_y + armor_offset_y * zoom;
 
                         draw_texture_ex(
-                            equip_sprite,
+                            body_texture,
                             armor_draw_x,
                             armor_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(armor_src_x, 0.0, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(armor_src_x, body_atlas_y, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
                                 dest_size: Some(Vec2::new(scaled_armor_width, scaled_armor_height)),
                                 flip_x: armor_frame.flip_h,
                                 ..Default::default()
@@ -3002,12 +3247,12 @@ impl Renderer {
                     } else {
                         // Old grid-style body armor format (matches player sprite sheet layout)
                         draw_texture_ex(
-                            equip_sprite,
+                            body_texture,
                             draw_x,
                             draw_y,
                             tint, // Same tint as player
                             DrawTextureParams {
-                                source: Some(Rect::new(src_x, src_y, src_w, src_h)),
+                                source: Some(Rect::new(body_atlas_x + src_x, body_atlas_y + src_y, src_w, src_h)),
                                 dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
@@ -3021,16 +3266,17 @@ impl Renderer {
             if player.equipped_head.is_none() {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
-                    if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
+                    if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
                         let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                         let frame_index = color * 2 + if is_back { 1 } else { 0 };
-                        let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
+                        let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
+                        let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
                         let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
                         let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
 
                         // Calculate hair offsets using gender-aware function
                         let anim_frame = player.animation.frame as u32;
-                        let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                        let (hair_pos_offset_x, hair_pos_offset_y) = get_hair_offset(
                             player.animation.state,
                             player.animation.direction,
                             anim_frame,
@@ -3038,8 +3284,8 @@ impl Renderer {
                             coords.flip_h,
                         );
 
-                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                        let hair_draw_y = draw_y + hair_offset_y * zoom;
+                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_pos_offset_x * zoom;
+                        let hair_draw_y = draw_y + hair_pos_offset_y * zoom;
 
                         draw_texture_ex(
                             hair_tex,
@@ -3047,7 +3293,7 @@ impl Renderer {
                             hair_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(hair_src_x, hair_atlas_y, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
                                 dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
@@ -3059,9 +3305,12 @@ impl Renderer {
 
             // Draw equipment overlay (boots)
             if let Some(ref feet_item_id) = player.equipped_feet {
-                if let Some(equip_sprite) = self.equipment_sprites.get(feet_item_id) {
+                if let Some((feet_texture, feet_atlas_offset)) = self.equipment_sprites.get(feet_item_id) {
                     // Check if this is a new-style single-row boot sprite (width > height)
-                    let is_single_row = equip_sprite.width() > equip_sprite.height();
+                    let (feet_w, feet_h) = self.equipment_sprites.get_dimensions(feet_item_id)
+                        .unwrap_or((feet_texture.width(), feet_texture.height()));
+                    let is_single_row = feet_w > feet_h;
+                    let (feet_atlas_x, feet_atlas_y) = feet_atlas_offset.unwrap_or((0.0, 0.0));
 
                     if is_single_row {
                         // New single-row boot format
@@ -3069,7 +3318,7 @@ impl Renderer {
                         let boot_frame = get_boot_frame(player.animation.state, player.animation.direction, anim_frame);
                         let (boot_offset_x, boot_offset_y) = get_boot_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
-                        let boot_src_x = boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
+                        let boot_src_x = feet_atlas_x + boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
                         let scaled_boot_width = BOOT_SPRITE_WIDTH * zoom;
                         let scaled_boot_height = BOOT_SPRITE_HEIGHT * zoom;
 
@@ -3077,12 +3326,12 @@ impl Renderer {
                         let boot_draw_y = draw_y + boot_offset_y * zoom;
 
                         draw_texture_ex(
-                            equip_sprite,
+                            feet_texture,
                             boot_draw_x,
                             boot_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(boot_src_x, 0.0, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(boot_src_x, feet_atlas_y, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
                                 dest_size: Some(Vec2::new(scaled_boot_width, scaled_boot_height)),
                                 flip_x: boot_frame.flip_h,
                                 ..Default::default()
@@ -3091,12 +3340,12 @@ impl Renderer {
                     } else {
                         // Old grid-style boot format (matches player sprite sheet layout)
                         draw_texture_ex(
-                            equip_sprite,
+                            feet_texture,
                             draw_x,
                             draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(src_x, src_y, src_w, src_h)),
+                                source: Some(Rect::new(feet_atlas_x + src_x, feet_atlas_y + src_y, src_w, src_h)),
                                 dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
@@ -3108,11 +3357,14 @@ impl Renderer {
 
             // Draw back slot equipment (quiver, shield, etc.)
             if let Some(ref back_item_id) = player.equipped_back {
-                if let Some(equip_sprite) = self.equipment_sprites.get(back_item_id) {
+                if let Some((back_texture, back_atlas_offset)) = self.equipment_sprites.get(back_item_id) {
                     // Detect sprite type by dimensions:
                     // - 16-frame offhand (shield): width > height * 8 (very wide strip)
                     // - 2-frame static back (quiver): width < height * 4 (narrow strip)
-                    let is_offhand = equip_sprite.width() > equip_sprite.height() * 8.0;
+                    let (back_w, back_h) = self.equipment_sprites.get_dimensions(back_item_id)
+                        .unwrap_or((back_texture.width(), back_texture.height()));
+                    let is_offhand = back_w > back_h * 8.0;
+                    let (back_atlas_x, back_atlas_y) = back_atlas_offset.unwrap_or((0.0, 0.0));
 
                     if is_offhand {
                         // 16-frame offhand item (shield)
@@ -3120,7 +3372,7 @@ impl Renderer {
                         let offhand_frame = get_offhand_frame(player.animation.state, player.animation.direction, anim_frame);
                         let (offhand_offset_x, offhand_offset_y) = get_offhand_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
-                        let offhand_src_x = offhand_frame.frame as f32 * OFFHAND_SPRITE_WIDTH;
+                        let offhand_src_x = back_atlas_x + offhand_frame.frame as f32 * OFFHAND_SPRITE_WIDTH;
                         let scaled_offhand_width = OFFHAND_SPRITE_WIDTH * zoom;
                         let scaled_offhand_height = OFFHAND_SPRITE_HEIGHT * zoom;
 
@@ -3128,12 +3380,12 @@ impl Renderer {
                         let offhand_draw_y = draw_y + offhand_offset_y * zoom;
 
                         draw_texture_ex(
-                            equip_sprite,
+                            back_texture,
                             offhand_draw_x,
                             offhand_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(offhand_src_x, 0.0, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(offhand_src_x, back_atlas_y, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT)),
                                 dest_size: Some(Vec2::new(scaled_offhand_width, scaled_offhand_height)),
                                 flip_x: offhand_frame.flip_h,
                                 ..Default::default()
@@ -3147,22 +3399,22 @@ impl Renderer {
                         // Only render here if visible and NOT rendering behind player
                         // (behind rendering happens before player sprite)
                         if back_frame.visible && !back_frame.render_behind {
-                            let (back_offset_x, back_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                            let (back_pos_offset_x, back_pos_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
-                            let back_src_x = back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
+                            let back_src_x = back_atlas_x + back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
                             let scaled_back_width = BACK_STATIC_SPRITE_WIDTH * zoom;
                             let scaled_back_height = BACK_STATIC_SPRITE_HEIGHT * zoom;
 
-                            let back_draw_x = draw_x + back_offset_x * zoom;
-                            let back_draw_y = draw_y + back_offset_y * zoom;
+                            let back_draw_x = draw_x + back_pos_offset_x * zoom;
+                            let back_draw_y = draw_y + back_pos_offset_y * zoom;
 
                             draw_texture_ex(
-                                equip_sprite,
+                                back_texture,
                                 back_draw_x,
                                 back_draw_y,
                                 tint,
                                 DrawTextureParams {
-                                    source: Some(Rect::new(back_src_x, 0.0, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
+                                    source: Some(Rect::new(back_src_x, back_atlas_y, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
                                     dest_size: Some(Vec2::new(scaled_back_width, scaled_back_height)),
                                     flip_x: back_frame.flip_h,
                                     ..Default::default()
@@ -3174,9 +3426,10 @@ impl Renderer {
             }
 
             // Draw weapon over-layer (after equipment, for attack frame 2 front overlay)
-            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
                 if let Some(frame_over) = weapon_frame.frame_over {
-                    let weapon_src_x = frame_over as f32 * wf_width;
+                    let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
+                    let weapon_src_x = atlas_x + frame_over as f32 * wf_width;
                     let weapon_draw_x = draw_x + offset_x * zoom;
                     let weapon_draw_y = draw_y + offset_y * zoom;
 
@@ -3186,7 +3439,7 @@ impl Renderer {
                         weapon_draw_y,
                         tint,
                         DrawTextureParams {
-                            source: Some(Rect::new(weapon_src_x, 0.0, wf_width, wf_height)),
+                            source: Some(Rect::new(weapon_src_x, atlas_y, wf_width, wf_height)),
                             dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
                             flip_x: weapon_frame.flip_h,
                             ..Default::default()
@@ -3269,9 +3522,10 @@ impl Renderer {
         // Subtle semi-transparent tint (~20% opacity)
         let silhouette_tint = Color::from_rgba(255, 255, 255, 50);
 
-        if let Some(sprite) = self.get_player_sprite(&player.gender, &player.skin) {
+        if let Some((player_texture, player_offset)) = self.get_player_sprite(&player.gender, &player.skin) {
             let coords = player.animation.get_sprite_coords();
             let (src_x, src_y, src_w, src_h) = coords.to_source_rect();
+            let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
 
             let draw_x = screen_x - scaled_sprite_width / 2.0;
             let draw_y = screen_y - scaled_sprite_height + 8.0 * zoom;
@@ -3283,21 +3537,25 @@ impl Renderer {
             let is_sitting_sil = matches!(player.animation.state,
                 crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
             let weapon_info = player.equipped_weapon.as_ref().filter(|_| !is_sitting_sil).and_then(|weapon_id| {
-                self.weapon_sprites.get(weapon_id).map(|ws| {
+                self.weapon_sprites.get(weapon_id).map(|(tex, atlas_offset)| {
                     let anim_frame = player.animation.frame as u32;
                     let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
                     let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
-                    (&ws.texture, weapon_frame, offset_x, offset_y, ws.frame_width, ws.frame_height)
+                    let (fw, fh) = self.weapon_frame_sizes.get(weapon_id)
+                        .copied()
+                        .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                    (tex, atlas_offset, weapon_frame, offset_x, offset_y, fw, fh)
                 })
             });
 
             let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info.as_ref()
-                .map(|(_, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
+                .map(|(_, _, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
                 .unwrap_or((WEAPON_SPRITE_WIDTH * zoom, WEAPON_SPRITE_HEIGHT * zoom, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
 
             // Draw weapon under-layer (before player sprite)
-            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
-                let weapon_src_x = weapon_frame.frame_under as f32 * wf_width;
+            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+                let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
+                let weapon_src_x = atlas_x + weapon_frame.frame_under as f32 * wf_width;
                 let weapon_draw_x = draw_x + offset_x * zoom;
                 let weapon_draw_y = draw_y + offset_y * zoom;
 
@@ -3307,7 +3565,7 @@ impl Renderer {
                     weapon_draw_y,
                     silhouette_tint,
                     DrawTextureParams {
-                        source: Some(Rect::new(weapon_src_x, 0.0, wf_width, wf_height)),
+                        source: Some(Rect::new(weapon_src_x, atlas_y, wf_width, wf_height)),
                         dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
                         flip_x: weapon_frame.flip_h,
                         ..Default::default()
@@ -3318,12 +3576,12 @@ impl Renderer {
             // Draw player base sprite (skip if body armor or head slot equipped to avoid transparency stacking)
             if player.equipped_body.is_none() && player.equipped_head.is_none() {
                 draw_texture_ex(
-                    sprite,
+                    player_texture,
                     draw_x,
                     draw_y,
                     silhouette_tint,
                     DrawTextureParams {
-                        source: Some(Rect::new(src_x, src_y, src_w, src_h)),
+                        source: Some(Rect::new(player_atlas_x + src_x, player_atlas_y + src_y, src_w, src_h)),
                         dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
                         flip_x: coords.flip_h,
                         ..Default::default()
@@ -3335,8 +3593,11 @@ impl Renderer {
 
             // Draw equipment silhouette (body armor)
             if let Some(ref body_item_id) = player.equipped_body {
-                if let Some(equip_sprite) = self.equipment_sprites.get(body_item_id) {
-                    let is_single_row = equip_sprite.width() > equip_sprite.height() * 2.0;
+                if let Some((body_texture, body_atlas_offset)) = self.equipment_sprites.get(body_item_id) {
+                    let (body_w, body_h) = self.equipment_sprites.get_dimensions(body_item_id)
+                        .unwrap_or((body_texture.width(), body_texture.height()));
+                    let is_single_row = body_w > body_h * 2.0;
+                    let (body_atlas_x, body_atlas_y) = body_atlas_offset.unwrap_or((0.0, 0.0));
 
                     if is_single_row {
                         // New single-row body armor format
@@ -3344,7 +3605,7 @@ impl Renderer {
                         let armor_frame = get_body_armor_frame(player.animation.state, player.animation.direction, anim_frame);
                         let (armor_offset_x, armor_offset_y) = get_body_armor_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
-                        let armor_src_x = armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
+                        let armor_src_x = body_atlas_x + armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
                         let scaled_armor_width = BODY_ARMOR_SPRITE_WIDTH * zoom;
                         let scaled_armor_height = BODY_ARMOR_SPRITE_HEIGHT * zoom;
 
@@ -3352,12 +3613,12 @@ impl Renderer {
                         let armor_draw_y = draw_y + armor_offset_y * zoom;
 
                         draw_texture_ex(
-                            equip_sprite,
+                            body_texture,
                             armor_draw_x,
                             armor_draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(armor_src_x, 0.0, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(armor_src_x, body_atlas_y, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
                                 dest_size: Some(Vec2::new(scaled_armor_width, scaled_armor_height)),
                                 flip_x: armor_frame.flip_h,
                                 ..Default::default()
@@ -3366,12 +3627,12 @@ impl Renderer {
                     } else {
                         // Old grid-style body armor format
                         draw_texture_ex(
-                            equip_sprite,
+                            body_texture,
                             draw_x,
                             draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(src_x, src_y, src_w, src_h)),
+                                source: Some(Rect::new(body_atlas_x + src_x, body_atlas_y + src_y, src_w, src_h)),
                                 dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
@@ -3385,25 +3646,26 @@ impl Renderer {
             if player.equipped_head.is_none() {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
-                    if let Some(hair_tex) = self.hair_sprites.get(&hair_key) {
+                    if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
                         let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
                         let frame_index = color * 2 + if is_back { 1 } else { 0 };
-                        let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
+                        let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
+                        let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
 
                         let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
                         let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
 
                         // Calculate hair offsets using gender-aware function
                         let anim_frame = player.animation.frame as u32;
-                        let (hair_offset_x, hair_offset_y) = get_hair_offset(
+                        let (hair_pos_offset_x, hair_pos_offset_y) = get_hair_offset(
                             player.animation.state,
                             player.animation.direction,
                             anim_frame,
                             player_gender,
                             coords.flip_h,
                         );
-                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_offset_x * zoom;
-                        let hair_draw_y = draw_y + hair_offset_y * zoom;
+                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_pos_offset_x * zoom;
+                        let hair_draw_y = draw_y + hair_pos_offset_y * zoom;
 
                         draw_texture_ex(
                             hair_tex,
@@ -3411,7 +3673,7 @@ impl Renderer {
                             hair_draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(hair_src_x, 0.0, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(hair_src_x, hair_atlas_y, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
                                 dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
@@ -3423,8 +3685,11 @@ impl Renderer {
 
             // Draw equipment silhouette (boots)
             if let Some(ref feet_item_id) = player.equipped_feet {
-                if let Some(equip_sprite) = self.equipment_sprites.get(feet_item_id) {
-                    let is_single_row = equip_sprite.width() > equip_sprite.height();
+                if let Some((feet_texture, feet_atlas_offset)) = self.equipment_sprites.get(feet_item_id) {
+                    let (feet_w, feet_h) = self.equipment_sprites.get_dimensions(feet_item_id)
+                        .unwrap_or((feet_texture.width(), feet_texture.height()));
+                    let is_single_row = feet_w > feet_h;
+                    let (feet_atlas_x, feet_atlas_y) = feet_atlas_offset.unwrap_or((0.0, 0.0));
 
                     if is_single_row {
                         // New single-row boot format
@@ -3432,7 +3697,7 @@ impl Renderer {
                         let boot_frame = get_boot_frame(player.animation.state, player.animation.direction, anim_frame);
                         let (boot_offset_x, boot_offset_y) = get_boot_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
 
-                        let boot_src_x = boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
+                        let boot_src_x = feet_atlas_x + boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
                         let scaled_boot_width = BOOT_SPRITE_WIDTH * zoom;
                         let scaled_boot_height = BOOT_SPRITE_HEIGHT * zoom;
 
@@ -3440,12 +3705,12 @@ impl Renderer {
                         let boot_draw_y = draw_y + boot_offset_y * zoom;
 
                         draw_texture_ex(
-                            equip_sprite,
+                            feet_texture,
                             boot_draw_x,
                             boot_draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(boot_src_x, 0.0, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(boot_src_x, feet_atlas_y, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
                                 dest_size: Some(Vec2::new(scaled_boot_width, scaled_boot_height)),
                                 flip_x: boot_frame.flip_h,
                                 ..Default::default()
@@ -3454,12 +3719,12 @@ impl Renderer {
                     } else {
                         // Old grid-style boot format
                         draw_texture_ex(
-                            equip_sprite,
+                            feet_texture,
                             draw_x,
                             draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(src_x, src_y, src_w, src_h)),
+                                source: Some(Rect::new(feet_atlas_x + src_x, feet_atlas_y + src_y, src_w, src_h)),
                                 dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
@@ -3471,9 +3736,10 @@ impl Renderer {
 
 
             // Draw weapon over-layer (after equipment)
-            if let Some((weapon_sprite, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
                 if let Some(frame_over) = weapon_frame.frame_over {
-                    let weapon_src_x = frame_over as f32 * wf_width;
+                    let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
+                    let weapon_src_x = atlas_x + frame_over as f32 * wf_width;
                     let weapon_draw_x = draw_x + offset_x * zoom;
                     let weapon_draw_y = draw_y + offset_y * zoom;
 
@@ -3483,7 +3749,7 @@ impl Renderer {
                         weapon_draw_y,
                         silhouette_tint,
                         DrawTextureParams {
-                            source: Some(Rect::new(weapon_src_x, 0.0, wf_width, wf_height)),
+                            source: Some(Rect::new(weapon_src_x, atlas_y, wf_width, wf_height)),
                             dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
                             flip_x: weapon_frame.flip_h,
                             ..Default::default()
@@ -3523,14 +3789,17 @@ impl Renderer {
         };
 
         // Try to render with sprite, fall back to ellipse
-        let sprite_height = if let Some(sprite) = self.npc_sprites.get(&npc.entity_type) {
+        let sprite_height = if let Some((npc_texture, npc_atlas_offset)) = self.npc_sprites.get(&npc.entity_type) {
             // Auto-detect frame size from texture (16 frames per sheet)
-            let frame_width = sprite.width() / 16.0;
-            let frame_height = sprite.height();
+            let (tex_w, tex_h) = self.npc_sprites.get_dimensions(&npc.entity_type)
+                .unwrap_or((npc_texture.width(), npc_texture.height()));
+            let frame_width = tex_w / 16.0;
+            let frame_height = tex_h;
+            let (npc_atlas_x, npc_atlas_y) = npc_atlas_offset.unwrap_or((0.0, 0.0));
 
             // Get current frame based on animation state and direction
             let frame_index = npc.animation.get_frame_index(npc.direction);
-            let src_x = frame_index as f32 * frame_width;
+            let src_x = npc_atlas_x + frame_index as f32 * frame_width;
 
             // Flip horizontally for Right/Left directions
             let flip_x = NpcAnimation::should_flip(npc.direction);
@@ -3554,12 +3823,12 @@ impl Renderer {
             );
 
             draw_texture_ex(
-                sprite,
+                npc_texture,
                 draw_x,
                 draw_y,
                 tint_color,
                 DrawTextureParams {
-                    source: Some(Rect::new(src_x, 0.0, frame_width, frame_height)),
+                    source: Some(Rect::new(src_x, npc_atlas_y, frame_width, frame_height)),
                     dest_size: Some(Vec2::new(scaled_width, scaled_height)),
                     flip_x,
                     ..Default::default()
@@ -3918,22 +4187,23 @@ impl Renderer {
                 continue;
             }
             let sign_name = Self::crop_to_sprite_name(&patch.crop_id);
-            if let Some(texture) = self.farming_sprites.get(sign_name.as_str()) {
+            if let Some((farm_texture, farm_atlas_offset)) = self.farming_sprites.get(sign_name.as_str()) {
                 let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
                 let sign_frame = 5u32;
-                let src_x = sign_frame as f32 * frame_w;
+                let (farm_atlas_x, farm_atlas_y) = farm_atlas_offset.unwrap_or((0.0, 0.0));
+                let src_x = farm_atlas_x + sign_frame as f32 * frame_w;
                 let sign_w = frame_w * zoom;
                 let sign_h = frame_h * zoom;
                 // Position at the top (back) of the isometric tile
                 let sign_x = screen_x - sign_w / 2.0;
                 let sign_y = screen_y - sign_h - 4.0 * zoom;
                 draw_texture_ex(
-                    texture,
+                    farm_texture,
                     sign_x,
                     sign_y,
                     WHITE,
                     DrawTextureParams {
-                        source: Some(Rect::new(src_x, 0.0, frame_w, frame_h)),
+                        source: Some(Rect::new(src_x, farm_atlas_y, frame_w, frame_h)),
                         dest_size: Some(Vec2::new(sign_w, sign_h)),
                         ..Default::default()
                     },
@@ -3968,20 +4238,21 @@ impl Renderer {
 
             // Try to draw sprite
             let drew_sprite = if let Some(ref name) = sprite_name {
-                if let Some(texture) = self.farming_sprites.get(name.as_str()) {
-                    let src_x = frame_index as f32 * frame_w;
+                if let Some((crop_texture, crop_atlas_offset)) = self.farming_sprites.get(name.as_str()) {
+                    let (crop_atlas_x, crop_atlas_y) = crop_atlas_offset.unwrap_or((0.0, 0.0));
+                    let src_x = crop_atlas_x + frame_index as f32 * frame_w;
                     let draw_w = frame_w * zoom;
                     let draw_h = frame_h * zoom;
 
                     let tint = WHITE;
 
                     draw_texture_ex(
-                        texture,
+                        crop_texture,
                         screen_x - draw_w / 2.0,
                         screen_y - draw_h + draw_h * 0.25,
                         tint,
                         DrawTextureParams {
-                            source: Some(Rect::new(src_x, 0.0, frame_w, frame_h)),
+                            source: Some(Rect::new(src_x, crop_atlas_y, frame_w, frame_h)),
                             dest_size: Some(Vec2::new(draw_w, draw_h)),
                             ..Default::default()
                         },

@@ -98,6 +98,20 @@ pub struct SpriteManifest {
     pub walls_atlas: Option<SpriteAtlasInfo>,
     #[serde(default)]
     pub inventory_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub players_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub hair_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub equipment_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub weapons_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub enemies_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub farming_atlas: Option<SpriteAtlasInfo>,
+    #[serde(default)]
+    pub effects_atlas: Option<SpriteAtlasInfo>,
     /// Per-weapon frame size overrides: { "weapon_id": [width, height] }
     /// Weapons not listed here use the default 68x84.
     #[serde(default)]

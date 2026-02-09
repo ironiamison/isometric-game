@@ -22,24 +22,61 @@ impl Default for AudioSettings {
 
 pub struct AudioManager {
     current_music: Option<Sound>,
+    current_music_path: Option<String>,
     settings: AudioSettings,
     /// Preloaded sound effects by name
     sfx: HashMap<String, Sound>,
     /// Sword attack sounds for random selection
     sword_sounds: Vec<Sound>,
+    /// Preloaded music tracks by path
+    music: HashMap<String, Sound>,
 }
 
 impl AudioManager {
-    pub async fn new() -> Self {
+    /// Create AudioManager without preloading (call preload_all() separately during loading screen)
+    pub fn new_without_preload() -> Self {
         let settings = load_settings();
-        let mut manager = Self {
+        Self {
             current_music: None,
+            current_music_path: None,
             settings,
             sfx: HashMap::new(),
             sword_sounds: Vec::new(),
-        };
-        manager.preload_sfx().await;
+            music: HashMap::new(),
+        }
+    }
+
+    /// Create AudioManager and preload all audio
+    pub async fn new() -> Self {
+        let mut manager = Self::new_without_preload();
+        manager.preload_all().await;
         manager
+    }
+
+    /// Preload all audio (SFX + music) - call this during loading screen
+    pub async fn preload_all(&mut self) {
+        self.preload_sfx().await;
+        self.preload_music().await;
+    }
+
+    /// Preload music tracks at startup
+    pub async fn preload_music(&mut self) {
+        let music_files = [
+            "assets/audio/menu.ogg",
+            "assets/audio/start.ogg",
+        ];
+
+        for path in music_files {
+            match load_sound(&asset_path(path)).await {
+                Ok(sound) => {
+                    self.music.insert(path.to_string(), sound);
+                    log::info!("Preloaded music: {}", path);
+                }
+                Err(e) => {
+                    log::warn!("Failed to preload music '{}': {:?}", path, e);
+                }
+            }
+        }
     }
 
     /// Preload all sound effects at startup
@@ -119,14 +156,36 @@ impl AudioManager {
     }
 
     pub async fn play_music(&mut self, path: &str) {
+        // Don't restart the same track
+        if self.current_music_path.as_deref() == Some(path) {
+            return;
+        }
+
         // Stop any currently playing music
         self.stop_music();
 
+        let volume = self.effective_music_volume();
+
+        // Check if music is preloaded
+        if let Some(sound) = self.music.get(path) {
+            log::info!("Playing preloaded music: {} (volume: {})", path, volume);
+            play_sound(
+                sound,
+                PlaySoundParams {
+                    looped: true,
+                    volume,
+                },
+            );
+            self.current_music = Some(sound.clone());
+            self.current_music_path = Some(path.to_string());
+            return;
+        }
+
+        // Fall back to loading on demand
         let actual_path = asset_path(path);
         log::info!("Loading music from: {}", actual_path);
         match load_sound(&actual_path).await {
             Ok(sound) => {
-                let volume = self.effective_music_volume();
                 log::info!("Playing music with volume: {} (muted: {})", volume, self.settings.muted);
                 play_sound(
                     &sound,
@@ -136,6 +195,7 @@ impl AudioManager {
                     },
                 );
                 self.current_music = Some(sound);
+                self.current_music_path = Some(path.to_string());
                 log::info!("Music started successfully");
             }
             Err(e) => {
@@ -148,6 +208,7 @@ impl AudioManager {
         if let Some(sound) = self.current_music.take() {
             stop_sound(&sound);
         }
+        self.current_music_path = None;
     }
 
     pub fn set_music_volume(&mut self, volume: f32) {

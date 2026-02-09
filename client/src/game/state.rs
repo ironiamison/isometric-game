@@ -170,6 +170,68 @@ impl FrameTimings {
     }
 }
 
+/// Rolling ping statistics for debug display
+pub struct PingStats {
+    /// Rolling window of recent ping samples
+    samples: [f64; 20],
+    idx: usize,
+    filled: usize,
+    /// When the last auto-ping was sent
+    pub last_auto_ping: f64,
+    /// Current/latest ping
+    pub current_ms: f64,
+    /// Rolling average
+    pub avg_ms: f64,
+    /// Rolling min
+    pub min_ms: f64,
+    /// Rolling max
+    pub max_ms: f64,
+}
+
+impl Default for PingStats {
+    fn default() -> Self {
+        Self {
+            samples: [0.0; 20],
+            idx: 0,
+            filled: 0,
+            last_auto_ping: 0.0,
+            current_ms: 0.0,
+            avg_ms: 0.0,
+            min_ms: 0.0,
+            max_ms: 0.0,
+        }
+    }
+}
+
+impl PingStats {
+    pub fn record(&mut self, ms: f64) {
+        self.current_ms = ms;
+        self.samples[self.idx] = ms;
+        self.idx = (self.idx + 1) % 20;
+        if self.filled < 20 {
+            self.filled += 1;
+        }
+
+        // Recalculate stats over filled samples
+        let mut sum = 0.0;
+        let mut min = f64::MAX;
+        let mut max = f64::MIN;
+        for i in 0..self.filled {
+            let s = self.samples[i];
+            sum += s;
+            min = min.min(s);
+            max = max.max(s);
+        }
+        self.avg_ms = sum / self.filled as f64;
+        self.min_ms = min;
+        self.max_ms = max;
+    }
+
+    pub fn has_data(&self) -> bool {
+        self.filled > 0
+    }
+}
+
 pub struct Camera {
     pub x: f32,
     pub y: f32,
@@ -1130,6 +1192,9 @@ pub struct GameState {
 
     /// Timestamp when last ping was sent (for latency measurement)
     pub ping_sent_at: Option<f64>,
+
+    /// Continuous ping tracking (for debug menu)
+    pub ping_stats: PingStats,
 }
 
 impl GameState {
@@ -1202,6 +1267,7 @@ impl GameState {
             max_prayer_points: 1,
             active_prayers: Vec::new(),
             ping_sent_at: None,
+            ping_stats: PingStats::default(),
         }
     }
 

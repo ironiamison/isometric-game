@@ -71,8 +71,10 @@ async fn async_main() {
 
     // On WASM, macroquad/miniquad handles panic logging to console
 
-    let renderer = Renderer::new().await;
-    let mut audio = AudioManager::new().await;
+    // Create audio manager first (just initializes, doesn't load yet)
+    let mut audio = AudioManager::new_without_preload();
+    // Renderer shows loading screen and loads all assets including audio
+    let renderer = Renderer::new(&mut audio).await;
     let scaler = MobileScaler::new();
 
     // Native build with auth flow
@@ -272,6 +274,7 @@ async fn async_main() {
         audio.play_music("assets/audio/menu.ogg").await;
 
         let mut login_screen = LoginScreen::new(SERVER_URL);
+        login_screen.use_renderer_font(renderer.font().clone());
         login_screen.load_font().await;
 
         enum WasmAppState {
@@ -307,6 +310,12 @@ async fn async_main() {
                         ScreenState::ToCharacterSelect(session) => {
                             audio.play_sfx("login_success");
                             let mut char_screen = CharacterSelectScreen::new(session, SERVER_URL);
+                            char_screen.use_renderer_assets(
+                                renderer.font().clone(),
+                                renderer.player_sprites().clone(),
+                                renderer.hair_sprites().clone(),
+                                renderer.equipment_sprites().clone(),
+                            );
                             char_screen.load_font().await;
                             app_state = WasmAppState::CharacterSelect(char_screen);
                         }
@@ -361,11 +370,17 @@ async fn async_main() {
                         }
                         ScreenState::ToCharacterCreate(session) => {
                             let mut create_screen = CharacterCreateScreen::new(session, SERVER_URL);
+                            create_screen.use_renderer_assets(
+                                renderer.font().clone(),
+                                renderer.player_sprites().clone(),
+                                renderer.hair_sprites().clone(),
+                            );
                             create_screen.load_font().await;
                             app_state = WasmAppState::CharacterCreate(create_screen);
                         }
                         ScreenState::ToLogin => {
                             let mut login_screen = LoginScreen::new(SERVER_URL);
+                            login_screen.use_renderer_font(renderer.font().clone());
                             login_screen.load_font().await;
                             app_state = WasmAppState::Login(login_screen);
                         }
@@ -380,6 +395,12 @@ async fn async_main() {
                     match result {
                         ScreenState::ToCharacterSelect(session) => {
                             let mut char_screen = CharacterSelectScreen::new(session, SERVER_URL);
+                            char_screen.use_renderer_assets(
+                                renderer.font().clone(),
+                                renderer.player_sprites().clone(),
+                                renderer.hair_sprites().clone(),
+                                renderer.equipment_sprites().clone(),
+                            );
                             char_screen.load_font().await;
                             app_state = WasmAppState::CharacterSelect(char_screen);
                         }
@@ -442,6 +463,12 @@ async fn async_main() {
                                 log::error!("Matchmaking failed: {}", e);
                                 // Go back to character select with error message
                                 let mut char_screen = CharacterSelectScreen::new(session.clone(), SERVER_URL);
+                                char_screen.use_renderer_assets(
+                                    renderer.font().clone(),
+                                    renderer.player_sprites().clone(),
+                                    renderer.hair_sprites().clone(),
+                                    renderer.equipment_sprites().clone(),
+                                );
                                 char_screen.set_error(format!("{}", e));
                                 char_screen.load_font().await;
                                 app_state = WasmAppState::CharacterSelect(char_screen);
@@ -459,6 +486,7 @@ async fn async_main() {
                         audio.play_music("assets/audio/menu.ogg").await;
                         network.disconnect();
                         let mut login_screen = LoginScreen::new(SERVER_URL);
+                        login_screen.use_renderer_font(renderer.font().clone());
                         login_screen.load_font().await;
                         app_state = WasmAppState::Login(login_screen);
                     }

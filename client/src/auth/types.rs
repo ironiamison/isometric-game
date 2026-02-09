@@ -31,6 +31,7 @@ impl std::fmt::Display for AuthError {
 pub struct AuthSession {
     pub token: String,
     pub username: String,
+    pub characters: Vec<CharacterInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +64,7 @@ pub struct AuthResponse {
     pub success: bool,
     pub token: Option<String>,
     pub username: Option<String>,
+    pub characters: Option<Vec<CharacterInfo>>,
     pub error: Option<String>,
 }
 

@@ -11,6 +11,7 @@ use crate::util::asset_path;
 pub const FONT_SIZES: &[u16] = &[8, 10, 12, 16, 20, 24, 32];
 
 /// Multi-size bitmap font that provides pixel-perfect rendering
+#[derive(Clone)]
 pub struct BitmapFont {
     /// Fonts keyed by their native size
     fonts: HashMap<u16, Font>,
@@ -71,6 +72,11 @@ impl BitmapFont {
         }
 
         Self { fonts }
+    }
+
+    /// Check if no fonts are loaded
+    pub fn is_empty(&self) -> bool {
+        self.fonts.is_empty()
     }
 
     /// Get the closest available font size

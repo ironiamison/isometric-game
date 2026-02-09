@@ -235,6 +235,7 @@ impl AuthClient {
             Ok(AuthSession {
                 token: resp.token.unwrap_or_default(),
                 username: resp.username.unwrap_or_default(),
+                characters: resp.characters.unwrap_or_default(),
             })
         } else {
             let error = resp.error.unwrap_or_else(|| "Unknown error".to_string());
