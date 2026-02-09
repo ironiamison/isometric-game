@@ -146,6 +146,10 @@ pub enum ClientMessage {
     // Spell system commands
     #[serde(rename = "castSpell")]
     CastSpell { spell_id: String },
+
+    // Ping for latency measurement
+    #[serde(rename = "ping")]
+    Ping { timestamp: f64 },
 }
 
 impl ClientMessage {
@@ -344,6 +348,10 @@ impl ClientMessage {
             ClientMessage::CastSpell { spell_id } => {
                 data.insert("spell_id".into(), Value::String(spell_id.clone().into()));
                 "castSpell"
+            }
+            ClientMessage::Ping { timestamp } => {
+                data.insert("timestamp".into(), Value::F64(*timestamp));
+                "ping"
             }
         };
 

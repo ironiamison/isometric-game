@@ -2437,6 +2437,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "pong" => {
+            // Handle ping response - calculate and display latency
+            if let Some(sent_at) = state.ping_sent_at.take() {
+                let now = macroquad::time::get_time();
+                let latency_ms = ((now - sent_at) * 1000.0).round() as i32;
+                state.ui_state.chat_messages.push(
+                    ChatMessage::system(format!("Ping: {}ms", latency_ms))
+                );
+            }
+        }
+
         _ => {
             log::debug!("Unhandled message type: {}", msg_type);
         }

@@ -1127,6 +1127,9 @@ pub struct GameState {
     pub max_prayer_points: i32,
     /// Currently active prayers (by prayer ID)
     pub active_prayers: Vec<String>,
+
+    /// Timestamp when last ping was sent (for latency measurement)
+    pub ping_sent_at: Option<f64>,
 }
 
 impl GameState {
@@ -1198,6 +1201,7 @@ impl GameState {
             prayer_points: 0,
             max_prayer_points: 1,
             active_prayers: Vec::new(),
+            ping_sent_at: None,
         }
     }
 

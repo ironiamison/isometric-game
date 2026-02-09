@@ -2502,6 +2502,10 @@ async fn handle_client_message(
         }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
+        // Ping/Pong for latency measurement
+        ClientMessage::Ping { timestamp } => {
+            room.send_to_player(player_id, ServerMessage::Pong { timestamp }).await;
+        }
     }
 
     Ok(())

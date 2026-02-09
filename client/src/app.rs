@@ -218,7 +218,16 @@ pub fn run_game_frame(
             },
             InputCommand::Target { entity_id } => ClientMessage::Target { entity_id: entity_id.clone() },
             InputCommand::ClearTarget => ClientMessage::Target { entity_id: String::new() },
-            InputCommand::Chat { text } => ClientMessage::Chat { text: text.clone() },
+            InputCommand::Chat { text } => {
+                // Handle /ping command
+                if text.trim().eq_ignore_ascii_case("/ping") {
+                    let timestamp = get_time();
+                    game_state.ping_sent_at = Some(timestamp);
+                    ClientMessage::Ping { timestamp }
+                } else {
+                    ClientMessage::Chat { text: text.clone() }
+                }
+            },
             InputCommand::Pickup { item_id } => ClientMessage::Pickup { item_id: item_id.clone() },
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem { slot_index: *slot_index as u32 },
             InputCommand::Interact { npc_id } => ClientMessage::Interact { npc_id: npc_id.clone() },

@@ -179,6 +179,12 @@ pub enum ClientMessage {
     /// Chop a tree once (player-initiated, one chop per attack)
     #[serde(rename = "chopTree")]
     ChopTree { tree_x: i32, tree_y: i32, tree_gid: u32 },
+
+    // ===== Utility Messages =====
+
+    /// Ping for latency measurement - server responds with pong
+    #[serde(rename = "ping")]
+    Ping { timestamp: f64 },
 }
 
 // ============================================================================
@@ -690,6 +696,10 @@ pub enum ServerMessage {
     DepletedTreesSync {
         trees: Vec<DepletedTreeData>,
     },
+    /// Response to ping for latency measurement
+    Pong {
+        timestamp: f64,
+    },
 }
 
 /// Farming patch data for client synchronization
@@ -989,6 +999,7 @@ impl ServerMessage {
             ServerMessage::TreeDepleted { .. } => "treeDepleted",
             ServerMessage::TreeRespawned { .. } => "treeRespawned",
             ServerMessage::DepletedTreesSync { .. } => "depletedTreesSync",
+            ServerMessage::Pong { .. } => "pong",
         }
     }
 }
@@ -2579,6 +2590,11 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("trees".into()), Value::Array(tree_values)));
             Value::Map(map)
         }
+        ServerMessage::Pong { timestamp } => {
+            let mut map = Vec::new();
+            map.push((Value::String("timestamp".into()), Value::F64(*timestamp)));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -2838,6 +2854,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let tree_gid = extract_i64(msg_data, "tree_gid").unwrap_or(0) as u32;
             Ok(ClientMessage::ChopTree { tree_x, tree_y, tree_gid })
         }
+        // Utility messages
+        "ping" => {
+            let timestamp = extract_f64(msg_data, "timestamp").unwrap_or(0.0);
+            Ok(ClientMessage::Ping { timestamp })
+        }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }
@@ -2851,6 +2872,14 @@ fn extract_string(value: &rmpv::Value, key: &str) -> Option<String> {
         map.iter()
             .find(|(k, _)| k.as_str() == Some(key))
             .and_then(|(_, v)| v.as_str().map(|s| s.to_string()))
+    })
+}
+
+fn extract_f64(value: &rmpv::Value, key: &str) -> Option<f64> {
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| v.as_f64())
     })
 }
 
