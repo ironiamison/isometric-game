@@ -8,6 +8,14 @@
 # - attack_bonus: Increases accuracy (hit chance)
 # - strength_bonus: Increases max hit (damage)
 # - defence_bonus: Reduces chance of being hit
+#
+# 4-Tier Balance System:
+# | Tier     | Level Req | Attack  | Strength | Defence |
+# |----------|-----------|---------|----------|---------|
+# | Starter  | 1-10      | +1-4    | +1-3     | +1-5    |
+# | Mid      | 20        | +6-12   | +4-8     | +6-12   |
+# | Late     | 40        | +14-20  | +10-15   | +14-22  |
+# | Endgame  | 60        | +22-30  | +16-22   | +24-35  |
 
 # =============================================================================
 # FEET (Defence requirement)
@@ -24,9 +32,9 @@ sellable = true
 [training_boots.equipment]
 slot_type = "feet"
 defence_level_required = 1
-attack_bonus = 1
+attack_bonus = 0
 strength_bonus = 1
-defence_bonus = 0
+defence_bonus = 1
 
 [rusty_boots]
 display_name = "Rusty Boots"
@@ -41,7 +49,7 @@ slot_type = "feet"
 defence_level_required = 5
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 3
+defence_bonus = 2
 
 [ancient_boots]
 display_name = "Ancient Boots"
@@ -70,7 +78,7 @@ slot_type = "feet"
 defence_level_required = 40
 attack_bonus = 0
 strength_bonus = 4
-defence_bonus = 10
+defence_bonus = 14
 
 [worn_sandals]
 display_name = "Worn Sandals"
@@ -104,7 +112,7 @@ slot_type = "body"
 defence_level_required = 1
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 5
+defence_bonus = 4
 
 [peasant_suit]
 display_name = "Peasant Suit"
@@ -146,9 +154,9 @@ base_price = 180
 [archery_armor.equipment]
 slot_type = "body"
 defence_level_required = 20
-attack_bonus = 8
+attack_bonus = 6
 strength_bonus = 0
-defence_bonus = 15
+defence_bonus = 8
 
 [rogue_garb]
 display_name = "Rogue Garb"
@@ -160,9 +168,9 @@ base_price = 200
 [rogue_garb.equipment]
 slot_type = "body"
 defence_level_required = 25
-attack_bonus = 5
-strength_bonus = 5
-defence_bonus = 12
+attack_bonus = 4
+strength_bonus = 4
+defence_bonus = 7
 
 [commander_armor]
 display_name = "Commander Armor"
@@ -175,8 +183,8 @@ base_price = 350
 slot_type = "body"
 defence_level_required = 40
 attack_bonus = 0
-strength_bonus = 8
-defence_bonus = 35
+strength_bonus = 10
+defence_bonus = 18
 
 [crusader_armor]
 display_name = "Crusader Armor"
@@ -190,7 +198,7 @@ slot_type = "body"
 defence_level_required = 50
 attack_bonus = 0
 strength_bonus = 12
-defence_bonus = 45
+defence_bonus = 20
 
 [oblon_armor]
 display_name = "Oblon Armor"
@@ -203,8 +211,8 @@ base_price = 420
 slot_type = "body"
 defence_level_required = 45
 attack_bonus = 0
-strength_bonus = 5
-defence_bonus = 40
+strength_bonus = 8
+defence_bonus = 16
 
 [undead_armor]
 display_name = "Undead Armor"
@@ -217,8 +225,8 @@ base_price = 600
 slot_type = "body"
 defence_level_required = 60
 attack_bonus = 0
-strength_bonus = 15
-defence_bonus = 55
+strength_bonus = 16
+defence_bonus = 28
 
 [admin_robes]
 display_name = "Admin Robes"
@@ -246,7 +254,7 @@ slot_type = "body"
 defence_level_required = 1
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 2
+defence_bonus = 1
 
 [hero_armor]
 display_name = "Hero's Armor"
@@ -258,9 +266,9 @@ base_price = 2500
 [hero_armor.equipment]
 slot_type = "body"
 defence_level_required = 70
-attack_bonus = 5
-strength_bonus = 25
-defence_bonus = 60
+attack_bonus = 4
+strength_bonus = 20
+defence_bonus = 32
 
 [sorcerer_robe]
 display_name = "Sorcerer's Robe"
@@ -272,9 +280,9 @@ base_price = 500
 [sorcerer_robe.equipment]
 slot_type = "body"
 defence_level_required = 30
-attack_bonus = 12
+attack_bonus = 8
 strength_bonus = 0
-defence_bonus = 18
+defence_bonus = 10
 
 [peasant_garb]
 display_name = "Peasant Garb"
@@ -302,7 +310,7 @@ slot_type = "body"
 defence_level_required = 50
 attack_bonus = -2
 strength_bonus = 10
-defence_bonus = 45
+defence_bonus = 22
 
 [torn_clothes]
 display_name = "Torn Clothes"
@@ -350,8 +358,8 @@ sellable = true
 [salvaged_sword.equipment]
 slot_type = "weapon"
 attack_level_required = 1
-attack_bonus = 6
-strength_bonus = 8
+attack_bonus = 3
+strength_bonus = 2
 defence_bonus = 0
 
 [goblin_spear]
@@ -365,8 +373,8 @@ sellable = true
 [goblin_spear.equipment]
 slot_type = "weapon"
 attack_level_required = 1
-attack_bonus = 5
-strength_bonus = 8
+attack_bonus = 2
+strength_bonus = 2
 defence_bonus = 0
 
 [goblin_axe]
@@ -380,8 +388,8 @@ sellable = true
 [goblin_axe.equipment]
 slot_type = "weapon"
 attack_level_required = 1
-attack_bonus = 4
-strength_bonus = 10
+attack_bonus = 2
+strength_bonus = 3
 defence_bonus = 0
 
 [hatchet]
@@ -395,8 +403,8 @@ sellable = true
 [hatchet.equipment]
 slot_type = "weapon"
 attack_level_required = 5
-attack_bonus = 6
-strength_bonus = 9
+attack_bonus = 3
+strength_bonus = 3
 defence_bonus = 0
 
 [machete]
@@ -410,8 +418,8 @@ sellable = true
 [machete.equipment]
 slot_type = "weapon"
 attack_level_required = 10
-attack_bonus = 12
-strength_bonus = 14
+attack_bonus = 4
+strength_bonus = 3
 defence_bonus = 0
 
 [battle_axe]
@@ -425,8 +433,8 @@ sellable = true
 [battle_axe.equipment]
 slot_type = "weapon"
 attack_level_required = 25
-attack_bonus = 20
-strength_bonus = 28
+attack_bonus = 10
+strength_bonus = 7
 defence_bonus = 0
 
 [twin_blade]
@@ -440,8 +448,8 @@ sellable = true
 [twin_blade.equipment]
 slot_type = "weapon"
 attack_level_required = 35
-attack_bonus = 35
-strength_bonus = 32
+attack_bonus = 14
+strength_bonus = 10
 defence_bonus = 0
 
 [great_axe]
@@ -455,8 +463,8 @@ sellable = true
 [great_axe.equipment]
 slot_type = "weapon"
 attack_level_required = 45
-attack_bonus = 40
-strength_bonus = 50
+attack_bonus = 18
+strength_bonus = 14
 defence_bonus = 0
 
 [death_blade]
@@ -470,8 +478,8 @@ sellable = true
 [death_blade.equipment]
 slot_type = "weapon"
 attack_level_required = 55
-attack_bonus = 55
-strength_bonus = 62
+attack_bonus = 22
+strength_bonus = 18
 defence_bonus = 0
 
 [steel_sword]
@@ -485,8 +493,8 @@ sellable = true
 [steel_sword.equipment]
 slot_type = "weapon"
 attack_level_required = 1
-attack_bonus = 5
-strength_bonus = 5
+attack_bonus = 3
+strength_bonus = 2
 defence_bonus = 0
 
 [chain]
@@ -500,8 +508,8 @@ sellable = true
 [chain.equipment]
 slot_type = "weapon"
 attack_level_required = 1
-attack_bonus = 2
-strength_bonus = 3
+attack_bonus = 1
+strength_bonus = 2
 defence_bonus = 0
 
 [rapier]
@@ -515,8 +523,8 @@ sellable = true
 [rapier.equipment]
 slot_type = "weapon"
 attack_level_required = 15
-attack_bonus = 18
-strength_bonus = 10
+attack_bonus = 6
+strength_bonus = 4
 defence_bonus = 0
 
 [gutter_blade]
@@ -530,8 +538,8 @@ sellable = true
 [gutter_blade.equipment]
 slot_type = "weapon"
 attack_level_required = 30
-attack_bonus = 15
-strength_bonus = 15
+attack_bonus = 12
+strength_bonus = 8
 defence_bonus = 0
 
 [long_bow]
@@ -547,8 +555,8 @@ slot_type = "weapon"
 weapon_type = "ranged"
 range = 8
 attack_level_required = 20
-attack_bonus = 25
-strength_bonus = 18
+attack_bonus = 8
+strength_bonus = 6
 defence_bonus = 0
 
 [dark_bow]
@@ -564,8 +572,8 @@ slot_type = "weapon"
 weapon_type = "ranged"
 range = 10
 attack_level_required = 50
-attack_bonus = 48
-strength_bonus = 55
+attack_bonus = 20
+strength_bonus = 14
 defence_bonus = 0
 
 [worn_pitchfork]
@@ -579,8 +587,8 @@ sellable = true
 [worn_pitchfork.equipment]
 slot_type = "weapon"
 attack_level_required = 1
-attack_bonus = 2
-strength_bonus = 3
+attack_bonus = 1
+strength_bonus = 1
 defence_bonus = 0
 
 # =============================================================================
@@ -613,8 +621,8 @@ sellable = true
 [silver_ring.equipment]
 slot_type = "ring"
 defence_level_required = 1
-attack_bonus = 2
-strength_bonus = 2
+attack_bonus = 1
+strength_bonus = 1
 defence_bonus = 0
 
 [ice_ring]
@@ -627,8 +635,8 @@ base_price = 280
 [ice_ring.equipment]
 slot_type = "ring"
 defence_level_required = 20
-attack_bonus = 4
-strength_bonus = 4
+attack_bonus = 2
+strength_bonus = 2
 defence_bonus = 2
 
 [great_silver_ring]
@@ -641,9 +649,9 @@ base_price = 300
 [great_silver_ring.equipment]
 slot_type = "ring"
 defence_level_required = 30
-attack_bonus = 4
-strength_bonus = 5
-defence_bonus = 4
+attack_bonus = 3
+strength_bonus = 3
+defence_bonus = 3
 
 [undead_ring]
 display_name = "Undead Ring"
@@ -655,8 +663,8 @@ base_price = 380
 [undead_ring.equipment]
 slot_type = "ring"
 defence_level_required = 35
-attack_bonus = 6
-strength_bonus = 8
+attack_bonus = 4
+strength_bonus = 4
 defence_bonus = 2
 
 [great_gold_ring]
@@ -669,8 +677,8 @@ base_price = 450
 [great_gold_ring.equipment]
 slot_type = "ring"
 defence_level_required = 40
-attack_bonus = 6
-strength_bonus = 8
+attack_bonus = 5
+strength_bonus = 5
 defence_bonus = 4
 
 [ring_of_life]
@@ -685,7 +693,7 @@ slot_type = "ring"
 defence_level_required = 50
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 15
+defence_bonus = 10
 
 # =============================================================================
 # NECKLACES (Defence requirement - provides bonuses)
@@ -703,7 +711,7 @@ slot_type = "necklace"
 defence_level_required = 30
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 10
+defence_bonus = 8
 
 [ice_necklace]
 display_name = "Ice Necklace"
@@ -715,8 +723,8 @@ base_price = 350
 [ice_necklace.equipment]
 slot_type = "necklace"
 defence_level_required = 35
-attack_bonus = 5
-strength_bonus = 6
+attack_bonus = 4
+strength_bonus = 4
 defence_bonus = 2
 
 [magic_necklace]
@@ -729,8 +737,8 @@ base_price = 400
 [magic_necklace.equipment]
 slot_type = "necklace"
 defence_level_required = 40
-attack_bonus = 8
-strength_bonus = 10
+attack_bonus = 6
+strength_bonus = 6
 defence_bonus = 0
 
 [mana_ring]
@@ -743,8 +751,8 @@ base_price = 220
 [mana_ring.equipment]
 slot_type = "necklace"
 defence_level_required = 20
-attack_bonus = 6
-strength_bonus = 6
+attack_bonus = 4
+strength_bonus = 4
 defence_bonus = 0
 
 # =============================================================================
@@ -794,7 +802,7 @@ slot_type = "belt"
 defence_level_required = 15
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 5
+defence_bonus = 4
 
 [runic_belt]
 display_name = "Runic Belt"
@@ -807,8 +815,8 @@ base_price = 250
 slot_type = "belt"
 defence_level_required = 25
 attack_bonus = 0
-strength_bonus = 4
-defence_bonus = 4
+strength_bonus = 3
+defence_bonus = 5
 
 # =============================================================================
 # GLOVES (Defence requirement)
@@ -826,7 +834,7 @@ sellable = true
 slot_type = "gloves"
 defence_level_required = 1
 attack_bonus = 0
-strength_bonus = 2
+strength_bonus = 1
 defence_bonus = 1
 
 [undead_gloves]
@@ -840,8 +848,8 @@ base_price = 400
 slot_type = "gloves"
 defence_level_required = 50
 attack_bonus = 0
-strength_bonus = 10
-defence_bonus = 15
+strength_bonus = 8
+defence_bonus = 10
 
 [death_gloves]
 display_name = "Death Gloves"
@@ -854,8 +862,8 @@ base_price = 800
 slot_type = "gloves"
 defence_level_required = 70
 attack_bonus = 0
-strength_bonus = 18
-defence_bonus = 10
+strength_bonus = 12
+defence_bonus = 8
 
 # =============================================================================
 # HEAD (Defence requirement)
@@ -902,9 +910,9 @@ sellable = true
 [helmet_of_darkness.equipment]
 slot_type = "head"
 defence_level_required = 40
-attack_bonus = 5
-strength_bonus = 8
-defence_bonus = 15
+attack_bonus = 4
+strength_bonus = 6
+defence_bonus = 14
 
 [shades]
 display_name = "Shades"
@@ -919,7 +927,7 @@ slot_type = "head"
 defence_level_required = 1
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 1
+defence_bonus = 0
 
 
 # =============================================================================
@@ -969,7 +977,7 @@ slot_type = "back"
 defence_level_required = 30
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 25
+defence_bonus = 12
 
 # =============================================================================
 # SCAVENGER SET (Craftable early-game gear)
@@ -1017,8 +1025,8 @@ sellable = true
 slot_type = "feet"
 defence_level_required = 20
 attack_bonus = 0
-strength_bonus = 3
-defence_bonus = 3
+strength_bonus = 2
+defence_bonus = 6
 
 [bone_ring]
 display_name = "Bone Ring"
@@ -1048,7 +1056,7 @@ slot_type = "necklace"
 defence_level_required = 1
 attack_bonus = 0
 strength_bonus = 0
-defence_bonus = 3
+defence_bonus = 2
 
 [spine_blade]
 display_name = "Spine Blade"
@@ -1061,8 +1069,8 @@ sellable = true
 [spine_blade.equipment]
 slot_type = "weapon"
 attack_level_required = 1
-attack_bonus = 4
-strength_bonus = 6
+attack_bonus = 2
+strength_bonus = 2
 defence_bonus = 0
 
 [scavenger_bow]
@@ -1078,8 +1086,8 @@ slot_type = "weapon"
 weapon_type = "ranged"
 range = 6
 attack_level_required = 1
-attack_bonus = 8
-strength_bonus = 5
+attack_bonus = 3
+strength_bonus = 2
 defence_bonus = 0
 
 # =============================================================================
@@ -1097,8 +1105,8 @@ sellable = true
 [bronze_axe.equipment]
 slot_type = "weapon"
 woodcutting_level_required = 1
-attack_bonus = 2
-strength_bonus = 3
+attack_bonus = 1
+strength_bonus = 1
 defence_bonus = 0
 chop_speed_multiplier = 1.0
 
@@ -1113,8 +1121,8 @@ sellable = true
 [iron_axe.equipment]
 slot_type = "weapon"
 woodcutting_level_required = 6
-attack_bonus = 4
-strength_bonus = 5
+attack_bonus = 2
+strength_bonus = 2
 defence_bonus = 0
 chop_speed_multiplier = 1.2
 
@@ -1129,8 +1137,8 @@ sellable = true
 [steel_axe.equipment]
 slot_type = "weapon"
 woodcutting_level_required = 11
-attack_bonus = 6
-strength_bonus = 7
+attack_bonus = 3
+strength_bonus = 2
 defence_bonus = 0
 chop_speed_multiplier = 1.4
 
@@ -1145,8 +1153,8 @@ sellable = true
 [mithril_axe.equipment]
 slot_type = "weapon"
 woodcutting_level_required = 21
-attack_bonus = 8
-strength_bonus = 9
+attack_bonus = 6
+strength_bonus = 4
 defence_bonus = 0
 chop_speed_multiplier = 1.6
 
@@ -1161,8 +1169,8 @@ sellable = true
 [adamant_axe.equipment]
 slot_type = "weapon"
 woodcutting_level_required = 31
-attack_bonus = 10
-strength_bonus = 11
+attack_bonus = 8
+strength_bonus = 6
 defence_bonus = 0
 chop_speed_multiplier = 1.8
 
@@ -1177,7 +1185,7 @@ sellable = true
 [rune_axe.equipment]
 slot_type = "weapon"
 woodcutting_level_required = 41
-attack_bonus = 12
-strength_bonus = 13
+attack_bonus = 10
+strength_bonus = 8
 defence_bonus = 0
 chop_speed_multiplier = 2.0
