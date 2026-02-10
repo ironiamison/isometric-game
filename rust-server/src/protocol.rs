@@ -599,6 +599,7 @@ pub enum ServerMessage {
     /// Send all farming patch states (on connect/area load)
     FarmingPatchStates {
         patches: Vec<FarmingPatchData>,
+        unlocked_plots: Vec<u32>,
     },
     /// Update a single farming patch state
     PatchStateUpdate {
@@ -2507,7 +2508,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("direction".into()), Value::Integer((*direction as i64).into())));
             Value::Map(map)
         }
-        ServerMessage::FarmingPatchStates { patches } => {
+        ServerMessage::FarmingPatchStates { patches, unlocked_plots } => {
             let mut map = Vec::new();
             let patch_values: Vec<Value> = patches.iter().map(|p| {
                 let mut pmap = Vec::new();
@@ -2521,6 +2522,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::Map(pmap)
             }).collect();
             map.push((Value::String("patches".into()), Value::Array(patch_values)));
+            let plot_values: Vec<Value> = unlocked_plots.iter()
+                .map(|p| Value::Integer((*p as i64).into()))
+                .collect();
+            map.push((Value::String("unlocked_plots".into()), Value::Array(plot_values)));
             Value::Map(map)
         }
         ServerMessage::PatchStateUpdate { patch_id, state, crop_id, growth_stage, owner_id } => {

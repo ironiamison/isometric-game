@@ -6098,7 +6098,8 @@ impl GameRoom {
                 owner_id: u.owner_id,
             }
         }).collect();
-        ServerMessage::FarmingPatchStates { patches }
+        let unlocked_plots = farming.get_unlocked_plots(player_id);
+        ServerMessage::FarmingPatchStates { patches, unlocked_plots }
     }
 
     pub async fn tick(&self) {
