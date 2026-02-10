@@ -5,7 +5,7 @@ use tracing_subscriber::Layer;
 
 const MAX_LOG_ENTRIES: usize = 1000;
 const MAX_IMPORTANT_LOG_ENTRIES: usize = 10_000;
-const IMPORTANT_KEYWORDS: [&str; 10] = [
+const IMPORTANT_KEYWORDS: [&str; 11] = [
     "slow tick",
     "tick loop overrun",
     "slow auto-save cycle",
@@ -16,6 +16,7 @@ const IMPORTANT_KEYWORDS: [&str; 10] = [
     "timeout",
     "backpressure",
     "lag",
+    "[perf]",
 ];
 
 #[derive(Clone, serde::Serialize)]

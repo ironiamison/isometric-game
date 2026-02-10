@@ -6153,12 +6153,12 @@ impl GameRoom {
             text: "Ah, welcome! I've been tending these fields for decades. What can I help you with?".to_string(),
             choices: vec![
                 crate::protocol::DialogueChoice {
-                    id: "buy_plots".to_string(),
-                    text: "Buy allotment plot".to_string(),
-                },
-                crate::protocol::DialogueChoice {
                     id: "contracts".to_string(),
                     text: "Farming contracts".to_string(),
+                },
+                crate::protocol::DialogueChoice {
+                    id: "buy_plots".to_string(),
+                    text: "Buy allotment plot".to_string(),
                 },
                 crate::protocol::DialogueChoice {
                     id: "close".to_string(),

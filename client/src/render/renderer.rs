@@ -1667,7 +1667,6 @@ impl Renderer {
 
         // 6. Render floating level up text
         self.render_level_up_events(state);
-        self.render_firework_particles(state);
 
         // 7. Render chat bubbles above players
         self.render_chat_bubbles(state);
@@ -1774,38 +1773,6 @@ impl Renderer {
 
             let base_color = Color::new(1.0, 1.0, 0.0, alpha);
             self.draw_text_sharp(&text, draw_x, final_y, FONT_SIZE, base_color);
-        }
-    }
-
-    fn render_firework_particles(&self, state: &GameState) {
-        let current_time = macroquad::time::get_time();
-        let zoom = state.camera.zoom;
-
-        for p in &state.firework_particles {
-            let age = (current_time - p.time) as f32;
-            let max_age = if p.is_spark { 0.5 } else { 1.0 };
-            if age > max_age {
-                continue;
-            }
-
-            // Use the particle's stored origin (position of the player who leveled up)
-            let (origin_x, origin_y) = world_to_screen(p.origin_x, p.origin_y, &state.camera);
-            let base_y = origin_y - 10.0;
-
-            // Draw trail
-            let trail_len = p.trail.len();
-            for (i, &(tx, ty)) in p.trail.iter().enumerate() {
-                let t = (i + 1) as f32 / (trail_len + 1) as f32;
-                let trail_alpha = (t * 150.0 * (1.0 - age / max_age)) as u8;
-                let trail_size = p.size * t * 0.6 * zoom;
-                let c = Color::from_rgba(p.color.0, p.color.1, p.color.2, trail_alpha);
-                draw_circle(origin_x + tx, base_y + ty, trail_size, c);
-            }
-
-            // Draw head
-            let alpha = ((1.0 - age / max_age) * 255.0) as u8;
-            let color = Color::from_rgba(p.color.0, p.color.1, p.color.2, alpha);
-            draw_circle(origin_x + p.ox, base_y + p.oy, p.size * zoom, color);
         }
     }
 

@@ -49,6 +49,7 @@ mod skills;
 mod spell;
 mod tilemap;
 mod log_buffer;
+mod perf_metrics;
 mod woodcutting;
 mod world;
 
@@ -109,6 +110,8 @@ struct AppState {
     online_characters: Arc<DashSet<i64>>,
     /// In-memory log buffer for /api/logs endpoint
     log_buffer: log_buffer::LogBuffer,
+    /// In-memory rolling performance metrics for /api/perf endpoint
+    perf_metrics: perf_metrics::PerfMetrics,
 }
 
 impl AppState {
@@ -207,6 +210,7 @@ impl AppState {
             play_time_anchors: Arc::new(DashMap::new()),
             online_characters: Arc::new(DashSet::new()),
             log_buffer,
+            perf_metrics: perf_metrics::PerfMetrics::new(),
         }
     }
 
@@ -1317,6 +1321,12 @@ struct LogsQuery {
     important: Option<bool>,
 }
 
+#[derive(Deserialize)]
+struct PerfQuery {
+    rooms: Option<usize>,
+    spikes: Option<usize>,
+}
+
 async fn api_logs(
     State(state): State<AppState>,
     Query(params): Query<LogsQuery>,
@@ -1339,6 +1349,15 @@ async fn api_logs(
     };
 
     Json(entries)
+}
+
+async fn api_perf(
+    State(state): State<AppState>,
+    Query(params): Query<PerfQuery>,
+) -> impl IntoResponse {
+    let top_rooms = params.rooms.unwrap_or(10).clamp(1, 50);
+    let recent_spikes = params.spikes.unwrap_or(50).min(200);
+    Json(state.perf_metrics.snapshot(top_rooms, recent_spikes))
 }
 
 async fn logs_page() -> impl IntoResponse {
@@ -1621,6 +1640,7 @@ async fn handle_socket(
 
     // Spawn task to forward messages to WebSocket
     let send_player_id = player_id.clone();
+    let send_perf = state.perf_metrics.clone();
     let mut send_task = tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -1631,9 +1651,10 @@ async fn handle_socket(
                     if sender.send(Message::Binary(msg)).await.is_err() {
                         break;
                     }
-                    let send_ms = send_start.elapsed().as_millis();
-                    if send_ms > 50 {
-                        tracing::warn!("Slow WS send (unicast): {}ms, {}B for {}", send_ms, msg_len, send_player_id);
+                    let send_ms = send_start.elapsed().as_secs_f64() * 1000.0;
+                    send_perf.record_ws_send("unicast", send_ms, msg_len);
+                    if send_ms > 50.0 {
+                        tracing::warn!("Slow WS send (unicast): {:.2}ms, {}B for {}", send_ms, msg_len, send_player_id);
                     }
                 }
                 // Handle broadcast messages (pre-encoded bytes)
@@ -1643,9 +1664,10 @@ async fn handle_socket(
                     if sender.send(Message::Binary(bytes)).await.is_err() {
                         break;
                     }
-                    let send_ms = send_start.elapsed().as_millis();
-                    if send_ms > 50 {
-                        tracing::warn!("Slow WS send (broadcast): {}ms, {}B for {}", send_ms, msg_len, send_player_id);
+                    let send_ms = send_start.elapsed().as_secs_f64() * 1000.0;
+                    send_perf.record_ws_send("broadcast", send_ms, msg_len);
+                    if send_ms > 50.0 {
+                        tracing::warn!("Slow WS send (broadcast): {:.2}ms, {}B for {}", send_ms, msg_len, send_player_id);
                     }
                 }
                 else => break,
@@ -2603,8 +2625,10 @@ async fn handle_client_message(
     }
 
     let handler_duration = handler_start.elapsed();
+    let handler_ms = handler_duration.as_secs_f64() * 1000.0;
+    state.perf_metrics.record_handler(msg_name, handler_ms);
     if handler_duration.as_millis() > 20 {
-        tracing::warn!("Slow handler: {} took {}ms for player {}", msg_name, handler_duration.as_millis(), player_id);
+        tracing::warn!("Slow handler: {} took {:.2}ms for player {}", msg_name, handler_ms, player_id);
     }
 
     Ok(())
@@ -2643,11 +2667,15 @@ async fn main() {
             let loop_start = std::time::Instant::now();
             let room_count = tick_state.rooms.len();
             for room in tick_state.rooms.iter() {
+                let room_start = std::time::Instant::now();
                 room.tick().await;
+                let room_ms = room_start.elapsed().as_secs_f64() * 1000.0;
+                tick_state.perf_metrics.record_room_tick(&room.name, room_ms);
             }
-            let loop_ms = loop_start.elapsed().as_millis();
-            if loop_ms > 50 {
-                warn!("Tick loop overrun: {}ms across {} room(s)", loop_ms, room_count);
+            let loop_ms = loop_start.elapsed().as_secs_f64() * 1000.0;
+            tick_state.perf_metrics.record_tick_loop(loop_ms, room_count);
+            if loop_ms > 50.0 {
+                warn!("Tick loop overrun: {:.2}ms across {} room(s)", loop_ms, room_count);
             }
         }
     });
@@ -2775,6 +2803,13 @@ async fn main() {
             }
 
             let cycle_ms = cycle_start.elapsed().as_millis();
+            save_state.perf_metrics.record_autosave(
+                snapshot_phase_ms,
+                write_phase_ms,
+                cycle_ms,
+                room_players.len(),
+                snapshot_count,
+            );
             if cycle_ms > 250 {
                 warn!(
                     "Slow auto-save cycle: {}ms (rooms={}, snapshots={}, snapshot_phase={}ms, write_phase={}ms)",
@@ -2785,6 +2820,37 @@ async fn main() {
                     write_phase_ms,
                 );
             }
+        }
+    });
+
+    // Spawn periodic perf summary logs
+    let perf_state = state.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            let perf = perf_state.perf_metrics.snapshot(3, 0);
+            info!(
+                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
+                perf.uptime_seconds,
+                perf.tick_loop_ms.p95_ms,
+                perf.tick_loop_ms.p99_ms,
+                perf.tick_loop_ms.max_ms,
+                perf.room_tick_ms.p95_ms,
+                perf.room_tick_ms.p99_ms,
+                perf.room_tick_ms.max_ms,
+                perf.autosave_total_ms.p95_ms,
+                perf.autosave_total_ms.max_ms,
+                perf.handler_ms.p95_ms,
+                perf.handler_ms.max_ms,
+                perf.ws_send_ms.p95_ms,
+                perf.ws_send_ms.max_ms,
+                perf.counters.tick_loop_overruns,
+                perf.counters.slow_room_ticks,
+                perf.counters.slow_autosaves,
+                perf.counters.slow_handlers,
+                perf.counters.slow_ws_sends,
+            );
         }
     });
 
@@ -2808,6 +2874,7 @@ async fn main() {
         .route("/api/stats/online", get(stats_online))
         .route("/api/stats/leaderboard", get(stats_leaderboard))
         .route("/api/stats/items", get(stats_items))
+        .route("/api/perf", get(api_perf))
         // Server logs (admin)
         .route("/api/logs", get(api_logs))
         .route("/logs", get(logs_page))
