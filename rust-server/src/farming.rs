@@ -115,6 +115,107 @@ pub const PLOT_REQUIREMENTS: &[PlotRequirement] = &[
     PlotRequirement { plot_id: 4, farming_level: 45, gold_cost: 5000 },
 ];
 
+// ---------------------------------------------------------------------------
+// Farming contracts
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContractDifficulty {
+    Easy,
+    Medium,
+    Hard,
+}
+
+impl ContractDifficulty {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ContractDifficulty::Easy => "easy",
+            ContractDifficulty::Medium => "medium",
+            ContractDifficulty::Hard => "hard",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "easy" => Some(ContractDifficulty::Easy),
+            "medium" => Some(ContractDifficulty::Medium),
+            "hard" => Some(ContractDifficulty::Hard),
+            _ => None,
+        }
+    }
+
+    pub fn level_required(&self) -> i32 {
+        match self {
+            ContractDifficulty::Easy => 1,
+            ContractDifficulty::Medium => 15,
+            ContractDifficulty::Hard => 30,
+        }
+    }
+
+    pub fn harvest_range(&self) -> (i32, i32) {
+        match self {
+            ContractDifficulty::Easy => (3, 5),
+            ContractDifficulty::Medium => (6, 10),
+            ContractDifficulty::Hard => (12, 18),
+        }
+    }
+
+    pub fn xp_reward(&self) -> i64 {
+        match self {
+            ContractDifficulty::Easy => 150,
+            ContractDifficulty::Medium => 500,
+            ContractDifficulty::Hard => 1200,
+        }
+    }
+
+    pub fn gold_reward(&self) -> i32 {
+        match self {
+            ContractDifficulty::Easy => 100,
+            ContractDifficulty::Medium => 350,
+            ContractDifficulty::Hard => 800,
+        }
+    }
+
+    pub fn seed_reward_count(&self) -> i32 {
+        match self {
+            ContractDifficulty::Easy => 1,
+            ContractDifficulty::Medium => 2,
+            ContractDifficulty::Hard => 3,
+        }
+    }
+
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            ContractDifficulty::Easy => "Easy",
+            ContractDifficulty::Medium => "Medium",
+            ContractDifficulty::Hard => "Hard",
+        }
+    }
+}
+
+/// An active farming contract for a player
+#[derive(Debug, Clone)]
+pub struct FarmingContract {
+    pub player_id: String,
+    pub difficulty: ContractDifficulty,
+    pub crop_id: String,
+    pub amount_required: i32,
+    pub amount_harvested: i32,
+    pub created_at: u64,
+}
+
+impl FarmingContract {
+    pub fn is_complete(&self) -> bool {
+        self.amount_harvested >= self.amount_required
+    }
+
+    pub fn produce_item(&self, crops: &HashMap<String, CropConfig>) -> String {
+        crops.get(&self.crop_id)
+            .map(|c| c.produce_item.clone())
+            .unwrap_or_else(|| self.crop_id.clone())
+    }
+}
+
 /// Info about a patch state update to send to clients
 #[derive(Debug, Clone)]
 pub struct PatchUpdate {
@@ -136,6 +237,8 @@ pub struct FarmingSystem {
     pub player_states: HashMap<(String, String), PlayerPatchState>,
     /// Per-player plot unlocks: player_id -> set of unlocked plot IDs
     pub player_plot_unlocks: HashMap<String, HashSet<u32>>,
+    /// Active farming contracts: player_id -> contract
+    pub contracts: HashMap<String, FarmingContract>,
 }
 
 impl FarmingSystem {
@@ -146,6 +249,7 @@ impl FarmingSystem {
             patch_positions: HashMap::new(),
             player_states: HashMap::new(),
             player_plot_unlocks: HashMap::new(),
+            contracts: HashMap::new(),
         }
     }
 
@@ -402,5 +506,94 @@ impl FarmingSystem {
         }
 
         updates
+    }
+
+    /// Generate a new farming contract for a player
+    pub fn generate_contract(
+        &mut self,
+        player_id: &str,
+        difficulty: &ContractDifficulty,
+        farming_level: i32,
+        current_time: u64,
+    ) -> Result<&FarmingContract, String> {
+        if self.contracts.contains_key(player_id) {
+            return Err("You already have an active contract".to_string());
+        }
+
+        if farming_level < difficulty.level_required() {
+            return Err(format!("You need Farming level {} for {} contracts",
+                difficulty.level_required(), difficulty.display_name()));
+        }
+
+        let eligible_crops: Vec<(&str, &CropConfig)> = self.crops.iter()
+            .filter(|(_, c)| c.level_required <= farming_level)
+            .map(|(id, c)| (id.as_str(), c))
+            .collect();
+
+        if eligible_crops.is_empty() {
+            return Err("No crops available for your level".to_string());
+        }
+
+        let mut rng = rand::thread_rng();
+        let (crop_id, _) = eligible_crops[rng.gen_range(0..eligible_crops.len())];
+        let (min, max) = difficulty.harvest_range();
+        let amount = rng.gen_range(min..=max);
+
+        let contract = FarmingContract {
+            player_id: player_id.to_string(),
+            difficulty: difficulty.clone(),
+            crop_id: crop_id.to_string(),
+            amount_required: amount,
+            amount_harvested: 0,
+            created_at: current_time,
+        };
+
+        self.contracts.insert(player_id.to_string(), contract);
+        Ok(self.contracts.get(player_id).unwrap())
+    }
+
+    /// Record a harvest toward a player's active contract
+    pub fn record_contract_harvest(&mut self, player_id: &str, crop_id: &str, amount: i32) -> Option<(i32, i32, bool)> {
+        let contract = self.contracts.get_mut(player_id)?;
+        if contract.crop_id != crop_id || contract.is_complete() {
+            return None;
+        }
+        contract.amount_harvested = (contract.amount_harvested + amount).min(contract.amount_required);
+        let complete = contract.is_complete();
+        Some((contract.amount_harvested, contract.amount_required, complete))
+    }
+
+    /// Get a player's active contract
+    pub fn get_contract(&self, player_id: &str) -> Option<&FarmingContract> {
+        self.contracts.get(player_id)
+    }
+
+    /// Remove a player's contract (on completion or abandonment)
+    pub fn remove_contract(&mut self, player_id: &str) -> Option<FarmingContract> {
+        self.contracts.remove(player_id)
+    }
+
+    /// Restore a contract from database
+    pub fn restore_contract(&mut self, player_id: &str, difficulty: &str, crop_id: &str, amount_required: i32, amount_harvested: i32, created_at: u64) {
+        if let Some(diff) = ContractDifficulty::from_str(difficulty) {
+            self.contracts.insert(player_id.to_string(), FarmingContract {
+                player_id: player_id.to_string(),
+                difficulty: diff,
+                crop_id: crop_id.to_string(),
+                amount_required,
+                amount_harvested,
+                created_at,
+            });
+        }
+    }
+
+    /// Pick a random seed item appropriate for the player's level
+    pub fn random_seed_for_level(&self, farming_level: i32) -> Option<String> {
+        let eligible: Vec<&CropConfig> = self.crops.values()
+            .filter(|c| c.level_required <= farming_level)
+            .collect();
+        if eligible.is_empty() { return None; }
+        let mut rng = rand::thread_rng();
+        Some(eligible[rng.gen_range(0..eligible.len())].seed_item.clone())
     }
 }
