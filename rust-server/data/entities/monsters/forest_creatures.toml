@@ -13,7 +13,7 @@ description = "A gelatinous blob that oozes through the forest."
 [slime.stats]
 level = 1
 max_hp = 12
-damage = 2
+damage = 1
 attack_bonus = 0
 defence_bonus = 0
 attack_range = 1

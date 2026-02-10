@@ -125,7 +125,7 @@ description = "A gelatinous blob that oozes through the forest."
 [slime_blue.stats]
 level = 1
 max_hp = 12
-damage = 2
+damage = 1
 attack_bonus = 0
 defence_bonus = 0
 attack_range = 1
@@ -168,7 +168,7 @@ description = "A gelatinous blob that oozes through the forest."
 [slime_green.stats]
 level = 1
 max_hp = 12
-damage = 2
+damage = 1
 attack_bonus = 0
 defence_bonus = 0
 attack_range = 1
@@ -211,7 +211,7 @@ description = "A gelatinous blob that oozes through the forest."
 [slime_pink.stats]
 level = 1
 max_hp = 12
-damage = 2
+damage = 1
 attack_bonus = 0
 defence_bonus = 0
 attack_range = 1

@@ -263,6 +263,11 @@ impl Renderer {
         };
         let progress_text = format!("{} {}/{} harvested", check, contract.amount_harvested, contract.amount_required);
         self.draw_text_sharp(&progress_text, tracker_x + 10.0, y, 16.0, status_color);
+
+        if complete {
+            y += line_height - 2.0;
+            self.draw_text_sharp("[ ] Return to Master Farmer", tracker_x + 10.0, y, 16.0, Color::from_rgba(200, 200, 200, 255));
+        }
     }
 
     pub(crate) fn render_quest_completed(&self, state: &GameState) {

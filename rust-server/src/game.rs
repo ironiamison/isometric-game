@@ -3338,30 +3338,7 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_plot_seller {
-            let npc_name = self.entity_registry.get(&entity_type)
-                .map(|p| p.display_name.clone())
-                .unwrap_or_else(|| "Master Farmer".to_string());
-
-            self.send_to_player(player_id, ServerMessage::ShowDialogue {
-                quest_id: format!("plot_seller:{}", npc_id),
-                npc_id: npc_id.to_string(),
-                speaker: npc_name,
-                text: "Ah, welcome! I've been tending these fields for decades. What can I help you with?".to_string(),
-                choices: vec![
-                    crate::protocol::DialogueChoice {
-                        id: "buy_plots".to_string(),
-                        text: "Buy allotment plot".to_string(),
-                    },
-                    crate::protocol::DialogueChoice {
-                        id: "contracts".to_string(),
-                        text: "Farming contracts".to_string(),
-                    },
-                    crate::protocol::DialogueChoice {
-                        id: "nevermind".to_string(),
-                        text: "Nevermind".to_string(),
-                    },
-                ],
-            }).await;
+            self.show_master_farmer_dialogue(player_id, &npc_id).await;
             return;
         }
 
@@ -3696,8 +3673,11 @@ impl GameRoom {
                 if let Ok(plot_id) = plot_str.parse::<u32>() {
                     self.handle_plot_purchase(player_id, plot_id).await;
                 }
+            } else if choice_id == "nevermind" {
+                // Go back to main master farmer dialogue
+                self.show_master_farmer_dialogue(player_id, npc_id).await;
             } else {
-                // "owned_N", "locked_N", "nevermind" all just close
+                // "close", "owned_N", "locked_N" just close
                 self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
             }
             return;
@@ -6103,6 +6083,39 @@ impl GameRoom {
         }).await;
     }
 
+    /// Show the main master farmer dialogue menu
+    async fn show_master_farmer_dialogue(&self, player_id: &str, npc_id: &str) {
+        let npc_name = {
+            let npcs = self.npcs.read().await;
+            npcs.get(npc_id)
+                .map(|n| self.entity_registry.get(&n.prototype_id)
+                    .map(|p| p.display_name.clone())
+                    .unwrap_or_else(|| "Master Farmer".to_string()))
+                .unwrap_or_else(|| "Master Farmer".to_string())
+        };
+
+        self.send_to_player(player_id, ServerMessage::ShowDialogue {
+            quest_id: format!("plot_seller:{}", npc_id),
+            npc_id: npc_id.to_string(),
+            speaker: npc_name,
+            text: "Ah, welcome! I've been tending these fields for decades. What can I help you with?".to_string(),
+            choices: vec![
+                crate::protocol::DialogueChoice {
+                    id: "buy_plots".to_string(),
+                    text: "Buy allotment plot".to_string(),
+                },
+                crate::protocol::DialogueChoice {
+                    id: "contracts".to_string(),
+                    text: "Farming contracts".to_string(),
+                },
+                crate::protocol::DialogueChoice {
+                    id: "close".to_string(),
+                    text: "Nevermind".to_string(),
+                },
+            ],
+        }).await;
+    }
+
     /// Show the farming contract dialogue
     async fn show_contract_dialogue(&self, player_id: &str, npc_id: &str) {
         let npc_name = {
@@ -6540,10 +6553,10 @@ impl GameRoom {
         ServerMessage::FarmingPatchStates { patches, unlocked_plots, tile_overrides }
     }
 
-    /// Send farming contract state to a player (active contract or cleared)
-    pub async fn send_farming_contract_update(&self, player_id: &str) {
+    /// Build farming contract state message for a player
+    pub async fn get_farming_contract_message(&self, player_id: &str) -> ServerMessage {
         let farming = self.farming.read().await;
-        let msg = match farming.get_contract(player_id) {
+        match farming.get_contract(player_id) {
             Some(contract) => {
                 let crop_name = farming.crops.get(&contract.crop_id)
                     .map(|c| c.produce_item.clone())
@@ -6563,8 +6576,12 @@ impl GameRoom {
                 amount_required: 0,
                 amount_harvested: 0,
             },
-        };
-        drop(farming);
+        }
+    }
+
+    /// Send farming contract state to a player (active contract or cleared)
+    pub async fn send_farming_contract_update(&self, player_id: &str) {
+        let msg = self.get_farming_contract_message(player_id).await;
         self.send_to_player(player_id, msg).await;
     }
 

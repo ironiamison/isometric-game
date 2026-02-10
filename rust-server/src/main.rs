@@ -1472,7 +1472,10 @@ async fn handle_socket(
     }
 
     // Send farming contract state
-    room.send_farming_contract_update(&player_id).await;
+    let contract_msg = room.get_farming_contract_message(&player_id).await;
+    if let Ok(bytes) = protocol::encode_server_message(&contract_msg) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
 
     // Send chair positions
     let chair_positions = room.get_chair_positions_message().await;
