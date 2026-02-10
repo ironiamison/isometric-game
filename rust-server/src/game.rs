@@ -763,6 +763,24 @@ impl GameRoom {
             }
         }
 
+        // Load plot unlocks from database
+        if let Some(ref db) = db {
+            match db.load_plot_unlocks().await {
+                Ok(unlocks) => {
+                    let count = unlocks.len();
+                    for (player_id, plot_id) in &unlocks {
+                        farming.restore_plot_unlock(player_id, *plot_id);
+                    }
+                    if count > 0 {
+                        tracing::info!("Restored {} farming plot unlocks from database", count);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load farming plot unlocks from database: {}", e);
+                }
+            }
+        }
+
         // Load chair config
         let mut chair_gids: HashMap<u32, Direction> = HashMap::new();
         match std::fs::read_to_string("data/chairs.toml") {
@@ -3296,6 +3314,70 @@ impl GameRoom {
             return;
         }
 
+        // Plot seller interaction - show plot purchase dialogue
+        let is_plot_seller = self.entity_registry.get(&entity_type)
+            .map(|p| p.behaviors.plot_seller)
+            .unwrap_or(false);
+
+        if is_plot_seller {
+            let npc_name = self.entity_registry.get(&entity_type)
+                .map(|p| p.display_name.clone())
+                .unwrap_or_else(|| "Master Farmer".to_string());
+
+            // Get player's farming level and gold
+            let (farming_level, gold) = {
+                let players = self.players.read().await;
+                match players.get(player_id) {
+                    Some(p) => (p.skills.farming.level, p.inventory.gold),
+                    None => return,
+                }
+            };
+
+            // Get player's unlocked plots
+            let farming = self.farming.read().await;
+            let unlocked = farming.get_unlocked_plots(player_id);
+
+            // Build dialogue choices
+            let mut choices = Vec::new();
+            for req in crate::farming::PLOT_REQUIREMENTS {
+                let owned = unlocked.contains(&req.plot_id);
+                if owned {
+                    choices.push(crate::protocol::DialogueChoice {
+                        id: format!("owned_{}", req.plot_id),
+                        text: format!("Plot {} (Owned)", req.plot_id),
+                    });
+                } else if farming_level < req.farming_level {
+                    choices.push(crate::protocol::DialogueChoice {
+                        id: format!("locked_{}", req.plot_id),
+                        text: format!("Plot {} (Requires Farming {})", req.plot_id, req.farming_level),
+                    });
+                } else {
+                    choices.push(crate::protocol::DialogueChoice {
+                        id: format!("unlock_{}", req.plot_id),
+                        text: format!("Unlock Plot {} - {}gp", req.plot_id, req.gold_cost),
+                    });
+                }
+            }
+            choices.push(crate::protocol::DialogueChoice {
+                id: "nevermind".to_string(),
+                text: "Nevermind".to_string(),
+            });
+
+            let text = format!(
+                "I manage the allotment plots around here.\n\nYour gold: {}gp\nFarming level: {}\n\nWould you like to unlock a new plot?",
+                gold, farming_level
+            );
+
+            self.send_to_player(player_id, ServerMessage::ShowDialogue {
+                quest_id: format!("plot_seller:{}", npc_id),
+                npc_id: npc_id.to_string(),
+                speaker: npc_name,
+                text,
+                choices,
+            }).await;
+            return;
+        }
+
         // Check entity prototype for behaviors
         let prototype = self.entity_registry.get(&entity_type);
 
@@ -3602,6 +3684,20 @@ impl GameRoom {
                 self.handle_pray_at_altar(player_id, altar_id).await;
             }
             // "close" choice just closes the dialogue (already sent DialogueClosed above)
+            return;
+        }
+
+        // Handle plot seller dialogue choices (format: "plot_seller:{npc_id}")
+        if let Some(_npc_id) = quest_id.strip_prefix("plot_seller:") {
+            self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+
+            // Parse the choice
+            if let Some(plot_str) = choice_id.strip_prefix("unlock_") {
+                if let Ok(plot_id) = plot_str.parse::<u32>() {
+                    self.handle_plot_purchase(player_id, plot_id).await;
+                }
+            }
+            // "owned_N", "locked_N", "nevermind" all just close
             return;
         }
 
@@ -5896,6 +5992,90 @@ impl GameRoom {
                 }).await;
             }
         }
+    }
+
+    /// Handle a player purchasing a farming plot
+    async fn handle_plot_purchase(&self, player_id: &str, plot_id: u32) {
+        // Find the plot requirement
+        let req = match crate::farming::PLOT_REQUIREMENTS.iter().find(|r| r.plot_id == plot_id) {
+            Some(r) => r,
+            None => {
+                self.send_system_message(player_id, "Invalid plot.").await;
+                return;
+            }
+        };
+
+        // Check not already unlocked
+        {
+            let farming = self.farming.read().await;
+            if farming.is_plot_unlocked(player_id, plot_id) {
+                self.send_system_message(player_id, "You already own this plot.").await;
+                return;
+            }
+        }
+
+        // Check farming level and gold
+        let (farming_level, gold) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => (p.skills.farming.level, p.inventory.gold),
+                None => return,
+            }
+        };
+
+        if farming_level < req.farming_level {
+            self.send_system_message(player_id,
+                &format!("You need Farming level {} to unlock this plot.", req.farming_level)
+            ).await;
+            return;
+        }
+
+        if gold < req.gold_cost {
+            self.send_system_message(player_id,
+                &format!("You need {}gp to unlock this plot. You have {}gp.", req.gold_cost, gold)
+            ).await;
+            return;
+        }
+
+        // Deduct gold
+        let inv_update = {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+            player.inventory.gold -= req.gold_cost;
+            (player.inventory.to_update(), player.inventory.gold)
+        };
+
+        // Send inventory update (gold changed)
+        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: inv_update.0,
+            gold: inv_update.1,
+        }).await;
+
+        // Unlock the plot
+        {
+            let mut farming = self.farming.write().await;
+            farming.unlock_plot(player_id, plot_id);
+        }
+
+        // Persist to database
+        if let Some(ref db) = self.db {
+            if let Err(e) = db.save_plot_unlock(player_id, plot_id).await {
+                tracing::error!("Failed to save plot unlock: {}", e);
+            }
+        }
+
+        // Send success message
+        self.send_system_message(player_id,
+            &format!("You've unlocked Plot {}! 16 new allotment patches are now available.", plot_id)
+        ).await;
+
+        // Send updated farming patches (now includes newly unlocked plot)
+        let patches_msg = self.get_farming_patches_message(player_id).await;
+        self.send_to_player(player_id, patches_msg).await;
     }
 
     /// Get farming patch states message for a specific connecting client
