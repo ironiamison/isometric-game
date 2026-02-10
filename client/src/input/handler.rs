@@ -2859,7 +2859,7 @@ impl InputHandler {
 
                             // Check if facing tile has a tree object and is not depleted
                             if !state.depleted_trees.contains_key(&(face_x, face_y)) {
-                                let obj_result = state.chunk_manager.get_object_at(face_x, face_y);
+                                let obj_result = state.chunk_manager.get_object_at_exact(face_x, face_y);
                                 if let Some(obj) = obj_result {
                                     log::info!("Found object at ({}, {}): gid={}", face_x, face_y, obj.gid);
                                     Some((face_x, face_y, obj.gid))

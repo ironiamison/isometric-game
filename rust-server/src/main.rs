@@ -1622,18 +1622,16 @@ async fn handle_socket(
                         tracing::warn!("Slow WS send (unicast): {}ms, {}B for {}", send_ms, msg_len, send_player_id);
                     }
                 }
-                // Handle broadcast messages
-                Ok(msg) = broadcast_rx.recv() => {
-                    if let Ok(bytes) = protocol::encode_server_message(&msg) {
-                        let send_start = std::time::Instant::now();
-                        let msg_len = bytes.len();
-                        if sender.send(Message::Binary(bytes)).await.is_err() {
-                            break;
-                        }
-                        let send_ms = send_start.elapsed().as_millis();
-                        if send_ms > 50 {
-                            tracing::warn!("Slow WS send (broadcast): {}ms, {}B for {}", send_ms, msg_len, send_player_id);
-                        }
+                // Handle broadcast messages (pre-encoded bytes)
+                Ok(bytes) = broadcast_rx.recv() => {
+                    let send_start = std::time::Instant::now();
+                    let msg_len = bytes.len();
+                    if sender.send(Message::Binary(bytes)).await.is_err() {
+                        break;
+                    }
+                    let send_ms = send_start.elapsed().as_millis();
+                    if send_ms > 50 {
+                        tracing::warn!("Slow WS send (broadcast): {}ms, {}B for {}", send_ms, msg_len, send_player_id);
                     }
                 }
                 else => break,
@@ -2643,41 +2641,46 @@ async fn main() {
         loop {
             interval.tick().await;
 
-            // Phase 1: Snapshot all player data quickly (holds locks briefly)
+            // Phase 1: Collect valid sessions and batch-snapshot data per room
             let mut snapshots = Vec::new();
+
+            // Group sessions by room for batch snapshotting
+            let mut room_players: std::collections::HashMap<String, Vec<(i64, String, String)>> = std::collections::HashMap::new();
             for session in save_state.sessions.iter() {
                 let session_data = session.value().clone();
-                let character_id = session_data.character_id;
-                let character_name = session_data.character_name.clone();
-
                 if !save_state.auth_sessions.contains_key(&session_data.auth_token) {
-                    warn!("Auto-save skipped for {}: auth token no longer valid", character_name);
+                    warn!("Auto-save skipped for {}: auth token no longer valid", session_data.character_name);
                     continue;
                 }
+                room_players.entry(session_data.room_id.clone())
+                    .or_default()
+                    .push((session_data.character_id, session_data.character_name.clone(), session_data.player_id.clone()));
+            }
 
-                if let Some(room) = save_state.rooms.get(&session_data.room_id) {
-                    let save_data = room.get_player_save_data(&session_data.player_id).await;
-                    let quest_state = room.get_player_quest_state(&session_data.player_id).await;
-                    let discovered_recipes = room.get_player_discovered_recipes(&session_data.player_id).await;
+            // Batch-snapshot all players per room (single lock acquisition per room)
+            for (room_id, players) in &room_players {
+                if let Some(room) = save_state.rooms.get(room_id) {
+                    let player_ids: Vec<String> = players.iter().map(|(_, _, pid)| pid.clone()).collect();
+                    let bulk_data = room.get_bulk_save_data(&player_ids).await;
 
-                    if let Some(mut save_data) = save_data {
-                        // Compute played time delta and reset anchor
-                        let played_time_delta = save_state.play_time_anchors
-                            .get(&character_id)
-                            .map(|anchor| anchor.elapsed().as_secs() as i64)
-                            .unwrap_or(0);
-                        save_state.play_time_anchors.insert(character_id, std::time::Instant::now());
+                    for (character_id, character_name, player_id) in players {
+                        if let Some((mut save_data, quest_state, discovered_recipes)) = bulk_data.get(player_id).cloned() {
+                            let played_time_delta = save_state.play_time_anchors
+                                .get(character_id)
+                                .map(|anchor| anchor.elapsed().as_secs() as i64)
+                                .unwrap_or(0);
+                            save_state.play_time_anchors.insert(*character_id, std::time::Instant::now());
 
-                        // If in instance, save entrance position instead of interior position
-                        if save_data.current_map.is_some() {
-                            let entrance_positions = save_state.player_entrance_positions.read().await;
-                            if let Some(&(entrance_x, entrance_y)) = entrance_positions.get(&session_data.player_id) {
-                                save_data.x = entrance_x as f32;
-                                save_data.y = entrance_y as f32;
+                            if save_data.current_map.is_some() {
+                                let entrance_positions = save_state.player_entrance_positions.read().await;
+                                if let Some(&(entrance_x, entrance_y)) = entrance_positions.get(player_id) {
+                                    save_data.x = entrance_x as f32;
+                                    save_data.y = entrance_y as f32;
+                                }
                             }
-                        }
 
-                        snapshots.push((character_id, character_name, save_data, quest_state, played_time_delta, discovered_recipes));
+                            snapshots.push((*character_id, character_name.clone(), save_data, quest_state, played_time_delta, discovered_recipes));
+                        }
                     }
                 }
             }

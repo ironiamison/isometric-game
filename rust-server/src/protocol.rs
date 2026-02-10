@@ -1059,6 +1059,95 @@ impl ServerMessage {
 // Encoding/Decoding
 // ============================================================================
 
+/// Pre-encode a PlayerUpdate to rmpv::Value for reuse across per-player StateSync messages.
+pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
+    use rmpv::Value;
+    let mut pmap = Vec::with_capacity(30);
+    pmap.push((Value::String("id".into()), Value::String(p.id.clone().into())));
+    pmap.push((Value::String("name".into()), Value::String(p.name.clone().into())));
+    pmap.push((Value::String("x".into()), Value::Integer((p.x as i64).into())));
+    pmap.push((Value::String("y".into()), Value::Integer((p.y as i64).into())));
+    pmap.push((Value::String("direction".into()), Value::Integer((p.direction as i64).into())));
+    pmap.push((Value::String("velX".into()), Value::Integer((p.vel_x as i64).into())));
+    pmap.push((Value::String("velY".into()), Value::Integer((p.vel_y as i64).into())));
+    pmap.push((Value::String("hp".into()), Value::Integer((p.hp as i64).into())));
+    pmap.push((Value::String("maxHp".into()), Value::Integer((p.max_hp as i64).into())));
+    pmap.push((Value::String("combatLevel".into()), Value::Integer((p.combat_level as i64).into())));
+    pmap.push((Value::String("hitpointsLevel".into()), Value::Integer((p.hitpoints_level as i64).into())));
+    pmap.push((Value::String("combatSkillLevel".into()), Value::Integer((p.combat_skill_level as i64).into())));
+    pmap.push((Value::String("gold".into()), Value::Integer((p.gold as i64).into())));
+    pmap.push((Value::String("gender".into()), Value::String(p.gender.clone().into())));
+    pmap.push((Value::String("skin".into()), Value::String(p.skin.clone().into())));
+    pmap.push((Value::String("hair_style".into()), match p.hair_style { Some(v) => Value::Integer((v as i64).into()), None => Value::Nil }));
+    pmap.push((Value::String("hair_color".into()), match p.hair_color { Some(v) => Value::Integer((v as i64).into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_head".into()), match &p.equipped_head { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_body".into()), match &p.equipped_body { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_weapon".into()), match &p.equipped_weapon { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_back".into()), match &p.equipped_back { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_feet".into()), match &p.equipped_feet { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_ring".into()), match &p.equipped_ring { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_gloves".into()), match &p.equipped_gloves { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_necklace".into()), match &p.equipped_necklace { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("equipped_belt".into()), match &p.equipped_belt { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((Value::String("is_admin".into()), Value::Boolean(p.is_admin)));
+    pmap.push((Value::String("sitting".into()), Value::Boolean(p.sitting)));
+    pmap.push((Value::String("is_gathering".into()), Value::Boolean(p.is_gathering)));
+    pmap.push((Value::String("mp".into()), Value::Integer((p.mp as i64).into())));
+    pmap.push((Value::String("maxMp".into()), Value::Integer((p.max_mp as i64).into())));
+    Value::Map(pmap)
+}
+
+/// Pre-encode an NpcUpdate to rmpv::Value for reuse across per-player StateSync messages.
+pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
+    use rmpv::Value;
+    let mut nmap = Vec::with_capacity(16);
+    nmap.push((Value::String("id".into()), Value::String(n.id.clone().into())));
+    nmap.push((Value::String("entity_type".into()), Value::String(n.entity_type.clone().into())));
+    nmap.push((Value::String("display_name".into()), Value::String(n.display_name.clone().into())));
+    nmap.push((Value::String("x".into()), Value::Integer((n.x as i64).into())));
+    nmap.push((Value::String("y".into()), Value::Integer((n.y as i64).into())));
+    nmap.push((Value::String("direction".into()), Value::Integer((n.direction as i64).into())));
+    nmap.push((Value::String("hp".into()), Value::Integer((n.hp as i64).into())));
+    nmap.push((Value::String("max_hp".into()), Value::Integer((n.max_hp as i64).into())));
+    nmap.push((Value::String("level".into()), Value::Integer((n.level as i64).into())));
+    nmap.push((Value::String("state".into()), Value::Integer((n.state as i64).into())));
+    nmap.push((Value::String("hostile".into()), Value::Boolean(n.hostile)));
+    nmap.push((Value::String("is_quest_giver".into()), Value::Boolean(n.is_quest_giver)));
+    nmap.push((Value::String("is_merchant".into()), Value::Boolean(n.is_merchant)));
+    nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
+    nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
+    nmap.push((Value::String("just_attacked".into()), Value::Boolean(n.just_attacked)));
+    Value::Map(nmap)
+}
+
+/// Encode a StateSync message from pre-built rmpv::Values (avoids re-encoding per player).
+pub fn encode_state_sync_from_values(
+    tick: u64,
+    player_values: Vec<rmpv::Value>,
+    npc_values: Vec<rmpv::Value>,
+    instance_id: &str,
+) -> Result<Vec<u8>, String> {
+    use rmpv::Value;
+    let mut map = Vec::new();
+    map.push((Value::String("tick".into()), Value::Integer(tick.into())));
+    if !instance_id.is_empty() {
+        map.push((Value::String("instanceId".into()), Value::String(instance_id.into())));
+    }
+    map.push((Value::String("players".into()), Value::Array(player_values)));
+    map.push((Value::String("npcs".into()), Value::Array(npc_values)));
+
+    let array = Value::Array(vec![
+        Value::Integer(13.into()),
+        Value::String("stateSync".into()),
+        Value::Map(map),
+    ]);
+
+    let mut buf = Vec::new();
+    rmpv::encode::write_value(&mut buf, &array)
+        .map_err(|e| format!("Failed to encode message: {}", e))?;
+    Ok(buf)
+}
+
 /// Encode a server message to MessagePack format
 /// Format: [13, "msg_type", {data}] (matching Colyseus ROOM_DATA protocol)
 pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {

@@ -582,7 +582,7 @@ pub struct GameRoom {
     /// Track which chunk each player is in for streaming updates
     player_chunks: RwLock<HashMap<String, ChunkCoord>>,
     tick: RwLock<u64>,
-    broadcast_tx: broadcast::Sender<ServerMessage>,
+    broadcast_tx: broadcast::Sender<Vec<u8>>,
     /// Per-player message senders for unicast (SECURITY: private inventory updates)
     player_senders: RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>,
     /// Tracks which instance each player is currently in (None = overworld)
@@ -838,13 +838,14 @@ impl GameRoom {
         }
     }
 
-    pub fn subscribe(&self) -> broadcast::Receiver<ServerMessage> {
+    pub fn subscribe(&self) -> broadcast::Receiver<Vec<u8>> {
         self.broadcast_tx.subscribe()
     }
 
     pub async fn broadcast(&self, msg: ServerMessage) {
-        // Ignore send errors (no receivers)
-        let _ = self.broadcast_tx.send(msg);
+        if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+            let _ = self.broadcast_tx.send(bytes);
+        }
     }
 
     /// Broadcast a message only to players in the same zone as the given player
@@ -1205,6 +1206,86 @@ impl GameRoom {
                 sitting_at_y: p.sitting_at.map(|(_, y)| y),
             }
         })
+    }
+
+    /// Batch-snapshot save data for multiple players in a single lock acquisition.
+    /// Returns a map of player_id -> (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)
+    pub async fn get_bulk_save_data(&self, player_ids: &[String]) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)> {
+        let mut result = HashMap::new();
+
+        // Snapshot instance assignments once
+        let instance_map: HashMap<String, String> = {
+            let instances = self.player_instances.read().await;
+            player_ids.iter()
+                .filter_map(|pid| instances.get(pid).map(|inst| (pid.clone(), inst.clone())))
+                .collect()
+        };
+
+        // Resolve map_ids for players in instances (batch)
+        let mut map_ids: HashMap<String, String> = HashMap::new();
+        for (pid, _inst_id) in &instance_map {
+            if let Some(inst) = self.instance_manager.find_player_instance(pid).await {
+                map_ids.insert(pid.clone(), inst.map_id.clone());
+            }
+        }
+
+        // Single lock on players to snapshot all save data + discovered recipes
+        {
+            let players = self.players.read().await;
+            for pid in player_ids {
+                if let Some(p) = players.get(pid) {
+                    let inventory_slots: Vec<(usize, String, i32)> = p.inventory.slots
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, slot)| {
+                            slot.as_ref()
+                                .filter(|s| s.quantity > 0 && !s.item_id.is_empty())
+                                .map(|s| (idx, s.item_id.clone(), s.quantity))
+                        })
+                        .collect();
+                    let inventory_json = serde_json::to_string(&inventory_slots).unwrap_or_else(|_| "[]".to_string());
+
+                    let save_data = PlayerSaveData {
+                        x: p.x as f32,
+                        y: p.y as f32,
+                        hp: p.hp,
+                        prayer_points: p.prayer_points,
+                        skills: p.skills.clone(),
+                        gold: p.inventory.gold,
+                        inventory_json,
+                        gender: p.gender.clone(),
+                        skin: p.skin.clone(),
+                        equipped_head: p.equipped_head.clone(),
+                        equipped_body: p.equipped_body.clone(),
+                        equipped_weapon: p.equipped_weapon.clone(),
+                        equipped_back: p.equipped_back.clone(),
+                        equipped_feet: p.equipped_feet.clone(),
+                        equipped_ring: p.equipped_ring.clone(),
+                        equipped_gloves: p.equipped_gloves.clone(),
+                        equipped_necklace: p.equipped_necklace.clone(),
+                        equipped_belt: p.equipped_belt.clone(),
+                        current_map: map_ids.get(pid).cloned(),
+                        sitting_at_x: p.sitting_at.map(|(x, _)| x),
+                        sitting_at_y: p.sitting_at.map(|(_, y)| y),
+                    };
+
+                    let recipes = p.discovered_recipes.clone();
+                    result.insert(pid.clone(), (save_data, None, recipes));
+                }
+            }
+        }
+
+        // Single lock on quest states
+        {
+            let quest_states = self.player_quest_states.read().await;
+            for pid in player_ids {
+                if let Some(entry) = result.get_mut(pid) {
+                    entry.1 = quest_states.get(pid).cloned();
+                }
+            }
+        }
+
+        result
     }
 
     /// Initialize quest state for a player (called on join)
@@ -6846,26 +6927,20 @@ impl GameRoom {
 
         // Instance groups: encode once per instance, send to all players in that instance
         for (inst_id, group_senders) in &instance_groups {
-            let players_for_group: Vec<PlayerUpdate> = players_by_instance
+            let player_values: Vec<rmpv::Value> = players_by_instance
                 .get(inst_id)
-                .map(|ps| ps.iter().map(|p| (*p).clone()).collect())
+                .map(|ps| ps.iter().map(|p| crate::protocol::player_update_to_value(p)).collect())
                 .unwrap_or_default();
 
-            // Get NPCs from this instance
-            let instance_npcs = if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
-                instance.get_npc_updates().await
+            let npc_values: Vec<rmpv::Value> = if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                instance.get_npc_updates().await.iter()
+                    .map(|n| crate::protocol::npc_update_to_value(n))
+                    .collect()
             } else {
                 Vec::new()
             };
 
-            let msg = ServerMessage::StateSync {
-                tick,
-                players: players_for_group,
-                npcs: instance_npcs,
-                instance_id: inst_id.to_string(),
-            };
-
-            if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+            if let Ok(bytes) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, inst_id) {
                 for (pid, sender) in group_senders {
                     if let Err(e) = sender.try_send(bytes.clone()) {
                         tracing::debug!("StateSync drop for {}: {}", pid, e);
@@ -6874,39 +6949,31 @@ impl GameRoom {
             }
         }
 
-        // Overworld: per-player view-distance culling
+        // Overworld: pre-encode all player/NPC Values once, then filter per-player
+        let prebuilt_players: Vec<(i32, i32, rmpv::Value)> = overworld_players.iter()
+            .map(|p| (p.x, p.y, crate::protocol::player_update_to_value(p)))
+            .collect();
+        let prebuilt_npcs: Vec<(i32, i32, rmpv::Value)> = npc_updates.iter()
+            .map(|n| (n.x, n.y, crate::protocol::npc_update_to_value(n)))
+            .collect();
+
         for (player_id, sender) in &overworld_senders {
             let (px, py) = match player_pos_map.get(player_id.as_str()) {
                 Some(pos) => *pos,
                 None => continue,
             };
 
-            let nearby_players: Vec<PlayerUpdate> = overworld_players.iter()
-                .filter(|p| {
-                    let dx = (p.x - px).abs();
-                    let dy = (p.y - py).abs();
-                    dx.max(dy) <= VIEW_DISTANCE
-                })
-                .map(|p| (*p).clone())
+            let nearby_players: Vec<rmpv::Value> = prebuilt_players.iter()
+                .filter(|(x, y, _)| (x - px).abs().max((y - py).abs()) <= VIEW_DISTANCE)
+                .map(|(_, _, v)| v.clone())
                 .collect();
 
-            let nearby_npcs: Vec<NpcUpdate> = npc_updates.iter()
-                .filter(|n| {
-                    let dx = (n.x - px).abs();
-                    let dy = (n.y - py).abs();
-                    dx.max(dy) <= VIEW_DISTANCE
-                })
-                .cloned()
+            let nearby_npcs: Vec<rmpv::Value> = prebuilt_npcs.iter()
+                .filter(|(x, y, _)| (x - px).abs().max((y - py).abs()) <= VIEW_DISTANCE)
+                .map(|(_, _, v)| v.clone())
                 .collect();
 
-            let msg = ServerMessage::StateSync {
-                tick,
-                players: nearby_players,
-                npcs: nearby_npcs,
-                instance_id: String::new(),
-            };
-
-            if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+            if let Ok(bytes) = crate::protocol::encode_state_sync_from_values(tick, nearby_players, nearby_npcs, "") {
                 if let Err(e) = sender.try_send(bytes) {
                     tracing::debug!("StateSync drop for {}: {}", player_id, e);
                 }
