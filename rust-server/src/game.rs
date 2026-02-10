@@ -3353,6 +3353,10 @@ impl GameRoom {
                         text: "Buy allotment plot".to_string(),
                     },
                     crate::protocol::DialogueChoice {
+                        id: "contracts".to_string(),
+                        text: "Farming contracts".to_string(),
+                    },
+                    crate::protocol::DialogueChoice {
                         id: "nevermind".to_string(),
                         text: "Nevermind".to_string(),
                     },
@@ -3675,6 +3679,18 @@ impl GameRoom {
             if choice_id == "buy_plots" {
                 // Show the plot purchase screen
                 self.show_plot_purchase_dialogue(player_id, npc_id).await;
+            } else if choice_id == "contracts" {
+                // Show the farming contracts screen
+                self.show_contract_dialogue(player_id, npc_id).await;
+            } else if let Some(diff_str) = choice_id.strip_prefix("accept_") {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.handle_accept_contract(player_id, diff_str).await;
+            } else if choice_id == "claim_contract" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.handle_claim_contract(player_id).await;
+            } else if choice_id == "abandon_contract" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.handle_abandon_contract(player_id).await;
             } else if let Some(plot_str) = choice_id.strip_prefix("unlock_") {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
                 if let Ok(plot_id) = plot_str.parse::<u32>() {
@@ -6047,6 +6063,315 @@ impl GameRoom {
             text,
             choices,
         }).await;
+    }
+
+    /// Show the farming contract dialogue
+    async fn show_contract_dialogue(&self, player_id: &str, npc_id: &str) {
+        let npc_name = {
+            let npcs = self.npcs.read().await;
+            npcs.get(npc_id)
+                .map(|n| self.entity_registry.get(&n.prototype_id)
+                    .map(|p| p.display_name.clone())
+                    .unwrap_or_else(|| "Master Farmer".to_string()))
+                .unwrap_or_else(|| "Master Farmer".to_string())
+        };
+
+        let farming_level = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => p.skills.farming.level,
+                None => return,
+            }
+        };
+
+        let farming = self.farming.read().await;
+
+        if let Some(contract) = farming.get_contract(player_id) {
+            let crop_name = farming.crops.get(&contract.crop_id)
+                .map(|c| c.produce_item.clone())
+                .unwrap_or_else(|| contract.crop_id.clone());
+
+            if contract.is_complete() {
+                // Contract completed - show claim dialogue
+                let text = format!(
+                    "Well done! You've completed your {} contract.\n\nHarvested: {}/{} {}\n\nRewards: {} Farming XP, {}gp, and {} bonus seed(s).",
+                    contract.difficulty.display_name(),
+                    contract.amount_harvested,
+                    contract.amount_required,
+                    crop_name,
+                    contract.difficulty.xp_reward(),
+                    contract.difficulty.gold_reward(),
+                    contract.difficulty.seed_reward_count(),
+                );
+
+                self.send_to_player(player_id, ServerMessage::ShowDialogue {
+                    quest_id: format!("plot_seller:{}", npc_id),
+                    npc_id: npc_id.to_string(),
+                    speaker: npc_name,
+                    text,
+                    choices: vec![
+                        crate::protocol::DialogueChoice {
+                            id: "claim_contract".to_string(),
+                            text: "Claim rewards".to_string(),
+                        },
+                        crate::protocol::DialogueChoice {
+                            id: "nevermind".to_string(),
+                            text: "Go back".to_string(),
+                        },
+                    ],
+                }).await;
+            } else {
+                // Contract in progress - show progress
+                let text = format!(
+                    "You're working on a {} contract:\n\nHarvest {} {} ({}/{})\n\nKeep at it!",
+                    contract.difficulty.display_name(),
+                    contract.amount_required,
+                    crop_name,
+                    contract.amount_harvested,
+                    contract.amount_required,
+                );
+
+                self.send_to_player(player_id, ServerMessage::ShowDialogue {
+                    quest_id: format!("plot_seller:{}", npc_id),
+                    npc_id: npc_id.to_string(),
+                    speaker: npc_name,
+                    text,
+                    choices: vec![
+                        crate::protocol::DialogueChoice {
+                            id: "abandon_contract".to_string(),
+                            text: "Abandon contract".to_string(),
+                        },
+                        crate::protocol::DialogueChoice {
+                            id: "nevermind".to_string(),
+                            text: "Go back".to_string(),
+                        },
+                    ],
+                }).await;
+            }
+        } else {
+            // No active contract - show difficulty selection
+            let mut choices = Vec::new();
+            let difficulties = [
+                crate::farming::ContractDifficulty::Easy,
+                crate::farming::ContractDifficulty::Medium,
+                crate::farming::ContractDifficulty::Hard,
+            ];
+
+            for diff in &difficulties {
+                if farming_level >= diff.level_required() {
+                    choices.push(crate::protocol::DialogueChoice {
+                        id: format!("accept_{}", diff.as_str()),
+                        text: format!("{} - {}xp, {}gp", diff.display_name(), diff.xp_reward(), diff.gold_reward()),
+                    });
+                } else {
+                    choices.push(crate::protocol::DialogueChoice {
+                        id: format!("locked_{}", diff.as_str()),
+                        text: format!("{} (Requires Farming {})", diff.display_name(), diff.level_required()),
+                    });
+                }
+            }
+
+            choices.push(crate::protocol::DialogueChoice {
+                id: "nevermind".to_string(),
+                text: "Go back".to_string(),
+            });
+
+            self.send_to_player(player_id, ServerMessage::ShowDialogue {
+                quest_id: format!("plot_seller:{}", npc_id),
+                npc_id: npc_id.to_string(),
+                speaker: npc_name,
+                text: "I've got work that needs doing. Pick a contract and harvest the crops I need.\n\nYou can have one active contract at a time.".to_string(),
+                choices,
+            }).await;
+        }
+    }
+
+    /// Handle a player accepting a farming contract
+    async fn handle_accept_contract(&self, player_id: &str, difficulty_str: &str) {
+        let difficulty = match crate::farming::ContractDifficulty::from_str(difficulty_str) {
+            Some(d) => d,
+            None => {
+                self.send_system_message(player_id, "Invalid contract difficulty.").await;
+                return;
+            }
+        };
+
+        let farming_level = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => p.skills.farming.level,
+                None => return,
+            }
+        };
+
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let (crop_name, amount) = {
+            let mut farming = self.farming.write().await;
+            match farming.generate_contract(player_id, &difficulty, farming_level, current_time) {
+                Ok(contract) => {
+                    let crop_id = contract.crop_id.clone();
+                    let amount = contract.amount_required;
+                    let crop_name = farming.crops.get(&crop_id)
+                        .map(|c| c.produce_item.clone())
+                        .unwrap_or_else(|| crop_id);
+                    (crop_name, amount)
+                }
+                Err(e) => {
+                    self.send_system_message(player_id, &e).await;
+                    return;
+                }
+            }
+        };
+
+        // Persist to database
+        if let Some(ref db) = self.db {
+            let farming = self.farming.read().await;
+            if let Some(contract) = farming.get_contract(player_id) {
+                if let Err(e) = db.save_farming_contract(
+                    player_id,
+                    contract.difficulty.as_str(),
+                    &contract.crop_id,
+                    contract.amount_required,
+                    contract.amount_harvested,
+                    contract.created_at,
+                ).await {
+                    tracing::error!("Failed to save farming contract: {}", e);
+                }
+            }
+        }
+
+        self.send_system_message(player_id,
+            &format!("Contract accepted! Harvest {} {}.", amount, crop_name)
+        ).await;
+    }
+
+    /// Handle a player claiming a completed farming contract
+    async fn handle_claim_contract(&self, player_id: &str) {
+        // Get contract info and verify complete
+        let contract_info = {
+            let farming = self.farming.read().await;
+            match farming.get_contract(player_id) {
+                Some(c) if c.is_complete() => Some((
+                    c.difficulty.xp_reward(),
+                    c.difficulty.gold_reward(),
+                    c.difficulty.seed_reward_count(),
+                    c.difficulty.display_name().to_string(),
+                )),
+                Some(_) => {
+                    drop(farming);
+                    self.send_system_message(player_id, "Your contract isn't complete yet.").await;
+                    return;
+                }
+                None => {
+                    drop(farming);
+                    self.send_system_message(player_id, "You don't have an active contract.").await;
+                    return;
+                }
+            }
+        };
+
+        let (xp_reward, gold_reward, seed_count, diff_name) = contract_info.unwrap();
+
+        // Grant rewards
+        let farming = self.farming.read().await;
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) => p,
+            None => return,
+        };
+
+        player.inventory.gold += gold_reward;
+
+        let mut seed_names = Vec::new();
+        for _ in 0..seed_count {
+            if let Some(seed_id) = farming.random_seed_for_level(player.skills.farming.level) {
+                let seed_name = self.item_registry.get(&seed_id)
+                    .map(|d| d.display_name.clone())
+                    .unwrap_or_else(|| seed_id.clone());
+                player.inventory.add_item(&seed_id, 1, &self.item_registry);
+                seed_names.push(seed_name);
+            }
+        }
+
+        let leveled = player.skills.farming.add_xp(xp_reward);
+        let skill_xp = player.skills.farming.xp;
+        let skill_level = player.skills.farming.level;
+        let inv_slots = player.inventory.to_update();
+        let gold = player.inventory.gold;
+
+        drop(players);
+        drop(farming);
+
+        // Remove contract from memory
+        {
+            let mut farming = self.farming.write().await;
+            farming.remove_contract(player_id);
+        }
+
+        // Delete from database
+        if let Some(ref db) = self.db {
+            if let Err(e) = db.delete_farming_contract(player_id).await {
+                tracing::error!("Failed to delete farming contract: {}", e);
+            }
+        }
+
+        // Send inventory update
+        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: inv_slots,
+            gold,
+        }).await;
+
+        // Send XP gain
+        self.send_to_player(player_id, ServerMessage::SkillXp {
+            player_id: player_id.to_string(),
+            skill: "farming".to_string(),
+            xp_gained: xp_reward,
+            total_xp: skill_xp,
+            level: skill_level,
+        }).await;
+
+        if leveled {
+            self.broadcast(ServerMessage::SkillLevelUp {
+                player_id: player_id.to_string(),
+                skill: "farming".to_string(),
+                new_level: skill_level,
+            }).await;
+        }
+
+        let seed_text = if seed_names.is_empty() {
+            String::new()
+        } else {
+            format!(" and {}", seed_names.join(", "))
+        };
+
+        self.send_system_message(player_id,
+            &format!("{} contract complete! Received {} Farming XP, {}gp{}.",
+                diff_name, xp_reward, gold_reward, seed_text)
+        ).await;
+    }
+
+    /// Handle a player abandoning a farming contract
+    async fn handle_abandon_contract(&self, player_id: &str) {
+        {
+            let mut farming = self.farming.write().await;
+            if farming.remove_contract(player_id).is_none() {
+                self.send_system_message(player_id, "You don't have an active contract.").await;
+                return;
+            }
+        }
+
+        if let Some(ref db) = self.db {
+            if let Err(e) = db.delete_farming_contract(player_id).await {
+                tracing::error!("Failed to delete farming contract: {}", e);
+            }
+        }
+
+        self.send_system_message(player_id, "Contract abandoned.").await;
     }
 
     /// Handle a player purchasing a farming plot
