@@ -340,6 +340,22 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Farming contracts - one active contract per player
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS farming_contracts (
+                player_id TEXT PRIMARY KEY,
+                difficulty TEXT NOT NULL,
+                crop_id TEXT NOT NULL,
+                amount_required INTEGER NOT NULL,
+                amount_harvested INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         // Friendships table - for friend system
         sqlx::query(
             r#"
@@ -1172,6 +1188,83 @@ impl Database {
         }).collect();
 
         Ok(unlocks)
+    }
+
+    // =========================================================================
+    // Farming Contract Persistence
+    // =========================================================================
+
+    /// Save a new farming contract
+    pub async fn save_farming_contract(
+        &self,
+        player_id: &str,
+        difficulty: &str,
+        crop_id: &str,
+        amount_required: i32,
+        amount_harvested: i32,
+        created_at: u64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO farming_contracts (player_id, difficulty, crop_id, amount_required, amount_harvested, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(player_id)
+        .bind(difficulty)
+        .bind(crop_id)
+        .bind(amount_required)
+        .bind(amount_harvested)
+        .bind(created_at as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update contract progress
+    pub async fn update_farming_contract_progress(
+        &self,
+        player_id: &str,
+        amount_harvested: i32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE farming_contracts SET amount_harvested = ? WHERE player_id = ?"
+        )
+        .bind(amount_harvested)
+        .bind(player_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Delete a farming contract (on completion or abandonment)
+    pub async fn delete_farming_contract(&self, player_id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM farming_contracts WHERE player_id = ?")
+            .bind(player_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Load all active farming contracts
+    pub async fn load_farming_contracts(&self) -> Result<Vec<(String, String, String, i32, i32, u64)>, sqlx::Error> {
+        let rows = sqlx::query(
+            "SELECT player_id, difficulty, crop_id, amount_required, amount_harvested, created_at FROM farming_contracts"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let contracts = rows.iter().map(|row| {
+            let player_id: String = row.get("player_id");
+            let difficulty: String = row.get("difficulty");
+            let crop_id: String = row.get("crop_id");
+            let amount_required: i32 = row.get("amount_required");
+            let amount_harvested: i32 = row.get("amount_harvested");
+            let created_at: i64 = row.get("created_at");
+            (player_id, difficulty, crop_id, amount_required, amount_harvested, created_at as u64)
+        }).collect();
+
+        Ok(contracts)
     }
 
     // =========================================================================
