@@ -5920,9 +5920,14 @@ impl GameRoom {
             .unwrap()
             .as_millis() as u64;
 
+        let farming_level = {
+            let players = self.players.read().await;
+            players.get(player_id).map(|p| p.skills.farming.level).unwrap_or(1)
+        };
+
         let result = {
             let mut farming = self.farming.write().await;
-            farming.harvest_crop(patch_id, player_id, current_time)
+            farming.harvest_crop(patch_id, player_id, current_time, farming_level)
         };
 
         match result {

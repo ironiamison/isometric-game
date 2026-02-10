@@ -371,6 +371,7 @@ impl FarmingSystem {
         patch_id: &str,
         player_id: &str,
         current_time: u64,
+        farming_level: i32,
     ) -> Result<HarvestResult, String> {
         if !self.patches.contains_key(patch_id) {
             return Err("Patch not found".to_string());
@@ -389,7 +390,10 @@ impl FarmingSystem {
             .ok_or("Unknown crop type")?;
 
         let mut rng = rand::thread_rng();
-        let amount = rng.gen_range(crop.harvest_amount_min..=crop.harvest_amount_max);
+        let base_amount = rng.gen_range(crop.harvest_amount_min..=crop.harvest_amount_max);
+        // Bonus yield: +1 per 10 levels above the crop's requirement
+        let bonus = ((farming_level - crop.level_required) / 10).max(0);
+        let amount = base_amount + bonus;
         let xp = crop.xp_per_harvest * amount as i64;
         let seed_returned: f32 = rng.gen_range(0.0..1.0);
         let seed_returned = seed_returned < crop.seed_return_chance;
