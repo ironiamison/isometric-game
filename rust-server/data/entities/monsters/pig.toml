@@ -81,22 +81,4 @@ drop_chance = 1.0
 quantity_min = 3
 quantity_max = 5
 
-[wild_boar]
-extends = "pig"
-display_name = "Wild Boar"
-sprite = "pig"
-description = "A fierce boar with sharp tusks."
-
-[wild_boar.stats]
-level = 5
-max_hp = 40
-damage = 3
-attack_bonus = 2
-defence_bonus = 1
-
-[wild_boar.rewards]
-exp_base = 30
-
-[[wild_boar.loot]]
-item_id = "piglet"
-drop_chance = 0.40
+# Wild Boar is defined in forest_creatures.toml (sprite = "wild_boar", wanders)
