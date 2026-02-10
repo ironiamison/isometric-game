@@ -5195,7 +5195,7 @@ impl Renderer {
             let bar_bottom_offset = EXP_BAR_GAP * scale + 6.0; // distance from screen bottom to hotkey bar bottom + extra margin
             let box_bottom = chat_sh - bar_bottom_offset; // box bottom edge aligns with hotkey bar bottom
             let line_height = 18.0 * zoom;
-            let max_chat_width = 400.0 * zoom;
+            let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 220.0 } else { 400.0 * zoom };
             let font_size = 16.0 * zoom;
             let max_visible_lines: usize = 9;
             let chat_area_h = max_visible_lines as f32 * line_height;
@@ -5270,18 +5270,31 @@ impl Renderer {
                 current_y -= line_height;
             }
 
-            // Show scroll indicator if there are older messages
-            if start > 0 {
-                let indicator = format!("▲ {} more", start);
-                let indicator_size = 13.0 * zoom;
-                self.draw_text_sharp(&indicator, chat_x, chat_top_y - 2.0 * zoom, indicator_size, Color::from_rgba(180, 180, 180, 160));
-            }
-
             // Disable scissor clipping
             {
                 let mut gl = unsafe { get_internal_gl() };
                 gl.flush();
                 gl.quad_gl.scissor(None);
+            }
+
+            // Draw scroll indicator (thin scrollbar on the right edge)
+            if max_scroll_px > 0.0 {
+                let scrollbar_w = 3.0 * zoom;
+                let scrollbar_x = clip_x + clip_w - scrollbar_w - 2.0 * zoom;
+                let track_y = clip_y;
+                let track_h = clip_h;
+
+                // Track (subtle background)
+                draw_rectangle(scrollbar_x, track_y, scrollbar_w, track_h, Color::new(1.0, 1.0, 1.0, 0.08));
+
+                // Thumb - size proportional to visible area, position based on scroll
+                let visible_ratio = (chat_area_h / total_content_height).min(1.0);
+                let thumb_h = (track_h * visible_ratio).max(12.0 * zoom);
+                // scroll_px=0 means at bottom (most recent), max_scroll_px means scrolled to top
+                let scroll_ratio = scroll_px / max_scroll_px;
+                let thumb_y = track_y + (track_h - thumb_h) * (1.0 - scroll_ratio);
+
+                draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, Color::new(1.0, 1.0, 1.0, 0.35));
             }
         }
 

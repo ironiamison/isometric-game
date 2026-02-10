@@ -299,3 +299,297 @@ quantity_max = 1
 
 [reaper.behaviors]
 hostile = true
+
+# =============================================================================
+# Skeleton
+# =============================================================================
+
+[skeleton]
+display_name = "Skeleton"
+sprite = "skeleton"
+animation_type = "standard"
+description = "An animated skeleton risen from the grave."
+
+[skeleton.stats]
+level = 10
+max_hp = 28
+damage = 4
+attack_bonus = 4
+defence_bonus = 0
+attack_range = 1
+aggro_range = 5
+chase_range = 8
+move_cooldown_ms = 450
+attack_cooldown_ms = 1600
+respawn_time_ms = 12000
+
+[skeleton.rewards]
+exp_base = 38
+gold_min = 6
+gold_max = 16
+
+[[skeleton.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 2
+
+[[skeleton.loot]]
+item_id = "bone_fragment"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 2
+
+[skeleton.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Skeleton Brute
+# =============================================================================
+
+[skeleton_brute]
+display_name = "Skeleton Brute"
+sprite = "skeleton_brute"
+animation_type = "standard"
+description = "A hulking skeleton with reinforced bones."
+
+[skeleton_brute.stats]
+level = 16
+max_hp = 55
+damage = 8
+attack_bonus = 6
+defence_bonus = 4
+attack_range = 1
+aggro_range = 6
+chase_range = 9
+move_cooldown_ms = 500
+attack_cooldown_ms = 1800
+respawn_time_ms = 20000
+
+[skeleton_brute.rewards]
+exp_base = 65
+gold_min = 12
+gold_max = 28
+
+[[skeleton_brute.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 2
+quantity_max = 3
+
+[[skeleton_brute.loot]]
+item_id = "bone_fragment"
+drop_chance = 0.40
+quantity_min = 1
+quantity_max = 3
+
+[[skeleton_brute.loot]]
+item_id = "big_bones"
+drop_chance = 0.15
+quantity_min = 1
+quantity_max = 1
+
+[skeleton_brute.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Forgotten Monk
+# =============================================================================
+
+[forgotten_monk]
+display_name = "Forgotten Monk"
+sprite = "forgotten_monk"
+animation_type = "standard"
+description = "A corrupted monk whose faith has turned to darkness."
+
+[forgotten_monk.stats]
+level = 14
+max_hp = 42
+damage = 6
+attack_bonus = 6
+defence_bonus = 2
+attack_range = 1
+aggro_range = 6
+chase_range = 9
+move_cooldown_ms = 400
+attack_cooldown_ms = 1500
+respawn_time_ms = 18000
+
+[forgotten_monk.rewards]
+exp_base = 52
+gold_min = 10
+gold_max = 24
+
+[[forgotten_monk.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[forgotten_monk.loot]]
+item_id = "dark_essence"
+drop_chance = 0.12
+quantity_min = 1
+quantity_max = 1
+
+[forgotten_monk.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Wolf Spider
+# =============================================================================
+
+[wolf_spider]
+display_name = "Wolf Spider"
+sprite = "wolf_spider"
+animation_type = "standard"
+description = "A massive spider that hunts like a wolf."
+
+[wolf_spider.stats]
+level = 18
+max_hp = 65
+damage = 9
+attack_bonus = 10
+defence_bonus = -1
+attack_range = 1
+aggro_range = 7
+chase_range = 10
+move_cooldown_ms = 350
+attack_cooldown_ms = 1400
+respawn_time_ms = 25000
+
+[wolf_spider.rewards]
+exp_base = 78
+gold_min = 14
+gold_max = 35
+
+[[wolf_spider.loot]]
+item_id = "spider_silk"
+drop_chance = 0.50
+quantity_min = 1
+quantity_max = 3
+
+[[wolf_spider.loot]]
+item_id = "spider_fang"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 2
+
+[[wolf_spider.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[wolf_spider.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Low Orc
+# =============================================================================
+
+[low_orc]
+display_name = "Low Orc"
+sprite = "low_orc"
+animation_type = "standard"
+description = "A grunt orc from the war bands."
+
+[low_orc.stats]
+level = 11
+max_hp = 38
+damage = 5
+attack_bonus = 5
+defence_bonus = 1
+attack_range = 1
+aggro_range = 6
+chase_range = 8
+move_cooldown_ms = 420
+attack_cooldown_ms = 1550
+respawn_time_ms = 14000
+
+[low_orc.rewards]
+exp_base = 42
+gold_min = 8
+gold_max = 20
+
+[[low_orc.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[low_orc.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.20
+quantity_min = 1
+quantity_max = 2
+
+[low_orc.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Miner Mike
+# =============================================================================
+
+[miner_mike]
+display_name = "Miner Mike"
+sprite = "miner_mike"
+animation_type = "standard"
+description = "A corrupted miner still clutching his pick."
+
+[miner_mike.stats]
+level = 9
+max_hp = 32
+damage = 4
+attack_bonus = 3
+defence_bonus = 0
+attack_range = 1
+aggro_range = 5
+chase_range = 7
+move_cooldown_ms = 480
+attack_cooldown_ms = 1700
+respawn_time_ms = 15000
+
+[miner_mike.rewards]
+exp_base = 35
+gold_min = 5
+gold_max = 14
+
+[[miner_mike.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[miner_mike.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.15
+quantity_min = 1
+quantity_max = 1
+
+[miner_mike.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
