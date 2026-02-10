@@ -492,3 +492,226 @@ wander_enabled = true
 wander_radius = 3
 wander_pause_min_ms = 2500
 wander_pause_max_ms = 5500
+
+# =============================================================================
+# Mushroom
+# =============================================================================
+
+[mushroom]
+display_name = "Mushroom"
+sprite = "mushroom"
+animation_type = "standard"
+description = "A walking mushroom with a mean streak."
+
+[mushroom.stats]
+level = 3
+max_hp = 14
+damage = 2
+attack_bonus = 0
+defence_bonus = 1
+attack_range = 1
+aggro_range = 4
+chase_range = 5
+move_cooldown_ms = 650
+attack_cooldown_ms = 2200
+respawn_time_ms = 10000
+
+[mushroom.rewards]
+exp_base = 18
+gold_min = 2
+gold_max = 8
+
+[[mushroom.loot]]
+item_id = "onion_seed"
+drop_chance = 0.08
+quantity_min = 1
+quantity_max = 1
+
+[mushroom.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 2
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 6000
+
+# =============================================================================
+# Mad Mushroom
+# =============================================================================
+
+[mad_mushroom]
+display_name = "Mad Mushroom"
+sprite = "mad_mushroom"
+animation_type = "standard"
+description = "A frenzied mushroom that attacks anything that moves."
+
+[mad_mushroom.stats]
+level = 6
+max_hp = 22
+damage = 3
+attack_bonus = 2
+defence_bonus = 0
+attack_range = 1
+aggro_range = 5
+chase_range = 6
+move_cooldown_ms = 500
+attack_cooldown_ms = 1800
+respawn_time_ms = 12000
+
+[mad_mushroom.rewards]
+exp_base = 28
+gold_min = 4
+gold_max = 12
+
+[[mad_mushroom.loot]]
+item_id = "slime_core"
+drop_chance = 0.15
+quantity_min = 1
+quantity_max = 1
+
+[[mad_mushroom.loot]]
+item_id = "cabbage_seed"
+drop_chance = 0.06
+quantity_min = 1
+quantity_max = 1
+
+[mad_mushroom.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Poison Mushroom
+# =============================================================================
+
+[poision_mushroom]
+display_name = "Poison Mushroom"
+sprite = "poision_mushroom"
+animation_type = "standard"
+description = "A toxic mushroom that exudes noxious spores."
+
+[poision_mushroom.stats]
+level = 8
+max_hp = 30
+damage = 4
+attack_bonus = 4
+defence_bonus = -1
+attack_range = 1
+aggro_range = 5
+chase_range = 7
+move_cooldown_ms = 550
+attack_cooldown_ms = 1700
+respawn_time_ms = 14000
+
+[poision_mushroom.rewards]
+exp_base = 35
+gold_min = 6
+gold_max = 15
+
+[[poision_mushroom.loot]]
+item_id = "dark_essence"
+drop_chance = 0.08
+quantity_min = 1
+quantity_max = 1
+
+[[poision_mushroom.loot]]
+item_id = "strawberry_seed"
+drop_chance = 0.05
+quantity_min = 1
+quantity_max = 1
+
+[poision_mushroom.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Sheep
+# =============================================================================
+
+[sheep]
+display_name = "Sheep"
+sprite = "sheep"
+animation_type = "standard"
+description = "A woolly sheep. Mostly harmless."
+
+[sheep.stats]
+level = 2
+max_hp = 12
+damage = 1
+attack_bonus = -1
+defence_bonus = 0
+attack_range = 1
+aggro_range = 3
+chase_range = 4
+move_cooldown_ms = 700
+attack_cooldown_ms = 2500
+respawn_time_ms = 8000
+
+[sheep.rewards]
+exp_base = 14
+gold_min = 2
+gold_max = 6
+
+[[sheep.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.20
+quantity_min = 1
+quantity_max = 1
+
+[sheep.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 5
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 7000
+
+# =============================================================================
+# Swamper
+# =============================================================================
+
+[swamper]
+display_name = "Swamper"
+sprite = "swamper"
+animation_type = "standard"
+description = "A bog-dwelling creature that lurks in murky water."
+
+[swamper.stats]
+level = 7
+max_hp = 26
+damage = 3
+attack_bonus = 2
+defence_bonus = 1
+attack_range = 1
+aggro_range = 5
+chase_range = 6
+move_cooldown_ms = 580
+attack_cooldown_ms = 1900
+respawn_time_ms = 12000
+
+[swamper.rewards]
+exp_base = 30
+gold_min = 5
+gold_max = 14
+
+[[swamper.loot]]
+item_id = "slime_core"
+drop_chance = 0.30
+quantity_min = 1
+quantity_max = 1
+
+[[swamper.loot]]
+item_id = "worm_segment"
+drop_chance = 0.15
+quantity_min = 1
+quantity_max = 2
+
+[swamper.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 2500
+wander_pause_max_ms = 5500
