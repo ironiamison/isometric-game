@@ -5986,6 +5986,36 @@ impl GameRoom {
 
                 // Fire quest event for harvesting
                 self.process_quest_item_collect(player_id, &format!("harvest_{}", harvest.produce_item), harvest.amount).await;
+
+                // Track farming contract progress
+                {
+                    let mut farming = self.farming.write().await;
+                    let crop_id = farming.crops.iter()
+                        .find(|(_, c)| c.produce_item == harvest.produce_item)
+                        .map(|(id, _)| id.clone());
+
+                    if let Some(crop_id) = crop_id {
+                        if let Some((harvested, required, complete)) = farming.record_contract_harvest(player_id, &crop_id, harvest.amount) {
+                            drop(farming);
+                            if complete {
+                                self.send_system_message(player_id,
+                                    &format!("Contract complete! ({}/{}) Return to the Master Farmer to claim your rewards.", harvested, required)
+                                ).await;
+                            } else {
+                                self.send_system_message(player_id,
+                                    &format!("Contract progress: {}/{} harvested.", harvested, required)
+                                ).await;
+                            }
+
+                            // Update database
+                            if let Some(ref db) = self.db {
+                                if let Err(e) = db.update_farming_contract_progress(player_id, harvested).await {
+                                    tracing::warn!("Failed to update contract progress: {}", e);
+                                }
+                            }
+                        }
+                    }
+                }
             }
             Err(e) => {
                 self.send_to_player(player_id, ServerMessage::Error {
