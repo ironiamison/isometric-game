@@ -304,10 +304,7 @@ gold_max = 0
 [master_farmer.behaviors]
 hostile = false
 plot_seller = true
-wander_enabled = true
-wander_radius = 2
-wander_pause_min_ms = 5000
-wander_pause_max_ms = 10000
+wander_enabled = false
 
 [master_farmer.speech]
 radius = 5
