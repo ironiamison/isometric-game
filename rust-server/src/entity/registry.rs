@@ -170,6 +170,12 @@ impl EntityRegistry {
             damage: raw.stats.damage
                 .or_else(|| parent.map(|p| p.stats.damage))
                 .unwrap_or(10),
+            attack_bonus: raw.stats.attack_bonus
+                .or_else(|| parent.map(|p| p.stats.attack_bonus))
+                .unwrap_or(0),
+            defence_bonus: raw.stats.defence_bonus
+                .or_else(|| parent.map(|p| p.stats.defence_bonus))
+                .unwrap_or(0),
             attack_range: raw.stats.attack_range
                 .or_else(|| parent.map(|p| p.stats.attack_range))
                 .unwrap_or(1),
