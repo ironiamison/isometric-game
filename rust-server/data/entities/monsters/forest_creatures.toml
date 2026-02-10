@@ -193,20 +193,20 @@ animation_type = "standard"
 description = "A giant worm that burrows through the earth."
 
 [worm.stats]
-level = 2
-max_hp = 10
+level = 3
+max_hp = 30
 damage = 1
 attack_bonus = 2
-defence_bonus = -3
+defence_bonus = 0
 attack_range = 1
-aggro_range = 3
-chase_range = 4
+aggro_range = 1
+chase_range = 5
 move_cooldown_ms = 700
 attack_cooldown_ms = 2200
 respawn_time_ms = 8000
 
 [worm.rewards]
-exp_base = 12
+exp_base = 22
 gold_min = 1
 gold_max = 5
 
