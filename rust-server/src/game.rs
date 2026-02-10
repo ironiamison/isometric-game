@@ -2340,7 +2340,7 @@ impl GameRoom {
                     // Hit - calculate and apply damage
                     let max_hit = calculate_max_hit(combat_level, strength_bonus);
                     let damage = roll_damage(max_hit);
-                    let died = npc.take_damage(damage, current_time);
+                    let died = npc.take_damage(damage, current_time, Some(player_id));
                     let name = npc.name();
                     tracing::info!(
                         "{} hits {} for {} damage (max: {}, HP: {})",
@@ -8152,7 +8152,7 @@ impl GameRoom {
                     // Hit
                     let max_hit = crate::spell::calculate_spell_max_hit(magic_level, spell_def.base_power);
                     let damage = crate::spell::roll_spell_damage(max_hit);
-                    let died = npc.take_damage(damage, current_time);
+                    let died = npc.take_damage(damage, current_time, Some(player_id));
                     let name = npc.name();
                     tracing::info!(
                         "{} spell hits {} for {} damage (max: {}, HP: {})",

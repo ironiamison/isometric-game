@@ -234,8 +234,9 @@ impl Npc {
         self.state != NpcState::Dead
     }
 
-    /// Take damage and return true if the NPC died
-    pub fn take_damage(&mut self, damage: i32, current_time: u64) -> bool {
+    /// Take damage and return true if the NPC died.
+    /// If attacker_id is provided and NPC survives, it will start chasing the attacker.
+    pub fn take_damage(&mut self, damage: i32, current_time: u64, attacker_id: Option<&str>) -> bool {
         self.hp = (self.hp - damage).max(0);
         if self.hp <= 0 {
             self.state = NpcState::Dead;
@@ -243,6 +244,14 @@ impl Npc {
             self.target_id = None;
             true
         } else {
+            // If we don't have a target and we're attackable, chase the attacker
+            if self.target_id.is_none() && self.is_attackable() {
+                if let Some(attacker) = attacker_id {
+                    self.target_id = Some(attacker.to_string());
+                    self.state = NpcState::Chasing;
+                    self.wander_target = None;
+                }
+            }
             false
         }
     }
