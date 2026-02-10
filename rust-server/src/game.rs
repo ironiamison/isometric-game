@@ -781,6 +781,24 @@ impl GameRoom {
             }
         }
 
+        // Load farming contracts from database
+        if let Some(ref db) = db {
+            match db.load_farming_contracts().await {
+                Ok(contracts) => {
+                    let count = contracts.len();
+                    for (player_id, difficulty, crop_id, amount_required, amount_harvested, created_at) in &contracts {
+                        farming.restore_contract(player_id, difficulty, crop_id, *amount_required, *amount_harvested, *created_at);
+                    }
+                    if count > 0 {
+                        tracing::info!("Restored {} farming contracts from database", count);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load farming contracts from database: {}", e);
+                }
+            }
+        }
+
         // Load chair config
         let mut chair_gids: HashMap<u32, Direction> = HashMap::new();
         match std::fs::read_to_string("data/chairs.toml") {
