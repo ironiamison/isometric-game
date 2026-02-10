@@ -3324,56 +3324,21 @@ impl GameRoom {
                 .map(|p| p.display_name.clone())
                 .unwrap_or_else(|| "Master Farmer".to_string());
 
-            // Get player's farming level and gold
-            let (farming_level, gold) = {
-                let players = self.players.read().await;
-                match players.get(player_id) {
-                    Some(p) => (p.skills.farming.level, p.inventory.gold),
-                    None => return,
-                }
-            };
-
-            // Get player's unlocked plots
-            let farming = self.farming.read().await;
-            let unlocked = farming.get_unlocked_plots(player_id);
-
-            // Build dialogue choices
-            let mut choices = Vec::new();
-            for req in crate::farming::PLOT_REQUIREMENTS {
-                let owned = unlocked.contains(&req.plot_id);
-                if owned {
-                    choices.push(crate::protocol::DialogueChoice {
-                        id: format!("owned_{}", req.plot_id),
-                        text: format!("Plot {} (Owned)", req.plot_id),
-                    });
-                } else if farming_level < req.farming_level {
-                    choices.push(crate::protocol::DialogueChoice {
-                        id: format!("locked_{}", req.plot_id),
-                        text: format!("Plot {} (Requires Farming {})", req.plot_id, req.farming_level),
-                    });
-                } else {
-                    choices.push(crate::protocol::DialogueChoice {
-                        id: format!("unlock_{}", req.plot_id),
-                        text: format!("Unlock Plot {} - {}gp", req.plot_id, req.gold_cost),
-                    });
-                }
-            }
-            choices.push(crate::protocol::DialogueChoice {
-                id: "nevermind".to_string(),
-                text: "Nevermind".to_string(),
-            });
-
-            let text = format!(
-                "I manage the allotment plots around here.\n\nYour gold: {}gp\nFarming level: {}\n\nWould you like to unlock a new plot?",
-                gold, farming_level
-            );
-
             self.send_to_player(player_id, ServerMessage::ShowDialogue {
                 quest_id: format!("plot_seller:{}", npc_id),
                 npc_id: npc_id.to_string(),
                 speaker: npc_name,
-                text,
-                choices,
+                text: "Ah, welcome! I've been tending these fields for decades. What can I help you with?".to_string(),
+                choices: vec![
+                    crate::protocol::DialogueChoice {
+                        id: "buy_plots".to_string(),
+                        text: "Buy allotment plot".to_string(),
+                    },
+                    crate::protocol::DialogueChoice {
+                        id: "nevermind".to_string(),
+                        text: "Nevermind".to_string(),
+                    },
+                ],
             }).await;
             return;
         }
@@ -3688,16 +3653,19 @@ impl GameRoom {
         }
 
         // Handle plot seller dialogue choices (format: "plot_seller:{npc_id}")
-        if let Some(_npc_id) = quest_id.strip_prefix("plot_seller:") {
-            self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
-
-            // Parse the choice
-            if let Some(plot_str) = choice_id.strip_prefix("unlock_") {
+        if let Some(npc_id) = quest_id.strip_prefix("plot_seller:") {
+            if choice_id == "buy_plots" {
+                // Show the plot purchase screen
+                self.show_plot_purchase_dialogue(player_id, npc_id).await;
+            } else if let Some(plot_str) = choice_id.strip_prefix("unlock_") {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
                 if let Ok(plot_id) = plot_str.parse::<u32>() {
                     self.handle_plot_purchase(player_id, plot_id).await;
                 }
+            } else {
+                // "owned_N", "locked_N", "nevermind" all just close
+                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
             }
-            // "owned_N", "locked_N", "nevermind" all just close
             return;
         }
 
@@ -5992,6 +5960,75 @@ impl GameRoom {
                 }).await;
             }
         }
+    }
+
+    /// Show the plot purchase dialogue with available plots
+    async fn show_plot_purchase_dialogue(&self, player_id: &str, npc_id: &str) {
+        let npc_name = {
+            let npcs = self.npcs.read().await;
+            npcs.get(npc_id)
+                .map(|n| self.entity_registry.get(&n.prototype_id)
+                    .map(|p| p.display_name.clone())
+                    .unwrap_or_else(|| "Master Farmer".to_string()))
+                .unwrap_or_else(|| "Master Farmer".to_string())
+        };
+
+        // Get player's farming level and gold
+        let (farming_level, gold) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => (p.skills.farming.level, p.inventory.gold),
+                None => return,
+            }
+        };
+
+        // Get player's unlocked plots
+        let farming = self.farming.read().await;
+        let unlocked = farming.get_unlocked_plots(player_id);
+
+        // Build dialogue choices
+        let mut choices = Vec::new();
+        for req in crate::farming::PLOT_REQUIREMENTS {
+            let owned = unlocked.contains(&req.plot_id);
+            if owned {
+                choices.push(crate::protocol::DialogueChoice {
+                    id: format!("owned_{}", req.plot_id),
+                    text: format!("Plot {} (Owned)", req.plot_id),
+                });
+            } else if farming_level < req.farming_level {
+                choices.push(crate::protocol::DialogueChoice {
+                    id: format!("locked_{}", req.plot_id),
+                    text: format!("Plot {} - {}gp (Requires Farming {})", req.plot_id, req.gold_cost, req.farming_level),
+                });
+            } else if gold < req.gold_cost {
+                choices.push(crate::protocol::DialogueChoice {
+                    id: format!("locked_{}", req.plot_id),
+                    text: format!("Plot {} - {}gp (Not enough gold)", req.plot_id, req.gold_cost),
+                });
+            } else {
+                choices.push(crate::protocol::DialogueChoice {
+                    id: format!("unlock_{}", req.plot_id),
+                    text: format!("Plot {} - {}gp", req.plot_id, req.gold_cost),
+                });
+            }
+        }
+        choices.push(crate::protocol::DialogueChoice {
+            id: "nevermind".to_string(),
+            text: "Go back".to_string(),
+        });
+
+        let text = format!(
+            "Each allotment plot gives you 16 farming patches to grow crops.\n\nYour gold: {}gp | Farming level: {}",
+            gold, farming_level
+        );
+
+        self.send_to_player(player_id, ServerMessage::ShowDialogue {
+            quest_id: format!("plot_seller:{}", npc_id),
+            npc_id: npc_id.to_string(),
+            speaker: npc_name,
+            text,
+            choices,
+        }).await;
     }
 
     /// Handle a player purchasing a farming plot
