@@ -235,6 +235,7 @@ pub fn run_game_frame(
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem { slot_index: *slot_index as u32 },
             InputCommand::Interact { npc_id } => ClientMessage::Interact { npc_id: npc_id.clone() },
             InputCommand::DialogueChoice { quest_id, choice_id } => {
+                audio.play_sfx("enter");
                 if quest_id == "__control_scheme__" {
                     let classic = choice_id == "classic";
                     game_state.ui_state.classic_controls = classic;

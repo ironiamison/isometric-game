@@ -850,6 +850,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         state.ui_state.chat_messages.push(ChatMessage::system(
                             format!("{} leveled up to {}!", skill_name, new_level)
                         ));
+                        state.pending_sfx.push("level_up".to_string());
                     }
 
                     let now = macroquad::time::get_time();
@@ -876,18 +877,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         (255, 165, 0),    // orange
                         (255, 255, 255),  // white
                     ];
-                    for i in 0..12 {
-                        let spread = (i as f32 / 12.0) * std::f32::consts::PI;
+                    for i in 0..8 {
+                        let spread = (i as f32 / 8.0) * std::f32::consts::PI;
                         let angle = -std::f32::consts::PI + spread;
-                        let speed = 120.0 + (i as f32 % 4.0) * 40.0;
+                        let speed = 60.0 + (i as f32 % 4.0) * 20.0;
                         let color = firework_colors[i % firework_colors.len()];
                         state.firework_particles.push(FireworkParticle {
                             origin_x: px,
                             origin_y: py,
                             ox: 0.0,
                             oy: 0.0,
-                            vx: angle.cos() * speed * 0.5,
-                            vy: angle.sin() * speed - 160.0,
+                            vx: angle.cos() * speed * 0.4,
+                            vy: angle.sin() * speed - 80.0,
                             color,
                             time: now,
                             size: 2.0,
