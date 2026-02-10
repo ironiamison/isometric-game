@@ -4,7 +4,7 @@
 //! through 4 stages, and can be harvested for produce and Farming XP.
 //! Each player has their own instanced state per patch.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use rand::Rng;
 use serde::Deserialize;
@@ -102,6 +102,19 @@ pub struct HarvestResult {
     pub seed_item: String,
 }
 
+/// Plot unlock requirements
+pub struct PlotRequirement {
+    pub plot_id: u32,
+    pub farming_level: i32,
+    pub gold_cost: i32,
+}
+
+pub const PLOT_REQUIREMENTS: &[PlotRequirement] = &[
+    PlotRequirement { plot_id: 2, farming_level: 15, gold_cost: 500 },
+    PlotRequirement { plot_id: 3, farming_level: 30, gold_cost: 2000 },
+    PlotRequirement { plot_id: 4, farming_level: 45, gold_cost: 5000 },
+];
+
 /// Info about a patch state update to send to clients
 #[derive(Debug, Clone)]
 pub struct PatchUpdate {
@@ -121,6 +134,8 @@ pub struct FarmingSystem {
     pub patch_positions: HashMap<(i32, i32), String>,
     /// Per-player patch states: (patch_id, player_id) -> state
     pub player_states: HashMap<(String, String), PlayerPatchState>,
+    /// Per-player plot unlocks: player_id -> set of unlocked plot IDs
+    pub player_plot_unlocks: HashMap<String, HashSet<u32>>,
 }
 
 impl FarmingSystem {
@@ -130,6 +145,7 @@ impl FarmingSystem {
             patches: HashMap::new(),
             patch_positions: HashMap::new(),
             player_states: HashMap::new(),
+            player_plot_unlocks: HashMap::new(),
         }
     }
 
@@ -223,6 +239,12 @@ impl FarmingSystem {
             return Err("Patch not found".to_string());
         }
 
+        // Check plot is unlocked for this player
+        let plot_id = self.patches.get(patch_id).unwrap().plot;
+        if !self.is_plot_unlocked(player_id, plot_id) {
+            return Err("You haven't unlocked this allotment plot yet".to_string());
+        }
+
         // Check this player doesn't already have something planted here
         let key = (patch_id.to_string(), player_id.to_string());
         if self.player_states.contains_key(&key) {
@@ -314,11 +336,51 @@ impl FarmingSystem {
             .and_then(|id| self.patches.get(id))
     }
 
+    /// Check if a player has unlocked a specific plot (plot 1 is always unlocked)
+    pub fn is_plot_unlocked(&self, player_id: &str, plot_id: u32) -> bool {
+        if plot_id <= 1 { return true; }
+        self.player_plot_unlocks
+            .get(player_id)
+            .map(|plots| plots.contains(&plot_id))
+            .unwrap_or(false)
+    }
+
+    /// Unlock a plot for a player
+    pub fn unlock_plot(&mut self, player_id: &str, plot_id: u32) {
+        self.player_plot_unlocks
+            .entry(player_id.to_string())
+            .or_default()
+            .insert(plot_id);
+    }
+
+    /// Get all unlocked plot IDs for a player (always includes plot 1)
+    pub fn get_unlocked_plots(&self, player_id: &str) -> Vec<u32> {
+        let mut plots = vec![1];
+        if let Some(unlocked) = self.player_plot_unlocks.get(player_id) {
+            plots.extend(unlocked.iter());
+        }
+        plots.sort();
+        plots
+    }
+
+    /// Restore plot unlock from database
+    pub fn restore_plot_unlock(&mut self, player_id: &str, plot_id: u32) {
+        self.player_plot_unlocks
+            .entry(player_id.to_string())
+            .or_default()
+            .insert(plot_id);
+    }
+
     /// Get all patch states for a specific player (for sending on connect)
     pub fn get_player_patch_states(&self, player_id: &str, current_time: u64) -> Vec<PatchUpdate> {
         let mut updates = Vec::new();
 
         for patch in self.patches.values() {
+            // Only send patches for plots the player has unlocked
+            if !self.is_plot_unlocked(player_id, patch.plot) {
+                continue;
+            }
+
             let key = (patch.id.clone(), player_id.to_string());
             if let Some(state) = self.player_states.get(&key) {
                 let stage = state.growth_stage(&self.crops, current_time);
