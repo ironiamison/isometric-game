@@ -40,10 +40,18 @@ impl ShopDefinition {
         self.stock.iter_mut().find(|s| s.item_id == item_id)
     }
 
-    /// Restock all items by their restock_rate, capped at max_quantity
-    pub fn restock(&mut self) {
+    /// Restock all items by their restock_rate, capped at max_quantity.
+    /// Returns only the stock entries that actually changed.
+    pub fn restock(&mut self) -> Vec<(String, i32)> {
+        let mut changed = Vec::new();
         for item in &mut self.stock {
-            item.current_quantity = (item.current_quantity + item.restock_rate).min(item.max_quantity);
+            let old_quantity = item.current_quantity;
+            let new_quantity = (item.current_quantity + item.restock_rate).min(item.max_quantity);
+            if new_quantity != old_quantity {
+                item.current_quantity = new_quantity;
+                changed.push((item.item_id.clone(), new_quantity));
+            }
         }
+        changed
     }
 }

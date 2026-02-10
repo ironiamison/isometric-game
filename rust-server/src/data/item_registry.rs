@@ -88,32 +88,45 @@ impl ItemRegistry {
 
     /// Generate item definitions message for client sync
     pub fn to_client_definitions(&self) -> crate::protocol::ServerMessage {
-        use crate::protocol::ClientItemDef;
         use super::item_def::EquipmentSlot;
+        use crate::protocol::ClientItemDef;
 
-        let items: Vec<ClientItemDef> = self.items
+        let items: Vec<ClientItemDef> = self
+            .items
             .values()
             .map(|item| {
                 // Extract equipment stats if present and has valid slot
-                let (equipment_slot, attack_level_required, defence_level_required, woodcutting_level_required, attack_bonus, strength_bonus, defence_bonus, chop_speed_multiplier) =
-                    if let Some(ref equip) = item.equipment {
-                        if equip.slot_type != EquipmentSlot::None {
-                            (
-                                Some(equip.slot_type.as_str().to_string()),
-                                Some(equip.attack_level_required),
-                                Some(equip.defence_level_required),
-                                Some(equip.woodcutting_level_required),
-                                Some(equip.attack_bonus),
-                                Some(equip.strength_bonus),
-                                Some(equip.defence_bonus),
-                                if equip.chop_speed_multiplier > 0.0 { Some(equip.chop_speed_multiplier) } else { None },
-                            )
-                        } else {
-                            (None, None, None, None, None, None, None, None)
-                        }
+                let (
+                    equipment_slot,
+                    attack_level_required,
+                    defence_level_required,
+                    woodcutting_level_required,
+                    attack_bonus,
+                    strength_bonus,
+                    defence_bonus,
+                    chop_speed_multiplier,
+                ) = if let Some(ref equip) = item.equipment {
+                    if equip.slot_type != EquipmentSlot::None {
+                        (
+                            Some(equip.slot_type.as_str().to_string()),
+                            Some(equip.attack_level_required),
+                            Some(equip.defence_level_required),
+                            Some(equip.woodcutting_level_required),
+                            Some(equip.attack_bonus),
+                            Some(equip.strength_bonus),
+                            Some(equip.defence_bonus),
+                            if equip.chop_speed_multiplier > 0.0 {
+                                Some(equip.chop_speed_multiplier)
+                            } else {
+                                None
+                            },
+                        )
                     } else {
                         (None, None, None, None, None, None, None, None)
-                    };
+                    }
+                } else {
+                    (None, None, None, None, None, None, None, None)
+                };
 
                 ClientItemDef {
                     id: item.id.clone(),
@@ -131,11 +144,9 @@ impl ItemRegistry {
                     attack_bonus,
                     strength_bonus,
                     defence_bonus,
-                    weapon_type: item.equipment.as_ref().map(|e| {
-                        match e.weapon_type {
-                            WeaponType::Melee => "melee".to_string(),
-                            WeaponType::Ranged => "ranged".to_string(),
-                        }
+                    weapon_type: item.equipment.as_ref().map(|e| match e.weapon_type {
+                        WeaponType::Melee => "melee".to_string(),
+                        WeaponType::Ranged => "ranged".to_string(),
                     }),
                     range: item.equipment.as_ref().map(|e| e.range),
                     chop_speed_multiplier,

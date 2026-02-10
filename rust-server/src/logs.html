@@ -30,6 +30,11 @@
 </head>
 <body>
 <div class="toolbar">
+  <label>View:</label>
+  <select id="importantFilter">
+    <option value="">All</option>
+    <option value="true">Important</option>
+  </select>
   <label>Level:</label>
   <select id="levelFilter">
     <option value="">All</option>
@@ -46,6 +51,8 @@
     <option value="200" selected>200</option>
     <option value="500">500</option>
     <option value="1000">1000</option>
+    <option value="2000">2000</option>
+    <option value="5000">5000</option>
   </select>
   <button id="autoRefreshBtn" onclick="toggleAutoRefresh()">Auto-refresh: OFF</button>
   <button onclick="fetchLogs()">Refresh</button>
@@ -71,11 +78,13 @@ function toggleAutoRefresh() {
 }
 
 async function fetchLogs() {
+  const important = document.getElementById('importantFilter').value === 'true';
   const level = document.getElementById('levelFilter').value;
   const count = document.getElementById('countSelect').value;
   const search = document.getElementById('searchBox').value.toLowerCase();
 
   let url = `/api/logs?count=${count}`;
+  if (important) url += '&important=true';
   if (level) url += `&level=${level}`;
 
   try {
@@ -86,6 +95,7 @@ async function fetchLogs() {
     const wasAtBottom = (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50;
 
     let html = '';
+    let shown = 0;
     for (const entry of logs) {
       const msg = entry.message;
       if (search && !msg.toLowerCase().includes(search) && !entry.level.toLowerCase().includes(search)) continue;
@@ -93,9 +103,11 @@ async function fetchLogs() {
       const levelClass = `lvl-${entry.level}`;
       const msgClass = entry.level === 'ERROR' ? 'msg-error' : entry.level === 'WARN' ? 'msg-warn' : '';
       html += `<div class="log-line"><span class="ts">${entry.timestamp}</span> <span class="${levelClass}">${entry.level.padEnd(5)}</span> <span class="${msgClass}">${escapeHtml(msg)}</span></div>`;
+      shown += 1;
     }
     container.innerHTML = html;
-    document.getElementById('status').textContent = `${logs.length} entries | ${new Date().toLocaleTimeString()}`;
+    const scope = important ? 'important' : 'all';
+    document.getElementById('status').textContent = `${shown}/${logs.length} ${scope} entries | ${new Date().toLocaleTimeString()}`;
 
     if (wasAtBottom) window.scrollTo(0, document.body.scrollHeight);
   } catch (e) {

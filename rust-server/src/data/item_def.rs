@@ -121,15 +121,23 @@ pub struct EquipmentStats {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UseEffect {
-    Heal { amount: i32 },
-    RestoreMana { amount: i32 },
-    RestorePrayer { amount: i32 },
+    Heal {
+        amount: i32,
+    },
+    RestoreMana {
+        amount: i32,
+    },
+    RestorePrayer {
+        amount: i32,
+    },
     Buff {
         stat: String,
         amount: i32,
         duration_ms: u64,
     },
-    Teleport { destination: String },
+    Teleport {
+        destination: String,
+    },
 }
 
 // ============================================================================
@@ -155,8 +163,12 @@ pub struct RawItemDefinition {
     pub prayer_xp: i32,
 }
 
-fn default_true() -> bool { true }
-fn default_range() -> i32 { 1 }
+fn default_true() -> bool {
+    true
+}
+fn default_range() -> i32 {
+    1
+}
 
 // ============================================================================
 // Resolved Item Definition
@@ -183,12 +195,9 @@ impl ItemDefinition {
     pub fn from_raw(id: &str, raw: &RawItemDefinition) -> Self {
         Self {
             id: id.to_string(),
-            display_name: raw.display_name.clone()
-                .unwrap_or_else(|| id.to_string()),
-            sprite: raw.sprite.clone()
-                .unwrap_or_else(|| format!("item_{}", id)),
-            description: raw.description.clone()
-                .unwrap_or_default(),
+            display_name: raw.display_name.clone().unwrap_or_else(|| id.to_string()),
+            sprite: raw.sprite.clone().unwrap_or_else(|| format!("item_{}", id)),
+            description: raw.description.clone().unwrap_or_default(),
             category: raw.category,
             max_stack: raw.max_stack.unwrap_or(99),
             base_price: raw.base_price.unwrap_or(1),
@@ -216,21 +225,24 @@ impl ItemDefinition {
 
     /// Check if this is equippable (has equipment stats with a valid slot)
     pub fn is_equippable(&self) -> bool {
-        self.equipment.as_ref()
+        self.equipment
+            .as_ref()
             .map(|e| e.slot_type != EquipmentSlot::None)
             .unwrap_or(false)
     }
 
     /// Check if this is body equipment
     pub fn is_body_equipment(&self) -> bool {
-        self.equipment.as_ref()
+        self.equipment
+            .as_ref()
             .map(|e| e.slot_type == EquipmentSlot::Body)
             .unwrap_or(false)
     }
 
     /// Check if this is feet equipment
     pub fn is_feet_equipment(&self) -> bool {
-        self.equipment.as_ref()
+        self.equipment
+            .as_ref()
             .map(|e| e.slot_type == EquipmentSlot::Feet)
             .unwrap_or(false)
     }

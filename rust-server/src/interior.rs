@@ -67,7 +67,9 @@ pub struct InteriorEntitySpawn {
     #[serde(default = "default_true")]
     pub respawn: bool,
 }
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 /// Definition of an interior map (loaded from JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,7 +84,7 @@ pub struct InteriorMapDef {
     #[serde(default)]
     pub layers: InteriorLayers,
     #[serde(default)]
-    pub collision: String,  // Base64 encoded or empty
+    pub collision: String, // Base64 encoded or empty
     #[serde(default)]
     pub entities: Vec<InteriorEntitySpawn>,
     #[serde(default, rename = "mapObjects")]
@@ -121,9 +123,9 @@ impl InteriorMapDef {
     }
 
     pub fn get_portal_at(&self, x: i32, y: i32) -> Option<&InteriorPortal> {
-        self.portals.iter().find(|p| {
-            x >= p.x && x < p.x + p.width && y >= p.y && y < p.y + p.height
-        })
+        self.portals
+            .iter()
+            .find(|p| x >= p.x && x < p.x + p.width && y >= p.y && y < p.y + p.height)
     }
 }
 

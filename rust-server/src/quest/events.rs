@@ -53,16 +53,10 @@ pub enum QuestEvent {
     },
 
     /// Player accepted a quest (from dialogue)
-    QuestAccepted {
-        player_id: String,
-        quest_id: String,
-    },
+    QuestAccepted { player_id: String, quest_id: String },
 
     /// Player abandoned a quest
-    QuestAbandoned {
-        player_id: String,
-        quest_id: String,
-    },
+    QuestAbandoned { player_id: String, quest_id: String },
 
     /// Player made a dialogue choice
     DialogueChoice {

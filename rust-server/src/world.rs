@@ -1,11 +1,14 @@
+use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
-use serde::Deserialize;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-use crate::chunk::{world_to_local, Chunk, ChunkCoord, ChunkLayer, ChunkLayerType, EntitySpawn, GatheringZoneMarker, MapObject, Portal, Wall, WallEdge, CHUNK_SIZE};
+use crate::chunk::{
+    world_to_local, Chunk, ChunkCoord, ChunkLayer, ChunkLayerType, EntitySpawn,
+    GatheringZoneMarker, MapObject, Portal, Wall, WallEdge, CHUNK_SIZE,
+};
 
 #[derive(Deserialize)]
 struct CollisionIgnoreConfig {
@@ -132,7 +135,10 @@ impl World {
                     Ok(mut chunk) => {
                         self.clear_ignored_collision(&mut chunk);
                         let blocked_count = chunk.collision.iter().filter(|&&b| b).count();
-                        info!("Loaded chunk {:?} from {:?} - {} blocked tiles", chunk.coord, path, blocked_count);
+                        info!(
+                            "Loaded chunk {:?} from {:?} - {} blocked tiles",
+                            chunk.coord, path, blocked_count
+                        );
                         Some(chunk)
                     }
                     Err(e) => {
@@ -140,7 +146,7 @@ impl World {
                         None
                     }
                 }
-            },
+            }
             Err(e) => {
                 warn!("Failed to read chunk {:?}: {}", path, e);
                 None
@@ -149,8 +155,12 @@ impl World {
     }
 
     /// Parse new simplified JSON format (version 2+)
-    fn parse_simplified_json(&self, coord: ChunkCoord, value: &serde_json::Value) -> Result<Chunk, String> {
-        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+    fn parse_simplified_json(
+        &self,
+        coord: ChunkCoord,
+        value: &serde_json::Value,
+    ) -> Result<Chunk, String> {
+        use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 
         let size = value["size"].as_u64().unwrap_or(CHUNK_SIZE as u64) as u32;
         if size != CHUNK_SIZE {
@@ -295,11 +305,9 @@ impl World {
         // Parse gathering zones
         if let Some(gz_array) = value["gatheringZones"].as_array() {
             for gz in gz_array {
-                if let (Some(x), Some(y), Some(zone_id)) = (
-                    gz["x"].as_i64(),
-                    gz["y"].as_i64(),
-                    gz["zoneId"].as_str(),
-                ) {
+                if let (Some(x), Some(y), Some(zone_id)) =
+                    (gz["x"].as_i64(), gz["y"].as_i64(), gz["zoneId"].as_str())
+                {
                     chunk.gathering_zones.push(GatheringZoneMarker {
                         world_x: coord.x * CHUNK_SIZE as i32 + x as i32,
                         world_y: coord.y * CHUNK_SIZE as i32 + y as i32,
@@ -416,7 +424,9 @@ impl World {
                                 let collision_width = (obj_width / 64.0).ceil() as u32;
                                 let collision_height = (obj_height / 32.0).ceil() as u32;
 
-                                if obj_type == "collision" || name.to_lowercase().contains("collision") {
+                                if obj_type == "collision"
+                                    || name.to_lowercase().contains("collision")
+                                {
                                     // Mark collision area
                                     for dy in 0..collision_height.max(1) {
                                         for dx in 0..collision_width.max(1) {
@@ -426,11 +436,14 @@ impl World {
                                 } else if obj_type == "entity_spawn" || obj_type == "npc_spawn" {
                                     // Parse entity spawn from Tiled object properties
                                     if let Some(spawn) = self.parse_entity_spawn(obj, coord) {
-                                        info!("Found entity spawn: {} at ({}, {})",
-                                            spawn.entity_id, spawn.world_x, spawn.world_y);
+                                        info!(
+                                            "Found entity spawn: {} at ({}, {})",
+                                            spawn.entity_id, spawn.world_x, spawn.world_y
+                                        );
                                         chunk.entity_spawns.push(spawn);
                                     }
-                                } else if obj_type == "player_spawn" || obj_type == "spawn"
+                                } else if obj_type == "player_spawn"
+                                    || obj_type == "spawn"
                                     || name.to_lowercase().contains("spawn")
                                 {
                                     chunk.player_spawns.push((x, y));
@@ -446,7 +459,11 @@ impl World {
     }
 
     /// Parse an entity spawn object from Tiled JSON
-    fn parse_entity_spawn(&self, obj: &serde_json::Value, chunk_coord: ChunkCoord) -> Option<EntitySpawn> {
+    fn parse_entity_spawn(
+        &self,
+        obj: &serde_json::Value,
+        chunk_coord: ChunkCoord,
+    ) -> Option<EntitySpawn> {
         // Get pixel position and convert to grid
         let pixel_x = obj["x"].as_f64()?;
         let pixel_y = obj["y"].as_f64()?;
@@ -465,8 +482,11 @@ impl World {
 
         // Extract optional properties
         let level = self.get_property_int(properties, "level"); // None = use prototype's level
-        let respawn = self.get_property_bool(properties, "respawn").unwrap_or(true);
-        let respawn_time_override = self.get_property_int(properties, "respawn_time_override")
+        let respawn = self
+            .get_property_bool(properties, "respawn")
+            .unwrap_or(true);
+        let respawn_time_override = self
+            .get_property_int(properties, "respawn_time_override")
             .map(|v| v as u64);
         let facing = self.get_property_string(properties, "facing");
         let unique_id = self.get_property_string(properties, "unique_id");
@@ -484,22 +504,33 @@ impl World {
     }
 
     /// Get a string property from Tiled properties array
-    fn get_property_string(&self, props: Option<&Vec<serde_json::Value>>, name: &str) -> Option<String> {
-        props?.iter()
+    fn get_property_string(
+        &self,
+        props: Option<&Vec<serde_json::Value>>,
+        name: &str,
+    ) -> Option<String> {
+        props?
+            .iter()
             .find(|p| p["name"].as_str() == Some(name))
             .and_then(|p| p["value"].as_str().map(|s| s.to_string()))
     }
 
     /// Get an int property from Tiled properties array
     fn get_property_int(&self, props: Option<&Vec<serde_json::Value>>, name: &str) -> Option<i32> {
-        props?.iter()
+        props?
+            .iter()
             .find(|p| p["name"].as_str() == Some(name))
             .and_then(|p| p["value"].as_i64().map(|i| i as i32))
     }
 
     /// Get a bool property from Tiled properties array
-    fn get_property_bool(&self, props: Option<&Vec<serde_json::Value>>, name: &str) -> Option<bool> {
-        props?.iter()
+    fn get_property_bool(
+        &self,
+        props: Option<&Vec<serde_json::Value>>,
+        name: &str,
+    ) -> Option<bool> {
+        props?
+            .iter()
             .find(|p| p["name"].as_str() == Some(name))
             .and_then(|p| p["value"].as_bool())
     }
@@ -528,7 +559,9 @@ impl World {
     }
 
     /// Get a read guard to the loaded chunks (avoids cloning the entire map)
-    pub async fn chunks_read(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<ChunkCoord, Arc<Chunk>>> {
+    pub async fn chunks_read(
+        &self,
+    ) -> tokio::sync::RwLockReadGuard<'_, HashMap<ChunkCoord, Arc<Chunk>>> {
         self.chunks.read().await
     }
 
@@ -581,12 +614,16 @@ impl World {
 
             let e2 = 2 * err;
             if e2 >= dy {
-                if x == x1 { return true; }
+                if x == x1 {
+                    return true;
+                }
                 err += dy;
                 x += sx;
             }
             if e2 <= dx {
-                if y == y1 { return true; }
+                if y == y1 {
+                    return true;
+                }
                 err += dx;
                 y += sy;
             }
@@ -668,7 +705,9 @@ impl World {
                     if let Some(name) = name.strip_suffix(".json") {
                         let parts: Vec<&str> = name.split('_').collect();
                         if parts.len() == 2 {
-                            if let (Ok(x), Ok(y)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>()) {
+                            if let (Ok(x), Ok(y)) =
+                                (parts[0].parse::<i32>(), parts[1].parse::<i32>())
+                            {
                                 coords.push(ChunkCoord::new(x, y));
                             }
                         }

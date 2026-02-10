@@ -137,20 +137,14 @@ impl Prayer {
     pub fn from_raw(id: &str, raw: &RawPrayerDefinition) -> Self {
         Self {
             id: id.to_string(),
-            name: raw
-                .name
-                .clone()
-                .unwrap_or_else(|| id.replace('_', " ")),
+            name: raw.name.clone().unwrap_or_else(|| id.replace('_', " ")),
             description: raw.description.clone().unwrap_or_default(),
             level_req: raw.level_req,
             category: raw.category,
             effect_type: raw.effect_type,
             effect_value: raw.effect_value,
             drain_rate: raw.drain_rate,
-            icon: raw
-                .icon
-                .clone()
-                .unwrap_or_else(|| format!("prayer_{}", id)),
+            icon: raw.icon.clone().unwrap_or_else(|| format!("prayer_{}", id)),
         }
     }
 
@@ -194,9 +188,15 @@ impl ActivePrayerEffects {
                 PrayerEffectType::AttackBonus => effects.attack_bonus += prayer.effect_value,
                 PrayerEffectType::StrengthBonus => effects.strength_bonus += prayer.effect_value,
                 PrayerEffectType::DefenceBonus => effects.defence_bonus += prayer.effect_value,
-                PrayerEffectType::DamageReduction => effects.damage_reduction += prayer.effect_value,
-                PrayerEffectType::HPRegenMultiplier => effects.hp_regen_multiplier = prayer.effect_value,
-                PrayerEffectType::GatherSpeedBonus => effects.gather_speed_bonus += prayer.effect_value,
+                PrayerEffectType::DamageReduction => {
+                    effects.damage_reduction += prayer.effect_value
+                }
+                PrayerEffectType::HPRegenMultiplier => {
+                    effects.hp_regen_multiplier = prayer.effect_value
+                }
+                PrayerEffectType::GatherSpeedBonus => {
+                    effects.gather_speed_bonus += prayer.effect_value
+                }
             }
             effects.total_drain_rate += prayer.drain_rate;
         }
@@ -302,11 +302,7 @@ impl PrayerRegistry {
     pub fn get_by_category(&self, category: PrayerCategory) -> Vec<&Prayer> {
         self.by_category
             .get(&category)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.prayers.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.prayers.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -319,7 +315,10 @@ impl PrayerRegistry {
     }
 
     /// Get all prayers available at a given level, organized by category
-    pub fn available_by_category(&self, prayer_level: i32) -> HashMap<PrayerCategory, Vec<&Prayer>> {
+    pub fn available_by_category(
+        &self,
+        prayer_level: i32,
+    ) -> HashMap<PrayerCategory, Vec<&Prayer>> {
         let mut result: HashMap<PrayerCategory, Vec<&Prayer>> = HashMap::new();
 
         for prayer in self.prayers.values() {
@@ -382,7 +381,9 @@ impl PrayerRegistry {
                 if let Some(existing) = active_categories.get(&prayer.category) {
                     return Err(format!(
                         "Cannot activate '{}' - '{}' is already active in the {} category",
-                        id, existing, prayer.category.as_str()
+                        id,
+                        existing,
+                        prayer.category.as_str()
                     ));
                 }
                 active_categories.insert(prayer.category, id);
@@ -448,7 +449,8 @@ category = "hp_regen"
 effect_type = "hp_regen_multiplier"
 effect_value = 2.0
 drain_rate = 2.0
-"#.to_string()
+"#
+        .to_string()
     }
 
     #[test]
@@ -457,7 +459,8 @@ drain_rate = 2.0
         let prayers_file = temp_dir.path().join("prayers.toml");
 
         let mut file = std::fs::File::create(&prayers_file).unwrap();
-        file.write_all(create_test_prayer_toml().as_bytes()).unwrap();
+        file.write_all(create_test_prayer_toml().as_bytes())
+            .unwrap();
 
         let mut registry = PrayerRegistry::new();
         registry.load_from_file(&prayers_file).unwrap();
@@ -482,7 +485,8 @@ drain_rate = 2.0
         let prayers_file = temp_dir.path().join("prayers.toml");
 
         let mut file = std::fs::File::create(&prayers_file).unwrap();
-        file.write_all(create_test_prayer_toml().as_bytes()).unwrap();
+        file.write_all(create_test_prayer_toml().as_bytes())
+            .unwrap();
 
         let mut registry = PrayerRegistry::new();
         registry.load_from_file(&prayers_file).unwrap();
@@ -502,7 +506,8 @@ drain_rate = 2.0
         let prayers_file = temp_dir.path().join("prayers.toml");
 
         let mut file = std::fs::File::create(&prayers_file).unwrap();
-        file.write_all(create_test_prayer_toml().as_bytes()).unwrap();
+        file.write_all(create_test_prayer_toml().as_bytes())
+            .unwrap();
 
         let mut registry = PrayerRegistry::new();
         registry.load_from_file(&prayers_file).unwrap();
@@ -526,16 +531,15 @@ drain_rate = 2.0
         let prayers_file = temp_dir.path().join("prayers.toml");
 
         let mut file = std::fs::File::create(&prayers_file).unwrap();
-        file.write_all(create_test_prayer_toml().as_bytes()).unwrap();
+        file.write_all(create_test_prayer_toml().as_bytes())
+            .unwrap();
 
         let mut registry = PrayerRegistry::new();
         registry.load_from_file(&prayers_file).unwrap();
 
         // Activate clarity (+5% attack) and burst_of_strength (+5% strength)
-        let effects = registry.calculate_effects(&[
-            "clarity".to_string(),
-            "burst_of_strength".to_string(),
-        ]);
+        let effects =
+            registry.calculate_effects(&["clarity".to_string(), "burst_of_strength".to_string()]);
 
         assert_eq!(effects.attack_bonus, 5.0);
         assert_eq!(effects.strength_bonus, 5.0);
@@ -581,16 +585,14 @@ drain_rate = 1.0
         registry.load_from_file(&prayers_file).unwrap();
 
         // Valid: different categories
-        assert!(registry.validate_prayer_set(&[
-            "clarity".to_string(),
-            "thick_skin".to_string(),
-        ]).is_ok());
+        assert!(registry
+            .validate_prayer_set(&["clarity".to_string(), "thick_skin".to_string(),])
+            .is_ok());
 
         // Invalid: same category (attack)
-        assert!(registry.validate_prayer_set(&[
-            "clarity".to_string(),
-            "improved_clarity".to_string(),
-        ]).is_err());
+        assert!(registry
+            .validate_prayer_set(&["clarity".to_string(), "improved_clarity".to_string(),])
+            .is_err());
     }
 
     #[test]
@@ -646,7 +648,9 @@ drain_rate = 1.0
         let data_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/prayers.toml");
 
         let mut registry = PrayerRegistry::new();
-        registry.load_from_file(&data_path).expect("Failed to load prayers.toml");
+        registry
+            .load_from_file(&data_path)
+            .expect("Failed to load prayers.toml");
 
         // Verify we have all 14 prayers
         assert_eq!(registry.len(), 14, "Expected 14 prayers in prayers.toml");
@@ -654,18 +658,42 @@ drain_rate = 1.0
         // Verify specific prayers exist
         assert!(registry.contains("clarity"), "Missing clarity prayer");
         assert!(registry.contains("thick_skin"), "Missing thick_skin prayer");
-        assert!(registry.contains("burst_of_strength"), "Missing burst_of_strength prayer");
-        assert!(registry.contains("improved_clarity"), "Missing improved_clarity prayer");
+        assert!(
+            registry.contains("burst_of_strength"),
+            "Missing burst_of_strength prayer"
+        );
+        assert!(
+            registry.contains("improved_clarity"),
+            "Missing improved_clarity prayer"
+        );
         assert!(registry.contains("rock_skin"), "Missing rock_skin prayer");
-        assert!(registry.contains("superhuman_strength"), "Missing superhuman_strength prayer");
-        assert!(registry.contains("resourcefulness"), "Missing resourcefulness prayer");
+        assert!(
+            registry.contains("superhuman_strength"),
+            "Missing superhuman_strength prayer"
+        );
+        assert!(
+            registry.contains("resourcefulness"),
+            "Missing resourcefulness prayer"
+        );
         assert!(registry.contains("rapid_heal"), "Missing rapid_heal prayer");
         assert!(registry.contains("steel_skin"), "Missing steel_skin prayer");
-        assert!(registry.contains("incredible_clarity"), "Missing incredible_clarity prayer");
-        assert!(registry.contains("ultimate_strength"), "Missing ultimate_strength prayer");
+        assert!(
+            registry.contains("incredible_clarity"),
+            "Missing incredible_clarity prayer"
+        );
+        assert!(
+            registry.contains("ultimate_strength"),
+            "Missing ultimate_strength prayer"
+        );
         assert!(registry.contains("protection"), "Missing protection prayer");
-        assert!(registry.contains("greater_resourcefulness"), "Missing greater_resourcefulness prayer");
-        assert!(registry.contains("greater_protection"), "Missing greater_protection prayer");
+        assert!(
+            registry.contains("greater_resourcefulness"),
+            "Missing greater_resourcefulness prayer"
+        );
+        assert!(
+            registry.contains("greater_protection"),
+            "Missing greater_protection prayer"
+        );
 
         // Verify categories have correct prayers
         let attack_prayers = registry.get_by_category(PrayerCategory::Attack);

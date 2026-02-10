@@ -7,11 +7,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
-use super::definition::{Quest, RawQuestFile, ObjectiveType};
-use super::state::{PlayerQuestState, QuestProgress};
+use super::definition::{ObjectiveType, Quest, RawQuestFile};
 use super::events::{QuestEvent, QuestEventResult};
+use super::state::{PlayerQuestState, QuestProgress};
 
 /// Registry for all quest definitions
 pub struct QuestRegistry {
@@ -58,7 +58,11 @@ impl QuestRegistry {
     }
 
     /// Recursively load quests from a directory (non-async to avoid boxing)
-    fn load_quests_recursive_sync(&self, dir: &Path, paths: &mut Vec<PathBuf>) -> Result<(), String> {
+    fn load_quests_recursive_sync(
+        &self,
+        dir: &Path,
+        paths: &mut Vec<PathBuf>,
+    ) -> Result<(), String> {
         let entries = std::fs::read_dir(dir)
             .map_err(|e| format!("Failed to read directory {:?}: {}", dir, e))?;
 
@@ -94,8 +98,8 @@ impl QuestRegistry {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read {:?}: {}", path, e))?;
 
-        let raw: RawQuestFile = toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse {:?}: {}", path, e))?;
+        let raw: RawQuestFile =
+            toml::from_str(&content).map_err(|e| format!("Failed to parse {:?}: {}", path, e))?;
 
         let quest = Quest::from_raw(&raw.quest)?;
         let quest_id = quest.id.clone();
@@ -256,28 +260,27 @@ impl QuestRegistry {
 
         match event {
             QuestEvent::MonsterKilled { entity_type, .. } => {
-                results.extend(
-                    self.update_kill_objectives(player_state, entity_type).await
-                );
+                results.extend(self.update_kill_objectives(player_state, entity_type).await);
             }
             QuestEvent::ItemCollected { item_id, count, .. } => {
                 results.extend(
-                    self.update_collect_objectives(player_state, item_id, *count).await
+                    self.update_collect_objectives(player_state, item_id, *count)
+                        .await,
                 );
             }
             QuestEvent::NpcInteraction { npc_id, .. } => {
-                results.extend(
-                    self.update_talk_objectives(player_state, npc_id).await
-                );
+                results.extend(self.update_talk_objectives(player_state, npc_id).await);
             }
             QuestEvent::LocationReached { location_id, .. } => {
                 results.extend(
-                    self.update_location_objectives(player_state, location_id).await
+                    self.update_location_objectives(player_state, location_id)
+                        .await,
                 );
             }
             QuestEvent::TreeDepleted { tree_type, .. } => {
                 results.extend(
-                    self.update_deplete_objectives(player_state, tree_type).await
+                    self.update_deplete_objectives(player_state, tree_type)
+                        .await,
                 );
             }
             _ => {}
@@ -304,9 +307,9 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::KillMonster
                         && objective.target == entity_type
                     {
-                        if let Some(result) = self.update_single_objective(
-                            player_state, &quest_id, &objective.id, 1
-                        ) {
+                        if let Some(result) =
+                            self.update_single_objective(player_state, &quest_id, &objective.id, 1)
+                        {
                             results.push(result);
                         }
                     }
@@ -373,7 +376,10 @@ impl QuestRegistry {
                         && objective.target == item_id
                     {
                         if let Some(result) = self.update_single_objective(
-                            player_state, &quest_id, &objective.id, count
+                            player_state,
+                            &quest_id,
+                            &objective.id,
+                            count,
                         ) {
                             results.push(result);
                         }
@@ -406,10 +412,14 @@ impl QuestRegistry {
                         if objective.sequential {
                             // Get all other objectives and check if they're complete
                             if let Some(progress) = player_state.get_quest(&quest_id) {
-                                let others_complete = quest.objectives.iter()
+                                let others_complete = quest
+                                    .objectives
+                                    .iter()
                                     .filter(|o| o.id != objective.id)
                                     .all(|o| {
-                                        progress.objectives.get(&o.id)
+                                        progress
+                                            .objectives
+                                            .get(&o.id)
                                             .map(|p| p.completed)
                                             .unwrap_or(false)
                                     });
@@ -420,9 +430,9 @@ impl QuestRegistry {
                             }
                         }
 
-                        if let Some(result) = self.force_complete_objective(
-                            player_state, &quest_id, &objective.id
-                        ) {
+                        if let Some(result) =
+                            self.force_complete_objective(player_state, &quest_id, &objective.id)
+                        {
                             results.push(result);
                         }
                     }
@@ -486,9 +496,9 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::ReachLocation
                         && objective.target == location_id
                     {
-                        if let Some(result) = self.force_complete_objective(
-                            player_state, &quest_id, &objective.id
-                        ) {
+                        if let Some(result) =
+                            self.force_complete_objective(player_state, &quest_id, &objective.id)
+                        {
                             results.push(result);
                         }
                     }
@@ -509,7 +519,10 @@ impl QuestRegistry {
         let quests = self.quests.read().await;
 
         let quest_ids: Vec<String> = player_state.active_quests.keys().cloned().collect();
-        info!("Processing tree depletion for tree_type='{}', active quests: {:?}", tree_type, quest_ids);
+        info!(
+            "Processing tree depletion for tree_type='{}', active quests: {:?}",
+            tree_type, quest_ids
+        );
 
         for quest_id in quest_ids {
             if let Some(quest) = quests.get(&quest_id) {
@@ -522,9 +535,9 @@ impl QuestRegistry {
                         && objective.target == tree_type
                     {
                         info!("Match found! Updating objective '{}'", objective.id);
-                        if let Some(result) = self.update_single_objective(
-                            player_state, &quest_id, &objective.id, 1
-                        ) {
+                        if let Some(result) =
+                            self.update_single_objective(player_state, &quest_id, &objective.id, 1)
+                        {
                             results.push(result);
                         }
                     }
@@ -544,7 +557,9 @@ impl QuestRegistry {
     /// Reload a specific quest (for hot-reload)
     pub async fn reload_quest(&self, quest_id: &str) -> Result<(), String> {
         // Find the file for this quest
-        let quest = self.get(quest_id).await
+        let quest = self
+            .get(quest_id)
+            .await
             .ok_or_else(|| format!("Quest '{}' not found", quest_id))?;
 
         // We'd need to track file -> quest_id mapping for proper hot-reload
@@ -606,7 +621,10 @@ impl QuestRegistry {
                 }
             }
 
-            info!("Quest hot-reload watcher started for {:?} and {:?}", data_dir, scripts_dir);
+            info!(
+                "Quest hot-reload watcher started for {:?} and {:?}",
+                data_dir, scripts_dir
+            );
 
             // Process events
             loop {
@@ -617,9 +635,8 @@ impl QuestRegistry {
                         match event.kind {
                             EventKind::Modify(_) | EventKind::Create(_) => {
                                 for path in &event.paths {
-                                    let extension = path.extension()
-                                        .and_then(|e| e.to_str())
-                                        .unwrap_or("");
+                                    let extension =
+                                        path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
                                     if extension == "toml" || extension == "lua" {
                                         info!("Detected change in {:?}, triggering reload", path);
@@ -635,9 +652,11 @@ impl QuestRegistry {
                                                 let _ = tx.send(HotReloadEvent::Error(e)).await;
                                             } else {
                                                 info!("Hot-reload completed successfully");
-                                                let _ = tx.send(HotReloadEvent::Reloaded(
-                                                    path_clone.to_string_lossy().to_string()
-                                                )).await;
+                                                let _ = tx
+                                                    .send(HotReloadEvent::Reloaded(
+                                                        path_clone.to_string_lossy().to_string(),
+                                                    ))
+                                                    .await;
                                             }
                                         });
                                     }
@@ -699,10 +718,7 @@ gold = 25
         let quest_dir = temp_dir.path().join("quests");
         std::fs::create_dir_all(&quest_dir).unwrap();
 
-        std::fs::write(
-            quest_dir.join("test.toml"),
-            create_test_quest_toml(),
-        ).unwrap();
+        std::fs::write(quest_dir.join("test.toml"), create_test_quest_toml()).unwrap();
 
         let registry = QuestRegistry::new(temp_dir.path());
         registry.load_all().await.unwrap();

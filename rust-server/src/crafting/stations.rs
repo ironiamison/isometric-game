@@ -23,8 +23,8 @@ impl StationRegistry {
     }
 
     pub fn load_from_file(&mut self, path: &Path) -> Result<(), String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read stations file: {}", e))?;
+        let content =
+            fs::read_to_string(path).map_err(|e| format!("Failed to read stations file: {}", e))?;
         let stations: HashMap<String, StationDefinition> = toml::from_str(&content)
             .map_err(|e| format!("Failed to parse stations TOML: {}", e))?;
         self.stations = stations;

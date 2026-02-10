@@ -4,10 +4,10 @@
 //! through 4 stages, and can be harvested for produce and Farming XP.
 //! Each player has their own instanced state per patch.
 
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
 use rand::Rng;
 use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use tracing::info;
 
 // ---------------------------------------------------------------------------
@@ -38,7 +38,9 @@ struct PatchLocationEntry {
     pub plot: u32,
 }
 
-fn default_plot() -> u32 { 1 }
+fn default_plot() -> u32 {
+    1
+}
 
 #[derive(Deserialize, Debug, Clone)]
 struct PatchLocationsFile {
@@ -53,7 +55,7 @@ struct PatchLocationsFile {
 #[derive(Debug, Clone)]
 pub struct PlayerPatchState {
     pub crop_id: String,
-    pub planted_at: u64,  // timestamp ms
+    pub planted_at: u64, // timestamp ms
     /// Last growth stage sent to this player (for detecting transitions)
     pub last_broadcast_stage: u32,
 }
@@ -110,9 +112,21 @@ pub struct PlotRequirement {
 }
 
 pub const PLOT_REQUIREMENTS: &[PlotRequirement] = &[
-    PlotRequirement { plot_id: 2, farming_level: 15, gold_cost: 500 },
-    PlotRequirement { plot_id: 3, farming_level: 30, gold_cost: 2000 },
-    PlotRequirement { plot_id: 4, farming_level: 45, gold_cost: 5000 },
+    PlotRequirement {
+        plot_id: 2,
+        farming_level: 15,
+        gold_cost: 500,
+    },
+    PlotRequirement {
+        plot_id: 3,
+        farming_level: 30,
+        gold_cost: 2000,
+    },
+    PlotRequirement {
+        plot_id: 4,
+        farming_level: 45,
+        gold_cost: 5000,
+    },
 ];
 
 // ---------------------------------------------------------------------------
@@ -210,7 +224,8 @@ impl FarmingContract {
     }
 
     pub fn produce_item(&self, crops: &HashMap<String, CropConfig>) -> String {
-        crops.get(&self.crop_id)
+        crops
+            .get(&self.crop_id)
             .map(|c| c.produce_item.clone())
             .unwrap_or_else(|| self.crop_id.clone())
     }
@@ -220,7 +235,7 @@ impl FarmingContract {
 #[derive(Debug, Clone)]
 pub struct PatchUpdate {
     pub patch_id: String,
-    pub state: String,       // "empty", "planted", "growing", "harvestable"
+    pub state: String, // "empty", "planted", "growing", "harvestable"
     pub crop_id: String,
     pub growth_stage: u32,
     pub owner_id: String,
@@ -284,7 +299,9 @@ impl FarmingSystem {
                     patch_type: entry.patch_type,
                     plot: entry.plot,
                 };
-                system.patch_positions.insert((entry.x, entry.y), entry.id.clone());
+                system
+                    .patch_positions
+                    .insert((entry.x, entry.y), entry.id.clone());
                 system.patches.insert(entry.id, patch);
             }
             info!("Loaded {} farming patch locations", system.patches.len());
@@ -294,7 +311,13 @@ impl FarmingSystem {
     }
 
     /// Restore a planted patch state (from database on startup)
-    pub fn restore_patch(&mut self, patch_id: &str, player_id: &str, crop_id: &str, planted_at: u64) {
+    pub fn restore_patch(
+        &mut self,
+        patch_id: &str,
+        player_id: &str,
+        crop_id: &str,
+        planted_at: u64,
+    ) {
         if self.patches.contains_key(patch_id) {
             self.player_states.insert(
                 (patch_id.to_string(), player_id.to_string()),
@@ -304,7 +327,10 @@ impl FarmingSystem {
                     last_broadcast_stage: 0,
                 },
             );
-            info!("Restored farming patch {} for player {} with crop {}", patch_id, player_id, crop_id);
+            info!(
+                "Restored farming patch {} for player {} with crop {}",
+                patch_id, player_id, crop_id
+            );
         } else {
             info!("Skipping unknown patch {} during restore", patch_id);
         }
@@ -312,7 +338,8 @@ impl FarmingSystem {
 
     /// Get crop config for a seed item ID
     pub fn crop_for_seed(&self, seed_item_id: &str) -> Option<(&str, &CropConfig)> {
-        self.crops.iter()
+        self.crops
+            .iter()
             .find(|(_, c)| c.seed_item == seed_item_id)
             .map(|(id, c)| (id.as_str(), c))
     }
@@ -327,12 +354,16 @@ impl FarmingSystem {
         current_time: u64,
     ) -> Result<(String, i64), String> {
         // Find crop for this seed
-        let (crop_id, crop) = self.crop_for_seed(seed_item_id)
+        let (crop_id, crop) = self
+            .crop_for_seed(seed_item_id)
             .ok_or_else(|| format!("{} is not a valid seed", seed_item_id))?;
 
         // Check level requirement
         if farming_level < crop.level_required {
-            return Err(format!("You need Farming level {} to plant this", crop.level_required));
+            return Err(format!(
+                "You need Farming level {} to plant this",
+                crop.level_required
+            ));
         }
 
         let xp = crop.xp_planting;
@@ -356,11 +387,14 @@ impl FarmingSystem {
         }
 
         // Plant the seed
-        self.player_states.insert(key, PlayerPatchState {
-            crop_id: crop_id.clone(),
-            planted_at: current_time,
-            last_broadcast_stage: 0,
-        });
+        self.player_states.insert(
+            key,
+            PlayerPatchState {
+                crop_id: crop_id.clone(),
+                planted_at: current_time,
+                last_broadcast_stage: 0,
+            },
+        );
 
         Ok((crop_id, xp))
     }
@@ -378,7 +412,9 @@ impl FarmingSystem {
         }
 
         let key = (patch_id.to_string(), player_id.to_string());
-        let state = self.player_states.get(&key)
+        let state = self
+            .player_states
+            .get(&key)
             .ok_or_else(|| "Nothing to harvest".to_string())?;
 
         // Check if harvestable
@@ -386,8 +422,7 @@ impl FarmingSystem {
             return Err("This crop is not ready to harvest yet".to_string());
         }
 
-        let crop = self.crops.get(&state.crop_id)
-            .ok_or("Unknown crop type")?;
+        let crop = self.crops.get(&state.crop_id).ok_or("Unknown crop type")?;
 
         let mut rng = rand::thread_rng();
         let base_amount = rng.gen_range(crop.harvest_amount_min..=crop.harvest_amount_max);
@@ -423,15 +458,22 @@ impl FarmingSystem {
                 state.last_broadcast_stage = current_stage;
 
                 let is_harvestable = state.is_harvestable(&self.crops, current_time);
-                let state_str = if is_harvestable { "harvestable" } else { "growing" };
+                let state_str = if is_harvestable {
+                    "harvestable"
+                } else {
+                    "growing"
+                };
 
-                updates.push((player_id.clone(), PatchUpdate {
-                    patch_id: patch_id.clone(),
-                    state: state_str.to_string(),
-                    crop_id: state.crop_id.clone(),
-                    growth_stage: current_stage,
-                    owner_id: player_id.clone(),
-                }));
+                updates.push((
+                    player_id.clone(),
+                    PatchUpdate {
+                        patch_id: patch_id.clone(),
+                        state: state_str.to_string(),
+                        crop_id: state.crop_id.clone(),
+                        growth_stage: current_stage,
+                        owner_id: player_id.clone(),
+                    },
+                ));
             }
         }
 
@@ -440,13 +482,16 @@ impl FarmingSystem {
 
     /// Get patch at a world position
     pub fn patch_at(&self, x: i32, y: i32) -> Option<&FarmingPatch> {
-        self.patch_positions.get(&(x, y))
+        self.patch_positions
+            .get(&(x, y))
             .and_then(|id| self.patches.get(id))
     }
 
     /// Check if a player has unlocked a specific plot (plot 1 is always unlocked)
     pub fn is_plot_unlocked(&self, player_id: &str, plot_id: u32) -> bool {
-        if plot_id <= 1 { return true; }
+        if plot_id <= 1 {
+            return true;
+        }
         self.player_plot_unlocks
             .get(player_id)
             .map(|plots| plots.contains(&plot_id))
@@ -490,7 +535,11 @@ impl FarmingSystem {
             if let Some(state) = self.player_states.get(&key) {
                 let stage = state.growth_stage(&self.crops, current_time);
                 let is_harvestable = state.is_harvestable(&self.crops, current_time);
-                let state_str = if is_harvestable { "harvestable" } else { "growing" };
+                let state_str = if is_harvestable {
+                    "harvestable"
+                } else {
+                    "growing"
+                };
                 updates.push(PatchUpdate {
                     patch_id: patch.id.clone(),
                     state: state_str.to_string(),
@@ -525,11 +574,16 @@ impl FarmingSystem {
         }
 
         if farming_level < difficulty.level_required() {
-            return Err(format!("You need Farming level {} for {} contracts",
-                difficulty.level_required(), difficulty.display_name()));
+            return Err(format!(
+                "You need Farming level {} for {} contracts",
+                difficulty.level_required(),
+                difficulty.display_name()
+            ));
         }
 
-        let eligible_crops: Vec<(&str, &CropConfig)> = self.crops.iter()
+        let eligible_crops: Vec<(&str, &CropConfig)> = self
+            .crops
+            .iter()
             .filter(|(_, c)| c.level_required <= farming_level)
             .map(|(id, c)| (id.as_str(), c))
             .collect();
@@ -557,14 +611,24 @@ impl FarmingSystem {
     }
 
     /// Record a harvest toward a player's active contract
-    pub fn record_contract_harvest(&mut self, player_id: &str, crop_id: &str, amount: i32) -> Option<(i32, i32, bool)> {
+    pub fn record_contract_harvest(
+        &mut self,
+        player_id: &str,
+        crop_id: &str,
+        amount: i32,
+    ) -> Option<(i32, i32, bool)> {
         let contract = self.contracts.get_mut(player_id)?;
         if contract.crop_id != crop_id || contract.is_complete() {
             return None;
         }
-        contract.amount_harvested = (contract.amount_harvested + amount).min(contract.amount_required);
+        contract.amount_harvested =
+            (contract.amount_harvested + amount).min(contract.amount_required);
         let complete = contract.is_complete();
-        Some((contract.amount_harvested, contract.amount_required, complete))
+        Some((
+            contract.amount_harvested,
+            contract.amount_required,
+            complete,
+        ))
     }
 
     /// Get a player's active contract
@@ -578,25 +642,40 @@ impl FarmingSystem {
     }
 
     /// Restore a contract from database
-    pub fn restore_contract(&mut self, player_id: &str, difficulty: &str, crop_id: &str, amount_required: i32, amount_harvested: i32, created_at: u64) {
+    pub fn restore_contract(
+        &mut self,
+        player_id: &str,
+        difficulty: &str,
+        crop_id: &str,
+        amount_required: i32,
+        amount_harvested: i32,
+        created_at: u64,
+    ) {
         if let Some(diff) = ContractDifficulty::from_str(difficulty) {
-            self.contracts.insert(player_id.to_string(), FarmingContract {
-                player_id: player_id.to_string(),
-                difficulty: diff,
-                crop_id: crop_id.to_string(),
-                amount_required,
-                amount_harvested,
-                created_at,
-            });
+            self.contracts.insert(
+                player_id.to_string(),
+                FarmingContract {
+                    player_id: player_id.to_string(),
+                    difficulty: diff,
+                    crop_id: crop_id.to_string(),
+                    amount_required,
+                    amount_harvested,
+                    created_at,
+                },
+            );
         }
     }
 
     /// Pick a random seed item appropriate for the player's level
     pub fn random_seed_for_level(&self, farming_level: i32) -> Option<String> {
-        let eligible: Vec<&CropConfig> = self.crops.values()
+        let eligible: Vec<&CropConfig> = self
+            .crops
+            .values()
             .filter(|c| c.level_required <= farming_level)
             .collect();
-        if eligible.is_empty() { return None; }
+        if eligible.is_empty() {
+            return None;
+        }
         let mut rng = rand::thread_rng();
         Some(eligible[rng.gen_range(0..eligible.len())].seed_item.clone())
     }

@@ -19,9 +19,8 @@ pub fn generate_loot_from_prototype(
 
     // Gold drop
     if prototype.rewards.gold_max > 0 {
-        let gold_amount = rng.r#gen_range(
-            prototype.rewards.gold_min..=prototype.rewards.gold_max
-        ) * level; // Scale by level
+        let gold_amount =
+            rng.r#gen_range(prototype.rewards.gold_min..=prototype.rewards.gold_max) * level; // Scale by level
 
         if gold_amount > 0 {
             let id = format!("item_{}_{}", current_time, item_counter);

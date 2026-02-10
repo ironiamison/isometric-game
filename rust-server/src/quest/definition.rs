@@ -177,10 +177,14 @@ impl Reward {
         Self {
             exp: raw.exp,
             gold: raw.gold,
-            items: raw.items.iter().map(|i| ItemReward {
-                item_id: i.id.clone(),
-                count: i.count,
-            }).collect(),
+            items: raw
+                .items
+                .iter()
+                .map(|i| ItemReward {
+                    item_id: i.id.clone(),
+                    count: i.count,
+                })
+                .collect(),
         }
     }
 }
@@ -257,12 +261,17 @@ pub struct Quest {
 impl Quest {
     /// Create a Quest from raw TOML data
     pub fn from_raw(raw: &RawQuest) -> Result<Self, String> {
-        let objectives: Vec<Objective> = raw.objectives
+        let objectives: Vec<Objective> = raw
+            .objectives
             .iter()
             .enumerate()
             .map(|(i, o)| {
-                Objective::from_raw(o)
-                    .ok_or_else(|| format!("Invalid objective type '{}' at index {}", o.objective_type, i))
+                Objective::from_raw(o).ok_or_else(|| {
+                    format!(
+                        "Invalid objective type '{}' at index {}",
+                        o.objective_type, i
+                    )
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -277,14 +286,20 @@ impl Quest {
             giver_npc: raw.giver_npc.clone(),
             level_required: raw.level_required,
             lua_script: raw.lua_script.clone(),
-            chain: raw.chain.as_ref()
+            chain: raw
+                .chain
+                .as_ref()
                 .map(QuestChain::from_raw)
                 .unwrap_or_default(),
             objectives,
-            rewards: raw.rewards.as_ref()
+            rewards: raw
+                .rewards
+                .as_ref()
                 .map(Reward::from_raw)
                 .unwrap_or_default(),
-            dialogue: raw.dialogue.as_ref()
+            dialogue: raw
+                .dialogue
+                .as_ref()
                 .map(QuestDialogue::from_raw)
                 .unwrap_or_default(),
             repeatable: raw.repeatable,
@@ -313,12 +328,30 @@ mod tests {
 
     #[test]
     fn test_objective_type_parsing() {
-        assert_eq!(ObjectiveType::from_str("kill_monster"), Some(ObjectiveType::KillMonster));
-        assert_eq!(ObjectiveType::from_str("collect_item"), Some(ObjectiveType::CollectItem));
-        assert_eq!(ObjectiveType::from_str("talk_to"), Some(ObjectiveType::TalkTo));
-        assert_eq!(ObjectiveType::from_str("reach_location"), Some(ObjectiveType::ReachLocation));
-        assert_eq!(ObjectiveType::from_str("deplete_tree"), Some(ObjectiveType::DepleteTree));
-        assert_eq!(ObjectiveType::from_str("chop_tree"), Some(ObjectiveType::DepleteTree));
+        assert_eq!(
+            ObjectiveType::from_str("kill_monster"),
+            Some(ObjectiveType::KillMonster)
+        );
+        assert_eq!(
+            ObjectiveType::from_str("collect_item"),
+            Some(ObjectiveType::CollectItem)
+        );
+        assert_eq!(
+            ObjectiveType::from_str("talk_to"),
+            Some(ObjectiveType::TalkTo)
+        );
+        assert_eq!(
+            ObjectiveType::from_str("reach_location"),
+            Some(ObjectiveType::ReachLocation)
+        );
+        assert_eq!(
+            ObjectiveType::from_str("deplete_tree"),
+            Some(ObjectiveType::DepleteTree)
+        );
+        assert_eq!(
+            ObjectiveType::from_str("chop_tree"),
+            Some(ObjectiveType::DepleteTree)
+        );
         assert_eq!(ObjectiveType::from_str("invalid"), None);
     }
 }

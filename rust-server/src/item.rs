@@ -232,8 +232,8 @@ pub struct GroundItem {
     pub x: f32,
     pub y: f32,
     pub quantity: i32,
-    pub owner_id: Option<String>,    // Player who can pick up (None = anyone)
-    pub drop_time: u64,              // When the item was dropped
+    pub owner_id: Option<String>, // Player who can pick up (None = anyone)
+    pub drop_time: u64,           // When the item was dropped
     pub instance_id: Option<String>, // Which instance this item is in (None = overworld)
 }
 
@@ -329,4 +329,3 @@ impl From<&GroundItem> for GroundItemUpdate {
         }
     }
 }
-

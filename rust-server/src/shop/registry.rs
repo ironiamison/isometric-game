@@ -42,7 +42,10 @@ impl ShopRegistry {
                 shop.initialize_stock();
 
                 if self.shops.contains_key(&shop.id) {
-                    warn!("Duplicate shop ID '{}' in {:?}, overwriting", shop.id, file_path);
+                    warn!(
+                        "Duplicate shop ID '{}' in {:?}, overwriting",
+                        shop.id, file_path
+                    );
                 }
 
                 self.shops.insert(shop.id.clone(), shop);

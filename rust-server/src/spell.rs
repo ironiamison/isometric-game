@@ -69,6 +69,8 @@ pub fn calculate_heal_amount(magic_level: i32, base_power: i32) -> i32 {
 
 /// Roll spell damage between 0 and max_hit
 pub fn roll_spell_damage(max_hit: i32) -> i32 {
-    if max_hit <= 0 { return 0; }
+    if max_hit <= 0 {
+        return 0;
+    }
     rand::thread_rng().gen_range(0..=max_hit)
 }

@@ -61,7 +61,14 @@ impl Tilemap {
     }
 
     /// Try to move from current position to new position (for NPCs with float positions)
-    pub fn resolve_movement(&self, from_x: f32, from_y: f32, to_x: f32, to_y: f32, _radius: f32) -> (f32, f32) {
+    pub fn resolve_movement(
+        &self,
+        from_x: f32,
+        from_y: f32,
+        to_x: f32,
+        to_y: f32,
+        _radius: f32,
+    ) -> (f32, f32) {
         // Check if target tile is walkable
         let target_tile_x = to_x.round() as i32;
         let target_tile_y = to_y.round() as i32;
@@ -139,12 +146,16 @@ impl Tilemap {
 
             let e2 = 2 * err;
             if e2 >= dy {
-                if x == x1 { return true; }
+                if x == x1 {
+                    return true;
+                }
                 err += dy;
                 x += sx;
             }
             if e2 <= dx {
-                if y == y1 { return true; }
+                if y == y1 {
+                    return true;
+                }
                 err += dx;
                 y += sy;
             }

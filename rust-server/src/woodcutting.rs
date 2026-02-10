@@ -360,7 +360,10 @@ impl WoodcuttingSystem {
 
     /// Get all currently depleted trees (for syncing to new clients)
     pub fn get_depleted_trees(&self) -> Vec<((i32, i32), &DepletedTree)> {
-        self.depleted_trees.iter().map(|(pos, tree)| (*pos, tree)).collect()
+        self.depleted_trees
+            .iter()
+            .map(|(pos, tree)| (*pos, tree))
+            .collect()
     }
 
     /// Deplete a tree externally (used when loading from persistent state if needed)
@@ -400,11 +403,15 @@ impl WoodcuttingSystem {
         }
 
         // Find tree type by GID
-        let tree_type_id = self.gid_to_tree_type.get(&tree_gid)
+        let tree_type_id = self
+            .gid_to_tree_type
+            .get(&tree_gid)
             .cloned()
             .ok_or_else(|| "Not a valid tree".to_string())?;
 
-        let tree_config = self.tree_types.get(&tree_type_id)
+        let tree_config = self
+            .tree_types
+            .get(&tree_type_id)
             .ok_or_else(|| "Unknown tree type".to_string())?;
 
         // Check level requirement
@@ -457,14 +464,19 @@ impl WoodcuttingSystem {
                 },
             );
 
-            info!("Tree at ({}, {}) depleted, respawn in {}ms", tree_x, tree_y, respawn_delay);
+            info!(
+                "Tree at ({}, {}) depleted, respawn in {}ms",
+                tree_x, tree_y, respawn_delay
+            );
             Some(respawn_delay)
         } else {
             None
         };
 
-        info!("Chop success at ({}, {}): {} (+{}xp, depleted={})",
-              tree_x, tree_y, log_item_id, xp_gained, tree_depleted);
+        info!(
+            "Chop success at ({}, {}): {} (+{}xp, depleted={})",
+            tree_x, tree_y, log_item_id, xp_gained, tree_depleted
+        );
 
         Ok(ChopResult {
             success: true,

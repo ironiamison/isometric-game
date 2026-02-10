@@ -2,9 +2,9 @@
 //!
 //! Tracks player quest progress, status, and persistence.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Status of a quest for a player
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -179,7 +179,10 @@ impl QuestProgress {
 
     /// Check if quest is in a terminal state
     pub fn is_terminal(&self) -> bool {
-        matches!(self.status, QuestStatus::Completed | QuestStatus::Failed | QuestStatus::Abandoned)
+        matches!(
+            self.status,
+            QuestStatus::Completed | QuestStatus::Failed | QuestStatus::Abandoned
+        )
     }
 
     /// Serialize objectives to JSON for database storage
@@ -287,13 +290,18 @@ impl PlayerQuestState {
     }
 
     /// Get all active quests that are waiting for a specific event type
-    pub fn get_quests_for_target(&self, target: &str, objective_type: super::definition::ObjectiveType) -> Vec<(&str, &str)> {
+    pub fn get_quests_for_target(
+        &self,
+        target: &str,
+        objective_type: super::definition::ObjectiveType,
+    ) -> Vec<(&str, &str)> {
         // This would need the Quest definitions to check, so return quest_id + objective_id pairs
         // The caller should filter by checking the Quest definitions
         self.active_quests
             .values()
             .flat_map(|progress| {
-                progress.objectives
+                progress
+                    .objectives
                     .iter()
                     .filter(|(_, obj)| !obj.completed)
                     .map(|(obj_id, _)| (progress.quest_id.as_str(), obj_id.as_str()))

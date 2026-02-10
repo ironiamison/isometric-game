@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 use super::prototype::{
-    AnimationType, DialogueConfig, EntityBehaviors, EntityPrototype, LootEntry,
-    RawEntityPrototype, ResolvedRewards, ResolvedStats, SpeechConfig,
+    AnimationType, DialogueConfig, EntityBehaviors, EntityPrototype, LootEntry, RawEntityPrototype,
+    ResolvedRewards, ResolvedStats, SpeechConfig,
 };
 
 /// Registry for all entity prototypes
@@ -161,65 +161,95 @@ impl EntityRegistry {
 
         // Merge stats with parent (child overrides parent)
         let stats = ResolvedStats {
-            level: raw.stats.level
+            level: raw
+                .stats
+                .level
                 .or_else(|| parent.map(|p| p.stats.level))
                 .unwrap_or(1),
-            max_hp: raw.stats.max_hp
+            max_hp: raw
+                .stats
+                .max_hp
                 .or_else(|| parent.map(|p| p.stats.max_hp))
                 .unwrap_or(100),
-            damage: raw.stats.damage
+            damage: raw
+                .stats
+                .damage
                 .or_else(|| parent.map(|p| p.stats.damage))
                 .unwrap_or(10),
-            attack_bonus: raw.stats.attack_bonus
+            attack_bonus: raw
+                .stats
+                .attack_bonus
                 .or_else(|| parent.map(|p| p.stats.attack_bonus))
                 .unwrap_or(0),
-            defence_bonus: raw.stats.defence_bonus
+            defence_bonus: raw
+                .stats
+                .defence_bonus
                 .or_else(|| parent.map(|p| p.stats.defence_bonus))
                 .unwrap_or(0),
-            attack_range: raw.stats.attack_range
+            attack_range: raw
+                .stats
+                .attack_range
                 .or_else(|| parent.map(|p| p.stats.attack_range))
                 .unwrap_or(1),
-            aggro_range: raw.stats.aggro_range
+            aggro_range: raw
+                .stats
+                .aggro_range
                 .or_else(|| parent.map(|p| p.stats.aggro_range))
                 .unwrap_or(5),
-            chase_range: raw.stats.chase_range
+            chase_range: raw
+                .stats
+                .chase_range
                 .or_else(|| parent.map(|p| p.stats.chase_range))
                 .unwrap_or(8),
-            move_cooldown_ms: raw.stats.move_cooldown_ms
+            move_cooldown_ms: raw
+                .stats
+                .move_cooldown_ms
                 .or_else(|| parent.map(|p| p.stats.move_cooldown_ms))
                 .unwrap_or(500),
-            attack_cooldown_ms: raw.stats.attack_cooldown_ms
+            attack_cooldown_ms: raw
+                .stats
+                .attack_cooldown_ms
                 .or_else(|| parent.map(|p| p.stats.attack_cooldown_ms))
                 .unwrap_or(800),
-            respawn_time_ms: raw.stats.respawn_time_ms
+            respawn_time_ms: raw
+                .stats
+                .respawn_time_ms
                 .or_else(|| parent.map(|p| p.stats.respawn_time_ms))
                 .unwrap_or(10000),
-            hp_regen_percent_per_sec: raw.stats.hp_regen_percent_per_sec
+            hp_regen_percent_per_sec: raw
+                .stats
+                .hp_regen_percent_per_sec
                 .or_else(|| parent.map(|p| p.stats.hp_regen_percent_per_sec))
                 .unwrap_or(2.0),
         };
 
         // Merge rewards
         let rewards = ResolvedRewards {
-            exp_base: raw.rewards.exp_base
+            exp_base: raw
+                .rewards
+                .exp_base
                 .or_else(|| parent.map(|p| p.rewards.exp_base))
                 .unwrap_or(10),
-            gold_min: raw.rewards.gold_min
+            gold_min: raw
+                .rewards
+                .gold_min
                 .or_else(|| parent.map(|p| p.rewards.gold_min))
                 .unwrap_or(1),
-            gold_max: raw.rewards.gold_max
+            gold_max: raw
+                .rewards
+                .gold_max
                 .or_else(|| parent.map(|p| p.rewards.gold_max))
                 .unwrap_or(5),
         };
 
         // Merge loot tables (child appends to parent)
-        let mut loot: Vec<LootEntry> = parent
-            .map(|p| p.loot.clone())
-            .unwrap_or_default();
+        let mut loot: Vec<LootEntry> = parent.map(|p| p.loot.clone()).unwrap_or_default();
         loot.extend(raw.loot.clone());
 
         // Parse animation type
-        let animation_type = raw.animation_type.as_deref()
+        let animation_type = raw
+            .animation_type
+            .as_deref()
             .map(AnimationType::from_str)
             .or_else(|| parent.map(|p| p.animation_type))
             .unwrap_or_default();
@@ -229,26 +259,39 @@ impl EntityRegistry {
 
         Ok(EntityPrototype {
             id: id.to_string(),
-            display_name: raw.display_name.clone()
+            display_name: raw
+                .display_name
+                .clone()
                 .or_else(|| parent.map(|p| p.display_name.clone()))
                 .unwrap_or_else(|| id.to_string()),
-            sprite: raw.sprite.clone()
+            sprite: raw
+                .sprite
+                .clone()
                 .or_else(|| parent.map(|p| p.sprite.clone()))
                 .unwrap_or_else(|| "unknown".to_string()),
             animation_type,
-            description: raw.description.clone()
+            description: raw
+                .description
+                .clone()
                 .or_else(|| parent.map(|p| p.description.clone()))
                 .unwrap_or_default(),
             stats,
             rewards,
             loot,
             behaviors,
-            merchant: raw.merchant.clone()
+            merchant: raw
+                .merchant
+                .clone()
                 .or_else(|| parent.and_then(|p| p.merchant.clone())),
-            quest_giver: raw.quest_giver.clone()
+            quest_giver: raw
+                .quest_giver
+                .clone()
                 .or_else(|| parent.and_then(|p| p.quest_giver.clone())),
             dialogue: raw.dialogue.clone().unwrap_or_default(),
-            speech: raw.speech.as_ref().map(SpeechConfig::from)
+            speech: raw
+                .speech
+                .as_ref()
+                .map(SpeechConfig::from)
                 .or_else(|| parent.and_then(|p| p.speech.clone())),
         })
     }

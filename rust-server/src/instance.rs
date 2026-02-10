@@ -13,7 +13,7 @@ pub struct Instance {
     pub id: String,
     pub map_id: String,
     pub instance_type: InstanceType,
-    pub owner_id: Option<String>,  // For private instances
+    pub owner_id: Option<String>, // For private instances
     pub players: RwLock<HashSet<String>>,
     /// NPCs spawned in this instance
     pub npcs: RwLock<HashMap<String, Npc>>,
@@ -51,8 +51,11 @@ impl Instance {
         entities: &[crate::interior::InteriorEntitySpawn],
         entity_registry: &crate::entity::registry::EntityRegistry,
     ) {
-        info!("spawn_npcs called for instance {} with {} entity definitions",
-            self.id, entities.len());
+        info!(
+            "spawn_npcs called for instance {} with {} entity definitions",
+            self.id,
+            entities.len()
+        );
 
         let mut spawned = self.npcs_spawned.write().await;
         if *spawned {
@@ -62,14 +65,18 @@ impl Instance {
 
         let mut npcs = self.npcs.write().await;
         for (i, spawn) in entities.iter().enumerate() {
-            let npc_id = spawn.unique_id.clone()
+            let npc_id = spawn
+                .unique_id
+                .clone()
                 .unwrap_or_else(|| format!("{}_{}", self.id, i));
 
             if let Some(prototype) = entity_registry.get(&spawn.entity_id) {
                 // Use spawn's level if specified, otherwise use prototype's level
                 let level = spawn.level.unwrap_or(prototype.stats.level);
-                info!("Spawning {} at ({}, {}) level {} in instance {}",
-                    spawn.entity_id, spawn.x, spawn.y, level, self.id);
+                info!(
+                    "Spawning {} at ({}, {}) level {} in instance {}",
+                    spawn.entity_id, spawn.x, spawn.y, level, self.id
+                );
                 let npc = Npc::from_prototype(
                     &npc_id,
                     &spawn.entity_id,
@@ -80,7 +87,11 @@ impl Instance {
                 );
                 npcs.insert(npc_id, npc);
             } else {
-                tracing::warn!("Prototype '{}' not found for instance {}", spawn.entity_id, self.id);
+                tracing::warn!(
+                    "Prototype '{}' not found for instance {}",
+                    spawn.entity_id,
+                    self.id
+                );
             }
         }
 
@@ -96,7 +107,9 @@ impl Instance {
     /// Get NPC updates for sending to clients
     pub async fn get_npc_updates(&self) -> Vec<crate::npc::NpcUpdate> {
         let npcs = self.npcs.read().await;
-        npcs.values().map(|npc| crate::npc::NpcUpdate::from(npc)).collect()
+        npcs.values()
+            .map(|npc| crate::npc::NpcUpdate::from(npc))
+            .collect()
     }
 }
 
@@ -133,7 +146,8 @@ impl InstanceManager {
             npcs_spawned: RwLock::new(false),
         });
 
-        self.public_instances.insert(map_id.to_string(), instance.clone());
+        self.public_instances
+            .insert(map_id.to_string(), instance.clone());
         info!("Created public instance: {}", instance_id);
         (instance, true)
     }
@@ -158,7 +172,10 @@ impl InstanceManager {
         });
 
         self.private_instances.insert(key, instance.clone());
-        info!("Created private instance: {} for owner {}", instance_id, owner_id);
+        info!(
+            "Created private instance: {} for owner {}",
+            instance_id, owner_id
+        );
         (instance, true)
     }
 

@@ -1,5 +1,5 @@
-use std::collections::{HashMap, HashSet};
 use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 
 // ---------------------------------------------------------------------------
 // Zone bounds
@@ -57,14 +57,29 @@ impl Default for ArenaConfig {
             countdown_duration_ms: 10_000,
             results_duration_ms: 10_000,
             // Queue / waiting area
-            queue_zone: ZoneBounds { min_x: 13, min_y: 2, max_x: 30, max_y: 13 },
+            queue_zone: ZoneBounds {
+                min_x: 13,
+                min_y: 2,
+                max_x: 30,
+                max_y: 13,
+            },
             rings: vec![
                 // Small 1v1 ring (3,3 - 11,11)
                 RingConfig {
                     name: "1v1 Ring".to_string(),
                     max_players: 2,
-                    ring_zone: ZoneBounds { min_x: 3, min_y: 3, max_x: 11, max_y: 11 },
-                    spectator_zone: ZoneBounds { min_x: 3, min_y: 12, max_x: 11, max_y: 13 },
+                    ring_zone: ZoneBounds {
+                        min_x: 3,
+                        min_y: 3,
+                        max_x: 11,
+                        max_y: 11,
+                    },
+                    spectator_zone: ZoneBounds {
+                        min_x: 3,
+                        min_y: 12,
+                        max_x: 11,
+                        max_y: 13,
+                    },
                     ring_spawn_points: vec![(5, 5), (9, 9)],
                     spectator_spawn: (7, 12),
                 },
@@ -72,11 +87,27 @@ impl Default for ArenaConfig {
                 RingConfig {
                     name: "FFA Ring".to_string(),
                     max_players: 8,
-                    ring_zone: ZoneBounds { min_x: 15, min_y: 15, max_x: 29, max_y: 29 },
-                    spectator_zone: ZoneBounds { min_x: 13, min_y: 14, max_x: 30, max_y: 14 },
+                    ring_zone: ZoneBounds {
+                        min_x: 15,
+                        min_y: 15,
+                        max_x: 29,
+                        max_y: 29,
+                    },
+                    spectator_zone: ZoneBounds {
+                        min_x: 13,
+                        min_y: 14,
+                        max_x: 30,
+                        max_y: 14,
+                    },
                     ring_spawn_points: vec![
-                        (17, 19), (27, 19), (22, 17), (22, 27),
-                        (17, 17), (27, 17), (17, 27), (27, 27),
+                        (17, 19),
+                        (27, 19),
+                        (22, 17),
+                        (22, 27),
+                        (17, 17),
+                        (27, 17),
+                        (17, 27),
+                        (27, 27),
                     ],
                     spectator_spawn: (22, 14),
                 },
@@ -170,7 +201,8 @@ impl ArenaManager {
 
     /// Get the currently active ring config (only valid during Countdown/Fighting/Results)
     pub fn active_ring(&self) -> Option<&RingConfig> {
-        self.active_ring_index.and_then(|i| self.config.rings.get(i))
+        self.active_ring_index
+            .and_then(|i| self.config.rings.get(i))
     }
 
     /// Pick the best ring for a given player count.
@@ -292,7 +324,9 @@ impl ArenaManager {
         let ring = &self.config.rings[self.active_ring_index.unwrap()];
         tracing::info!(
             "Arena: selected '{}' for {} players (max {})",
-            ring.name, self.queued_players.len(), ring.max_players
+            ring.name,
+            self.queued_players.len(),
+            ring.max_players
         );
 
         let duration = custom_duration_ms.unwrap_or(self.config.countdown_duration_ms);
@@ -343,7 +377,11 @@ impl ArenaManager {
             *self.match_stats.kills.entry(kid.to_string()).or_insert(0) += 1;
         }
 
-        if !self.match_stats.death_order.contains(&player_id.to_string()) {
+        if !self
+            .match_stats
+            .death_order
+            .contains(&player_id.to_string())
+        {
             self.match_stats.death_order.push(player_id.to_string());
         }
 
@@ -414,10 +452,7 @@ impl ArenaManager {
     // Disconnection handling
     // -----------------------------------------------------------------------
 
-    pub fn on_player_disconnect(
-        &mut self,
-        player_id: &str,
-    ) -> Option<(String, Option<String>)> {
+    pub fn on_player_disconnect(&mut self, player_id: &str) -> Option<(String, Option<String>)> {
         let was_fighting = self.active_fighters.contains(&player_id.to_string());
 
         self.queued_players.retain(|id| id != player_id);
@@ -487,7 +522,8 @@ impl ArenaManager {
                 )
             }
             ArenaState::Countdown { ends_at } => {
-                let ring_name = self.active_ring()
+                let ring_name = self
+                    .active_ring()
                     .map(|r| r.name.as_str())
                     .unwrap_or("unknown");
                 format!(
@@ -498,19 +534,22 @@ impl ArenaManager {
                 )
             }
             ArenaState::Fighting => {
-                let ring_name = self.active_ring()
+                let ring_name = self
+                    .active_ring()
                     .map(|r| r.name.as_str())
                     .unwrap_or("unknown");
                 format!(
                     "Fight in progress ({})! {} fighter{} remaining.",
                     ring_name,
                     self.active_fighters.len(),
-                    if self.active_fighters.len() == 1 { "" } else { "s" }
+                    if self.active_fighters.len() == 1 {
+                        ""
+                    } else {
+                        "s"
+                    }
                 )
             }
-            ArenaState::Results { .. } => {
-                "Match complete. Results on display.".to_string()
-            }
+            ArenaState::Results { .. } => "Match complete. Results on display.".to_string(),
         }
     }
 

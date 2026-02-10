@@ -1,7 +1,7 @@
+use crate::interior::InteriorMapDef;
 use std::collections::HashMap;
 use std::path::Path;
-use tracing::{info, warn, error};
-use crate::interior::InteriorMapDef;
+use tracing::{error, info, warn};
 
 pub struct InteriorRegistry {
     interiors: HashMap<String, InteriorMapDef>,
@@ -13,7 +13,10 @@ impl InteriorRegistry {
         let path = Path::new(dir);
 
         if !path.exists() {
-            warn!("Interiors directory {} does not exist, creating empty registry", dir);
+            warn!(
+                "Interiors directory {} does not exist, creating empty registry",
+                dir
+            );
             return Ok(Self { interiors });
         }
 
@@ -25,8 +28,12 @@ impl InteriorRegistry {
             if file_path.extension().map_or(false, |ext| ext == "json") {
                 match InteriorMapDef::load_from_file(file_path.to_str().unwrap()) {
                     Ok(interior) => {
-                        info!("Loaded interior map: {} ({}) with {} entities",
-                            interior.id, interior.name, interior.entities.len());
+                        info!(
+                            "Loaded interior map: {} ({}) with {} entities",
+                            interior.id,
+                            interior.name,
+                            interior.entities.len()
+                        );
                         interiors.insert(interior.id.clone(), interior);
                     }
                     Err(e) => {

@@ -78,7 +78,12 @@ pub enum ClientMessage {
 
     /// Drop item from inventory slot (optionally at a target tile)
     #[serde(rename = "dropItem")]
-    DropItem { slot_index: u8, quantity: u32, target_x: Option<i32>, target_y: Option<i32> },
+    DropItem {
+        slot_index: u8,
+        quantity: u32,
+        target_x: Option<i32>,
+        target_y: Option<i32>,
+    },
 
     /// Drop gold to the ground
     #[serde(rename = "dropGold")]
@@ -90,11 +95,19 @@ pub enum ClientMessage {
 
     /// Buy item from shop
     #[serde(rename = "shopBuy")]
-    ShopBuy { npc_id: String, item_id: String, quantity: i32 },
+    ShopBuy {
+        npc_id: String,
+        item_id: String,
+        quantity: i32,
+    },
 
     /// Sell item to shop
     #[serde(rename = "shopSell")]
-    ShopSell { npc_id: String, item_id: String, quantity: i32 },
+    ShopSell {
+        npc_id: String,
+        item_id: String,
+        quantity: i32,
+    },
 
     /// Enter a portal to transition to another map
     #[serde(rename = "enterPortal")]
@@ -125,7 +138,6 @@ pub enum ClientMessage {
     HarvestCrop { patch_id: String },
 
     // ===== Friend System Messages =====
-
     /// Send a friend request to a player by name
     #[serde(rename = "sendFriendRequest")]
     SendFriendRequest { target_name: String },
@@ -147,7 +159,6 @@ pub enum ClientMessage {
     GetOnlinePlayers,
 
     // ===== Prayer System Messages =====
-
     /// Toggle a prayer on/off
     #[serde(rename = "togglePrayer")]
     TogglePrayer { prayer_id: String },
@@ -169,19 +180,20 @@ pub enum ClientMessage {
     PrayAtAltar { altar_id: String },
 
     // ===== Spell System Messages =====
-
     /// Cast a spell
     #[serde(rename = "castSpell")]
     CastSpell { spell_id: String },
 
     // ===== Woodcutting System Messages =====
-
     /// Chop a tree once (player-initiated, one chop per attack)
     #[serde(rename = "chopTree")]
-    ChopTree { tree_x: i32, tree_y: i32, tree_gid: u32 },
+    ChopTree {
+        tree_x: i32,
+        tree_y: i32,
+        tree_gid: u32,
+    },
 
     // ===== Utility Messages =====
-
     /// Ping for latency measurement - server responds with pong
     #[serde(rename = "ping")]
     Ping { timestamp: f64 },
@@ -411,9 +423,9 @@ pub enum ServerMessage {
         chunk_x: i32,
         chunk_y: i32,
         layers: Vec<ChunkLayerData>,
-        collision: Vec<u8>, // Packed collision bits
+        collision: Vec<u8>,            // Packed collision bits
         objects: Vec<ChunkObjectData>, // Map objects (trees, rocks, etc.)
-        walls: Vec<ChunkWallData>,  // Edge-aligned walls
+        walls: Vec<ChunkWallData>,     // Edge-aligned walls
         portals: Vec<ChunkPortalData>, // Portals to other maps
     },
     ChunkNotFound {
@@ -523,11 +535,11 @@ pub enum ServerMessage {
     },
     /// Tell client to transition to a different map (interior or world)
     MapTransition {
-        map_type: String,      // "interior" or "world"
-        map_id: String,        // Interior ID or "world_0"
+        map_type: String, // "interior" or "world"
+        map_id: String,   // Interior ID or "world_0"
         spawn_x: f32,
         spawn_y: f32,
-        instance_id: String,   // Unique instance identifier
+        instance_id: String, // Unique instance identifier
     },
     /// Full interior map data sent when entering an interior
     InteriorData {
@@ -612,7 +624,6 @@ pub enum ServerMessage {
     },
 
     // ===== Friend System Messages =====
-
     /// Sent when someone sends you a friend request
     FriendRequestReceived {
         from_id: i64,
@@ -656,7 +667,6 @@ pub enum ServerMessage {
     },
 
     // ===== Crafting System Messages =====
-
     /// Sent on connect: player's discovered recipe IDs
     DiscoveredRecipes {
         recipes: Vec<String>,
@@ -682,7 +692,6 @@ pub enum ServerMessage {
     },
 
     // ===== Prayer System Messages =====
-
     /// Update client on prayer state (points and active prayers)
     PrayerStateUpdate {
         points: i32,
@@ -691,7 +700,6 @@ pub enum ServerMessage {
     },
 
     // ===== Spell System Messages =====
-
     /// Spell visual effect notification
     SpellEffect {
         caster_id: String,
@@ -707,7 +715,6 @@ pub enum ServerMessage {
     },
 
     // ===== Woodcutting System Messages =====
-
     /// Player started chopping a tree
     WoodcuttingStarted {
         player_id: String,
@@ -778,7 +785,7 @@ pub struct FarmingPatchData {
     pub patch_id: String,
     pub x: i32,
     pub y: i32,
-    pub state: String,       // "empty", "growing", "harvestable"
+    pub state: String, // "empty", "growing", "harvestable"
     pub crop_id: String,
     pub growth_stage: u32,
     pub owner_id: String,
@@ -844,11 +851,11 @@ pub struct ChunkLayerData {
 /// Map object data for chunk transmission (trees, rocks, decorations)
 #[derive(Debug, Clone, Serialize)]
 pub struct ChunkObjectData {
-    pub gid: u32,      // Global tile ID from objects.tsx
-    pub tile_x: i32,   // World tile X coordinate
-    pub tile_y: i32,   // World tile Y coordinate
-    pub width: u32,    // Sprite width in pixels
-    pub height: u32,   // Sprite height in pixels
+    pub gid: u32,    // Global tile ID from objects.tsx
+    pub tile_x: i32, // World tile X coordinate
+    pub tile_y: i32, // World tile Y coordinate
+    pub width: u32,  // Sprite width in pixels
+    pub height: u32, // Sprite height in pixels
 }
 
 /// Wall data for chunk transmission
@@ -1083,37 +1090,157 @@ impl ServerMessage {
 pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
     use rmpv::Value;
     let mut pmap = Vec::with_capacity(30);
-    pmap.push((Value::String("id".into()), Value::String(p.id.clone().into())));
-    pmap.push((Value::String("name".into()), Value::String(p.name.clone().into())));
-    pmap.push((Value::String("x".into()), Value::Integer((p.x as i64).into())));
-    pmap.push((Value::String("y".into()), Value::Integer((p.y as i64).into())));
-    pmap.push((Value::String("direction".into()), Value::Integer((p.direction as i64).into())));
-    pmap.push((Value::String("velX".into()), Value::Integer((p.vel_x as i64).into())));
-    pmap.push((Value::String("velY".into()), Value::Integer((p.vel_y as i64).into())));
-    pmap.push((Value::String("hp".into()), Value::Integer((p.hp as i64).into())));
-    pmap.push((Value::String("maxHp".into()), Value::Integer((p.max_hp as i64).into())));
-    pmap.push((Value::String("combatLevel".into()), Value::Integer((p.combat_level as i64).into())));
-    pmap.push((Value::String("hitpointsLevel".into()), Value::Integer((p.hitpoints_level as i64).into())));
-    pmap.push((Value::String("combatSkillLevel".into()), Value::Integer((p.combat_skill_level as i64).into())));
-    pmap.push((Value::String("gold".into()), Value::Integer((p.gold as i64).into())));
-    pmap.push((Value::String("gender".into()), Value::String(p.gender.clone().into())));
-    pmap.push((Value::String("skin".into()), Value::String(p.skin.clone().into())));
-    pmap.push((Value::String("hair_style".into()), match p.hair_style { Some(v) => Value::Integer((v as i64).into()), None => Value::Nil }));
-    pmap.push((Value::String("hair_color".into()), match p.hair_color { Some(v) => Value::Integer((v as i64).into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_head".into()), match &p.equipped_head { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_body".into()), match &p.equipped_body { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_weapon".into()), match &p.equipped_weapon { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_back".into()), match &p.equipped_back { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_feet".into()), match &p.equipped_feet { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_ring".into()), match &p.equipped_ring { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_gloves".into()), match &p.equipped_gloves { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_necklace".into()), match &p.equipped_necklace { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
-    pmap.push((Value::String("equipped_belt".into()), match &p.equipped_belt { Some(v) => Value::String(v.clone().into()), None => Value::Nil }));
+    pmap.push((
+        Value::String("id".into()),
+        Value::String(p.id.clone().into()),
+    ));
+    pmap.push((
+        Value::String("name".into()),
+        Value::String(p.name.clone().into()),
+    ));
+    pmap.push((
+        Value::String("x".into()),
+        Value::Integer((p.x as i64).into()),
+    ));
+    pmap.push((
+        Value::String("y".into()),
+        Value::Integer((p.y as i64).into()),
+    ));
+    pmap.push((
+        Value::String("direction".into()),
+        Value::Integer((p.direction as i64).into()),
+    ));
+    pmap.push((
+        Value::String("velX".into()),
+        Value::Integer((p.vel_x as i64).into()),
+    ));
+    pmap.push((
+        Value::String("velY".into()),
+        Value::Integer((p.vel_y as i64).into()),
+    ));
+    pmap.push((
+        Value::String("hp".into()),
+        Value::Integer((p.hp as i64).into()),
+    ));
+    pmap.push((
+        Value::String("maxHp".into()),
+        Value::Integer((p.max_hp as i64).into()),
+    ));
+    pmap.push((
+        Value::String("combatLevel".into()),
+        Value::Integer((p.combat_level as i64).into()),
+    ));
+    pmap.push((
+        Value::String("hitpointsLevel".into()),
+        Value::Integer((p.hitpoints_level as i64).into()),
+    ));
+    pmap.push((
+        Value::String("combatSkillLevel".into()),
+        Value::Integer((p.combat_skill_level as i64).into()),
+    ));
+    pmap.push((
+        Value::String("gold".into()),
+        Value::Integer((p.gold as i64).into()),
+    ));
+    pmap.push((
+        Value::String("gender".into()),
+        Value::String(p.gender.clone().into()),
+    ));
+    pmap.push((
+        Value::String("skin".into()),
+        Value::String(p.skin.clone().into()),
+    ));
+    pmap.push((
+        Value::String("hair_style".into()),
+        match p.hair_style {
+            Some(v) => Value::Integer((v as i64).into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("hair_color".into()),
+        match p.hair_color {
+            Some(v) => Value::Integer((v as i64).into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_head".into()),
+        match &p.equipped_head {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_body".into()),
+        match &p.equipped_body {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_weapon".into()),
+        match &p.equipped_weapon {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_back".into()),
+        match &p.equipped_back {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_feet".into()),
+        match &p.equipped_feet {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_ring".into()),
+        match &p.equipped_ring {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_gloves".into()),
+        match &p.equipped_gloves {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_necklace".into()),
+        match &p.equipped_necklace {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    pmap.push((
+        Value::String("equipped_belt".into()),
+        match &p.equipped_belt {
+            Some(v) => Value::String(v.clone().into()),
+            None => Value::Nil,
+        },
+    ));
     pmap.push((Value::String("is_admin".into()), Value::Boolean(p.is_admin)));
     pmap.push((Value::String("sitting".into()), Value::Boolean(p.sitting)));
-    pmap.push((Value::String("is_gathering".into()), Value::Boolean(p.is_gathering)));
-    pmap.push((Value::String("mp".into()), Value::Integer((p.mp as i64).into())));
-    pmap.push((Value::String("maxMp".into()), Value::Integer((p.max_mp as i64).into())));
+    pmap.push((
+        Value::String("is_gathering".into()),
+        Value::Boolean(p.is_gathering),
+    ));
+    pmap.push((
+        Value::String("mp".into()),
+        Value::Integer((p.mp as i64).into()),
+    ));
+    pmap.push((
+        Value::String("maxMp".into()),
+        Value::Integer((p.max_mp as i64).into()),
+    ));
     Value::Map(pmap)
 }
 
@@ -1121,22 +1248,61 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
 pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
     use rmpv::Value;
     let mut nmap = Vec::with_capacity(16);
-    nmap.push((Value::String("id".into()), Value::String(n.id.clone().into())));
-    nmap.push((Value::String("entity_type".into()), Value::String(n.entity_type.clone().into())));
-    nmap.push((Value::String("display_name".into()), Value::String(n.display_name.clone().into())));
-    nmap.push((Value::String("x".into()), Value::Integer((n.x as i64).into())));
-    nmap.push((Value::String("y".into()), Value::Integer((n.y as i64).into())));
-    nmap.push((Value::String("direction".into()), Value::Integer((n.direction as i64).into())));
-    nmap.push((Value::String("hp".into()), Value::Integer((n.hp as i64).into())));
-    nmap.push((Value::String("max_hp".into()), Value::Integer((n.max_hp as i64).into())));
-    nmap.push((Value::String("level".into()), Value::Integer((n.level as i64).into())));
-    nmap.push((Value::String("state".into()), Value::Integer((n.state as i64).into())));
+    nmap.push((
+        Value::String("id".into()),
+        Value::String(n.id.clone().into()),
+    ));
+    nmap.push((
+        Value::String("entity_type".into()),
+        Value::String(n.entity_type.clone().into()),
+    ));
+    nmap.push((
+        Value::String("display_name".into()),
+        Value::String(n.display_name.clone().into()),
+    ));
+    nmap.push((
+        Value::String("x".into()),
+        Value::Integer((n.x as i64).into()),
+    ));
+    nmap.push((
+        Value::String("y".into()),
+        Value::Integer((n.y as i64).into()),
+    ));
+    nmap.push((
+        Value::String("direction".into()),
+        Value::Integer((n.direction as i64).into()),
+    ));
+    nmap.push((
+        Value::String("hp".into()),
+        Value::Integer((n.hp as i64).into()),
+    ));
+    nmap.push((
+        Value::String("max_hp".into()),
+        Value::Integer((n.max_hp as i64).into()),
+    ));
+    nmap.push((
+        Value::String("level".into()),
+        Value::Integer((n.level as i64).into()),
+    ));
+    nmap.push((
+        Value::String("state".into()),
+        Value::Integer((n.state as i64).into()),
+    ));
     nmap.push((Value::String("hostile".into()), Value::Boolean(n.hostile)));
-    nmap.push((Value::String("is_quest_giver".into()), Value::Boolean(n.is_quest_giver)));
-    nmap.push((Value::String("is_merchant".into()), Value::Boolean(n.is_merchant)));
+    nmap.push((
+        Value::String("is_quest_giver".into()),
+        Value::Boolean(n.is_quest_giver),
+    ));
+    nmap.push((
+        Value::String("is_merchant".into()),
+        Value::Boolean(n.is_merchant),
+    ));
     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
     nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
-    nmap.push((Value::String("just_attacked".into()), Value::Boolean(n.just_attacked)));
+    nmap.push((
+        Value::String("just_attacked".into()),
+        Value::Boolean(n.just_attacked),
+    ));
     Value::Map(nmap)
 }
 
@@ -1151,7 +1317,10 @@ pub fn encode_state_sync_from_values(
     let mut map = Vec::new();
     map.push((Value::String("tick".into()), Value::Integer(tick.into())));
     if !instance_id.is_empty() {
-        map.push((Value::String("instanceId".into()), Value::String(instance_id.into())));
+        map.push((
+            Value::String("instanceId".into()),
+            Value::String(instance_id.into()),
+        ));
     }
     map.push((Value::String("players".into()), Value::Array(player_values)));
     map.push((Value::String("npcs".into()), Value::Array(npc_values)));
@@ -1185,17 +1354,38 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::PlayerJoined { id, name, x, y, gender, skin, hair_style, hair_color } => {
+        ServerMessage::PlayerJoined {
+            id,
+            name,
+            x,
+            y,
+            gender,
+            skin,
+            hair_style,
+            hair_color,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("id".into()), Value::String(id.clone().into())));
             map.push((
                 Value::String("name".into()),
                 Value::String(name.clone().into()),
             ));
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
-            map.push((Value::String("gender".into()), Value::String(gender.clone().into())));
-            map.push((Value::String("skin".into()), Value::String(skin.clone().into())));
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("gender".into()),
+                Value::String(gender.clone().into()),
+            ));
+            map.push((
+                Value::String("skin".into()),
+                Value::String(skin.clone().into()),
+            ));
             map.push((
                 Value::String("hair_style".into()),
                 match hair_style {
@@ -1217,11 +1407,19 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("id".into()), Value::String(id.clone().into())));
             Value::Map(map)
         }
-        ServerMessage::StateSync { tick, players, npcs, instance_id } => {
+        ServerMessage::StateSync {
+            tick,
+            players,
+            npcs,
+            instance_id,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("tick".into()), Value::Integer((*tick).into())));
             if !instance_id.is_empty() {
-                map.push((Value::String("instanceId".into()), Value::String(instance_id.clone().into())));
+                map.push((
+                    Value::String("instanceId".into()),
+                    Value::String(instance_id.clone().into()),
+                ));
             }
 
             let player_values: Vec<Value> = players
@@ -1236,24 +1434,60 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::String("name".into()),
                         Value::String(p.name.clone().into()),
                     ));
-                    pmap.push((Value::String("x".into()), Value::Integer((p.x as i64).into())));
-                    pmap.push((Value::String("y".into()), Value::Integer((p.y as i64).into())));
+                    pmap.push((
+                        Value::String("x".into()),
+                        Value::Integer((p.x as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("y".into()),
+                        Value::Integer((p.y as i64).into()),
+                    ));
                     pmap.push((
                         Value::String("direction".into()),
                         Value::Integer((p.direction as i64).into()),
                     ));
                     // Include velocity for client-side prediction
-                    pmap.push((Value::String("velX".into()), Value::Integer((p.vel_x as i64).into())));
-                    pmap.push((Value::String("velY".into()), Value::Integer((p.vel_y as i64).into())));
-                    pmap.push((Value::String("hp".into()), Value::Integer((p.hp as i64).into())));
-                    pmap.push((Value::String("maxHp".into()), Value::Integer((p.max_hp as i64).into())));
-                    pmap.push((Value::String("combatLevel".into()), Value::Integer((p.combat_level as i64).into())));
+                    pmap.push((
+                        Value::String("velX".into()),
+                        Value::Integer((p.vel_x as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("velY".into()),
+                        Value::Integer((p.vel_y as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("hp".into()),
+                        Value::Integer((p.hp as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("maxHp".into()),
+                        Value::Integer((p.max_hp as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("combatLevel".into()),
+                        Value::Integer((p.combat_level as i64).into()),
+                    ));
                     // Individual skill levels
-                    pmap.push((Value::String("hitpointsLevel".into()), Value::Integer((p.hitpoints_level as i64).into())));
-                    pmap.push((Value::String("combatSkillLevel".into()), Value::Integer((p.combat_skill_level as i64).into())));
-                    pmap.push((Value::String("gold".into()), Value::Integer((p.gold as i64).into())));
-                    pmap.push((Value::String("gender".into()), Value::String(p.gender.clone().into())));
-                    pmap.push((Value::String("skin".into()), Value::String(p.skin.clone().into())));
+                    pmap.push((
+                        Value::String("hitpointsLevel".into()),
+                        Value::Integer((p.hitpoints_level as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("combatSkillLevel".into()),
+                        Value::Integer((p.combat_skill_level as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("gold".into()),
+                        Value::Integer((p.gold as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("gender".into()),
+                        Value::String(p.gender.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("skin".into()),
+                        Value::String(p.skin.clone().into()),
+                    ));
                     pmap.push((
                         Value::String("hair_style".into()),
                         match p.hair_style {
@@ -1331,14 +1565,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                             None => Value::Nil,
                         },
                     ));
-                    pmap.push((
-                        Value::String("is_admin".into()),
-                        Value::Boolean(p.is_admin),
-                    ));
-                    pmap.push((
-                        Value::String("sitting".into()),
-                        Value::Boolean(p.sitting),
-                    ));
+                    pmap.push((Value::String("is_admin".into()), Value::Boolean(p.is_admin)));
+                    pmap.push((Value::String("sitting".into()), Value::Boolean(p.sitting)));
                     pmap.push((
                         Value::String("is_gathering".into()),
                         Value::Boolean(p.is_gathering),
@@ -1364,21 +1592,57 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::String("id".into()),
                         Value::String(n.id.clone().into()),
                     ));
-                    nmap.push((Value::String("entity_type".into()), Value::String(n.entity_type.clone().into())));
-                    nmap.push((Value::String("display_name".into()), Value::String(n.display_name.clone().into())));
-                    nmap.push((Value::String("x".into()), Value::Integer((n.x as i64).into())));
-                    nmap.push((Value::String("y".into()), Value::Integer((n.y as i64).into())));
-                    nmap.push((Value::String("direction".into()), Value::Integer((n.direction as i64).into())));
-                    nmap.push((Value::String("hp".into()), Value::Integer((n.hp as i64).into())));
-                    nmap.push((Value::String("max_hp".into()), Value::Integer((n.max_hp as i64).into())));
-                    nmap.push((Value::String("level".into()), Value::Integer((n.level as i64).into())));
-                    nmap.push((Value::String("state".into()), Value::Integer((n.state as i64).into())));
+                    nmap.push((
+                        Value::String("entity_type".into()),
+                        Value::String(n.entity_type.clone().into()),
+                    ));
+                    nmap.push((
+                        Value::String("display_name".into()),
+                        Value::String(n.display_name.clone().into()),
+                    ));
+                    nmap.push((
+                        Value::String("x".into()),
+                        Value::Integer((n.x as i64).into()),
+                    ));
+                    nmap.push((
+                        Value::String("y".into()),
+                        Value::Integer((n.y as i64).into()),
+                    ));
+                    nmap.push((
+                        Value::String("direction".into()),
+                        Value::Integer((n.direction as i64).into()),
+                    ));
+                    nmap.push((
+                        Value::String("hp".into()),
+                        Value::Integer((n.hp as i64).into()),
+                    ));
+                    nmap.push((
+                        Value::String("max_hp".into()),
+                        Value::Integer((n.max_hp as i64).into()),
+                    ));
+                    nmap.push((
+                        Value::String("level".into()),
+                        Value::Integer((n.level as i64).into()),
+                    ));
+                    nmap.push((
+                        Value::String("state".into()),
+                        Value::Integer((n.state as i64).into()),
+                    ));
                     nmap.push((Value::String("hostile".into()), Value::Boolean(n.hostile)));
-                    nmap.push((Value::String("is_quest_giver".into()), Value::Boolean(n.is_quest_giver)));
-                    nmap.push((Value::String("is_merchant".into()), Value::Boolean(n.is_merchant)));
+                    nmap.push((
+                        Value::String("is_quest_giver".into()),
+                        Value::Boolean(n.is_quest_giver),
+                    ));
+                    nmap.push((
+                        Value::String("is_merchant".into()),
+                        Value::Boolean(n.is_merchant),
+                    ));
                     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
                     nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
-                    nmap.push((Value::String("just_attacked".into()), Value::Boolean(n.just_attacked)));
+                    nmap.push((
+                        Value::String("just_attacked".into()),
+                        Value::Boolean(n.just_attacked),
+                    ));
                     Value::Map(nmap)
                 })
                 .collect();
@@ -1489,10 +1753,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::AttackResult { success, reason } => {
             let mut map = Vec::new();
-            map.push((
-                Value::String("success".into()),
-                Value::Boolean(*success),
-            ));
+            map.push((Value::String("success".into()), Value::Boolean(*success)));
             map.push((
                 Value::String("reason".into()),
                 match reason {
@@ -1504,10 +1765,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::NpcDied { id, killer_id } => {
             let mut map = Vec::new();
-            map.push((
-                Value::String("id".into()),
-                Value::String(id.clone().into()),
-            ));
+            map.push((Value::String("id".into()), Value::String(id.clone().into())));
             map.push((
                 Value::String("killer_id".into()),
                 Value::String(killer_id.clone().into()),
@@ -1516,20 +1774,20 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::NpcRespawned { id, x, y } => {
             let mut map = Vec::new();
+            map.push((Value::String("id".into()), Value::String(id.clone().into())));
             map.push((
-                Value::String("id".into()),
-                Value::String(id.clone().into()),
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
             ));
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::PlayerDied { id, killer_id } => {
             let mut map = Vec::new();
-            map.push((
-                Value::String("id".into()),
-                Value::String(id.clone().into()),
-            ));
+            map.push((Value::String("id".into()), Value::String(id.clone().into())));
             map.push((
                 Value::String("killer_id".into()),
                 Value::String(killer_id.clone().into()),
@@ -1538,13 +1796,19 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::PlayerRespawned { id, x, y, hp } => {
             let mut map = Vec::new();
+            map.push((Value::String("id".into()), Value::String(id.clone().into())));
             map.push((
-                Value::String("id".into()),
-                Value::String(id.clone().into()),
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
             ));
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
-            map.push((Value::String("hp".into()), Value::Integer((*hp as i64).into())));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("hp".into()),
+                Value::Integer((*hp as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::SkillXp {
@@ -1695,10 +1959,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             quantity,
         } => {
             let mut map = Vec::new();
-            map.push((
-                Value::String("id".into()),
-                Value::String(id.clone().into()),
-            ));
+            map.push((Value::String("id".into()), Value::String(id.clone().into())));
             map.push((
                 Value::String("item_id".into()),
                 Value::String(item_id.clone().into()),
@@ -1733,87 +1994,212 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::ItemQuantityUpdated { id, quantity } => {
             let mut map = Vec::new();
-            map.push((
-                Value::String("id".into()),
-                Value::String(id.clone().into()),
-            ));
+            map.push((Value::String("id".into()), Value::String(id.clone().into())));
             map.push((
                 Value::String("quantity".into()),
                 Value::Integer((*quantity as i64).into()),
             ));
             Value::Map(map)
         }
-        ServerMessage::InventoryUpdate { player_id, slots, gold } => {
+        ServerMessage::InventoryUpdate {
+            player_id,
+            slots,
+            gold,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
 
-            let slot_values: Vec<Value> = slots.iter().map(|s| {
-                let mut smap = Vec::new();
-                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
-                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
-                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
-                Value::Map(smap)
-            }).collect();
+            let slot_values: Vec<Value> = slots
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("slot".into()),
+                        Value::Integer((s.slot as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("item_id".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
 
             map.push((Value::String("slots".into()), Value::Array(slot_values)));
-            map.push((Value::String("gold".into()), Value::Integer((*gold as i64).into())));
+            map.push((
+                Value::String("gold".into()),
+                Value::Integer((*gold as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::ItemUsed { player_id, slot, item_id, effect } => {
+        ServerMessage::ItemUsed {
+            player_id,
+            slot,
+            item_id,
+            effect,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("slot".into()), Value::Integer((*slot as i64).into())));
-            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
-            map.push((Value::String("effect".into()), Value::String(effect.clone().into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("slot".into()),
+                Value::Integer((*slot as i64).into()),
+            ));
+            map.push((
+                Value::String("item_id".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("effect".into()),
+                Value::String(effect.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::QuestAccepted { quest_id, quest_name, objectives } => {
+        ServerMessage::QuestAccepted {
+            quest_id,
+            quest_name,
+            objectives,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("quest_id".into()), Value::String(quest_id.clone().into())));
-            map.push((Value::String("quest_name".into()), Value::String(quest_name.clone().into())));
+            map.push((
+                Value::String("quest_id".into()),
+                Value::String(quest_id.clone().into()),
+            ));
+            map.push((
+                Value::String("quest_name".into()),
+                Value::String(quest_name.clone().into()),
+            ));
 
-            let obj_values: Vec<Value> = objectives.iter().map(|obj| {
-                let mut omap = Vec::new();
-                omap.push((Value::String("id".into()), Value::String(obj.id.clone().into())));
-                omap.push((Value::String("description".into()), Value::String(obj.description.clone().into())));
-                omap.push((Value::String("current".into()), Value::Integer((obj.current as i64).into())));
-                omap.push((Value::String("target".into()), Value::Integer((obj.target as i64).into())));
-                omap.push((Value::String("completed".into()), Value::Boolean(obj.completed)));
-                Value::Map(omap)
-            }).collect();
+            let obj_values: Vec<Value> = objectives
+                .iter()
+                .map(|obj| {
+                    let mut omap = Vec::new();
+                    omap.push((
+                        Value::String("id".into()),
+                        Value::String(obj.id.clone().into()),
+                    ));
+                    omap.push((
+                        Value::String("description".into()),
+                        Value::String(obj.description.clone().into()),
+                    ));
+                    omap.push((
+                        Value::String("current".into()),
+                        Value::Integer((obj.current as i64).into()),
+                    ));
+                    omap.push((
+                        Value::String("target".into()),
+                        Value::Integer((obj.target as i64).into()),
+                    ));
+                    omap.push((
+                        Value::String("completed".into()),
+                        Value::Boolean(obj.completed),
+                    ));
+                    Value::Map(omap)
+                })
+                .collect();
             map.push((Value::String("objectives".into()), Value::Array(obj_values)));
 
             Value::Map(map)
         }
-        ServerMessage::QuestObjectiveProgress { quest_id, objective_id, current, target } => {
+        ServerMessage::QuestObjectiveProgress {
+            quest_id,
+            objective_id,
+            current,
+            target,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("quest_id".into()), Value::String(quest_id.clone().into())));
-            map.push((Value::String("objective_id".into()), Value::String(objective_id.clone().into())));
-            map.push((Value::String("current".into()), Value::Integer((*current as i64).into())));
-            map.push((Value::String("target".into()), Value::Integer((*target as i64).into())));
+            map.push((
+                Value::String("quest_id".into()),
+                Value::String(quest_id.clone().into()),
+            ));
+            map.push((
+                Value::String("objective_id".into()),
+                Value::String(objective_id.clone().into()),
+            ));
+            map.push((
+                Value::String("current".into()),
+                Value::Integer((*current as i64).into()),
+            ));
+            map.push((
+                Value::String("target".into()),
+                Value::Integer((*target as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::QuestCompleted { quest_id, quest_name, rewards_exp, rewards_gold } => {
+        ServerMessage::QuestCompleted {
+            quest_id,
+            quest_name,
+            rewards_exp,
+            rewards_gold,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("quest_id".into()), Value::String(quest_id.clone().into())));
-            map.push((Value::String("quest_name".into()), Value::String(quest_name.clone().into())));
-            map.push((Value::String("rewards_exp".into()), Value::Integer((*rewards_exp as i64).into())));
-            map.push((Value::String("rewards_gold".into()), Value::Integer((*rewards_gold as i64).into())));
+            map.push((
+                Value::String("quest_id".into()),
+                Value::String(quest_id.clone().into()),
+            ));
+            map.push((
+                Value::String("quest_name".into()),
+                Value::String(quest_name.clone().into()),
+            ));
+            map.push((
+                Value::String("rewards_exp".into()),
+                Value::Integer((*rewards_exp as i64).into()),
+            ));
+            map.push((
+                Value::String("rewards_gold".into()),
+                Value::Integer((*rewards_gold as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::ShowDialogue { quest_id, npc_id, speaker, text, choices } => {
+        ServerMessage::ShowDialogue {
+            quest_id,
+            npc_id,
+            speaker,
+            text,
+            choices,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("quest_id".into()), Value::String(quest_id.clone().into())));
-            map.push((Value::String("npc_id".into()), Value::String(npc_id.clone().into())));
-            map.push((Value::String("speaker".into()), Value::String(speaker.clone().into())));
-            map.push((Value::String("text".into()), Value::String(text.clone().into())));
+            map.push((
+                Value::String("quest_id".into()),
+                Value::String(quest_id.clone().into()),
+            ));
+            map.push((
+                Value::String("npc_id".into()),
+                Value::String(npc_id.clone().into()),
+            ));
+            map.push((
+                Value::String("speaker".into()),
+                Value::String(speaker.clone().into()),
+            ));
+            map.push((
+                Value::String("text".into()),
+                Value::String(text.clone().into()),
+            ));
 
-            let choice_values: Vec<Value> = choices.iter().map(|c| {
-                let mut cmap = Vec::new();
-                cmap.push((Value::String("id".into()), Value::String(c.id.clone().into())));
-                cmap.push((Value::String("text".into()), Value::String(c.text.clone().into())));
-                Value::Map(cmap)
-            }).collect();
+            let choice_values: Vec<Value> = choices
+                .iter()
+                .map(|c| {
+                    let mut cmap = Vec::new();
+                    cmap.push((
+                        Value::String("id".into()),
+                        Value::String(c.id.clone().into()),
+                    ));
+                    cmap.push((
+                        Value::String("text".into()),
+                        Value::String(c.text.clone().into()),
+                    ));
+                    Value::Map(cmap)
+                })
+                .collect();
             map.push((Value::String("choices".into()), Value::Array(choice_values)));
 
             Value::Map(map)
@@ -1993,15 +2379,33 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .iter()
                 .map(|e| {
                     let mut emap = Vec::new();
-                    emap.push((Value::String("id".into()), Value::String(e.id.clone().into())));
-                    emap.push((Value::String("displayName".into()), Value::String(e.display_name.clone().into())));
-                    emap.push((Value::String("sprite".into()), Value::String(e.sprite.clone().into())));
-                    emap.push((Value::String("animationType".into()), Value::String(e.animation_type.clone().into())));
-                    emap.push((Value::String("maxHp".into()), Value::Integer((e.max_hp as i64).into())));
+                    emap.push((
+                        Value::String("id".into()),
+                        Value::String(e.id.clone().into()),
+                    ));
+                    emap.push((
+                        Value::String("displayName".into()),
+                        Value::String(e.display_name.clone().into()),
+                    ));
+                    emap.push((
+                        Value::String("sprite".into()),
+                        Value::String(e.sprite.clone().into()),
+                    ));
+                    emap.push((
+                        Value::String("animationType".into()),
+                        Value::String(e.animation_type.clone().into()),
+                    ));
+                    emap.push((
+                        Value::String("maxHp".into()),
+                        Value::Integer((e.max_hp as i64).into()),
+                    ));
                     Value::Map(emap)
                 })
                 .collect();
-            map.push((Value::String("entities".into()), Value::Array(entity_values)));
+            map.push((
+                Value::String("entities".into()),
+                Value::Array(entity_values),
+            ));
             Value::Map(map)
         }
         ServerMessage::ItemDefinitions { items } => {
@@ -2010,48 +2414,102 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .iter()
                 .map(|i| {
                     let mut imap = Vec::new();
-                    imap.push((Value::String("id".into()), Value::String(i.id.clone().into())));
-                    imap.push((Value::String("displayName".into()), Value::String(i.display_name.clone().into())));
-                    imap.push((Value::String("sprite".into()), Value::String(i.sprite.clone().into())));
-                    imap.push((Value::String("category".into()), Value::String(i.category.clone().into())));
-                    imap.push((Value::String("maxStack".into()), Value::Integer((i.max_stack as i64).into())));
-                    imap.push((Value::String("description".into()), Value::String(i.description.clone().into())));
-                    imap.push((Value::String("basePrice".into()), Value::Integer((i.base_price as i64).into())));
+                    imap.push((
+                        Value::String("id".into()),
+                        Value::String(i.id.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("displayName".into()),
+                        Value::String(i.display_name.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("sprite".into()),
+                        Value::String(i.sprite.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("category".into()),
+                        Value::String(i.category.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("maxStack".into()),
+                        Value::Integer((i.max_stack as i64).into()),
+                    ));
+                    imap.push((
+                        Value::String("description".into()),
+                        Value::String(i.description.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("basePrice".into()),
+                        Value::Integer((i.base_price as i64).into()),
+                    ));
                     imap.push((Value::String("sellable".into()), Value::Boolean(i.sellable)));
                     // Add equipment fields if present
                     if let Some(ref slot) = i.equipment_slot {
-                        imap.push((Value::String("equipment_slot".into()), Value::String(slot.clone().into())));
+                        imap.push((
+                            Value::String("equipment_slot".into()),
+                            Value::String(slot.clone().into()),
+                        ));
                     }
                     if let Some(level) = i.attack_level_required {
-                        imap.push((Value::String("attack_level_required".into()), Value::Integer((level as i64).into())));
+                        imap.push((
+                            Value::String("attack_level_required".into()),
+                            Value::Integer((level as i64).into()),
+                        ));
                     }
                     if let Some(level) = i.defence_level_required {
-                        imap.push((Value::String("defence_level_required".into()), Value::Integer((level as i64).into())));
+                        imap.push((
+                            Value::String("defence_level_required".into()),
+                            Value::Integer((level as i64).into()),
+                        ));
                     }
                     if let Some(bonus) = i.attack_bonus {
-                        imap.push((Value::String("attack_bonus".into()), Value::Integer((bonus as i64).into())));
+                        imap.push((
+                            Value::String("attack_bonus".into()),
+                            Value::Integer((bonus as i64).into()),
+                        ));
                     }
                     if let Some(bonus) = i.strength_bonus {
-                        imap.push((Value::String("strength_bonus".into()), Value::Integer((bonus as i64).into())));
+                        imap.push((
+                            Value::String("strength_bonus".into()),
+                            Value::Integer((bonus as i64).into()),
+                        ));
                     }
                     if let Some(def) = i.defence_bonus {
-                        imap.push((Value::String("defence_bonus".into()), Value::Integer((def as i64).into())));
+                        imap.push((
+                            Value::String("defence_bonus".into()),
+                            Value::Integer((def as i64).into()),
+                        ));
                     }
                     if let Some(ref wtype) = i.weapon_type {
-                        imap.push((Value::String("weapon_type".into()), Value::String(wtype.clone().into())));
+                        imap.push((
+                            Value::String("weapon_type".into()),
+                            Value::String(wtype.clone().into()),
+                        ));
                     }
                     if let Some(r) = i.range {
-                        imap.push((Value::String("range".into()), Value::Integer((r as i64).into())));
+                        imap.push((
+                            Value::String("range".into()),
+                            Value::Integer((r as i64).into()),
+                        ));
                     }
                     if i.prayer_xp > 0 {
-                        imap.push((Value::String("prayer_xp".into()), Value::Integer((i.prayer_xp as i64).into())));
+                        imap.push((
+                            Value::String("prayer_xp".into()),
+                            Value::Integer((i.prayer_xp as i64).into()),
+                        ));
                     }
                     // Woodcutting-specific fields
                     if let Some(level) = i.woodcutting_level_required {
-                        imap.push((Value::String("woodcutting_level_required".into()), Value::Integer((level as i64).into())));
+                        imap.push((
+                            Value::String("woodcutting_level_required".into()),
+                            Value::Integer((level as i64).into()),
+                        ));
                     }
                     if let Some(speed) = i.chop_speed_multiplier {
-                        imap.push((Value::String("chop_speed_multiplier".into()), Value::F32(speed)));
+                        imap.push((
+                            Value::String("chop_speed_multiplier".into()),
+                            Value::F32(speed),
+                        ));
                     }
                     Value::Map(imap)
                 })
@@ -2069,38 +2527,94 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .iter()
                 .map(|r| {
                     let mut rmap = Vec::new();
-                    rmap.push((Value::String("id".into()), Value::String(r.id.clone().into())));
-                    rmap.push((Value::String("display_name".into()), Value::String(r.display_name.clone().into())));
-                    rmap.push((Value::String("description".into()), Value::String(r.description.clone().into())));
-                    rmap.push((Value::String("category".into()), Value::String(r.category.clone().into())));
-                    rmap.push((Value::String("level_required".into()), Value::Integer((r.level_required as i64).into())));
+                    rmap.push((
+                        Value::String("id".into()),
+                        Value::String(r.id.clone().into()),
+                    ));
+                    rmap.push((
+                        Value::String("display_name".into()),
+                        Value::String(r.display_name.clone().into()),
+                    ));
+                    rmap.push((
+                        Value::String("description".into()),
+                        Value::String(r.description.clone().into()),
+                    ));
+                    rmap.push((
+                        Value::String("category".into()),
+                        Value::String(r.category.clone().into()),
+                    ));
+                    rmap.push((
+                        Value::String("level_required".into()),
+                        Value::Integer((r.level_required as i64).into()),
+                    ));
 
-                    let ingredient_values: Vec<Value> = r.ingredients.iter().map(|i| {
-                        let mut imap = Vec::new();
-                        imap.push((Value::String("item_id".into()), Value::String(i.item_id.clone().into())));
-                        imap.push((Value::String("item_name".into()), Value::String(i.item_name.clone().into())));
-                        imap.push((Value::String("count".into()), Value::Integer((i.count as i64).into())));
-                        Value::Map(imap)
-                    }).collect();
-                    rmap.push((Value::String("ingredients".into()), Value::Array(ingredient_values)));
+                    let ingredient_values: Vec<Value> = r
+                        .ingredients
+                        .iter()
+                        .map(|i| {
+                            let mut imap = Vec::new();
+                            imap.push((
+                                Value::String("item_id".into()),
+                                Value::String(i.item_id.clone().into()),
+                            ));
+                            imap.push((
+                                Value::String("item_name".into()),
+                                Value::String(i.item_name.clone().into()),
+                            ));
+                            imap.push((
+                                Value::String("count".into()),
+                                Value::Integer((i.count as i64).into()),
+                            ));
+                            Value::Map(imap)
+                        })
+                        .collect();
+                    rmap.push((
+                        Value::String("ingredients".into()),
+                        Value::Array(ingredient_values),
+                    ));
 
-                    let result_values: Vec<Value> = r.results.iter().map(|res| {
-                        let mut resmap = Vec::new();
-                        resmap.push((Value::String("item_id".into()), Value::String(res.item_id.clone().into())));
-                        resmap.push((Value::String("item_name".into()), Value::String(res.item_name.clone().into())));
-                        resmap.push((Value::String("count".into()), Value::Integer((res.count as i64).into())));
-                        Value::Map(resmap)
-                    }).collect();
+                    let result_values: Vec<Value> = r
+                        .results
+                        .iter()
+                        .map(|res| {
+                            let mut resmap = Vec::new();
+                            resmap.push((
+                                Value::String("item_id".into()),
+                                Value::String(res.item_id.clone().into()),
+                            ));
+                            resmap.push((
+                                Value::String("item_name".into()),
+                                Value::String(res.item_name.clone().into()),
+                            ));
+                            resmap.push((
+                                Value::String("count".into()),
+                                Value::Integer((res.count as i64).into()),
+                            ));
+                            Value::Map(resmap)
+                        })
+                        .collect();
                     rmap.push((Value::String("results".into()), Value::Array(result_values)));
 
                     // Extended recipe fields
                     match &r.station {
-                        Some(s) => rmap.push((Value::String("station".into()), Value::String(s.clone().into()))),
+                        Some(s) => rmap.push((
+                            Value::String("station".into()),
+                            Value::String(s.clone().into()),
+                        )),
                         None => rmap.push((Value::String("station".into()), Value::Nil)),
                     }
-                    rmap.push((Value::String("craft_time_ms".into()), Value::Integer((r.craft_time_ms as i64).into())));
-                    rmap.push((Value::String("xp".into()), Value::Integer((r.xp as i64).into())));
-                    rmap.push((Value::String("requires_discovery".into()), Value::Boolean(r.requires_discovery)));
+                    rmap.push((
+                        Value::String("craft_time_ms".into()),
+                        Value::Integer((r.craft_time_ms as i64).into()),
+                    ));
+                    rmap.push((
+                        Value::String("xp".into()),
+                        Value::Integer((r.xp as i64).into()),
+                    ));
+                    rmap.push((
+                        Value::String("requires_discovery".into()),
+                        Value::Boolean(r.requires_discovery),
+                    ));
 
                     Value::Map(rmap)
                 })
@@ -2108,10 +2622,18 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("recipes".into()), Value::Array(recipe_values)));
             Value::Map(map)
         }
-        ServerMessage::CraftResult { success, recipe_id, error, items_gained } => {
+        ServerMessage::CraftResult {
+            success,
+            recipe_id,
+            error,
+            items_gained,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
-            map.push((Value::String("recipeId".into()), Value::String(recipe_id.clone().into())));
+            map.push((
+                Value::String("recipeId".into()),
+                Value::String(recipe_id.clone().into()),
+            ));
             map.push((
                 Value::String("error".into()),
                 match error {
@@ -2120,51 +2642,116 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 },
             ));
 
-            let item_values: Vec<Value> = items_gained.iter().map(|item| {
-                let mut imap = Vec::new();
-                imap.push((Value::String("itemId".into()), Value::String(item.item_id.clone().into())));
-                imap.push((Value::String("count".into()), Value::Integer((item.count as i64).into())));
-                Value::Map(imap)
-            }).collect();
-            map.push((Value::String("itemsGained".into()), Value::Array(item_values)));
+            let item_values: Vec<Value> = items_gained
+                .iter()
+                .map(|item| {
+                    let mut imap = Vec::new();
+                    imap.push((
+                        Value::String("itemId".into()),
+                        Value::String(item.item_id.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("count".into()),
+                        Value::Integer((item.count as i64).into()),
+                    ));
+                    Value::Map(imap)
+                })
+                .collect();
+            map.push((
+                Value::String("itemsGained".into()),
+                Value::Array(item_values),
+            ));
 
             Value::Map(map)
         }
         ServerMessage::ShopOpen { npc_id } => {
             let mut map = Vec::new();
-            map.push((Value::String("npc_id".into()), Value::String(npc_id.clone().into())));
+            map.push((
+                Value::String("npc_id".into()),
+                Value::String(npc_id.clone().into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::ShopData { npc_id, shop } => {
             let mut map = Vec::new();
-            map.push((Value::String("npcId".into()), Value::String(npc_id.clone().into())));
+            map.push((
+                Value::String("npcId".into()),
+                Value::String(npc_id.clone().into()),
+            ));
 
             let mut shop_map = Vec::new();
-            shop_map.push((Value::String("shopId".into()), Value::String(shop.shop_id.clone().into())));
-            shop_map.push((Value::String("displayName".into()), Value::String(shop.display_name.clone().into())));
-            shop_map.push((Value::String("buyMultiplier".into()), Value::F64(shop.buy_multiplier as f64)));
-            shop_map.push((Value::String("sellMultiplier".into()), Value::F64(shop.sell_multiplier as f64)));
-            shop_map.push((Value::String("showCrafting".into()), Value::Boolean(shop.show_crafting)));
+            shop_map.push((
+                Value::String("shopId".into()),
+                Value::String(shop.shop_id.clone().into()),
+            ));
+            shop_map.push((
+                Value::String("displayName".into()),
+                Value::String(shop.display_name.clone().into()),
+            ));
+            shop_map.push((
+                Value::String("buyMultiplier".into()),
+                Value::F64(shop.buy_multiplier as f64),
+            ));
+            shop_map.push((
+                Value::String("sellMultiplier".into()),
+                Value::F64(shop.sell_multiplier as f64),
+            ));
+            shop_map.push((
+                Value::String("showCrafting".into()),
+                Value::Boolean(shop.show_crafting),
+            ));
 
-            let stock_values: Vec<Value> = shop.stock.iter().map(|s| {
-                let mut smap = Vec::new();
-                smap.push((Value::String("itemId".into()), Value::String(s.item_id.clone().into())));
-                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
-                smap.push((Value::String("price".into()), Value::Integer((s.price as i64).into())));
-                Value::Map(smap)
-            }).collect();
+            let stock_values: Vec<Value> = shop
+                .stock
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("itemId".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("price".into()),
+                        Value::Integer((s.price as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
             shop_map.push((Value::String("stock".into()), Value::Array(stock_values)));
 
             map.push((Value::String("shop".into()), Value::Map(shop_map)));
             Value::Map(map)
         }
-        ServerMessage::ShopResult { success, action, item_id, quantity, gold_change, error } => {
+        ServerMessage::ShopResult {
+            success,
+            action,
+            item_id,
+            quantity,
+            gold_change,
+            error,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
-            map.push((Value::String("action".into()), Value::String(action.clone().into())));
-            map.push((Value::String("itemId".into()), Value::String(item_id.clone().into())));
-            map.push((Value::String("quantity".into()), Value::Integer((*quantity as i64).into())));
-            map.push((Value::String("goldChange".into()), Value::Integer((*gold_change as i64).into())));
+            map.push((
+                Value::String("action".into()),
+                Value::String(action.clone().into()),
+            ));
+            map.push((
+                Value::String("itemId".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("quantity".into()),
+                Value::Integer((*quantity as i64).into()),
+            ));
+            map.push((
+                Value::String("goldChange".into()),
+                Value::Integer((*gold_change as i64).into()),
+            ));
             map.push((
                 Value::String("error".into()),
                 match error {
@@ -2174,16 +2761,43 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::ShopStockUpdate { npc_id, item_id, new_quantity } => {
+        ServerMessage::ShopStockUpdate {
+            npc_id,
+            item_id,
+            new_quantity,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("npcId".into()), Value::String(npc_id.clone().into())));
-            map.push((Value::String("itemId".into()), Value::String(item_id.clone().into())));
-            map.push((Value::String("newQuantity".into()), Value::Integer((*new_quantity as i64).into())));
+            map.push((
+                Value::String("npcId".into()),
+                Value::String(npc_id.clone().into()),
+            ));
+            map.push((
+                Value::String("itemId".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("newQuantity".into()),
+                Value::Integer((*new_quantity as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::EquipmentUpdate { player_id, equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet, equipped_ring, equipped_gloves, equipped_necklace, equipped_belt } => {
+        ServerMessage::EquipmentUpdate {
+            player_id,
+            equipped_head,
+            equipped_body,
+            equipped_weapon,
+            equipped_back,
+            equipped_feet,
+            equipped_ring,
+            equipped_gloves,
+            equipped_necklace,
+            equipped_belt,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
             map.push((
                 Value::String("equipped_head".into()),
                 match equipped_head {
@@ -2249,10 +2863,18 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::EquipResult { success, slot_type, item_id, error } => {
+        ServerMessage::EquipResult {
+            success,
+            slot_type,
+            item_id,
+            error,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
-            map.push((Value::String("slot_type".into()), Value::String(slot_type.clone().into())));
+            map.push((
+                Value::String("slot_type".into()),
+                Value::String(slot_type.clone().into()),
+            ));
             map.push((
                 Value::String("item_id".into()),
                 match item_id {
@@ -2271,27 +2893,60 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::Announcement { text } => {
             let mut map = Vec::new();
-            map.push((Value::String("text".into()), Value::String(text.clone().into())));
+            map.push((
+                Value::String("text".into()),
+                Value::String(text.clone().into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::NpcSpeech { npc_id, message } => {
             let mut map = Vec::new();
-            map.push((Value::String("npcId".into()), Value::String(npc_id.clone().into())));
-            map.push((Value::String("message".into()), Value::String(message.clone().into())));
+            map.push((
+                Value::String("npcId".into()),
+                Value::String(npc_id.clone().into()),
+            ));
+            map.push((
+                Value::String("message".into()),
+                Value::String(message.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::MapTransition { map_type, map_id, spawn_x, spawn_y, instance_id } => {
+        ServerMessage::MapTransition {
+            map_type,
+            map_id,
+            spawn_x,
+            spawn_y,
+            instance_id,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("mapType".into()), Value::String(map_type.clone().into())));
-            map.push((Value::String("mapId".into()), Value::String(map_id.clone().into())));
+            map.push((
+                Value::String("mapType".into()),
+                Value::String(map_type.clone().into()),
+            ));
+            map.push((
+                Value::String("mapId".into()),
+                Value::String(map_id.clone().into()),
+            ));
             map.push((Value::String("spawnX".into()), Value::F64(*spawn_x as f64)));
             map.push((Value::String("spawnY".into()), Value::F64(*spawn_y as f64)));
-            map.push((Value::String("instanceId".into()), Value::String(instance_id.clone().into())));
+            map.push((
+                Value::String("instanceId".into()),
+                Value::String(instance_id.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::ArenaStateUpdate { state, countdown_remaining, queued_count, fighter_count, entry_fee } => {
+        ServerMessage::ArenaStateUpdate {
+            state,
+            countdown_remaining,
+            queued_count,
+            fighter_count,
+            entry_fee,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("state".into()), Value::String(state.clone().into())));
+            map.push((
+                Value::String("state".into()),
+                Value::String(state.clone().into()),
+            ));
             map.push((
                 Value::String("countdownRemaining".into()),
                 match countdown_remaining {
@@ -2299,47 +2954,122 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     None => Value::Nil,
                 },
             ));
-            map.push((Value::String("queuedCount".into()), Value::Integer((*queued_count as i64).into())));
-            map.push((Value::String("fighterCount".into()), Value::Integer((*fighter_count as i64).into())));
-            map.push((Value::String("entryFee".into()), Value::Integer((*entry_fee as i64).into())));
+            map.push((
+                Value::String("queuedCount".into()),
+                Value::Integer((*queued_count as i64).into()),
+            ));
+            map.push((
+                Value::String("fighterCount".into()),
+                Value::Integer((*fighter_count as i64).into()),
+            ));
+            map.push((
+                Value::String("entryFee".into()),
+                Value::Integer((*entry_fee as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::ArenaMatchStart { fighter_ids } => {
             let mut map = Vec::new();
-            let ids: Vec<Value> = fighter_ids.iter().map(|id| Value::String(id.clone().into())).collect();
+            let ids: Vec<Value> = fighter_ids
+                .iter()
+                .map(|id| Value::String(id.clone().into()))
+                .collect();
             map.push((Value::String("fighterIds".into()), Value::Array(ids)));
             Value::Map(map)
         }
-        ServerMessage::ArenaPlayerEliminated { player_id, player_name, killer_id, killer_name, remaining } => {
+        ServerMessage::ArenaPlayerEliminated {
+            player_id,
+            player_name,
+            killer_id,
+            killer_name,
+            remaining,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("playerId".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("playerName".into()), Value::String(player_name.clone().into())));
-            map.push((Value::String("killerId".into()), Value::String(killer_id.clone().into())));
-            map.push((Value::String("killerName".into()), Value::String(killer_name.clone().into())));
-            map.push((Value::String("remaining".into()), Value::Integer((*remaining as i64).into())));
+            map.push((
+                Value::String("playerId".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("playerName".into()),
+                Value::String(player_name.clone().into()),
+            ));
+            map.push((
+                Value::String("killerId".into()),
+                Value::String(killer_id.clone().into()),
+            ));
+            map.push((
+                Value::String("killerName".into()),
+                Value::String(killer_name.clone().into()),
+            ));
+            map.push((
+                Value::String("remaining".into()),
+                Value::Integer((*remaining as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::ArenaMatchEnd { placements } => {
             let mut map = Vec::new();
-            let placement_values: Vec<Value> = placements.iter().map(|p| {
-                let mut pmap = Vec::new();
-                pmap.push((Value::String("rank".into()), Value::Integer((p.rank as i64).into())));
-                pmap.push((Value::String("playerId".into()), Value::String(p.player_id.clone().into())));
-                pmap.push((Value::String("playerName".into()), Value::String(p.player_name.clone().into())));
-                pmap.push((Value::String("kills".into()), Value::Integer((p.kills as i64).into())));
-                pmap.push((Value::String("goldReward".into()), Value::Integer((p.gold_reward as i64).into())));
-                Value::Map(pmap)
-            }).collect();
-            map.push((Value::String("placements".into()), Value::Array(placement_values)));
+            let placement_values: Vec<Value> = placements
+                .iter()
+                .map(|p| {
+                    let mut pmap = Vec::new();
+                    pmap.push((
+                        Value::String("rank".into()),
+                        Value::Integer((p.rank as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("playerId".into()),
+                        Value::String(p.player_id.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("playerName".into()),
+                        Value::String(p.player_name.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("kills".into()),
+                        Value::Integer((p.kills as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("goldReward".into()),
+                        Value::Integer((p.gold_reward as i64).into()),
+                    ));
+                    Value::Map(pmap)
+                })
+                .collect();
+            map.push((
+                Value::String("placements".into()),
+                Value::Array(placement_values),
+            ));
             Value::Map(map)
         }
-        ServerMessage::ArenaStatsUpdate { wins, kills, deaths, current_streak, best_streak } => {
+        ServerMessage::ArenaStatsUpdate {
+            wins,
+            kills,
+            deaths,
+            current_streak,
+            best_streak,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("wins".into()), Value::Integer((*wins as i64).into())));
-            map.push((Value::String("kills".into()), Value::Integer((*kills as i64).into())));
-            map.push((Value::String("deaths".into()), Value::Integer((*deaths as i64).into())));
-            map.push((Value::String("currentStreak".into()), Value::Integer((*current_streak as i64).into())));
-            map.push((Value::String("bestStreak".into()), Value::Integer((*best_streak as i64).into())));
+            map.push((
+                Value::String("wins".into()),
+                Value::Integer((*wins as i64).into()),
+            ));
+            map.push((
+                Value::String("kills".into()),
+                Value::Integer((*kills as i64).into()),
+            ));
+            map.push((
+                Value::String("deaths".into()),
+                Value::Integer((*deaths as i64).into()),
+            ));
+            map.push((
+                Value::String("currentStreak".into()),
+                Value::Integer((*current_streak as i64).into()),
+            ));
+            map.push((
+                Value::String("bestStreak".into()),
+                Value::Integer((*best_streak as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::InteriorData {
@@ -2357,11 +3087,26 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             walls,
         } => {
             let mut map = Vec::new();
-            map.push((Value::String("mapId".into()), Value::String(map_id.clone().into())));
-            map.push((Value::String("name".into()), Value::String(name.clone().into())));
-            map.push((Value::String("instanceId".into()), Value::String(instance_id.clone().into())));
-            map.push((Value::String("width".into()), Value::Integer((*width as i64).into())));
-            map.push((Value::String("height".into()), Value::Integer((*height as i64).into())));
+            map.push((
+                Value::String("mapId".into()),
+                Value::String(map_id.clone().into()),
+            ));
+            map.push((
+                Value::String("name".into()),
+                Value::String(name.clone().into()),
+            ));
+            map.push((
+                Value::String("instanceId".into()),
+                Value::String(instance_id.clone().into()),
+            ));
+            map.push((
+                Value::String("width".into()),
+                Value::Integer((*width as i64).into()),
+            ));
+            map.push((
+                Value::String("height".into()),
+                Value::Integer((*height as i64).into()),
+            ));
             map.push((Value::String("spawnX".into()), Value::F64(*spawn_x as f64)));
             map.push((Value::String("spawnY".into()), Value::F64(*spawn_y as f64)));
 
@@ -2390,20 +3135,44 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .iter()
                 .map(|&b| Value::Integer((b as i64).into()))
                 .collect();
-            map.push((Value::String("collision".into()), Value::Array(collision_bytes)));
+            map.push((
+                Value::String("collision".into()),
+                Value::Array(collision_bytes),
+            ));
 
             // Encode portals
             let portal_values: Vec<Value> = portals
                 .iter()
                 .map(|p| {
                     let mut pmap = Vec::new();
-                    pmap.push((Value::String("id".into()), Value::String(p.id.clone().into())));
-                    pmap.push((Value::String("x".into()), Value::Integer((p.x as i64).into())));
-                    pmap.push((Value::String("y".into()), Value::Integer((p.y as i64).into())));
-                    pmap.push((Value::String("width".into()), Value::Integer((p.width as i64).into())));
-                    pmap.push((Value::String("height".into()), Value::Integer((p.height as i64).into())));
-                    pmap.push((Value::String("targetMap".into()), Value::String(p.target_map.clone().into())));
-                    pmap.push((Value::String("targetSpawn".into()), Value::String(p.target_spawn.clone().into())));
+                    pmap.push((
+                        Value::String("id".into()),
+                        Value::String(p.id.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("x".into()),
+                        Value::Integer((p.x as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("y".into()),
+                        Value::Integer((p.y as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("width".into()),
+                        Value::Integer((p.width as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("height".into()),
+                        Value::Integer((p.height as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("targetMap".into()),
+                        Value::String(p.target_map.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("targetSpawn".into()),
+                        Value::String(p.target_spawn.clone().into()),
+                    ));
                     Value::Map(pmap)
                 })
                 .collect();
@@ -2414,11 +3183,26 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .iter()
                 .map(|o| {
                     let mut omap = Vec::new();
-                    omap.push((Value::String("gid".into()), Value::Integer((o.gid as i64).into())));
-                    omap.push((Value::String("tileX".into()), Value::Integer((o.tile_x as i64).into())));
-                    omap.push((Value::String("tileY".into()), Value::Integer((o.tile_y as i64).into())));
-                    omap.push((Value::String("width".into()), Value::Integer((o.width as i64).into())));
-                    omap.push((Value::String("height".into()), Value::Integer((o.height as i64).into())));
+                    omap.push((
+                        Value::String("gid".into()),
+                        Value::Integer((o.gid as i64).into()),
+                    ));
+                    omap.push((
+                        Value::String("tileX".into()),
+                        Value::Integer((o.tile_x as i64).into()),
+                    ));
+                    omap.push((
+                        Value::String("tileY".into()),
+                        Value::Integer((o.tile_y as i64).into()),
+                    ));
+                    omap.push((
+                        Value::String("width".into()),
+                        Value::Integer((o.width as i64).into()),
+                    ));
+                    omap.push((
+                        Value::String("height".into()),
+                        Value::Integer((o.height as i64).into()),
+                    ));
                     Value::Map(omap)
                 })
                 .collect();
@@ -2429,10 +3213,22 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .iter()
                 .map(|w| {
                     let mut wmap = Vec::new();
-                    wmap.push((Value::String("gid".into()), Value::Integer((w.gid as i64).into())));
-                    wmap.push((Value::String("tileX".into()), Value::Integer((w.tile_x as i64).into())));
-                    wmap.push((Value::String("tileY".into()), Value::Integer((w.tile_y as i64).into())));
-                    wmap.push((Value::String("edge".into()), Value::String(w.edge.clone().into())));
+                    wmap.push((
+                        Value::String("gid".into()),
+                        Value::Integer((w.gid as i64).into()),
+                    ));
+                    wmap.push((
+                        Value::String("tileX".into()),
+                        Value::Integer((w.tile_x as i64).into()),
+                    ));
+                    wmap.push((
+                        Value::String("tileY".into()),
+                        Value::Integer((w.tile_y as i64).into()),
+                    ));
+                    wmap.push((
+                        Value::String("edge".into()),
+                        Value::String(w.edge.clone().into()),
+                    ));
                     Value::Map(wmap)
                 })
                 .collect();
@@ -2442,205 +3238,463 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::GatheringMarkers { markers } => {
             let mut map = Vec::new();
-            let marker_values: Vec<Value> = markers.iter().map(|m| {
-                let mut mmap = Vec::new();
-                mmap.push((Value::String("x".into()), Value::Integer((m.x as i64).into())));
-                mmap.push((Value::String("y".into()), Value::Integer((m.y as i64).into())));
-                mmap.push((Value::String("zone_id".into()), Value::String(m.zone_id.clone().into())));
-                mmap.push((Value::String("skill".into()), Value::String(m.skill.clone().into())));
-                Value::Map(mmap)
-            }).collect();
+            let marker_values: Vec<Value> = markers
+                .iter()
+                .map(|m| {
+                    let mut mmap = Vec::new();
+                    mmap.push((
+                        Value::String("x".into()),
+                        Value::Integer((m.x as i64).into()),
+                    ));
+                    mmap.push((
+                        Value::String("y".into()),
+                        Value::Integer((m.y as i64).into()),
+                    ));
+                    mmap.push((
+                        Value::String("zone_id".into()),
+                        Value::String(m.zone_id.clone().into()),
+                    ));
+                    mmap.push((
+                        Value::String("skill".into()),
+                        Value::String(m.skill.clone().into()),
+                    ));
+                    Value::Map(mmap)
+                })
+                .collect();
             map.push((Value::String("markers".into()), Value::Array(marker_values)));
             Value::Map(map)
         }
-        ServerMessage::GatheringStarted { player_id, marker_x, marker_y, zone_id } => {
+        ServerMessage::GatheringStarted {
+            player_id,
+            marker_x,
+            marker_y,
+            zone_id,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("marker_x".into()), Value::Integer((*marker_x as i64).into())));
-            map.push((Value::String("marker_y".into()), Value::Integer((*marker_y as i64).into())));
-            map.push((Value::String("zone_id".into()), Value::String(zone_id.clone().into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("marker_x".into()),
+                Value::Integer((*marker_x as i64).into()),
+            ));
+            map.push((
+                Value::String("marker_y".into()),
+                Value::Integer((*marker_y as i64).into()),
+            ));
+            map.push((
+                Value::String("zone_id".into()),
+                Value::String(zone_id.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::GatheringResult { player_id, item_id, xp_gained } => {
+        ServerMessage::GatheringResult {
+            player_id,
+            item_id,
+            xp_gained,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
-            map.push((Value::String("xp_gained".into()), Value::Integer((*xp_gained).into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("item_id".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("xp_gained".into()),
+                Value::Integer((*xp_gained).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::GatheringStopped { player_id, reason } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("reason".into()),
+                Value::String(reason.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::BonusTileSpawned { x, y, zone_id, telegraph_duration } => {
+        ServerMessage::BonusTileSpawned {
+            x,
+            y,
+            zone_id,
+            telegraph_duration,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
-            map.push((Value::String("zone_id".into()), Value::String(zone_id.clone().into())));
-            map.push((Value::String("telegraph_duration".into()), Value::Integer((*telegraph_duration as i64).into())));
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("zone_id".into()),
+                Value::String(zone_id.clone().into()),
+            ));
+            map.push((
+                Value::String("telegraph_duration".into()),
+                Value::Integer((*telegraph_duration as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::BonusTileClaimed { x, y, player_id } => {
             let mut map = Vec::new();
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::BonusTileExpired { x, y } => {
             let mut map = Vec::new();
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::BuffApplied { player_id, buff_type, duration } => {
+        ServerMessage::BuffApplied {
+            player_id,
+            buff_type,
+            duration,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("buff_type".into()), Value::String(buff_type.clone().into())));
-            map.push((Value::String("duration".into()), Value::Integer((*duration as i64).into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("buff_type".into()),
+                Value::String(buff_type.clone().into()),
+            ));
+            map.push((
+                Value::String("duration".into()),
+                Value::Integer((*duration as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::BuffExpired { player_id, buff_type } => {
+        ServerMessage::BuffExpired {
+            player_id,
+            buff_type,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("buff_type".into()), Value::String(buff_type.clone().into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("buff_type".into()),
+                Value::String(buff_type.clone().into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::ChairPositions { positions } => {
             let mut map = Vec::new();
-            let pos_values: Vec<Value> = positions.iter().map(|(x, y)| {
-                let mut pmap = Vec::new();
-                pmap.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-                pmap.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
-                Value::Map(pmap)
-            }).collect();
+            let pos_values: Vec<Value> = positions
+                .iter()
+                .map(|(x, y)| {
+                    let mut pmap = Vec::new();
+                    pmap.push((
+                        Value::String("x".into()),
+                        Value::Integer((*x as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("y".into()),
+                        Value::Integer((*y as i64).into()),
+                    ));
+                    Value::Map(pmap)
+                })
+                .collect();
             map.push((Value::String("positions".into()), Value::Array(pos_values)));
             Value::Map(map)
         }
-        ServerMessage::SitResult { success, tile_x, tile_y, direction } => {
+        ServerMessage::SitResult {
+            success,
+            tile_x,
+            tile_y,
+            direction,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
-            map.push((Value::String("tileX".into()), Value::Integer((*tile_x as i64).into())));
-            map.push((Value::String("tileY".into()), Value::Integer((*tile_y as i64).into())));
-            map.push((Value::String("direction".into()), Value::Integer((*direction as i64).into())));
+            map.push((
+                Value::String("tileX".into()),
+                Value::Integer((*tile_x as i64).into()),
+            ));
+            map.push((
+                Value::String("tileY".into()),
+                Value::Integer((*tile_y as i64).into()),
+            ));
+            map.push((
+                Value::String("direction".into()),
+                Value::Integer((*direction as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::FarmingPatchStates { patches, unlocked_plots, tile_overrides } => {
+        ServerMessage::FarmingPatchStates {
+            patches,
+            unlocked_plots,
+            tile_overrides,
+        } => {
             let mut map = Vec::new();
-            let patch_values: Vec<Value> = patches.iter().map(|p| {
-                let mut pmap = Vec::new();
-                pmap.push((Value::String("patch_id".into()), Value::String(p.patch_id.clone().into())));
-                pmap.push((Value::String("x".into()), Value::Integer((p.x as i64).into())));
-                pmap.push((Value::String("y".into()), Value::Integer((p.y as i64).into())));
-                pmap.push((Value::String("state".into()), Value::String(p.state.clone().into())));
-                pmap.push((Value::String("crop_id".into()), Value::String(p.crop_id.clone().into())));
-                pmap.push((Value::String("growth_stage".into()), Value::Integer((p.growth_stage as i64).into())));
-                pmap.push((Value::String("owner_id".into()), Value::String(p.owner_id.clone().into())));
-                Value::Map(pmap)
-            }).collect();
+            let patch_values: Vec<Value> = patches
+                .iter()
+                .map(|p| {
+                    let mut pmap = Vec::new();
+                    pmap.push((
+                        Value::String("patch_id".into()),
+                        Value::String(p.patch_id.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("x".into()),
+                        Value::Integer((p.x as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("y".into()),
+                        Value::Integer((p.y as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("state".into()),
+                        Value::String(p.state.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("crop_id".into()),
+                        Value::String(p.crop_id.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("growth_stage".into()),
+                        Value::Integer((p.growth_stage as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("owner_id".into()),
+                        Value::String(p.owner_id.clone().into()),
+                    ));
+                    Value::Map(pmap)
+                })
+                .collect();
             map.push((Value::String("patches".into()), Value::Array(patch_values)));
-            let plot_values: Vec<Value> = unlocked_plots.iter()
+            let plot_values: Vec<Value> = unlocked_plots
+                .iter()
                 .map(|p| Value::Integer((*p as i64).into()))
                 .collect();
-            map.push((Value::String("unlocked_plots".into()), Value::Array(plot_values)));
-            let tile_override_values: Vec<Value> = tile_overrides.iter().map(|t| {
-                let mut tmap = Vec::new();
-                tmap.push((Value::String("x".into()), Value::Integer((t.x as i64).into())));
-                tmap.push((Value::String("y".into()), Value::Integer((t.y as i64).into())));
-                tmap.push((Value::String("tile_id".into()), Value::Integer((t.tile_id as i64).into())));
-                Value::Map(tmap)
-            }).collect();
-            map.push((Value::String("tile_overrides".into()), Value::Array(tile_override_values)));
+            map.push((
+                Value::String("unlocked_plots".into()),
+                Value::Array(plot_values),
+            ));
+            let tile_override_values: Vec<Value> = tile_overrides
+                .iter()
+                .map(|t| {
+                    let mut tmap = Vec::new();
+                    tmap.push((
+                        Value::String("x".into()),
+                        Value::Integer((t.x as i64).into()),
+                    ));
+                    tmap.push((
+                        Value::String("y".into()),
+                        Value::Integer((t.y as i64).into()),
+                    ));
+                    tmap.push((
+                        Value::String("tile_id".into()),
+                        Value::Integer((t.tile_id as i64).into()),
+                    ));
+                    Value::Map(tmap)
+                })
+                .collect();
+            map.push((
+                Value::String("tile_overrides".into()),
+                Value::Array(tile_override_values),
+            ));
             Value::Map(map)
         }
-        ServerMessage::PatchStateUpdate { patch_id, state, crop_id, growth_stage, owner_id } => {
+        ServerMessage::PatchStateUpdate {
+            patch_id,
+            state,
+            crop_id,
+            growth_stage,
+            owner_id,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("patch_id".into()), Value::String(patch_id.clone().into())));
-            map.push((Value::String("state".into()), Value::String(state.clone().into())));
-            map.push((Value::String("crop_id".into()), Value::String(crop_id.clone().into())));
-            map.push((Value::String("growth_stage".into()), Value::Integer((*growth_stage as i64).into())));
-            map.push((Value::String("owner_id".into()), Value::String(owner_id.clone().into())));
+            map.push((
+                Value::String("patch_id".into()),
+                Value::String(patch_id.clone().into()),
+            ));
+            map.push((
+                Value::String("state".into()),
+                Value::String(state.clone().into()),
+            ));
+            map.push((
+                Value::String("crop_id".into()),
+                Value::String(crop_id.clone().into()),
+            ));
+            map.push((
+                Value::String("growth_stage".into()),
+                Value::Integer((*growth_stage as i64).into()),
+            ));
+            map.push((
+                Value::String("owner_id".into()),
+                Value::String(owner_id.clone().into()),
+            ));
             Value::Map(map)
         }
         // Friend system messages
         ServerMessage::FriendRequestReceived { from_id, from_name } => {
             let mut map = Vec::new();
-            map.push((Value::String("from_id".into()), Value::Integer((*from_id).into())));
-            map.push((Value::String("from_name".into()), Value::String(from_name.clone().into())));
+            map.push((
+                Value::String("from_id".into()),
+                Value::Integer((*from_id).into()),
+            ));
+            map.push((
+                Value::String("from_name".into()),
+                Value::String(from_name.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::FriendRequestAccepted { friend_id, friend_name } => {
+        ServerMessage::FriendRequestAccepted {
+            friend_id,
+            friend_name,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("friend_id".into()), Value::Integer((*friend_id).into())));
-            map.push((Value::String("friend_name".into()), Value::String(friend_name.clone().into())));
+            map.push((
+                Value::String("friend_id".into()),
+                Value::Integer((*friend_id).into()),
+            ));
+            map.push((
+                Value::String("friend_name".into()),
+                Value::String(friend_name.clone().into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::FriendRequestDeclined { by_id } => {
             let mut map = Vec::new();
-            map.push((Value::String("by_id".into()), Value::Integer((*by_id).into())));
+            map.push((
+                Value::String("by_id".into()),
+                Value::Integer((*by_id).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::FriendRemoved { friend_id } => {
             let mut map = Vec::new();
-            map.push((Value::String("friend_id".into()), Value::Integer((*friend_id).into())));
+            map.push((
+                Value::String("friend_id".into()),
+                Value::Integer((*friend_id).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::FriendsList { friends } => {
             let mut map = Vec::new();
-            let friend_values: Vec<Value> = friends.iter().map(|f| {
-                let mut fmap = Vec::new();
-                fmap.push((Value::String("id".into()), Value::Integer(f.id.into())));
-                fmap.push((Value::String("name".into()), Value::String(f.name.clone().into())));
-                fmap.push((Value::String("online".into()), Value::Boolean(f.online)));
-                Value::Map(fmap)
-            }).collect();
+            let friend_values: Vec<Value> = friends
+                .iter()
+                .map(|f| {
+                    let mut fmap = Vec::new();
+                    fmap.push((Value::String("id".into()), Value::Integer(f.id.into())));
+                    fmap.push((
+                        Value::String("name".into()),
+                        Value::String(f.name.clone().into()),
+                    ));
+                    fmap.push((Value::String("online".into()), Value::Boolean(f.online)));
+                    Value::Map(fmap)
+                })
+                .collect();
             map.push((Value::String("friends".into()), Value::Array(friend_values)));
             Value::Map(map)
         }
         ServerMessage::PendingFriendRequests { requests } => {
             let mut map = Vec::new();
-            let request_values: Vec<Value> = requests.iter().map(|r| {
-                let mut rmap = Vec::new();
-                rmap.push((Value::String("from_id".into()), Value::Integer(r.from_id.into())));
-                rmap.push((Value::String("from_name".into()), Value::String(r.from_name.clone().into())));
-                Value::Map(rmap)
-            }).collect();
-            map.push((Value::String("requests".into()), Value::Array(request_values)));
+            let request_values: Vec<Value> = requests
+                .iter()
+                .map(|r| {
+                    let mut rmap = Vec::new();
+                    rmap.push((
+                        Value::String("from_id".into()),
+                        Value::Integer(r.from_id.into()),
+                    ));
+                    rmap.push((
+                        Value::String("from_name".into()),
+                        Value::String(r.from_name.clone().into()),
+                    ));
+                    Value::Map(rmap)
+                })
+                .collect();
+            map.push((
+                Value::String("requests".into()),
+                Value::Array(request_values),
+            ));
             Value::Map(map)
         }
         ServerMessage::OnlinePlayersList { players } => {
             let mut map = Vec::new();
-            let player_values: Vec<Value> = players.iter().map(|p| {
-                let mut pmap = Vec::new();
-                pmap.push((Value::String("id".into()), Value::Integer(p.id.into())));
-                pmap.push((Value::String("name".into()), Value::String(p.name.clone().into())));
-                pmap.push((Value::String("is_friend".into()), Value::Boolean(p.is_friend)));
-                Value::Map(pmap)
-            }).collect();
+            let player_values: Vec<Value> = players
+                .iter()
+                .map(|p| {
+                    let mut pmap = Vec::new();
+                    pmap.push((Value::String("id".into()), Value::Integer(p.id.into())));
+                    pmap.push((
+                        Value::String("name".into()),
+                        Value::String(p.name.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("is_friend".into()),
+                        Value::Boolean(p.is_friend),
+                    ));
+                    Value::Map(pmap)
+                })
+                .collect();
             map.push((Value::String("players".into()), Value::Array(player_values)));
             Value::Map(map)
         }
         ServerMessage::FriendStatusChanged { friend_id, online } => {
             let mut map = Vec::new();
-            map.push((Value::String("friend_id".into()), Value::Integer((*friend_id).into())));
+            map.push((
+                Value::String("friend_id".into()),
+                Value::Integer((*friend_id).into()),
+            ));
             map.push((Value::String("online".into()), Value::Boolean(*online)));
             Value::Map(map)
         }
-        ServerMessage::FriendActionResult { action, success, error } => {
+        ServerMessage::FriendActionResult {
+            action,
+            success,
+            error,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("action".into()), Value::String(action.clone().into())));
+            map.push((
+                Value::String("action".into()),
+                Value::String(action.clone().into()),
+            ));
             map.push((Value::String("success".into()), Value::Boolean(*success)));
             if let Some(err) = error {
-                map.push((Value::String("error".into()), Value::String(err.clone().into())));
+                map.push((
+                    Value::String("error".into()),
+                    Value::String(err.clone().into()),
+                ));
             }
             Value::Map(map)
         }
         // Crafting system messages
         ServerMessage::DiscoveredRecipes { recipes } => {
             let mut map = Vec::new();
-            let recipe_values: Vec<Value> = recipes.iter()
+            let recipe_values: Vec<Value> = recipes
+                .iter()
                 .map(|r| Value::String(r.clone().into()))
                 .collect();
             map.push((Value::String("recipes".into()), Value::Array(recipe_values)));
@@ -2648,116 +3702,278 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::RecipeDiscovered { recipe_id } => {
             let mut map = Vec::new();
-            map.push((Value::String("recipe_id".into()), Value::String(recipe_id.clone().into())));
+            map.push((
+                Value::String("recipe_id".into()),
+                Value::String(recipe_id.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::CraftingStarted { recipe_id, duration_ms } => {
+        ServerMessage::CraftingStarted {
+            recipe_id,
+            duration_ms,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("recipe_id".into()), Value::String(recipe_id.clone().into())));
-            map.push((Value::String("duration_ms".into()), Value::Integer((*duration_ms as i64).into())));
+            map.push((
+                Value::String("recipe_id".into()),
+                Value::String(recipe_id.clone().into()),
+            ));
+            map.push((
+                Value::String("duration_ms".into()),
+                Value::Integer((*duration_ms as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::CraftingCancelled { reason } => {
             let mut map = Vec::new();
-            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            map.push((
+                Value::String("reason".into()),
+                Value::String(reason.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::CraftingCompleted { recipe_id, items_gained, xp_gained } => {
+        ServerMessage::CraftingCompleted {
+            recipe_id,
+            items_gained,
+            xp_gained,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("recipe_id".into()), Value::String(recipe_id.clone().into())));
-            let item_values: Vec<Value> = items_gained.iter().map(|(item_id, count)| {
-                let mut imap = Vec::new();
-                imap.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
-                imap.push((Value::String("count".into()), Value::Integer((*count as i64).into())));
-                Value::Map(imap)
-            }).collect();
-            map.push((Value::String("items_gained".into()), Value::Array(item_values)));
-            map.push((Value::String("xp_gained".into()), Value::Integer((*xp_gained as i64).into())));
+            map.push((
+                Value::String("recipe_id".into()),
+                Value::String(recipe_id.clone().into()),
+            ));
+            let item_values: Vec<Value> = items_gained
+                .iter()
+                .map(|(item_id, count)| {
+                    let mut imap = Vec::new();
+                    imap.push((
+                        Value::String("item_id".into()),
+                        Value::String(item_id.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("count".into()),
+                        Value::Integer((*count as i64).into()),
+                    ));
+                    Value::Map(imap)
+                })
+                .collect();
+            map.push((
+                Value::String("items_gained".into()),
+                Value::Array(item_values),
+            ));
+            map.push((
+                Value::String("xp_gained".into()),
+                Value::Integer((*xp_gained as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::PrayerStateUpdate { points, max_points, active_prayers } => {
+        ServerMessage::PrayerStateUpdate {
+            points,
+            max_points,
+            active_prayers,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
-            map.push((Value::String("max_points".into()), Value::Integer((*max_points as i64).into())));
-            let prayer_values: Vec<Value> = active_prayers.iter()
+            map.push((
+                Value::String("points".into()),
+                Value::Integer((*points as i64).into()),
+            ));
+            map.push((
+                Value::String("max_points".into()),
+                Value::Integer((*max_points as i64).into()),
+            ));
+            let prayer_values: Vec<Value> = active_prayers
+                .iter()
                 .map(|p| Value::String(p.clone().into()))
                 .collect();
-            map.push((Value::String("active_prayers".into()), Value::Array(prayer_values)));
+            map.push((
+                Value::String("active_prayers".into()),
+                Value::Array(prayer_values),
+            ));
             Value::Map(map)
         }
-        ServerMessage::SpellEffect { caster_id, target_id, spell_id, target_x, target_y } => {
+        ServerMessage::SpellEffect {
+            caster_id,
+            target_id,
+            spell_id,
+            target_x,
+            target_y,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("caster_id".into()), Value::String(caster_id.clone().into())));
+            map.push((
+                Value::String("caster_id".into()),
+                Value::String(caster_id.clone().into()),
+            ));
             match target_id {
-                Some(tid) => map.push((Value::String("target_id".into()), Value::String(tid.clone().into()))),
+                Some(tid) => map.push((
+                    Value::String("target_id".into()),
+                    Value::String(tid.clone().into()),
+                )),
                 None => map.push((Value::String("target_id".into()), Value::Nil)),
             }
-            map.push((Value::String("spell_id".into()), Value::String(spell_id.clone().into())));
-            map.push((Value::String("target_x".into()), Value::Integer((*target_x as i64).into())));
-            map.push((Value::String("target_y".into()), Value::Integer((*target_y as i64).into())));
+            map.push((
+                Value::String("spell_id".into()),
+                Value::String(spell_id.clone().into()),
+            ));
+            map.push((
+                Value::String("target_x".into()),
+                Value::Integer((*target_x as i64).into()),
+            ));
+            map.push((
+                Value::String("target_y".into()),
+                Value::Integer((*target_y as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::SpellResult { success, reason } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
             match reason {
-                Some(r) => map.push((Value::String("reason".into()), Value::String(r.clone().into()))),
+                Some(r) => map.push((
+                    Value::String("reason".into()),
+                    Value::String(r.clone().into()),
+                )),
                 None => map.push((Value::String("reason".into()), Value::Nil)),
             }
             Value::Map(map)
         }
         // Woodcutting system messages
-        ServerMessage::WoodcuttingStarted { player_id, tree_x, tree_y, tree_type } => {
+        ServerMessage::WoodcuttingStarted {
+            player_id,
+            tree_x,
+            tree_y,
+            tree_type,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("tree_x".into()), Value::Integer((*tree_x as i64).into())));
-            map.push((Value::String("tree_y".into()), Value::Integer((*tree_y as i64).into())));
-            map.push((Value::String("tree_type".into()), Value::String(tree_type.clone().into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("tree_x".into()),
+                Value::Integer((*tree_x as i64).into()),
+            ));
+            map.push((
+                Value::String("tree_y".into()),
+                Value::Integer((*tree_y as i64).into()),
+            ));
+            map.push((
+                Value::String("tree_type".into()),
+                Value::String(tree_type.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::WoodcuttingSwing { player_id, tree_x, tree_y } => {
+        ServerMessage::WoodcuttingSwing {
+            player_id,
+            tree_x,
+            tree_y,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("tree_x".into()), Value::Integer((*tree_x as i64).into())));
-            map.push((Value::String("tree_y".into()), Value::Integer((*tree_y as i64).into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("tree_x".into()),
+                Value::Integer((*tree_x as i64).into()),
+            ));
+            map.push((
+                Value::String("tree_y".into()),
+                Value::Integer((*tree_y as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::WoodcuttingResult { player_id, item_id, xp_gained } => {
+        ServerMessage::WoodcuttingResult {
+            player_id,
+            item_id,
+            xp_gained,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
-            map.push((Value::String("xp_gained".into()), Value::Integer((*xp_gained).into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("item_id".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("xp_gained".into()),
+                Value::Integer((*xp_gained).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::WoodcuttingStopped { player_id, reason } => {
             let mut map = Vec::new();
-            map.push((Value::String("player_id".into()), Value::String(player_id.clone().into())));
-            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("reason".into()),
+                Value::String(reason.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::TreeDepleted { x, y, gid, respawn_delay_ms } => {
+        ServerMessage::TreeDepleted {
+            x,
+            y,
+            gid,
+            respawn_delay_ms,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
-            map.push((Value::String("gid".into()), Value::Integer((*gid as i64).into())));
-            map.push((Value::String("respawn_delay_ms".into()), Value::Integer((*respawn_delay_ms as i64).into())));
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("gid".into()),
+                Value::Integer((*gid as i64).into()),
+            ));
+            map.push((
+                Value::String("respawn_delay_ms".into()),
+                Value::Integer((*respawn_delay_ms as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::TreeRespawned { x, y, gid } => {
             let mut map = Vec::new();
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
-            map.push((Value::String("gid".into()), Value::Integer((*gid as i64).into())));
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("gid".into()),
+                Value::Integer((*gid as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::DepletedTreesSync { trees } => {
-            let tree_values: Vec<Value> = trees.iter().map(|t| {
-                let mut tree_map = Vec::new();
-                tree_map.push((Value::String("x".into()), Value::Integer((t.x as i64).into())));
-                tree_map.push((Value::String("y".into()), Value::Integer((t.y as i64).into())));
-                tree_map.push((Value::String("gid".into()), Value::Integer((t.gid as i64).into())));
-                Value::Map(tree_map)
-            }).collect();
+            let tree_values: Vec<Value> = trees
+                .iter()
+                .map(|t| {
+                    let mut tree_map = Vec::new();
+                    tree_map.push((
+                        Value::String("x".into()),
+                        Value::Integer((t.x as i64).into()),
+                    ));
+                    tree_map.push((
+                        Value::String("y".into()),
+                        Value::Integer((t.y as i64).into()),
+                    ));
+                    tree_map.push((
+                        Value::String("gid".into()),
+                        Value::Integer((t.gid as i64).into()),
+                    ));
+                    Value::Map(tree_map)
+                })
+                .collect();
             let mut map = Vec::new();
             map.push((Value::String("trees".into()), Value::Array(tree_values)));
             Value::Map(map)
@@ -2767,13 +3983,31 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("timestamp".into()), Value::F64(*timestamp)));
             Value::Map(map)
         }
-        ServerMessage::FarmingContractUpdate { active, difficulty, crop_name, amount_required, amount_harvested } => {
+        ServerMessage::FarmingContractUpdate {
+            active,
+            difficulty,
+            crop_name,
+            amount_required,
+            amount_harvested,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("active".into()), Value::Boolean(*active)));
-            map.push((Value::String("difficulty".into()), Value::String(difficulty.clone().into())));
-            map.push((Value::String("crop_name".into()), Value::String(crop_name.clone().into())));
-            map.push((Value::String("amount_required".into()), Value::Integer((*amount_required as i64).into())));
-            map.push((Value::String("amount_harvested".into()), Value::Integer((*amount_harvested as i64).into())));
+            map.push((
+                Value::String("difficulty".into()),
+                Value::String(difficulty.clone().into()),
+            ));
+            map.push((
+                Value::String("crop_name".into()),
+                Value::String(crop_name.clone().into()),
+            ));
+            map.push((
+                Value::String("amount_required".into()),
+                Value::Integer((*amount_required as i64).into()),
+            ));
+            map.push((
+                Value::String("amount_harvested".into()),
+                Value::Integer((*amount_harvested as i64).into()),
+            ));
             Value::Map(map)
         }
     };
@@ -2802,25 +4036,19 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
     let value = rmpv::decode::read_value(&mut cursor)
         .map_err(|e| format!("Failed to decode MessagePack: {}", e))?;
 
-    let array = value
-        .as_array()
-        .ok_or("Expected array")?;
+    let array = value.as_array().ok_or("Expected array")?;
 
     if array.len() < 2 {
         return Err("Array too short".to_string());
     }
 
-    let protocol = array[0]
-        .as_u64()
-        .ok_or("Protocol code must be integer")? as u8;
+    let protocol = array[0].as_u64().ok_or("Protocol code must be integer")? as u8;
 
     if protocol != 13 {
         return Err(format!("Unexpected protocol code: {}", protocol));
     }
 
-    let msg_type = array[1]
-        .as_str()
-        .ok_or("Message type must be string")?;
+    let msg_type = array[1].as_str().ok_or("Message type must be string")?;
 
     let msg_data = if array.len() > 2 {
         &array[2]
@@ -2835,7 +4063,8 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::Move { dx, dy })
         }
         "face" => {
-            let direction = msg_data.as_map()
+            let direction = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("direction")))
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
                 .unwrap_or(0);
@@ -2855,7 +4084,8 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::Pickup { item_id })
         }
         "useItem" => {
-            let slot_index = msg_data.as_map()
+            let slot_index = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("slot_index")))
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
                 .unwrap_or(0);
@@ -2883,7 +4113,10 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "dialogueChoice" => {
             let quest_id = extract_string(msg_data, "quest_id").unwrap_or_default();
             let choice_id = extract_string(msg_data, "choice_id").unwrap_or_default();
-            Ok(ClientMessage::DialogueChoiceMsg { quest_id, choice_id })
+            Ok(ClientMessage::DialogueChoiceMsg {
+                quest_id,
+                choice_id,
+            })
         }
         "acceptQuest" => {
             let quest_id = extract_string(msg_data, "quest_id").unwrap_or_default();
@@ -2903,7 +4136,8 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         }
         "cancelCraft" => Ok(ClientMessage::CancelCraft),
         "equip" => {
-            let slot_index = msg_data.as_map()
+            let slot_index = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("slot_index")))
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
                 .unwrap_or(0);
@@ -2914,32 +4148,43 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::Unequip { slot_type })
         }
         "dropItem" => {
-            let slot_index = msg_data.as_map()
+            let slot_index = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("slot_index")))
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
                 .unwrap_or(0);
-            let quantity = msg_data.as_map()
+            let quantity = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("quantity")))
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u32))
                 .unwrap_or(1);
-            let target_x = msg_data.as_map()
+            let target_x = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("target_x")))
                 .and_then(|(_, v)| v.as_i64().map(|i| i as i32));
-            let target_y = msg_data.as_map()
+            let target_y = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("target_y")))
                 .and_then(|(_, v)| v.as_i64().map(|i| i as i32));
-            Ok(ClientMessage::DropItem { slot_index, quantity, target_x, target_y })
+            Ok(ClientMessage::DropItem {
+                slot_index,
+                quantity,
+                target_x,
+                target_y,
+            })
         }
         "dropGold" => {
             let amount = extract_i32(msg_data, "amount").unwrap_or(0);
             Ok(ClientMessage::DropGold { amount })
         }
         "swapSlots" => {
-            let from_slot = msg_data.as_map()
+            let from_slot = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("from_slot")))
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
                 .unwrap_or(0);
-            let to_slot = msg_data.as_map()
+            let to_slot = msg_data
+                .as_map()
                 .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("to_slot")))
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
                 .unwrap_or(0);
@@ -2949,13 +4194,21 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let npc_id = extract_string(msg_data, "npcId").unwrap_or_default();
             let item_id = extract_string(msg_data, "itemId").unwrap_or_default();
             let quantity = extract_i32(msg_data, "quantity").unwrap_or(0);
-            Ok(ClientMessage::ShopBuy { npc_id, item_id, quantity })
+            Ok(ClientMessage::ShopBuy {
+                npc_id,
+                item_id,
+                quantity,
+            })
         }
         "shopSell" => {
             let npc_id = extract_string(msg_data, "npcId").unwrap_or_default();
             let item_id = extract_string(msg_data, "itemId").unwrap_or_default();
             let quantity = extract_i32(msg_data, "quantity").unwrap_or(0);
-            Ok(ClientMessage::ShopSell { npc_id, item_id, quantity })
+            Ok(ClientMessage::ShopSell {
+                npc_id,
+                item_id,
+                quantity,
+            })
         }
         "enterPortal" => {
             let portal_id = extract_string(msg_data, "portalId").unwrap_or_default();
@@ -3033,7 +4286,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let tree_x = extract_i64(msg_data, "tree_x").unwrap_or(0) as i32;
             let tree_y = extract_i64(msg_data, "tree_y").unwrap_or(0) as i32;
             let tree_gid = extract_i64(msg_data, "tree_gid").unwrap_or(0) as u32;
-            Ok(ClientMessage::ChopTree { tree_x, tree_y, tree_gid })
+            Ok(ClientMessage::ChopTree {
+                tree_x,
+                tree_y,
+                tree_gid,
+            })
         }
         // Utility messages
         "ping" => {
@@ -3093,9 +4350,6 @@ fn extract_i64(value: &rmpv::Value, key: &str) -> Option<i64> {
     value.as_map().and_then(|map| {
         map.iter()
             .find(|(k, _)| k.as_str() == Some(key))
-            .and_then(|(_, v)| {
-                v.as_i64()
-                    .or_else(|| v.as_u64().map(|u| u as i64))
-            })
+            .and_then(|(_, v)| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64)))
     })
 }

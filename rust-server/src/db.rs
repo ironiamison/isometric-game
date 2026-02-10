@@ -1,12 +1,12 @@
+use crate::quest::state::{ObjectiveProgress, PlayerQuestState, QuestProgress, QuestStatus};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteJournalMode};
-use sqlx::Row;
-use crate::quest::state::{PlayerQuestState, QuestProgress, QuestStatus, ObjectiveProgress};
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
+use sqlx::Row;
+use std::collections::HashMap;
 
 /// Account data - separate from character data
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ pub struct AccountData {
     pub last_login: Option<String>,
 }
 
-use crate::skills::{Skills, LegacySkills};
+use crate::skills::{LegacySkills, Skills};
 
 /// Character data - belongs to an account
 #[derive(Debug, Clone)]
@@ -26,15 +26,15 @@ pub struct CharacterData {
     pub id: i64,
     pub account_id: i64,
     pub name: String,
-    pub gender: String,         // "male" or "female"
-    pub skin: String,           // "tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"
+    pub gender: String,          // "male" or "female"
+    pub skin: String,            // "tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"
     pub hair_style: Option<i32>, // 0-5 (or None for bald)
     pub hair_color: Option<i32>, // 0-6 (color variant index)
     pub x: f32,
     pub y: f32,
     pub hp: i32,
     pub prayer_points: i32,
-    pub skills: Skills,         // Combat skills (Hitpoints, Attack, Strength, Defence)
+    pub skills: Skills, // Combat skills (Hitpoints, Attack, Strength, Defence)
     pub gold: i32,
     pub inventory_json: String, // JSON serialized inventory
     // Equipment slots
@@ -47,14 +47,13 @@ pub struct CharacterData {
     pub equipped_gloves: Option<String>,
     pub equipped_necklace: Option<String>,
     pub equipped_belt: Option<String>,
-    pub played_time: i64,       // Seconds played
+    pub played_time: i64, // Seconds played
     pub created_at: Option<String>,
-    pub is_admin: bool,         // Game Master privileges
+    pub is_admin: bool,              // Game Master privileges
     pub current_map: Option<String>, // Interior map ID if player is in an instance (NULL = overworld)
     pub sitting_at_x: Option<i32>,   // Chair tile X if sitting (NULL = not sitting)
     pub sitting_at_y: Option<i32>,   // Chair tile Y if sitting (NULL = not sitting)
 }
-
 
 // Available appearance options
 pub const GENDERS: &[&str] = &["male", "female"];
@@ -83,7 +82,8 @@ impl Database {
     }
 
     pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
-        let options: SqliteConnectOptions = database_url.parse::<SqliteConnectOptions>()?
+        let options: SqliteConnectOptions = database_url
+            .parse::<SqliteConnectOptions>()?
             .journal_mode(SqliteJournalMode::Wal);
 
         let pool = SqlitePoolOptions::new()
@@ -152,7 +152,7 @@ impl Database {
         // Migration: Add skills_json column if it doesn't exist (for existing databases)
         // SQLite doesn't have IF NOT EXISTS for ALTER TABLE, so we check first
         let column_exists: bool = sqlx::query_scalar(
-            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'skills_json'"
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'skills_json'",
         )
         .fetch_one(pool)
         .await
@@ -167,7 +167,7 @@ impl Database {
 
         // Migration: Add hair_style column if it doesn't exist
         let hair_style_exists: bool = sqlx::query_scalar(
-            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'hair_style'"
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'hair_style'",
         )
         .fetch_one(pool)
         .await
@@ -182,7 +182,7 @@ impl Database {
 
         // Migration: Add hair_color column if it doesn't exist
         let hair_color_exists: bool = sqlx::query_scalar(
-            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'hair_color'"
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'hair_color'",
         )
         .fetch_one(pool)
         .await
@@ -197,7 +197,7 @@ impl Database {
 
         // Migration: Add current_map column if it doesn't exist
         let current_map_exists: bool = sqlx::query_scalar(
-            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'current_map'"
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'current_map'",
         )
         .fetch_one(pool)
         .await
@@ -212,7 +212,7 @@ impl Database {
 
         // Migration: Add sitting_at columns if they don't exist
         let sitting_at_x_exists: bool = sqlx::query_scalar(
-            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'sitting_at_x'"
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'sitting_at_x'",
         )
         .fetch_one(pool)
         .await
@@ -231,7 +231,7 @@ impl Database {
 
         // Migration: Add prayer_points column if it doesn't exist
         let prayer_points_exists: bool = sqlx::query_scalar(
-            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'prayer_points'"
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'prayer_points'",
         )
         .fetch_one(pool)
         .await
@@ -376,13 +376,13 @@ impl Database {
 
         // Create index for faster friend lookups
         sqlx::query(
-            "CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships(requester_id)"
+            "CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships(requester_id)",
         )
         .execute(pool)
         .await?;
 
         sqlx::query(
-            "CREATE INDEX IF NOT EXISTS idx_friendships_recipient ON friendships(recipient_id)"
+            "CREATE INDEX IF NOT EXISTS idx_friendships_recipient ON friendships(recipient_id)",
         )
         .execute(pool)
         .await?;
@@ -501,11 +501,7 @@ impl Database {
     // =========================================================================
 
     /// Create a new account (no character created)
-    pub async fn create_account(
-        &self,
-        username: &str,
-        password: &str,
-    ) -> Result<i64, String> {
+    pub async fn create_account(&self, username: &str, password: &str) -> Result<i64, String> {
         // Hash the password with Argon2
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
@@ -514,20 +510,18 @@ impl Database {
             .map_err(|e| format!("Failed to hash password: {}", e))?
             .to_string();
 
-        let result = sqlx::query(
-            "INSERT INTO accounts (username, password_hash) VALUES (?, ?)",
-        )
-        .bind(username)
-        .bind(&password_hash)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("UNIQUE constraint failed") {
-                "Username already exists".to_string()
-            } else {
-                format!("Database error: {}", e)
-            }
-        })?;
+        let result = sqlx::query("INSERT INTO accounts (username, password_hash) VALUES (?, ?)")
+            .bind(username)
+            .bind(&password_hash)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                if e.to_string().contains("UNIQUE constraint failed") {
+                    "Username already exists".to_string()
+                } else {
+                    format!("Database error: {}", e)
+                }
+            })?;
 
         let account_id = result.last_insert_rowid();
         tracing::info!("Created account: {} (id: {})", username, account_id);
@@ -535,7 +529,11 @@ impl Database {
     }
 
     /// Verify account password and return account data if valid
-    pub async fn verify_account_password(&self, username: &str, password: &str) -> Option<AccountData> {
+    pub async fn verify_account_password(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Option<AccountData> {
         let row = sqlx::query(
             "SELECT id, username, password_hash, created_at, last_login FROM accounts WHERE username = ?",
         )
@@ -559,10 +557,11 @@ impl Database {
                 .is_ok()
             {
                 // Update last login time
-                let _ = sqlx::query("UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?")
-                    .bind(account.id)
-                    .execute(&self.pool)
-                    .await;
+                let _ =
+                    sqlx::query("UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?")
+                        .bind(account.id)
+                        .execute(&self.pool)
+                        .await;
                 return Some(account);
             }
         }
@@ -574,7 +573,10 @@ impl Database {
     // =========================================================================
 
     /// Get all characters for an account
-    pub async fn get_characters_for_account(&self, account_id: i64) -> Result<Vec<CharacterData>, sqlx::Error> {
+    pub async fn get_characters_for_account(
+        &self,
+        account_id: i64,
+    ) -> Result<Vec<CharacterData>, sqlx::Error> {
         let rows = sqlx::query(
             r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, prayer_points, gold,
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
@@ -587,64 +589,101 @@ impl Database {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| {
-            // Try to load skills from JSON column, with legacy format migration
-            let skills = r.try_get::<String, _>("skills_json")
-                .ok()
-                .and_then(|json| {
-                    // First try the new format (hitpoints + combat)
-                    if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
-                        return Some(skills);
-                    }
-                    // Fall back to legacy format (hitpoints + attack + strength + defence)
-                    // and convert to new format by summing combat XP
-                    if let Ok(legacy) = serde_json::from_str::<LegacySkills>(&json) {
-                        return Some(legacy.to_skills());
-                    }
-                    None
-                })
-                .unwrap_or_else(Skills::new);
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                // Try to load skills from JSON column, with legacy format migration
+                let skills = r
+                    .try_get::<String, _>("skills_json")
+                    .ok()
+                    .and_then(|json| {
+                        // First try the new format (hitpoints + combat)
+                        if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
+                            return Some(skills);
+                        }
+                        // Fall back to legacy format (hitpoints + attack + strength + defence)
+                        // and convert to new format by summing combat XP
+                        if let Ok(legacy) = serde_json::from_str::<LegacySkills>(&json) {
+                            return Some(legacy.to_skills());
+                        }
+                        None
+                    })
+                    .unwrap_or_else(Skills::new);
 
-            CharacterData {
-                id: r.get("id"),
-                account_id: r.get("account_id"),
-                name: r.get("name"),
-                gender: r.get("gender"),
-                skin: r.get("skin"),
-                hair_style: r.try_get::<Option<i32>, _>("hair_style").unwrap_or(None),
-                hair_color: r.try_get::<Option<i32>, _>("hair_color").unwrap_or(None),
-                x: r.get("x"),
-                y: r.get("y"),
-                hp: r.get("hp"),
-                prayer_points: r.try_get::<Option<i32>, _>("prayer_points").unwrap_or(None).unwrap_or(10 + skills.prayer.level),
-                skills,
-                gold: r.get("gold"),
-                equipped_head: r.try_get::<String, _>("equipped_head").ok().filter(|s| !s.is_empty()),
-                equipped_body: r.try_get::<String, _>("equipped_body").ok().filter(|s| !s.is_empty()),
-                equipped_weapon: r.try_get::<String, _>("equipped_weapon").ok().filter(|s| !s.is_empty()),
-                equipped_back: r.try_get::<String, _>("equipped_back").ok().filter(|s| !s.is_empty()),
-                equipped_feet: r.try_get::<String, _>("equipped_feet").ok().filter(|s| !s.is_empty()),
-                equipped_ring: r.try_get::<String, _>("equipped_ring").ok().filter(|s| !s.is_empty()),
-                equipped_gloves: r.try_get::<String, _>("equipped_gloves").ok().filter(|s| !s.is_empty()),
-                equipped_necklace: r.try_get::<String, _>("equipped_necklace").ok().filter(|s| !s.is_empty()),
-                equipped_belt: r.try_get::<String, _>("equipped_belt").ok().filter(|s| !s.is_empty()),
-                inventory_json: r.get("inventory_json"),
-                played_time: r.get("played_time"),
-                created_at: r.get("created_at"),
-                is_admin: r.try_get::<bool, _>("is_admin").unwrap_or(false),
-                current_map: r.try_get::<Option<String>, _>("current_map").unwrap_or(None),
-                sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
-                sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
-            }
-        }).collect())
+                CharacterData {
+                    id: r.get("id"),
+                    account_id: r.get("account_id"),
+                    name: r.get("name"),
+                    gender: r.get("gender"),
+                    skin: r.get("skin"),
+                    hair_style: r.try_get::<Option<i32>, _>("hair_style").unwrap_or(None),
+                    hair_color: r.try_get::<Option<i32>, _>("hair_color").unwrap_or(None),
+                    x: r.get("x"),
+                    y: r.get("y"),
+                    hp: r.get("hp"),
+                    prayer_points: r
+                        .try_get::<Option<i32>, _>("prayer_points")
+                        .unwrap_or(None)
+                        .unwrap_or(10 + skills.prayer.level),
+                    skills,
+                    gold: r.get("gold"),
+                    equipped_head: r
+                        .try_get::<String, _>("equipped_head")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    equipped_body: r
+                        .try_get::<String, _>("equipped_body")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    equipped_weapon: r
+                        .try_get::<String, _>("equipped_weapon")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    equipped_back: r
+                        .try_get::<String, _>("equipped_back")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    equipped_feet: r
+                        .try_get::<String, _>("equipped_feet")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    equipped_ring: r
+                        .try_get::<String, _>("equipped_ring")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    equipped_gloves: r
+                        .try_get::<String, _>("equipped_gloves")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    equipped_necklace: r
+                        .try_get::<String, _>("equipped_necklace")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    equipped_belt: r
+                        .try_get::<String, _>("equipped_belt")
+                        .ok()
+                        .filter(|s| !s.is_empty()),
+                    inventory_json: r.get("inventory_json"),
+                    played_time: r.get("played_time"),
+                    created_at: r.get("created_at"),
+                    is_admin: r.try_get::<bool, _>("is_admin").unwrap_or(false),
+                    current_map: r
+                        .try_get::<Option<String>, _>("current_map")
+                        .unwrap_or(None),
+                    sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
+                    sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
+                }
+            })
+            .collect())
     }
 
     /// Check if a character name is already taken (case-insensitive, globally unique)
     pub async fn is_character_name_taken(&self, name: &str) -> Result<bool, sqlx::Error> {
-        let row = sqlx::query("SELECT COUNT(*) as count FROM characters WHERE LOWER(name) = LOWER(?)")
-            .bind(name)
-            .fetch_one(&self.pool)
-            .await?;
+        let row =
+            sqlx::query("SELECT COUNT(*) as count FROM characters WHERE LOWER(name) = LOWER(?)")
+                .bind(name)
+                .fetch_one(&self.pool)
+                .await?;
         let count: i64 = row.get("count");
         Ok(count > 0)
     }
@@ -697,7 +736,11 @@ impl Database {
 
         // Starting equipment for new characters (Tier 0 Cursed Lands gear)
         let starting_weapon = "chain";
-        let starting_body = if gender == "female" { "peasant_suit_female" } else { "torn_clothes" };
+        let starting_body = if gender == "female" {
+            "peasant_suit_female"
+        } else {
+            "torn_clothes"
+        };
         let starting_feet = "worn_sandals";
         let starting_gold = 25;
 
@@ -732,13 +775,17 @@ impl Database {
             name, character_id, account_id, starting_gold);
 
         // Fetch and return the created character
-        self.get_character(character_id).await
+        self.get_character(character_id)
+            .await
             .map_err(|e| format!("Failed to fetch created character: {}", e))?
             .ok_or_else(|| "Failed to find created character".to_string())
     }
 
     /// Get a character by ID
-    pub async fn get_character(&self, character_id: i64) -> Result<Option<CharacterData>, sqlx::Error> {
+    pub async fn get_character(
+        &self,
+        character_id: i64,
+    ) -> Result<Option<CharacterData>, sqlx::Error> {
         let row = sqlx::query(
             r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, prayer_points, gold,
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
@@ -753,7 +800,8 @@ impl Database {
 
         Ok(row.map(|r| {
             // Try to load skills from JSON column, with legacy format migration
-            let skills = r.try_get::<String, _>("skills_json")
+            let skills = r
+                .try_get::<String, _>("skills_json")
                 .ok()
                 .and_then(|json| {
                     // First try the new format (hitpoints + combat)
@@ -780,23 +828,55 @@ impl Database {
                 x: r.get("x"),
                 y: r.get("y"),
                 hp: r.get("hp"),
-                prayer_points: r.try_get::<Option<i32>, _>("prayer_points").unwrap_or(None).unwrap_or(10 + skills.prayer.level),
+                prayer_points: r
+                    .try_get::<Option<i32>, _>("prayer_points")
+                    .unwrap_or(None)
+                    .unwrap_or(10 + skills.prayer.level),
                 skills,
                 gold: r.get("gold"),
-                equipped_head: r.try_get::<String, _>("equipped_head").ok().filter(|s| !s.is_empty()),
-                equipped_body: r.try_get::<String, _>("equipped_body").ok().filter(|s| !s.is_empty()),
-                equipped_weapon: r.try_get::<String, _>("equipped_weapon").ok().filter(|s| !s.is_empty()),
-                equipped_back: r.try_get::<String, _>("equipped_back").ok().filter(|s| !s.is_empty()),
-                equipped_feet: r.try_get::<String, _>("equipped_feet").ok().filter(|s| !s.is_empty()),
-                equipped_ring: r.try_get::<String, _>("equipped_ring").ok().filter(|s| !s.is_empty()),
-                equipped_gloves: r.try_get::<String, _>("equipped_gloves").ok().filter(|s| !s.is_empty()),
-                equipped_necklace: r.try_get::<String, _>("equipped_necklace").ok().filter(|s| !s.is_empty()),
-                equipped_belt: r.try_get::<String, _>("equipped_belt").ok().filter(|s| !s.is_empty()),
+                equipped_head: r
+                    .try_get::<String, _>("equipped_head")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                equipped_body: r
+                    .try_get::<String, _>("equipped_body")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                equipped_weapon: r
+                    .try_get::<String, _>("equipped_weapon")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                equipped_back: r
+                    .try_get::<String, _>("equipped_back")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                equipped_feet: r
+                    .try_get::<String, _>("equipped_feet")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                equipped_ring: r
+                    .try_get::<String, _>("equipped_ring")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                equipped_gloves: r
+                    .try_get::<String, _>("equipped_gloves")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                equipped_necklace: r
+                    .try_get::<String, _>("equipped_necklace")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+                equipped_belt: r
+                    .try_get::<String, _>("equipped_belt")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
                 inventory_json: r.get("inventory_json"),
                 played_time: r.get("played_time"),
                 created_at: r.get("created_at"),
                 is_admin: r.try_get::<bool, _>("is_admin").unwrap_or(false),
-                current_map: r.try_get::<Option<String>, _>("current_map").unwrap_or(None),
+                current_map: r
+                    .try_get::<Option<String>, _>("current_map")
+                    .unwrap_or(None),
                 sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
                 sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
             }
@@ -804,7 +884,11 @@ impl Database {
     }
 
     /// Delete a character (with ownership verification)
-    pub async fn delete_character(&self, character_id: i64, account_id: i64) -> Result<bool, sqlx::Error> {
+    pub async fn delete_character(
+        &self,
+        character_id: i64,
+        account_id: i64,
+    ) -> Result<bool, sqlx::Error> {
         // Delete related quest data first
         sqlx::query("DELETE FROM character_quests WHERE character_id = ?")
             .bind(character_id)
@@ -837,7 +921,11 @@ impl Database {
 
         let deleted = result.rows_affected() > 0;
         if deleted {
-            tracing::info!("Deleted character {} for account {}", character_id, account_id);
+            tracing::info!(
+                "Deleted character {} for account {}",
+                character_id,
+                account_id
+            );
         }
         Ok(deleted)
     }
@@ -921,7 +1009,10 @@ impl Database {
     // =========================================================================
 
     /// Load quest state for a character from database
-    pub async fn load_character_quest_state(&self, character_id: i64) -> Result<PlayerQuestState, sqlx::Error> {
+    pub async fn load_character_quest_state(
+        &self,
+        character_id: i64,
+    ) -> Result<PlayerQuestState, sqlx::Error> {
         let mut state = PlayerQuestState::new();
 
         // Load quests from character_quests table
@@ -942,8 +1033,16 @@ impl Database {
             let status = QuestStatus::from_str(&state_str).unwrap_or(QuestStatus::Active);
 
             // Parse timestamps
-            let started_at_dt = started_at.and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc)));
-            let completed_at_dt = completed_at.and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc)));
+            let started_at_dt = started_at.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc))
+            });
+            let completed_at_dt = completed_at.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc))
+            });
 
             // Deserialize objectives
             let objectives = QuestProgress::objectives_from_json(&objectives_json);
@@ -970,28 +1069,28 @@ impl Database {
         }
 
         // Load available quests
-        let available_rows = sqlx::query(
-            "SELECT quest_id FROM character_quest_availability WHERE character_id = ?"
-        )
-        .bind(character_id)
-        .fetch_all(&self.pool)
-        .await?;
+        let available_rows =
+            sqlx::query("SELECT quest_id FROM character_quest_availability WHERE character_id = ?")
+                .bind(character_id)
+                .fetch_all(&self.pool)
+                .await?;
 
         for row in available_rows {
             let quest_id: String = row.get("quest_id");
             // Only add if not already active or completed
-            if !state.active_quests.contains_key(&quest_id) && !state.completed_quests.contains(&quest_id) {
+            if !state.active_quests.contains_key(&quest_id)
+                && !state.completed_quests.contains(&quest_id)
+            {
                 state.available_quests.push(quest_id);
             }
         }
 
         // Load flags
-        let flag_rows = sqlx::query(
-            "SELECT flag_name, flag_value FROM character_flags WHERE character_id = ?"
-        )
-        .bind(character_id)
-        .fetch_all(&self.pool)
-        .await?;
+        let flag_rows =
+            sqlx::query("SELECT flag_name, flag_value FROM character_flags WHERE character_id = ?")
+                .bind(character_id)
+                .fetch_all(&self.pool)
+                .await?;
 
         for row in flag_rows {
             let flag_name: String = row.get("flag_name");
@@ -1001,7 +1100,8 @@ impl Database {
             }
         }
 
-        tracing::debug!("Loaded quest state for character {}: {} active, {} completed, {} available",
+        tracing::debug!(
+            "Loaded quest state for character {}: {} active, {} completed, {} available",
             character_id,
             state.active_quests.len(),
             state.completed_quests.len(),
@@ -1012,7 +1112,11 @@ impl Database {
     }
 
     /// Save quest state for a character to database
-    pub async fn save_character_quest_state(&self, character_id: i64, state: &PlayerQuestState) -> Result<(), sqlx::Error> {
+    pub async fn save_character_quest_state(
+        &self,
+        character_id: i64,
+        state: &PlayerQuestState,
+    ) -> Result<(), sqlx::Error> {
         // Save active quests
         for (quest_id, progress) in &state.active_quests {
             let objectives_json = progress.objectives_to_json();
@@ -1045,7 +1149,7 @@ impl Database {
                    VALUES (?, ?, 'completed', CURRENT_TIMESTAMP)
                    ON CONFLICT(character_id, quest_id) DO UPDATE SET
                        state = 'completed',
-                       completed_at = CURRENT_TIMESTAMP"#
+                       completed_at = CURRENT_TIMESTAMP"#,
             )
             .bind(character_id)
             .bind(quest_id)
@@ -1057,7 +1161,7 @@ impl Database {
         for quest_id in &state.available_quests {
             sqlx::query(
                 r#"INSERT OR IGNORE INTO character_quest_availability (character_id, quest_id)
-                   VALUES (?, ?)"#
+                   VALUES (?, ?)"#,
             )
             .bind(character_id)
             .bind(quest_id)
@@ -1071,7 +1175,7 @@ impl Database {
                 r#"INSERT INTO character_flags (character_id, flag_name, flag_value)
                    VALUES (?, ?, ?)
                    ON CONFLICT(character_id, flag_name) DO UPDATE SET
-                       flag_value = excluded.flag_value"#
+                       flag_value = excluded.flag_value"#,
             )
             .bind(character_id)
             .bind(flag_name)
@@ -1080,7 +1184,8 @@ impl Database {
             .await?;
         }
 
-        tracing::debug!("Saved quest state for character {}: {} active, {} completed",
+        tracing::debug!(
+            "Saved quest state for character {}: {} active, {} completed",
             character_id,
             state.active_quests.len(),
             state.completed_quests.len()
@@ -1117,7 +1222,11 @@ impl Database {
     }
 
     /// Delete a farming patch for a specific player (after harvest or reset)
-    pub async fn delete_farming_patch(&self, patch_id: &str, player_id: &str) -> Result<(), sqlx::Error> {
+    pub async fn delete_farming_patch(
+        &self,
+        patch_id: &str,
+        player_id: &str,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query("DELETE FROM farming_patches WHERE patch_id = ? AND player_id = ?")
             .bind(patch_id)
             .bind(player_id)
@@ -1127,20 +1236,24 @@ impl Database {
     }
 
     /// Load all planted farming patches from the database
-    pub async fn load_farming_patches(&self) -> Result<Vec<(String, String, String, u64)>, sqlx::Error> {
-        let rows = sqlx::query(
-            "SELECT patch_id, player_id, crop_id, planted_at FROM farming_patches"
-        )
-        .fetch_all(&self.pool)
-        .await?;
+    pub async fn load_farming_patches(
+        &self,
+    ) -> Result<Vec<(String, String, String, u64)>, sqlx::Error> {
+        let rows =
+            sqlx::query("SELECT patch_id, player_id, crop_id, planted_at FROM farming_patches")
+                .fetch_all(&self.pool)
+                .await?;
 
-        let patches = rows.iter().map(|row| {
-            let patch_id: String = row.get("patch_id");
-            let player_id: String = row.get("player_id");
-            let crop_id: String = row.get("crop_id");
-            let planted_at: i64 = row.get("planted_at");
-            (patch_id, player_id, crop_id, planted_at as u64)
-        }).collect();
+        let patches = rows
+            .iter()
+            .map(|row| {
+                let patch_id: String = row.get("patch_id");
+                let player_id: String = row.get("player_id");
+                let crop_id: String = row.get("crop_id");
+                let planted_at: i64 = row.get("planted_at");
+                (patch_id, player_id, crop_id, planted_at as u64)
+            })
+            .collect();
 
         Ok(patches)
     }
@@ -1150,11 +1263,7 @@ impl Database {
     // =========================================================================
 
     /// Save a plot unlock for a player
-    pub async fn save_plot_unlock(
-        &self,
-        player_id: &str,
-        plot_id: u32,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn save_plot_unlock(&self, player_id: &str, plot_id: u32) -> Result<(), sqlx::Error> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -1175,17 +1284,18 @@ impl Database {
 
     /// Load all plot unlocks from the database
     pub async fn load_plot_unlocks(&self) -> Result<Vec<(String, u32)>, sqlx::Error> {
-        let rows = sqlx::query(
-            "SELECT player_id, plot_id FROM farming_plot_unlocks"
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows = sqlx::query("SELECT player_id, plot_id FROM farming_plot_unlocks")
+            .fetch_all(&self.pool)
+            .await?;
 
-        let unlocks = rows.iter().map(|row| {
-            let player_id: String = row.get("player_id");
-            let plot_id: i32 = row.get("plot_id");
-            (player_id, plot_id as u32)
-        }).collect();
+        let unlocks = rows
+            .iter()
+            .map(|row| {
+                let player_id: String = row.get("player_id");
+                let plot_id: i32 = row.get("plot_id");
+                (player_id, plot_id as u32)
+            })
+            .collect();
 
         Ok(unlocks)
     }
@@ -1227,13 +1337,11 @@ impl Database {
         player_id: &str,
         amount_harvested: i32,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE farming_contracts SET amount_harvested = ? WHERE player_id = ?"
-        )
-        .bind(amount_harvested)
-        .bind(player_id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE farming_contracts SET amount_harvested = ? WHERE player_id = ?")
+            .bind(amount_harvested)
+            .bind(player_id)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
@@ -1247,22 +1355,34 @@ impl Database {
     }
 
     /// Load all active farming contracts
-    pub async fn load_farming_contracts(&self) -> Result<Vec<(String, String, String, i32, i32, u64)>, sqlx::Error> {
+    pub async fn load_farming_contracts(
+        &self,
+    ) -> Result<Vec<(String, String, String, i32, i32, u64)>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT player_id, difficulty, crop_id, amount_required, amount_harvested, created_at FROM farming_contracts"
         )
         .fetch_all(&self.pool)
         .await?;
 
-        let contracts = rows.iter().map(|row| {
-            let player_id: String = row.get("player_id");
-            let difficulty: String = row.get("difficulty");
-            let crop_id: String = row.get("crop_id");
-            let amount_required: i32 = row.get("amount_required");
-            let amount_harvested: i32 = row.get("amount_harvested");
-            let created_at: i64 = row.get("created_at");
-            (player_id, difficulty, crop_id, amount_required, amount_harvested, created_at as u64)
-        }).collect();
+        let contracts = rows
+            .iter()
+            .map(|row| {
+                let player_id: String = row.get("player_id");
+                let difficulty: String = row.get("difficulty");
+                let crop_id: String = row.get("crop_id");
+                let amount_required: i32 = row.get("amount_required");
+                let amount_harvested: i32 = row.get("amount_harvested");
+                let created_at: i64 = row.get("created_at");
+                (
+                    player_id,
+                    difficulty,
+                    crop_id,
+                    amount_required,
+                    amount_harvested,
+                    created_at as u64,
+                )
+            })
+            .collect();
 
         Ok(contracts)
     }
@@ -1272,13 +1392,14 @@ impl Database {
     // =========================================================================
 
     /// Load discovered recipes for a character
-    pub async fn load_discovered_recipes(&self, character_id: i64) -> Result<Vec<String>, sqlx::Error> {
-        let rows = sqlx::query(
-            "SELECT recipe_id FROM discovered_recipes WHERE character_id = ?"
-        )
-        .bind(character_id)
-        .fetch_all(&self.pool)
-        .await?;
+    pub async fn load_discovered_recipes(
+        &self,
+        character_id: i64,
+    ) -> Result<Vec<String>, sqlx::Error> {
+        let rows = sqlx::query("SELECT recipe_id FROM discovered_recipes WHERE character_id = ?")
+            .bind(character_id)
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok(rows.iter().map(|row| row.get("recipe_id")).collect())
     }
@@ -1316,7 +1437,7 @@ impl Database {
         let existing = sqlx::query(
             r#"SELECT id FROM friendships
                WHERE (requester_id = ? AND recipient_id = ?)
-                  OR (requester_id = ? AND recipient_id = ?)"#
+                  OR (requester_id = ? AND recipient_id = ?)"#,
         )
         .bind(requester_id)
         .bind(recipient_id)
@@ -1331,7 +1452,7 @@ impl Database {
         }
 
         sqlx::query(
-            "INSERT INTO friendships (requester_id, recipient_id, status) VALUES (?, ?, 'pending')"
+            "INSERT INTO friendships (requester_id, recipient_id, status) VALUES (?, ?, 'pending')",
         )
         .bind(requester_id)
         .bind(recipient_id)
@@ -1339,7 +1460,11 @@ impl Database {
         .await
         .map_err(|e| format!("Database error: {}", e))?;
 
-        tracing::info!("Friend request created: {} -> {}", requester_id, recipient_id);
+        tracing::info!(
+            "Friend request created: {} -> {}",
+            requester_id,
+            recipient_id
+        );
         Ok(())
     }
 
@@ -1362,7 +1487,11 @@ impl Database {
             return Err("No pending friend request found".to_string());
         }
 
-        tracing::info!("Friend request accepted: {} <- {}", requester_id, recipient_id);
+        tracing::info!(
+            "Friend request accepted: {} <- {}",
+            requester_id,
+            recipient_id
+        );
         Ok(())
     }
 
@@ -1385,21 +1514,21 @@ impl Database {
             return Err("No pending friend request found".to_string());
         }
 
-        tracing::info!("Friend request declined: {} <- {}", requester_id, recipient_id);
+        tracing::info!(
+            "Friend request declined: {} <- {}",
+            requester_id,
+            recipient_id
+        );
         Ok(())
     }
 
     /// Remove a friend (deletes the accepted friendship in either direction)
-    pub async fn remove_friend(
-        &self,
-        character_id: i64,
-        friend_id: i64,
-    ) -> Result<(), String> {
+    pub async fn remove_friend(&self, character_id: i64, friend_id: i64) -> Result<(), String> {
         let result = sqlx::query(
             r#"DELETE FROM friendships
                WHERE status = 'accepted'
                  AND ((requester_id = ? AND recipient_id = ?)
-                   OR (requester_id = ? AND recipient_id = ?))"#
+                   OR (requester_id = ? AND recipient_id = ?))"#,
         )
         .bind(character_id)
         .bind(friend_id)
@@ -1418,37 +1547,39 @@ impl Database {
     }
 
     /// Get all accepted friends for a character (returns character_id and name)
-    pub async fn get_friends_list(&self, character_id: i64) -> Result<Vec<(i64, String)>, sqlx::Error> {
+    pub async fn get_friends_list(
+        &self,
+        character_id: i64,
+    ) -> Result<Vec<(i64, String)>, sqlx::Error> {
         let rows = sqlx::query(
             r#"SELECT c.id, c.name FROM characters c
                INNER JOIN friendships f ON
                    (f.requester_id = ? AND f.recipient_id = c.id AND f.status = 'accepted')
-                OR (f.recipient_id = ? AND f.requester_id = c.id AND f.status = 'accepted')"#
+                OR (f.recipient_id = ? AND f.requester_id = c.id AND f.status = 'accepted')"#,
         )
         .bind(character_id)
         .bind(character_id)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|r| {
-            (r.get("id"), r.get("name"))
-        }).collect())
+        Ok(rows.iter().map(|r| (r.get("id"), r.get("name"))).collect())
     }
 
     /// Get pending friend requests received by a character (returns requester_id and name)
-    pub async fn get_pending_requests(&self, character_id: i64) -> Result<Vec<(i64, String)>, sqlx::Error> {
+    pub async fn get_pending_requests(
+        &self,
+        character_id: i64,
+    ) -> Result<Vec<(i64, String)>, sqlx::Error> {
         let rows = sqlx::query(
             r#"SELECT c.id, c.name FROM characters c
                INNER JOIN friendships f ON f.requester_id = c.id
-               WHERE f.recipient_id = ? AND f.status = 'pending'"#
+               WHERE f.recipient_id = ? AND f.status = 'pending'"#,
         )
         .bind(character_id)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|r| {
-            (r.get("id"), r.get("name"))
-        }).collect())
+        Ok(rows.iter().map(|r| (r.get("id"), r.get("name"))).collect())
     }
 
     /// Get character ID by name (for sending friend requests by name)
@@ -1477,7 +1608,7 @@ impl Database {
             r#"SELECT id FROM friendships
                WHERE status = 'accepted'
                  AND ((requester_id = ? AND recipient_id = ?)
-                   OR (requester_id = ? AND recipient_id = ?))"#
+                   OR (requester_id = ? AND recipient_id = ?))"#,
         )
         .bind(char1_id)
         .bind(char2_id)
@@ -1490,7 +1621,11 @@ impl Database {
     }
 
     /// Check if there's a pending request from requester to recipient
-    pub async fn has_pending_request(&self, requester_id: i64, recipient_id: i64) -> Result<bool, sqlx::Error> {
+    pub async fn has_pending_request(
+        &self,
+        requester_id: i64,
+        recipient_id: i64,
+    ) -> Result<bool, sqlx::Error> {
         let row = sqlx::query(
             "SELECT id FROM friendships WHERE requester_id = ? AND recipient_id = ? AND status = 'pending'"
         )

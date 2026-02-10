@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use std::path::Path;
+use crate::chunk::CHUNK_SIZE;
 use rand::Rng;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::path::Path;
 use tracing::info;
-use crate::chunk::CHUNK_SIZE;
 
 // ---------------------------------------------------------------------------
 // TOML deserialization structures
@@ -107,8 +107,8 @@ pub struct GatheringSystem {
 pub fn load_zones(path: &Path) -> Result<HashMap<String, GatheringZoneConfig>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read zones file {:?}: {}", path, e))?;
-    let file: GatheringZonesFile = toml::from_str(&content)
-        .map_err(|e| format!("Failed to parse zones TOML: {}", e))?;
+    let file: GatheringZonesFile =
+        toml::from_str(&content).map_err(|e| format!("Failed to parse zones TOML: {}", e))?;
     info!("Loaded {} gathering zones", file.zones.len());
     Ok(file.zones)
 }
@@ -116,8 +116,8 @@ pub fn load_zones(path: &Path) -> Result<HashMap<String, GatheringZoneConfig>, S
 pub fn load_loot_tables(path: &Path) -> Result<HashMap<String, LootTable>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read loot tables file {:?}: {}", path, e))?;
-    let tables: HashMap<String, LootTable> = toml::from_str(&content)
-        .map_err(|e| format!("Failed to parse loot tables TOML: {}", e))?;
+    let tables: HashMap<String, LootTable> =
+        toml::from_str(&content).map_err(|e| format!("Failed to parse loot tables TOML: {}", e))?;
     info!("Loaded {} loot tables", tables.len());
     Ok(tables)
 }
@@ -137,13 +137,17 @@ struct GatheringMarkerConfig {
 pub fn load_markers(path: &Path) -> Result<Vec<GatheringMarker>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read markers file {:?}: {}", path, e))?;
-    let file: GatheringMarkersFile = toml::from_str(&content)
-        .map_err(|e| format!("Failed to parse markers TOML: {}", e))?;
-    let markers: Vec<GatheringMarker> = file.markers.into_iter().map(|m| GatheringMarker {
-        x: m.x,
-        y: m.y,
-        zone_id: m.zone_id,
-    }).collect();
+    let file: GatheringMarkersFile =
+        toml::from_str(&content).map_err(|e| format!("Failed to parse markers TOML: {}", e))?;
+    let markers: Vec<GatheringMarker> = file
+        .markers
+        .into_iter()
+        .map(|m| GatheringMarker {
+            x: m.x,
+            y: m.y,
+            zone_id: m.zone_id,
+        })
+        .collect();
     info!("Loaded {} gathering markers", markers.len());
     Ok(markers)
 }
@@ -416,8 +420,7 @@ impl GatheringSystem {
                 continue;
             }
 
-            self.last_bonus_check
-                .insert(zone_id.clone(), current_time);
+            self.last_bonus_check.insert(zone_id.clone(), current_time);
 
             // Pick a random marker in this zone to spawn a bonus tile near
             // Only spawn bonus tiles in chunk 0,0 of the overworld
@@ -469,13 +472,7 @@ impl GatheringSystem {
         events
     }
 
-    pub fn claim_bonus_tile(
-        &mut self,
-        player_id: &str,
-        x: i32,
-        y: i32,
-        current_time: u64,
-    ) -> bool {
+    pub fn claim_bonus_tile(&mut self, player_id: &str, x: i32, y: i32, current_time: u64) -> bool {
         // Find and remove the bonus tile at (x, y)
         let idx = self.bonus_tiles.iter().position(|t| t.x == x && t.y == y);
         let idx = match idx {
@@ -490,10 +487,7 @@ impl GatheringSystem {
             state.buff_expires_at = current_time + 30_000;
             info!(
                 "Player {} claimed bonus tile at ({}, {}), buff until {}",
-                player_id,
-                x,
-                y,
-                state.buff_expires_at
+                player_id, x, y, state.buff_expires_at
             );
             true
         } else {

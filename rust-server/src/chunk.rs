@@ -255,7 +255,12 @@ impl Chunk {
                 let world_y = coord.y * CHUNK_SIZE as i32 + y as i32;
 
                 // Rocks using a different pattern than edges
-                if (world_x + world_y * 3) % 17 == 0 && x > 2 && y > 2 && x < CHUNK_SIZE - 3 && y < CHUNK_SIZE - 3 {
+                if (world_x + world_y * 3) % 17 == 0
+                    && x > 2
+                    && y > 2
+                    && x < CHUNK_SIZE - 3
+                    && y < CHUNK_SIZE - 3
+                {
                     chunk.layers[0].tiles[idx] = 4; // Rock tile
                     chunk.collision[idx] = true;
                 }

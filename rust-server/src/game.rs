@@ -1259,6 +1259,30 @@ impl GameRoom {
     /// Batch-snapshot save data for multiple players in a single lock acquisition.
     /// Returns a map of player_id -> (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)
     pub async fn get_bulk_save_data(&self, player_ids: &[String]) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)> {
+        struct RawPlayerSnapshot {
+            x: i32,
+            y: i32,
+            hp: i32,
+            prayer_points: i32,
+            skills: Skills,
+            gold: i32,
+            inventory_slots: Vec<(usize, String, i32)>,
+            gender: String,
+            skin: String,
+            equipped_head: Option<String>,
+            equipped_body: Option<String>,
+            equipped_weapon: Option<String>,
+            equipped_back: Option<String>,
+            equipped_feet: Option<String>,
+            equipped_ring: Option<String>,
+            equipped_gloves: Option<String>,
+            equipped_necklace: Option<String>,
+            equipped_belt: Option<String>,
+            sitting_at_x: Option<i32>,
+            sitting_at_y: Option<i32>,
+            recipes: HashSet<String>,
+        }
+
         let mut result = HashMap::new();
 
         // Snapshot instance assignments once
@@ -1277,9 +1301,11 @@ impl GameRoom {
             }
         }
 
-        // Single lock on players to snapshot all save data + discovered recipes
-        {
+        // Single lock on players to snapshot all mutable gameplay state.
+        // Keep this lock scope minimal; expensive JSON serialization happens after unlock.
+        let raw_snapshots: HashMap<String, RawPlayerSnapshot> = {
             let players = self.players.read().await;
+            let mut snapshots = HashMap::new();
             for pid in player_ids {
                 if let Some(p) = players.get(pid) {
                     let inventory_slots: Vec<(usize, String, i32)> = p.inventory.slots
@@ -1291,16 +1317,15 @@ impl GameRoom {
                                 .map(|s| (idx, s.item_id.clone(), s.quantity))
                         })
                         .collect();
-                    let inventory_json = serde_json::to_string(&inventory_slots).unwrap_or_else(|_| "[]".to_string());
 
-                    let save_data = PlayerSaveData {
-                        x: p.x as f32,
-                        y: p.y as f32,
+                    snapshots.insert(pid.clone(), RawPlayerSnapshot {
+                        x: p.x,
+                        y: p.y,
                         hp: p.hp,
                         prayer_points: p.prayer_points,
                         skills: p.skills.clone(),
                         gold: p.inventory.gold,
-                        inventory_json,
+                        inventory_slots,
                         gender: p.gender.clone(),
                         skin: p.skin.clone(),
                         equipped_head: p.equipped_head.clone(),
@@ -1312,15 +1337,42 @@ impl GameRoom {
                         equipped_gloves: p.equipped_gloves.clone(),
                         equipped_necklace: p.equipped_necklace.clone(),
                         equipped_belt: p.equipped_belt.clone(),
-                        current_map: map_ids.get(pid).cloned(),
                         sitting_at_x: p.sitting_at.map(|(x, _)| x),
                         sitting_at_y: p.sitting_at.map(|(_, y)| y),
-                    };
-
-                    let recipes = p.discovered_recipes.clone();
-                    result.insert(pid.clone(), (save_data, None, recipes));
+                        recipes: p.discovered_recipes.clone(),
+                    });
                 }
             }
+            snapshots
+        };
+
+        // Build save payloads outside the players lock.
+        for (pid, raw) in raw_snapshots {
+            let inventory_json = serde_json::to_string(&raw.inventory_slots).unwrap_or_else(|_| "[]".to_string());
+            let save_data = PlayerSaveData {
+                x: raw.x as f32,
+                y: raw.y as f32,
+                hp: raw.hp,
+                prayer_points: raw.prayer_points,
+                skills: raw.skills,
+                gold: raw.gold,
+                inventory_json,
+                gender: raw.gender,
+                skin: raw.skin,
+                equipped_head: raw.equipped_head,
+                equipped_body: raw.equipped_body,
+                equipped_weapon: raw.equipped_weapon,
+                equipped_back: raw.equipped_back,
+                equipped_feet: raw.equipped_feet,
+                equipped_ring: raw.equipped_ring,
+                equipped_gloves: raw.equipped_gloves,
+                equipped_necklace: raw.equipped_necklace,
+                equipped_belt: raw.equipped_belt,
+                current_map: map_ids.get(&pid).cloned(),
+                sitting_at_x: raw.sitting_at_x,
+                sitting_at_y: raw.sitting_at_y,
+            };
+            result.insert(pid, (save_data, None, raw.recipes));
         }
 
         // Single lock on quest states
@@ -6587,6 +6639,10 @@ impl GameRoom {
 
     pub async fn tick(&self) {
         let tick_start = std::time::Instant::now();
+        let mut chunk_unload_ms = 0u128;
+        let mut prayer_drain_ms = 0u128;
+        let mut farming_growth_ms = 0u128;
+        let mut restock_ms = 0u128;
         let delta_time = 1.0 / TICK_RATE;
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -6602,6 +6658,7 @@ impl GameRoom {
 
         // Periodically unload distant chunks to prevent unbounded memory/CPU growth
         if current_tick % 100 == 0 {
+            let unload_start = std::time::Instant::now();
             let active_coords: Vec<ChunkCoord> = {
                 let chunks = self.player_chunks.read().await;
                 chunks.values().cloned().collect()
@@ -6609,7 +6666,10 @@ impl GameRoom {
             if !active_coords.is_empty() {
                 self.world.unload_distant_chunks(&active_coords, 5).await;
             }
+            chunk_unload_ms = unload_start.elapsed().as_millis();
         }
+
+        let pre_npc_start = std::time::Instant::now();
 
         // Handle player respawns
         let mut respawned_players = Vec::new();
@@ -6838,6 +6898,7 @@ impl GameRoom {
         // Prayer drain + mana regen (every 60 ticks / 3 seconds)
         // Combined into single players.write() to reduce lock contention
         if current_tick % PRAYER_DRAIN_INTERVAL_TICKS == 0 {
+            let drain_start = std::time::Instant::now();
             struct PrayerDrainUpdate {
                 player_id: String,
                 new_points: i32,
@@ -6906,6 +6967,7 @@ impl GameRoom {
                     self.send_system_message(&update.player_id, "You have run out of prayer points").await;
                 }
             }
+            prayer_drain_ms = drain_start.elapsed().as_millis();
         }
 
         // Re-acquire players read lock for generating player updates
@@ -7118,6 +7180,9 @@ impl GameRoom {
                 }
             }
         }
+
+        let pre_npc_ms = pre_npc_start.elapsed().as_millis();
+        let npc_world_start = std::time::Instant::now();
 
         // Get player positions for NPC AI (only alive overworld players, grid positions)
         let player_positions: Vec<(String, i32, i32, i32)> = {
@@ -7544,6 +7609,7 @@ impl GameRoom {
 
         // Farming tick: check growth stage transitions (every 5 seconds / ~100 ticks)
         if current_tick % 100 == 50 {
+            let farming_growth_start = std::time::Instant::now();
             let updates = {
                 let mut farming = self.farming.write().await;
                 farming.tick_growth(current_time)
@@ -7557,20 +7623,26 @@ impl GameRoom {
                     owner_id: update.owner_id,
                 }).await;
             }
+            farming_growth_ms = farming_growth_start.elapsed().as_millis();
         }
 
         // Check for shop restocks (every 60 seconds)
         {
             let last_restock = *self.last_shop_restock.read().await;
             if last_restock.elapsed().as_secs() >= 60 {
+                let restock_start = std::time::Instant::now();
                 self.restock_shops().await;
                 let mut last = self.last_shop_restock.write().await;
                 *last = std::time::Instant::now();
+                restock_ms = restock_start.elapsed().as_millis();
             }
         }
 
+        let npc_world_ms = npc_world_start.elapsed().as_millis();
+
         // Send state sync to each player, filtering by instance and view distance
         // Snapshot lock data quickly, then release locks before expensive encoding
+        let state_sync_start = std::time::Instant::now();
         let tick = *self.tick.read().await;
 
         let (instance_snapshot, senders_snapshot) = {
@@ -7613,6 +7685,10 @@ impl GameRoom {
 
         // Instance groups: encode once per instance, send to all players in that instance
         for (inst_id, group_senders) in &instance_groups {
+            if !group_senders.iter().any(|(_, sender)| sender.capacity() > 0) {
+                continue;
+            }
+
             let player_values: Vec<rmpv::Value> = players_by_instance
                 .get(inst_id)
                 .map(|ps| ps.iter().map(|p| crate::protocol::player_update_to_value(p)).collect())
@@ -7628,6 +7704,9 @@ impl GameRoom {
 
             if let Ok(bytes) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, inst_id) {
                 for (pid, sender) in group_senders {
+                    if sender.capacity() == 0 {
+                        continue;
+                    }
                     if let Err(e) = sender.try_send(bytes.clone()) {
                         tracing::debug!("StateSync drop for {}: {}", pid, e);
                     }
@@ -7644,6 +7723,10 @@ impl GameRoom {
             .collect();
 
         for (player_id, sender) in &overworld_senders {
+            if sender.capacity() == 0 {
+                continue;
+            }
+
             let (px, py) = match player_pos_map.get(player_id.as_str()) {
                 Some(pos) => *pos,
                 None => continue,
@@ -7666,13 +7749,33 @@ impl GameRoom {
             }
         }
 
+        let state_sync_ms = state_sync_start.elapsed().as_millis();
+
         // Arena tick: zone detection + state machine
+        let arena_start = std::time::Instant::now();
         self.arena_tick(current_time).await;
+        let arena_ms = arena_start.elapsed().as_millis();
 
         // Log slow ticks for debugging latency spikes
         let tick_duration = tick_start.elapsed();
         if tick_duration.as_millis() > 50 {
-            tracing::warn!("Slow tick {}: {}ms", current_tick, tick_duration.as_millis());
+            tracing::warn!(
+                "Slow tick {}: {}ms (pre_npc={}ms npc_world={}ms sync={}ms arena={}ms players={} npcs={} overworld_senders={} instance_groups={} chunk_unload={}ms prayer_drain={}ms farming_growth={}ms restock={}ms)",
+                current_tick,
+                tick_duration.as_millis(),
+                pre_npc_ms,
+                npc_world_ms,
+                state_sync_ms,
+                arena_ms,
+                player_updates.len(),
+                npc_updates.len(),
+                overworld_senders.len(),
+                instance_groups.len(),
+                chunk_unload_ms,
+                prayer_drain_ms,
+                farming_growth_ms,
+                restock_ms,
+            );
         }
     }
 
@@ -7882,7 +7985,10 @@ impl GameRoom {
                 if merchant_config.restock_interval_minutes.is_some() {
                     // Get and restock the shop
                     if let Some(shop) = shop_registry.get_mut(&merchant_config.shop_id) {
-                        shop.restock();
+                        let changed_stock = shop.restock();
+                        if changed_stock.is_empty() {
+                            continue;
+                        }
 
                         // Find all NPCs of this type to broadcast stock updates
                         let npc_ids: Vec<String> = npcs
@@ -7893,19 +7999,20 @@ impl GameRoom {
 
                         // Collect stock updates for broadcasting
                         for npc_id in npc_ids {
-                            for stock_item in &shop.stock {
+                            for (item_id, quantity) in &changed_stock {
                                 restocked_shops.push((
                                     npc_id.clone(),
-                                    stock_item.item_id.clone(),
-                                    stock_item.current_quantity,
+                                    item_id.clone(),
+                                    *quantity,
                                 ));
                             }
                         }
 
                         tracing::info!(
-                            "Restocked shop '{}' for entity type '{}'",
+                            "Restocked shop '{}' for entity type '{}' ({} stock entries changed)",
                             merchant_config.shop_id,
-                            proto.id
+                            proto.id,
+                            changed_stock.len(),
                         );
                     }
                 }

@@ -1314,14 +1314,22 @@ async fn health_check() -> impl IntoResponse {
 struct LogsQuery {
     count: Option<usize>,
     level: Option<String>,
+    important: Option<bool>,
 }
 
 async fn api_logs(
     State(state): State<AppState>,
     Query(params): Query<LogsQuery>,
 ) -> impl IntoResponse {
-    let count = params.count.unwrap_or(200).min(1000);
-    let entries = state.log_buffer.recent(count);
+    let important_only = params.important.unwrap_or(false);
+    let max_count = if important_only { 5000 } else { 1000 };
+    let default_count = if important_only { 500 } else { 200 };
+    let count = params.count.unwrap_or(default_count).min(max_count);
+    let entries = if important_only {
+        state.log_buffer.recent_important(count)
+    } else {
+        state.log_buffer.recent(count)
+    };
 
     let entries: Vec<_> = if let Some(level_filter) = &params.level {
         let level_upper = level_filter.to_uppercase();
@@ -2632,8 +2640,14 @@ async fn main() {
         let mut interval = tokio::time::interval(Duration::from_millis(50)); // 20 Hz
         loop {
             interval.tick().await;
+            let loop_start = std::time::Instant::now();
+            let room_count = tick_state.rooms.len();
             for room in tick_state.rooms.iter() {
                 room.tick().await;
+            }
+            let loop_ms = loop_start.elapsed().as_millis();
+            if loop_ms > 50 {
+                warn!("Tick loop overrun: {}ms across {} room(s)", loop_ms, room_count);
             }
         }
     });
@@ -2646,6 +2660,8 @@ async fn main() {
         let mut interval = tokio::time::interval(Duration::from_secs(30));
         loop {
             interval.tick().await;
+            let cycle_start = std::time::Instant::now();
+            let snapshot_phase_start = std::time::Instant::now();
 
             // Phase 1: Collect valid sessions and batch-snapshot data per room
             let mut snapshots = Vec::new();
@@ -2690,9 +2706,13 @@ async fn main() {
                     }
                 }
             }
+            let snapshot_phase_ms = snapshot_phase_start.elapsed().as_millis();
+            let snapshot_count = snapshots.len();
+            let mut write_phase_ms = 0u128;
 
             // Phase 2: Write all snapshots to DB concurrently (no locks held)
             if !snapshots.is_empty() {
+                let write_phase_start = std::time::Instant::now();
                 let save_count = snapshots.len();
                 let mut save_tasks = Vec::with_capacity(save_count);
 
@@ -2744,7 +2764,26 @@ async fn main() {
                     }
                 }
 
-                info!("Auto-saved {} character(s) to database", saved_count);
+                write_phase_ms = write_phase_start.elapsed().as_millis();
+                info!(
+                    "Auto-saved {} character(s) to database (snapshot={}ms, write={}ms, total={}ms)",
+                    saved_count,
+                    snapshot_phase_ms,
+                    write_phase_ms,
+                    cycle_start.elapsed().as_millis()
+                );
+            }
+
+            let cycle_ms = cycle_start.elapsed().as_millis();
+            if cycle_ms > 250 {
+                warn!(
+                    "Slow auto-save cycle: {}ms (rooms={}, snapshots={}, snapshot_phase={}ms, write_phase={}ms)",
+                    cycle_ms,
+                    room_players.len(),
+                    snapshot_count,
+                    snapshot_phase_ms,
+                    write_phase_ms,
+                );
             }
         }
     });

@@ -69,7 +69,9 @@ pub struct LootEntry {
     pub quantity_max: i32,
 }
 
-fn default_one() -> i32 { 1 }
+fn default_one() -> i32 {
+    1
+}
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct RawEntityBehaviors {
@@ -108,9 +110,15 @@ pub struct RawSpeechConfig {
     pub messages: Vec<String>,
 }
 
-fn default_speech_radius() -> i32 { 5 }
-fn default_speech_interval_min() -> u64 { 15000 }
-fn default_speech_interval_max() -> u64 { 45000 }
+fn default_speech_radius() -> i32 {
+    5
+}
+fn default_speech_interval_min() -> u64 {
+    15000
+}
+fn default_speech_interval_max() -> u64 {
+    45000
+}
 
 #[derive(Debug, Clone)]
 pub struct SpeechConfig {
@@ -143,10 +151,16 @@ pub struct MerchantConfig {
     pub show_crafting: bool,
 }
 
-fn default_show_crafting() -> bool { true }
+fn default_show_crafting() -> bool {
+    true
+}
 
-fn default_buy_mult() -> f32 { 0.5 }
-fn default_sell_mult() -> f32 { 1.0 }
+fn default_buy_mult() -> f32 {
+    0.5
+}
+fn default_sell_mult() -> f32 {
+    1.0
+}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct QuestGiverConfig {

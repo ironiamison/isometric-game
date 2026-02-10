@@ -1,7 +1,7 @@
-use std::collections::HashSet;
-use serde::Serialize;
-use rand::Rng;
 use crate::game::Direction;
+use rand::Rng;
+use serde::Serialize;
+use std::collections::HashSet;
 
 // ============================================================================
 // Level Scaling
@@ -25,12 +25,12 @@ fn scale_damage(base_damage: i32, level: i32) -> i32 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcState {
-    Idle,       // 0
-    Chasing,    // 1
-    Attacking,  // 2
-    Returning,  // 3
-    Dead,       // 4
-    Wandering,  // 5 - added at end to preserve existing state values
+    Idle,      // 0
+    Chasing,   // 1
+    Attacking, // 2
+    Returning, // 3
+    Dead,      // 4
+    Wandering, // 5 - added at end to preserve existing state values
 }
 
 // ============================================================================
@@ -83,7 +83,7 @@ pub struct Npc {
     pub target_id: Option<String>, // Player it's aggro'd on
     pub last_attack_time: u64,
     pub last_move_time: u64, // For grid movement cooldown
-    pub death_time: u64, // When the NPC died (for respawn)
+    pub death_time: u64,     // When the NPC died (for respawn)
     /// Set to true on the tick when this NPC attacks, for client animation sync
     pub just_attacked: bool,
     /// Target position for wandering
@@ -161,8 +161,16 @@ impl Npc {
             last_regen_time: 0,
             speech_messages: prototype.speech.as_ref().map(|s| s.messages.clone()),
             speech_radius: prototype.speech.as_ref().map(|s| s.radius).unwrap_or(0),
-            speech_interval_min_ms: prototype.speech.as_ref().map(|s| s.interval_min_ms).unwrap_or(15000),
-            speech_interval_max_ms: prototype.speech.as_ref().map(|s| s.interval_max_ms).unwrap_or(45000),
+            speech_interval_min_ms: prototype
+                .speech
+                .as_ref()
+                .map(|s| s.interval_min_ms)
+                .unwrap_or(15000),
+            speech_interval_max_ms: prototype
+                .speech
+                .as_ref()
+                .map(|s| s.interval_max_ms)
+                .unwrap_or(45000),
             next_speech_at: 0,
             wander_best_distance: i32::MAX,
             wander_stuck_count: 0,
@@ -236,7 +244,12 @@ impl Npc {
 
     /// Take damage and return true if the NPC died.
     /// If attacker_id is provided and NPC survives, it will start chasing the attacker.
-    pub fn take_damage(&mut self, damage: i32, current_time: u64, attacker_id: Option<&str>) -> bool {
+    pub fn take_damage(
+        &mut self,
+        damage: i32,
+        current_time: u64,
+        attacker_id: Option<&str>,
+    ) -> bool {
         self.hp = (self.hp - damage).max(0);
         if self.hp <= 0 {
             self.state = NpcState::Dead;
@@ -292,7 +305,9 @@ impl Npc {
         if current_time - self.last_regen_time >= REGEN_INTERVAL_MS {
             self.last_regen_time = current_time;
             if self.hp < self.max_hp && self.hp > 0 {
-                let regen = ((self.max_hp as f32 * self.stats.hp_regen_percent_per_sec) / 100.0).ceil().max(1.0) as i32;
+                let regen = ((self.max_hp as f32 * self.stats.hp_regen_percent_per_sec) / 100.0)
+                    .ceil()
+                    .max(1.0) as i32;
                 self.hp = (self.hp + regen).min(self.max_hp);
             }
         }
@@ -428,9 +443,9 @@ impl Npc {
     /// Returns Some((target_id, damage)) if the NPC attacks a player
     pub fn update(
         &mut self,
-        _delta: f32, // Not used for grid movement
-        players: &[(String, i32, i32, i32)], // (id, x, y, hp) - grid positions
-        other_npc_positions: &HashSet<(i32, i32)>,  // positions of other NPCs and players (excluding self)
+        _delta: f32,                               // Not used for grid movement
+        players: &[(String, i32, i32, i32)],       // (id, x, y, hp) - grid positions
+        other_npc_positions: &HashSet<(i32, i32)>, // positions of other NPCs and players (excluding self)
         current_time: u64,
         walkable_check: &dyn Fn(i32, i32) -> bool,
     ) -> Option<(String, i32)> {
@@ -476,7 +491,8 @@ impl Npc {
                     // Only wander if target is different from current position
                     if target.0 != self.x || target.1 != self.y {
                         self.wander_target = Some(target);
-                        self.wander_best_distance = Self::grid_distance(self.x, self.y, target.0, target.1);
+                        self.wander_best_distance =
+                            Self::grid_distance(self.x, self.y, target.0, target.1);
                         self.wander_stuck_count = 0;
                         self.state = NpcState::Wandering;
                     } else {
@@ -516,7 +532,13 @@ impl Npc {
                         self.wander_stuck_count = 0;
                         self.set_random_idle_pause(current_time);
                     } else {
-                        let moved = self.try_move_toward(tx, ty, current_time, other_npc_positions, walkable_check);
+                        let moved = self.try_move_toward(
+                            tx,
+                            ty,
+                            current_time,
+                            other_npc_positions,
+                            walkable_check,
+                        );
 
                         if moved {
                             // Check if we made progress toward target
@@ -550,26 +572,48 @@ impl Npc {
             NpcState::Chasing => {
                 // Check if target is still valid
                 let target_pos = self.target_id.as_ref().and_then(|tid| {
-                    players.iter()
+                    players
+                        .iter()
                         .find(|(id, _, _, hp)| id == tid && *hp > 0)
                         .map(|(_, x, y, _)| (*x, *y))
                 });
 
                 if let Some((tx, ty)) = target_pos {
-                    let spawn_dist = Self::grid_distance(self.x, self.y, self.spawn_x, self.spawn_y);
+                    let spawn_dist =
+                        Self::grid_distance(self.x, self.y, self.spawn_x, self.spawn_y);
                     let target_dist = Self::grid_distance(self.x, self.y, tx, ty);
-                    let movement_done = current_time - self.last_move_time >= self.get_move_cooldown_ms();
+                    let movement_done =
+                        current_time - self.last_move_time >= self.get_move_cooldown_ms();
 
                     if spawn_dist > self.get_chase_range() || target_dist > self.get_chase_range() {
                         // Too far from spawn OR target got too far away, return home
                         self.state = NpcState::Returning;
                         self.target_id = None;
-                    } else if Self::is_in_attack_range(self.x, self.y, tx, ty, self.get_attack_range()) && movement_done {
+                    } else if Self::is_in_attack_range(
+                        self.x,
+                        self.y,
+                        tx,
+                        ty,
+                        self.get_attack_range(),
+                    ) && movement_done
+                    {
                         // In attack range (cardinal direction only) and movement completed
                         self.state = NpcState::Attacking;
-                    } else if !Self::is_in_attack_range(self.x, self.y, tx, ty, self.get_attack_range()) {
+                    } else if !Self::is_in_attack_range(
+                        self.x,
+                        self.y,
+                        tx,
+                        ty,
+                        self.get_attack_range(),
+                    ) {
                         // Not in range, move toward target (one tile at a time)
-                        self.try_move_toward(tx, ty, current_time, other_npc_positions, walkable_check);
+                        self.try_move_toward(
+                            tx,
+                            ty,
+                            current_time,
+                            other_npc_positions,
+                            walkable_check,
+                        );
                     }
                     // If in range but movement not done, stay in Chasing and wait
                 } else {
@@ -582,7 +626,8 @@ impl Npc {
             NpcState::Attacking => {
                 // Check if target is still in range
                 let target_info = self.target_id.as_ref().and_then(|tid| {
-                    players.iter()
+                    players
+                        .iter()
                         .find(|(id, _, _, hp)| id == tid && *hp > 0)
                         .map(|(id, x, y, _)| (id.clone(), *x, *y))
                 });
@@ -596,13 +641,16 @@ impl Npc {
                         let dx = tx - self.x;
                         let dy = ty - self.y;
                         if dx != 0 || dy != 0 {
-                            self.direction = crate::game::Direction::from_velocity(dx as f32, dy as f32);
+                            self.direction =
+                                crate::game::Direction::from_velocity(dx as f32, dy as f32);
                         }
 
                         // Attack only if movement has completed (movement cooldown expired)
                         // and attack cooldown is ready
-                        let movement_done = current_time - self.last_move_time >= self.get_move_cooldown_ms();
-                        let attack_ready = current_time - self.last_attack_time >= self.get_attack_cooldown_ms();
+                        let movement_done =
+                            current_time - self.last_move_time >= self.get_move_cooldown_ms();
+                        let attack_ready =
+                            current_time - self.last_attack_time >= self.get_attack_cooldown_ms();
 
                         if movement_done && attack_ready {
                             self.last_attack_time = current_time;
@@ -630,7 +678,13 @@ impl Npc {
                     }
                 } else {
                     // Move toward spawn (one tile at a time)
-                    self.try_move_toward(self.spawn_x, self.spawn_y, current_time, other_npc_positions, walkable_check);
+                    self.try_move_toward(
+                        self.spawn_x,
+                        self.spawn_y,
+                        current_time,
+                        other_npc_positions,
+                        walkable_check,
+                    );
                 }
             }
 
@@ -652,8 +706,8 @@ pub struct NpcUpdate {
     pub entity_type: String,
     /// Display name to show above NPC
     pub display_name: String,
-    pub x: i32,  // Grid position
-    pub y: i32,  // Grid position
+    pub x: i32, // Grid position
+    pub y: i32, // Grid position
     pub direction: u8,
     pub hp: i32,
     pub max_hp: i32,
