@@ -6124,7 +6124,7 @@ impl GameRoom {
             if contract.is_complete() {
                 // Contract completed - show claim dialogue
                 let text = format!(
-                    "Well done! You've completed your {} contract.\n\nHarvested: {}/{} {}\n\nRewards: {} Farming XP, {}gp, and {} bonus seed(s).",
+                    "Well done! You've completed your {} contract. Harvested: {}/{} {}. Rewards: {} Farming XP, {}gp, and {} bonus seed(s).",
                     contract.difficulty.display_name(),
                     contract.amount_harvested,
                     contract.amount_required,
@@ -6153,7 +6153,7 @@ impl GameRoom {
             } else {
                 // Contract in progress - show progress
                 let text = format!(
-                    "You're working on a {} contract:\n\nHarvest {} {} ({}/{})\n\nKeep at it!",
+                    "You have an active {} contract: Harvest {} {} ({}/{}). Keep at it!",
                     contract.difficulty.display_name(),
                     contract.amount_required,
                     crop_name,
@@ -6210,7 +6210,7 @@ impl GameRoom {
                 quest_id: format!("plot_seller:{}", npc_id),
                 npc_id: npc_id.to_string(),
                 speaker: npc_name,
-                text: "I've got work that needs doing. Pick a contract and harvest the crops I need.\n\nYou can have one active contract at a time.".to_string(),
+                text: "I've got work that needs doing. Pick a contract and harvest the crops I need. You can have one active contract at a time.".to_string(),
                 choices,
             }).await;
         }
