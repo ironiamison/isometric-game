@@ -5678,11 +5678,12 @@ impl Renderer {
         // Quest objective tracker (top-left)
         self.render_quest_tracker(state);
 
-        // Farming contract tracker (below quests, only in farming chunk 0,-1)
+        // Farming contract tracker (shown in farming area)
         if state.farming_contract.is_some() {
             if let Some(player) = state.get_local_player() {
-                let chunk = crate::game::ChunkCoord::from_world_f32(player.x, player.y);
-                if chunk.x == 0 && chunk.y == -1 {
+                let px = player.x;
+                let py = player.y;
+                if px >= 0.0 && px <= 29.0 && py >= -42.0 && py <= -16.0 {
                     self.render_farming_contract_tracker(state);
                 }
             }
