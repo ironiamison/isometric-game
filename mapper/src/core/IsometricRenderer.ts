@@ -95,16 +95,16 @@ export class IsometricRenderer {
       }
     }
 
-    if (this.options.showCollision) {
-      for (const chunk of sortedChunks) {
-        this.renderCollisionOverlay(chunk, viewport);
-      }
-    }
-
     // Render map objects and walls together (depth sorted)
     if (this.options.showMapObjects) {
       for (const chunk of sortedChunks) {
         this.renderMapObjectsAndWalls(chunk, viewport);
+      }
+    }
+
+    if (this.options.showCollision) {
+      for (const chunk of sortedChunks) {
+        this.renderCollisionOverlay(chunk, viewport);
       }
     }
 
@@ -175,14 +175,14 @@ export class IsometricRenderer {
     // Render interior bounds
     this.renderInteriorBounds(interior, viewport);
 
-    // Render collision overlay
-    if (this.options.showCollision) {
-      this.renderInteriorCollision(interior, viewport);
-    }
-
     // Render map objects and walls
     if (this.options.showMapObjects) {
       this.renderInteriorObjectsAndWalls(interior, viewport);
+    }
+
+    // Render collision overlay (on top of objects/walls so it's always visible)
+    if (this.options.showCollision) {
+      this.renderInteriorCollision(interior, viewport);
     }
 
     // Render entities
