@@ -365,10 +365,7 @@ impl FarmingSystem {
 
     /// Restore plot unlock from database
     pub fn restore_plot_unlock(&mut self, player_id: &str, plot_id: u32) {
-        self.player_plot_unlocks
-            .entry(player_id.to_string())
-            .or_default()
-            .insert(plot_id);
+        self.unlock_plot(player_id, plot_id);
     }
 
     /// Get all patch states for a specific player (for sending on connect)
