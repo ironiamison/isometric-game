@@ -2230,6 +2230,22 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "farmingContractUpdate" => {
+            if let Some(value) = data {
+                let active = extract_bool(value, "active").unwrap_or(false);
+                if active {
+                    state.farming_contract = Some(crate::game::FarmingContractInfo {
+                        difficulty: extract_string(value, "difficulty").unwrap_or_default(),
+                        crop_name: extract_string(value, "crop_name").unwrap_or_default(),
+                        amount_required: extract_i32(value, "amount_required").unwrap_or(0),
+                        amount_harvested: extract_i32(value, "amount_harvested").unwrap_or(0),
+                    });
+                } else {
+                    state.farming_contract = None;
+                }
+            }
+        }
+
         // =====================================================================
         // Friend System Messages
         // =====================================================================

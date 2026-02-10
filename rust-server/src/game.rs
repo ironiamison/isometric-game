@@ -6018,6 +6018,9 @@ impl GameRoom {
                                     tracing::warn!("Failed to update contract progress: {}", e);
                                 }
                             }
+
+                            // Send contract progress to client
+                            self.send_farming_contract_update(player_id).await;
                         }
                     }
                 }
@@ -6282,6 +6285,9 @@ impl GameRoom {
         self.send_system_message(player_id,
             &format!("Contract accepted! Harvest {} {}.", amount, crop_name)
         ).await;
+
+        // Send contract update to client
+        self.send_farming_contract_update(player_id).await;
     }
 
     /// Handle a player claiming a completed farming contract
@@ -6388,6 +6394,9 @@ impl GameRoom {
             &format!("{} contract complete! Received {} Farming XP, {}gp{}.",
                 diff_name, xp_reward, gold_reward, seed_text)
         ).await;
+
+        // Send cleared contract to client
+        self.send_farming_contract_update(player_id).await;
     }
 
     /// Handle a player abandoning a farming contract
@@ -6407,6 +6416,9 @@ impl GameRoom {
         }
 
         self.send_system_message(player_id, "Contract abandoned.").await;
+
+        // Send cleared contract to client
+        self.send_farming_contract_update(player_id).await;
     }
 
     /// Handle a player purchasing a farming plot
@@ -6526,6 +6538,34 @@ impl GameRoom {
         }).collect();
 
         ServerMessage::FarmingPatchStates { patches, unlocked_plots, tile_overrides }
+    }
+
+    /// Send farming contract state to a player (active contract or cleared)
+    pub async fn send_farming_contract_update(&self, player_id: &str) {
+        let farming = self.farming.read().await;
+        let msg = match farming.get_contract(player_id) {
+            Some(contract) => {
+                let crop_name = farming.crops.get(&contract.crop_id)
+                    .map(|c| c.produce_item.clone())
+                    .unwrap_or_else(|| contract.crop_id.clone());
+                ServerMessage::FarmingContractUpdate {
+                    active: true,
+                    difficulty: contract.difficulty.display_name().to_string(),
+                    crop_name,
+                    amount_required: contract.amount_required,
+                    amount_harvested: contract.amount_harvested,
+                }
+            }
+            None => ServerMessage::FarmingContractUpdate {
+                active: false,
+                difficulty: String::new(),
+                crop_name: String::new(),
+                amount_required: 0,
+                amount_harvested: 0,
+            },
+        };
+        drop(farming);
+        self.send_to_player(player_id, msg).await;
     }
 
     pub async fn tick(&self) {

@@ -677,6 +677,15 @@ pub struct FarmingPatch {
     pub owner_id: String,
 }
 
+/// Active farming contract info received from server
+#[derive(Debug, Clone)]
+pub struct FarmingContractInfo {
+    pub difficulty: String,
+    pub crop_name: String,
+    pub amount_required: i32,
+    pub amount_harvested: i32,
+}
+
 /// A gathering marker tile in the world (fishing spot, mining node, etc.)
 #[derive(Debug, Clone)]
 pub struct GatheringMarker {
@@ -1081,6 +1090,8 @@ pub struct GameState {
     pub farming_patch_positions: HashMap<(i32, i32), String>,
     /// Which farming plots the player has unlocked
     pub unlocked_farming_plots: Vec<u32>,
+    /// Active farming contract (if any)
+    pub farming_contract: Option<FarmingContractInfo>,
     /// Ground tile overrides from server (farming plot tiles: locked=65, unlocked=62)
     pub ground_tile_overrides: HashMap<(i32, i32), u32>,
     /// Gathering marker positions received from server
@@ -1229,6 +1240,7 @@ impl GameState {
             farming_patches: HashMap::new(),
             farming_patch_positions: HashMap::new(),
             unlocked_farming_plots: vec![1],
+            farming_contract: None,
             ground_tile_overrides: HashMap::new(),
             gathering_markers: Vec::new(),
             is_gathering: false,

@@ -210,6 +210,61 @@ impl Renderer {
         }
     }
 
+    /// Render farming contract tracker (shown when in the farming chunk)
+    pub(crate) fn render_farming_contract_tracker(&self, state: &GameState) {
+        let contract = match &state.farming_contract {
+            Some(c) => c,
+            None => return,
+        };
+
+        let tracker_x = 10.0;
+        let line_height = 18.0;
+
+        // Calculate starting Y below the quest tracker
+        let base_y = if state.debug_mode {
+            460.0
+        } else {
+            #[cfg(target_os = "android")]
+            { 46.0 }
+            #[cfg(not(target_os = "android"))]
+            { 20.0 }
+        };
+
+        // Offset past quest tracker content
+        let mut y = base_y;
+        if !state.ui_state.active_quests.is_empty() {
+            y += line_height + 5.0; // "QUESTS" header
+            for quest in state.ui_state.active_quests.iter().take(2) {
+                y += line_height; // quest name
+                y += quest.objectives.len() as f32 * (line_height - 2.0); // objectives
+                y += 8.0; // spacing
+            }
+            if state.ui_state.active_quests.len() > 2 {
+                y += line_height; // "...and N more"
+            }
+            y += 6.0; // gap between quest and contract sections
+        }
+
+        // Header
+        self.draw_text_sharp("CONTRACT", tracker_x, y, 16.0, Color::from_rgba(180, 220, 130, 255));
+        y += line_height + 5.0;
+
+        // Contract info: "Easy: Harvest potatoes"
+        let title = format!("{}: Harvest {}", contract.difficulty, contract.crop_name);
+        self.draw_text_sharp(&title, tracker_x, y, 16.0, WHITE);
+        y += line_height;
+
+        // Progress: "[x] 3/5 harvested" or "[x] 5/5 harvested" (complete)
+        let complete = contract.amount_harvested >= contract.amount_required;
+        let (check, status_color) = if complete {
+            ("[x]", Color::from_rgba(100, 255, 100, 255))
+        } else {
+            ("[ ]", Color::from_rgba(200, 200, 200, 255))
+        };
+        let progress_text = format!("{} {}/{} harvested", check, contract.amount_harvested, contract.amount_required);
+        self.draw_text_sharp(&progress_text, tracker_x + 10.0, y, 16.0, status_color);
+    }
+
     pub(crate) fn render_quest_completed(&self, state: &GameState) {
         let current_time = macroquad::time::get_time();
         let (sw, _sh) = virtual_screen_size();

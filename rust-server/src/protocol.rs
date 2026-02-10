@@ -753,6 +753,15 @@ pub enum ServerMessage {
     Pong {
         timestamp: f64,
     },
+    /// Update client on farming contract state (sent on connect, accept, harvest, claim, abandon)
+    FarmingContractUpdate {
+        /// None = no active contract, Some = active contract details
+        active: bool,
+        difficulty: String,
+        crop_name: String,
+        amount_required: i32,
+        amount_harvested: i32,
+    },
 }
 
 /// Ground tile override for farming plots (locked vs unlocked appearance)
@@ -1061,6 +1070,7 @@ impl ServerMessage {
             ServerMessage::TreeRespawned { .. } => "treeRespawned",
             ServerMessage::DepletedTreesSync { .. } => "depletedTreesSync",
             ServerMessage::Pong { .. } => "pong",
+            ServerMessage::FarmingContractUpdate { .. } => "farmingContractUpdate",
         }
     }
 }
@@ -2755,6 +2765,15 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         ServerMessage::Pong { timestamp } => {
             let mut map = Vec::new();
             map.push((Value::String("timestamp".into()), Value::F64(*timestamp)));
+            Value::Map(map)
+        }
+        ServerMessage::FarmingContractUpdate { active, difficulty, crop_name, amount_required, amount_harvested } => {
+            let mut map = Vec::new();
+            map.push((Value::String("active".into()), Value::Boolean(*active)));
+            map.push((Value::String("difficulty".into()), Value::String(difficulty.clone().into())));
+            map.push((Value::String("crop_name".into()), Value::String(crop_name.clone().into())));
+            map.push((Value::String("amount_required".into()), Value::Integer((*amount_required as i64).into())));
+            map.push((Value::String("amount_harvested".into()), Value::Integer((*amount_harvested as i64).into())));
             Value::Map(map)
         }
     };
