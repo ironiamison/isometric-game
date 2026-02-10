@@ -326,6 +326,20 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Farming plot unlocks - tracks which plots each player has purchased
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS farming_plot_unlocks (
+                player_id TEXT NOT NULL,
+                plot_id INTEGER NOT NULL,
+                unlocked_at INTEGER NOT NULL,
+                PRIMARY KEY (player_id, plot_id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         // Friendships table - for friend system
         sqlx::query(
             r#"
@@ -1113,6 +1127,51 @@ impl Database {
         }).collect();
 
         Ok(patches)
+    }
+
+    // =========================================================================
+    // Farming Plot Unlock Persistence
+    // =========================================================================
+
+    /// Save a plot unlock for a player
+    pub async fn save_plot_unlock(
+        &self,
+        player_id: &str,
+        plot_id: u32,
+    ) -> Result<(), sqlx::Error> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO farming_plot_unlocks (player_id, plot_id, unlocked_at)
+            VALUES (?, ?, ?)
+            "#,
+        )
+        .bind(player_id)
+        .bind(plot_id as i32)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Load all plot unlocks from the database
+    pub async fn load_plot_unlocks(&self) -> Result<Vec<(String, u32)>, sqlx::Error> {
+        let rows = sqlx::query(
+            "SELECT player_id, plot_id FROM farming_plot_unlocks"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let unlocks = rows.iter().map(|row| {
+            let player_id: String = row.get("player_id");
+            let plot_id: i32 = row.get("plot_id");
+            (player_id, plot_id as u32)
+        }).collect();
+
+        Ok(unlocks)
     }
 
     // =========================================================================
