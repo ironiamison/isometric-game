@@ -1536,6 +1536,7 @@ impl InputHandler {
                             if dialogue.quest_id != "__control_scheme__" {
                                 commands.push(InputCommand::CloseDialogue);
                                 state.ui_state.active_dialogue = None;
+                                state.pending_sfx.push("enter".to_string());
                                 return commands;
                             }
                         }
@@ -1661,6 +1662,7 @@ impl InputHandler {
                         state.ui_state.crafting_npc_id = None;
                         state.ui_state.shop_data = None;
                         state.ui_state.shop_quantity_hold_element = None;
+                        state.pending_sfx.push("enter".to_string());
                         return commands;
                     }
                     UiElementId::MainTab(idx) => {
