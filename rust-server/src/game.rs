@@ -2993,6 +2993,20 @@ impl GameRoom {
         }
 
         if let Some((picked_item_id, quantity)) = item_info {
+            // Check if player has inventory space before removing from ground
+            let has_space = {
+                let players = self.players.read().await;
+                match players.get(player_id) {
+                    Some(player) => player.inventory.has_space_for(&picked_item_id, quantity, &self.item_registry),
+                    None => return,
+                }
+            };
+
+            if !has_space {
+                self.send_system_message(player_id, "Your inventory is full.").await;
+                return;
+            }
+
             // Remove item from ground
             let removed = {
                 let mut items = self.ground_items.write().await;
@@ -3008,21 +3022,18 @@ impl GameRoom {
                 tracing::debug!("Player {} picked up {} x{}", player_id, display_name, quantity);
 
                 // Add to player's inventory
-                let (leftover, inventory_update, gold) = {
+                let (inventory_update, gold) = {
                     let mut players = self.players.write().await;
                     if let Some(player) = players.get_mut(player_id) {
-                        let leftover = player.inventory.add_item(&picked_item_id, quantity, &self.item_registry);
-                        (leftover, player.inventory.to_update(), player.inventory.gold)
+                        player.inventory.add_item(&picked_item_id, quantity, &self.item_registry);
+                        (player.inventory.to_update(), player.inventory.gold)
                     } else {
                         return;
                     }
                 };
 
-                // Process quest item collection (amount actually picked up)
-                let picked_up_count = quantity - leftover;
-                if picked_up_count > 0 {
-                    self.process_quest_item_collect(player_id, &picked_item_id, picked_up_count).await;
-                }
+                // Process quest item collection
+                self.process_quest_item_collect(player_id, &picked_item_id, quantity).await;
 
                 // Broadcast pickup to players in same zone
                 let pickup_msg = ServerMessage::ItemPickedUp {
@@ -3038,12 +3049,6 @@ impl GameRoom {
                     gold,
                 };
                 self.send_to_player(player_id, inv_msg).await;
-
-                // If some items couldn't fit, drop them back on ground
-                if leftover > 0 {
-                    tracing::debug!("Inventory full, dropping {} back", leftover);
-                    // Could spawn a new ground item here
-                }
             }
         }
     }
