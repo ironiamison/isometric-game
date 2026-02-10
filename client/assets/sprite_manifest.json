@@ -1,26 +1,57 @@
 {
   "enemies": [
     "arena_board",
+    "banker",
+    "barbarian",
+    "barbarian_leader",
+    "barbarian_warrior",
     "blacksmith",
+    "blacksmith_master",
     "blob_blue",
     "blob_green",
     "blob_pink",
+    "bone_monster",
+    "cactus",
+    "cow",
     "crow",
     "elf",
     "farmer_barley",
+    "forgotten_monk",
+    "guard",
+    "guard_purple",
     "hedgehog",
     "lee",
+    "low_orc",
     "lumberjack",
+    "mad_mushroom",
+    "master_farmer",
+    "miner",
+    "miner_mike",
+    "mushroom",
     "pig",
     "piglet",
+    "poision_mushroom",
+    "priest",
     "reaper",
+    "rock",
+    "rock_golem",
+    "sheep",
+    "skeleton",
+    "skeleton_archer",
+    "skeleton_brute",
     "slime",
     "snail",
     "snail2",
+    "snake",
     "spider",
     "springs",
+    "swamper",
     "village_elder",
     "village_lady",
+    "wild_boar",
+    "wise_man",
+    "witch",
+    "wolf_spider",
     "worm"
   ],
   "equipment": [
@@ -15913,135 +15944,321 @@
   "enemies_atlas": {
     "file": "sprites/enemies_atlas.png",
     "sprites": {
-      "elf": {
+      "bone_monster": {
         "x": 0,
         "y": 0,
+        "w": 1920,
+        "h": 140
+      },
+      "rock_golem": {
+        "x": 1920,
+        "y": 0,
+        "w": 1296,
+        "h": 140
+      },
+      "elf": {
+        "x": 0,
+        "y": 140,
         "w": 1776,
         "h": 122
       },
       "reaper": {
         "x": 1776,
-        "y": 0,
+        "y": 140,
         "w": 1120,
         "h": 90
       },
-      "arena_board": {
+      "low_orc": {
         "x": 2896,
-        "y": 0,
+        "y": 140,
+        "w": 960,
+        "h": 86
+      },
+      "blacksmith_master": {
+        "x": 0,
+        "y": 262,
+        "w": 832,
+        "h": 84
+      },
+      "witch": {
+        "x": 832,
+        "y": 262,
+        "w": 912,
+        "h": 83
+      },
+      "master_farmer": {
+        "x": 1744,
+        "y": 262,
+        "w": 1072,
+        "h": 81
+      },
+      "barbarian": {
+        "x": 2816,
+        "y": 262,
+        "w": 640,
+        "h": 80
+      },
+      "mad_mushroom": {
+        "x": 0,
+        "y": 346,
+        "w": 944,
+        "h": 79
+      },
+      "arena_board": {
+        "x": 944,
+        "y": 346,
         "w": 960,
         "h": 76
       },
+      "wise_man": {
+        "x": 1904,
+        "y": 346,
+        "w": 880,
+        "h": 75
+      },
       "village_lady": {
         "x": 0,
-        "y": 122,
+        "y": 425,
         "w": 1776,
         "h": 74
       },
-      "farmer_barley": {
+      "priest": {
         "x": 1776,
-        "y": 122,
+        "y": 425,
+        "w": 1024,
+        "h": 74
+      },
+      "farmer_barley": {
+        "x": 2800,
+        "y": 425,
         "w": 640,
         "h": 71
       },
-      "lee": {
-        "x": 2416,
-        "y": 122,
+      "skeleton": {
+        "x": 0,
+        "y": 499,
+        "w": 1120,
+        "h": 70
+      },
+      "skeleton_brute": {
+        "x": 1120,
+        "y": 499,
+        "w": 1120,
+        "h": 70
+      },
+      "cow": {
+        "x": 2240,
+        "y": 499,
+        "w": 992,
+        "h": 70
+      },
+      "guard": {
+        "x": 3232,
+        "y": 499,
         "w": 800,
         "h": 70
       },
-      "village_elder": {
+      "guard_purple": {
         "x": 0,
-        "y": 196,
+        "y": 569,
+        "w": 800,
+        "h": 70
+      },
+      "lee": {
+        "x": 800,
+        "y": 569,
+        "w": 800,
+        "h": 70
+      },
+      "banker": {
+        "x": 1600,
+        "y": 569,
+        "w": 640,
+        "h": 70
+      },
+      "miner_mike": {
+        "x": 2240,
+        "y": 569,
+        "w": 544,
+        "h": 70
+      },
+      "village_elder": {
+        "x": 2784,
+        "y": 569,
         "w": 1152,
         "h": 68
       },
       "blacksmith": {
-        "x": 1152,
-        "y": 196,
+        "x": 0,
+        "y": 639,
         "w": 960,
         "h": 68
       },
+      "skeleton_archer": {
+        "x": 960,
+        "y": 639,
+        "w": 944,
+        "h": 65
+      },
+      "swamper": {
+        "x": 1904,
+        "y": 639,
+        "w": 1024,
+        "h": 64
+      },
       "hedgehog": {
-        "x": 2112,
-        "y": 196,
+        "x": 2928,
+        "y": 639,
         "w": 736,
         "h": 64
       },
+      "cactus": {
+        "x": 0,
+        "y": 707,
+        "w": 672,
+        "h": 64
+      },
+      "barbarian_leader": {
+        "x": 672,
+        "y": 707,
+        "w": 640,
+        "h": 64
+      },
       "lumberjack": {
-        "x": 2848,
-        "y": 196,
+        "x": 1312,
+        "y": 707,
         "w": 544,
         "h": 64
       },
-      "worm": {
+      "miner": {
+        "x": 1856,
+        "y": 707,
+        "w": 544,
+        "h": 62
+      },
+      "forgotten_monk": {
+        "x": 2400,
+        "y": 707,
+        "w": 448,
+        "h": 61
+      },
+      "rock": {
+        "x": 2848,
+        "y": 707,
+        "w": 800,
+        "h": 60
+      },
+      "barbarian_warrior": {
         "x": 0,
-        "y": 264,
+        "y": 771,
+        "w": 480,
+        "h": 60
+      },
+      "wolf_spider": {
+        "x": 480,
+        "y": 771,
+        "w": 1472,
+        "h": 56
+      },
+      "mushroom": {
+        "x": 1952,
+        "y": 771,
+        "w": 608,
+        "h": 52
+      },
+      "worm": {
+        "x": 2560,
+        "y": 771,
         "w": 960,
         "h": 50
       },
       "springs": {
-        "x": 960,
-        "y": 264,
+        "x": 3520,
+        "y": 771,
         "w": 320,
         "h": 50
       },
       "piglet": {
-        "x": 1280,
-        "y": 264,
+        "x": 0,
+        "y": 831,
         "w": 768,
         "h": 46
       },
       "snail": {
-        "x": 2048,
-        "y": 264,
+        "x": 768,
+        "y": 831,
         "w": 736,
         "h": 46
       },
       "snail2": {
-        "x": 2784,
-        "y": 264,
+        "x": 1504,
+        "y": 831,
         "w": 736,
         "h": 46
       },
+      "poision_mushroom": {
+        "x": 2240,
+        "y": 831,
+        "w": 608,
+        "h": 46
+      },
+      "sheep": {
+        "x": 2848,
+        "y": 831,
+        "w": 800,
+        "h": 45
+      },
       "slime": {
         "x": 0,
-        "y": 314,
+        "y": 877,
         "w": 800,
         "h": 45
       },
       "spider": {
         "x": 800,
-        "y": 314,
+        "y": 877,
         "w": 960,
         "h": 40
       },
-      "blob_blue": {
+      "snake": {
         "x": 1760,
-        "y": 314,
+        "y": 877,
+        "w": 800,
+        "h": 40
+      },
+      "wild_boar": {
+        "x": 2560,
+        "y": 877,
+        "w": 592,
+        "h": 36
+      },
+      "blob_blue": {
+        "x": 3152,
+        "y": 877,
         "w": 576,
         "h": 36
       },
       "blob_green": {
-        "x": 2336,
-        "y": 314,
+        "x": 0,
+        "y": 922,
         "w": 576,
         "h": 36
       },
       "blob_pink": {
-        "x": 2912,
-        "y": 314,
+        "x": 576,
+        "y": 922,
         "w": 576,
         "h": 36
       },
       "pig": {
-        "x": 0,
-        "y": 359,
+        "x": 1152,
+        "y": 922,
         "w": 768,
         "h": 34
       },
       "crow": {
-        "x": 768,
-        "y": 359,
+        "x": 1920,
+        "y": 922,
         "w": 368,
         "h": 23
       }
