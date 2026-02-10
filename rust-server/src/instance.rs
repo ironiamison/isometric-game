@@ -66,15 +66,17 @@ impl Instance {
                 .unwrap_or_else(|| format!("{}_{}", self.id, i));
 
             if let Some(prototype) = entity_registry.get(&spawn.entity_id) {
-                info!("Spawning {} at ({}, {}) in instance {}",
-                    spawn.entity_id, spawn.x, spawn.y, self.id);
+                // Use spawn's level if specified, otherwise use prototype's level
+                let level = spawn.level.unwrap_or(prototype.stats.level);
+                info!("Spawning {} at ({}, {}) level {} in instance {}",
+                    spawn.entity_id, spawn.x, spawn.y, level, self.id);
                 let npc = Npc::from_prototype(
                     &npc_id,
                     &spawn.entity_id,
                     prototype,
                     spawn.x,
                     spawn.y,
-                    spawn.level,
+                    level,
                 );
                 npcs.insert(npc_id, npc);
             } else {

@@ -1195,6 +1195,11 @@ pub struct GameState {
 
     /// Continuous ping tracking (for debug menu)
     pub ping_stats: PingStats,
+
+    /// Fade-in progress when world first becomes ready (1.0 = fully black, 0.0 = done)
+    pub world_fade_in: f32,
+    /// Whether the world has ever been ready (to trigger fade-in once)
+    pub world_was_ready: bool,
 }
 
 impl GameState {
@@ -1268,6 +1273,8 @@ impl GameState {
             active_prayers: Vec::new(),
             ping_sent_at: None,
             ping_stats: PingStats::default(),
+            world_fade_in: 0.0,
+            world_was_ready: false,
         }
     }
 
@@ -1279,6 +1286,17 @@ impl GameState {
     /// Update all players - simple server-authoritative model
     /// Local player facing is immediate when stationary, movement direction from server
     pub fn update(&mut self, delta: f32, input_dx: f32, input_dy: f32) {
+        // Trigger fade-in when world first becomes ready
+        if !self.world_was_ready && self.is_world_ready() {
+            self.world_was_ready = true;
+            self.world_fade_in = 1.0;
+        }
+
+        // Tick down fade-in overlay
+        if self.world_fade_in > 0.0 {
+            self.world_fade_in = (self.world_fade_in - delta * 3.0).max(0.0); // ~0.33s fade
+        }
+
         // Use smoothed delta for visual interpolation (reduces jitter from frame variance)
         let visual_delta = self.frame_timings.smoothed_delta;
 

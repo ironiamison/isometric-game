@@ -641,10 +641,11 @@ impl GameRoom {
                     npc_counter += 1;
 
                     if let Some(prototype) = entity_registry.get(&spawn.entity_id) {
-                        // Spawn from prototype
+                        // Use spawn's level if specified, otherwise use prototype's level
+                        let level = spawn.level.unwrap_or(prototype.stats.level);
                         tracing::info!(
                             "Spawning {} at ({}, {}) level {}",
-                            spawn.entity_id, spawn.world_x, spawn.world_y, spawn.level
+                            spawn.entity_id, spawn.world_x, spawn.world_y, level
                         );
                         let npc = Npc::from_prototype(
                             &npc_id,
@@ -652,7 +653,7 @@ impl GameRoom {
                             prototype,
                             spawn.world_x,
                             spawn.world_y,
-                            spawn.level,
+                            level,
                         );
                         npcs.insert(npc_id, npc);
                     } else {

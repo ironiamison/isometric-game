@@ -4,6 +4,22 @@ use rand::Rng;
 use crate::game::Direction;
 
 // ============================================================================
+// Level Scaling
+// ============================================================================
+
+/// Scale NPC HP based on level (10% increase per level above 1)
+fn scale_hp(base_hp: i32, level: i32) -> i32 {
+    let multiplier = 1.0 + 0.10 * (level - 1).max(0) as f64;
+    (base_hp as f64 * multiplier).round() as i32
+}
+
+/// Scale NPC damage based on level (15% increase per level above 1)
+fn scale_damage(base_damage: i32, level: i32) -> i32 {
+    let multiplier = 1.0 + 0.15 * (level - 1).max(0) as f64;
+    (base_damage as f64 * multiplier).round() as i32
+}
+
+// ============================================================================
 // NPC State
 // ============================================================================
 
@@ -100,7 +116,7 @@ impl Npc {
         let stats = PrototypeStats {
             display_name: prototype.display_name.clone(),
             sprite: prototype.sprite.clone(),
-            damage: prototype.stats.damage,
+            damage: scale_damage(prototype.stats.damage, level),
             attack_range: prototype.stats.attack_range,
             aggro_range: prototype.stats.aggro_range,
             chase_range: prototype.stats.chase_range,
@@ -127,8 +143,8 @@ impl Npc {
             spawn_x: x,
             spawn_y: y,
             direction: Direction::Down,
-            hp: prototype.stats.max_hp,
-            max_hp: prototype.stats.max_hp,
+            hp: scale_hp(prototype.stats.max_hp, level),
+            max_hp: scale_hp(prototype.stats.max_hp, level),
             level,
             state: NpcState::Idle,
             target_id: None,

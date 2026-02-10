@@ -11,8 +11,8 @@ pub struct EntitySpawn {
     pub world_x: i32,
     /// World Y coordinate
     pub world_y: i32,
-    /// Entity level
-    pub level: i32,
+    /// Entity level override (None = use prototype's level)
+    pub level: Option<i32>,
     /// Whether entity respawns after death
     pub respawn: bool,
     /// Optional respawn time override (ms)
@@ -274,7 +274,7 @@ impl Chunk {
                 entity_id: "pig".to_string(),
                 world_x: base_x + 19,
                 world_y: base_y + 9,
-                level: 1,
+                level: None, // Use prototype's level
                 respawn: true,
                 respawn_time_override: None,
                 facing: None,
@@ -284,7 +284,7 @@ impl Chunk {
                 entity_id: "pig".to_string(),
                 world_x: base_x + 19,
                 world_y: base_y + 8,
-                level: 1,
+                level: None, // Use prototype's level
                 respawn: true,
                 respawn_time_override: None,
                 facing: None,
@@ -294,7 +294,7 @@ impl Chunk {
                 entity_id: "pig".to_string(),
                 world_x: base_x + 8,
                 world_y: base_y + 12,
-                level: 1,
+                level: None, // Use prototype's level
                 respawn: true,
                 respawn_time_override: None,
                 facing: None,
@@ -304,7 +304,7 @@ impl Chunk {
                 entity_id: "pig".to_string(),
                 world_x: base_x + 20,
                 world_y: base_y + 15,
-                level: 2,
+                level: Some(2), // Explicit level override
                 respawn: true,
                 respawn_time_override: None,
                 facing: None,
@@ -314,7 +314,7 @@ impl Chunk {
                 entity_id: "pig".to_string(),
                 world_x: base_x + 15,
                 world_y: base_y + 20,
-                level: 3,
+                level: Some(3), // Explicit level override for boss
                 respawn: true,
                 respawn_time_override: Some(300000), // 5 minutes
                 facing: None,

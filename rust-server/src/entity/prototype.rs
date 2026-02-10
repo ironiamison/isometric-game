@@ -38,6 +38,7 @@ impl AnimationType {
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct RawEntityStats {
+    pub level: Option<i32>,
     pub max_hp: Option<i32>,
     pub damage: Option<i32>,
     pub attack_range: Option<i32>,
@@ -198,6 +199,7 @@ pub struct RawEntityPrototype {
 
 #[derive(Debug, Clone)]
 pub struct ResolvedStats {
+    pub level: i32,
     pub max_hp: i32,
     pub damage: i32,
     pub attack_range: i32,
@@ -212,6 +214,7 @@ pub struct ResolvedStats {
 impl Default for ResolvedStats {
     fn default() -> Self {
         Self {
+            level: 1,
             max_hp: 100,
             damage: 10,
             attack_range: 1,

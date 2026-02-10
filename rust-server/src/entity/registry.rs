@@ -161,6 +161,9 @@ impl EntityRegistry {
 
         // Merge stats with parent (child overrides parent)
         let stats = ResolvedStats {
+            level: raw.stats.level
+                .or_else(|| parent.map(|p| p.stats.level))
+                .unwrap_or(1),
             max_hp: raw.stats.max_hp
                 .or_else(|| parent.map(|p| p.stats.max_hp))
                 .unwrap_or(100),

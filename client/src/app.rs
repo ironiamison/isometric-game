@@ -425,7 +425,8 @@ pub fn run_game_frame(
             smooth_str, t.smoothed_delta * 1000.0), 10.0, 430.0, 16.0, timing_color);
     }
 
-    // 6. Render transition overlay
+    // 6. Render overlays
+    renderer.render_world_fade_in(game_state);
     renderer.render_transition_overlay(game_state);
 
     // 7. Render touch controls (mobile only)

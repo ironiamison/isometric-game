@@ -1291,7 +1291,7 @@ impl Renderer {
         let dots = &"..."[..dot_count];
         let text = format!("{}{}", status, dots);
 
-        let font_size = 16.0;
+        let font_size = 32.0;
         let dims = self.measure_text_sharp(&text, font_size);
         let x = ((sw - dims.width) / 2.0).floor();
         let y = ((sh) / 2.0).floor();
@@ -5931,6 +5931,22 @@ impl Renderer {
         }
 
         lines
+    }
+
+    /// Render fade-in overlay when world first becomes ready
+    pub fn render_world_fade_in(&self, state: &GameState) {
+        if state.world_fade_in <= 0.0 {
+            return;
+        }
+        let (sw, sh) = virtual_screen_size();
+        let bg = Color::from_rgba(30, 30, 40, 255);
+        draw_rectangle(
+            0.0,
+            0.0,
+            sw,
+            sh,
+            Color::new(bg.r, bg.g, bg.b, state.world_fade_in),
+        );
     }
 
     /// Render transition fade overlay

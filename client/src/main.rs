@@ -689,6 +689,7 @@ fn run_game_frame(
 
     }
 
-    // 6. Render transition overlay (must be last, covers everything)
+    // 6. Render overlays (must be last, covers everything)
+    renderer.render_world_fade_in(game_state);
     renderer.render_transition_overlay(game_state);
 }

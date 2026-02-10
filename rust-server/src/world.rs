@@ -218,7 +218,7 @@ impl World {
                 let world_x = coord.x * CHUNK_SIZE as i32 + local_x as i32;
                 let world_y = coord.y * CHUNK_SIZE as i32 + local_y as i32;
 
-                let level = entity["level"].as_i64().unwrap_or(1) as i32;
+                let level = entity["level"].as_i64().map(|l| l as i32);
                 let respawn = entity["respawn"].as_bool().unwrap_or(true);
                 let facing = entity["facing"].as_str().map(|s| s.to_string());
                 let unique_id = entity["uniqueId"].as_str().map(|s| s.to_string());
@@ -227,7 +227,7 @@ impl World {
                     entity_id,
                     world_x,
                     world_y,
-                    level,
+                    level, // None = use prototype's level
                     respawn,
                     respawn_time_override: None,
                     facing,
@@ -464,7 +464,7 @@ impl World {
         let entity_id = self.get_property_string(properties, "entity_id")?;
 
         // Extract optional properties
-        let level = self.get_property_int(properties, "level").unwrap_or(1);
+        let level = self.get_property_int(properties, "level"); // None = use prototype's level
         let respawn = self.get_property_bool(properties, "respawn").unwrap_or(true);
         let respawn_time_override = self.get_property_int(properties, "respawn_time_override")
             .map(|v| v as u64);

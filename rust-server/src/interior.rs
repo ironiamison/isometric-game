@@ -57,8 +57,9 @@ pub struct InteriorEntitySpawn {
     pub entity_id: String,
     pub x: i32,
     pub y: i32,
-    #[serde(default = "default_level")]
-    pub level: i32,
+    /// Level override (None = use prototype's level)
+    #[serde(default)]
+    pub level: Option<i32>,
     #[serde(default)]
     pub unique_id: Option<String>,
     #[serde(default)]
@@ -66,8 +67,6 @@ pub struct InteriorEntitySpawn {
     #[serde(default = "default_true")]
     pub respawn: bool,
 }
-
-fn default_level() -> i32 { 1 }
 fn default_true() -> bool { true }
 
 /// Definition of an interior map (loaded from JSON)
