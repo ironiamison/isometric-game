@@ -58,7 +58,7 @@ animation_type = "standard"
 description = "A slow but surprisingly aggressive snail."
 
 [snail.stats]
-level = 1
+level = 5
 max_hp = 20
 damage = 1
 attack_bonus = -2
@@ -99,7 +99,7 @@ animation_type = "standard"
 description = "A snail with an extra tough shell."
 
 [shell_snail.stats]
-level = 2
+level = 7
 max_hp = 35
 damage = 2
 attack_bonus = -1
@@ -146,7 +146,7 @@ animation_type = "standard"
 description = "A prickly critter that curls into a ball when threatened."
 
 [hedgehog.stats]
-level = 2
+level = 6
 max_hp = 25
 damage = 4
 attack_bonus = 0
@@ -193,7 +193,7 @@ animation_type = "standard"
 description = "A giant worm that burrows through the earth."
 
 [worm.stats]
-level = 1
+level = 2
 max_hp = 10
 damage = 1
 attack_bonus = 2
@@ -234,7 +234,7 @@ animation_type = "standard"
 description = "A bouncy creature made of coiled springs."
 
 [springs.stats]
-level = 2
+level = 8
 max_hp = 18
 damage = 3
 attack_bonus = 7

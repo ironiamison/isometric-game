@@ -60,6 +60,7 @@ sprite = "pig_king"
 description = "A massive pig that rules its brethren."
 
 [pig_king.stats]
+level = 18
 max_hp = 500
 damage = 25
 attack_bonus = 15
@@ -87,6 +88,7 @@ sprite = "pig"
 description = "A fierce boar with sharp tusks."
 
 [wild_boar.stats]
+level = 5
 max_hp = 40
 damage = 3
 attack_bonus = 2

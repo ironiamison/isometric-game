@@ -11,7 +11,7 @@ animation_type = "standard"
 description = "A large venomous spider that lurks in dark places."
 
 [spider.stats]
-level = 3
+level = 12
 max_hp = 35
 damage = 5
 attack_bonus = 8
@@ -76,7 +76,7 @@ animation_type = "standard"
 description = "A menacing black crow with sharp talons."
 
 [crow.stats]
-level = 1
+level = 2
 max_hp = 5
 damage = 2
 attack_bonus = 2
@@ -256,7 +256,7 @@ animation_type = "standard"
 description = "A terrifying specter that harvests souls."
 
 [reaper.stats]
-level = 5
+level = 25
 max_hp = 150
 damage = 15
 attack_bonus = 12
