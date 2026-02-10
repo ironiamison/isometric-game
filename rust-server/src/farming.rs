@@ -34,7 +34,11 @@ struct PatchLocationEntry {
     pub x: i32,
     pub y: i32,
     pub patch_type: String,
+    #[serde(default = "default_plot")]
+    pub plot: u32,
 }
+
+fn default_plot() -> u32 { 1 }
 
 #[derive(Deserialize, Debug, Clone)]
 struct PatchLocationsFile {
@@ -85,6 +89,7 @@ pub struct FarmingPatch {
     pub x: i32,
     pub y: i32,
     pub patch_type: String,
+    pub plot: u32,
 }
 
 /// Result of a harvest action
@@ -157,6 +162,7 @@ impl FarmingSystem {
                     x: entry.x,
                     y: entry.y,
                     patch_type: entry.patch_type,
+                    plot: entry.plot,
                 };
                 system.patch_positions.insert((entry.x, entry.y), entry.id.clone());
                 system.patches.insert(entry.id, patch);
