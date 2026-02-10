@@ -2466,6 +2466,12 @@ impl InputHandler {
         let left = if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) };
         let right = if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) };
 
+        // Check for newly pressed keys this frame (last-key-wins priority)
+        let up_just = if classic { is_key_pressed(KeyCode::Up) } else { is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up) };
+        let down_just = if classic { is_key_pressed(KeyCode::Down) } else { is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down) };
+        let left_just = if classic { is_key_pressed(KeyCode::Left) } else { is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left) };
+        let right_just = if classic { is_key_pressed(KeyCode::Right) } else { is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right) };
+
         // Get touch D-pad input (for mobile)
         use crate::input::touch::DPadDirection;
         let dpad_dir = self.touch_controls.get_direction();
@@ -2478,19 +2484,24 @@ impl InputHandler {
         }
 
         // Determine new direction from keyboard - only one direction at a time
-        // Priority: keep current direction if still held, otherwise pick new one
-        let keyboard_dir = match self.current_dir {
-            CardinalDir::Up if up => CardinalDir::Up,
-            CardinalDir::Down if down => CardinalDir::Down,
-            CardinalDir::Left if left => CardinalDir::Left,
-            CardinalDir::Right if right => CardinalDir::Right,
-            _ => {
-                // Current direction released, pick a new one (priority order)
-                if up { CardinalDir::Up }
-                else if down { CardinalDir::Down }
-                else if left { CardinalDir::Left }
-                else if right { CardinalDir::Right }
-                else { CardinalDir::None }
+        // Newly pressed keys override current direction (last-key-wins),
+        // then keep current direction if still held, then fall back to any held key
+        let keyboard_dir = if up_just { CardinalDir::Up }
+            else if down_just { CardinalDir::Down }
+            else if left_just { CardinalDir::Left }
+            else if right_just { CardinalDir::Right }
+            else { match self.current_dir {
+                CardinalDir::Up if up => CardinalDir::Up,
+                CardinalDir::Down if down => CardinalDir::Down,
+                CardinalDir::Left if left => CardinalDir::Left,
+                CardinalDir::Right if right => CardinalDir::Right,
+                _ => {
+                    if up { CardinalDir::Up }
+                    else if down { CardinalDir::Down }
+                    else if left { CardinalDir::Left }
+                    else if right { CardinalDir::Right }
+                    else { CardinalDir::None }
+                }
             }
         };
 
