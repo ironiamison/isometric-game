@@ -1139,6 +1139,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 log::info!("Showing dialogue from {}: {} ({} choices)", speaker, text, choices.len());
 
+                let already_open = state.ui_state.active_dialogue.as_ref()
+                    .map(|d| d.npc_id == npc_id)
+                    .unwrap_or(false);
+
                 state.ui_state.dialogue_scroll_offset = 0.0;
                 state.ui_state.dialogue_touch_scroll_id = None;
                 state.ui_state.dialogue_touch_dragged = false;
@@ -1150,7 +1154,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     choices,
                     show_time: macroquad::time::get_time(),
                 });
-                state.pending_sfx.push("ui_open".to_string());
+                if !already_open {
+                    state.pending_sfx.push("ui_open".to_string());
+                }
             }
         }
 
