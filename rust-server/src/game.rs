@@ -1153,6 +1153,18 @@ impl GameRoom {
             woodcutting.stop_woodcutting(player_id);
         }
 
+        // Clean up player chunk tracking
+        {
+            let mut chunks = self.player_chunks.write().await;
+            chunks.remove(player_id);
+        }
+
+        // Clean up player quest states
+        {
+            let mut quest_states = self.player_quest_states.write().await;
+            quest_states.remove(player_id);
+        }
+
         let mut players = self.players.write().await;
         players.remove(player_id);
     }
@@ -6034,6 +6046,8 @@ impl GameRoom {
         };
 
         // Check walkability and entity collision for each pending move
+        // Grab chunks lock once for all walkability checks (avoids per-move lock acquisition)
+        let chunks_guard = self.world.chunks_read().await;
         let mut valid_moves: Vec<(String, i32, i32)> = Vec::new();
         let mut auto_sit_requests: Vec<(String, i32, i32)> = Vec::new();
         for (id, target_x, target_y, move_dir) in pending_moves {
@@ -6042,7 +6056,14 @@ impl GameRoom {
             // TODO: Add server-side interior collision checking
             if !players_in_instances.contains(&id) {
                 // Check static tile collision (only for overworld players)
-                if !self.world.is_tile_walkable_loaded(target_x, target_y).await {
+                let coord = crate::chunk::ChunkCoord::from_world(target_x, target_y);
+                let walkable = if let Some(chunk) = chunks_guard.get(&coord) {
+                    let (lx, ly) = crate::chunk::world_to_local(target_x, target_y);
+                    chunk.is_walkable_local(lx, ly)
+                } else {
+                    false
+                };
+                if !walkable {
                     continue;
                 }
             }
@@ -6087,6 +6108,7 @@ impl GameRoom {
             }
             valid_moves.push((id, target_x, target_y));
         }
+        drop(chunks_guard); // Release before NPC AI section acquires its own
 
         // Process auto-sit requests (players who walked into unoccupied chairs)
         for (id, tile_x, tile_y) in auto_sit_requests {
