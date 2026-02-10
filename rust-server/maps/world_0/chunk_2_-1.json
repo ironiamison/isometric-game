@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAEMABPAHAAAAAAAA8AMAAcADAAAA9AECADwAAAAAAAAAAAAAAgAAAAAAAAIAAAAEAAAAAAAAAAAAAAAAAAAAAAEAAAAgAAAAIIABADAAAAEAAAA=",
+  "collision": "kAAAAKAAAAAgAQAAQAIAAEACAACABAAAAAkAAAwSAAAAFgAAACgAAAAwAAAA0EMABPAHAAAAAAAAAAAAAeADAABA9QECQD0AAEACAACAAgAAggEAAIABAAKAAQAEgAIAAIACAACABAAAgAQAAIEEAACgCAAAYIgBAHAwAAE4QAA=",
   "entities": [
     {
       "entityId": "snail",
@@ -3118,15 +3118,15 @@
       "level": 1
     },
     {
-      "entityId": "slime",
-      "x": 2,
-      "y": 21,
-      "level": 1
-    },
-    {
       "entityId": "snail",
       "x": 25,
       "y": 27,
+      "level": 1
+    },
+    {
+      "entityId": "slime_green",
+      "x": 1,
+      "y": 8,
       "level": 1
     }
   ],
