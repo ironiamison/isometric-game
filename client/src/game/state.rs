@@ -1122,6 +1122,8 @@ pub struct GameState {
     pub level_up_events: Vec<LevelUpEvent>,
     /// Pending sound effects to play (queued by message handler, played by main loop)
     pub pending_sfx: Vec<String>,
+    /// Pending attack sounds (bool = has_weapon) queued by message handler
+    pub pending_attack_sounds: Vec<bool>,
     pub firework_particles: Vec<FireworkParticle>,
     pub skill_xp_events: Vec<SkillXpEvent>,
     pub xp_globes: XpGlobesManager,
@@ -1247,6 +1249,7 @@ impl GameState {
             damage_events: Vec::new(),
             level_up_events: Vec::new(),
             pending_sfx: Vec::new(),
+            pending_attack_sounds: Vec::new(),
             firework_particles: Vec::new(),
             skill_xp_events: Vec::new(),
             xp_globes: XpGlobesManager::new(),

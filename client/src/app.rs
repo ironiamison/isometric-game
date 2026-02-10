@@ -153,6 +153,9 @@ pub fn run_game_frame(
     for sfx_name in game_state.pending_sfx.drain(..) {
         audio.play_sfx(&sfx_name);
     }
+    for has_weapon in game_state.pending_attack_sounds.drain(..) {
+        audio.play_attack_sound(has_weapon);
+    }
 
     // 2. Render and get UI layout for hit detection
     clear_background(Color::from_rgba(30, 30, 40, 255));

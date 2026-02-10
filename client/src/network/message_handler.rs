@@ -2039,10 +2039,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let tree_x = extract_i32(value, "tree_x").unwrap_or(0);
                 let tree_y = extract_i32(value, "tree_y").unwrap_or(0);
 
-                // Server says player swung - play attack animation
+                // Server says player swung - play attack animation and sound
+                let has_weapon = state.players.get(&player_id)
+                    .map(|p| p.equipped_weapon.is_some())
+                    .unwrap_or(false);
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.play_attack();
                 }
+                state.pending_attack_sounds.push(has_weapon);
 
                 // Play woodcutting sound effect
                 state.pending_sfx.push("woodcut".to_string());
