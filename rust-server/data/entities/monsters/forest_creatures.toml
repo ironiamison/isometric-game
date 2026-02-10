@@ -492,3 +492,267 @@ wander_enabled = true
 wander_radius = 3
 wander_pause_min_ms = 2500
 wander_pause_max_ms = 5500
+
+# =============================================================================
+# Cactus
+# =============================================================================
+
+[cactus]
+display_name = "Cactus"
+sprite = "cactus"
+animation_type = "standard"
+description = "A walking cactus with sharp spines."
+
+[cactus.stats]
+level = 5
+max_hp = 24
+damage = 3
+attack_bonus = 1
+defence_bonus = 3
+attack_range = 1
+aggro_range = 4
+chase_range = 5
+move_cooldown_ms = 620
+attack_cooldown_ms = 2000
+respawn_time_ms = 11000
+
+[cactus.rewards]
+exp_base = 22
+gold_min = 3
+gold_max = 10
+
+[[cactus.loot]]
+item_id = "hedgehog_spine"
+drop_chance = 0.15
+quantity_min = 1
+quantity_max = 2
+
+[cactus.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 2
+wander_pause_min_ms = 3500
+wander_pause_max_ms = 6500
+
+# =============================================================================
+# Cow
+# =============================================================================
+
+[cow]
+display_name = "Cow"
+sprite = "cow"
+animation_type = "standard"
+description = "A sturdy cow. Not friendly."
+
+[cow.stats]
+level = 4
+max_hp = 28
+damage = 3
+attack_bonus = 0
+defence_bonus = 2
+attack_range = 1
+aggro_range = 4
+chase_range = 5
+move_cooldown_ms = 550
+attack_cooldown_ms = 2100
+respawn_time_ms = 12000
+
+[cow.rewards]
+exp_base = 24
+gold_min = 4
+gold_max = 11
+
+[[cow.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 2
+
+[cow.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 6000
+
+# =============================================================================
+# Wild Boar
+# =============================================================================
+
+[wild_boar]
+display_name = "Wild Boar"
+sprite = "wild_boar"
+animation_type = "standard"
+description = "An aggressive boar with sharp tusks."
+
+[wild_boar.stats]
+level = 7
+max_hp = 32
+damage = 4
+attack_bonus = 3
+defence_bonus = 1
+attack_range = 1
+aggro_range = 5
+chase_range = 7
+move_cooldown_ms = 400
+attack_cooldown_ms = 1600
+respawn_time_ms = 13000
+
+[wild_boar.rewards]
+exp_base = 32
+gold_min = 6
+gold_max = 16
+
+[[wild_boar.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.30
+quantity_min = 1
+quantity_max = 2
+
+[[wild_boar.loot]]
+item_id = "spoiled_meat"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 1
+
+[wild_boar.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Elf (hostile)
+# =============================================================================
+
+[elf]
+display_name = "Dark Elf"
+sprite = "elf"
+animation_type = "standard"
+description = "A reclusive elf turned hostile."
+
+[elf.stats]
+level = 13
+max_hp = 36
+damage = 6
+attack_bonus = 7
+defence_bonus = -1
+attack_range = 3
+aggro_range = 7
+chase_range = 9
+move_cooldown_ms = 380
+attack_cooldown_ms = 1600
+respawn_time_ms = 17000
+
+[elf.rewards]
+exp_base = 48
+gold_min = 9
+gold_max = 22
+
+[[elf.loot]]
+item_id = "bone_arrow"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 4
+
+[[elf.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[elf.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Village Lady (corrupted)
+# =============================================================================
+
+[village_lady]
+display_name = "Corrupted Villager"
+sprite = "village_lady"
+animation_type = "standard"
+description = "A villager lost to the corruption."
+
+[village_lady.stats]
+level = 6
+max_hp = 24
+damage = 3
+attack_bonus = 2
+defence_bonus = -1
+attack_range = 1
+aggro_range = 5
+chase_range = 6
+move_cooldown_ms = 500
+attack_cooldown_ms = 1800
+respawn_time_ms = 12000
+
+[village_lady.rewards]
+exp_base = 28
+gold_min = 4
+gold_max = 12
+
+[[village_lady.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[village_lady.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.12
+quantity_min = 1
+quantity_max = 1
+
+[village_lady.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Piglet (wild)
+# =============================================================================
+
+[piglet]
+display_name = "Wild Piglet"
+sprite = "piglet"
+animation_type = "standard"
+description = "A small but feisty wild piglet."
+
+[piglet.stats]
+level = 2
+max_hp = 10
+damage = 1
+attack_bonus = 0
+defence_bonus = -2
+attack_range = 1
+aggro_range = 3
+chase_range = 4
+move_cooldown_ms = 650
+attack_cooldown_ms = 2400
+respawn_time_ms = 8000
+
+[piglet.rewards]
+exp_base = 12
+gold_min = 1
+gold_max = 5
+
+[[piglet.loot]]
+item_id = "spoiled_meat"
+drop_chance = 0.15
+quantity_min = 1
+quantity_max = 1
+
+[piglet.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2500
+wander_pause_max_ms = 6000

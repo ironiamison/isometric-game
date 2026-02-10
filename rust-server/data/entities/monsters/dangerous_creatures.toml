@@ -548,48 +548,506 @@ wander_pause_min_ms = 2000
 wander_pause_max_ms = 5000
 
 # =============================================================================
-# Miner Mike
+# Barbarian
 # =============================================================================
 
-[miner_mike]
-display_name = "Miner Mike"
-sprite = "miner_mike"
+[barbarian]
+display_name = "Barbarian"
+sprite = "barbarian"
 animation_type = "standard"
-description = "A corrupted miner still clutching his pick."
+description = "A fierce warrior from the wild lands."
 
-[miner_mike.stats]
-level = 9
-max_hp = 32
-damage = 4
-attack_bonus = 3
-defence_bonus = 0
+[barbarian.stats]
+level = 10
+max_hp = 35
+damage = 5
+attack_bonus = 4
+defence_bonus = -1
 attack_range = 1
-aggro_range = 5
-chase_range = 7
-move_cooldown_ms = 480
-attack_cooldown_ms = 1700
-respawn_time_ms = 15000
+aggro_range = 6
+chase_range = 8
+move_cooldown_ms = 420
+attack_cooldown_ms = 1500
+respawn_time_ms = 14000
 
-[miner_mike.rewards]
-exp_base = 35
-gold_min = 5
-gold_max = 14
+[barbarian.rewards]
+exp_base = 40
+gold_min = 8
+gold_max = 20
 
-[[miner_mike.loot]]
+[[barbarian.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.25
+quantity_min = 1
+quantity_max = 2
+
+[[barbarian.loot]]
 item_id = "regular_bones"
 drop_chance = 1.0
 quantity_min = 1
 quantity_max = 1
 
-[[miner_mike.loot]]
-item_id = "scrap_leather"
-drop_chance = 0.15
-quantity_min = 1
-quantity_max = 1
+[barbarian.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
 
-[miner_mike.behaviors]
+# =============================================================================
+# Barbarian Warrior
+# =============================================================================
+
+[barbarian_warrior]
+display_name = "Barbarian Warrior"
+sprite = "barbarian_warrior"
+animation_type = "standard"
+description = "A seasoned barbarian fighter."
+
+[barbarian_warrior.stats]
+level = 14
+max_hp = 48
+damage = 7
+attack_bonus = 6
+defence_bonus = 1
+attack_range = 1
+aggro_range = 6
+chase_range = 9
+move_cooldown_ms = 380
+attack_cooldown_ms = 1400
+respawn_time_ms = 18000
+
+[barbarian_warrior.rewards]
+exp_base = 55
+gold_min = 12
+gold_max = 28
+
+[[barbarian_warrior.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.30
+quantity_min = 1
+quantity_max = 2
+
+[[barbarian_warrior.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 2
+
+[barbarian_warrior.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Barbarian Leader
+# =============================================================================
+
+[barbarian_leader]
+display_name = "Barbarian Leader"
+sprite = "barbarian_leader"
+animation_type = "standard"
+description = "A chieftain of the barbarian clan."
+
+[barbarian_leader.stats]
+level = 19
+max_hp = 72
+damage = 10
+attack_bonus = 8
+defence_bonus = 3
+attack_range = 1
+aggro_range = 7
+chase_range = 10
+move_cooldown_ms = 350
+attack_cooldown_ms = 1300
+respawn_time_ms = 30000
+
+[barbarian_leader.rewards]
+exp_base = 85
+gold_min = 18
+gold_max = 42
+
+[[barbarian_leader.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.40
+quantity_min = 1
+quantity_max = 3
+
+[[barbarian_leader.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 2
+quantity_max = 2
+
+[barbarian_leader.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 5
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Bone Monster
+# =============================================================================
+
+[bone_monster]
+display_name = "Bone Monster"
+sprite = "bone_monster"
+animation_type = "standard"
+description = "A heap of bones animated by dark magic."
+
+[bone_monster.stats]
+level = 13
+max_hp = 45
+damage = 6
+attack_bonus = 5
+defence_bonus = 2
+attack_range = 1
+aggro_range = 6
+chase_range = 8
+move_cooldown_ms = 430
+attack_cooldown_ms = 1600
+respawn_time_ms = 16000
+
+[bone_monster.rewards]
+exp_base = 50
+gold_min = 10
+gold_max = 24
+
+[[bone_monster.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 2
+quantity_max = 4
+
+[[bone_monster.loot]]
+item_id = "bone_fragment"
+drop_chance = 0.35
+quantity_min = 1
+quantity_max = 3
+
+[bone_monster.behaviors]
 hostile = true
 wander_enabled = true
 wander_radius = 3
 wander_pause_min_ms = 2000
 wander_pause_max_ms = 5000
+
+# =============================================================================
+# Skeleton Archer
+# =============================================================================
+
+[skeleton_archer]
+display_name = "Skeleton Archer"
+sprite = "skeleton_archer"
+animation_type = "standard"
+description = "An undead archer that shoots from afar."
+
+[skeleton_archer.stats]
+level = 12
+max_hp = 30
+damage = 5
+attack_bonus = 6
+defence_bonus = -2
+attack_range = 5
+aggro_range = 8
+chase_range = 10
+move_cooldown_ms = 400
+attack_cooldown_ms = 1800
+respawn_time_ms = 15000
+
+[skeleton_archer.rewards]
+exp_base = 45
+gold_min = 7
+gold_max = 18
+
+[[skeleton_archer.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 2
+
+[[skeleton_archer.loot]]
+item_id = "bone_arrow"
+drop_chance = 0.20
+quantity_min = 1
+quantity_max = 3
+
+[skeleton_archer.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Snake
+# =============================================================================
+
+[snake]
+display_name = "Snake"
+sprite = "snake"
+animation_type = "standard"
+description = "A venomous serpent."
+
+[snake.stats]
+level = 8
+max_hp = 22
+damage = 4
+attack_bonus = 4
+defence_bonus = -2
+attack_range = 1
+aggro_range = 5
+chase_range = 6
+move_cooldown_ms = 350
+attack_cooldown_ms = 1400
+respawn_time_ms = 10000
+
+[snake.rewards]
+exp_base = 32
+gold_min = 5
+gold_max = 14
+
+[[snake.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[snake.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Witch
+# =============================================================================
+
+[witch]
+display_name = "Witch"
+sprite = "witch"
+animation_type = "standard"
+description = "A dark sorceress who hexes intruders."
+
+[witch.stats]
+level = 15
+max_hp = 40
+damage = 7
+attack_bonus = 8
+defence_bonus = 0
+attack_range = 4
+aggro_range = 7
+chase_range = 9
+move_cooldown_ms = 450
+attack_cooldown_ms = 2000
+respawn_time_ms = 22000
+
+[witch.rewards]
+exp_base = 60
+gold_min = 12
+gold_max = 30
+
+[[witch.loot]]
+item_id = "dark_essence"
+drop_chance = 0.20
+quantity_min = 1
+quantity_max = 2
+
+[[witch.loot]]
+item_id = "recipe_scavenger_bow"
+drop_chance = 0.04
+quantity_min = 1
+quantity_max = 1
+
+[witch.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Guard
+# =============================================================================
+
+[guard]
+display_name = "Corrupted Guard"
+sprite = "guard"
+animation_type = "standard"
+description = "A former guard twisted by corruption."
+
+[guard.stats]
+level = 11
+max_hp = 38
+damage = 5
+attack_bonus = 5
+defence_bonus = 2
+attack_range = 1
+aggro_range = 6
+chase_range = 8
+move_cooldown_ms = 410
+attack_cooldown_ms = 1550
+respawn_time_ms = 15000
+
+[guard.rewards]
+exp_base = 44
+gold_min = 8
+gold_max = 22
+
+[[guard.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[guard.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.22
+quantity_min = 1
+quantity_max = 2
+
+[guard.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Purple Guard
+# =============================================================================
+
+[guard_purple]
+display_name = "Elite Corrupted Guard"
+sprite = "guard_purple"
+animation_type = "standard"
+description = "A stronger corrupted guard in purple armor."
+
+[guard_purple.stats]
+level = 15
+max_hp = 52
+damage = 7
+attack_bonus = 7
+defence_bonus = 4
+attack_range = 1
+aggro_range = 6
+chase_range = 9
+move_cooldown_ms = 380
+attack_cooldown_ms = 1450
+respawn_time_ms = 20000
+
+[guard_purple.rewards]
+exp_base = 62
+gold_min = 14
+gold_max = 32
+
+[[guard_purple.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 2
+
+[[guard_purple.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.30
+quantity_min = 1
+quantity_max = 2
+
+[guard_purple.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Rock Golem
+# =============================================================================
+
+[rock_golem]
+display_name = "Rock Golem"
+sprite = "rock_golem"
+animation_type = "standard"
+description = "A living statue of stone."
+
+[rock_golem.stats]
+level = 20
+max_hp = 90
+damage = 12
+attack_bonus = 6
+defence_bonus = 10
+attack_range = 1
+aggro_range = 5
+chase_range = 7
+move_cooldown_ms = 550
+attack_cooldown_ms = 2000
+respawn_time_ms = 45000
+
+[rock_golem.rewards]
+exp_base = 100
+gold_min = 20
+gold_max = 50
+
+[[rock_golem.loot]]
+item_id = "bone_fragment"
+drop_chance = 0.15
+quantity_min = 1
+quantity_max = 2
+
+[[rock_golem.loot]]
+item_id = "regular_bones"
+drop_chance = 0.5
+quantity_min = 1
+quantity_max = 1
+
+[rock_golem.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 2
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 6000
+
+# =============================================================================
+# Rock (minor)
+# =============================================================================
+
+[rock]
+display_name = "Living Rock"
+sprite = "rock"
+animation_type = "standard"
+description = "A small animated rock creature."
+
+[rock.stats]
+level = 6
+max_hp = 28
+damage = 3
+attack_bonus = 2
+defence_bonus = 5
+attack_range = 1
+aggro_range = 4
+chase_range = 5
+move_cooldown_ms = 600
+attack_cooldown_ms = 2200
+respawn_time_ms = 12000
+
+[rock.rewards]
+exp_base = 26
+gold_min = 4
+gold_max = 12
+
+[[rock.loot]]
+item_id = "bone_fragment"
+drop_chance = 0.10
+quantity_min = 1
+quantity_max = 1
+
+[rock.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 2
+wander_pause_min_ms = 4000
+wander_pause_max_ms = 7000
