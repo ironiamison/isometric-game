@@ -2325,7 +2325,7 @@ impl GameRoom {
             if let Some(npc) = npcs.get_mut(&target_id) {
                 // NPC's defence = level, no equipment bonus
                 let npc_defence_level = npc.level;
-                let npc_defence_bonus = 0;
+                let npc_defence_bonus = npc.stats.defence_bonus;
 
                 // Check if attack hits (combat_level used for both attack and strength)
                 if !calculate_hit(combat_level, attack_bonus, npc_defence_level, npc_defence_bonus) {
@@ -6375,7 +6375,7 @@ impl GameRoom {
 
         let mut npc_updates = Vec::new();
         let mut respawned_npcs = Vec::new();
-        let mut npc_attacks: Vec<(String, String, i32, i32)> = Vec::new(); // (npc_id, target_id, npc_level, max_hit)
+        let mut npc_attacks: Vec<(String, String, i32, i32, i32)> = Vec::new(); // (npc_id, target_id, npc_level, max_hit, attack_bonus)
         let mut npc_speech_events: Vec<(String, String, String)> = Vec::new(); // (player_id, npc_id, message)
         {
             let mut npcs = self.npcs.write().await;
@@ -6418,7 +6418,7 @@ impl GameRoom {
 
                 // Run NPC AI update
                 if let Some((target_id, max_hit)) = npc.update(delta_time, &player_positions, &occupied_tiles, current_time, &walkable_check) {
-                    npc_attacks.push((npc.id.clone(), target_id, npc.level, max_hit));
+                    npc_attacks.push((npc.id.clone(), target_id, npc.level, max_hit, npc.stats.attack_bonus));
                 }
 
                 // Verify NPC isn't on a blocked tile (debug check)
@@ -6507,7 +6507,7 @@ impl GameRoom {
         }
 
         // Process NPC attacks on players using hit/miss mechanics
-        for (npc_id, target_id, npc_level, max_hit) in npc_attacks {
+        for (npc_id, target_id, npc_level, max_hit, npc_attack_bonus) in npc_attacks {
             // Players in gathering zones are immune to NPC damage
             {
                 let gathering = self.gathering.read().await;
@@ -6526,9 +6526,8 @@ impl GameRoom {
                         continue;
                     }
 
-                    // NPC uses its level as attack level, no equipment bonuses
+                    // NPC uses its level as attack level
                     let npc_attack_level = npc_level;
-                    let npc_attack_bonus = 0;
 
                     // Player uses their combat skill level and equipment bonus
                     let player_defence_level = target.skills.combat.level;
@@ -8134,7 +8133,7 @@ impl GameRoom {
             let mut npcs = self.npcs.write().await;
             if let Some(npc) = npcs.get_mut(&target_id) {
                 let npc_defence_level = npc.level;
-                let npc_defence_bonus = 0;
+                let npc_defence_bonus = npc.stats.defence_bonus;
 
                 if !crate::skills::calculate_hit(effective_level, attack_bonus, npc_defence_level, npc_defence_bonus) {
                     // Miss
