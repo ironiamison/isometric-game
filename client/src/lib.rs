@@ -412,7 +412,14 @@ async fn async_main() {
                     // Draw a simple "Connecting..." screen
                     clear_background(Color::from_rgba(25, 25, 35, 255));
                     let (sw, sh) = (screen_width(), screen_height());
-                    draw_text("Connecting to server...", sw / 2.0 - 100.0, sh / 2.0, 20.0, WHITE);
+                    let dot_count = ((macroquad::time::get_time() * 3.0) as usize % 4) as usize;
+                    let dots = &"..."[..dot_count];
+                    let conn_text = format!("Connecting{}", dots);
+                    let font_size = 32.0;
+                    let dims = renderer.measure_text_sharp(&conn_text, font_size);
+                    let tx = ((sw - dims.width) / 2.0).floor();
+                    let ty = (sh / 2.0).floor();
+                    renderer.draw_text_sharp(&conn_text, tx, ty, font_size, WHITE);
 
                     if let Some(result) = auth_client.poll() {
                         match result {
