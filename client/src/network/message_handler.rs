@@ -2170,6 +2170,15 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             owner_id,
                         });
                     }
+                    // Parse unlocked plots
+                    if let Some(plots_arr) = extract_array(value, "unlocked_plots") {
+                        state.unlocked_farming_plots = plots_arr.iter()
+                            .filter_map(|v| v.as_u64().map(|u| u as u32))
+                            .collect();
+                    } else {
+                        state.unlocked_farming_plots = vec![1];
+                    }
+
                     log::info!("Received {} farming patches", state.farming_patches.len());
                 }
             }

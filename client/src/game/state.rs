@@ -1079,6 +1079,8 @@ pub struct GameState {
     pub farming_patches: HashMap<String, FarmingPatch>,
     /// Farming patch lookup by position
     pub farming_patch_positions: HashMap<(i32, i32), String>,
+    /// Which farming plots the player has unlocked
+    pub unlocked_farming_plots: Vec<u32>,
     /// Gathering marker positions received from server
     pub gathering_markers: Vec<GatheringMarker>,
     /// Whether the local player is currently gathering
@@ -1222,6 +1224,7 @@ impl GameState {
             pending_ground_items: Vec::new(),
             farming_patches: HashMap::new(),
             farming_patch_positions: HashMap::new(),
+            unlocked_farming_plots: vec![1],
             gathering_markers: Vec::new(),
             is_gathering: false,
             is_sitting: false,
