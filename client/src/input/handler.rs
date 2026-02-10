@@ -1665,6 +1665,7 @@ impl InputHandler {
                     }
                     UiElementId::MainTab(idx) => {
                         state.ui_state.shop_main_tab = *idx;
+                        state.pending_sfx.push("enter".to_string());
                         return commands;
                     }
                     UiElementId::CraftingCategoryTab(idx) => {
@@ -1674,6 +1675,7 @@ impl InputHandler {
                                 state.ui_state.crafting_selected_category = *idx;
                                 state.ui_state.crafting_selected_recipe = 0;
                                 state.ui_state.crafting_scroll_offset = 0.0;
+                                state.pending_sfx.push("enter".to_string());
                             }
                         }
                         return commands;
@@ -1682,6 +1684,7 @@ impl InputHandler {
                         // Disable recipe selection during crafting
                         if !state.ui_state.crafting_in_progress {
                             state.ui_state.crafting_selected_recipe = *idx;
+                            state.pending_sfx.push("enter".to_string());
                         }
                         return commands;
                     }
@@ -1734,11 +1737,13 @@ impl InputHandler {
                     UiElementId::ShopBuyItem(idx) => {
                         state.ui_state.shop_selected_buy_index = *idx;
                         state.ui_state.shop_buy_quantity = 1;
+                        state.pending_sfx.push("enter".to_string());
                         return commands;
                     }
                     UiElementId::ShopSellItem(idx) => {
                         state.ui_state.shop_selected_sell_index = *idx;
                         state.ui_state.shop_sell_quantity = 1;
+                        state.pending_sfx.push("enter".to_string());
                         return commands;
                     }
                     UiElementId::ShopBuyQuantityMinus => {

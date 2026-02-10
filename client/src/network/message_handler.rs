@@ -1621,6 +1621,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 });
                 state.ui_state.crafting_open = true; // Open crafting window (which has shop tab)
                 state.ui_state.shop_main_tab = 1; // Switch to Shop tab
+                state.pending_sfx.push("ui_open".to_string());
             }
         }
 
