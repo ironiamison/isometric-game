@@ -273,8 +273,8 @@ impl LegacySkills {
 /// Calculate whether an attack hits using attack roll vs defence roll.
 /// Returns true if the attack hits.
 ///
-/// Formula: Roll attacker's combat (0 to combat_level * (attack_bonus + 64))
-///          Roll defender's combat (0 to combat_level * (defence_bonus + 64))
+/// Formula: Roll attacker's combat (0 to combat_level * (attack_bonus + 20))
+///          Roll defender's combat (0 to combat_level * (defence_bonus + 20))
 ///          Hit if attack_roll > defence_roll
 pub fn calculate_hit(
     attacker_combat_level: i32,
@@ -284,8 +284,8 @@ pub fn calculate_hit(
 ) -> bool {
     let mut rng = rand::thread_rng();
 
-    let attack_max = attacker_combat_level * (attack_bonus + 64);
-    let defence_max = defender_combat_level * (defence_bonus + 64);
+    let attack_max = attacker_combat_level * (attack_bonus + 20);
+    let defence_max = defender_combat_level * (defence_bonus + 20);
 
     let attack_roll = rng.gen_range(0..=attack_max.max(1));
     let defence_roll = rng.gen_range(0..=defence_max.max(1));
@@ -295,25 +295,24 @@ pub fn calculate_hit(
 
 /// Calculate maximum hit based on combat level and equipment bonus.
 ///
-/// Formula: 1.3 + (combat_level / 10) + (combat_level * strength_bonus / 640)
+/// Formula: 1 + (combat_level / 8) + (strength_bonus / 4)
 /// This gives roughly:
 /// - Level 1, no bonus: 1
-/// - Level 50, no bonus: 6
-/// - Level 99, no bonus: 11
-/// - Level 99, +50 bonus: 18
+/// - Level 30, +10 bonus: 6
+/// - Level 70, +25 bonus: 15
 pub fn calculate_max_hit(combat_level: i32, strength_bonus: i32) -> i32 {
-    let base = 1.3 + (combat_level as f64 / 10.0);
-    let bonus = (combat_level * strength_bonus) as f64 / 640.0;
-    (base + bonus).floor() as i32
+    let base = 1.0 + (combat_level as f64 / 8.0);
+    let bonus = strength_bonus as f64 / 4.0;
+    ((base + bonus).floor() as i32).max(1)
 }
 
-/// Roll damage between 0 and max_hit (inclusive).
-/// In RS, you can hit 0 even on a successful hit roll (a "low hit").
+/// Roll damage between 1 and max_hit (inclusive).
+/// Minimum damage on a successful hit is always 1.
 pub fn roll_damage(max_hit: i32) -> i32 {
-    if max_hit <= 0 {
-        return 0;
+    if max_hit <= 1 {
+        return 1;
     }
-    rand::thread_rng().gen_range(0..=max_hit)
+    rand::thread_rng().gen_range(1..=max_hit)
 }
 
 /// XP awarded per damage dealt.
