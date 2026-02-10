@@ -709,7 +709,18 @@ impl Renderer {
             let objects = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/objects", &manifest.objects, "assets/sprites/objects").await);
             let walls = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/walls", &manifest.walls, "assets/sprites/walls").await);
             let npcs = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/enemies", &manifest.enemies, "assets/sprites/enemies").await);
-            let farming = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/farming", &[], "assets/sprites/farming").await);
+            let farming = {
+                let crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
+                let mut sprites = HashMap::new();
+                for crop in &crop_names {
+                    let path = format!("assets/sprites/farming/farming_{}.png", crop);
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(crop.to_string(), tex);
+                    }
+                }
+                SpritesheetStore::Individual(sprites)
+            };
             let effects = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/effects", &[], "assets/sprites/effects").await);
             (equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects)
         };

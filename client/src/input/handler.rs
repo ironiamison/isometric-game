@@ -1512,7 +1512,7 @@ impl InputHandler {
             }
             let was_scrollbar = state.ui_state.dialogue_scrollbar_dragging;
 
-            if !was_touch_drag && !was_scrollbar {
+            if !was_touch_drag && !was_scrollbar && mouse_clicked {
                 if let Some(ref element) = clicked_element {
                     match element {
                         UiElementId::DialogueChoice(idx) => {

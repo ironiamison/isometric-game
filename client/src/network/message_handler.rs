@@ -465,6 +465,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     timestamp,
                     channel: ChatChannel::Local,
                 });
+                state.pending_sfx.push("message_add".to_string());
 
                 if state.ui_state.chat_messages.len() > 75 {
                     state.ui_state.chat_messages.remove(0);
@@ -1149,6 +1150,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     choices,
                     show_time: macroquad::time::get_time(),
                 });
+                state.pending_sfx.push("ui_open".to_string());
             }
         }
 

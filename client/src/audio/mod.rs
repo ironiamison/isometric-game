@@ -92,6 +92,8 @@ impl AudioManager {
             ("announce", "assets/audio/sfx/misc/announce.wav"),
             ("unarmed", "assets/audio/sfx/attack/unarmed.wav"),
             ("woodcut", "assets/audio/sfx/misc/woodcut.ogg"),
+            ("ui_open", "assets/audio/sfx/ui_open.mp3"),
+            ("message_add", "assets/audio/sfx/message_add.mp3"),
         ];
 
         for (name, path) in sfx_files {
