@@ -94,6 +94,7 @@ impl AudioManager {
             ("woodcut", "assets/audio/sfx/misc/woodcut.ogg"),
             ("ui_open", "assets/audio/sfx/ui_open.mp3"),
             ("message_add", "assets/audio/sfx/message_add.mp3"),
+            ("pop", "assets/audio/sfx/misc/pop.ogg"),
         ];
 
         for (name, path) in sfx_files {

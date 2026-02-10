@@ -2211,6 +2211,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let owner_id = extract_string(value, "owner_id").unwrap_or_default();
 
                 if let Some(patch) = state.farming_patches.get_mut(&patch_id) {
+                    // Detect harvest: was harvestable, now empty
+                    if patch.state == "harvestable" && patch_state == "empty" {
+                        state.pending_sfx.push("pop".to_string());
+                    }
                     patch.state = patch_state;
                     patch.crop_id = crop_id;
                     patch.growth_stage = growth_stage;
