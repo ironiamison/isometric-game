@@ -2179,7 +2179,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         state.unlocked_farming_plots = vec![1];
                     }
 
-                    log::info!("Received {} farming patches", state.farming_patches.len());
+                    // Parse ground tile overrides (farming plot tiles)
+                    state.ground_tile_overrides.clear();
+                    if let Some(overrides_arr) = extract_array(value, "tile_overrides") {
+                        for t in overrides_arr {
+                            let x = extract_i32(t, "x").unwrap_or(0);
+                            let y = extract_i32(t, "y").unwrap_or(0);
+                            let tile_id = extract_u32(t, "tile_id").unwrap_or(0);
+                            state.ground_tile_overrides.insert((x, y), tile_id);
+                        }
+                    }
+
+                    log::info!("Received {} farming patches, {} tile overrides", state.farming_patches.len(), state.ground_tile_overrides.len());
                 }
             }
         }

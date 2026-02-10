@@ -1081,6 +1081,8 @@ pub struct GameState {
     pub farming_patch_positions: HashMap<(i32, i32), String>,
     /// Which farming plots the player has unlocked
     pub unlocked_farming_plots: Vec<u32>,
+    /// Ground tile overrides from server (farming plot tiles: locked=65, unlocked=62)
+    pub ground_tile_overrides: HashMap<(i32, i32), u32>,
     /// Gathering marker positions received from server
     pub gathering_markers: Vec<GatheringMarker>,
     /// Whether the local player is currently gathering
@@ -1225,6 +1227,7 @@ impl GameState {
             farming_patches: HashMap::new(),
             farming_patch_positions: HashMap::new(),
             unlocked_farming_plots: vec![1],
+            ground_tile_overrides: HashMap::new(),
             gathering_markers: Vec::new(),
             is_gathering: false,
             is_sitting: false,

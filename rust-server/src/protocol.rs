@@ -600,6 +600,7 @@ pub enum ServerMessage {
     FarmingPatchStates {
         patches: Vec<FarmingPatchData>,
         unlocked_plots: Vec<u32>,
+        tile_overrides: Vec<TileOverride>,
     },
     /// Update a single farming patch state
     PatchStateUpdate {
@@ -752,6 +753,14 @@ pub enum ServerMessage {
     Pong {
         timestamp: f64,
     },
+}
+
+/// Ground tile override for farming plots (locked vs unlocked appearance)
+#[derive(Debug, Clone, Serialize)]
+pub struct TileOverride {
+    pub x: i32,
+    pub y: i32,
+    pub tile_id: u32,
 }
 
 /// Farming patch data for client synchronization
@@ -2508,7 +2517,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("direction".into()), Value::Integer((*direction as i64).into())));
             Value::Map(map)
         }
-        ServerMessage::FarmingPatchStates { patches, unlocked_plots } => {
+        ServerMessage::FarmingPatchStates { patches, unlocked_plots, tile_overrides } => {
             let mut map = Vec::new();
             let patch_values: Vec<Value> = patches.iter().map(|p| {
                 let mut pmap = Vec::new();
@@ -2526,6 +2535,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .map(|p| Value::Integer((*p as i64).into()))
                 .collect();
             map.push((Value::String("unlocked_plots".into()), Value::Array(plot_values)));
+            let tile_override_values: Vec<Value> = tile_overrides.iter().map(|t| {
+                let mut tmap = Vec::new();
+                tmap.push((Value::String("x".into()), Value::Integer((t.x as i64).into())));
+                tmap.push((Value::String("y".into()), Value::Integer((t.y as i64).into())));
+                tmap.push((Value::String("tile_id".into()), Value::Integer((t.tile_id as i64).into())));
+                Value::Map(tmap)
+            }).collect();
+            map.push((Value::String("tile_overrides".into()), Value::Array(tile_override_values)));
             Value::Map(map)
         }
         ServerMessage::PatchStateUpdate { patch_id, state, crop_id, growth_stage, owner_id } => {

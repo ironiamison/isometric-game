@@ -6099,7 +6099,18 @@ impl GameRoom {
             }
         }).collect();
         let unlocked_plots = farming.get_unlocked_plots(player_id);
-        ServerMessage::FarmingPatchStates { patches, unlocked_plots }
+
+        // Build tile overrides for all farming patches (locked=65, unlocked=62)
+        let tile_overrides = farming.patches.values().map(|patch| {
+            let tile_id = if farming.is_plot_unlocked(player_id, patch.plot) { 62 } else { 65 };
+            crate::protocol::TileOverride {
+                x: patch.x,
+                y: patch.y,
+                tile_id,
+            }
+        }).collect();
+
+        ServerMessage::FarmingPatchStates { patches, unlocked_plots, tile_overrides }
     }
 
     pub async fn tick(&self) {

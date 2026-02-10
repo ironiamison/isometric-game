@@ -2731,6 +2731,15 @@ impl Renderer {
                             let world_x = chunk_offset_x + local_x as i32;
                             let world_y = chunk_offset_y + local_y as i32;
 
+                            // Apply ground tile overrides (e.g. farming plot tiles)
+                            let tile_id = if chunk_layer_type == ChunkLayerType::Ground {
+                                state.ground_tile_overrides.get(&(world_x, world_y))
+                                    .copied()
+                                    .unwrap_or(tile_id)
+                            } else {
+                                tile_id
+                            };
+
                             // Draw tile sprite (or fallback to colored tile)
                             self.draw_tile_sprite(screen_x, screen_y, tile_id, zoom, Some((world_x as f32, world_y as f32)), water_effects);
 
