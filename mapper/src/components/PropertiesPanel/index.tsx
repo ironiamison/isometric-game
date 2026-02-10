@@ -607,10 +607,6 @@ export function PropertiesPanel() {
     );
   }
 
-  // Nothing selected - only show title
-  return (
-    <div className={styles.panel}>
-      <div className={styles.title}>Properties</div>
-    </div>
-  );
+  // Nothing selected - hide the panel entirely
+  return null;
 }
