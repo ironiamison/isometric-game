@@ -96,6 +96,9 @@ pub struct RawEntityBehaviors {
     pub wander_radius: Option<i32>,
     pub wander_pause_min_ms: Option<u64>,
     pub wander_pause_max_ms: Option<u64>,
+    #[serde(default)]
+    pub no_shadow: bool,
+    pub render_offset_y: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -281,6 +284,8 @@ pub struct EntityBehaviors {
     pub wander_radius: i32,
     pub wander_pause_min_ms: u64,
     pub wander_pause_max_ms: u64,
+    pub no_shadow: bool,
+    pub render_offset_y: f32,
 }
 
 impl Default for EntityBehaviors {
@@ -298,6 +303,8 @@ impl Default for EntityBehaviors {
             wander_radius: 3,
             wander_pause_min_ms: 2000,
             wander_pause_max_ms: 5000,
+            no_shadow: false,
+            render_offset_y: 0.0,
         }
     }
 }
@@ -317,6 +324,8 @@ impl From<&RawEntityBehaviors> for EntityBehaviors {
             wander_radius: raw.wander_radius.unwrap_or(3),
             wander_pause_min_ms: raw.wander_pause_min_ms.unwrap_or(2000),
             wander_pause_max_ms: raw.wander_pause_max_ms.unwrap_or(5000),
+            no_shadow: raw.no_shadow,
+            render_offset_y: raw.render_offset_y.unwrap_or(0.0),
         }
     }
 }

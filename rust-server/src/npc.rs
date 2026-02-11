@@ -60,6 +60,8 @@ pub struct PrototypeStats {
     pub wander_radius: i32,
     pub wander_pause_min_ms: u64,
     pub wander_pause_max_ms: u64,
+    pub no_shadow: bool,
+    pub render_offset_y: f32,
     pub hp_regen_percent_per_sec: f32,
 }
 
@@ -137,6 +139,8 @@ impl Npc {
             wander_pause_min_ms: prototype.behaviors.wander_pause_min_ms,
             wander_pause_max_ms: prototype.behaviors.wander_pause_max_ms,
             hp_regen_percent_per_sec: prototype.stats.hp_regen_percent_per_sec,
+            no_shadow: prototype.behaviors.no_shadow,
+            render_offset_y: prototype.behaviors.render_offset_y,
         };
 
         Self {
@@ -725,6 +729,10 @@ pub struct NpcUpdate {
     pub move_speed: f32,
     /// True only on the tick when this NPC attacks (for animation sync)
     pub just_attacked: bool,
+    /// Whether to hide the shadow under this NPC
+    pub no_shadow: bool,
+    /// Vertical pixel offset for rendering (positive = down)
+    pub render_offset_y: f32,
 }
 
 impl From<&Npc> for NpcUpdate {
@@ -754,6 +762,8 @@ impl From<&Npc> for NpcUpdate {
             is_altar: npc.is_altar(),
             move_speed,
             just_attacked: npc.just_attacked,
+            no_shadow: npc.stats.no_shadow,
+            render_offset_y: npc.stats.render_offset_y,
         }
     }
 }

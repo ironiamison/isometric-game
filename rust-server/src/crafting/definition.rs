@@ -14,6 +14,7 @@ pub enum RecipeCategory {
     Equipment,
     Tools,
     Smithing,
+    Alchemy,
 }
 
 impl Default for RecipeCategory {
@@ -30,6 +31,7 @@ impl RecipeCategory {
             RecipeCategory::Equipment => "equipment",
             RecipeCategory::Tools => "tools",
             RecipeCategory::Smithing => "smithing",
+            RecipeCategory::Alchemy => "alchemy",
         }
     }
 }

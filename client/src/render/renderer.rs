@@ -3907,18 +3907,20 @@ impl Renderer {
             let scaled_width = (frame_width * zoom).round();
             let scaled_height = (frame_height * zoom).round();
             let draw_x = (screen_x - scaled_width / 2.0).round();
-            let draw_y = (screen_y - scaled_height + 4.0 * zoom).round();
+            let draw_y = (screen_y - scaled_height + 4.0 * zoom + npc.render_offset_y * zoom).round();
 
-            // Draw shadow
-            let shadow_scale = (frame_width / 50.0).clamp(0.5, 2.0);
-            draw_ellipse(
-                screen_x,
-                screen_y,
-                16.0 * shadow_scale * zoom,
-                6.0 * shadow_scale * zoom,
-                0.0,
-                Color::from_rgba(0, 0, 0, 60),
-            );
+            // Draw shadow (unless disabled)
+            if !npc.no_shadow {
+                let shadow_scale = (frame_width / 50.0).clamp(0.5, 2.0);
+                draw_ellipse(
+                    screen_x,
+                    screen_y,
+                    16.0 * shadow_scale * zoom,
+                    6.0 * shadow_scale * zoom,
+                    0.0,
+                    Color::from_rgba(0, 0, 0, 60),
+                );
+            }
 
             draw_texture_ex(
                 npc_texture,
@@ -3967,8 +3969,10 @@ impl Renderer {
             let radius = (10.0 + wobble * 1.5) * zoom;
             let height_offset = (8.0 + wobble * 2.0) * zoom;
 
-            // Draw shadow
-            draw_ellipse(screen_x, screen_y, 16.0 * zoom, 6.0 * zoom, 0.0, Color::from_rgba(0, 0, 0, 60));
+            // Draw shadow (unless disabled)
+            if !npc.no_shadow {
+                draw_ellipse(screen_x, screen_y, 16.0 * zoom, 6.0 * zoom, 0.0, Color::from_rgba(0, 0, 0, 60));
+            }
 
             // Draw NPC body (oval blob)
             draw_ellipse(screen_x, screen_y - height_offset, radius, radius * 0.7, 0.0, base_color);

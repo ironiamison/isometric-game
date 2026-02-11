@@ -24,3 +24,23 @@ loot_table = "fish_advanced"
 bonus_spawn_frequency = 45
 base_gather_speed = 4.0
 base_xp = 50
+
+# =============================================================================
+# Herb Gathering Zones (Farming skill)
+# =============================================================================
+
+[zones.forest_herbs]
+skill = "farming"
+level_required = 1
+loot_table = "herbs_beginner"
+bonus_spawn_frequency = 60
+base_gather_speed = 6.0
+base_xp = 8
+
+[zones.swamp_herbs]
+skill = "farming"
+level_required = 15
+loot_table = "herbs_intermediate"
+bonus_spawn_frequency = 55
+base_gather_speed = 5.5
+base_xp = 20

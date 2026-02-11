@@ -85,3 +85,79 @@ harvest_amount_max = 2
 xp_planting = 8
 xp_per_harvest = 35
 seed_return_chance = 0.15
+
+# =============================================================================
+# Herbs (Alchemy)
+# =============================================================================
+
+[greenleaf]
+seed_item = "greenleaf_seed"
+produce_item = "greenleaf"
+level_required = 1
+growth_time_minutes = 5
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 2
+xp_planting = 3
+xp_per_harvest = 10
+seed_return_chance = 0.15
+
+[tangleroots]
+seed_item = "tangleroots_seed"
+produce_item = "tangleroots"
+level_required = 10
+growth_time_minutes = 8
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 2
+xp_planting = 5
+xp_per_harvest = 18
+seed_return_chance = 0.15
+
+[marshbloom]
+seed_item = "marshbloom_seed"
+produce_item = "marshbloom"
+level_required = 20
+growth_time_minutes = 12
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 2
+xp_planting = 8
+xp_per_harvest = 28
+seed_return_chance = 0.15
+
+[ashveil]
+seed_item = "ashveil_seed"
+produce_item = "ashveil"
+level_required = 35
+growth_time_minutes = 15
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 2
+xp_planting = 12
+xp_per_harvest = 40
+seed_return_chance = 0.15
+
+[nightthorn]
+seed_item = "nightthorn_seed"
+produce_item = "nightthorn"
+level_required = 50
+growth_time_minutes = 20
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 2
+xp_planting = 18
+xp_per_harvest = 55
+seed_return_chance = 0.15
+
+[bloodcap]
+seed_item = "bloodcap_seed"
+produce_item = "bloodcap"
+level_required = 70
+growth_time_minutes = 25
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 1
+xp_planting = 25
+xp_per_harvest = 75
+seed_return_chance = 0.10

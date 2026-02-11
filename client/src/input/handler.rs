@@ -49,7 +49,8 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
                 continue;
             }
             if !player.is_dead {
-                occupied.insert((player.x.round() as i32, player.y.round() as i32));
+                // Use server-authoritative coordinates to match server-side collision checks.
+                occupied.insert((player.server_x.round() as i32, player.server_y.round() as i32));
             }
         }
     }
@@ -57,7 +58,8 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
     // Add all alive NPCs
     for npc in state.npcs.values() {
         if npc.is_alive() {
-            occupied.insert((npc.x.round() as i32, npc.y.round() as i32));
+            // Use server-authoritative coordinates to avoid interpolation skew.
+            occupied.insert((npc.server_x.round() as i32, npc.server_y.round() as i32));
         }
     }
 
@@ -2664,8 +2666,9 @@ impl InputHandler {
                         false
                     }
                 } else if let Some(player) = state.get_local_player() {
-                    let player_x = player.x.round() as i32;
-                    let player_y = player.y.round() as i32;
+                    // Use authoritative player tile, not interpolated visual position.
+                    let player_x = player.server_x.round() as i32;
+                    let player_y = player.server_y.round() as i32;
                     let target_x = player_x + dx as i32;
                     let target_y = player_y + dy as i32;
 

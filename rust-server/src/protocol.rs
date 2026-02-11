@@ -1303,6 +1303,14 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
         Value::String("just_attacked".into()),
         Value::Boolean(n.just_attacked),
     ));
+    nmap.push((
+        Value::String("no_shadow".into()),
+        Value::Boolean(n.no_shadow),
+    ));
+    nmap.push((
+        Value::String("render_offset_y".into()),
+        Value::F32(n.render_offset_y),
+    ));
     Value::Map(nmap)
 }
 

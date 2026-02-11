@@ -71,6 +71,10 @@ pub struct Npc {
     pub pending_death: bool,
     /// Speech bubble text and timestamp
     pub speech_bubble: Option<(String, f64)>,
+    /// Whether to hide the shadow under this NPC
+    pub no_shadow: bool,
+    /// Vertical pixel offset for rendering (positive = down)
+    pub render_offset_y: f32,
 }
 
 impl Npc {
@@ -100,6 +104,8 @@ impl Npc {
             death_timer: None,
             pending_death: false,
             speech_bubble: None,
+            no_shadow: false,
+            render_offset_y: 0.0,
         }
     }
 

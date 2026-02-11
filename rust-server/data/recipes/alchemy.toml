@@ -1,0 +1,352 @@
+# =============================================================================
+# Alchemy Recipes - Potions
+# =============================================================================
+
+# --- Restoration: Weak Tier (Herb + Vial) ---
+
+[weak_health_potion]
+display_name = "Weak Health Potion"
+description = "Brew a basic health potion from greenleaf."
+category = "alchemy"
+level_required = 1
+xp = 25
+
+[[weak_health_potion.ingredients]]
+item_id = "greenleaf"
+count = 1
+
+[[weak_health_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[weak_health_potion.results]]
+item_id = "weak_health_potion"
+count = 1
+
+[weak_mana_potion]
+display_name = "Weak Mana Potion"
+description = "Brew a basic mana potion from tangleroots."
+category = "alchemy"
+level_required = 5
+xp = 30
+
+[[weak_mana_potion.ingredients]]
+item_id = "tangleroots"
+count = 1
+
+[[weak_mana_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[weak_mana_potion.results]]
+item_id = "weak_mana_potion"
+count = 1
+
+# --- Utility ---
+
+[antidote]
+display_name = "Antidote"
+description = "Brew an antidote from greenleaf and hedgehog spine."
+category = "alchemy"
+level_required = 10
+xp = 35
+
+[[antidote.ingredients]]
+item_id = "greenleaf"
+count = 1
+
+[[antidote.ingredients]]
+item_id = "hedgehog_spine"
+count = 1
+
+[[antidote.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[antidote.results]]
+item_id = "antidote"
+count = 1
+
+# --- Stat Buffs: Basic Tier ---
+
+[attack_potion]
+display_name = "Attack Potion"
+description = "Brew a potion that temporarily boosts attack."
+category = "alchemy"
+level_required = 15
+xp = 50
+
+[[attack_potion.ingredients]]
+item_id = "tangleroots"
+count = 1
+
+[[attack_potion.ingredients]]
+item_id = "spider_fang"
+count = 1
+
+[[attack_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[attack_potion.results]]
+item_id = "attack_potion"
+count = 1
+
+# --- Restoration: Mid Tier ---
+
+[health_potion_recipe]
+display_name = "Health Potion"
+description = "Brew a health potion from marshbloom and slime core."
+category = "alchemy"
+level_required = 20
+xp = 60
+
+[[health_potion_recipe.ingredients]]
+item_id = "marshbloom"
+count = 1
+
+[[health_potion_recipe.ingredients]]
+item_id = "slime_core"
+count = 1
+
+[[health_potion_recipe.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[health_potion_recipe.results]]
+item_id = "health_potion"
+count = 1
+
+[strength_potion]
+display_name = "Strength Potion"
+description = "Brew a potion that temporarily boosts strength."
+category = "alchemy"
+level_required = 20
+xp = 60
+
+[[strength_potion.ingredients]]
+item_id = "marshbloom"
+count = 1
+
+[[strength_potion.ingredients]]
+item_id = "slime_core"
+count = 1
+
+[[strength_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[strength_potion.results]]
+item_id = "strength_potion"
+count = 1
+
+[mana_potion_recipe]
+display_name = "Mana Potion"
+description = "Brew a mana potion from marshbloom and worm segment."
+category = "alchemy"
+level_required = 25
+xp = 65
+
+[[mana_potion_recipe.ingredients]]
+item_id = "marshbloom"
+count = 1
+
+[[mana_potion_recipe.ingredients]]
+item_id = "worm_segment"
+count = 1
+
+[[mana_potion_recipe.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[mana_potion_recipe.results]]
+item_id = "mana_potion"
+count = 1
+
+[defence_potion]
+display_name = "Defence Potion"
+description = "Brew a potion that temporarily boosts defence."
+category = "alchemy"
+level_required = 25
+xp = 65
+
+[[defence_potion.ingredients]]
+item_id = "marshbloom"
+count = 1
+
+[[defence_potion.ingredients]]
+item_id = "hedgehog_spine"
+count = 1
+
+[[defence_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[defence_potion.results]]
+item_id = "defence_potion"
+count = 1
+
+[prayer_potion_recipe]
+display_name = "Prayer Potion"
+description = "Brew a prayer potion from tangleroots and crow feather."
+category = "alchemy"
+level_required = 30
+xp = 70
+
+[[prayer_potion_recipe.ingredients]]
+item_id = "tangleroots"
+count = 1
+
+[[prayer_potion_recipe.ingredients]]
+item_id = "crow_feather"
+count = 1
+
+[[prayer_potion_recipe.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[prayer_potion_recipe.results]]
+item_id = "prayer_potion"
+count = 1
+
+# --- Restoration: Strong Tier ---
+
+[strong_health_potion]
+display_name = "Strong Health Potion"
+description = "Brew a powerful health potion from ashveil and spider fang."
+category = "alchemy"
+level_required = 45
+xp = 100
+
+[[strong_health_potion.ingredients]]
+item_id = "ashveil"
+count = 1
+
+[[strong_health_potion.ingredients]]
+item_id = "spider_fang"
+count = 1
+
+[[strong_health_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[strong_health_potion.results]]
+item_id = "strong_health_potion"
+count = 1
+
+[strong_mana_potion]
+display_name = "Strong Mana Potion"
+description = "Brew a potent mana elixir from ashveil and dark essence."
+category = "alchemy"
+level_required = 50
+xp = 110
+
+[[strong_mana_potion.ingredients]]
+item_id = "ashveil"
+count = 1
+
+[[strong_mana_potion.ingredients]]
+item_id = "dark_essence"
+count = 1
+
+[[strong_mana_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[strong_mana_potion.results]]
+item_id = "strong_mana_potion"
+count = 1
+
+# --- Stat Buffs: Super Tier ---
+
+[super_attack_potion]
+display_name = "Super Attack Potion"
+description = "Brew a powerful attack potion from nightthorn and spider fang."
+category = "alchemy"
+level_required = 55
+xp = 110
+
+[[super_attack_potion.ingredients]]
+item_id = "nightthorn"
+count = 1
+
+[[super_attack_potion.ingredients]]
+item_id = "spider_fang"
+count = 1
+
+[[super_attack_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[super_attack_potion.results]]
+item_id = "super_attack_potion"
+count = 1
+
+[strong_prayer_potion]
+display_name = "Strong Prayer Potion"
+description = "Brew a blessed elixir from nightthorn and crow feather."
+category = "alchemy"
+level_required = 55
+xp = 120
+
+[[strong_prayer_potion.ingredients]]
+item_id = "nightthorn"
+count = 1
+
+[[strong_prayer_potion.ingredients]]
+item_id = "crow_feather"
+count = 1
+
+[[strong_prayer_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[strong_prayer_potion.results]]
+item_id = "strong_prayer_potion"
+count = 1
+
+[super_strength_potion]
+display_name = "Super Strength Potion"
+description = "Brew a powerful strength potion from nightthorn and dark essence."
+category = "alchemy"
+level_required = 60
+xp = 120
+
+[[super_strength_potion.ingredients]]
+item_id = "nightthorn"
+count = 1
+
+[[super_strength_potion.ingredients]]
+item_id = "dark_essence"
+count = 1
+
+[[super_strength_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[super_strength_potion.results]]
+item_id = "super_strength_potion"
+count = 1
+
+[super_defence_potion]
+display_name = "Super Defence Potion"
+description = "Brew a powerful defence potion from bloodcap and hedgehog spine."
+category = "alchemy"
+level_required = 65
+xp = 130
+
+[[super_defence_potion.ingredients]]
+item_id = "bloodcap"
+count = 1
+
+[[super_defence_potion.ingredients]]
+item_id = "hedgehog_spine"
+count = 1
+
+[[super_defence_potion.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[super_defence_potion.results]]
+item_id = "super_defence_potion"
+count = 1

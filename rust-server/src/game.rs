@@ -259,6 +259,15 @@ pub struct Player {
     pub mp: i32,
     /// Per-spell cooldown tracking: spell_id -> last_cast_time_ms
     pub spell_cooldowns: HashMap<String, u64>,
+    /// Active temporary buffs (from potions etc.), not persisted to DB
+    pub active_buffs: Vec<ActiveBuff>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ActiveBuff {
+    pub stat: String,      // "attack", "strength", "defence"
+    pub amount: i32,
+    pub expires_at: u64,   // millisecond timestamp when buff expires
 }
 
 const PLAYER_RESPAWN_TIME_MS: u64 = 5000; // 5 seconds to respawn
@@ -308,6 +317,7 @@ impl Player {
             crafting_state: None,
             active_prayers: HashSet::new(),
             spell_cooldowns: HashMap::new(),
+            active_buffs: Vec::new(),
         }
     }
 
@@ -358,7 +368,7 @@ impl Player {
                 }
             }
         }
-        bonus
+        bonus + self.buff_bonus("attack")
     }
 
     /// Calculate total strength bonus (max hit) from equipped items
@@ -373,7 +383,7 @@ impl Player {
                 }
             }
         }
-        bonus
+        bonus + self.buff_bonus("strength")
     }
 
     /// Calculate total defence bonus from equipped items
@@ -388,7 +398,7 @@ impl Player {
                 }
             }
         }
-        bonus
+        bonus + self.buff_bonus("defence")
     }
 
     /// Award combat XP based on damage dealt.
@@ -483,6 +493,32 @@ impl Player {
                 self.hp = (self.hp + regen).min(max_hp);
             }
         }
+    }
+
+    /// Get total buff bonus for a stat
+    pub fn buff_bonus(&self, stat: &str) -> i32 {
+        self.active_buffs
+            .iter()
+            .filter(|b| b.stat == stat)
+            .map(|b| b.amount)
+            .sum()
+    }
+
+    /// Apply a buff, replacing any existing buff for the same stat (no stacking)
+    pub fn apply_buff(&mut self, stat: String, amount: i32, duration_ms: u64, current_time_ms: u64) {
+        self.active_buffs.retain(|b| b.stat != stat);
+        self.active_buffs.push(ActiveBuff {
+            stat,
+            amount,
+            expires_at: current_time_ms + duration_ms,
+        });
+    }
+
+    /// Remove expired buffs, returns true if any were removed
+    pub fn tick_buffs(&mut self, current_time_ms: u64) -> bool {
+        let before = self.active_buffs.len();
+        self.active_buffs.retain(|b| b.expires_at > current_time_ms);
+        self.active_buffs.len() != before
     }
 }
 
@@ -3934,8 +3970,11 @@ impl GameRoom {
                                 format!("heal:{}", amount)
                             }
                             Some(UseEffect::RestoreMana { amount }) => {
-                                // Mana not implemented yet
-                                format!("mana:{}", amount)
+                                let max_mp = player.max_mp();
+                                let old_mp = player.mp;
+                                player.mp = (player.mp + amount).min(max_mp);
+                                let actual_restored = player.mp - old_mp;
+                                format!("mana:{}", actual_restored)
                             }
                             Some(UseEffect::RestorePrayer { amount }) => {
                                 // Prayer potion formula: amount + floor(prayer_level / 4)
@@ -3947,7 +3986,11 @@ impl GameRoom {
                                 format!("prayer:{}", actual_restored)
                             }
                             Some(UseEffect::Buff { stat, amount, duration_ms }) => {
-                                // Buffs not implemented yet
+                                let now = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_millis() as u64;
+                                player.apply_buff(stat.clone(), *amount, *duration_ms, now);
                                 format!("buff:{}:{}:{}", stat, amount, duration_ms)
                             }
                             Some(UseEffect::Teleport { destination }) => {
@@ -4083,6 +4126,7 @@ impl GameRoom {
 
     /// Handle a crafting request from a player
     pub async fn handle_craft(&self, player_id: &str, recipe_id: &str) {
+        use crate::crafting::definition::RecipeCategory;
         use crate::protocol::RecipeResult as ProtoRecipeResult;
 
         // Get recipe definition
@@ -4110,15 +4154,26 @@ impl GameRoom {
             _ => return,
         };
 
-        // Check level requirement (use combat level for now, will add crafting skill later)
-        if player.combat_level() < recipe.level_required {
+        // Check level requirement - smithing/alchemy check their own skill, others use combat level
+        let level_check_passed = match recipe.category {
+            RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
+            RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
+            _ => player.combat_level() >= recipe.level_required,
+        };
+
+        if !level_check_passed {
+            let skill_name = match recipe.category {
+                RecipeCategory::Smithing => "Smithing",
+                RecipeCategory::Alchemy => "Alchemy",
+                _ => "Combat",
+            };
             drop(players);
             self.send_to_player(
                 player_id,
                 ServerMessage::CraftResult {
                     success: false,
                     recipe_id: recipe_id.to_string(),
-                    error: Some(format!("Requires combat level {}", recipe.level_required)),
+                    error: Some(format!("Requires {} level {}", skill_name, recipe.level_required)),
                     items_gained: vec![],
                 },
             )
@@ -4182,6 +4237,30 @@ impl GameRoom {
             });
         }
 
+        // Award crafting skill XP if applicable
+        let xp_gained = recipe.xp;
+        let mut xp_results = Vec::new();
+        if xp_gained > 0 && recipe.category == RecipeCategory::Smithing {
+            let leveled = player.skills.smithing.add_xp(xp_gained as i64);
+            xp_results.push((
+                SkillType::Smithing,
+                xp_gained as i64,
+                player.skills.smithing.xp,
+                player.skills.smithing.level,
+                leveled,
+            ));
+        }
+        if xp_gained > 0 && recipe.category == RecipeCategory::Alchemy {
+            let leveled = player.skills.alchemy.add_xp(xp_gained as i64);
+            xp_results.push((
+                SkillType::Alchemy,
+                xp_gained as i64,
+                player.skills.alchemy.xp,
+                player.skills.alchemy.level,
+                leveled,
+            ));
+        }
+
         // Get inventory update
         let inventory_update = player.inventory.to_update();
         let gold = player.inventory.gold;
@@ -4216,6 +4295,26 @@ impl GameRoom {
             },
         )
         .await;
+
+        // Send XP updates
+        for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
+            self.send_to_player(player_id, ServerMessage::SkillXp {
+                player_id: player_id.to_string(),
+                skill: skill_type.as_str().to_string(),
+                xp_gained: xp_amount,
+                total_xp,
+                level,
+            }).await;
+
+            if leveled_up {
+                tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
+                self.broadcast(ServerMessage::SkillLevelUp {
+                    player_id: player_id.to_string(),
+                    skill: skill_type.as_str().to_string(),
+                    new_level: level,
+                }).await;
+            }
+        }
     }
 
     /// Handle start craft - supports both instant and timed crafting
@@ -4257,18 +4356,18 @@ impl GameRoom {
             return;
         }
 
-        // Check level requirement - smithing recipes check smithing level, others use combat level
-        let level_check_passed = if recipe.category == RecipeCategory::Smithing {
-            player.skills.smithing.level >= recipe.level_required
-        } else {
-            player.combat_level() >= recipe.level_required
+        // Check level requirement - smithing/alchemy check their own skill, others use combat level
+        let level_check_passed = match recipe.category {
+            RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
+            RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
+            _ => player.combat_level() >= recipe.level_required,
         };
 
         if !level_check_passed {
-            let skill_name = if recipe.category == RecipeCategory::Smithing {
-                "smithing"
-            } else {
-                "combat"
+            let skill_name = match recipe.category {
+                RecipeCategory::Smithing => "Smithing",
+                RecipeCategory::Alchemy => "Alchemy",
+                _ => "Combat",
             };
             drop(players);
             self.send_to_player(
@@ -4339,7 +4438,7 @@ impl GameRoom {
                 items_gained.push((result.item_id.clone(), result.count as u32));
             }
 
-            // Award smithing XP if applicable
+            // Award crafting skill XP if applicable
             let xp_gained = recipe.xp;
             let mut xp_results = Vec::new();
             if xp_gained > 0 && recipe.category == RecipeCategory::Smithing {
@@ -4349,6 +4448,16 @@ impl GameRoom {
                     xp_gained as i64,
                     player.skills.smithing.xp,
                     player.skills.smithing.level,
+                    leveled,
+                ));
+            }
+            if xp_gained > 0 && recipe.category == RecipeCategory::Alchemy {
+                let leveled = player.skills.alchemy.add_xp(xp_gained as i64);
+                xp_results.push((
+                    SkillType::Alchemy,
+                    xp_gained as i64,
+                    player.skills.alchemy.xp,
+                    player.skills.alchemy.level,
                     leveled,
                 ));
             }
@@ -6916,6 +7025,13 @@ impl GameRoom {
                 let prayer_effects = self.prayer_registry.calculate_effects(&active_ids);
                 player.apply_regen(current_time, prayer_effects.hp_regen_multiplier);
             }
+
+            // Expire temporary buffs
+            for player in players.values_mut() {
+                if player.active {
+                    player.tick_buffs(current_time);
+                }
+            }
         }
 
         // Prayer drain + mana regen (every 60 ticks / 3 seconds)
@@ -7095,12 +7211,17 @@ impl GameRoom {
                 items_gained: Vec<(String, u32)>,
                 xp_gained: u32,
                 is_smithing: bool,
+                is_alchemy: bool,
                 inv_update: Vec<crate::item::InventorySlotUpdate>,
                 gold: i32,
                 smithing_xp: i64,
                 smithing_total_xp: i64,
                 smithing_level: i32,
                 smithing_leveled: bool,
+                alchemy_xp: i64,
+                alchemy_total_xp: i64,
+                alchemy_level: i32,
+                alchemy_leveled: bool,
             }
 
             let completions = {
@@ -7135,13 +7256,21 @@ impl GameRoom {
                         items_gained.push((result.item_id.clone(), result.count as u32));
                     }
 
-                    // Award smithing XP if applicable
+                    // Award crafting skill XP if applicable
                     let xp_gained = recipe.xp;
                     let is_smithing = recipe.category == RecipeCategory::Smithing;
+                    let is_alchemy = recipe.category == RecipeCategory::Alchemy;
                     let (smithing_xp, smithing_total_xp, smithing_level, smithing_leveled) =
                         if xp_gained > 0 && is_smithing {
                             let leveled = player.skills.smithing.add_xp(xp_gained as i64);
                             (xp_gained as i64, player.skills.smithing.xp, player.skills.smithing.level, leveled)
+                        } else {
+                            (0, 0, 0, false)
+                        };
+                    let (alchemy_xp, alchemy_total_xp, alchemy_level, alchemy_leveled) =
+                        if xp_gained > 0 && is_alchemy {
+                            let leveled = player.skills.alchemy.add_xp(xp_gained as i64);
+                            (xp_gained as i64, player.skills.alchemy.xp, player.skills.alchemy.level, leveled)
                         } else {
                             (0, 0, 0, false)
                         };
@@ -7152,12 +7281,17 @@ impl GameRoom {
                         items_gained,
                         xp_gained,
                         is_smithing,
+                        is_alchemy,
                         inv_update: player.inventory.to_update(),
                         gold: player.inventory.gold,
                         smithing_xp,
                         smithing_total_xp,
                         smithing_level,
                         smithing_leveled,
+                        alchemy_xp,
+                        alchemy_total_xp,
+                        alchemy_level,
+                        alchemy_leveled,
                     });
                 }
                 completions
@@ -7198,6 +7332,26 @@ impl GameRoom {
                             player_id: comp.pid.clone(),
                             skill: "smithing".to_string(),
                             new_level: comp.smithing_level,
+                        }).await;
+                    }
+                }
+
+                // Send alchemy XP if applicable
+                if comp.is_alchemy && comp.alchemy_xp > 0 {
+                    self.send_to_player(&comp.pid, ServerMessage::SkillXp {
+                        player_id: comp.pid.clone(),
+                        skill: "alchemy".to_string(),
+                        xp_gained: comp.alchemy_xp,
+                        total_xp: comp.alchemy_total_xp,
+                        level: comp.alchemy_level,
+                    }).await;
+
+                    if comp.alchemy_leveled {
+                        tracing::info!("Player {} leveled up alchemy to {}", comp.pid, comp.alchemy_level);
+                        self.broadcast(ServerMessage::SkillLevelUp {
+                            player_id: comp.pid.clone(),
+                            skill: "alchemy".to_string(),
+                            new_level: comp.alchemy_level,
                         }).await;
                     }
                 }

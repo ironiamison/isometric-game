@@ -42,3 +42,40 @@ item_id = "watermelon_seed"
 max_quantity = 5
 restock_rate = 1
 restock_interval_minutes = 5
+
+# Herb Seeds
+[[stock]]
+item_id = "greenleaf_seed"
+max_quantity = 15
+restock_rate = 3
+restock_interval_minutes = 5
+
+[[stock]]
+item_id = "tangleroots_seed"
+max_quantity = 10
+restock_rate = 2
+restock_interval_minutes = 5
+
+[[stock]]
+item_id = "marshbloom_seed"
+max_quantity = 8
+restock_rate = 2
+restock_interval_minutes = 5
+
+[[stock]]
+item_id = "ashveil_seed"
+max_quantity = 5
+restock_rate = 1
+restock_interval_minutes = 5
+
+[[stock]]
+item_id = "nightthorn_seed"
+max_quantity = 3
+restock_rate = 1
+restock_interval_minutes = 5
+
+[[stock]]
+item_id = "bloodcap_seed"
+max_quantity = 2
+restock_rate = 1
+restock_interval_minutes = 5

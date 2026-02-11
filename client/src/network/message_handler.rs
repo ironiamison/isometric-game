@@ -384,6 +384,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let is_merchant = extract_bool(npc_value, "is_merchant").unwrap_or(false);
                         let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
                         let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
+                        let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
+                        let render_offset_y = extract_f32(npc_value, "render_offset_y").unwrap_or(0.0);
 
                         if let Some(npc) = state.npcs.get_mut(&id) {
                             // Update existing NPC - interpolate toward new grid position
@@ -418,6 +420,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.is_merchant = is_merchant;
                             npc.is_altar = is_altar;
                             npc.move_speed = move_speed;
+                            npc.no_shadow = no_shadow;
+                            npc.render_offset_y = render_offset_y;
                         } else {
                             // New NPC - add to state
                             let mut npc = Npc::new(id.clone(), entity_type, x, y);
@@ -432,6 +436,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.is_merchant = is_merchant;
                             npc.is_altar = is_altar;
                             npc.move_speed = move_speed;
+                            npc.no_shadow = no_shadow;
+                            npc.render_offset_y = render_offset_y;
                             state.npcs.insert(id, npc);
                         }
                     }
