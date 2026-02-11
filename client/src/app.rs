@@ -435,9 +435,10 @@ pub fn run_game_frame(
 
     // 7. Render touch controls (mobile only)
     // Update attack button icon to show equipped weapon
-    let weapon_id = game_state.get_local_player()
-        .and_then(|p| p.equipped_weapon.as_deref());
-    input_handler.update_attack_button_icon(weapon_id, &renderer.item_sprites);
+    let weapon_sprite_key = game_state.get_local_player()
+        .and_then(|p| p.equipped_weapon.as_deref())
+        .map(|id| game_state.item_registry.get_sprite_key(id));
+    input_handler.update_attack_button_icon(weapon_sprite_key, &renderer.item_sprites);
 
     // Hide controls when any panel is open
     let in_dialogue = game_state.ui_state.active_dialogue.is_some();

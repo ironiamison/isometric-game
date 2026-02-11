@@ -571,7 +571,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Play hit sound when our player gets attacked (including misses)
                 if state.local_player_id.as_deref() == Some(&target_id) {
-                    state.pending_sfx.push("attack_enemy".to_string());
+                    state.pending_sfx.push("unarmed".to_string());
                 }
 
                 // Create floating damage number with target_id for height lookup at render time

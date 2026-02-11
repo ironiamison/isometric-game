@@ -92,6 +92,13 @@ impl ItemRegistry {
         })
     }
 
+    /// Get the sprite key for an item ID (resolves item_id → sprite field)
+    pub fn get_sprite_key<'a>(&'a self, id: &'a str) -> &'a str {
+        self.items.get(id)
+            .map(|def| def.sprite.as_str())
+            .unwrap_or(id)
+    }
+
     /// Get display name for an item ID
     pub fn get_display_name<'a>(&'a self, id: &'a str) -> &'a str {
         self.items

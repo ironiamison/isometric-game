@@ -396,7 +396,8 @@ impl Renderer {
             }
         }
 
-        if let Some((texture, source_rect)) = self.item_sprites.get(item_id) {
+        let sprite_key = state.item_registry.get_sprite_key(item_id);
+        if let Some((texture, source_rect)) = self.item_sprites.get(sprite_key) {
             let (icon_width, icon_height) = if let Some(r) = source_rect {
                 (r.w, r.h)
             } else {
@@ -432,7 +433,8 @@ impl Renderer {
         let (mx, my) = mouse_position();
 
         // Get the item texture to determine its size
-        if let Some((texture, source_rect)) = self.item_sprites.get(&drag.item_id) {
+        let drag_sprite_key = state.item_registry.get_sprite_key(&drag.item_id);
+        if let Some((texture, source_rect)) = self.item_sprites.get(drag_sprite_key) {
             let (icon_width, icon_height) = if let Some(r) = source_rect {
                 (r.w, r.h)
             } else {

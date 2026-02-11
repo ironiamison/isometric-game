@@ -104,7 +104,7 @@ amount = 7
 
 [weak_health_potion]
 display_name = "Weak Health Potion"
-sprite = "item_health_potion"
+sprite = "mini_health_potion"
 description = "A basic herbal remedy. Restores 15 HP."
 category = "consumable"
 max_stack = 10

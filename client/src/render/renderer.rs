@@ -4215,7 +4215,7 @@ impl Renderer {
         let item_y = screen_y - 8.0 * zoom - height_offset * zoom;
 
         // Try to use item sprite, fall back to colored rectangle
-        if let Some((texture, source_rect)) = self.item_sprites.get(&item.item_id) {
+        if let Some((texture, source_rect)) = self.item_sprites.get(&item_def.sprite) {
             // Use texture (or atlas region), centered on the ground position
             let (sprite_w, sprite_h) = if let Some(r) = source_rect {
                 (r.w, r.h)
