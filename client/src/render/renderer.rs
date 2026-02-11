@@ -5254,28 +5254,27 @@ impl Renderer {
             let scale = state.ui_state.ui_scale;
             let chat_x = 10.0;
             let (_, chat_sh) = virtual_screen_size();
-            // Align chat box bottom with the bottom of the quick slot bar
+            // Layout: BG bottom aligned with hotkey bar bottom, text inside with padding
             let bg_padding = 6.0 * zoom;
-            let bar_bottom_offset = EXP_BAR_GAP * scale + 6.0; // distance from screen bottom to hotkey bar bottom + extra margin
-            let box_bottom = chat_sh - bar_bottom_offset; // box bottom edge aligns with hotkey bar bottom
             let line_height = 18.0 * zoom;
             let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 220.0 } else { 400.0 * zoom };
             let font_size = 16.0 * zoom;
             let max_visible_lines: usize = 9;
             let chat_area_h = max_visible_lines as f32 * line_height;
-            // chat_bottom_y = Y of the last text line baseline, inside the padding
-            let chat_bottom_y = box_bottom - bg_padding;
-            let chat_top_y = chat_bottom_y - chat_area_h + line_height;
 
-            // Semi-transparent background behind chat log
-            let bg_padding = 6.0 * zoom;
-            let clip_x = chat_x - bg_padding;
-            let clip_y = chat_top_y - bg_padding;
-            let clip_w = max_chat_width + bg_padding * 2.0;
+            // BG rectangle positioned from the hotkey bar bottom edge
+            let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
             let clip_h = chat_area_h + bg_padding * 2.0;
+            let clip_x = chat_x - bg_padding;
+            let clip_y = bg_bottom - clip_h;
+            let clip_w = max_chat_width + bg_padding * 2.0;
+
+            // Text baselines inside the BG, bg_padding from edges
+            let chat_bottom_y = bg_bottom - bg_padding;
+            let chat_top_y = clip_y + bg_padding;
 
             // Tab bar above chat log
-            let tab_h = 18.0 * zoom;
+            let tab_h = 22.0 * zoom;
             let tab_names = ["Public", "Global", "System"];
             let tab_channels = [ChatChannel::Local, ChatChannel::Global, ChatChannel::System];
             let num_tabs = 3.0f32;
@@ -5306,7 +5305,7 @@ impl Renderer {
                     draw_rectangle(tx + 2.0, tab_bar_y + tab_h - 2.0, tab_w - 4.0, 2.0, Color::new(0.76, 0.60, 0.23, 1.0));
                 }
 
-                let label_size = (13.0 * zoom).max(12.0);
+                let label_size = 16.0 * zoom;
                 let tw = self.measure_text_sharp(tab_names[i], label_size).width;
                 self.draw_text_sharp(
                     tab_names[i],
@@ -5792,17 +5791,15 @@ impl Renderer {
             let chat_x = 10.0;
             let (_, chat_sh) = virtual_screen_size();
             let bg_padding = 6.0 * zoom;
-            let bar_bottom_offset = EXP_BAR_GAP * scale + 6.0;
-            let box_bottom = chat_sh - bar_bottom_offset;
             let line_height = 18.0 * zoom;
             let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 220.0 } else { 400.0 * zoom };
             let max_visible_lines: usize = 9;
             let chat_area_h = max_visible_lines as f32 * line_height;
-            let chat_bottom_y = box_bottom - bg_padding;
-            let chat_top_y = chat_bottom_y - chat_area_h + line_height;
-            let clip_y = chat_top_y - bg_padding;
+            let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
+            let clip_h = chat_area_h + bg_padding * 2.0;
+            let clip_y = bg_bottom - clip_h;
 
-            let tab_h = 18.0 * zoom;
+            let tab_h = 22.0 * zoom;
             let num_tabs = 3.0f32;
             let tab_w = (max_chat_width / num_tabs).floor();
             let tab_bar_y = clip_y - tab_h;
