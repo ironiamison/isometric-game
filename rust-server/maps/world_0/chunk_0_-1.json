@@ -3110,6 +3110,12 @@
       "x": 12,
       "y": 6,
       "level": 1
+    },
+    {
+      "entityId": "lumberjack_pete",
+      "x": 28,
+      "y": 28,
+      "uniqueId": "lumberjack_pete"
     }
   ],
   "mapObjects": [
