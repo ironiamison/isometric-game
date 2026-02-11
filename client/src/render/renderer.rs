@@ -52,6 +52,9 @@ struct ChatLinesCache {
     lines: Vec<(String, Color)>,
 }
 
+const TEXT_MEASURE_CACHE_BUCKET_LIMIT: usize = 2048;
+const TEXT_WRAP_CACHE_BUCKET_LIMIT: usize = 512;
+
 /// Tileset configuration
 const TILESET_TILE_WIDTH: f32 = 64.0;
 const TILESET_TILE_HEIGHT: f32 = 32.0;
@@ -307,6 +310,10 @@ pub struct Renderer {
     exit_arrow_right: Option<Texture2D>,
     /// Cached wrapped chat lines to avoid rebuilding/wrapping every frame.
     chat_lines_cache: RefCell<ChatLinesCache>,
+    /// Cached text measurements bucketed by font size.
+    text_measure_cache: RefCell<HashMap<i32, HashMap<String, TextDimensions>>>,
+    /// Cached wrapped lines bucketed by (max width, font size).
+    text_wrap_cache: RefCell<HashMap<(i32, i32), HashMap<String, Vec<String>>>>,
 }
 
 impl Renderer {
@@ -1094,6 +1101,8 @@ impl Renderer {
             exit_arrow_left,
             exit_arrow_right,
             chat_lines_cache: RefCell::new(ChatLinesCache::default()),
+            text_measure_cache: RefCell::new(HashMap::new()),
+            text_wrap_cache: RefCell::new(HashMap::new()),
         }
     }
 
@@ -1159,7 +1168,22 @@ impl Renderer {
 
     /// Measure text with pixel font
     pub(crate) fn measure_text_sharp(&self, text: &str, font_size: f32) -> TextDimensions {
-        self.font.measure_text(text, font_size)
+        let font_key = (font_size * 100.0).round() as i32;
+
+        if let Some(bucket) = self.text_measure_cache.borrow().get(&font_key) {
+            if let Some(cached) = bucket.get(text) {
+                return *cached;
+            }
+        }
+
+        let measured = self.font.measure_text(text, font_size);
+        let mut cache = self.text_measure_cache.borrow_mut();
+        let bucket = cache.entry(font_key).or_default();
+        if bucket.len() >= TEXT_MEASURE_CACHE_BUCKET_LIMIT {
+            bucket.clear();
+        }
+        bucket.insert(text.to_string(), measured);
+        measured
     }
 
     /// Draw text with word wrapping to fit within max_width
@@ -1470,21 +1494,24 @@ impl Renderer {
             renderables.push((depth, Renderable::Npc(npc)));
         }
 
-        // Add object layer tiles (trees, rocks, buildings) from static tilemap
-        for layer in &state.tilemap.layers {
-            if layer.layer_type == LayerType::Objects {
-                for y in 0..state.tilemap.height {
-                    for x in 0..state.tilemap.width {
-                        let wx = x as f32;
-                        let wy = y as f32;
-                        if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
-                            continue;
-                        }
-                        let idx = (y * state.tilemap.width + x) as usize;
-                        let tile_id = layer.tiles.get(idx).copied().unwrap_or(0);
-                        if tile_id > 0 {
-                            let depth = calculate_depth(wx, wy, 1);
-                            renderables.push((depth, Renderable::Tile { x, y, tile_id }));
+        // Add legacy object-layer tiles only when chunk data is unavailable.
+        // In streamed worlds, chunk objects/walls are the source of truth.
+        if state.chunk_manager.chunks().is_empty() {
+            for layer in &state.tilemap.layers {
+                if layer.layer_type == LayerType::Objects {
+                    for y in 0..state.tilemap.height {
+                        for x in 0..state.tilemap.width {
+                            let wx = x as f32;
+                            let wy = y as f32;
+                            if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
+                                continue;
+                            }
+                            let idx = (y * state.tilemap.width + x) as usize;
+                            let tile_id = layer.tiles.get(idx).copied().unwrap_or(0);
+                            if tile_id > 0 {
+                                let depth = calculate_depth(wx, wy, 1);
+                                renderables.push((depth, Renderable::Tile { x, y, tile_id }));
+                            }
                         }
                     }
                 }
@@ -5972,6 +5999,27 @@ impl Renderer {
     /// Word-wrap text to fit within a given width (approximate, assumes ~8px per char at size 16)
     /// Prefers breaking on word boundaries, but will break long words if necessary
     pub(crate) fn wrap_text(&self, text: &str, max_width: f32, font_size: f32) -> Vec<String> {
+        let width_key = (max_width * 100.0).round() as i32;
+        let font_key = (font_size * 100.0).round() as i32;
+        let bucket_key = (width_key, font_key);
+
+        if let Some(bucket) = self.text_wrap_cache.borrow().get(&bucket_key) {
+            if let Some(cached) = bucket.get(text) {
+                return cached.clone();
+            }
+        }
+
+        let wrapped = Self::wrap_text_uncached(text, max_width, font_size);
+        let mut cache = self.text_wrap_cache.borrow_mut();
+        let bucket = cache.entry(bucket_key).or_default();
+        if bucket.len() >= TEXT_WRAP_CACHE_BUCKET_LIMIT {
+            bucket.clear();
+        }
+        bucket.insert(text.to_string(), wrapped.clone());
+        wrapped
+    }
+
+    fn wrap_text_uncached(text: &str, max_width: f32, font_size: f32) -> Vec<String> {
         let char_width = font_size * 0.5; // Approximate character width
         let max_chars = (max_width / char_width) as usize;
 

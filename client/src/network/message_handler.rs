@@ -569,8 +569,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     npc.last_damage_time = current_time;
                 }
 
-                // Play hit sound when our player gets attacked
-                if state.local_player_id.as_deref() == Some(&target_id) && damage > 0 {
+                // Play hit sound when our player gets attacked (including misses)
+                if state.local_player_id.as_deref() == Some(&target_id) {
                     state.pending_sfx.push("attack_enemy".to_string());
                 }
 
