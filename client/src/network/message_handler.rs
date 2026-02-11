@@ -463,13 +463,20 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let sender_name = extract_string(value, "senderName").unwrap_or_default();
                 let text = extract_string(value, "text").unwrap_or_default();
                 let timestamp = extract_u64(value, "timestamp").unwrap_or(0) as f64;
+                let channel_str = extract_string(value, "channel").unwrap_or_default();
+
+                let channel = match channel_str.as_str() {
+                    "global" => ChatChannel::Global,
+                    "system" => ChatChannel::System,
+                    _ => ChatChannel::Local, // "public" or unknown defaults to Local
+                };
 
                 // Add to chat log
                 state.ui_state.chat_messages.push(ChatMessage {
                     sender_name: sender_name.clone(),
                     text: text.clone(),
                     timestamp,
-                    channel: ChatChannel::Local,
+                    channel,
                 });
                 state.pending_sfx.push("message_add".to_string());
 
@@ -477,20 +484,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.ui_state.chat_messages.remove(0);
                 }
 
-                // Create chat bubble above the player who sent the message
-                // Find player by name
-                if let Some((player_id, _)) = state.players.iter().find(|(_, p)| p.name == sender_name) {
-                    let player_id = player_id.clone();
-
-                    // Remove any existing bubble for this player (only one bubble per player)
-                    state.chat_bubbles.retain(|b| b.player_id != player_id);
-
-                    // Add new bubble
-                    state.chat_bubbles.push(ChatBubble {
-                        player_id,
-                        text,
-                        time: macroquad::time::get_time(),
-                    });
+                // Chat bubbles only for public/nearby messages
+                if matches!(channel, ChatChannel::Local) {
+                    if let Some((player_id, _)) = state.players.iter().find(|(_, p)| p.name == sender_name) {
+                        let player_id = player_id.clone();
+                        state.chat_bubbles.retain(|b| b.player_id != player_id);
+                        state.chat_bubbles.push(ChatBubble {
+                            player_id,
+                            text,
+                            time: macroquad::time::get_time(),
+                        });
+                    }
                 }
             }
         }

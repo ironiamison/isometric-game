@@ -464,14 +464,14 @@ fn run_game_frame(
             },
             InputCommand::Target { entity_id } => ClientMessage::Target { entity_id: entity_id.clone() },
             InputCommand::ClearTarget => ClientMessage::Target { entity_id: String::new() },
-            InputCommand::Chat { text } => {
+            InputCommand::Chat { text, channel } => {
                 // Handle /ping command
                 if text.trim().eq_ignore_ascii_case("/ping") {
                     let timestamp = get_time();
                     game_state.ping_sent_at = Some(timestamp);
                     ClientMessage::Ping { timestamp }
                 } else {
-                    ClientMessage::Chat { text: text.clone() }
+                    ClientMessage::Chat { text: text.clone(), channel: channel.clone() }
                 }
             },
             InputCommand::Pickup { item_id } => ClientMessage::Pickup { item_id: item_id.clone() },

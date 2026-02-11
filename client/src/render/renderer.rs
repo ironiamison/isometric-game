@@ -44,6 +44,7 @@ struct ChatLinesCacheKey {
     content_checksum: u64,
     max_chat_width_x100: i32,
     font_size_x100: i32,
+    active_tab: u8,
 }
 
 #[derive(Default)]
@@ -5273,6 +5274,49 @@ impl Renderer {
             let clip_w = max_chat_width + bg_padding * 2.0;
             let clip_h = chat_area_h + bg_padding * 2.0;
 
+            // Tab bar above chat log
+            let tab_h = 18.0 * zoom;
+            let tab_names = ["Public", "Global", "System"];
+            let tab_channels = [ChatChannel::Local, ChatChannel::Global, ChatChannel::System];
+            let num_tabs = 3.0f32;
+            let tab_w = (max_chat_width / num_tabs).floor();
+            let tab_bar_y = clip_y - tab_h;
+
+            for i in 0..3 {
+                let tx = chat_x + i as f32 * tab_w;
+                let is_active = std::mem::discriminant(&state.ui_state.chat_active_tab) == std::mem::discriminant(&tab_channels[i]);
+                let is_hovered = state.ui_state.hovered_element.as_ref() == Some(&[
+                    UiElementId::ChatTabLocal,
+                    UiElementId::ChatTabGlobal,
+                    UiElementId::ChatTabSystem,
+                ][i]);
+
+                let bg = if is_active {
+                    Color::new(0.15, 0.15, 0.2, 0.85)
+                } else if is_hovered {
+                    Color::new(0.1, 0.1, 0.15, 0.7)
+                } else {
+                    Color::new(0.05, 0.05, 0.08, 0.65)
+                };
+
+                draw_rectangle(tx, tab_bar_y, tab_w, tab_h, bg);
+
+                if is_active {
+                    // Gold underline for active tab
+                    draw_rectangle(tx + 2.0, tab_bar_y + tab_h - 2.0, tab_w - 4.0, 2.0, Color::new(0.76, 0.60, 0.23, 1.0));
+                }
+
+                let label_size = (13.0 * zoom).max(12.0);
+                let tw = self.measure_text_sharp(tab_names[i], label_size).width;
+                self.draw_text_sharp(
+                    tab_names[i],
+                    (tx + (tab_w - tw) / 2.0).floor(),
+                    (tab_bar_y + tab_h / 2.0 + label_size * 0.35).floor(),
+                    label_size,
+                    if is_active { WHITE } else { Color::new(0.6, 0.6, 0.6, 1.0) },
+                );
+            }
+
             if state.ui_state.chat_log_background {
                 draw_rectangle(clip_x, clip_y, clip_w, clip_h, Color::new(0.0, 0.0, 0.0, 0.45));
             }
@@ -5301,6 +5345,11 @@ impl Renderer {
                 content_checksum,
                 max_chat_width_x100: (max_chat_width * 100.0).round() as i32,
                 font_size_x100: (font_size * 100.0).round() as i32,
+                active_tab: match state.ui_state.chat_active_tab {
+                    ChatChannel::Local => 0,
+                    ChatChannel::Global => 1,
+                    ChatChannel::System => 2,
+                },
             };
 
             let rebuild_chat_cache = {
@@ -5312,7 +5361,9 @@ impl Renderer {
                 let mut rebuilt_lines: Vec<(String, Color)> = Vec::new();
                 rebuilt_lines.reserve(state.ui_state.chat_messages.len() * 2);
 
-                for msg in state.ui_state.chat_messages.iter() {
+                for msg in state.ui_state.chat_messages.iter().filter(|m| {
+                    std::mem::discriminant(&m.channel) == std::mem::discriminant(&state.ui_state.chat_active_tab)
+                }) {
                     let (color, text) = match msg.channel {
                         ChatChannel::Local => (WHITE, format!("{}: {}", msg.sender_name, msg.text)),
                         ChatChannel::Global => (SKYBLUE, format!("[G] {}: {}", msg.sender_name, msg.text)),
@@ -5579,7 +5630,8 @@ impl Renderer {
         }
 
         // Chat input box (when open) - scale with zoom for readability
-        if state.ui_state.chat_open {
+        // Hidden on System tab (read-only channel)
+        if state.ui_state.chat_open && !matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
             let zoom = state.camera.zoom;
             let (_, input_sh) = virtual_screen_size();
             let input_x = 10.0;
@@ -5587,8 +5639,16 @@ impl Renderer {
             let input_width = 400.0 * zoom;
             let input_height = 24.0 * zoom;
             let text_padding = 5.0 * zoom;
-            let text_area_width = input_width - text_padding * 2.0 - 12.0 * zoom; // Extra margin for scroll indicators
             let font_size = 16.0 * zoom;
+
+            // Channel indicator
+            let (indicator, indicator_color) = match state.ui_state.chat_active_tab {
+                ChatChannel::Local => ("[Public] ", WHITE),
+                ChatChannel::Global => ("[Global] ", SKYBLUE),
+                ChatChannel::System => ("[System] ", YELLOW),
+            };
+            let indicator_w = self.measure_text_sharp(indicator, font_size).width;
+            let text_area_width = input_width - text_padding * 2.0 - 12.0 * zoom - indicator_w; // Extra margin for scroll indicators + indicator
 
             // Background
             draw_rectangle(input_x, input_y, input_width, input_height, Color::from_rgba(0, 0, 0, 180));
@@ -5644,13 +5704,15 @@ impl Renderer {
             let visible_text: String = input_text.chars().skip(scroll_offset).take(visible_char_count).collect();
             let visible_end = scroll_offset + visible_char_count;
 
-            // Draw visible text
+            // Draw channel indicator and visible text
             let text_y_offset = 17.0 * zoom;
-            self.draw_text_sharp(&visible_text, input_x + text_padding, input_y + text_y_offset, font_size, WHITE);
+            let text_start_x = input_x + text_padding + indicator_w;
+            self.draw_text_sharp(indicator, input_x + text_padding, input_y + text_y_offset, font_size, indicator_color);
+            self.draw_text_sharp(&visible_text, text_start_x, input_y + text_y_offset, font_size, WHITE);
 
             // Draw scroll indicators if text is clipped
             if scroll_offset > 0 {
-                self.draw_text_sharp("<", input_x + 1.0, input_y + text_y_offset, font_size, GRAY);
+                self.draw_text_sharp("<", text_start_x - 8.0 * zoom, input_y + text_y_offset, font_size, GRAY);
             }
             if visible_end < char_count {
                 self.draw_text_sharp(">", input_x + input_width - 10.0 * zoom, input_y + text_y_offset, font_size, GRAY);
@@ -5663,9 +5725,9 @@ impl Renderer {
                 let text_before_cursor: String = visible_text.chars().take(cursor_visible_pos).collect();
                 let cursor_x = self.measure_text_sharp(&text_before_cursor, font_size).width;
                 draw_line(
-                    input_x + text_padding + cursor_x + 1.0,
+                    text_start_x + cursor_x + 1.0,
                     input_y + 4.0 * zoom,
-                    input_x + text_padding + cursor_x + 1.0,
+                    text_start_x + cursor_x + 1.0,
                     input_y + input_height - 4.0 * zoom,
                     1.0,
                     WHITE,
@@ -5722,7 +5784,35 @@ impl Renderer {
         self.render_social_panel(state, hovered, &mut layout);
 
         // Chat log area is intentionally NOT registered for hit detection
-        // so that clicks/hovers pass through to the game world beneath it
+        // so that clicks/hovers pass through to the game world beneath it.
+        // However, the tab bar above the chat log IS registered for click handling.
+        if state.ui_state.chat_log_visible {
+            let zoom = state.camera.zoom;
+            let scale = state.ui_state.ui_scale;
+            let chat_x = 10.0;
+            let (_, chat_sh) = virtual_screen_size();
+            let bg_padding = 6.0 * zoom;
+            let bar_bottom_offset = EXP_BAR_GAP * scale + 6.0;
+            let box_bottom = chat_sh - bar_bottom_offset;
+            let line_height = 18.0 * zoom;
+            let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 220.0 } else { 400.0 * zoom };
+            let max_visible_lines: usize = 9;
+            let chat_area_h = max_visible_lines as f32 * line_height;
+            let chat_bottom_y = box_bottom - bg_padding;
+            let chat_top_y = chat_bottom_y - chat_area_h + line_height;
+            let clip_y = chat_top_y - bg_padding;
+
+            let tab_h = 18.0 * zoom;
+            let num_tabs = 3.0f32;
+            let tab_w = (max_chat_width / num_tabs).floor();
+            let tab_bar_y = clip_y - tab_h;
+
+            let tab_ids = [UiElementId::ChatTabLocal, UiElementId::ChatTabGlobal, UiElementId::ChatTabSystem];
+            for i in 0..3 {
+                let tx = chat_x + i as f32 * tab_w;
+                layout.add(tab_ids[i].clone(), macroquad::prelude::Rect::new(tx, tab_bar_y, tab_w, tab_h));
+            }
+        }
 
         // Quick slots and menu buttons - hide on mobile when crafting/shop panel is open
         let hide_bottom_bar = cfg!(target_os = "android") && state.ui_state.crafting_open;

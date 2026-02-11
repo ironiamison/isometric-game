@@ -74,7 +74,7 @@ pub enum InputCommand {
     Attack,
     Target { entity_id: String },
     ClearTarget,
-    Chat { text: String },
+    Chat { text: String, channel: String },
     Pickup { item_id: String },
     UseItem { slot_index: u8 },
     // Quest commands
@@ -865,13 +865,30 @@ impl InputHandler {
                         state.ui_state.chat_message_scroll = 0.0;
                     }
                     UiElementId::ChatSendButton => {
-                        let text = state.ui_state.chat_input.trim().to_string();
-                        if !text.is_empty() {
-                            audio.play_sfx("send_message");
-                            commands.push(InputCommand::Chat { text });
+                        // Block sending on System tab
+                        if matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
+                            state.ui_state.chat_input.clear();
+                            state.ui_state.chat_cursor = 0;
+                        } else {
+                            let text = state.ui_state.chat_input.trim().to_string();
+                            // Determine channel: ~ prefix forces global, otherwise match active tab
+                            let (send_text, channel) = if text.starts_with('~') {
+                                let trimmed = text[1..].trim().to_string();
+                                (trimmed, "global".to_string())
+                            } else {
+                                let ch = match state.ui_state.chat_active_tab {
+                                    ChatChannel::Global => "global",
+                                    _ => "public",
+                                };
+                                (text.clone(), ch.to_string())
+                            };
+                            if !send_text.is_empty() {
+                                audio.play_sfx("send_message");
+                                commands.push(InputCommand::Chat { text: send_text, channel });
+                            }
+                            state.ui_state.chat_input.clear();
+                            state.ui_state.chat_cursor = 0;
                         }
-                        state.ui_state.chat_input.clear();
-                        state.ui_state.chat_cursor = 0;
                     }
                     UiElementId::ChatInputField => {
                         state.ui_state.chat_open = true;
@@ -2323,14 +2340,32 @@ impl InputHandler {
 
             // Enter sends message
             if is_key_pressed(KeyCode::Enter) {
-                let text = state.ui_state.chat_input.trim().to_string();
-                if !text.is_empty() {
-                    audio.play_sfx("send_message");
-                    commands.push(InputCommand::Chat { text });
+                // Block sending on System tab
+                if matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
+                    state.ui_state.chat_input.clear();
+                    state.ui_state.chat_cursor = 0;
+                    state.ui_state.chat_scroll_offset = 0;
+                } else {
+                    let text = state.ui_state.chat_input.trim().to_string();
+                    // Determine channel: ~ prefix forces global, otherwise match active tab
+                    let (send_text, channel) = if text.starts_with('~') {
+                        let trimmed = text[1..].trim().to_string();
+                        (trimmed, "global".to_string())
+                    } else {
+                        let ch = match state.ui_state.chat_active_tab {
+                            ChatChannel::Global => "global",
+                            _ => "public",
+                        };
+                        (text.clone(), ch.to_string())
+                    };
+                    if !send_text.is_empty() {
+                        audio.play_sfx("send_message");
+                        commands.push(InputCommand::Chat { text: send_text, channel });
+                    }
+                    state.ui_state.chat_input.clear();
+                    state.ui_state.chat_cursor = 0;
+                    state.ui_state.chat_scroll_offset = 0;
                 }
-                state.ui_state.chat_input.clear();
-                state.ui_state.chat_cursor = 0;
-                state.ui_state.chat_scroll_offset = 0;
                 if classic {
                     // In classic mode, chat stays open after sending
                 } else {
@@ -2456,7 +2491,8 @@ impl InputHandler {
         let classic = state.ui_state.classic_controls;
 
         // Enter key opens chat (not in classic mode - chat is always open)
-        if !classic && is_key_pressed(KeyCode::Enter) {
+        // Don't open chat on System tab (read-only)
+        if !classic && is_key_pressed(KeyCode::Enter) && !matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
             state.ui_state.chat_open = true;
             state.ui_state.chat_input.clear();
             state.ui_state.chat_cursor = 0;

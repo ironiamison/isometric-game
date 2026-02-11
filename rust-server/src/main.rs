@@ -2493,8 +2493,8 @@ async fn handle_client_message(
         ClientMessage::Face { direction } => {
             room.handle_face(player_id, direction).await;
         }
-        ClientMessage::Chat { text } => {
-            room.handle_chat(player_id, &text).await;
+        ClientMessage::Chat { text, channel } => {
+            room.handle_chat(player_id, &text, &channel).await;
         }
         ClientMessage::Attack => {
             room.handle_attack(player_id).await;

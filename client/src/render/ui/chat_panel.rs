@@ -62,7 +62,7 @@ impl Renderer {
         let tab_x_start = panel_x + FRAME_THICKNESS;
 
         let tabs = [
-            (UiElementId::ChatTabLocal, "Local", ChatChannel::Local),
+            (UiElementId::ChatTabLocal, "Public", ChatChannel::Local),
             (UiElementId::ChatTabGlobal, "Global", ChatChannel::Global),
             (UiElementId::ChatTabSystem, "System", ChatChannel::System),
         ];

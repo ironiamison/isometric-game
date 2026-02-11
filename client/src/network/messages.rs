@@ -28,7 +28,7 @@ pub enum ClientMessage {
     Attack,
 
     #[serde(rename = "chat")]
-    Chat { text: String },
+    Chat { text: String, channel: String },
 
     #[serde(rename = "pickup")]
     Pickup { item_id: String },
@@ -189,8 +189,9 @@ impl ClientMessage {
                 "target"
             }
             ClientMessage::Attack => "attack",
-            ClientMessage::Chat { text } => {
+            ClientMessage::Chat { text, channel } => {
                 data.insert("text".into(), Value::String(text.clone().into()));
+                data.insert("channel".into(), Value::String(channel.clone().into()));
                 "chat"
             }
             ClientMessage::Pickup { item_id } => {

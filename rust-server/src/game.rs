@@ -1776,7 +1776,7 @@ impl GameRoom {
         }
     }
 
-    pub async fn handle_chat(&self, player_id: &str, text: &str) {
+    pub async fn handle_chat(&self, player_id: &str, text: &str, channel: &str) {
         let sanitized = text.trim().chars().take(200).collect::<String>();
         if sanitized.is_empty() {
             return;
@@ -1788,20 +1788,66 @@ impl GameRoom {
             return;
         }
 
-        // Regular chat message
         let players = self.players.read().await;
-        if let Some(player) = players.get(player_id) {
+        let sender = match players.get(player_id) {
+            Some(p) => p,
+            None => return,
+        };
+        let sender_name = sender.name.clone();
+        let sender_x = sender.x as i32;
+        let sender_y = sender.y as i32;
+        drop(players);
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        if channel == "global" {
             let msg = ServerMessage::ChatMessage {
                 sender_id: player_id.to_string(),
-                sender_name: player.name.clone(),
+                sender_name,
                 text: sanitized,
-                timestamp: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
+                timestamp,
+                channel: "global".to_string(),
             };
-            drop(players); // Release lock before broadcast
             self.broadcast(msg).await;
+        } else {
+            // Public (nearby) chat — send to players within VIEW_DISTANCE
+            let msg = ServerMessage::ChatMessage {
+                sender_id: player_id.to_string(),
+                sender_name,
+                text: sanitized,
+                timestamp,
+                channel: "public".to_string(),
+            };
+
+            let player_instances = self.player_instances.read().await;
+            let sender_instance = player_instances.get(player_id).cloned();
+            let all_players = self.players.read().await;
+            let senders = self.player_senders.read().await;
+
+            if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+                for (pid, sender_ch) in senders.iter() {
+                    // Must be in same instance
+                    if player_instances.get(pid).cloned() != sender_instance {
+                        continue;
+                    }
+                    // Always send to self
+                    if pid == player_id {
+                        let _ = sender_ch.try_send(bytes.clone());
+                        continue;
+                    }
+                    // Check distance
+                    if let Some(other) = all_players.get(pid) {
+                        let dx = (other.x as i32 - sender_x).abs();
+                        let dy = (other.y as i32 - sender_y).abs();
+                        if dx.max(dy) <= VIEW_DISTANCE {
+                            let _ = sender_ch.try_send(bytes.clone());
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -2372,6 +2418,7 @@ impl GameRoom {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
+            channel: "system".to_string(),
         };
         self.send_to_player(player_id, msg).await;
     }
@@ -8408,6 +8455,7 @@ impl GameRoom {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_millis() as u64,
+                    channel: "system".to_string(),
                 }).await;
             }
             Err(e) => {
@@ -8486,6 +8534,7 @@ impl GameRoom {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_millis() as u64,
+                    channel: "system".to_string(),
                 }).await;
             }
             Err(e) => {

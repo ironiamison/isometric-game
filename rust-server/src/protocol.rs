@@ -17,7 +17,7 @@ pub enum ClientMessage {
     Face { direction: u8 },
 
     #[serde(rename = "chat")]
-    Chat { text: String },
+    Chat { text: String, #[serde(default)] channel: String },
 
     #[serde(rename = "attack")]
     Attack,
@@ -288,6 +288,7 @@ pub enum ServerMessage {
         sender_name: String,
         text: String,
         timestamp: u64,
+        channel: String,
     },
     TargetChanged {
         player_id: String,
@@ -1663,6 +1664,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             sender_name,
             text,
             timestamp,
+            channel,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -1680,6 +1682,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("timestamp".into()),
                 Value::Integer((*timestamp).into()),
+            ));
+            map.push((
+                Value::String("channel".into()),
+                Value::String(channel.clone().into()),
             ));
             Value::Map(map)
         }
@@ -4080,7 +4086,8 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         }
         "chat" => {
             let text = extract_string(msg_data, "text").unwrap_or_default();
-            Ok(ClientMessage::Chat { text })
+            let channel = extract_string(msg_data, "channel").unwrap_or_default();
+            Ok(ClientMessage::Chat { text, channel })
         }
         "attack" => Ok(ClientMessage::Attack),
         "target" => {
