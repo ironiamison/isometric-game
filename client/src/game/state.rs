@@ -1006,7 +1006,7 @@ impl Default for UiState {
             chat_log_visible: false,
             #[cfg(not(target_os = "android"))]
             chat_log_visible: true,
-            chat_log_background: false,
+            chat_log_background: true,
             chat_panel_open: false,
             chat_active_tab: ChatChannel::Local,
             #[cfg(target_os = "android")]
