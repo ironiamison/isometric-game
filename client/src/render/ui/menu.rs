@@ -163,15 +163,19 @@ impl Renderer {
         draw_button(shift_drop_bounds.x, shift_drop_bounds.y, toggle_w, btn_height, shift_text, state.ui_state.shift_drop_enabled, is_hovered(shift_drop_bounds), self);
         y += row_height;
 
-        // Row 2: Chat Log + ChatBG
+        // Row 2: Chat Log + ChatBG (ChatBG desktop only)
         let chat_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-        let chat_bg_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
         layout.add(UiElementId::EscapeMenuChatLogToggle, chat_bounds);
-        layout.add(UiElementId::EscapeMenuChatBgToggle, chat_bg_bounds);
 
         let chat_text = if state.ui_state.chat_log_visible { "Chat" } else { "Chat" };
         draw_button(chat_bounds.x, chat_bounds.y, toggle_w, btn_height, chat_text, state.ui_state.chat_log_visible, is_hovered(chat_bounds), self);
-        draw_button(chat_bg_bounds.x, chat_bg_bounds.y, toggle_w, btn_height, "ChatBG", state.ui_state.chat_log_background, is_hovered(chat_bg_bounds), self);
+
+        #[cfg(not(target_os = "android"))]
+        {
+            let chat_bg_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+            layout.add(UiElementId::EscapeMenuChatBgToggle, chat_bg_bounds);
+            draw_button(chat_bg_bounds.x, chat_bg_bounds.y, toggle_w, btn_height, "ChatBG", state.ui_state.chat_log_background, is_hovered(chat_bg_bounds), self);
+        }
         y += row_height;
 
         // Row 3: Tap Walk
@@ -192,26 +196,31 @@ impl Renderer {
             y += row_height;
         }
 
-        // Row: Control Scheme (Modern / Classic)
-        let ctrl_modern_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-        let ctrl_classic_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
-        // Both buttons trigger the same toggle - clicking either switches the mode
-        layout.add(UiElementId::EscapeMenuControlSchemeToggle, ctrl_modern_bounds);
-        layout.add(UiElementId::EscapeMenuControlSchemeToggle, ctrl_classic_bounds);
+        // Row: Control Scheme (Modern / Classic) - desktop only
+        #[cfg(not(target_os = "android"))]
+        {
+            let ctrl_modern_bounds = Rect::new(content_x, y, toggle_w, btn_height);
+            let ctrl_classic_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+            layout.add(UiElementId::EscapeMenuControlSchemeToggle, ctrl_modern_bounds);
+            layout.add(UiElementId::EscapeMenuControlSchemeToggle, ctrl_classic_bounds);
 
-        draw_button(ctrl_modern_bounds.x, ctrl_modern_bounds.y, toggle_w, btn_height, "Modern", !state.ui_state.classic_controls, is_hovered(ctrl_modern_bounds), self);
-        draw_button(ctrl_classic_bounds.x, ctrl_classic_bounds.y, toggle_w, btn_height, "Classic", state.ui_state.classic_controls, is_hovered(ctrl_classic_bounds), self);
-        y += row_height;
+            draw_button(ctrl_modern_bounds.x, ctrl_modern_bounds.y, toggle_w, btn_height, "Modern", !state.ui_state.classic_controls, is_hovered(ctrl_modern_bounds), self);
+            draw_button(ctrl_classic_bounds.x, ctrl_classic_bounds.y, toggle_w, btn_height, "Classic", state.ui_state.classic_controls, is_hovered(ctrl_classic_bounds), self);
+            y += row_height;
+        }
 
-        // Row: Graphics Quality (High / Low)
-        let gfx_high_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-        let gfx_low_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
-        layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_high_bounds);
-        layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_low_bounds);
+        // Row: Graphics Quality (High / Low) - desktop only
+        #[cfg(not(target_os = "android"))]
+        {
+            let gfx_high_bounds = Rect::new(content_x, y, toggle_w, btn_height);
+            let gfx_low_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+            layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_high_bounds);
+            layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_low_bounds);
 
-        draw_button(gfx_high_bounds.x, gfx_high_bounds.y, toggle_w, btn_height, "GFX High", !state.ui_state.graphics_low, is_hovered(gfx_high_bounds), self);
-        draw_button(gfx_low_bounds.x, gfx_low_bounds.y, toggle_w, btn_height, "GFX Low", state.ui_state.graphics_low, is_hovered(gfx_low_bounds), self);
-        y += row_height;
+            draw_button(gfx_high_bounds.x, gfx_high_bounds.y, toggle_w, btn_height, "GFX High", !state.ui_state.graphics_low, is_hovered(gfx_high_bounds), self);
+            draw_button(gfx_low_bounds.x, gfx_low_bounds.y, toggle_w, btn_height, "GFX Low", state.ui_state.graphics_low, is_hovered(gfx_low_bounds), self);
+            y += row_height;
+        }
 
         y += 8.0;
 
