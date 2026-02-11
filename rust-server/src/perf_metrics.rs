@@ -51,6 +51,11 @@ pub struct PerfCounters {
     pub slow_ws_sends: u64,
     pub movement_attempts: u64,
     pub movement_rejections: u64,
+    pub movement_rejections_tile_blocked: u64,
+    pub movement_rejections_player_blocked: u64,
+    pub movement_rejections_npc_blocked: u64,
+    pub movement_rejections_chair_blocked: u64,
+    pub movement_rejections_arena_blocked: u64,
     pub state_sync_send_attempts: u64,
     pub state_sync_capacity_skips: u64,
     pub state_sync_try_send_drops: u64,
@@ -114,6 +119,11 @@ pub struct PerfThresholds {
 #[derive(Clone, Serialize)]
 pub struct PerfDerivedRates {
     pub movement_reject_rate_pct: f64,
+    pub movement_reject_tile_share_pct: f64,
+    pub movement_reject_player_share_pct: f64,
+    pub movement_reject_npc_share_pct: f64,
+    pub movement_reject_chair_share_pct: f64,
+    pub movement_reject_arena_share_pct: f64,
     pub state_sync_drop_rate_pct: f64,
 }
 
@@ -261,7 +271,16 @@ impl PerfMetrics {
         }
     }
 
-    pub fn record_movement(&self, attempts: usize, rejections: usize) {
+    pub fn record_movement(
+        &self,
+        attempts: usize,
+        rejections: usize,
+        rejected_tile_blocked: usize,
+        rejected_player_blocked: usize,
+        rejected_npc_blocked: usize,
+        rejected_chair_blocked: usize,
+        rejected_arena_blocked: usize,
+    ) {
         if attempts == 0 {
             return;
         }
@@ -269,6 +288,11 @@ impl PerfMetrics {
         let mut inner = self.inner.lock().unwrap();
         inner.counters.movement_attempts += attempts as u64;
         inner.counters.movement_rejections += rejections as u64;
+        inner.counters.movement_rejections_tile_blocked += rejected_tile_blocked as u64;
+        inner.counters.movement_rejections_player_blocked += rejected_player_blocked as u64;
+        inner.counters.movement_rejections_npc_blocked += rejected_npc_blocked as u64;
+        inner.counters.movement_rejections_chair_blocked += rejected_chair_blocked as u64;
+        inner.counters.movement_rejections_arena_blocked += rejected_arena_blocked as u64;
     }
 
     pub fn record_state_sync(
@@ -343,6 +367,26 @@ impl PerfMetrics {
                 movement_reject_rate_pct: percent(
                     inner.counters.movement_rejections,
                     inner.counters.movement_attempts,
+                ),
+                movement_reject_tile_share_pct: percent(
+                    inner.counters.movement_rejections_tile_blocked,
+                    inner.counters.movement_rejections,
+                ),
+                movement_reject_player_share_pct: percent(
+                    inner.counters.movement_rejections_player_blocked,
+                    inner.counters.movement_rejections,
+                ),
+                movement_reject_npc_share_pct: percent(
+                    inner.counters.movement_rejections_npc_blocked,
+                    inner.counters.movement_rejections,
+                ),
+                movement_reject_chair_share_pct: percent(
+                    inner.counters.movement_rejections_chair_blocked,
+                    inner.counters.movement_rejections,
+                ),
+                movement_reject_arena_share_pct: percent(
+                    inner.counters.movement_rejections_arena_blocked,
+                    inner.counters.movement_rejections,
                 ),
                 state_sync_drop_rate_pct: percent(
                     inner.counters.state_sync_try_send_drops,

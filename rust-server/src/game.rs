@@ -531,6 +531,11 @@ pub struct PlayerUpdate {
 pub struct TickTelemetry {
     pub pending_moves: usize,
     pub rejected_moves: usize,
+    pub rejected_tile_blocked: usize,
+    pub rejected_player_blocked: usize,
+    pub rejected_npc_blocked: usize,
+    pub rejected_chair_blocked: usize,
+    pub rejected_arena_blocked: usize,
     pub state_sync_send_attempts: usize,
     pub state_sync_capacity_skips: usize,
     pub state_sync_try_send_drops: usize,
@@ -6786,10 +6791,11 @@ impl GameRoom {
         let mut valid_moves: Vec<(String, i32, i32)> = Vec::new();
         let mut auto_sit_requests: Vec<(String, i32, i32)> = Vec::new();
         for (id, target_x, target_y, move_dir) in pending_moves {
+            let is_overworld = !players_in_instances.contains(&id);
             // Skip world collision check for players in interiors
             // Interior collision is handled client-side for now
             // TODO: Add server-side interior collision checking
-            if !players_in_instances.contains(&id) {
+            if is_overworld {
                 // Check static tile collision (only for overworld players)
                 let coord = crate::chunk::ChunkCoord::from_world(target_x, target_y);
                 let walkable = if let Some(chunk) = chunks_guard.get(&coord) {
@@ -6799,19 +6805,22 @@ impl GameRoom {
                     false
                 };
                 if !walkable {
+                    tick_telemetry.rejected_tile_blocked += 1;
                     continue;
                 }
             }
             // Check if another player is on the target tile
             if player_positions.contains(&(target_x, target_y)) {
+                tick_telemetry.rejected_player_blocked += 1;
                 continue;
             }
             // Check if an NPC is on the target tile
             if npc_positions.contains(&(target_x, target_y)) {
+                tick_telemetry.rejected_npc_blocked += 1;
                 continue;
             }
             // Check if target tile is a chair (overworld only - instances have their own maps)
-            if !players_in_instances.contains(&id) {
+            if is_overworld {
                 if let Some((occupied_by, chair_dir)) = chair_snapshot.get(&(target_x, target_y)) {
                     // Only allow sitting when approaching from the chair's facing direction
                     // (player walks toward the chair from in front, so move_dir is opposite of chair_dir)
@@ -6827,6 +6836,7 @@ impl GameRoom {
                         auto_sit_requests.push((id, target_x, target_y));
                     }
                     // Always block the move (chair is solid from all directions)
+                    tick_telemetry.rejected_chair_blocked += 1;
                     continue;
                 }
             }
@@ -6836,6 +6846,7 @@ impl GameRoom {
                 if arena.is_fighting() && arena.is_in_ring(&id) {
                     if let Some(ring_zone) = arena.active_ring_zone() {
                         if !ring_zone.contains(target_x, target_y) {
+                            tick_telemetry.rejected_arena_blocked += 1;
                             continue;
                         }
                     }
@@ -7779,7 +7790,7 @@ impl GameRoom {
         let tick_duration = tick_start.elapsed();
         if tick_duration.as_millis() > 50 {
             tracing::warn!(
-                "Slow tick {}: {}ms (pre_npc={}ms npc_world={}ms sync={}ms arena={}ms players={} npcs={} overworld_senders={} instance_groups={} chunk_unload={}ms prayer_drain={}ms farming_growth={}ms restock={}ms moves={}/{} sync_attempts={} sync_capacity_skips={} sync_drops={})",
+                "Slow tick {}: {}ms (pre_npc={}ms npc_world={}ms sync={}ms arena={}ms players={} npcs={} overworld_senders={} instance_groups={} chunk_unload={}ms prayer_drain={}ms farming_growth={}ms restock={}ms moves={}/{} reject_reasons(tile={} player={} npc={} chair={} arena={}) sync_attempts={} sync_capacity_skips={} sync_drops={})",
                 current_tick,
                 tick_duration.as_millis(),
                 pre_npc_ms,
@@ -7796,6 +7807,11 @@ impl GameRoom {
                 restock_ms,
                 tick_telemetry.pending_moves.saturating_sub(tick_telemetry.rejected_moves),
                 tick_telemetry.pending_moves,
+                tick_telemetry.rejected_tile_blocked,
+                tick_telemetry.rejected_player_blocked,
+                tick_telemetry.rejected_npc_blocked,
+                tick_telemetry.rejected_chair_blocked,
+                tick_telemetry.rejected_arena_blocked,
                 tick_telemetry.state_sync_send_attempts,
                 tick_telemetry.state_sync_capacity_skips,
                 tick_telemetry.state_sync_try_send_drops,

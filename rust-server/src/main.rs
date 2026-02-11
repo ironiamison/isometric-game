@@ -2674,6 +2674,11 @@ async fn main() {
                 tick_state.perf_metrics.record_movement(
                     tick_telemetry.pending_moves,
                     tick_telemetry.rejected_moves,
+                    tick_telemetry.rejected_tile_blocked,
+                    tick_telemetry.rejected_player_blocked,
+                    tick_telemetry.rejected_npc_blocked,
+                    tick_telemetry.rejected_chair_blocked,
+                    tick_telemetry.rejected_arena_blocked,
                 );
                 tick_state.perf_metrics.record_state_sync(
                     tick_telemetry.state_sync_send_attempts,
@@ -2840,7 +2845,7 @@ async fn main() {
             interval.tick().await;
             let perf = perf_state.perf_metrics.snapshot(3, 0);
             info!(
-                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}) state_sync(drop_rate={}%, attempts={}, capacity_skips={}, drops={}) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
+                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%)) state_sync(drop_rate={}%, attempts={}, capacity_skips={}, drops={}) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
                 perf.uptime_seconds,
                 perf.tick_loop_ms.p95_ms,
                 perf.tick_loop_ms.p99_ms,
@@ -2857,6 +2862,16 @@ async fn main() {
                 perf.derived_rates.movement_reject_rate_pct,
                 perf.counters.movement_attempts,
                 perf.counters.movement_rejections,
+                perf.counters.movement_rejections_tile_blocked,
+                perf.derived_rates.movement_reject_tile_share_pct,
+                perf.counters.movement_rejections_player_blocked,
+                perf.derived_rates.movement_reject_player_share_pct,
+                perf.counters.movement_rejections_npc_blocked,
+                perf.derived_rates.movement_reject_npc_share_pct,
+                perf.counters.movement_rejections_chair_blocked,
+                perf.derived_rates.movement_reject_chair_share_pct,
+                perf.counters.movement_rejections_arena_blocked,
+                perf.derived_rates.movement_reject_arena_share_pct,
                 perf.derived_rates.state_sync_drop_rate_pct,
                 perf.counters.state_sync_send_attempts,
                 perf.counters.state_sync_capacity_skips,

@@ -550,13 +550,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
-                // Update target's HP and last damage time (could be player or NPC)
+                // Update last damage time (could be player or NPC)
+                // NOTE: We intentionally do NOT update hp here. The StateSync snapshot
+                // is taken BEFORE combat in the tick loop, so it contains stale pre-damage HP.
+                // If we set hp = target_hp here, the subsequent stale StateSync would see
+                // hp_from_sync > entity.hp and falsely detect regen (showing green +X numbers).
+                // Letting StateSync be the sole authority for HP state avoids this race.
                 let current_time = macroquad::time::get_time();
                 if let Some(player) = state.players.get_mut(&target_id) {
-                    player.hp = target_hp;
                     player.last_damage_time = current_time;
                 } else if let Some(npc) = state.npcs.get_mut(&target_id) {
-                    npc.hp = target_hp;
                     npc.last_damage_time = current_time;
                 }
 
