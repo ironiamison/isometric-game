@@ -527,6 +527,15 @@ pub struct PlayerUpdate {
     pub max_mp: i32,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TickTelemetry {
+    pub pending_moves: usize,
+    pub rejected_moves: usize,
+    pub state_sync_send_attempts: usize,
+    pub state_sync_capacity_skips: usize,
+    pub state_sync_try_send_drops: usize,
+}
+
 // ============================================================================
 // Chair System
 // ============================================================================
@@ -6637,7 +6646,8 @@ impl GameRoom {
         self.send_to_player(player_id, msg).await;
     }
 
-    pub async fn tick(&self) {
+    pub async fn tick(&self) -> TickTelemetry {
+        let mut tick_telemetry = TickTelemetry::default();
         let tick_start = std::time::Instant::now();
         let mut chunk_unload_ms = 0u128;
         let mut prayer_drain_ms = 0u128;
@@ -6738,6 +6748,7 @@ impl GameRoom {
                 .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.direction))
                 .collect()
         };
+        tick_telemetry.pending_moves = pending_moves.len();
         // Track all players with pending moves so we can clear rejected ones
         let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _)| id.clone()).collect();
 
@@ -6841,6 +6852,7 @@ impl GameRoom {
 
         // Track which players moved this tick
         let moved_players: std::collections::HashSet<String> = valid_moves.iter().map(|(id, _, _)| id.clone()).collect();
+        tick_telemetry.rejected_moves = pending_player_ids.len().saturating_sub(moved_players.len());
 
         // Get set of gathering player IDs for state sync
         let gathering_player_ids: std::collections::HashSet<String> = {
@@ -7686,6 +7698,7 @@ impl GameRoom {
         // Instance groups: encode once per instance, send to all players in that instance
         for (inst_id, group_senders) in &instance_groups {
             if !group_senders.iter().any(|(_, sender)| sender.capacity() > 0) {
+                tick_telemetry.state_sync_capacity_skips += group_senders.len();
                 continue;
             }
 
@@ -7705,9 +7718,12 @@ impl GameRoom {
             if let Ok(bytes) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, inst_id) {
                 for (pid, sender) in group_senders {
                     if sender.capacity() == 0 {
+                        tick_telemetry.state_sync_capacity_skips += 1;
                         continue;
                     }
+                    tick_telemetry.state_sync_send_attempts += 1;
                     if let Err(e) = sender.try_send(bytes.clone()) {
+                        tick_telemetry.state_sync_try_send_drops += 1;
                         tracing::debug!("StateSync drop for {}: {}", pid, e);
                     }
                 }
@@ -7724,6 +7740,7 @@ impl GameRoom {
 
         for (player_id, sender) in &overworld_senders {
             if sender.capacity() == 0 {
+                tick_telemetry.state_sync_capacity_skips += 1;
                 continue;
             }
 
@@ -7743,7 +7760,9 @@ impl GameRoom {
                 .collect();
 
             if let Ok(bytes) = crate::protocol::encode_state_sync_from_values(tick, nearby_players, nearby_npcs, "") {
+                tick_telemetry.state_sync_send_attempts += 1;
                 if let Err(e) = sender.try_send(bytes) {
+                    tick_telemetry.state_sync_try_send_drops += 1;
                     tracing::debug!("StateSync drop for {}: {}", player_id, e);
                 }
             }
@@ -7760,7 +7779,7 @@ impl GameRoom {
         let tick_duration = tick_start.elapsed();
         if tick_duration.as_millis() > 50 {
             tracing::warn!(
-                "Slow tick {}: {}ms (pre_npc={}ms npc_world={}ms sync={}ms arena={}ms players={} npcs={} overworld_senders={} instance_groups={} chunk_unload={}ms prayer_drain={}ms farming_growth={}ms restock={}ms)",
+                "Slow tick {}: {}ms (pre_npc={}ms npc_world={}ms sync={}ms arena={}ms players={} npcs={} overworld_senders={} instance_groups={} chunk_unload={}ms prayer_drain={}ms farming_growth={}ms restock={}ms moves={}/{} sync_attempts={} sync_capacity_skips={} sync_drops={})",
                 current_tick,
                 tick_duration.as_millis(),
                 pre_npc_ms,
@@ -7775,8 +7794,15 @@ impl GameRoom {
                 prayer_drain_ms,
                 farming_growth_ms,
                 restock_ms,
+                tick_telemetry.pending_moves.saturating_sub(tick_telemetry.rejected_moves),
+                tick_telemetry.pending_moves,
+                tick_telemetry.state_sync_send_attempts,
+                tick_telemetry.state_sync_capacity_skips,
+                tick_telemetry.state_sync_try_send_drops,
             );
         }
+
+        tick_telemetry
     }
 
     /// Process arena zone detection and state machine events

@@ -49,6 +49,11 @@ pub struct PerfCounters {
     pub slow_autosaves: u64,
     pub slow_handlers: u64,
     pub slow_ws_sends: u64,
+    pub movement_attempts: u64,
+    pub movement_rejections: u64,
+    pub state_sync_send_attempts: u64,
+    pub state_sync_capacity_skips: u64,
+    pub state_sync_try_send_drops: u64,
 }
 
 #[derive(Clone, Serialize)]
@@ -86,6 +91,7 @@ pub struct PerfSnapshot {
     pub uptime_seconds: u64,
     pub thresholds_ms: PerfThresholds,
     pub counters: PerfCounters,
+    pub derived_rates: PerfDerivedRates,
     pub tick_loop_ms: SampleSummary,
     pub room_tick_ms: SampleSummary,
     pub autosave_total_ms: SampleSummary,
@@ -103,6 +109,12 @@ pub struct PerfThresholds {
     pub autosave_slow: f64,
     pub handler_slow: f64,
     pub ws_send_slow: f64,
+}
+
+#[derive(Clone, Serialize)]
+pub struct PerfDerivedRates {
+    pub movement_reject_rate_pct: f64,
+    pub state_sync_drop_rate_pct: f64,
 }
 
 impl PerfMetrics {
@@ -249,6 +261,32 @@ impl PerfMetrics {
         }
     }
 
+    pub fn record_movement(&self, attempts: usize, rejections: usize) {
+        if attempts == 0 {
+            return;
+        }
+
+        let mut inner = self.inner.lock().unwrap();
+        inner.counters.movement_attempts += attempts as u64;
+        inner.counters.movement_rejections += rejections as u64;
+    }
+
+    pub fn record_state_sync(
+        &self,
+        send_attempts: usize,
+        capacity_skips: usize,
+        try_send_drops: usize,
+    ) {
+        if send_attempts == 0 && capacity_skips == 0 && try_send_drops == 0 {
+            return;
+        }
+
+        let mut inner = self.inner.lock().unwrap();
+        inner.counters.state_sync_send_attempts += send_attempts as u64;
+        inner.counters.state_sync_capacity_skips += capacity_skips as u64;
+        inner.counters.state_sync_try_send_drops += try_send_drops as u64;
+    }
+
     pub fn snapshot(&self, top_rooms: usize, spikes: usize) -> PerfSnapshot {
         let inner = self.inner.lock().unwrap();
 
@@ -301,6 +339,16 @@ impl PerfMetrics {
                 ws_send_slow: WS_SEND_SLOW_THRESHOLD_MS,
             },
             counters: inner.counters,
+            derived_rates: PerfDerivedRates {
+                movement_reject_rate_pct: percent(
+                    inner.counters.movement_rejections,
+                    inner.counters.movement_attempts,
+                ),
+                state_sync_drop_rate_pct: percent(
+                    inner.counters.state_sync_try_send_drops,
+                    inner.counters.state_sync_send_attempts,
+                ),
+            },
             tick_loop_ms: summarize(&inner.tick_loop_ms),
             room_tick_ms: summarize(&inner.room_tick_ms),
             autosave_total_ms: summarize(&inner.autosave_total_ms),
@@ -371,6 +419,13 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
 
 fn round2(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
+}
+
+fn percent(num: u64, den: u64) -> f64 {
+    if den == 0 {
+        return 0.0;
+    }
+    round2((num as f64 * 100.0) / den as f64)
 }
 
 #[cfg(test)]

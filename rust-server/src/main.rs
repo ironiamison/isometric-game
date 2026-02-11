@@ -2668,9 +2668,18 @@ async fn main() {
             let room_count = tick_state.rooms.len();
             for room in tick_state.rooms.iter() {
                 let room_start = std::time::Instant::now();
-                room.tick().await;
+                let tick_telemetry = room.tick().await;
                 let room_ms = room_start.elapsed().as_secs_f64() * 1000.0;
                 tick_state.perf_metrics.record_room_tick(&room.name, room_ms);
+                tick_state.perf_metrics.record_movement(
+                    tick_telemetry.pending_moves,
+                    tick_telemetry.rejected_moves,
+                );
+                tick_state.perf_metrics.record_state_sync(
+                    tick_telemetry.state_sync_send_attempts,
+                    tick_telemetry.state_sync_capacity_skips,
+                    tick_telemetry.state_sync_try_send_drops,
+                );
             }
             let loop_ms = loop_start.elapsed().as_secs_f64() * 1000.0;
             tick_state.perf_metrics.record_tick_loop(loop_ms, room_count);
@@ -2831,7 +2840,7 @@ async fn main() {
             interval.tick().await;
             let perf = perf_state.perf_metrics.snapshot(3, 0);
             info!(
-                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
+                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}) state_sync(drop_rate={}%, attempts={}, capacity_skips={}, drops={}) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
                 perf.uptime_seconds,
                 perf.tick_loop_ms.p95_ms,
                 perf.tick_loop_ms.p99_ms,
@@ -2845,6 +2854,13 @@ async fn main() {
                 perf.handler_ms.max_ms,
                 perf.ws_send_ms.p95_ms,
                 perf.ws_send_ms.max_ms,
+                perf.derived_rates.movement_reject_rate_pct,
+                perf.counters.movement_attempts,
+                perf.counters.movement_rejections,
+                perf.derived_rates.state_sync_drop_rate_pct,
+                perf.counters.state_sync_send_attempts,
+                perf.counters.state_sync_capacity_skips,
+                perf.counters.state_sync_try_send_drops,
                 perf.counters.tick_loop_overruns,
                 perf.counters.slow_room_ticks,
                 perf.counters.slow_autosaves,
