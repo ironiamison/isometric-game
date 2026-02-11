@@ -42,6 +42,12 @@ drop_chance = 0.08
 quantity_min = 1
 quantity_max = 2
 
+[[pig.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
 [pig.behaviors]
 hostile = true
 wander_enabled = true
@@ -80,5 +86,47 @@ item_id = "piglet"
 drop_chance = 1.0
 quantity_min = 3
 quantity_max = 5
+
+[piglet]
+extends = "pig"
+display_name = "Piglet"
+sprite = "piglet"
+description = "A tough young boar with a thick hide. Stronger and more defensive than its elders."
+
+[piglet.stats]
+level = 4
+max_hp = 32
+damage = 3
+attack_bonus = 1
+defence_bonus = 6
+attack_range = 1
+aggro_range = 5
+chase_range = 6
+move_cooldown_ms = 550
+attack_cooldown_ms = 1800
+respawn_time_ms = 12000
+
+[piglet.rewards]
+exp_base = 38
+gold_min = 8
+gold_max = 18
+
+[[piglet.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[piglet.loot]]
+item_id = "health_potion"
+drop_chance = 0.15
+quantity_min = 1
+quantity_max = 1
+
+[[piglet.loot]]
+item_id = "potato_seed"
+drop_chance = 0.10
+quantity_min = 1
+quantity_max = 2
 
 # Wild Boar is defined in forest_creatures.toml (sprite = "wild_boar", wanders)

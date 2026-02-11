@@ -716,43 +716,4 @@ wander_radius = 4
 wander_pause_min_ms = 2000
 wander_pause_max_ms = 5000
 
-# =============================================================================
-# Piglet (wild)
-# =============================================================================
-
-[piglet]
-display_name = "Wild Piglet"
-sprite = "piglet"
-animation_type = "standard"
-description = "A small but feisty wild piglet."
-
-[piglet.stats]
-level = 2
-max_hp = 10
-damage = 1
-attack_bonus = 0
-defence_bonus = -2
-attack_range = 1
-aggro_range = 3
-chase_range = 4
-move_cooldown_ms = 650
-attack_cooldown_ms = 2400
-respawn_time_ms = 8000
-
-[piglet.rewards]
-exp_base = 12
-gold_min = 1
-gold_max = 5
-
-[[piglet.loot]]
-item_id = "spoiled_meat"
-drop_chance = 0.15
-quantity_min = 1
-quantity_max = 1
-
-[piglet.behaviors]
-hostile = true
-wander_enabled = true
-wander_radius = 4
-wander_pause_min_ms = 2500
-wander_pause_max_ms = 6000
+# Piglet is defined in pig.toml (sprite = "piglet", stronger/defensive variant)

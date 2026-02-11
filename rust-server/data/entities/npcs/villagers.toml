@@ -575,8 +575,8 @@ gold_max = 0
 
 [miner.behaviors]
 hostile = false
-wander_enabled = true
-wander_radius = 2
+wander_enabled = false
+wander_radius = 0
 wander_pause_min_ms = 5000
 wander_pause_max_ms = 11000
 

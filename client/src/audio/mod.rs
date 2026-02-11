@@ -95,6 +95,7 @@ impl AudioManager {
             ("ui_open", "assets/audio/sfx/ui_open.ogg"),
             ("message_add", "assets/audio/sfx/message_add.ogg"),
             ("pop", "assets/audio/sfx/misc/pop.ogg"),
+            ("attack_enemy", "assets/audio/sfx/attack/attack_enemy.wav"),
         ];
 
         for (name, path) in sfx_files {

@@ -563,6 +563,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     npc.last_damage_time = current_time;
                 }
 
+                // Play hit sound when our player gets attacked
+                if state.local_player_id.as_deref() == Some(&target_id) && damage > 0 {
+                    state.pending_sfx.push("attack_enemy".to_string());
+                }
+
                 // Create floating damage number with target_id for height lookup at render time
                 state.damage_events.push(DamageEvent {
                     x: target_x,
