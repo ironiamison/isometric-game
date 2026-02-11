@@ -3,7 +3,8 @@ use macroquad::models::{Mesh, Vertex, draw_mesh};
 use macroquad::material::{load_material, gl_use_material, gl_use_default_material, Material, MaterialParams};
 use macroquad::miniquad::UniformDesc;
 use macroquad::miniquad::ShaderSource;
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use crate::util::{asset_path, SpriteManifest, SpriteAtlasInfo, virtual_screen_size};
 use crate::game::{GameState, Player, Camera, ConnectionStatus, LayerType, GroundItem, ChunkLayerType, CHUNK_SIZE, MapObject, ChatChannel, Direction, DragSource, Wall, WallEdge};
 use crate::game::tree_types::get_tree_info;
@@ -35,6 +36,20 @@ pub struct RenderTimings {
     pub effects_ms: f64,
     pub ui_ms: f64,
     pub total_ms: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ChatLinesCacheKey {
+    message_count: usize,
+    content_checksum: u64,
+    max_chat_width_x100: i32,
+    font_size_x100: i32,
+}
+
+#[derive(Default)]
+struct ChatLinesCache {
+    key: Option<ChatLinesCacheKey>,
+    lines: Vec<(String, Color)>,
 }
 
 /// Tileset configuration
@@ -290,6 +305,8 @@ pub struct Renderer {
     exit_arrow_down: Option<Texture2D>,
     exit_arrow_left: Option<Texture2D>,
     exit_arrow_right: Option<Texture2D>,
+    /// Cached wrapped chat lines to avoid rebuilding/wrapping every frame.
+    chat_lines_cache: RefCell<ChatLinesCache>,
 }
 
 impl Renderer {
@@ -1076,6 +1093,7 @@ impl Renderer {
             exit_arrow_down,
             exit_arrow_left,
             exit_arrow_right,
+            chat_lines_cache: RefCell::new(ChatLinesCache::default()),
         }
     }
 
@@ -1402,14 +1420,38 @@ impl Renderer {
             return (layout, timings);
         }
 
+        // Compute visible world-space AABB from screen corners (avoids per-object world_to_screen)
+        let (cull_screen_w, cull_screen_h) = virtual_screen_size();
+        let corners_world = [
+            screen_to_world(0.0, 0.0, &state.camera),
+            screen_to_world(cull_screen_w, 0.0, &state.camera),
+            screen_to_world(0.0, cull_screen_h, &state.camera),
+            screen_to_world(cull_screen_w, cull_screen_h, &state.camera),
+        ];
+        // Margin in world tiles for tall objects and edge effects
+        let world_cull_margin = 8.0;
+        let vis_min_x = corners_world.iter().map(|c| c.0).fold(f32::MAX, f32::min) - world_cull_margin;
+        let vis_max_x = corners_world.iter().map(|c| c.0).fold(f32::MIN, f32::max) + world_cull_margin;
+        let vis_min_y = corners_world.iter().map(|c| c.1).fold(f32::MAX, f32::min) - world_cull_margin;
+        let vis_max_y = corners_world.iter().map(|c| c.1).fold(f32::MIN, f32::max) + world_cull_margin;
+        let is_visible_world = |wx: f32, wy: f32| {
+            wx >= vis_min_x && wx <= vis_max_x && wy >= vis_min_y && wy <= vis_max_y
+        };
+
         // Add ground items (render below entities)
         for item in state.ground_items.values() {
+            if !is_visible_world(item.x, item.y) {
+                continue;
+            }
             let depth = calculate_depth(item.x, item.y, 0); // Lower layer than entities
             renderables.push((depth, Renderable::Item(item)));
         }
 
         // Add players
         for player in state.players.values() {
+            if !is_visible_world(player.x, player.y) {
+                continue;
+            }
             let is_local = state.local_player_id.as_ref() == Some(&player.id);
             let mut depth = calculate_depth(player.x, player.y, 1);
             // Sitting players render on top of the chair object at the same tile
@@ -1421,24 +1463,12 @@ impl Renderer {
 
         // Add NPCs
         for npc in state.npcs.values() {
+            if !is_visible_world(npc.x, npc.y) {
+                continue;
+            }
             let depth = calculate_depth(npc.x, npc.y, 1);
             renderables.push((depth, Renderable::Npc(npc)));
         }
-
-        // Compute visible world-space AABB from screen corners (avoids per-object world_to_screen)
-        let (cull_screen_w, cull_screen_h) = virtual_screen_size();
-        let corners_world = [
-            screen_to_world(0.0, 0.0, &state.camera),
-            screen_to_world(cull_screen_w, 0.0, &state.camera),
-            screen_to_world(0.0, cull_screen_h, &state.camera),
-            screen_to_world(cull_screen_w, cull_screen_h, &state.camera),
-        ];
-        // Margin in world tiles for tall objects that extend above their tile
-        let world_cull_margin = 8.0;
-        let vis_min_x = corners_world.iter().map(|c| c.0).fold(f32::MAX, f32::min) - world_cull_margin;
-        let vis_max_x = corners_world.iter().map(|c| c.0).fold(f32::MIN, f32::max) + world_cull_margin;
-        let vis_min_y = corners_world.iter().map(|c| c.1).fold(f32::MAX, f32::min) - world_cull_margin;
-        let vis_max_y = corners_world.iter().map(|c| c.1).fold(f32::MIN, f32::max) + world_cull_margin;
 
         // Add object layer tiles (trees, rocks, buildings) from static tilemap
         for layer in &state.tilemap.layers {
@@ -1460,6 +1490,15 @@ impl Renderer {
                 }
             }
         }
+
+        // Build frame-local lookup tables for tree effects to avoid per-object linear scans.
+        let falling_tree_positions: HashSet<(i32, i32)> =
+            state.falling_trees.iter().map(|ft| (ft.x, ft.y)).collect();
+        let tree_shake_offsets: HashMap<(i32, i32), f32> = state
+            .tree_shake_effects
+            .iter()
+            .map(|shake| ((shake.x, shake.y), shake.get_offset()))
+            .collect();
 
         // Add map objects and walls from loaded chunks with chunk-level pre-culling
         let chunk_size = CHUNK_SIZE as f32;
@@ -1485,14 +1524,12 @@ impl Renderer {
                     continue;
                 }
                 // Skip trees that are currently falling (we render them with the fall animation)
-                let is_falling = state.falling_trees.iter().any(|ft| ft.x == obj.tile_x && ft.y == obj.tile_y);
-                if is_falling {
+                if falling_tree_positions.contains(&(obj.tile_x, obj.tile_y)) {
                     continue;
                 }
                 let depth = calculate_depth(wx, wy, 1);
                 // Check if tree is shaking and apply offset
-                if let Some(shake) = state.tree_shake_effects.iter().find(|s| s.x == obj.tile_x && s.y == obj.tile_y) {
-                    let offset = shake.get_offset();
+                if let Some(offset) = tree_shake_offsets.get(&(obj.tile_x, obj.tile_y)).copied() {
                     renderables.push((depth, Renderable::ChunkObjectShaking(obj, offset)));
                 } else {
                     renderables.push((depth, Renderable::ChunkObject(obj)));
@@ -1598,6 +1635,10 @@ impl Renderer {
 
         // Render leaf particles (world-space, after depth-sorted objects)
         for leaf in &state.leaf_particles {
+            if !is_visible_world(leaf.tile_x, leaf.tile_y) {
+                continue;
+            }
+
             // Convert tile coords to screen coords
             let (screen_x, base_screen_y) = world_to_screen(leaf.tile_x, leaf.tile_y, &state.camera);
 
@@ -5205,19 +5246,60 @@ impl Renderer {
                 draw_rectangle(clip_x, clip_y, clip_w, clip_h, Color::new(0.0, 0.0, 0.0, 0.45));
             }
 
-            // Build all wrapped lines
-            let mut all_lines: Vec<(String, Color)> = Vec::new();
+            // Build wrapped chat lines only when chat content or layout changes.
+            let message_count = state.ui_state.chat_messages.len();
+            // Lightweight checksum to detect rolling-window content changes.
+            let mut content_checksum = 1469598103934665603u64;
             for msg in state.ui_state.chat_messages.iter() {
-                let (color, text) = match msg.channel {
-                    ChatChannel::Local => (WHITE, format!("{}: {}", msg.sender_name, msg.text)),
-                    ChatChannel::Global => (SKYBLUE, format!("[G] {}: {}", msg.sender_name, msg.text)),
-                    ChatChannel::System => (YELLOW, format!("{} {}", msg.sender_name, msg.text)),
+                content_checksum ^= msg.timestamp.to_bits();
+                content_checksum = content_checksum.wrapping_mul(1099511628211);
+                content_checksum ^= msg.sender_name.len() as u64;
+                content_checksum = content_checksum.wrapping_mul(1099511628211);
+                content_checksum ^= msg.text.len() as u64;
+                content_checksum = content_checksum.wrapping_mul(1099511628211);
+                let channel_tag = match msg.channel {
+                    ChatChannel::Local => 1u64,
+                    ChatChannel::Global => 2u64,
+                    ChatChannel::System => 3u64,
                 };
-                let wrapped_lines = self.wrap_text(&text, max_chat_width, font_size);
-                for line in wrapped_lines {
-                    all_lines.push((line, color));
-                }
+                content_checksum ^= channel_tag;
+                content_checksum = content_checksum.wrapping_mul(1099511628211);
             }
+            let cache_key = ChatLinesCacheKey {
+                message_count,
+                content_checksum,
+                max_chat_width_x100: (max_chat_width * 100.0).round() as i32,
+                font_size_x100: (font_size * 100.0).round() as i32,
+            };
+
+            let rebuild_chat_cache = {
+                let cache = self.chat_lines_cache.borrow();
+                cache.key != Some(cache_key)
+            };
+
+            if rebuild_chat_cache {
+                let mut rebuilt_lines: Vec<(String, Color)> = Vec::new();
+                rebuilt_lines.reserve(state.ui_state.chat_messages.len() * 2);
+
+                for msg in state.ui_state.chat_messages.iter() {
+                    let (color, text) = match msg.channel {
+                        ChatChannel::Local => (WHITE, format!("{}: {}", msg.sender_name, msg.text)),
+                        ChatChannel::Global => (SKYBLUE, format!("[G] {}: {}", msg.sender_name, msg.text)),
+                        ChatChannel::System => (YELLOW, format!("{} {}", msg.sender_name, msg.text)),
+                    };
+                    let wrapped_lines = self.wrap_text(&text, max_chat_width, font_size);
+                    for line in wrapped_lines {
+                        rebuilt_lines.push((line, color));
+                    }
+                }
+
+                let mut cache = self.chat_lines_cache.borrow_mut();
+                cache.key = Some(cache_key);
+                cache.lines = rebuilt_lines;
+            }
+
+            let cache = self.chat_lines_cache.borrow();
+            let all_lines = &cache.lines;
 
             // Apply smooth pixel-based scroll offset
             let total_lines = all_lines.len();
