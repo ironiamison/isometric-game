@@ -4485,7 +4485,11 @@ impl Renderer {
 
     /// Map crop_id from farming config to sprite sheet name
     fn crop_to_sprite_name(crop_id: &str) -> String {
-        crop_id.to_string()
+        match crop_id {
+            // Herbs use cabbage sprite as placeholder
+            "greenleaf" | "tangleroots" | "marshbloom" | "ashveil" | "nightthorn" | "bloodcap" => "cabbage".to_string(),
+            _ => crop_id.to_string(),
+        }
     }
 
     fn render_farming_patch_labels(&self, state: &GameState) {

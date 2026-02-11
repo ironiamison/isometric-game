@@ -56,7 +56,7 @@ sellable = true
 
 [watermelon_seed]
 display_name = "Watermelon Seed"
-sprite = "watermelon_seed"
+sprite = "tomato_seed"
 description = "A seed that grows into a watermelon. Requires Farming level 45."
 category = "material"
 max_stack = 99
@@ -78,7 +78,7 @@ sellable = true
 
 [tangleroots_seed]
 display_name = "Tangleroots Seed"
-sprite = "potato_seed"
+sprite = "tomato_seed"
 description = "A seed that grows into tangleroots. Requires Farming level 10."
 category = "material"
 max_stack = 99
@@ -87,7 +87,7 @@ sellable = true
 
 [marshbloom_seed]
 display_name = "Marshbloom Seed"
-sprite = "potato_seed"
+sprite = "sweetcorn_seed"
 description = "A seed that grows into marshbloom. Requires Farming level 20."
 category = "material"
 max_stack = 99
@@ -96,7 +96,7 @@ sellable = true
 
 [ashveil_seed]
 display_name = "Ashveil Seed"
-sprite = "potato_seed"
+sprite = "onion_seed"
 description = "A seed that grows into ashveil. Requires Farming level 35."
 category = "material"
 max_stack = 99
@@ -105,7 +105,7 @@ sellable = true
 
 [nightthorn_seed]
 display_name = "Nightthorn Seed"
-sprite = "potato_seed"
+sprite = "strawberry_seed"
 description = "A seed that grows into nightthorn. Requires Farming level 50."
 category = "material"
 max_stack = 99
@@ -114,7 +114,7 @@ sellable = true
 
 [bloodcap_seed]
 display_name = "Bloodcap Seed"
-sprite = "potato_seed"
+sprite = "cabbage_seed"
 description = "A rare spore that grows into a bloodcap mushroom. Requires Farming level 70."
 category = "material"
 max_stack = 99

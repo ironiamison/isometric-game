@@ -2,7 +2,7 @@
 
 [health_potion]
 display_name = "Health Potion"
-sprite = "item_health_potion"
+sprite = "health_potion"
 description = "Restores 30 HP when consumed."
 category = "consumable"
 max_stack = 10
@@ -87,7 +87,7 @@ amount = 25
 
 [prayer_potion]
 display_name = "Prayer Potion"
-sprite = "item_prayer_potion"
+sprite = "prayer_potion"
 description = "Restores 7 + floor(level/4) prayer points when consumed."
 category = "consumable"
 max_stack = 10
