@@ -885,7 +885,7 @@
     ]
   },
   "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-  "entities": [],
+  "entities": [{"entityId":"witch_hazel","x":9,"y":8}],
   "mapObjects": [],
   "walls": [],
   "portals": [
