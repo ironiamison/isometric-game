@@ -5259,11 +5259,17 @@ impl Renderer {
             let line_height = 18.0 * zoom;
             let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 220.0 } else { 400.0 * zoom };
             let font_size = 16.0 * zoom;
-            let max_visible_lines: usize = 9;
+            let max_visible_lines: usize = if zoom >= 2.0 { 7 } else { 9 };
             let chat_area_h = max_visible_lines as f32 * line_height;
 
             // BG rectangle positioned from the hotkey bar bottom edge
-            let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
+            // Push chat log up when input bar is open to avoid overlap
+            let chat_input_open = state.ui_state.chat_open && !matches!(state.ui_state.chat_active_tab, ChatChannel::System);
+            let bg_bottom = if chat_input_open {
+                chat_sh - 54.0 * zoom
+            } else {
+                chat_sh - EXP_BAR_GAP * scale
+            };
             let clip_h = chat_area_h + bg_padding * 2.0;
             let clip_x = chat_x - bg_padding;
             let clip_y = bg_bottom - clip_h;
@@ -5793,9 +5799,14 @@ impl Renderer {
             let bg_padding = 6.0 * zoom;
             let line_height = 18.0 * zoom;
             let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 220.0 } else { 400.0 * zoom };
-            let max_visible_lines: usize = 9;
+            let max_visible_lines: usize = if zoom >= 2.0 { 7 } else { 9 };
             let chat_area_h = max_visible_lines as f32 * line_height;
-            let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
+            let chat_input_open = state.ui_state.chat_open && !matches!(state.ui_state.chat_active_tab, ChatChannel::System);
+            let bg_bottom = if chat_input_open {
+                chat_sh - 54.0 * zoom
+            } else {
+                chat_sh - EXP_BAR_GAP * scale
+            };
             let clip_h = chat_area_h + bg_padding * 2.0;
             let clip_y = bg_bottom - clip_h;
 
