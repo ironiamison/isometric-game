@@ -1202,6 +1202,8 @@ pub struct GameState {
     pub pending_portal_id: Option<String>,
     /// Last tile position checked for portal (to avoid triggering on spawn)
     pub last_portal_check_pos: Option<(i32, i32)>,
+    /// Cooldown timestamp - ignore portals until this time (prevents flip-flop on transitions)
+    pub portal_cooldown_until: f64,
     /// Area banner for displaying location names during transitions
     pub area_banner: AreaBanner,
 
@@ -1299,6 +1301,7 @@ impl GameState {
             current_instance: None,
             pending_portal_id: None,
             last_portal_check_pos: None,
+            portal_cooldown_until: 0.0,
             area_banner: AreaBanner::default(),
             social_state: SocialState::default(),
             spell_effects: Vec::new(),

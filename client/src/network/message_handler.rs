@@ -327,19 +327,22 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 }
 
                 // Check if local player walked onto a portal (auto-trigger)
-                // Only triggers when player moves to a new tile, not when spawning on one
+                // Uses server-authoritative position (not interpolated visual position)
+                // to detect portals immediately when the server confirms the move
                 if let Some(local_id) = &state.local_player_id {
                     if let Some(player) = state.players.get(local_id) {
-                        let current_tile = (player.x.floor() as i32, player.y.floor() as i32);
+                        let current_tile = (player.server_x.floor() as i32, player.server_y.floor() as i32);
                         let prev_tile = state.last_portal_check_pos;
 
                         // Only check for portal if we moved to a different tile
                         let moved_tiles = prev_tile.map_or(false, |prev| prev != current_tile);
 
+                        let now = macroquad::time::get_time();
                         if moved_tiles &&
                            state.pending_portal_id.is_none() &&
+                           now >= state.portal_cooldown_until &&
                            matches!(state.map_transition.state, TransitionState::None) {
-                            if let Some(portal) = state.chunk_manager.get_portal_at(player.x, player.y) {
+                            if let Some(portal) = state.chunk_manager.get_portal_at(player.server_x, player.server_y) {
                                 state.pending_portal_id = Some(portal.id.clone());
                             }
                         }
@@ -1756,14 +1759,19 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.npcs.clear();
                     state.ground_items.clear();
 
-                    // Reset portal check position to prevent immediate re-trigger
+                    // Reset portal check position and set cooldown to prevent flip-flop re-entry
                     state.last_portal_check_pos = None;
+                    state.portal_cooldown_until = macroquad::time::get_time() + 1.0;
 
-                    // Update player position
+                    // Update player position (both visual and server-authoritative)
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(player) = state.players.get_mut(local_id) {
                             player.x = spawn_x;
                             player.y = spawn_y;
+                            player.server_x = spawn_x;
+                            player.server_y = spawn_y;
+                            player.target_x = spawn_x;
+                            player.target_y = spawn_y;
                         }
                     }
 
@@ -1880,14 +1888,19 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.current_interior = Some(map_id.clone());
                 state.current_instance = Some(instance_id);
 
-                // Reset portal check position to prevent immediate re-trigger
+                // Reset portal check position and set cooldown to prevent flip-flop re-entry
                 state.last_portal_check_pos = None;
+                state.portal_cooldown_until = macroquad::time::get_time() + 1.0;
 
-                // Update player position to spawn point
+                // Update player position (both visual and server-authoritative)
                 if let Some(local_id) = &state.local_player_id {
                     if let Some(player) = state.players.get_mut(local_id) {
                         player.x = spawn_x;
                         player.y = spawn_y;
+                        player.server_x = spawn_x;
+                        player.server_y = spawn_y;
+                        player.target_x = spawn_x;
+                        player.target_y = spawn_y;
                     }
                 }
 

@@ -7361,6 +7361,15 @@ impl GameRoom {
                     player.x = target_x;
                     player.y = target_y;
                     player.last_move_tick = current_tick;
+
+                    // Stop movement on portal tiles so the player doesn't walk past
+                    // before the client can detect and trigger the portal
+                    if !players_in_instances.contains(&id)
+                        && self.portal_tiles.contains(&(target_x, target_y))
+                    {
+                        player.move_dx = 0;
+                        player.move_dy = 0;
+                    }
                 }
             }
 
