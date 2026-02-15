@@ -1851,8 +1851,22 @@ impl InputHandler {
                             if let Some(Some(inv_slot)) = state.inventory.slots.get(*slot_idx) {
                                 let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
                                 let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
-                                if ctrl_held {
-                                    // Open quantity dialog
+                                if shift_held {
+                                    // Shift+Click = deposit all
+                                    commands.push(InputCommand::BankDeposit {
+                                        item_id: inv_slot.item_id.clone(),
+                                        quantity: inv_slot.quantity,
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
+                                } else if ctrl_held {
+                                    // Ctrl+Click = deposit 1
+                                    commands.push(InputCommand::BankDeposit {
+                                        item_id: inv_slot.item_id.clone(),
+                                        quantity: 1,
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
+                                } else {
+                                    // Click = open quantity dialog
                                     state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
                                         input: String::new(),
                                         cursor: 0,
@@ -1860,13 +1874,6 @@ impl InputHandler {
                                         item_id: Some(inv_slot.item_id.clone()),
                                         max_quantity: inv_slot.quantity,
                                     });
-                                } else {
-                                    let quantity = if shift_held { 1 } else { inv_slot.quantity };
-                                    commands.push(InputCommand::BankDeposit {
-                                        item_id: inv_slot.item_id.clone(),
-                                        quantity,
-                                    });
-                                    state.pending_sfx.push("enter".to_string());
                                 }
                             }
                             return commands;
@@ -1876,8 +1883,22 @@ impl InputHandler {
                             if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(*idx) {
                                 let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
                                 let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
-                                if ctrl_held {
-                                    // Open quantity dialog
+                                if shift_held {
+                                    // Shift+Click = withdraw all
+                                    commands.push(InputCommand::BankWithdraw {
+                                        item_id: item_id.clone(),
+                                        quantity: *qty,
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
+                                } else if ctrl_held {
+                                    // Ctrl+Click = withdraw 1
+                                    commands.push(InputCommand::BankWithdraw {
+                                        item_id: item_id.clone(),
+                                        quantity: 1,
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
+                                } else {
+                                    // Click = open quantity dialog
                                     state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
                                         input: String::new(),
                                         cursor: 0,
@@ -1885,13 +1906,6 @@ impl InputHandler {
                                         item_id: Some(item_id.clone()),
                                         max_quantity: *qty,
                                     });
-                                } else {
-                                    let quantity = if shift_held { 1 } else { *qty };
-                                    commands.push(InputCommand::BankWithdraw {
-                                        item_id: item_id.clone(),
-                                        quantity,
-                                    });
-                                    state.pending_sfx.push("enter".to_string());
                                 }
                             }
                             return commands;
@@ -1900,7 +1914,13 @@ impl InputHandler {
                             if state.inventory.gold > 0 {
                                 let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
                                 let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
-                                if ctrl_held {
+                                if shift_held {
+                                    commands.push(InputCommand::BankDepositGold { amount: state.inventory.gold });
+                                    state.pending_sfx.push("enter".to_string());
+                                } else if ctrl_held {
+                                    commands.push(InputCommand::BankDepositGold { amount: 1 });
+                                    state.pending_sfx.push("enter".to_string());
+                                } else {
                                     state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
                                         input: String::new(),
                                         cursor: 0,
@@ -1908,10 +1928,6 @@ impl InputHandler {
                                         item_id: None,
                                         max_quantity: state.inventory.gold,
                                     });
-                                } else {
-                                    let amount = if shift_held { 1 } else { state.inventory.gold };
-                                    commands.push(InputCommand::BankDepositGold { amount });
-                                    state.pending_sfx.push("enter".to_string());
                                 }
                             }
                             return commands;
@@ -1920,7 +1936,13 @@ impl InputHandler {
                             if state.ui_state.bank_gold > 0 {
                                 let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
                                 let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
-                                if ctrl_held {
+                                if shift_held {
+                                    commands.push(InputCommand::BankWithdrawGold { amount: state.ui_state.bank_gold });
+                                    state.pending_sfx.push("enter".to_string());
+                                } else if ctrl_held {
+                                    commands.push(InputCommand::BankWithdrawGold { amount: 1 });
+                                    state.pending_sfx.push("enter".to_string());
+                                } else {
                                     state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
                                         input: String::new(),
                                         cursor: 0,
@@ -1928,10 +1950,6 @@ impl InputHandler {
                                         item_id: None,
                                         max_quantity: state.ui_state.bank_gold,
                                     });
-                                } else {
-                                    let amount = if shift_held { 1 } else { state.ui_state.bank_gold };
-                                    commands.push(InputCommand::BankWithdrawGold { amount });
-                                    state.pending_sfx.push("enter".to_string());
                                 }
                             }
                             return commands;

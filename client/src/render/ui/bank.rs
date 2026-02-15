@@ -67,8 +67,9 @@ impl Renderer {
         };
         draw_rectangle(help_x, help_y, help_size, help_size, help_border);
         draw_rectangle(help_x + 1.0, help_y + 1.0, help_size - 2.0, help_size - 2.0, help_bg);
-        let q_dims = self.measure_text_sharp("?", 14.0);
-        self.draw_text_sharp("?", help_x + (help_size - q_dims.width) / 2.0, help_y + (help_size + 10.0) / 2.0, 14.0, if help_hovered { TEXT_GOLD } else { TEXT_DIM });
+        let q_dims = self.measure_text_sharp("?", 16.0);
+        let help_text_color = if help_hovered { TEXT_GOLD } else { Color::new(0.7, 0.65, 0.5, 1.0) };
+        self.draw_text_sharp("?", help_x + (help_size - q_dims.width) / 2.0, help_y + (help_size + 12.0) / 2.0, 16.0, help_text_color);
 
         // Close button
         let close_size = 20.0;
@@ -435,15 +436,10 @@ impl Renderer {
         let lines: Vec<(&str, Color)> = vec![
             ("Bank Controls", TEXT_TITLE),
             ("", TEXT_NORMAL),
-            ("Items", TEXT_GOLD),
-            ("Click - Deposit/Withdraw all", TEXT_NORMAL),
-            ("Shift+Click - Deposit/Withdraw 1", TEXT_NORMAL),
-            ("Ctrl+Click - Enter custom amount", TEXT_NORMAL),
-            ("", TEXT_NORMAL),
-            ("Gold", TEXT_GOLD),
-            ("Click - Deposit/Withdraw all", TEXT_NORMAL),
-            ("Shift+Click - Deposit/Withdraw 1", TEXT_NORMAL),
-            ("Ctrl+Click - Enter custom amount", TEXT_NORMAL),
+            ("Items & Gold", TEXT_GOLD),
+            ("Click - Enter custom amount", TEXT_NORMAL),
+            ("Ctrl+Click - Deposit/Withdraw 1", TEXT_NORMAL),
+            ("Shift+Click - Deposit/Withdraw all", TEXT_NORMAL),
         ];
 
         let content_height = lines.len() as f32 * line_height + section_gap;
