@@ -3085,8 +3085,39 @@
       0
     ]
   },
-  "collision": "+BwAAMcjAAAC4AcAAAAYAAQAIAAAAMAAAAAAAQBgAAMAQAEEAIAACAxEABgAAAAgAAAAIAIAACACAQAgAAMAKAACACQAAMBAAAAAUAAAAIAIAACAAE0AgIB+C4OAgR+AwABggMAAgEdAAABIIAAASBAAAEgJAABEBAAASAKAf0g=",
-  "entities": [],
+  "collision": "AAAAAMAAAAACAAAAAAAAAAQAAAAAAAAAAAAAAABgAAAAQAEAAIAAAAxEAAAAAAAAAAAAAAIAAAACAQAAAAMACAACAAQAAMAAAAAAEAAAAAAIAAAAAE0AAIAACwOAAAAAQAAAAEAAAEAAAAAAAAAAQAAAAEABAABEAAAASAAAAEA=",
+  "entities": [
+    {
+      "entityId": "mushroom",
+      "x": 2,
+      "y": 7,
+      "level": 1
+    },
+    {
+      "entityId": "mushroom",
+      "x": 21,
+      "y": 19,
+      "level": 1
+    },
+    {
+      "entityId": "mushroom",
+      "x": 3,
+      "y": 22,
+      "level": 1
+    },
+    {
+      "entityId": "mushroom",
+      "x": 11,
+      "y": 13,
+      "level": 1
+    },
+    {
+      "entityId": "mushroom",
+      "x": 19,
+      "y": 6,
+      "level": 1
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1691,

@@ -3085,8 +3085,27 @@
       0
     ]
   },
-  "collision": "HwAAAAEAAAABAAAAAQAAAAEAAAAHAAABCACADh8AQHABADCYAQAIcAMABEYEAAOABIAwEATAMDAEYAAABBAAAAQYQAD8B4AAAADAAwAAAAP8BQAGBAUAAAQPYAAEFBjABCAIQDwgDABAQAAAQIABAEwAAgDMHwTBACAIIwAgECQ=",
-  "entities": [],
+  "collision": "AAAAAAEAAAABAAAAAQAAAAEAAAABAAAACAAAAB4AAAABAAAYAQAAcAEAAEYAAACABAAwEASAMDAEQAAABAAAAAQAQAAEAIAAAADAAwAAAAP4AQAGBAQAAAQGYAAEBBjABAAIQAQADAAAAAAAAAAAAAgAAAAEAAABAAAAAwAgAAQ=",
+  "entities": [
+    {
+      "entityId": "mushroom",
+      "x": 22,
+      "y": 26,
+      "level": 1
+    },
+    {
+      "entityId": "mushroom",
+      "x": 18,
+      "y": 15,
+      "level": 1
+    },
+    {
+      "entityId": "mushroom",
+      "x": 25,
+      "y": 15,
+      "level": 1
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1351,
