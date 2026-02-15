@@ -5029,6 +5029,7 @@ impl GameRoom {
                 Some(Some(slot)) => Some((
                     slot.item_id.clone(),
                     player.skills.combat.level,
+                    player.skills.woodcutting.level,
                     player.equipped_head.clone(),
                     player.equipped_body.clone(),
                     player.equipped_weapon.clone(),
@@ -5043,7 +5044,7 @@ impl GameRoom {
             }
         };
 
-        let (item_id, combat_level, equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet, equipped_ring, equipped_gloves, equipped_necklace, equipped_belt) = match item_info {
+        let (item_id, combat_level, woodcutting_level, equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet, equipped_ring, equipped_gloves, equipped_necklace, equipped_belt) = match item_info {
             Some(info) => info,
             None => {
                 self.send_to_player(player_id, ServerMessage::EquipResult {
@@ -5095,6 +5096,17 @@ impl GameRoom {
                 slot_type: slot_type_str,
                 item_id: None,
                 error: Some(format!("Requires Combat level {}", level_required)),
+            }).await;
+            return;
+        }
+
+        // Check woodcutting level requirement for axes
+        if equip_stats.woodcutting_level_required > 0 && woodcutting_level < equip_stats.woodcutting_level_required {
+            self.send_to_player(player_id, ServerMessage::EquipResult {
+                success: false,
+                slot_type: slot_type_str,
+                item_id: None,
+                error: Some(format!("Requires Woodcutting level {}", equip_stats.woodcutting_level_required)),
             }).await;
             return;
         }
