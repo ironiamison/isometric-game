@@ -1119,5 +1119,136 @@
       "edge": "down"
     }
   ],
-  "portals": []
+  "portals": [
+    {
+      "id": "exit_1771197696791_iscwy2sre",
+      "x": 7,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197697224_9ml6ztpsm",
+      "x": 6,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197697607_os80kop4k",
+      "x": 5,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197697991_hc62xg5ge",
+      "x": 4,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197699791_qlvjjl1lo",
+      "x": 1,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197700124_bz0nwegf6",
+      "x": 2,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197700442_il0ezgvg3",
+      "x": 3,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197701391_v7hcp0rc3",
+      "x": 9,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197701758_zg8bvo5m9",
+      "x": 10,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197702108_qjwz7qs62",
+      "x": 12,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197702957_89am9swmr",
+      "x": 11,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197703292_f36mlmawq",
+      "x": 13,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771197703641_me5jv506c",
+      "x": 14,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    }
+  ]
 }
