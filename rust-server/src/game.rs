@@ -6127,6 +6127,24 @@ impl GameRoom {
             players.get(player_id).map(|p| p.skills.farming.level).unwrap_or(1)
         };
 
+        // Check inventory space before harvesting (harvest destroys the crop)
+        {
+            let farming = self.farming.read().await;
+            let key = (patch_id.to_string(), player_id.to_string());
+            if let Some(state) = farming.player_states.get(&key) {
+                if let Some(crop) = farming.crops.get(&state.crop_id) {
+                    let players = self.players.read().await;
+                    if let Some(player) = players.get(player_id) {
+                        // Check for max possible yield to be safe
+                        if !player.inventory.has_space_for(&crop.produce_item, crop.harvest_amount_max, &self.item_registry) {
+                            self.send_system_message(player_id, "Your inventory is full.").await;
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
         let result = {
             let mut farming = self.farming.write().await;
             farming.harvest_crop(patch_id, player_id, current_time, farming_level)
