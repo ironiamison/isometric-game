@@ -1,7 +1,7 @@
 //! Bank vault UI - two-column grid layout: Bank (left) and Inventory (right)
 
 use macroquad::prelude::*;
-use crate::game::GameState;
+use crate::game::{GameState, BankQuantityDialog, BankQuantityAction};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use super::super::Renderer;
@@ -47,6 +47,28 @@ impl Renderer {
         let title = "Bank Vault";
         let title_dims = self.measure_text_sharp(title, 16.0);
         self.draw_text_sharp(title, header_x + (header_w - title_dims.width) / 2.0, header_y + 20.0, 16.0, TEXT_TITLE);
+
+        // Help button (?) on the left side of header
+        let help_size = 20.0;
+        let help_x = header_x + 6.0;
+        let help_y = header_y + (HEADER_HEIGHT - help_size) / 2.0;
+        let help_rect = Rect::new(help_x, help_y, help_size, help_size);
+        layout.add(UiElementId::BankHelpButton, help_rect);
+        let help_hovered = matches!(hovered, Some(UiElementId::BankHelpButton));
+        let help_bg = if help_hovered {
+            Color::new(0.25, 0.22, 0.30, 1.0)
+        } else {
+            Color::new(0.15, 0.13, 0.18, 1.0)
+        };
+        let help_border = if help_hovered {
+            Color::new(0.6, 0.55, 0.7, 1.0)
+        } else {
+            Color::new(0.35, 0.32, 0.40, 1.0)
+        };
+        draw_rectangle(help_x, help_y, help_size, help_size, help_border);
+        draw_rectangle(help_x + 1.0, help_y + 1.0, help_size - 2.0, help_size - 2.0, help_bg);
+        let q_dims = self.measure_text_sharp("?", 14.0);
+        self.draw_text_sharp("?", help_x + (help_size - q_dims.width) / 2.0, help_y + (help_size + 10.0) / 2.0, 14.0, if help_hovered { TEXT_GOLD } else { TEXT_DIM });
 
         // Close button
         let close_size = 20.0;
@@ -257,5 +279,215 @@ impl Renderer {
         let d_text = "Deposit";
         let d_dims = self.measure_text_sharp(d_text, 16.0);
         self.draw_text_sharp(d_text, deposit_x + (btn_w - d_dims.width) / 2.0, deposit_y + 17.0, 16.0, TEXT_NORMAL);
+    }
+
+    /// Render the bank quantity input dialog (Ctrl+Click)
+    pub(crate) fn render_bank_quantity_dialog(&self, dialog: &BankQuantityDialog, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+        let (sw, sh) = virtual_screen_size();
+
+        // Semi-transparent overlay to focus attention
+        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
+
+        let box_width = 280.0;
+        let box_height = 140.0;
+        let box_x = (sw - box_width) / 2.0;
+        let box_y = (sh - box_height) / 2.0;
+
+        // Draw themed panel frame with corner accents
+        self.draw_panel_frame(box_x, box_y, box_width, box_height);
+        self.draw_corner_accents(box_x, box_y, box_width, box_height);
+
+        // ===== TITLE TAB =====
+        let title_text = match dialog.action {
+            BankQuantityAction::DepositItem => "DEPOSIT ITEM",
+            BankQuantityAction::WithdrawItem => "WITHDRAW ITEM",
+            BankQuantityAction::DepositGold => "DEPOSIT GOLD",
+            BankQuantityAction::WithdrawGold => "WITHDRAW GOLD",
+        };
+        let title_width = self.measure_text_sharp(title_text, 16.0).width + 28.0;
+        let title_x = box_x + (box_width - title_width) / 2.0;
+        let title_y = box_y - 8.0;
+        let title_h = 26.0;
+
+        // Title tab with beveled effect
+        draw_rectangle(title_x - 1.0, title_y - 1.0, title_width + 2.0, title_h + 2.0, FRAME_OUTER);
+        draw_rectangle(title_x, title_y, title_width, title_h, HEADER_BG);
+        draw_rectangle(title_x + 1.0, title_y + 1.0, title_width - 2.0, title_h - 2.0, Color::new(0.165, 0.149, 0.188, 1.0));
+
+        // Title tab inner highlight
+        draw_line(title_x + 2.0, title_y + 2.0, title_x + title_width - 2.0, title_y + 2.0, 1.0, FRAME_INNER);
+
+        // Title text in gold
+        self.draw_text_sharp(title_text, title_x + 14.0, title_y + 18.0, 16.0, TEXT_TITLE);
+
+        // Small decorative accent on title tab corners
+        draw_rectangle(title_x, title_y, 3.0, 1.0, FRAME_ACCENT);
+        draw_rectangle(title_x + title_width - 3.0, title_y, 3.0, 1.0, FRAME_ACCENT);
+
+        // ===== CONTENT AREA =====
+        let content_x = box_x + FRAME_THICKNESS + 12.0;
+        let content_y = box_y + FRAME_THICKNESS + 16.0;
+        let content_width = box_width - FRAME_THICKNESS * 2.0 - 24.0;
+
+        // Available quantity display
+        let available_text = if matches!(dialog.action, BankQuantityAction::DepositGold | BankQuantityAction::WithdrawGold) {
+            format!("Available: {}g", dialog.max_quantity)
+        } else {
+            format!("Available: {}", dialog.max_quantity)
+        };
+        self.draw_text_sharp(&available_text, content_x, content_y + 16.0, 16.0, TEXT_GOLD);
+
+        // ===== INPUT FIELD =====
+        let input_y = content_y + 36.0;
+        let input_height = 28.0;
+        let input_width = content_width;
+
+        // Input field background
+        draw_rectangle(content_x, input_y, input_width, input_height, SLOT_BORDER);
+        draw_rectangle(content_x + 1.0, input_y + 1.0, input_width - 2.0, input_height - 2.0, SLOT_BG_EMPTY);
+
+        // Inner shadow
+        draw_line(content_x + 2.0, input_y + 2.0, content_x + input_width - 2.0, input_y + 2.0, 1.0, SLOT_INNER_SHADOW);
+        draw_line(content_x + 2.0, input_y + 2.0, content_x + 2.0, input_y + input_height - 2.0, 1.0, SLOT_INNER_SHADOW);
+
+        // Input text
+        let input_text_x = content_x + 8.0;
+        let input_text_y = input_y + 19.0;
+
+        if dialog.input.is_empty() {
+            self.draw_text_sharp("Enter amount...", input_text_x, input_text_y, 16.0, TEXT_DIM);
+        } else {
+            self.draw_text_sharp(&dialog.input, input_text_x, input_text_y, 16.0, TEXT_NORMAL);
+        }
+
+        // Blinking cursor
+        let cursor_visible = (macroquad::time::get_time() * 2.0) as i32 % 2 == 0;
+        if cursor_visible {
+            let text_before_cursor: String = dialog.input.chars().take(dialog.cursor).collect();
+            let cursor_x = input_text_x + self.measure_text_sharp(&text_before_cursor, 16.0).width;
+            draw_rectangle(cursor_x, input_y + 6.0, 2.0, input_height - 12.0, TEXT_NORMAL);
+        }
+
+        // ===== BUTTONS =====
+        let button_y = input_y + input_height + 12.0;
+        let button_width = (content_width - 12.0) / 2.0;
+        let button_height = 28.0;
+
+        // Confirm button
+        let confirm_x = content_x;
+        let confirm_bounds = Rect::new(confirm_x, button_y, button_width, button_height);
+        layout.add(UiElementId::BankQuantityConfirm, confirm_bounds);
+
+        let confirm_hovered = matches!(hovered, Some(UiElementId::BankQuantityConfirm));
+        let (confirm_bg, confirm_border) = if confirm_hovered {
+            (Color::new(0.235, 0.204, 0.141, 1.0), FRAME_ACCENT)
+        } else {
+            (Color::new(0.157, 0.141, 0.110, 1.0), FRAME_MID)
+        };
+
+        draw_rectangle(confirm_x, button_y, button_width, button_height, confirm_border);
+        draw_rectangle(confirm_x + 1.0, button_y + 1.0, button_width - 2.0, button_height - 2.0, confirm_bg);
+
+        if confirm_hovered {
+            draw_line(confirm_x + 2.0, button_y + 2.0, confirm_x + button_width - 2.0, button_y + 2.0, 1.0, FRAME_INNER);
+        }
+
+        let confirm_text_color = if confirm_hovered { TEXT_TITLE } else { TEXT_NORMAL };
+        let confirm_text = "Confirm";
+        let confirm_text_width = self.measure_text_sharp(confirm_text, 16.0).width;
+        self.draw_text_sharp(confirm_text, confirm_x + (button_width - confirm_text_width) / 2.0, button_y + 19.0, 16.0, confirm_text_color);
+
+        // Cancel button
+        let cancel_x = content_x + button_width + 12.0;
+        let cancel_bounds = Rect::new(cancel_x, button_y, button_width, button_height);
+        layout.add(UiElementId::BankQuantityCancel, cancel_bounds);
+
+        let cancel_hovered = matches!(hovered, Some(UiElementId::BankQuantityCancel));
+        let (cancel_bg, cancel_border) = if cancel_hovered {
+            (Color::new(0.235, 0.141, 0.141, 1.0), Color::new(0.8, 0.4, 0.4, 1.0))
+        } else {
+            (Color::new(0.157, 0.110, 0.110, 1.0), FRAME_MID)
+        };
+
+        draw_rectangle(cancel_x, button_y, button_width, button_height, cancel_border);
+        draw_rectangle(cancel_x + 1.0, button_y + 1.0, button_width - 2.0, button_height - 2.0, cancel_bg);
+
+        if cancel_hovered {
+            draw_line(cancel_x + 2.0, button_y + 2.0, cancel_x + button_width - 2.0, button_y + 2.0, 1.0, FRAME_INNER);
+        }
+
+        let cancel_text_color = if cancel_hovered { TEXT_TITLE } else { TEXT_NORMAL };
+        let cancel_text = "Cancel";
+        let cancel_text_width = self.measure_text_sharp(cancel_text, 16.0).width;
+        self.draw_text_sharp(cancel_text, cancel_x + (button_width - cancel_text_width) / 2.0, button_y + 19.0, 16.0, cancel_text_color);
+    }
+
+    /// Render the bank help overlay explaining controls
+    pub(crate) fn render_bank_help_overlay(&self, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+        let (screen_w, screen_h) = virtual_screen_size();
+
+        let overlay_w = 240.0_f32.min(screen_w - 20.0);
+        let font_size = 16.0;
+        let line_height = 20.0;
+        let padding = 10.0;
+        let section_gap = 6.0;
+
+        let lines: Vec<(&str, Color)> = vec![
+            ("Bank Controls", TEXT_TITLE),
+            ("", TEXT_NORMAL),
+            ("Items", TEXT_GOLD),
+            ("Click - Deposit/Withdraw all", TEXT_NORMAL),
+            ("Shift+Click - Deposit/Withdraw 1", TEXT_NORMAL),
+            ("Ctrl+Click - Enter custom amount", TEXT_NORMAL),
+            ("", TEXT_NORMAL),
+            ("Gold", TEXT_GOLD),
+            ("Click - Deposit/Withdraw all", TEXT_NORMAL),
+            ("Shift+Click - Deposit/Withdraw 1", TEXT_NORMAL),
+            ("Ctrl+Click - Enter custom amount", TEXT_NORMAL),
+        ];
+
+        let content_height = lines.len() as f32 * line_height + section_gap;
+        let close_btn_height = 22.0;
+        let overlay_h = padding * 2.0 + content_height + close_btn_height + 4.0;
+
+        let overlay_x = ((screen_w - overlay_w) / 2.0).floor();
+        let overlay_y = ((screen_h - overlay_h) / 2.0).floor();
+
+        // Dim background
+        draw_rectangle(0.0, 0.0, screen_w, screen_h, Color::new(0.0, 0.0, 0.0, 0.5));
+
+        // Panel frame
+        let accent = TEXT_GOLD;
+        draw_rectangle(overlay_x - 2.0, overlay_y - 2.0, overlay_w + 4.0, overlay_h + 4.0, accent);
+        draw_rectangle(overlay_x - 1.0, overlay_y - 1.0, overlay_w + 2.0, overlay_h + 2.0, TOOLTIP_FRAME);
+        draw_rectangle(overlay_x, overlay_y, overlay_w, overlay_h, TOOLTIP_BG);
+
+        // Draw text lines
+        let mut text_y = overlay_y + padding + 12.0;
+        for (text, color) in &lines {
+            if !text.is_empty() {
+                self.draw_text_sharp(text, (overlay_x + padding).floor(), text_y.floor(), font_size, *color);
+            }
+            text_y += line_height;
+        }
+        text_y += section_gap;
+
+        // Close button
+        let close_text = "Got it!";
+        let close_dims = self.measure_text_sharp(close_text, 16.0);
+        let close_btn_w = (close_dims.width + 20.0).min(overlay_w - padding * 2.0);
+        let close_btn_x = overlay_x + (overlay_w - close_btn_w) / 2.0;
+        let close_btn_y = text_y;
+
+        layout.add(UiElementId::BankHelpClose, Rect::new(close_btn_x, close_btn_y, close_btn_w, close_btn_height));
+
+        let close_hovered = matches!(hovered, Some(UiElementId::BankHelpClose));
+        let close_bg = if close_hovered { accent } else { Color::new(0.15, 0.13, 0.18, 1.0) };
+        let close_text_color = if close_hovered { Color::new(0.05, 0.05, 0.07, 1.0) } else { accent };
+
+        draw_rectangle(close_btn_x, close_btn_y, close_btn_w, close_btn_height, Color::new(0.3, 0.28, 0.35, 1.0));
+        draw_rectangle(close_btn_x + 1.0, close_btn_y + 1.0, close_btn_w - 2.0, close_btn_height - 2.0, close_bg);
+        let close_text_x = close_btn_x + (close_btn_w - close_dims.width) / 2.0;
+        self.draw_text_sharp(close_text, close_text_x.floor(), (close_btn_y + (close_btn_height + 12.0) / 2.0).floor(), 16.0, close_text_color);
     }
 }

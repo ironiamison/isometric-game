@@ -714,6 +714,25 @@ pub struct GoldDropDialog {
     pub cursor: usize,
 }
 
+/// What action the bank quantity dialog will perform on confirm
+#[derive(Debug, Clone, PartialEq)]
+pub enum BankQuantityAction {
+    DepositItem,
+    WithdrawItem,
+    DepositGold,
+    WithdrawGold,
+}
+
+/// Dialog for entering a custom quantity in the bank UI (Ctrl+Click)
+#[derive(Debug, Clone)]
+pub struct BankQuantityDialog {
+    pub input: String,
+    pub cursor: usize,
+    pub action: BankQuantityAction,
+    pub item_id: Option<String>,
+    pub max_quantity: i32,
+}
+
 /// Source of a drag operation
 #[derive(Debug, Clone, PartialEq)]
 pub enum DragSource {
@@ -891,6 +910,10 @@ pub struct UiState {
     pub context_menu: Option<ContextMenu>,
     // Gold drop dialog state
     pub gold_drop_dialog: Option<GoldDropDialog>,
+    // Bank quantity dialog state (Ctrl+Click in bank)
+    pub bank_quantity_dialog: Option<BankQuantityDialog>,
+    // Bank help overlay open
+    pub bank_help_open: bool,
     // Altar offering panel state
     pub altar_panel: Option<AltarPanelState>,
     // Drag state for inventory slot rearrangement
@@ -1008,6 +1031,8 @@ impl Default for UiState {
             hovered_element: None,
             context_menu: None,
             gold_drop_dialog: None,
+            bank_quantity_dialog: None,
+            bank_help_open: false,
             altar_panel: None,
             drag_state: None,
             double_click_state: DoubleClickState {

@@ -5780,6 +5780,12 @@ impl Renderer {
         // Bank UI (when open)
         if state.ui_state.bank_open {
             self.render_bank(state, hovered, &mut layout);
+            if let Some(ref dialog) = state.ui_state.bank_quantity_dialog {
+                self.render_bank_quantity_dialog(dialog, hovered, &mut layout);
+            }
+            if state.ui_state.bank_help_open {
+                self.render_bank_help_overlay(hovered, &mut layout);
+            }
         }
 
         // Skills panel (when open)

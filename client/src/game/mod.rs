@@ -12,7 +12,7 @@ pub mod prayer;
 pub mod spell;
 pub mod tree_types;
 
-pub use state::{GameState, Camera, ConnectionStatus, ChatChannel, ChatMessage, ChatBubble, UiState, DamageEvent, LevelUpEvent, SkillXpEvent, XpDropFeed, DialogueChoice, ActiveDialogue, QuestObjective, ActiveQuest, QuestCompletedEvent, ContextMenu, ContextMenuTarget, GoldDropDialog, DragState, DragSource, DoubleClickState, Announcement, FrameTimings, Projectile, TransitionState, MapTransition, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FarmingContractInfo, FriendInfo, PendingRequestInfo, OnlinePlayerInfo, SocialTab, SocialState, SpellEffect, AltarPanelState};
+pub use state::{GameState, Camera, ConnectionStatus, ChatChannel, ChatMessage, ChatBubble, UiState, DamageEvent, LevelUpEvent, SkillXpEvent, XpDropFeed, DialogueChoice, ActiveDialogue, QuestObjective, ActiveQuest, QuestCompletedEvent, ContextMenu, ContextMenuTarget, GoldDropDialog, BankQuantityDialog, BankQuantityAction, DragState, DragSource, DoubleClickState, Announcement, FrameTimings, Projectile, TransitionState, MapTransition, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FarmingContractInfo, FriendInfo, PendingRequestInfo, OnlinePlayerInfo, SocialTab, SocialState, SpellEffect, AltarPanelState};
 pub use entities::{Player, Direction};
 pub use tilemap::{Tilemap, TilemapLayer, LayerType};
 pub use npc::{Npc, NpcState};

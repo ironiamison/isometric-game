@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use std::collections::HashSet;
-use crate::game::{GameState, ChatChannel, ContextMenu, ContextMenuTarget, DragState, DragSource, GoldDropDialog, PathState, pathfinding};
+use crate::game::{GameState, ChatChannel, ContextMenu, ContextMenuTarget, DragState, DragSource, GoldDropDialog, BankQuantityDialog, BankQuantityAction, PathState, pathfinding};
 use crate::render::animation::AnimationState;
 use crate::render::isometric::screen_to_world;
 use crate::ui::{UiElementId, UiLayout};
@@ -1615,6 +1615,178 @@ impl InputHandler {
             return commands;
         }
 
+        // Handle bank help overlay (blocks other bank input while open)
+        if state.ui_state.bank_help_open && state.ui_state.bank_open {
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    if matches!(element, UiElementId::BankHelpClose) {
+                        state.ui_state.bank_help_open = false;
+                        return commands;
+                    }
+                }
+            }
+            if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) {
+                state.ui_state.bank_help_open = false;
+                return commands;
+            }
+            return commands;
+        }
+
+        // Handle bank quantity dialog (blocks other bank input while open)
+        if state.ui_state.bank_quantity_dialog.is_some() {
+            // Handle button clicks
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::BankQuantityConfirm => {
+                            let dialog = state.ui_state.bank_quantity_dialog.as_ref().unwrap();
+                            if let Ok(amount) = dialog.input.parse::<i32>() {
+                                if amount > 0 && amount <= dialog.max_quantity {
+                                    match dialog.action {
+                                        BankQuantityAction::DepositItem => {
+                                            if let Some(ref item_id) = dialog.item_id {
+                                                commands.push(InputCommand::BankDeposit {
+                                                    item_id: item_id.clone(),
+                                                    quantity: amount,
+                                                });
+                                            }
+                                        }
+                                        BankQuantityAction::WithdrawItem => {
+                                            if let Some(ref item_id) = dialog.item_id {
+                                                commands.push(InputCommand::BankWithdraw {
+                                                    item_id: item_id.clone(),
+                                                    quantity: amount,
+                                                });
+                                            }
+                                        }
+                                        BankQuantityAction::DepositGold => {
+                                            commands.push(InputCommand::BankDepositGold { amount });
+                                        }
+                                        BankQuantityAction::WithdrawGold => {
+                                            commands.push(InputCommand::BankWithdrawGold { amount });
+                                        }
+                                    }
+                                    state.pending_sfx.push("enter".to_string());
+                                    state.ui_state.bank_quantity_dialog = None;
+                                }
+                            }
+                            return commands;
+                        }
+                        UiElementId::BankQuantityCancel => {
+                            state.ui_state.bank_quantity_dialog = None;
+                            return commands;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Keyboard input
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.bank_quantity_dialog = None;
+                return commands;
+            }
+
+            if is_key_pressed(KeyCode::Enter) {
+                let dialog = state.ui_state.bank_quantity_dialog.as_ref().unwrap();
+                if let Ok(amount) = dialog.input.parse::<i32>() {
+                    if amount > 0 && amount <= dialog.max_quantity {
+                        match dialog.action {
+                            BankQuantityAction::DepositItem => {
+                                if let Some(ref item_id) = dialog.item_id {
+                                    commands.push(InputCommand::BankDeposit {
+                                        item_id: item_id.clone(),
+                                        quantity: amount,
+                                    });
+                                }
+                            }
+                            BankQuantityAction::WithdrawItem => {
+                                if let Some(ref item_id) = dialog.item_id {
+                                    commands.push(InputCommand::BankWithdraw {
+                                        item_id: item_id.clone(),
+                                        quantity: amount,
+                                    });
+                                }
+                            }
+                            BankQuantityAction::DepositGold => {
+                                commands.push(InputCommand::BankDepositGold { amount });
+                            }
+                            BankQuantityAction::WithdrawGold => {
+                                commands.push(InputCommand::BankWithdrawGold { amount });
+                            }
+                        }
+                        state.pending_sfx.push("enter".to_string());
+                        state.ui_state.bank_quantity_dialog = None;
+                    }
+                }
+                return commands;
+            }
+
+            // Number key input
+            let number_keys = [
+                (KeyCode::Key0, '0'), (KeyCode::Key1, '1'), (KeyCode::Key2, '2'),
+                (KeyCode::Key3, '3'), (KeyCode::Key4, '4'), (KeyCode::Key5, '5'),
+                (KeyCode::Key6, '6'), (KeyCode::Key7, '7'), (KeyCode::Key8, '8'),
+                (KeyCode::Key9, '9'),
+                (KeyCode::Kp0, '0'), (KeyCode::Kp1, '1'), (KeyCode::Kp2, '2'),
+                (KeyCode::Kp3, '3'), (KeyCode::Kp4, '4'), (KeyCode::Kp5, '5'),
+                (KeyCode::Kp6, '6'), (KeyCode::Kp7, '7'), (KeyCode::Kp8, '8'),
+                (KeyCode::Kp9, '9'),
+            ];
+
+            for (key, digit) in &number_keys {
+                if is_key_pressed(*key) {
+                    let dialog = state.ui_state.bank_quantity_dialog.as_mut().unwrap();
+                    if dialog.input.len() < 10 {
+                        dialog.input.insert(dialog.cursor, *digit);
+                        dialog.cursor += 1;
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Backspace) {
+                let dialog = state.ui_state.bank_quantity_dialog.as_mut().unwrap();
+                if dialog.cursor > 0 {
+                    dialog.input.remove(dialog.cursor - 1);
+                    dialog.cursor -= 1;
+                }
+            }
+
+            if is_key_pressed(KeyCode::Delete) {
+                let dialog = state.ui_state.bank_quantity_dialog.as_mut().unwrap();
+                if dialog.cursor < dialog.input.len() {
+                    dialog.input.remove(dialog.cursor);
+                }
+            }
+
+            if is_key_pressed(KeyCode::Left) {
+                let dialog = state.ui_state.bank_quantity_dialog.as_mut().unwrap();
+                if dialog.cursor > 0 {
+                    dialog.cursor -= 1;
+                }
+            }
+            if is_key_pressed(KeyCode::Right) {
+                let dialog = state.ui_state.bank_quantity_dialog.as_mut().unwrap();
+                if dialog.cursor < dialog.input.len() {
+                    dialog.cursor += 1;
+                }
+            }
+
+            if is_key_pressed(KeyCode::Home) {
+                let dialog = state.ui_state.bank_quantity_dialog.as_mut().unwrap();
+                dialog.cursor = 0;
+            }
+            if is_key_pressed(KeyCode::End) {
+                let dialog = state.ui_state.bank_quantity_dialog.as_mut().unwrap();
+                dialog.cursor = dialog.input.len();
+            }
+
+            // Drain character queue to prevent ghost characters
+            while get_char_pressed().is_some() {}
+
+            return commands;
+        }
+
         // Handle bank mode
         if state.ui_state.bank_open {
             // Auto-close if player moved too far from banker
@@ -1628,6 +1800,8 @@ impl InputHandler {
                     if !near_banker {
                         state.ui_state.bank_open = false;
                         state.ui_state.bank_slots.clear();
+                        state.ui_state.bank_quantity_dialog = None;
+                        state.ui_state.bank_help_open = false;
                         return commands;
                     }
                 }
@@ -1660,59 +1834,105 @@ impl InputHandler {
             if mouse_clicked {
                 if let Some(ref element) = clicked_element {
                     match element {
+                        UiElementId::BankHelpButton => {
+                            state.ui_state.bank_help_open = true;
+                            return commands;
+                        }
                         UiElementId::BankCloseButton => {
                             state.ui_state.bank_open = false;
                             state.ui_state.bank_slots.clear();
+                            state.ui_state.bank_quantity_dialog = None;
+                            state.ui_state.bank_help_open = false;
                             state.pending_sfx.push("enter".to_string());
                             return commands;
                         }
                         UiElementId::BankInventorySlot(slot_idx) => {
                             // Deposit item from inventory to bank
                             if let Some(Some(inv_slot)) = state.inventory.slots.get(*slot_idx) {
-                                let quantity = if is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift) {
-                                    1
+                                let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
+                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                if ctrl_held {
+                                    // Open quantity dialog
+                                    state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
+                                        input: String::new(),
+                                        cursor: 0,
+                                        action: BankQuantityAction::DepositItem,
+                                        item_id: Some(inv_slot.item_id.clone()),
+                                        max_quantity: inv_slot.quantity,
+                                    });
                                 } else {
-                                    inv_slot.quantity
-                                };
-                                commands.push(InputCommand::BankDeposit {
-                                    item_id: inv_slot.item_id.clone(),
-                                    quantity,
-                                });
-                                state.pending_sfx.push("enter".to_string());
+                                    let quantity = if shift_held { 1 } else { inv_slot.quantity };
+                                    commands.push(InputCommand::BankDeposit {
+                                        item_id: inv_slot.item_id.clone(),
+                                        quantity,
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
+                                }
                             }
                             return commands;
                         }
                         UiElementId::BankSlot(idx) => {
                             // Withdraw item from bank to inventory
                             if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(*idx) {
-                                let quantity = if is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift) {
-                                    1
+                                let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
+                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                if ctrl_held {
+                                    // Open quantity dialog
+                                    state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
+                                        input: String::new(),
+                                        cursor: 0,
+                                        action: BankQuantityAction::WithdrawItem,
+                                        item_id: Some(item_id.clone()),
+                                        max_quantity: *qty,
+                                    });
                                 } else {
-                                    *qty
-                                };
-                                commands.push(InputCommand::BankWithdraw {
-                                    item_id: item_id.clone(),
-                                    quantity,
-                                });
-                                state.pending_sfx.push("enter".to_string());
+                                    let quantity = if shift_held { 1 } else { *qty };
+                                    commands.push(InputCommand::BankWithdraw {
+                                        item_id: item_id.clone(),
+                                        quantity,
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
+                                }
                             }
                             return commands;
                         }
                         UiElementId::BankDepositGoldButton => {
                             if state.inventory.gold > 0 {
-                                commands.push(InputCommand::BankDepositGold {
-                                    amount: state.inventory.gold,
-                                });
-                                state.pending_sfx.push("enter".to_string());
+                                let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
+                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                if ctrl_held {
+                                    state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
+                                        input: String::new(),
+                                        cursor: 0,
+                                        action: BankQuantityAction::DepositGold,
+                                        item_id: None,
+                                        max_quantity: state.inventory.gold,
+                                    });
+                                } else {
+                                    let amount = if shift_held { 1 } else { state.inventory.gold };
+                                    commands.push(InputCommand::BankDepositGold { amount });
+                                    state.pending_sfx.push("enter".to_string());
+                                }
                             }
                             return commands;
                         }
                         UiElementId::BankWithdrawGoldButton => {
                             if state.ui_state.bank_gold > 0 {
-                                commands.push(InputCommand::BankWithdrawGold {
-                                    amount: state.ui_state.bank_gold,
-                                });
-                                state.pending_sfx.push("enter".to_string());
+                                let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
+                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                if ctrl_held {
+                                    state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
+                                        input: String::new(),
+                                        cursor: 0,
+                                        action: BankQuantityAction::WithdrawGold,
+                                        item_id: None,
+                                        max_quantity: state.ui_state.bank_gold,
+                                    });
+                                } else {
+                                    let amount = if shift_held { 1 } else { state.ui_state.bank_gold };
+                                    commands.push(InputCommand::BankWithdrawGold { amount });
+                                    state.pending_sfx.push("enter".to_string());
+                                }
                             }
                             return commands;
                         }
@@ -1725,6 +1945,8 @@ impl InputHandler {
             if is_key_pressed(KeyCode::Escape) {
                 state.ui_state.bank_open = false;
                 state.ui_state.bank_slots.clear();
+                state.ui_state.bank_quantity_dialog = None;
+                state.ui_state.bank_help_open = false;
                 return commands;
             }
 

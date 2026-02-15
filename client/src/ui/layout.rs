@@ -97,6 +97,10 @@ pub enum UiElementId {
     GoldDropConfirm,
     GoldDropCancel,
 
+    // Bank Quantity Dialog
+    BankQuantityConfirm,
+    BankQuantityCancel,
+
     // Chat Panel
     ChatButton,
     ChatTabLocal,
@@ -131,6 +135,8 @@ pub enum UiElementId {
     BankWithdrawGoldButton,
     BankScrollArea,
     BankInvScrollArea,
+    BankHelpButton,
+    BankHelpClose,
 
     // Altar Panel
     AltarOfferAll(usize),
