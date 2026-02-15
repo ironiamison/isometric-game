@@ -45,8 +45,8 @@ impl Renderer {
         draw_line(header_x, header_y + HEADER_HEIGHT, header_x + header_w, header_y + HEADER_HEIGHT, 1.0, HEADER_BORDER);
 
         let title = "Bank Vault";
-        let title_dims = self.measure_text_sharp(title, 18.0);
-        self.draw_text_sharp(title, header_x + (header_w - title_dims.width) / 2.0, header_y + 20.0, 18.0, TEXT_TITLE);
+        let title_dims = self.measure_text_sharp(title, 16.0);
+        self.draw_text_sharp(title, header_x + (header_w - title_dims.width) / 2.0, header_y + 20.0, 16.0, TEXT_TITLE);
 
         // Close button
         let close_size = 20.0;
