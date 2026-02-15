@@ -1071,6 +1071,8 @@ async fn matchmake_join_or_create(
         character_data.is_admin,
         character_data.sitting_at_x,
         character_data.sitting_at_y,
+        &character_data.bank_json,
+        character_data.bank_gold,
     ).await;
 
     // Load quest state from database
@@ -1752,6 +1754,8 @@ async fn handle_socket(
                 save_data.current_map.as_deref(),
                 save_data.sitting_at_x,
                 save_data.sitting_at_y,
+                &save_data.bank_json,
+                save_data.bank_gold,
             ).await {
                 error!("Failed to save character {} on disconnect: {}", character_name, e);
             } else {
@@ -2617,6 +2621,20 @@ async fn handle_client_message(
             room.handle_cast_spell(player_id, &spell_id).await;
         }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
+        // ===== Bank Messages =====
+        ClientMessage::BankDeposit { item_id, quantity } => {
+            room.handle_bank_deposit(player_id, &item_id, quantity).await;
+        }
+        ClientMessage::BankWithdraw { item_id, quantity } => {
+            room.handle_bank_withdraw(player_id, &item_id, quantity).await;
+        }
+        ClientMessage::BankDepositGold { amount } => {
+            room.handle_bank_deposit_gold(player_id, amount).await;
+        }
+        ClientMessage::BankWithdrawGold { amount } => {
+            room.handle_bank_withdraw_gold(player_id, amount).await;
+        }
+
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
         // Ping/Pong for latency measurement
         ClientMessage::Ping { timestamp } => {
@@ -2783,6 +2801,8 @@ async fn main() {
                             save_data.current_map.as_deref(),
                             save_data.sitting_at_x,
                             save_data.sitting_at_y,
+                            &save_data.bank_json,
+                            save_data.bank_gold,
                         ).await {
                             warn!("Auto-save failed for character {}: {}", character_name, e);
                         }
@@ -2923,15 +2943,91 @@ async fn main() {
                     axum::http::header::CONTENT_TYPE, 
                     axum::http::header::AUTHORIZATION
                 ])
-        )
-        .with_state(state);
+        );
+
+    // Graceful shutdown: save all players on Ctrl+C
+    let shutdown_state = state.clone();
+
+    let app = app.with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 2567));
     info!("Game server listening on http://{}", addr);
+    let shutdown_signal = async move {
+        tokio::signal::ctrl_c().await.ok();
+        info!("Shutdown signal received, saving all players...");
+
+        // Group sessions by room_id for bulk saving
+        let mut room_players: HashMap<String, Vec<(String, i64)>> = HashMap::new();
+        for entry in shutdown_state.sessions.iter() {
+            room_players.entry(entry.room_id.clone())
+                .or_default()
+                .push((entry.player_id.clone(), entry.character_id));
+        }
+
+        // Save all players in each room
+        let mut saved_count = 0u32;
+        for (room_id, players) in &room_players {
+            let room = match shutdown_state.rooms.get(room_id) {
+                Some(r) => r.value().clone(),
+                None => continue,
+            };
+            let player_ids: Vec<String> = players.iter().map(|(pid, _)| pid.clone()).collect();
+            let char_id_map: HashMap<&str, i64> = players.iter().map(|(pid, cid)| (pid.as_str(), *cid)).collect();
+
+            let bulk_data = room.get_bulk_save_data(&player_ids).await;
+            for (player_id, (save_data, quest_state, discovered_recipes)) in bulk_data {
+                let character_id = match char_id_map.get(player_id.as_str()) {
+                    Some(id) => *id,
+                    None => continue,
+                };
+
+                if let Err(e) = shutdown_state.db.save_character(
+                    character_id,
+                    save_data.x,
+                    save_data.y,
+                    save_data.hp,
+                    save_data.prayer_points,
+                    &save_data.skills,
+                    save_data.gold,
+                    &save_data.inventory_json,
+                    save_data.equipped_head.as_deref(),
+                    save_data.equipped_body.as_deref(),
+                    save_data.equipped_weapon.as_deref(),
+                    save_data.equipped_back.as_deref(),
+                    save_data.equipped_feet.as_deref(),
+                    save_data.equipped_ring.as_deref(),
+                    save_data.equipped_gloves.as_deref(),
+                    save_data.equipped_necklace.as_deref(),
+                    save_data.equipped_belt.as_deref(),
+                    0, // played_time_delta - skip for shutdown
+                    save_data.current_map.as_deref(),
+                    save_data.sitting_at_x,
+                    save_data.sitting_at_y,
+                    &save_data.bank_json,
+                    save_data.bank_gold,
+                ).await {
+                    error!("Shutdown save failed for player {}: {}", player_id, e);
+                } else {
+                    saved_count += 1;
+                }
+
+                if let Some(quest_state) = quest_state {
+                    let _ = shutdown_state.db.save_character_quest_state(character_id, &quest_state).await;
+                }
+
+                for recipe_id in &discovered_recipes {
+                    let _ = shutdown_state.db.save_discovered_recipe(character_id, recipe_id).await;
+                }
+            }
+        }
+
+        info!("Saved {} player(s). Shutting down.", saved_count);
+    };
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
         .tcp_nodelay(true)
+        .with_graceful_shutdown(shutdown_signal)
         .await
         .unwrap();
 }

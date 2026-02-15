@@ -61,6 +61,8 @@ pub struct Npc {
     pub is_merchant: bool,
     /// Whether this NPC is an altar
     pub is_altar: bool,
+    /// Whether this NPC is a banker
+    pub is_banker: bool,
     /// Movement speed in tiles per second (from server, for interpolation)
     pub move_speed: f32,
     /// Last time this NPC took damage (for health bar visibility)
@@ -99,6 +101,7 @@ impl Npc {
             is_quest_giver: false,
             is_merchant: false,
             is_altar: false,
+            is_banker: false,
             move_speed: 2.0, // Default, will be set by server
             last_damage_time: 0.0,
             death_timer: None,
@@ -111,7 +114,7 @@ impl Npc {
 
     pub fn name(&self) -> String {
         // Don't show level for friendly NPCs (quest givers, merchants, altars)
-        if self.is_quest_giver || self.is_merchant || self.is_altar {
+        if self.is_quest_giver || self.is_merchant || self.is_altar || self.is_banker {
             self.display_name.clone()
         } else {
             format!("{} Lv.{}", self.display_name, self.level)

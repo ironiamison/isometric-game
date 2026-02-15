@@ -2034,6 +2034,8 @@ impl Renderer {
                 Color::from_rgba(255, 150, 150, 255)
             } else if npc.is_quest_giver {
                 Color::from_rgba(150, 220, 255, 255)
+            } else if npc.is_banker {
+                Color::from_rgba(255, 215, 0, 255)
             } else if npc.is_merchant {
                 Color::from_rgba(150, 255, 150, 255)
             } else {
@@ -3949,6 +3951,8 @@ impl Renderer {
             Color::from_rgba(255, 150, 150, 255) // Red for hostile
         } else if npc.is_quest_giver {
             Color::from_rgba(150, 220, 255, 255) // Cyan for quest givers
+        } else if npc.is_banker {
+            Color::from_rgba(255, 215, 0, 255) // Gold for bankers
         } else if npc.is_merchant {
             Color::from_rgba(150, 255, 150, 255) // Light green for merchants
         } else {
@@ -5773,6 +5777,11 @@ impl Renderer {
             self.render_crafting(state, hovered, &mut layout);
         }
 
+        // Bank UI (when open)
+        if state.ui_state.bank_open {
+            self.render_bank(state, hovered, &mut layout);
+        }
+
         // Skills panel (when open)
         self.render_skills_panel(state, hovered, &mut layout);
 
@@ -5823,7 +5832,7 @@ impl Renderer {
         }
 
         // Quick slots and menu buttons - hide on mobile when crafting/shop panel is open
-        let hide_bottom_bar = cfg!(target_os = "android") && state.ui_state.crafting_open;
+        let hide_bottom_bar = cfg!(target_os = "android") && (state.ui_state.crafting_open || state.ui_state.bank_open);
         if !hide_bottom_bar {
             // Quick slots (always visible at bottom, above exp bar)
             self.render_quick_slots(state, hovered, &mut layout);

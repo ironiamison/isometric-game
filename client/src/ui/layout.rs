@@ -123,6 +123,15 @@ pub enum UiElementId {
     SocialPanelClose,
     SocialScrollArea,
 
+    // Bank
+    BankSlot(usize),
+    BankInventorySlot(usize),
+    BankCloseButton,
+    BankDepositGoldButton,
+    BankWithdrawGoldButton,
+    BankScrollArea,
+    BankInvScrollArea,
+
     // Altar Panel
     AltarOfferAll(usize),
     AltarPray,

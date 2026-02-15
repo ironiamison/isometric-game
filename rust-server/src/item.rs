@@ -222,6 +222,162 @@ pub struct InventorySlotUpdate {
 }
 
 // ============================================================================
+// Bank Vault
+// ============================================================================
+
+pub const BANK_SIZE: usize = 48;
+
+#[derive(Debug, Clone)]
+pub struct Bank {
+    pub slots: Vec<Option<InventorySlot>>,
+    pub gold: i32,
+}
+
+impl Bank {
+    pub fn new() -> Self {
+        Self {
+            slots: vec![None; BANK_SIZE],
+            gold: 0,
+        }
+    }
+
+    /// Try to add an item to the bank. Returns the quantity that couldn't fit.
+    pub fn add_item(&mut self, item_id: &str, mut quantity: i32, registry: &ItemRegistry) -> i32 {
+        if item_id == GOLD_ITEM_ID {
+            self.gold += quantity;
+            return 0;
+        }
+
+        let max_stack = registry
+            .get(item_id)
+            .map(|def| def.max_stack)
+            .unwrap_or(DEFAULT_MAX_STACK);
+
+        // First, try to stack with existing items
+        for slot in &mut self.slots {
+            if quantity <= 0 {
+                break;
+            }
+            if let Some(inv_slot) = slot {
+                if inv_slot.item_id == item_id {
+                    let can_add = max_stack - inv_slot.quantity;
+                    if can_add > 0 {
+                        let add = quantity.min(can_add);
+                        inv_slot.quantity += add;
+                        quantity -= add;
+                    }
+                }
+            }
+        }
+
+        // Then, try to find empty slots
+        for slot in &mut self.slots {
+            if quantity <= 0 {
+                break;
+            }
+            if slot.is_none() {
+                let add = quantity.min(max_stack);
+                *slot = Some(InventorySlot::new(item_id.to_string(), add));
+                quantity -= add;
+            }
+        }
+
+        quantity
+    }
+
+    /// Remove a specific quantity of an item from the bank.
+    /// Returns true if successful, false if not enough items.
+    pub fn remove_item(&mut self, item_id: &str, mut count: i32) -> bool {
+        if !self.has_item(item_id, count) {
+            return false;
+        }
+
+        for slot in &mut self.slots {
+            if count <= 0 {
+                break;
+            }
+            if let Some(inv_slot) = slot {
+                if inv_slot.item_id == item_id {
+                    let remove = count.min(inv_slot.quantity);
+                    inv_slot.quantity -= remove;
+                    count -= remove;
+                    if inv_slot.quantity <= 0 {
+                        *slot = None;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    /// Check if bank has at least `count` of the specified item
+    pub fn has_item(&self, item_id: &str, count: i32) -> bool {
+        self.count_item(item_id) >= count
+    }
+
+    /// Count total quantity of an item across all slots
+    pub fn count_item(&self, item_id: &str) -> i32 {
+        self.slots
+            .iter()
+            .filter_map(|slot| slot.as_ref())
+            .filter(|slot| slot.item_id == item_id)
+            .map(|slot| slot.quantity)
+            .sum()
+    }
+
+    /// Check if bank has space for additional items
+    pub fn has_space_for(&self, item_id: &str, count: i32, registry: &ItemRegistry) -> bool {
+        if item_id == GOLD_ITEM_ID {
+            return true;
+        }
+
+        let max_stack = registry
+            .get(item_id)
+            .map(|def| def.max_stack)
+            .unwrap_or(DEFAULT_MAX_STACK);
+        let mut remaining = count;
+
+        for slot in &self.slots {
+            if remaining <= 0 {
+                return true;
+            }
+            if let Some(inv_slot) = slot {
+                if inv_slot.item_id == item_id {
+                    let can_add = max_stack - inv_slot.quantity;
+                    remaining -= can_add;
+                }
+            }
+        }
+
+        if remaining <= 0 {
+            return true;
+        }
+
+        let empty_slots = self.slots.iter().filter(|s| s.is_none()).count();
+        let slots_needed = ((remaining + max_stack - 1) / max_stack).max(0) as usize;
+        empty_slots >= slots_needed
+    }
+
+    /// Get bank contents as a serializable update
+    pub fn to_update(&self) -> Vec<InventorySlotUpdate> {
+        self.slots
+            .iter()
+            .enumerate()
+            .filter_map(|(i, slot)| {
+                slot.as_ref()
+                    .filter(|s| s.quantity > 0 && !s.item_id.is_empty())
+                    .map(|s| InventorySlotUpdate {
+                        slot: i as u8,
+                        item_id: s.item_id.clone(),
+                        quantity: s.quantity,
+                    })
+            })
+            .collect()
+    }
+}
+
+// ============================================================================
 // Ground Item (dropped in world)
 // ============================================================================
 

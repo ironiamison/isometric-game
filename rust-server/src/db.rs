@@ -53,6 +53,8 @@ pub struct CharacterData {
     pub current_map: Option<String>, // Interior map ID if player is in an instance (NULL = overworld)
     pub sitting_at_x: Option<i32>,   // Chair tile X if sitting (NULL = not sitting)
     pub sitting_at_y: Option<i32>,   // Chair tile Y if sitting (NULL = not sitting)
+    pub bank_json: String,           // JSON serialized bank vault contents
+    pub bank_gold: i32,              // Gold stored in bank
 }
 
 // Available appearance options
@@ -239,6 +241,25 @@ impl Database {
 
         if !prayer_points_exists {
             sqlx::query("ALTER TABLE characters ADD COLUMN prayer_points INTEGER DEFAULT NULL")
+                .execute(pool)
+                .await
+                .ok();
+        }
+
+        // Migration: Add bank_json column if it doesn't exist
+        let bank_json_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'bank_json'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !bank_json_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN bank_json TEXT DEFAULT '[]'")
+                .execute(pool)
+                .await
+                .ok();
+            sqlx::query("ALTER TABLE characters ADD COLUMN bank_gold INTEGER DEFAULT 0")
                 .execute(pool)
                 .await
                 .ok();
@@ -582,7 +603,7 @@ impl Database {
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
-                sitting_at_x, sitting_at_y
+                sitting_at_x, sitting_at_y, bank_json, bank_gold
             FROM characters WHERE account_id = ? ORDER BY created_at DESC"#,
         )
         .bind(account_id)
@@ -672,6 +693,8 @@ impl Database {
                         .unwrap_or(None),
                     sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
                     sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
+                    bank_json: r.try_get::<String, _>("bank_json").unwrap_or_else(|_| "[]".to_string()),
+                    bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
                 }
             })
             .collect())
@@ -791,7 +814,7 @@ impl Database {
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
-                sitting_at_x, sitting_at_y
+                sitting_at_x, sitting_at_y, bank_json, bank_gold
             FROM characters WHERE id = ?"#,
         )
         .bind(character_id)
@@ -879,6 +902,8 @@ impl Database {
                     .unwrap_or(None),
                 sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
                 sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
+                bank_json: r.try_get::<String, _>("bank_json").unwrap_or_else(|_| "[]".to_string()),
+                bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
             }
         }))
     }
@@ -954,6 +979,8 @@ impl Database {
         current_map: Option<&str>,
         sitting_at_x: Option<i32>,
         sitting_at_y: Option<i32>,
+        bank_json: &str,
+        bank_gold: i32,
     ) -> Result<(), sqlx::Error> {
         // Serialize skills to JSON for the skills_json column
         let skills_json = serde_json::to_string(skills).unwrap_or_else(|_| "{}".to_string());
@@ -972,7 +999,9 @@ impl Database {
                 played_time = played_time + ?,
                 current_map = ?,
                 sitting_at_x = ?,
-                sitting_at_y = ?
+                sitting_at_y = ?,
+                bank_json = ?,
+                bank_gold = ?
             WHERE id = ?"#,
         )
         .bind(x)
@@ -997,6 +1026,8 @@ impl Database {
         .bind(current_map)
         .bind(sitting_at_x)
         .bind(sitting_at_y)
+        .bind(bank_json)
+        .bind(bank_gold)
         .bind(character_id)
         .execute(&self.pool)
         .await?;

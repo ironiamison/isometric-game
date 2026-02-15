@@ -863,6 +863,13 @@ pub struct UiState {
     pub shop_quantity_hold_element: Option<UiElementId>,
     pub shop_quantity_hold_start: f64,
     pub shop_quantity_hold_last_repeat: f64,
+    // Bank UI state
+    pub bank_open: bool,
+    pub bank_slots: Vec<Option<(String, i32)>>,  // (item_id, quantity) per slot
+    pub bank_gold: i32,
+    pub bank_max_slots: u32,
+    pub bank_scroll: f32,
+    pub bank_inv_scroll: f32,
     // Escape menu state
     pub escape_menu_open: bool,
     // Audio settings (synced with AudioManager)
@@ -979,6 +986,12 @@ impl Default for UiState {
             shop_quantity_hold_element: None,
             shop_quantity_hold_start: 0.0,
             shop_quantity_hold_last_repeat: 0.0,
+            bank_open: false,
+            bank_slots: Vec::new(),
+            bank_gold: 0,
+            bank_max_slots: 48,
+            bank_scroll: 0.0,
+            bank_inv_scroll: 0.0,
             escape_menu_open: false,
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,

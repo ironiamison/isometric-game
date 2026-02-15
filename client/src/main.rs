@@ -511,6 +511,11 @@ fn run_game_frame(
             // Shop commands
             InputCommand::ShopBuy { npc_id, item_id, quantity } => ClientMessage::ShopBuy { npc_id: npc_id.clone(), item_id: item_id.clone(), quantity: *quantity },
             InputCommand::ShopSell { npc_id, item_id, quantity } => ClientMessage::ShopSell { npc_id: npc_id.clone(), item_id: item_id.clone(), quantity: *quantity },
+            // Bank commands
+            InputCommand::BankDeposit { item_id, quantity } => ClientMessage::BankDeposit { item_id: item_id.clone(), quantity: *quantity },
+            InputCommand::BankWithdraw { item_id, quantity } => ClientMessage::BankWithdraw { item_id: item_id.clone(), quantity: *quantity },
+            InputCommand::BankDepositGold { amount } => ClientMessage::BankDepositGold { amount: *amount },
+            InputCommand::BankWithdrawGold { amount } => ClientMessage::BankWithdrawGold { amount: *amount },
             // Portal commands
             InputCommand::EnterPortal { portal_id } => ClientMessage::EnterPortal { portal_id: portal_id.clone() },
             InputCommand::StartGathering { marker_x, marker_y } => {

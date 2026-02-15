@@ -56,6 +56,7 @@ pub struct PrototypeStats {
     pub is_quest_giver: bool,
     pub is_merchant: bool,
     pub is_altar: bool,
+    pub is_banker: bool,
     pub wander_enabled: bool,
     pub wander_radius: i32,
     pub wander_pause_min_ms: u64,
@@ -78,6 +79,7 @@ pub struct Npc {
     pub spawn_x: i32,
     pub spawn_y: i32,
     pub direction: Direction,
+    pub spawn_direction: Direction,
     pub hp: i32,
     pub max_hp: i32,
     pub level: i32,
@@ -109,6 +111,7 @@ pub struct Npc {
 
 impl Npc {
     /// Create an NPC from an entity prototype
+    /// `facing_override` takes priority over the prototype's behaviors.facing
     pub fn from_prototype(
         id: &str,
         prototype_id: &str,
@@ -116,6 +119,7 @@ impl Npc {
         x: i32,
         y: i32,
         level: i32,
+        facing_override: Option<&str>,
     ) -> Self {
         let stats = PrototypeStats {
             display_name: prototype.display_name.clone(),
@@ -134,6 +138,7 @@ impl Npc {
             is_quest_giver: prototype.behaviors.quest_giver,
             is_merchant: prototype.behaviors.merchant,
             is_altar: prototype.behaviors.altar,
+            is_banker: prototype.behaviors.banker,
             wander_enabled: prototype.behaviors.wander_enabled,
             wander_radius: prototype.behaviors.wander_radius,
             wander_pause_min_ms: prototype.behaviors.wander_pause_min_ms,
@@ -150,7 +155,14 @@ impl Npc {
             y,
             spawn_x: x,
             spawn_y: y,
-            direction: Direction::Down,
+            direction: facing_override
+                .or(prototype.behaviors.facing.as_deref())
+                .map(Direction::from_str)
+                .unwrap_or(Direction::Down),
+            spawn_direction: facing_override
+                .or(prototype.behaviors.facing.as_deref())
+                .map(Direction::from_str)
+                .unwrap_or(Direction::Down),
             hp: scale_hp(prototype.stats.max_hp, level),
             max_hp: scale_hp(prototype.stats.max_hp, level),
             level,
@@ -227,10 +239,14 @@ impl Npc {
         self.stats.is_altar
     }
 
+    pub fn is_banker(&self) -> bool {
+        self.stats.is_banker
+    }
+
     /// Returns true if this NPC can be attacked by players.
-    /// Quest givers, merchants, and altars cannot be attacked.
+    /// Quest givers, merchants, altars, and bankers cannot be attacked.
     pub fn is_attackable(&self) -> bool {
-        !self.stats.is_quest_giver && !self.stats.is_merchant && !self.stats.is_altar
+        !self.stats.is_quest_giver && !self.stats.is_merchant && !self.stats.is_altar && !self.stats.is_banker
     }
 
     pub fn name(&self) -> String {
@@ -285,6 +301,7 @@ impl Npc {
     pub fn respawn(&mut self) {
         self.x = self.spawn_x;
         self.y = self.spawn_y;
+        self.direction = self.spawn_direction;
         self.hp = self.max_hp;
         self.state = NpcState::Idle;
         self.target_id = None;
@@ -725,6 +742,8 @@ pub struct NpcUpdate {
     pub is_merchant: bool,
     /// Whether this NPC is an altar
     pub is_altar: bool,
+    /// Whether this NPC is a banker
+    pub is_banker: bool,
     /// Movement speed in tiles per second (for client interpolation)
     pub move_speed: f32,
     /// True only on the tick when this NPC attacks (for animation sync)
@@ -760,6 +779,7 @@ impl From<&Npc> for NpcUpdate {
             is_quest_giver: npc.is_quest_giver(),
             is_merchant: npc.is_merchant(),
             is_altar: npc.is_altar(),
+            is_banker: npc.is_banker(),
             move_speed,
             just_attacked: npc.just_attacked,
             no_shadow: npc.stats.no_shadow,

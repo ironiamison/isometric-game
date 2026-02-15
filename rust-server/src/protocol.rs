@@ -193,6 +193,23 @@ pub enum ClientMessage {
         tree_gid: u32,
     },
 
+    // ===== Bank System Messages =====
+    /// Deposit item from inventory into bank
+    #[serde(rename = "bankDeposit")]
+    BankDeposit { item_id: String, quantity: i32 },
+
+    /// Withdraw item from bank into inventory
+    #[serde(rename = "bankWithdraw")]
+    BankWithdraw { item_id: String, quantity: i32 },
+
+    /// Deposit gold into bank
+    #[serde(rename = "bankDepositGold")]
+    BankDepositGold { amount: i32 },
+
+    /// Withdraw gold from bank
+    #[serde(rename = "bankWithdrawGold")]
+    BankWithdrawGold { amount: i32 },
+
     // ===== Utility Messages =====
     /// Ping for latency measurement - server responds with pong
     #[serde(rename = "ping")]
@@ -245,6 +262,10 @@ impl ClientMessage {
             ClientMessage::PrayAtAltar { .. } => "PrayAtAltar",
             ClientMessage::CastSpell { .. } => "CastSpell",
             ClientMessage::ChopTree { .. } => "ChopTree",
+            ClientMessage::BankDeposit { .. } => "BankDeposit",
+            ClientMessage::BankWithdraw { .. } => "BankWithdraw",
+            ClientMessage::BankDepositGold { .. } => "BankDepositGold",
+            ClientMessage::BankWithdrawGold { .. } => "BankWithdrawGold",
             ClientMessage::Ping { .. } => "Ping",
         }
     }
@@ -761,6 +782,25 @@ pub enum ServerMessage {
     Pong {
         timestamp: f64,
     },
+    // ===== Bank System Messages =====
+    /// Full bank state sent when opening bank
+    BankOpen {
+        slots: Vec<crate::item::InventorySlotUpdate>,
+        gold: i32,
+        max_slots: u32,
+    },
+    /// Bank state update after deposit/withdraw
+    BankUpdate {
+        slots: Vec<crate::item::InventorySlotUpdate>,
+        gold: i32,
+    },
+    /// Result feedback for bank operations
+    BankResult {
+        success: bool,
+        action: String,
+        error: Option<String>,
+    },
+
     /// Update client on farming contract state (sent on connect, accept, harvest, claim, abandon)
     FarmingContractUpdate {
         /// None = no active contract, Some = active contract details
@@ -1078,6 +1118,9 @@ impl ServerMessage {
             ServerMessage::TreeRespawned { .. } => "treeRespawned",
             ServerMessage::DepletedTreesSync { .. } => "depletedTreesSync",
             ServerMessage::Pong { .. } => "pong",
+            ServerMessage::BankOpen { .. } => "bankOpen",
+            ServerMessage::BankUpdate { .. } => "bankUpdate",
+            ServerMessage::BankResult { .. } => "bankResult",
             ServerMessage::FarmingContractUpdate { .. } => "farmingContractUpdate",
         }
     }
@@ -1299,6 +1342,7 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
         Value::Boolean(n.is_merchant),
     ));
     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
+    nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
     nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
     nmap.push((
         Value::String("just_attacked".into()),
@@ -1647,6 +1691,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::Boolean(n.is_merchant),
                     ));
                     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
+                    nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
                     nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
                     nmap.push((
                         Value::String("just_attacked".into()),
@@ -4024,6 +4069,86 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
+        ServerMessage::BankOpen { slots, gold, max_slots } => {
+            let mut map = Vec::new();
+
+            let slot_values: Vec<Value> = slots
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("slot".into()),
+                        Value::Integer((s.slot as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("item_id".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
+
+            map.push((Value::String("slots".into()), Value::Array(slot_values)));
+            map.push((
+                Value::String("gold".into()),
+                Value::Integer((*gold as i64).into()),
+            ));
+            map.push((
+                Value::String("max_slots".into()),
+                Value::Integer((*max_slots as i64).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::BankUpdate { slots, gold } => {
+            let mut map = Vec::new();
+
+            let slot_values: Vec<Value> = slots
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("slot".into()),
+                        Value::Integer((s.slot as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("item_id".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
+
+            map.push((Value::String("slots".into()), Value::Array(slot_values)));
+            map.push((
+                Value::String("gold".into()),
+                Value::Integer((*gold as i64).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::BankResult { success, action, error } => {
+            let mut map = Vec::new();
+            map.push((Value::String("success".into()), Value::Boolean(*success)));
+            map.push((
+                Value::String("action".into()),
+                Value::String(action.clone().into()),
+            ));
+            map.push((
+                Value::String("error".into()),
+                match error {
+                    Some(e) => Value::String(e.clone().into()),
+                    None => Value::Nil,
+                },
+            ));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -4311,6 +4436,25 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "ping" => {
             let timestamp = extract_f64(msg_data, "timestamp").unwrap_or(0.0);
             Ok(ClientMessage::Ping { timestamp })
+        }
+        // Bank messages
+        "bankDeposit" => {
+            let item_id = extract_string(msg_data, "item_id").unwrap_or_default();
+            let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
+            Ok(ClientMessage::BankDeposit { item_id, quantity })
+        }
+        "bankWithdraw" => {
+            let item_id = extract_string(msg_data, "item_id").unwrap_or_default();
+            let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
+            Ok(ClientMessage::BankWithdraw { item_id, quantity })
+        }
+        "bankDepositGold" => {
+            let amount = extract_i32(msg_data, "amount").unwrap_or(0);
+            Ok(ClientMessage::BankDepositGold { amount })
+        }
+        "bankWithdrawGold" => {
+            let amount = extract_i32(msg_data, "amount").unwrap_or(0);
+            Ok(ClientMessage::BankWithdrawGold { amount })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }

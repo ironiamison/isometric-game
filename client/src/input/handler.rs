@@ -94,6 +94,11 @@ pub enum InputCommand {
     // Shop commands
     ShopBuy { npc_id: String, item_id: String, quantity: u32 },
     ShopSell { npc_id: String, item_id: String, quantity: u32 },
+    // Bank commands
+    BankDeposit { item_id: String, quantity: i32 },
+    BankWithdraw { item_id: String, quantity: i32 },
+    BankDepositGold { amount: i32 },
+    BankWithdrawGold { amount: i32 },
     // Portal commands
     EnterPortal { portal_id: String },
     // Gathering commands
@@ -207,6 +212,7 @@ impl InputHandler {
             || state.ui_state.escape_menu_open
             || state.ui_state.crafting_open
             || state.ui_state.shop_data.is_some()
+            || state.ui_state.bank_open
             || state.ui_state.quest_log_open
             || state.ui_state.social_open
             || state.ui_state.chat_panel_open
@@ -215,6 +221,7 @@ impl InputHandler {
         let hide_direction_controls = state.ui_state.escape_menu_open
             || state.ui_state.crafting_open
             || state.ui_state.shop_data.is_some()
+            || state.ui_state.bank_open
             || state.ui_state.quest_log_open
             || in_dialogue;
         self.touch_controls.update(current_time, hide_action_buttons, hide_direction_controls, state.ui_state.use_joystick);
@@ -1605,6 +1612,122 @@ impl InputHandler {
             }
 
             // Don't process other input while dialogue is open
+            return commands;
+        }
+
+        // Handle bank mode
+        if state.ui_state.bank_open {
+            // Auto-close if player moved too far from banker
+            if let Some(local_id) = &state.local_player_id {
+                if let Some(player) = state.players.get(local_id) {
+                    let px = player.server_x;
+                    let py = player.server_y;
+                    let near_banker = state.npcs.values().any(|npc| {
+                        npc.is_banker && (npc.x - px).abs() <= 3.0 && (npc.y - py).abs() <= 3.0
+                    });
+                    if !near_banker {
+                        state.ui_state.bank_open = false;
+                        state.ui_state.bank_slots.clear();
+                        return commands;
+                    }
+                }
+            }
+
+            // Mouse wheel scrolling
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                const SCROLL_SPEED: f32 = 30.0;
+                let row_height = 48.0 + 4.0; // INV_SLOT_SIZE + SLOT_SPACING
+
+                match &state.ui_state.hovered_element {
+                    Some(UiElementId::BankScrollArea) | Some(UiElementId::BankSlot(_)) => {
+                        let total_rows = (state.ui_state.bank_slots.len() + 5) / 6; // BANK_COLS=6
+                        let total_h = total_rows as f32 * row_height;
+                        let max_scroll = (total_h - 200.0).max(0.0);
+                        state.ui_state.bank_scroll = (state.ui_state.bank_scroll - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                    }
+                    Some(UiElementId::BankInvScrollArea) | Some(UiElementId::BankInventorySlot(_)) => {
+                        let total_rows = (20 + 3) / 4; // 20 slots, INV_COLS=4
+                        let total_h = total_rows as f32 * row_height;
+                        let max_scroll = (total_h - 200.0).max(0.0);
+                        state.ui_state.bank_inv_scroll = (state.ui_state.bank_inv_scroll - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                    }
+                    _ => {}
+                }
+            }
+
+            // Click handling
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::BankCloseButton => {
+                            state.ui_state.bank_open = false;
+                            state.ui_state.bank_slots.clear();
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
+                        }
+                        UiElementId::BankInventorySlot(slot_idx) => {
+                            // Deposit item from inventory to bank
+                            if let Some(Some(inv_slot)) = state.inventory.slots.get(*slot_idx) {
+                                let quantity = if is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift) {
+                                    1
+                                } else {
+                                    inv_slot.quantity
+                                };
+                                commands.push(InputCommand::BankDeposit {
+                                    item_id: inv_slot.item_id.clone(),
+                                    quantity,
+                                });
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::BankSlot(idx) => {
+                            // Withdraw item from bank to inventory
+                            if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(*idx) {
+                                let quantity = if is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift) {
+                                    1
+                                } else {
+                                    *qty
+                                };
+                                commands.push(InputCommand::BankWithdraw {
+                                    item_id: item_id.clone(),
+                                    quantity,
+                                });
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::BankDepositGoldButton => {
+                            if state.inventory.gold > 0 {
+                                commands.push(InputCommand::BankDepositGold {
+                                    amount: state.inventory.gold,
+                                });
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::BankWithdrawGoldButton => {
+                            if state.ui_state.bank_gold > 0 {
+                                commands.push(InputCommand::BankWithdrawGold {
+                                    amount: state.ui_state.bank_gold,
+                                });
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Escape to close
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.bank_open = false;
+                state.ui_state.bank_slots.clear();
+                return commands;
+            }
+
             return commands;
         }
 

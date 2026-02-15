@@ -143,6 +143,8 @@ pub struct PlayerSaveData {
     pub current_map: Option<String>,
     pub sitting_at_x: Option<i32>,
     pub sitting_at_y: Option<i32>,
+    pub bank_json: String,
+    pub bank_gold: i32,
 }
 
 // ============================================================================
@@ -163,6 +165,20 @@ pub enum Direction {
 }
 
 impl Direction {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "down" => Direction::Down,
+            "up" => Direction::Up,
+            "left" => Direction::Left,
+            "right" => Direction::Right,
+            "down_left" | "downleft" => Direction::DownLeft,
+            "down_right" | "downright" => Direction::DownRight,
+            "up_left" | "upleft" => Direction::UpLeft,
+            "up_right" | "upright" => Direction::UpRight,
+            _ => Direction::Down,
+        }
+    }
+
     pub fn from_velocity(dx: f32, dy: f32) -> Self {
         if dx == 0.0 && dy == 0.0 {
             return Direction::Down;
@@ -261,6 +277,8 @@ pub struct Player {
     pub spell_cooldowns: HashMap<String, u64>,
     /// Active temporary buffs (from potions etc.), not persisted to DB
     pub active_buffs: Vec<ActiveBuff>,
+    /// Bank vault for storing items safely
+    pub bank: item::Bank,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -318,6 +336,7 @@ impl Player {
             active_prayers: HashSet::new(),
             spell_cooldowns: HashMap::new(),
             active_buffs: Vec::new(),
+            bank: item::Bank::new(),
         }
     }
 
@@ -704,6 +723,7 @@ impl GameRoom {
                             spawn.world_x,
                             spawn.world_y,
                             level,
+                            spawn.facing.as_deref(),
                         );
                         npcs.insert(npc_id, npc);
                     } else {
@@ -1086,6 +1106,8 @@ impl GameRoom {
         is_admin: bool,
         sitting_at_x: Option<i32>,
         sitting_at_y: Option<i32>,
+        bank_json: &str,
+        bank_gold: i32,
     ) {
         let mut player = Player::new(player_id, name, x, y, gender, skin, hair_style, hair_color);
 
@@ -1126,6 +1148,16 @@ impl GameRoom {
                         _ => continue, // Skip unknown items (2 was gold, handled separately)
                     }.to_string();
                     player.inventory.slots[slot_idx] = Some(item::InventorySlot::new(item_id, quantity));
+                }
+            }
+        }
+
+        // Restore bank from JSON
+        player.bank.gold = bank_gold;
+        if let Ok(slots) = serde_json::from_str::<Vec<(usize, String, i32)>>(bank_json) {
+            for (slot_idx, item_id, quantity) in slots {
+                if slot_idx < player.bank.slots.len() && !item_id.is_empty() && quantity > 0 {
+                    player.bank.slots[slot_idx] = Some(item::InventorySlot::new(item_id, quantity));
                 }
             }
         }
@@ -1280,6 +1312,18 @@ impl GameRoom {
                 .collect();
             let inventory_json = serde_json::to_string(&inventory_slots).unwrap_or_else(|_| "[]".to_string());
 
+            // Serialize bank to JSON
+            let bank_slots: Vec<(usize, String, i32)> = p.bank.slots
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, slot)| {
+                    slot.as_ref()
+                        .filter(|s| s.quantity > 0 && !s.item_id.is_empty())
+                        .map(|s| (idx, s.item_id.clone(), s.quantity))
+                })
+                .collect();
+            let bank_json = serde_json::to_string(&bank_slots).unwrap_or_else(|_| "[]".to_string());
+
             PlayerSaveData {
                 x: p.x as f32,
                 y: p.y as f32,
@@ -1302,6 +1346,8 @@ impl GameRoom {
                 current_map: current_map.clone(),
                 sitting_at_x: p.sitting_at.map(|(x, _)| x),
                 sitting_at_y: p.sitting_at.map(|(_, y)| y),
+                bank_json,
+                bank_gold: p.bank.gold,
             }
         })
     }
@@ -1331,6 +1377,8 @@ impl GameRoom {
             sitting_at_x: Option<i32>,
             sitting_at_y: Option<i32>,
             recipes: HashSet<String>,
+            bank_slots: Vec<(usize, String, i32)>,
+            bank_gold: i32,
         }
 
         let mut result = HashMap::new();
@@ -1390,6 +1438,16 @@ impl GameRoom {
                         sitting_at_x: p.sitting_at.map(|(x, _)| x),
                         sitting_at_y: p.sitting_at.map(|(_, y)| y),
                         recipes: p.discovered_recipes.clone(),
+                        bank_slots: p.bank.slots
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(idx, slot)| {
+                                slot.as_ref()
+                                    .filter(|s| s.quantity > 0 && !s.item_id.is_empty())
+                                    .map(|s| (idx, s.item_id.clone(), s.quantity))
+                            })
+                            .collect(),
+                        bank_gold: p.bank.gold,
                     });
                 }
             }
@@ -1421,6 +1479,8 @@ impl GameRoom {
                 current_map: map_ids.get(&pid).cloned(),
                 sitting_at_x: raw.sitting_at_x,
                 sitting_at_y: raw.sitting_at_y,
+                bank_json: serde_json::to_string(&raw.bank_slots).unwrap_or_else(|_| "[]".to_string()),
+                bank_gold: raw.bank_gold,
             };
             result.insert(pid, (save_data, None, raw.recipes));
         }
@@ -1648,6 +1708,7 @@ impl GameRoom {
             x as i32,
             y as i32,
             1, // Default level
+            None,
         );
 
         let mut npcs = self.npcs.write().await;
@@ -3491,6 +3552,16 @@ impl GameRoom {
             return;
         }
 
+        // Banker interaction - open bank vault
+        let is_banker = self.entity_registry.get(&entity_type)
+            .map(|p| p.behaviors.banker)
+            .unwrap_or(false);
+
+        if is_banker {
+            self.handle_bank_open(player_id).await;
+            return;
+        }
+
         // Check entity prototype for behaviors
         let prototype = self.entity_registry.get(&entity_type);
 
@@ -4644,6 +4715,215 @@ impl GameRoom {
             )
             .await;
         }
+    }
+
+    // =========================================================================
+    // Bank Handlers
+    // =========================================================================
+
+    /// Send full bank contents to the player
+    pub async fn handle_bank_open(&self, player_id: &str) {
+        let players = self.players.read().await;
+        let player = match players.get(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        let msg = ServerMessage::BankOpen {
+            slots: player.bank.to_update(),
+            gold: player.bank.gold,
+            max_slots: item::BANK_SIZE as u32,
+        };
+        drop(players);
+        self.send_to_player(player_id, msg).await;
+    }
+
+    /// Deposit an item from inventory into bank
+    pub async fn handle_bank_deposit(&self, player_id: &str, item_id: &str, quantity: i32) {
+        if quantity <= 0 {
+            return;
+        }
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        // Check inventory has the item
+        if !player.inventory.has_item(item_id, quantity) {
+            let msg = ServerMessage::BankResult {
+                success: false,
+                action: "deposit".to_string(),
+                error: Some("Not enough items in inventory.".to_string()),
+            };
+            drop(players);
+            self.send_to_player(player_id, msg).await;
+            return;
+        }
+
+        // Check bank has space
+        if !player.bank.has_space_for(item_id, quantity, &self.item_registry) {
+            let msg = ServerMessage::BankResult {
+                success: false,
+                action: "deposit".to_string(),
+                error: Some("Bank is full.".to_string()),
+            };
+            drop(players);
+            self.send_to_player(player_id, msg).await;
+            return;
+        }
+
+        // Transfer
+        player.inventory.remove_item(item_id, quantity);
+        player.bank.add_item(item_id, quantity, &self.item_registry);
+
+        let inv_msg = ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: player.inventory.to_update(),
+            gold: player.inventory.gold,
+        };
+        let bank_msg = ServerMessage::BankUpdate {
+            slots: player.bank.to_update(),
+            gold: player.bank.gold,
+        };
+        drop(players);
+        self.send_to_player(player_id, inv_msg).await;
+        self.send_to_player(player_id, bank_msg).await;
+    }
+
+    /// Withdraw an item from bank into inventory
+    pub async fn handle_bank_withdraw(&self, player_id: &str, item_id: &str, quantity: i32) {
+        if quantity <= 0 {
+            return;
+        }
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        // Check bank has the item
+        if !player.bank.has_item(item_id, quantity) {
+            let msg = ServerMessage::BankResult {
+                success: false,
+                action: "withdraw".to_string(),
+                error: Some("Not enough items in bank.".to_string()),
+            };
+            drop(players);
+            self.send_to_player(player_id, msg).await;
+            return;
+        }
+
+        // Check inventory has space
+        if !player.inventory.has_space_for(item_id, quantity, &self.item_registry) {
+            let msg = ServerMessage::BankResult {
+                success: false,
+                action: "withdraw".to_string(),
+                error: Some("Inventory is full.".to_string()),
+            };
+            drop(players);
+            self.send_to_player(player_id, msg).await;
+            return;
+        }
+
+        // Transfer
+        player.bank.remove_item(item_id, quantity);
+        player.inventory.add_item(item_id, quantity, &self.item_registry);
+
+        let inv_msg = ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: player.inventory.to_update(),
+            gold: player.inventory.gold,
+        };
+        let bank_msg = ServerMessage::BankUpdate {
+            slots: player.bank.to_update(),
+            gold: player.bank.gold,
+        };
+        drop(players);
+        self.send_to_player(player_id, inv_msg).await;
+        self.send_to_player(player_id, bank_msg).await;
+    }
+
+    /// Deposit gold from inventory into bank
+    pub async fn handle_bank_deposit_gold(&self, player_id: &str, amount: i32) {
+        if amount <= 0 {
+            return;
+        }
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        if player.inventory.gold < amount {
+            let msg = ServerMessage::BankResult {
+                success: false,
+                action: "depositGold".to_string(),
+                error: Some("Not enough gold.".to_string()),
+            };
+            drop(players);
+            self.send_to_player(player_id, msg).await;
+            return;
+        }
+
+        player.inventory.gold -= amount;
+        player.bank.gold += amount;
+
+        let inv_msg = ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: player.inventory.to_update(),
+            gold: player.inventory.gold,
+        };
+        let bank_msg = ServerMessage::BankUpdate {
+            slots: player.bank.to_update(),
+            gold: player.bank.gold,
+        };
+        drop(players);
+        self.send_to_player(player_id, inv_msg).await;
+        self.send_to_player(player_id, bank_msg).await;
+    }
+
+    /// Withdraw gold from bank into inventory
+    pub async fn handle_bank_withdraw_gold(&self, player_id: &str, amount: i32) {
+        if amount <= 0 {
+            return;
+        }
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        if player.bank.gold < amount {
+            let msg = ServerMessage::BankResult {
+                success: false,
+                action: "withdrawGold".to_string(),
+                error: Some("Not enough gold in bank.".to_string()),
+            };
+            drop(players);
+            self.send_to_player(player_id, msg).await;
+            return;
+        }
+
+        player.bank.gold -= amount;
+        player.inventory.gold += amount;
+
+        let inv_msg = ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: player.inventory.to_update(),
+            gold: player.inventory.gold,
+        };
+        let bank_msg = ServerMessage::BankUpdate {
+            slots: player.bank.to_update(),
+            gold: player.bank.gold,
+        };
+        drop(players);
+        self.send_to_player(player_id, inv_msg).await;
+        self.send_to_player(player_id, bank_msg).await;
     }
 
     /// Handle shop buy transaction

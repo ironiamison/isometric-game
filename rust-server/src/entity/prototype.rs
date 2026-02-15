@@ -99,6 +99,8 @@ pub struct RawEntityBehaviors {
     #[serde(default)]
     pub no_shadow: bool,
     pub render_offset_y: Option<f32>,
+    /// Initial facing direction (e.g. "down", "up", "left", "right")
+    pub facing: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -286,6 +288,8 @@ pub struct EntityBehaviors {
     pub wander_pause_max_ms: u64,
     pub no_shadow: bool,
     pub render_offset_y: f32,
+    /// Initial facing direction (e.g. "down", "up", "left", "right")
+    pub facing: Option<String>,
 }
 
 impl Default for EntityBehaviors {
@@ -305,6 +309,7 @@ impl Default for EntityBehaviors {
             wander_pause_max_ms: 5000,
             no_shadow: false,
             render_offset_y: 0.0,
+            facing: None,
         }
     }
 }
@@ -326,6 +331,7 @@ impl From<&RawEntityBehaviors> for EntityBehaviors {
             wander_pause_max_ms: raw.wander_pause_max_ms.unwrap_or(5000),
             no_shadow: raw.no_shadow,
             render_offset_y: raw.render_offset_y.unwrap_or(0.0),
+            facing: raw.facing.clone(),
         }
     }
 }

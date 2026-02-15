@@ -391,6 +391,7 @@ gold_max = 0
 
 [banker.behaviors]
 hostile = false
+banker = true
 wander_enabled = true
 wander_radius = 2
 wander_pause_min_ms = 4000

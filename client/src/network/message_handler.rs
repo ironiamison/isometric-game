@@ -383,6 +383,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let is_quest_giver = extract_bool(npc_value, "is_quest_giver").unwrap_or(false);
                         let is_merchant = extract_bool(npc_value, "is_merchant").unwrap_or(false);
                         let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
+                        let is_banker = extract_bool(npc_value, "is_banker").unwrap_or(false);
                         let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
                         let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
                         let render_offset_y = extract_f32(npc_value, "render_offset_y").unwrap_or(0.0);
@@ -419,6 +420,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.is_quest_giver = is_quest_giver;
                             npc.is_merchant = is_merchant;
                             npc.is_altar = is_altar;
+                            npc.is_banker = is_banker;
                             npc.move_speed = move_speed;
                             npc.no_shadow = no_shadow;
                             npc.render_offset_y = render_offset_y;
@@ -435,6 +437,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.is_quest_giver = is_quest_giver;
                             npc.is_merchant = is_merchant;
                             npc.is_altar = is_altar;
+                            npc.is_banker = is_banker;
                             npc.move_speed = move_speed;
                             npc.no_shadow = no_shadow;
                             npc.render_offset_y = render_offset_y;
@@ -1559,6 +1562,72 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         }
 
         // ========== Shop System Messages ==========
+
+        // ========== Bank System Messages ==========
+
+        "bankOpen" => {
+            if let Some(value) = data {
+                let mut slots = Vec::new();
+                if let Some(slots_arr) = extract_array(value, "slots") {
+                    for slot_value in slots_arr {
+                        let slot = extract_i32(slot_value, "slot").unwrap_or(0) as u8;
+                        let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
+                        let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
+                        if !item_id.is_empty() && quantity > 0 {
+                            slots.push((slot, item_id, quantity));
+                        }
+                    }
+                }
+                let gold = extract_i32(value, "gold").unwrap_or(0);
+                let max_slots = extract_i32(value, "max_slots").unwrap_or(48) as u32;
+
+                log::info!("Bank opened: {} items, {}g, {} max slots", slots.len(), gold, max_slots);
+                state.ui_state.bank_open = true;
+                state.ui_state.bank_slots = vec![None; max_slots as usize];
+                for (slot, item_id, quantity) in slots {
+                    if (slot as usize) < state.ui_state.bank_slots.len() {
+                        state.ui_state.bank_slots[slot as usize] = Some((item_id, quantity));
+                    }
+                }
+                state.ui_state.bank_gold = gold;
+                state.ui_state.bank_max_slots = max_slots;
+                state.pending_sfx.push("ui_open".to_string());
+            }
+        }
+
+        "bankUpdate" => {
+            if let Some(value) = data {
+                // Rebuild slots from server data
+                let mut new_slots = vec![None; state.ui_state.bank_max_slots as usize];
+                if let Some(slots_arr) = extract_array(value, "slots") {
+                    for slot_value in slots_arr {
+                        let slot = extract_i32(slot_value, "slot").unwrap_or(0) as u8;
+                        let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
+                        let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
+                        if !item_id.is_empty() && quantity > 0 && (slot as usize) < new_slots.len() {
+                            new_slots[slot as usize] = Some((item_id, quantity));
+                        }
+                    }
+                }
+                state.ui_state.bank_slots = new_slots;
+                state.ui_state.bank_gold = extract_i32(value, "gold").unwrap_or(state.ui_state.bank_gold);
+            }
+        }
+
+        "bankResult" => {
+            if let Some(value) = data {
+                let success = extract_bool(value, "success").unwrap_or(false);
+                let error = extract_string(value, "error");
+
+                if !success {
+                    if let Some(err) = error {
+                        state.ui_state.chat_messages.push(ChatMessage::system(
+                            format!("Bank: {}", err)
+                        ));
+                    }
+                }
+            }
+        }
 
         "shopData" => {
             if let Some(value) = data {

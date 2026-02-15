@@ -84,6 +84,7 @@ impl Instance {
                     spawn.x,
                     spawn.y,
                     level,
+                    spawn.facing.as_deref(),
                 );
                 npcs.insert(npc_id, npc);
             } else {

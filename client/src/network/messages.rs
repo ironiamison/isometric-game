@@ -82,6 +82,19 @@ pub enum ClientMessage {
     #[serde(rename = "shopSell")]
     ShopSell { npc_id: String, item_id: String, quantity: u32 },
 
+    // Bank commands
+    #[serde(rename = "bankDeposit")]
+    BankDeposit { item_id: String, quantity: i32 },
+
+    #[serde(rename = "bankWithdraw")]
+    BankWithdraw { item_id: String, quantity: i32 },
+
+    #[serde(rename = "bankDepositGold")]
+    BankDepositGold { amount: i32 },
+
+    #[serde(rename = "bankWithdrawGold")]
+    BankWithdrawGold { amount: i32 },
+
     #[serde(rename = "enterPortal")]
     EnterPortal { portal_id: String },
 
@@ -275,6 +288,24 @@ impl ClientMessage {
                 data.insert("itemId".into(), Value::String(item_id.clone().into()));
                 data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
                 "shopSell"
+            }
+            ClientMessage::BankDeposit { item_id, quantity } => {
+                data.insert("item_id".into(), Value::String(item_id.clone().into()));
+                data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
+                "bankDeposit"
+            }
+            ClientMessage::BankWithdraw { item_id, quantity } => {
+                data.insert("item_id".into(), Value::String(item_id.clone().into()));
+                data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
+                "bankWithdraw"
+            }
+            ClientMessage::BankDepositGold { amount } => {
+                data.insert("amount".into(), Value::Integer((*amount as i64).into()));
+                "bankDepositGold"
+            }
+            ClientMessage::BankWithdrawGold { amount } => {
+                data.insert("amount".into(), Value::Integer((*amount as i64).into()));
+                "bankWithdrawGold"
             }
             ClientMessage::EnterPortal { portal_id } => {
                 data.insert("portalId".into(), Value::String(portal_id.clone().into()));
