@@ -247,6 +247,7 @@ hostile = false
 merchant = true
 quest_giver = true
 wander_enabled = false
+facing="right"
 
 [lumberjack_pete.merchant]
 shop_id = "lumberjack"
