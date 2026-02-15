@@ -402,6 +402,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             }
                             npc.hp = hp;
                             npc.max_hp = max_hp;
+                            npc.level = level;
                             // Handle state transitions
                             let new_state = NpcState::from_u8(npc_state);
                             if new_state != NpcState::Dead {
