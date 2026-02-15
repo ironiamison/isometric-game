@@ -4425,7 +4425,7 @@
       "y": 24,
       "width": 1,
       "height": 1,
-      "targetMap": "player_house",
+      "targetMap": "starting_bank",
       "targetSpawn": "entrance"
     }
   ],
