@@ -460,7 +460,7 @@
       381,
       405,
       972,
-      972,
+      1,
       433,
       381,
       381,
@@ -490,7 +490,7 @@
       15,
       15,
       381,
-      381,
+      1,
       405,
       294,
       294,
@@ -522,7 +522,7 @@
       381,
       381,
       381,
-      381,
+      1,
       405,
       294,
       972,
@@ -555,7 +555,7 @@
       381,
       381,
       381,
-      381,
+      1,
       405,
       972,
       972,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAA/AAAAwYBAAIDAgACAQQAAgEYAEIBIAACAkBiAAKA/wACgCEABIABAAiAGQAIgAlAEIAJACCAGXBAgA9QgOABUAATBRAAFAVQABT/UAAUAHAAFwAAABEAAMARAP976P8=",
+  "collision": "AAAAAEAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAIAA/AAAAwYBAAIDAgACQQQAAgEYAEIBIAACAkBiAAKA/wATgKEABAABAAiAGQAIgAlAEIAJACCAGXBAwg9QwOABUAATBRAAFAVQABT/UAAUAHAAFwAAABEAAMBxAP976P8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3651,6 +3651,83 @@
       "y": 21,
       "width": 40,
       "height": 51
+    },
+    {
+      "gid": 2369,
+      "x": 14,
+      "y": 11,
+      "width": 67,
+      "height": 49
+    },
+    {
+      "gid": 2374,
+      "x": 21,
+      "y": 30,
+      "width": 26,
+      "height": 67
+    },
+    {
+      "gid": 2374,
+      "x": 22,
+      "y": 30,
+      "width": 26,
+      "height": 67
+    },
+    {
+      "gid": 2264,
+      "x": 6,
+      "y": 1,
+      "width": 33,
+      "height": 56
+    },
+    {
+      "gid": 2264,
+      "x": 9,
+      "y": 2,
+      "width": 33,
+      "height": 56
+    },
+    {
+      "gid": 2257,
+      "x": 8,
+      "y": 16,
+      "width": 25,
+      "height": 42
+    },
+    {
+      "gid": 2331,
+      "x": 14,
+      "y": 23,
+      "width": 29,
+      "height": 61
+    },
+    {
+      "gid": 2343,
+      "x": 31,
+      "y": 16,
+      "width": 39,
+      "height": 61
+    },
+    {
+      "gid": 2368,
+      "x": 17,
+      "y": 22,
+      "width": 65,
+      "height": 49
+    },
+    {
+      "gid": 2379,
+      "x": 22,
+      "y": 22,
+      "width": 41,
+      "height": 26
+    },
+    {
+      "gid": 2375,
+      "x": 12,
+      "y": 16,
+      "width": 26,
+      "height": 38
     }
   ],
   "walls": [
