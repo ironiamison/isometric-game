@@ -306,7 +306,7 @@ export class IsometricRenderer {
     const worldCoord: WorldCoord = { wx: obj.x, wy: obj.y };
     const screen = worldToScreen(worldCoord, viewport);
 
-    const objDef = objectLoader.getObjectByGid(obj.gid);
+    const objDef = objectLoader.getObject(objectLoader.gidToId(obj.gid));
 
     if (objDef?.image) {
       const scaledWidth = obj.width * viewport.zoom;
@@ -335,7 +335,7 @@ export class IsometricRenderer {
     const worldCoord: WorldCoord = { wx: wall.x, wy: wall.y };
     const screen = worldToScreen(worldCoord, viewport);
 
-    const objDef = objectLoader.getObjectByGid(wall.gid);
+    const objDef = objectLoader.getWallByGid(wall.gid);
 
     if (objDef?.image) {
       const scaledWidth = objDef.image.width * viewport.zoom;
@@ -635,8 +635,8 @@ export class IsometricRenderer {
     const worldCoord = chunkLocalToWorld(chunk.coord, { lx: obj.x, ly: obj.y });
     const screen = worldToScreen(worldCoord, viewport);
 
-    // Get the object definition from objectLoader using the gid
-    const objDef = objectLoader.getObjectByGid(obj.gid);
+    // Get the object definition using object-specific lookup (not getObjectByGid which checks walls first)
+    const objDef = objectLoader.getObject(objectLoader.gidToId(obj.gid));
 
     if (objDef?.image) {
       // Calculate draw position - objects are anchored at their base tile
@@ -668,8 +668,8 @@ export class IsometricRenderer {
     const worldCoord = chunkLocalToWorld(chunk.coord, { lx: wall.x, ly: wall.y });
     const screen = worldToScreen(worldCoord, viewport);
 
-    // Get the object definition from objectLoader using the gid
-    const objDef = objectLoader.getObjectByGid(wall.gid);
+    // Get the wall definition using wall-specific lookup
+    const objDef = objectLoader.getWallByGid(wall.gid);
 
     if (objDef?.image) {
       const scaledWidth = objDef.image.width * viewport.zoom;

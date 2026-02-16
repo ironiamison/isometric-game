@@ -530,7 +530,7 @@ export function PropertiesPanel() {
   // Show object properties
   if (selectedObject) {
     const { object, chunkCoord } = selectedObject;
-    const objDef = objectLoader.getObjectByGid(object.gid);
+    const objDef = objectLoader.getObject(objectLoader.gidToId(object.gid));
 
     const handleDelete = () => {
       removeMapObject(chunkCoord, object.id);
