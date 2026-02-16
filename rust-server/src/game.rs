@@ -13,7 +13,7 @@ use crate::skills::{Skills, SkillType, calculate_hit, calculate_max_hit, roll_da
 use crate::item::{self, GroundItem, Inventory, GOLD_ITEM_ID};
 use crate::npc::{Npc, NpcUpdate};
 use crate::protocol::{ServerMessage, QuestObjectiveData};
-use crate::quest::{QuestRegistry, QuestRunner, PlayerQuestState, QuestEvent};
+use crate::quest::{QuestRegistry, QuestRunner, PlayerQuestState, QuestEvent, ObjectiveType};
 use crate::shop::{ShopRegistry, ShopDefinition, ShopStockItem};
 use crate::world::World;
 
@@ -4066,9 +4066,17 @@ impl GameRoom {
                             };
                             self.send_to_player(player_id, msg).await;
 
-                            // Grant rewards
+                            // Remove collected quest items and grant rewards
                             let mut players = self.players.write().await;
                             if let Some(player) = players.get_mut(player_id) {
+                                // Remove items required by CollectItem objectives
+                                for objective in &quest.objectives {
+                                    if objective.objective_type == ObjectiveType::CollectItem {
+                                        player.inventory.remove_item(&objective.target, objective.count);
+                                    }
+                                }
+
+                                // Grant rewards
                                 player.inventory.gold += quest.rewards.gold;
                                 for item_reward in &quest.rewards.items {
                                     player.inventory.add_item(&item_reward.item_id, item_reward.count, &self.item_registry);
@@ -4275,8 +4283,17 @@ impl GameRoom {
                         };
                         self.send_to_player(player_id, msg).await;
 
+                        // Remove collected quest items and grant rewards
                         let mut players = self.players.write().await;
                         if let Some(player) = players.get_mut(player_id) {
+                            // Remove items required by CollectItem objectives
+                            for objective in &quest.objectives {
+                                if objective.objective_type == ObjectiveType::CollectItem {
+                                    player.inventory.remove_item(&objective.target, objective.count);
+                                }
+                            }
+
+                            // Grant rewards
                             player.inventory.gold += quest.rewards.gold;
                             for item_reward in &quest.rewards.items {
                                 player.inventory.add_item(&item_reward.item_id, item_reward.count, &self.item_registry);
@@ -6392,6 +6409,9 @@ impl GameRoom {
                             xp_gained: result.xp_gained,
                         }).await;
 
+                        // Process quest item collection for woodcutting drops
+                        self.process_quest_item_collect(player_id, &result.log_item_id, 1).await;
+
                         // Handle level up
                         if leveled_up {
                             self.broadcast(ServerMessage::SkillLevelUp {
@@ -8403,6 +8423,9 @@ impl GameRoom {
 
         // Phase 2: Send messages (no locks held)
         for tick in gather_ticks {
+            // Process quest item collection for gathering drops
+            self.process_quest_item_collect(&tick.pid, &tick.item_id, 1).await;
+
             self.send_to_player(&tick.pid, ServerMessage::GatheringResult {
                 player_id: tick.pid.clone(),
                 item_id: tick.item_id,
