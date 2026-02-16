@@ -8365,6 +8365,13 @@ impl GameRoom {
                 // Delta sync: only encode changed/new entities + removal lists
                 let mut changed_players: Vec<rmpv::Value> = Vec::new();
                 for (id, update) in &nearby_players {
+                    // Always include the receiving player's own update — the client
+                    // needs continuous position confirmation to correct mispredictions
+                    // (e.g. rejected moves hitting walls/NPCs).
+                    if id == player_id.as_str() {
+                        changed_players.push(crate::protocol::player_update_to_value(update));
+                        continue;
+                    }
                     match sync_state.last_players.get(id) {
                         Some(last) if last == *update => {} // unchanged, skip
                         _ => changed_players.push(crate::protocol::player_update_to_value(update)),
@@ -8388,13 +8395,6 @@ impl GameRoom {
                     .filter(|id| !nearby_npcs.contains_key(id.as_str()))
                     .cloned()
                     .collect();
-
-                // Skip sending if nothing changed
-                if changed_players.is_empty() && changed_npcs.is_empty()
-                    && removed_players.is_empty() && removed_npcs.is_empty()
-                {
-                    continue;
-                }
 
                 if let Ok(raw) = crate::protocol::encode_delta_state_sync(
                     tick, changed_players, changed_npcs, "", false, &removed_players, &removed_npcs,
