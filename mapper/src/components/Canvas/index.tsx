@@ -72,6 +72,8 @@ export function Canvas() {
     removeExitPortal,
     findExitPortalAt,
     setSelectedExitPortal,
+    setSelectedInteriorEntity,
+    setSelectedInteriorMapObject,
   } = useEditorStore();
 
   // Setup canvas and renderer
@@ -279,19 +281,35 @@ export function Canvas() {
               fillInteriorTiles(worldTile.wx, worldTile.wy, activeLayer, selectedTileId);
             }
             break;
-          case Tool.Entity:
-            if (selectedEntityId) {
+          case Tool.Entity: {
+            // Check for existing entity to select
+            const existingInteriorEntity = currentInterior.entities.find(
+              (e) => e.x === worldTile.wx && e.y === worldTile.wy
+            );
+            if (existingInteriorEntity) {
+              setSelectedInteriorEntity(existingInteriorEntity.id);
+              setSelectedInteriorMapObject(null);
+            } else if (selectedEntityId) {
               addInteriorEntity(worldTile.wx, worldTile.wy, selectedEntityId);
             }
             break;
-          case Tool.Object:
-            if (selectedObjectId) {
+          }
+          case Tool.Object: {
+            // Check for existing object to select
+            const existingInteriorObj = currentInterior.mapObjects.find(
+              (o) => o.x === worldTile.wx && o.y === worldTile.wy
+            );
+            if (existingInteriorObj) {
+              setSelectedInteriorMapObject(existingInteriorObj.id);
+              setSelectedInteriorEntity(null);
+            } else if (selectedObjectId) {
               const objDef = objectLoader.getObject(selectedObjectId);
               if (objDef) {
                 addInteriorMapObject(worldTile.wx, worldTile.wy, selectedObjectId, objDef.width, objDef.height);
               }
             }
             break;
+          }
           case Tool.Eyedropper: {
             const index = worldTile.wy * currentInterior.width + worldTile.wx;
             const layerKey =
@@ -593,6 +611,8 @@ export function Canvas() {
       removeExitPortal,
       findExitPortalAt,
       setSelectedExitPortal,
+      setSelectedInteriorEntity,
+      setSelectedInteriorMapObject,
     ]
   );
 

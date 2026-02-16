@@ -41,6 +41,14 @@ export function PropertiesPanel() {
     removeExitPortal,
     jumpToPortalTarget,
     jumpToExitPortalTarget,
+    editorMode,
+    selectedInteriorEntity,
+    selectedInteriorMapObject,
+    setSelectedInteriorEntity,
+    setSelectedInteriorMapObject,
+    removeInteriorEntity,
+    removeInteriorMapObject,
+    updateInteriorEntity,
   } = useEditorStore();
 
   // Get the actual entity spawn from the selection
@@ -99,11 +107,25 @@ export function PropertiesPanel() {
     return { zone, chunkCoord: selectedGatheringZone.chunkCoord };
   };
 
+  // Get selected interior entity from currentInterior
+  const getSelectedInteriorEntityData = () => {
+    if (!selectedInteriorEntity || !currentInterior) return null;
+    return currentInterior.entities.find((e) => e.id === selectedInteriorEntity) || null;
+  };
+
+  // Get selected interior map object from currentInterior
+  const getSelectedInteriorMapObjectData = () => {
+    if (!selectedInteriorMapObject || !currentInterior) return null;
+    return currentInterior.mapObjects.find((o) => o.id === selectedInteriorMapObject) || null;
+  };
+
   const selectedEntity = getSelectedEntity();
   const selectedObject = getSelectedObject();
   const selectedPortalData = getSelectedPortalData();
   const selectedExitPortalData = getSelectedExitPortalData();
   const selectedGatheringZoneData = getSelectedGatheringZoneData();
+  const interiorEntityData = getSelectedInteriorEntityData();
+  const interiorObjectData = getSelectedInteriorMapObjectData();
 
   // Delete key handler
   useEffect(() => {
@@ -133,13 +155,21 @@ export function PropertiesPanel() {
           e.preventDefault();
           removeExitPortal(selectedExitPortalData.id);
           setSelectedExitPortal(null);
+        } else if (interiorEntityData) {
+          e.preventDefault();
+          removeInteriorEntity(interiorEntityData.id);
+          setSelectedInteriorEntity(null);
+        } else if (interiorObjectData) {
+          e.preventDefault();
+          removeInteriorMapObject(interiorObjectData.id);
+          setSelectedInteriorMapObject(null);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity, selectedObject, selectedPortalData, selectedGatheringZoneData, selectedExitPortalData, removeEntity, removeMapObject, removePortal, removeGatheringZone, removeExitPortal, setSelectedEntitySpawn, setSelectedMapObject, setSelectedPortal, setSelectedGatheringZone, setSelectedExitPortal]);
+  }, [selectedEntity, selectedObject, selectedPortalData, selectedGatheringZoneData, selectedExitPortalData, interiorEntityData, interiorObjectData, removeEntity, removeMapObject, removePortal, removeGatheringZone, removeExitPortal, removeInteriorEntity, removeInteriorMapObject, setSelectedEntitySpawn, setSelectedMapObject, setSelectedPortal, setSelectedGatheringZone, setSelectedExitPortal, setSelectedInteriorEntity, setSelectedInteriorMapObject]);
 
   // Show portal properties
   if (selectedPortalData) {
@@ -570,6 +600,145 @@ export function PropertiesPanel() {
             Position: {object.x}, {object.y}
             <br />
             Chunk: {chunkCoord.cx}, {chunkCoord.cy}
+          </div>
+
+          <div className={styles.actions}>
+            <button className={styles.deleteButton} onClick={handleDelete}>
+              Delete Object
+            </button>
+          </div>
+          <div className={styles.hint}>Press Delete to remove</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show interior entity properties
+  if (interiorEntityData && editorMode === 'interior') {
+    const spawn = interiorEntityData;
+
+    const handleChange = (field: keyof EntitySpawn, value: string | number | boolean) => {
+      updateInteriorEntity(spawn.id, { [field]: value });
+    };
+
+    const handleDelete = () => {
+      removeInteriorEntity(spawn.id);
+      setSelectedInteriorEntity(null);
+    };
+
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>Interior Entity Properties</div>
+        <div className={styles.content}>
+          <div className={styles.field}>
+            <label className={styles.label}>Entity ID</label>
+            <input
+              type="text"
+              className={styles.input}
+              value={spawn.entityId}
+              onChange={(e) => handleChange('entityId', e.target.value)}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Name</label>
+            <input
+              type="text"
+              className={styles.input}
+              value={spawn.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Level</label>
+            <input
+              type="number"
+              className={styles.input}
+              value={spawn.level}
+              min={1}
+              onChange={(e) => handleChange('level', parseInt(e.target.value) || 1)}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Unique ID</label>
+            <input
+              type="text"
+              className={styles.input}
+              value={spawn.uniqueId || ''}
+              placeholder="Optional"
+              onChange={(e) => handleChange('uniqueId', e.target.value)}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Facing</label>
+            <select
+              className={styles.select}
+              value={spawn.facing || ''}
+              onChange={(e) => handleChange('facing', e.target.value)}
+            >
+              <option value="">Default</option>
+              <option value="north">North</option>
+              <option value="south">South</option>
+              <option value="east">East</option>
+              <option value="west">West</option>
+            </select>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={spawn.respawn ?? false}
+                onChange={(e) => handleChange('respawn', e.target.checked)}
+              />
+              Respawn
+            </label>
+          </div>
+
+          <div className={styles.info}>
+            Position: {spawn.x}, {spawn.y}
+          </div>
+
+          <div className={styles.actions}>
+            <button className={styles.deleteButton} onClick={handleDelete}>
+              Delete Entity
+            </button>
+          </div>
+          <div className={styles.hint}>Press Delete to remove</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show interior object properties
+  if (interiorObjectData && editorMode === 'interior') {
+    const object = interiorObjectData;
+    const objDef = objectLoader.getObject(objectLoader.gidToId(object.gid));
+
+    const handleDelete = () => {
+      removeInteriorMapObject(object.id);
+      setSelectedInteriorMapObject(null);
+    };
+
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>Interior Object Properties</div>
+        <div className={styles.content}>
+          <div className={styles.field}>
+            <label className={styles.label}>Type</label>
+            <div className={styles.value}>{objDef?.name || `GID: ${object.gid}`}</div>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Size</label>
+            <div className={styles.value}>{object.width} x {object.height} px</div>
+          </div>
+
+          <div className={styles.info}>
+            Position: {object.x}, {object.y}
           </div>
 
           <div className={styles.actions}>

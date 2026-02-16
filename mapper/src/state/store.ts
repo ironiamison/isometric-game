@@ -76,6 +76,8 @@ interface EditorState {
   currentInterior: InteriorMap | null;
   selectedExitPortal: { portalId: string } | null;
   selectedSpawnPoint: string | null;
+  selectedInteriorEntity: string | null;
+  selectedInteriorMapObject: string | null;
 
   // View state
   viewport: Viewport;
@@ -249,6 +251,10 @@ interface EditorActions {
   addInteriorMapObject: (x: number, y: number, objectId: number, width: number, height: number) => MapObject;
   removeInteriorMapObject: (objectId: string) => void;
 
+  // Interior selection actions
+  setSelectedInteriorEntity: (entityId: string | null) => void;
+  setSelectedInteriorMapObject: (objectId: string | null) => void;
+
   // Interior wall actions
   toggleInteriorWall: (x: number, y: number, edge: WallEdge, gid: number) => void;
 
@@ -287,6 +293,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   currentInterior: null,
   selectedExitPortal: null,
   selectedSpawnPoint: null,
+  selectedInteriorEntity: null,
+  selectedInteriorMapObject: null,
 
   viewport: {
     offsetX: 400,
@@ -1358,6 +1366,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       currentInterior: null,
       selectedExitPortal: null,
       selectedSpawnPoint: null,
+      selectedInteriorEntity: null,
+      selectedInteriorMapObject: null,
     });
   },
 
@@ -1384,6 +1394,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       selectedGatheringZone: null,
       selectedEntitySpawn: null,
       selectedMapObject: null,
+      selectedInteriorEntity: null,
+      selectedInteriorMapObject: null,
       viewport: {
         ...viewport,
         offsetX: 400 - screenX * viewport.zoom,
@@ -1420,6 +1432,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         selectedPortal: null,
         selectedEntitySpawn: null,
         selectedMapObject: null,
+        selectedInteriorEntity: null,
+        selectedInteriorMapObject: null,
         viewport: {
           ...viewport,
           offsetX: 400 - screenX * viewport.zoom,
@@ -1704,6 +1718,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   },
 
   setSelectedSpawnPoint: (name) => set({ selectedSpawnPoint: name }),
+
+  setSelectedInteriorEntity: (entityId) => set({ selectedInteriorEntity: entityId }),
+  setSelectedInteriorMapObject: (objectId) => set({ selectedInteriorMapObject: objectId }),
 
   // Exit portal actions
   addExitPortal: (x, y) => {

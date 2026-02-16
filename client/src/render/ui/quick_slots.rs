@@ -197,12 +197,12 @@ impl Renderer {
                     } else {
                         format!("{:.1}", remaining)
                     };
-                    let cd_w = self.measure_text_sharp(&cd_text, 14.0).width;
+                    let cd_w = self.measure_text_sharp(&cd_text, 16.0).width;
                     self.draw_text_sharp(
                         &cd_text,
                         x + (slot_size - cd_w) / 2.0,
                         y + slot_size / 2.0 + 4.0,
-                        14.0,
+                        16.0,
                         WHITE,
                     );
                 } else if insufficient_mana {
