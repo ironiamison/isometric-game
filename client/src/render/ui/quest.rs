@@ -45,9 +45,6 @@ impl Renderer {
         // Title
         self.draw_text_sharp("QUEST LOG", header_x + 12.0, header_y + 26.0, 16.0, TEXT_TITLE);
 
-        // Close hint (right side)
-        self.draw_text_sharp("[Q] Close", header_x + header_w - 80.0, header_y + 26.0, 16.0, TEXT_DIM);
-
         // ===== CONTENT AREA =====
         let content_x = panel_x + FRAME_THICKNESS + 8.0;
         let content_y = panel_y + FRAME_THICKNESS + HEADER_HEIGHT + 8.0;
@@ -152,8 +149,6 @@ impl Renderer {
 
         draw_rectangle(footer_x, footer_y, footer_w, FOOTER_HEIGHT, FOOTER_BG);
         draw_line(footer_x + 10.0, footer_y, footer_x + footer_w - 10.0, footer_y, 1.0, HEADER_BORDER);
-
-        self.draw_text_sharp("[Q] Close", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
 
         let quest_count = state.ui_state.active_quests.len();
         let count_text = format!("{} Active", quest_count);
