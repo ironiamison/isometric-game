@@ -76,8 +76,11 @@ export class IsometricRenderer {
 
     this.clear();
 
+    // Filter to only visible chunks before sorting
+    const visibleChunks = chunks.filter(chunk => this.isChunkVisible(chunk, viewport));
+
     // Sort chunks for proper depth ordering (back to front)
-    const sortedChunks = [...chunks].sort((a, b) => {
+    const sortedChunks = visibleChunks.sort((a, b) => {
       const sumA = a.coord.cx + a.coord.cy;
       const sumB = b.coord.cx + b.coord.cy;
       return sumA - sumB;
@@ -486,6 +489,30 @@ export class IsometricRenderer {
         );
       }
     }
+  }
+
+  private isChunkVisible(chunk: Chunk, viewport: Viewport): boolean {
+    if (!this.canvas) return true;
+
+    const cx = chunk.coord.cx;
+    const cy = chunk.coord.cy;
+
+    // Compute screen positions of the 4 world corners of this chunk
+    const c0 = worldToScreen({ wx: cx * CHUNK_SIZE, wy: cy * CHUNK_SIZE }, viewport);
+    const c1 = worldToScreen({ wx: (cx + 1) * CHUNK_SIZE, wy: cy * CHUNK_SIZE }, viewport);
+    const c2 = worldToScreen({ wx: (cx + 1) * CHUNK_SIZE, wy: (cy + 1) * CHUNK_SIZE }, viewport);
+    const c3 = worldToScreen({ wx: cx * CHUNK_SIZE, wy: (cy + 1) * CHUNK_SIZE }, viewport);
+
+    const minSx = Math.min(c0.sx, c1.sx, c2.sx, c3.sx);
+    const maxSx = Math.max(c0.sx, c1.sx, c2.sx, c3.sx);
+    const minSy = Math.min(c0.sy, c1.sy, c2.sy, c3.sy);
+    const maxSy = Math.max(c0.sy, c1.sy, c2.sy, c3.sy);
+
+    // Generous vertical padding for tall objects/walls that extend above their base tile
+    const TALL_SPRITE_PADDING = 500 * viewport.zoom;
+
+    return maxSx >= 0 && minSx <= this.canvas.width &&
+           maxSy >= 0 && (minSy - TALL_SPRITE_PADDING) <= this.canvas.height;
   }
 
   private renderChunk(chunk: Chunk, viewport: Viewport): void {
