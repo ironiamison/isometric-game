@@ -2510,6 +2510,9 @@ async fn handle_client_message(
         ClientMessage::Move { dx, dy } => {
             room.handle_move(player_id, dx, dy).await;
         }
+        ClientMessage::Dash => {
+            room.handle_dash(player_id).await;
+        }
         ClientMessage::Face { direction } => {
             room.handle_face(player_id, direction).await;
         }

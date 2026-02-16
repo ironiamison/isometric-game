@@ -26,6 +26,10 @@ const TICK_RATE: f32 = 20.0;
 // Grid-based movement: ticks between tile moves (5 ticks * 50ms = 250ms per tile)
 const MOVE_COOLDOWN_TICKS: u64 = 5;
 
+// Dash: 3 tiles forward, 3 second cooldown (60 ticks at 20Hz)
+const DASH_COOLDOWN_TICKS: u64 = 60;
+const DASH_DISTANCE: i32 = 3;
+
 const MAP_WIDTH: u32 = 32;
 const MAP_HEIGHT: u32 = 32;
 const STARTING_HP: i32 = 100;
@@ -279,6 +283,10 @@ pub struct Player {
     pub active_buffs: Vec<ActiveBuff>,
     /// Bank vault for storing items safely
     pub bank: item::Bank,
+    /// Tick when player last dashed (for cooldown)
+    pub last_dash_tick: u64,
+    /// True during the tick the player dashed (for StateSync broadcast)
+    pub is_dashing: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -337,6 +345,8 @@ impl Player {
             spell_cooldowns: HashMap::new(),
             active_buffs: Vec::new(),
             bank: item::Bank::new(),
+            last_dash_tick: 0,
+            is_dashing: false,
         }
     }
 
@@ -578,6 +588,7 @@ pub struct PlayerUpdate {
     pub sitting: bool,
     pub is_gathering: bool,
     pub is_woodcutting: bool,
+    pub dashing: bool,
     pub mp: i32,
     pub max_mp: i32,
 }
@@ -1745,6 +1756,8 @@ impl GameRoom {
             magic_xp: p.skills.magic.xp,
             woodcutting_level: p.skills.woodcutting.level,
             woodcutting_xp: p.skills.woodcutting.xp,
+            alchemy_level: p.skills.alchemy.level,
+            alchemy_xp: p.skills.alchemy.xp,
         })
     }
 
@@ -1854,6 +1867,115 @@ impl GameRoom {
                 if chair.occupied_by.as_deref() == Some(player_id) {
                     chair.occupied_by = None;
                 }
+            }
+        }
+    }
+
+    /// Handle dash - slide up to DASH_DISTANCE tiles in current facing direction
+    pub async fn handle_dash(&self, player_id: &str) {
+        let current_tick = *self.tick.read().await;
+
+        // Get player state and validate
+        let (px, py, direction, last_dash_tick, is_sitting, is_dead, active) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => (p.x, p.y, p.direction, p.last_dash_tick, p.sitting_at.is_some(), p.is_dead, p.active),
+                None => return,
+            }
+        };
+
+        if !active || is_dead || is_sitting {
+            return;
+        }
+
+        // Check cooldown
+        if current_tick.saturating_sub(last_dash_tick) < DASH_COOLDOWN_TICKS {
+            return;
+        }
+
+        // Get direction vector
+        let (dx, dy) = match direction {
+            Direction::Up => (0, -1),
+            Direction::Down => (0, 1),
+            Direction::Left => (-1, 0),
+            Direction::Right => (1, 0),
+            _ => return,
+        };
+
+        // Snapshot collision data
+        let player_inst = self.player_instances.read().await.get(player_id).cloned();
+        let is_overworld = player_inst.is_none();
+
+        let (overworld_player_pos, npc_positions, chair_positions) = {
+            let players = self.players.read().await;
+            let instances = self.player_instances.read().await;
+            let overworld: std::collections::HashSet<(i32, i32)> = players.values()
+                .filter(|p| p.active && !p.is_dead && p.id != player_id && !instances.contains_key(&p.id))
+                .map(|p| (p.x, p.y))
+                .collect();
+            drop(instances);
+            drop(players);
+
+            let npcs = self.npcs.read().await;
+            let npc_pos: std::collections::HashSet<(i32, i32)> = npcs.values()
+                .filter(|n| n.is_alive())
+                .map(|n| (n.x, n.y))
+                .collect();
+            drop(npcs);
+
+            let chairs = self.chairs.read().await;
+            let chair_pos: std::collections::HashSet<(i32, i32)> = chairs.keys().cloned().collect();
+            drop(chairs);
+
+            (overworld, npc_pos, chair_pos)
+        };
+
+        // Walk up to DASH_DISTANCE tiles, stopping at first collision
+        let chunks_guard = self.world.chunks_read().await;
+        let mut final_x = px;
+        let mut final_y = py;
+
+        for step in 1..=DASH_DISTANCE {
+            let check_x = px + dx * step;
+            let check_y = py + dy * step;
+
+            if is_overworld {
+                // Check tile walkability
+                let coord = crate::chunk::ChunkCoord::from_world(check_x, check_y);
+                let walkable = if let Some(chunk) = chunks_guard.get(&coord) {
+                    let (lx, ly) = crate::chunk::world_to_local(check_x, check_y);
+                    chunk.is_walkable_local(lx, ly)
+                } else {
+                    false
+                };
+                if !walkable { break; }
+
+                if overworld_player_pos.contains(&(check_x, check_y)) { break; }
+                if npc_positions.contains(&(check_x, check_y)) { break; }
+                if chair_positions.contains(&(check_x, check_y)) { break; }
+            }
+
+            final_x = check_x;
+            final_y = check_y;
+        }
+        drop(chunks_guard);
+
+        // Only dash if we can move at least 1 tile
+        if final_x == px && final_y == py {
+            return;
+        }
+
+        // Apply the dash
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.x = final_x;
+                player.y = final_y;
+                player.last_dash_tick = current_tick;
+                player.last_move_tick = current_tick;
+                player.is_dashing = true;
+                player.move_dx = 0;
+                player.move_dy = 0;
             }
         }
     }
@@ -7849,12 +7971,21 @@ impl GameRoom {
                     sitting: player.sitting_at.is_some(),
                     is_gathering: gathering_player_ids.contains(&player.id),
                     is_woodcutting: woodcutting_player_ids.contains(&player.id),
+                    dashing: player.is_dashing,
                     mp: player.mp,
                     max_mp: player.max_mp(),
                 });
             }
             player_updates
         };
+
+        // Clear dash flag after snapshotting for StateSync
+        {
+            let mut players = self.players.write().await;
+            for player in players.values_mut() {
+                player.is_dashing = false;
+            }
+        }
 
         // Stop gathering for any player who moved
         {

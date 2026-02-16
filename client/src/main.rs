@@ -556,6 +556,7 @@ fn run_game_frame(
             InputCommand::PrayAtAltar { altar_id } => ClientMessage::PrayAtAltar { altar_id: altar_id.clone() },
             // Spell commands
             InputCommand::CastSpell { spell_id } => ClientMessage::CastSpell { spell_id: spell_id.clone() },
+            InputCommand::Dash => ClientMessage::Dash,
         };
         network.send(&msg);
     }

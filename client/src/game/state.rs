@@ -1132,6 +1132,8 @@ pub struct GameState {
 
     /// Depleted trees (position -> info for respawn timer)
     pub depleted_trees: HashMap<(i32, i32), DepletedTreeInfo>,
+    /// Local dash cooldown tracking (game time when dash becomes available again)
+    pub dash_cooldown_end: f64,
     /// Whether the local player is currently woodcutting
     pub is_woodcutting: bool,
     /// Timestamp when woodcutting started
@@ -1271,6 +1273,7 @@ impl GameState {
             gathering_started_at: 0.0,
             bonus_tiles: Vec::new(),
             gathering_buff: None,
+            dash_cooldown_end: 0.0,
             depleted_trees: HashMap::new(),
             is_woodcutting: false,
             woodcutting_started_at: 0.0,

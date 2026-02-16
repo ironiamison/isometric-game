@@ -15,6 +15,9 @@ pub enum ClientMessage {
     #[serde(rename = "move")]
     Move { dx: f32, dy: f32 },
 
+    #[serde(rename = "dash")]
+    Dash,
+
     #[serde(rename = "face")]
     Face { direction: u8 },
 
@@ -187,6 +190,9 @@ impl ClientMessage {
                 data.insert("dx".into(), Value::F64(*dx as f64));
                 data.insert("dy".into(), Value::F64(*dy as f64));
                 "move"
+            }
+            ClientMessage::Dash => {
+                "dash"
             }
             ClientMessage::Face { direction } => {
                 data.insert("direction".into(), Value::Integer((*direction as i64).into()));

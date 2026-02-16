@@ -130,6 +130,8 @@ pub struct Player {
     pub woodcutting_started_at: f64,
     pub last_woodcutting_anim: f64,
 
+    /// Whether this player is currently in a dash slide
+    pub is_dashing: bool,
 }
 
 impl Player {
@@ -175,6 +177,7 @@ impl Player {
             is_woodcutting: false,
             woodcutting_started_at: 0.0,
             last_woodcutting_anim: 0.0,
+            is_dashing: false,
         }
     }
 
@@ -292,6 +295,17 @@ impl Player {
             self.direction = dir;
         }
 
+        // If dashing, set target to new position for fast slide interpolation (don't snap)
+        if self.is_dashing {
+            self.server_x = x;
+            self.server_y = y;
+            self.target_x = x;
+            self.target_y = y;
+            self.vel_x = 0.0;
+            self.vel_y = 0.0;
+            return;
+        }
+
         // Teleport detection (>2 tiles = snap immediately)
         let dist = ((self.x - x).powi(2) + (self.y - y).powi(2)).sqrt();
         if dist > 2.0 {
@@ -357,8 +371,11 @@ impl Player {
             self.x = self.target_x;
             self.y = self.target_y;
             self.is_moving = false;
+            self.is_dashing = false; // Dash slide complete
         } else {
-            let mut budget = VISUAL_SPEED * delta;
+            // Use fast speed during dash (24 tiles/sec vs normal 4)
+            let speed = if self.is_dashing { 24.0 } else { VISUAL_SPEED };
+            let mut budget = speed * delta;
 
             // Axis-aligned movement: resolve smaller displacement first,
             // then use remaining budget on the larger axis.
@@ -404,6 +421,14 @@ impl Player {
     /// Update animation state and frame
     /// Only syncs animation direction when movement aligns (prevents moonwalking)
     fn update_animation(&mut self, delta: f32, movement_dir: Option<Direction>) {
+        // During dash, freeze on walking frame 1 (mid-stride)
+        if self.is_dashing {
+            self.animation.state = AnimationState::Walking;
+            self.animation.frame = 1.0;
+            self.animation.direction = self.direction;
+            return;
+        }
+
         // Handle action animations (attack, cast, etc) - they take priority
         let in_action = self.animation.state == AnimationState::Attacking
             || self.animation.state == AnimationState::Casting

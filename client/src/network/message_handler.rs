@@ -150,6 +150,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 dir
                             };
 
+                            // Check if player is dashing (set before set_server_state so it handles interpolation)
+                            let dashing = extract_bool(player_value, "dashing").unwrap_or(false);
+                            if dashing {
+                                player.is_dashing = true;
+                            }
+
                             if let (Some(x), Some(y)) = (x, y) {
                                 // Set server state - local player direction only updates when moving
                                 player.set_server_state(x as f32, y as f32, vel_x, vel_y, dir, is_local_player);
@@ -287,6 +293,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 if is_woodcutting {
                                     new_player.is_woodcutting = true;
                                     new_player.woodcutting_started_at = macroquad::time::get_time();
+                                }
+                                let dashing = extract_bool(player_value, "dashing").unwrap_or(false);
+                                if dashing {
+                                    new_player.is_dashing = true;
                                 }
                                 if let Some(hp_val) = hp {
                                     new_player.hp = hp_val;
@@ -863,8 +873,20 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(xp) = extract_i32(value, "magic_xp") {
                             player.skills.magic.xp = xp as i64;
                         }
+                        if let Some(level) = extract_i32(value, "woodcutting_level") {
+                            player.skills.woodcutting.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "woodcutting_xp") {
+                            player.skills.woodcutting.xp = xp as i64;
+                        }
+                        if let Some(level) = extract_i32(value, "alchemy_level") {
+                            player.skills.alchemy.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "alchemy_xp") {
+                            player.skills.alchemy.xp = xp as i64;
+                        }
 
-                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}",
+                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}",
                             player_id,
                             player.skills.hitpoints.level,
                             player.skills.combat.level,
@@ -872,7 +894,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.skills.farming.level,
                             player.skills.smithing.level,
                             player.skills.prayer.level,
-                            player.skills.magic.level
+                            player.skills.magic.level,
+                            player.skills.woodcutting.level,
+                            player.skills.alchemy.level
                         );
                     } else {
                         log::warn!("skillsSync: player {} not found in state.players", player_id);
@@ -1266,6 +1290,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Remove from active quests
                 state.ui_state.active_quests.retain(|q| q.id != quest_id);
+
+                // Play quest complete sound
+                state.pending_sfx.push("quest_complete".to_string());
 
                 // Add completion notification
                 state.ui_state.quest_completed_events.push(QuestCompletedEvent {

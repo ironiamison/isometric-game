@@ -127,6 +127,8 @@ pub enum InputCommand {
     PrayAtAltar { altar_id: String },
     // Spell commands
     CastSpell { spell_id: String },
+    // Movement abilities
+    Dash,
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -3121,6 +3123,15 @@ impl InputHandler {
         // Handle keyboard release when D-pad not active - send stop command
         if !has_dpad_input && keyboard_dir == CardinalDir::None && self.move_sent {
             // Already handled above in dir_changed block
+        }
+
+        // Dash: left shift while moving
+        if is_key_pressed(KeyCode::LeftShift) {
+            let is_moving = self.last_dx != 0.0 || self.last_dy != 0.0;
+            if is_moving && current_time >= state.dash_cooldown_end {
+                commands.push(InputCommand::Dash);
+                state.dash_cooldown_end = current_time + 3.0; // 3 second cooldown
+            }
         }
 
         // Path following - generate movement commands when auto-pathing

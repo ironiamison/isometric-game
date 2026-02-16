@@ -13,6 +13,9 @@ pub enum ClientMessage {
     #[serde(rename = "move")]
     Move { dx: f32, dy: f32 },
 
+    #[serde(rename = "dash")]
+    Dash,
+
     #[serde(rename = "face")]
     Face { direction: u8 },
 
@@ -220,6 +223,7 @@ impl ClientMessage {
     pub fn name(&self) -> &'static str {
         match self {
             ClientMessage::Move { .. } => "Move",
+            ClientMessage::Dash => "Dash",
             ClientMessage::Face { .. } => "Face",
             ClientMessage::Chat { .. } => "Chat",
             ClientMessage::Attack => "Attack",
@@ -382,6 +386,8 @@ pub enum ServerMessage {
         magic_xp: i64,
         woodcutting_level: i32,
         woodcutting_xp: i64,
+        alchemy_level: i32,
+        alchemy_xp: i64,
     },
     ItemDropped {
         id: String,
@@ -1277,6 +1283,7 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
         Value::String("is_gathering".into()),
         Value::Boolean(p.is_gathering),
     ));
+    pmap.push((Value::String("dashing".into()), Value::Boolean(p.dashing)));
     pmap.push((
         Value::String("mp".into()),
         Value::Integer((p.mp as i64).into()),
@@ -1676,6 +1683,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::String("is_gathering".into()),
                         Value::Boolean(p.is_gathering),
                     ));
+                    pmap.push((Value::String("dashing".into()), Value::Boolean(p.dashing)));
                     pmap.push((
                         Value::String("mp".into()),
                         Value::Integer((p.mp as i64).into()),
@@ -1990,6 +1998,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             magic_xp,
             woodcutting_level,
             woodcutting_xp,
+            alchemy_level,
+            alchemy_xp,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -2059,6 +2069,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("woodcutting_xp".into()),
                 Value::Integer((*woodcutting_xp).into()),
+            ));
+            map.push((
+                Value::String("alchemy_level".into()),
+                Value::Integer((*alchemy_level as i64).into()),
+            ));
+            map.push((
+                Value::String("alchemy_xp".into()),
+                Value::Integer((*alchemy_xp).into()),
             ));
             Value::Map(map)
         }
