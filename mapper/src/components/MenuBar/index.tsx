@@ -12,6 +12,8 @@ export function MenuBar() {
   const [showNewInteriorModal, setShowNewInteriorModal] = useState(false);
   const [showOpenInteriorModal, setShowOpenInteriorModal] = useState(false);
   const [showResizeInteriorModal, setShowResizeInteriorModal] = useState(false);
+  const [showDownloadChunkModal, setShowDownloadChunkModal] = useState(false);
+  const [downloadChunkCoord, setDownloadChunkCoord] = useState('0, 0');
   const [newInteriorId, setNewInteriorId] = useState('');
   const [newInteriorName, setNewInteriorName] = useState('');
   const [newInteriorWidth, setNewInteriorWidth] = useState(16);
@@ -443,6 +445,29 @@ export function MenuBar() {
     switchToOverworld();
   };
 
+  const handleDownloadChunk = () => {
+    const parts = downloadChunkCoord.split(',').map((s) => parseInt(s.trim()));
+    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+      alert('Invalid coordinates. Expected format: cx, cy');
+      return;
+    }
+    const [cx, cy] = parts;
+    const chunk = chunks.get(`${cx},${cy}`);
+    if (!chunk) {
+      alert(`Chunk (${cx}, ${cy}) not found`);
+      return;
+    }
+    const json = chunkManager.exportChunkDataToJSON(chunk, true);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chunk_${cx}_${cy}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowDownloadChunkModal(false);
+  };
+
   const handleImportChunk = () => {
     importChunkInputRef.current?.click();
   };
@@ -598,6 +623,9 @@ export function MenuBar() {
                 </button>
                 <button className={styles.dropdownItem} onClick={handleImportChunk}>
                   Import Chunk (JSON)
+                </button>
+                <button className={styles.dropdownItem} onClick={() => setShowDownloadChunkModal(true)}>
+                  Download Chunk (JSON)
                 </button>
                 <div className={styles.separator} />
                 <button className={styles.dropdownItem} onClick={handleResetToServer}>
@@ -767,6 +795,32 @@ export function MenuBar() {
             )}
             <div className={styles.modalActions}>
               <button onClick={() => setShowOpenInteriorModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download Chunk Modal */}
+      {showDownloadChunkModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowDownloadChunkModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3>Download Chunk</h3>
+            <div className={styles.modalField}>
+              <label>Chunk Coordinate (cx, cy)</label>
+              <input
+                type="text"
+                value={downloadChunkCoord}
+                onChange={(e) => setDownloadChunkCoord(e.target.value)}
+                placeholder="0, 0"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleDownloadChunk(); }}
+              />
+            </div>
+            <div className={styles.modalActions}>
+              <button onClick={() => setShowDownloadChunkModal(false)}>Cancel</button>
+              <button className={styles.primaryButton} onClick={handleDownloadChunk}>
+                Download
+              </button>
             </div>
           </div>
         </div>
