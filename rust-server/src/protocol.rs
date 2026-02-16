@@ -1390,6 +1390,58 @@ pub fn encode_state_sync_from_values(
     Ok(buf)
 }
 
+/// Encode a delta StateSync message with optional removed entity lists.
+/// When `full` is true, this is a complete snapshot (same as encode_state_sync_from_values).
+/// When `full` is false, only changed entities + removal lists are included.
+pub fn encode_delta_state_sync(
+    tick: u64,
+    player_values: Vec<rmpv::Value>,
+    npc_values: Vec<rmpv::Value>,
+    instance_id: &str,
+    full: bool,
+    removed_players: &[String],
+    removed_npcs: &[String],
+) -> Result<Vec<u8>, String> {
+    use rmpv::Value;
+    let mut map = Vec::new();
+    map.push((Value::String("tick".into()), Value::Integer(tick.into())));
+    if !instance_id.is_empty() {
+        map.push((
+            Value::String("instanceId".into()),
+            Value::String(instance_id.into()),
+        ));
+    }
+    map.push((Value::String("players".into()), Value::Array(player_values)));
+    map.push((Value::String("npcs".into()), Value::Array(npc_values)));
+
+    if !full {
+        map.push((Value::String("full".into()), Value::Boolean(false)));
+        if !removed_players.is_empty() {
+            map.push((
+                Value::String("removedPlayers".into()),
+                Value::Array(removed_players.iter().map(|id| Value::String(id.clone().into())).collect()),
+            ));
+        }
+        if !removed_npcs.is_empty() {
+            map.push((
+                Value::String("removedNpcs".into()),
+                Value::Array(removed_npcs.iter().map(|id| Value::String(id.clone().into())).collect()),
+            ));
+        }
+    }
+
+    let array = Value::Array(vec![
+        Value::Integer(13.into()),
+        Value::String("stateSync".into()),
+        Value::Map(map),
+    ]);
+
+    let mut buf = Vec::new();
+    rmpv::encode::write_value(&mut buf, &array)
+        .map_err(|e| format!("Failed to encode message: {}", e))?;
+    Ok(buf)
+}
+
 /// Encode a server message to MessagePack format
 /// Format: [13, "msg_type", {data}] (matching Colyseus ROOM_DATA protocol)
 pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
@@ -4511,4 +4563,45 @@ fn extract_i64(value: &rmpv::Value, key: &str) -> Option<i64> {
             .find(|(k, _)| k.as_str() == Some(key))
             .and_then(|(_, v)| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64)))
     })
+}
+
+// ============================================================================
+// Binary Compression (for StateSync bandwidth reduction)
+// ============================================================================
+
+const COMPRESSION_THRESHOLD: usize = 128;
+
+/// Wrap a MessagePack payload with a compression prefix.
+/// - 0x00 prefix: uncompressed data follows
+/// - 0x01 prefix: deflate-compressed data follows
+/// Only compresses if the payload exceeds COMPRESSION_THRESHOLD bytes.
+pub fn maybe_compress(data: Vec<u8>) -> Vec<u8> {
+    use flate2::write::DeflateEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+
+    if data.len() <= COMPRESSION_THRESHOLD {
+        let mut out = Vec::with_capacity(1 + data.len());
+        out.push(0x00);
+        out.extend_from_slice(&data);
+        return out;
+    }
+
+    let mut encoder = DeflateEncoder::new(Vec::new(), Compression::fast());
+    if encoder.write_all(&data).is_ok() {
+        if let Ok(compressed) = encoder.finish() {
+            if compressed.len() < data.len() {
+                let mut out = Vec::with_capacity(1 + compressed.len());
+                out.push(0x01);
+                out.extend_from_slice(&compressed);
+                return out;
+            }
+        }
+    }
+
+    // Fallback: uncompressed
+    let mut out = Vec::with_capacity(1 + data.len());
+    out.push(0x00);
+    out.extend_from_slice(&data);
+    out
 }

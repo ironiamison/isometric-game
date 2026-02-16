@@ -29,12 +29,40 @@ miniquad_add_plugin({
 
         importObject.env.loading_hide = function () {
             var overlay = document.getElementById("loading-overlay");
-            if (overlay) {
+            if (!overlay) return;
+
+            // Replace loading content with a "Click to Play" prompt.
+            // Browsers require a real user gesture before delivering keyboard
+            // events to a canvas, so we need the user to click once.
+            var title = document.getElementById("loading-title");
+            var barBg = document.getElementById("loading-bar-bg");
+            var pct = document.getElementById("loading-pct");
+            var label = document.getElementById("loading-label");
+            if (title) title.textContent = "Click to Play";
+            if (barBg) barBg.style.display = "none";
+            if (pct) pct.style.display = "none";
+            if (label) label.style.display = "none";
+            overlay.style.cursor = "pointer";
+
+            function startGame() {
+                overlay.removeEventListener("click", startGame);
+                overlay.removeEventListener("touchstart", startGame);
+                document.removeEventListener("keydown", startGame);
                 overlay.classList.add("hidden");
                 setTimeout(function () {
                     overlay.style.display = "none";
                 }, 300);
+                var canvas = document.getElementById("glcanvas");
+                if (canvas) {
+                    canvas.setAttribute("tabindex", "1");
+                    canvas.focus();
+                }
             }
+
+            overlay.addEventListener("click", startGame);
+            overlay.addEventListener("touchstart", startGame);
+            // Also allow any keypress to dismiss (for users who instinctively type)
+            document.addEventListener("keydown", startGame);
         };
     },
 });

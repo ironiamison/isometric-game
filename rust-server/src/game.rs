@@ -541,7 +541,7 @@ impl Player {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PlayerUpdate {
     pub id: String,
     pub name: String,
@@ -620,6 +620,28 @@ struct ChairConfigEntry {
 }
 
 // ============================================================================
+// Delta Sync State (per-player tracking for bandwidth optimization)
+// ============================================================================
+
+const FULL_SYNC_INTERVAL: u64 = 20; // Force full sync every 20 ticks (1 second at 20Hz)
+
+struct PlayerSyncState {
+    last_players: HashMap<String, PlayerUpdate>,
+    last_npcs: HashMap<String, NpcUpdate>,
+    last_full_sync_tick: u64,
+}
+
+impl PlayerSyncState {
+    fn new() -> Self {
+        Self {
+            last_players: HashMap::new(),
+            last_npcs: HashMap::new(),
+            last_full_sync_tick: 0,
+        }
+    }
+}
+
+// ============================================================================
 // Game Room
 // ============================================================================
 
@@ -654,6 +676,8 @@ pub struct GameRoom {
     broadcast_tx: broadcast::Sender<Vec<u8>>,
     /// Per-player message senders for unicast (SECURITY: private inventory updates)
     player_senders: RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>,
+    /// Per-player delta sync state for bandwidth optimization
+    sync_states: RwLock<HashMap<String, PlayerSyncState>>,
     /// Tracks which instance each player is currently in (None = overworld)
     player_instances: Arc<RwLock<HashMap<String, String>>>,
     /// Instance manager for looking up instance NPCs
@@ -931,6 +955,7 @@ impl GameRoom {
             tick: RwLock::new(0),
             broadcast_tx: tx,
             player_senders: RwLock::new(HashMap::new()),
+            sync_states: RwLock::new(HashMap::new()),
             player_instances,
             instance_manager,
             arena_manager: RwLock::new(crate::arena::ArenaManager::new(crate::arena::ArenaConfig::default())),
@@ -996,6 +1021,7 @@ impl GameRoom {
     pub async fn register_player_sender(&self, player_id: &str, sender: mpsc::Sender<Vec<u8>>) {
         let mut senders = self.player_senders.write().await;
         senders.insert(player_id.to_string(), sender);
+        self.sync_states.write().await.insert(player_id.to_string(), PlayerSyncState::new());
         tracing::debug!("Registered sender for player {}", player_id);
     }
 
@@ -1003,7 +1029,16 @@ impl GameRoom {
     pub async fn unregister_player_sender(&self, player_id: &str) {
         let mut senders = self.player_senders.write().await;
         senders.remove(player_id);
+        self.sync_states.write().await.remove(player_id);
         tracing::debug!("Unregistered sender for player {}", player_id);
+    }
+
+    /// Reset a player's delta sync state (forces full sync on next tick).
+    /// Call on instance transitions so stale entity state doesn't carry over.
+    pub async fn reset_sync_state(&self, player_id: &str) {
+        if let Some(state) = self.sync_states.write().await.get_mut(player_id) {
+            *state = PlayerSyncState::new();
+        }
     }
 
     /// Find a portal at the player's current position
@@ -8247,7 +8282,8 @@ impl GameRoom {
                 Vec::new()
             };
 
-            if let Ok(bytes) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, inst_id) {
+            if let Ok(raw) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, inst_id) {
+                let bytes = crate::protocol::maybe_compress(raw);
                 for (pid, sender) in group_senders {
                     if sender.capacity() == 0 {
                         tick_telemetry.state_sync_capacity_skips += 1;
@@ -8262,13 +8298,17 @@ impl GameRoom {
             }
         }
 
-        // Overworld: pre-encode all player/NPC Values once, then filter per-player
-        let prebuilt_players: Vec<(i32, i32, rmpv::Value)> = overworld_players.iter()
-            .map(|p| (p.x, p.y, crate::protocol::player_update_to_value(p)))
+        // Overworld: delta-compressed per-player StateSync
+        // Build lookup maps for nearby entity filtering
+        let overworld_player_map: HashMap<&str, &PlayerUpdate> = overworld_players.iter()
+            .map(|p| (p.id.as_str(), *p))
             .collect();
-        let prebuilt_npcs: Vec<(i32, i32, rmpv::Value)> = npc_updates.iter()
-            .map(|n| (n.x, n.y, crate::protocol::npc_update_to_value(n)))
+        let npc_map: HashMap<&str, &NpcUpdate> = npc_updates.iter()
+            .map(|n| (n.id.as_str(), n))
             .collect();
+
+        let current_tick = tick;
+        let mut sync_states = self.sync_states.write().await;
 
         for (player_id, sender) in &overworld_senders {
             if sender.capacity() == 0 {
@@ -8281,24 +8321,102 @@ impl GameRoom {
                 None => continue,
             };
 
-            let nearby_players: Vec<rmpv::Value> = prebuilt_players.iter()
-                .filter(|(x, y, _)| (x - px).abs().max((y - py).abs()) <= VIEW_DISTANCE)
-                .map(|(_, _, v)| v.clone())
+            // Filter nearby entities by view distance
+            let nearby_players: HashMap<String, &PlayerUpdate> = overworld_player_map.iter()
+                .filter(|(_, p)| (p.x - px).abs().max((p.y - py).abs()) <= VIEW_DISTANCE)
+                .map(|(_, p)| (p.id.clone(), *p))
+                .collect();
+            let nearby_npcs: HashMap<String, &NpcUpdate> = npc_map.iter()
+                .filter(|(_, n)| (n.x - px).abs().max((n.y - py).abs()) <= VIEW_DISTANCE)
+                .map(|(_, n)| (n.id.clone(), *n))
                 .collect();
 
-            let nearby_npcs: Vec<rmpv::Value> = prebuilt_npcs.iter()
-                .filter(|(x, y, _)| (x - px).abs().max((y - py).abs()) <= VIEW_DISTANCE)
-                .map(|(_, _, v)| v.clone())
-                .collect();
+            let sync_state = sync_states.entry(player_id.to_string()).or_insert_with(PlayerSyncState::new);
+            let needs_full = sync_state.last_full_sync_tick == 0
+                || (current_tick - sync_state.last_full_sync_tick) >= FULL_SYNC_INTERVAL;
 
-            if let Ok(bytes) = crate::protocol::encode_state_sync_from_values(tick, nearby_players, nearby_npcs, "") {
-                tick_telemetry.state_sync_send_attempts += 1;
-                if let Err(e) = sender.try_send(bytes) {
-                    tick_telemetry.state_sync_try_send_drops += 1;
-                    tracing::debug!("StateSync drop for {}: {}", player_id, e);
+            if needs_full {
+                // Full sync: encode all nearby entities
+                let player_values: Vec<rmpv::Value> = nearby_players.values()
+                    .map(|p| crate::protocol::player_update_to_value(p))
+                    .collect();
+                let npc_values: Vec<rmpv::Value> = nearby_npcs.values()
+                    .map(|n| crate::protocol::npc_update_to_value(n))
+                    .collect();
+
+                if let Ok(raw) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, "") {
+                    let bytes = crate::protocol::maybe_compress(raw);
+                    tick_telemetry.state_sync_send_attempts += 1;
+                    if let Err(e) = sender.try_send(bytes) {
+                        tick_telemetry.state_sync_try_send_drops += 1;
+                        tracing::debug!("StateSync drop for {}: {}", player_id, e);
+                    } else {
+                        // Only update sync state if send succeeded
+                        sync_state.last_full_sync_tick = current_tick;
+                        sync_state.last_players = nearby_players.into_iter()
+                            .map(|(id, p)| (id, p.clone()))
+                            .collect();
+                        sync_state.last_npcs = nearby_npcs.into_iter()
+                            .map(|(id, n)| (id, n.clone()))
+                            .collect();
+                    }
+                }
+            } else {
+                // Delta sync: only encode changed/new entities + removal lists
+                let mut changed_players: Vec<rmpv::Value> = Vec::new();
+                for (id, update) in &nearby_players {
+                    match sync_state.last_players.get(id) {
+                        Some(last) if last == *update => {} // unchanged, skip
+                        _ => changed_players.push(crate::protocol::player_update_to_value(update)),
+                    }
+                }
+
+                let mut changed_npcs: Vec<rmpv::Value> = Vec::new();
+                for (id, update) in &nearby_npcs {
+                    match sync_state.last_npcs.get(id) {
+                        Some(last) if last == *update => {} // unchanged, skip
+                        _ => changed_npcs.push(crate::protocol::npc_update_to_value(update)),
+                    }
+                }
+
+                // Find removed entities (were in last sync but not nearby now)
+                let removed_players: Vec<String> = sync_state.last_players.keys()
+                    .filter(|id| !nearby_players.contains_key(id.as_str()))
+                    .cloned()
+                    .collect();
+                let removed_npcs: Vec<String> = sync_state.last_npcs.keys()
+                    .filter(|id| !nearby_npcs.contains_key(id.as_str()))
+                    .cloned()
+                    .collect();
+
+                // Skip sending if nothing changed
+                if changed_players.is_empty() && changed_npcs.is_empty()
+                    && removed_players.is_empty() && removed_npcs.is_empty()
+                {
+                    continue;
+                }
+
+                if let Ok(raw) = crate::protocol::encode_delta_state_sync(
+                    tick, changed_players, changed_npcs, "", false, &removed_players, &removed_npcs,
+                ) {
+                    let bytes = crate::protocol::maybe_compress(raw);
+                    tick_telemetry.state_sync_send_attempts += 1;
+                    if let Err(e) = sender.try_send(bytes) {
+                        tick_telemetry.state_sync_try_send_drops += 1;
+                        tracing::debug!("StateSync drop for {}: {}", player_id, e);
+                    } else {
+                        // Only update sync state if send succeeded
+                        sync_state.last_players = nearby_players.into_iter()
+                            .map(|(id, p)| (id, p.clone()))
+                            .collect();
+                        sync_state.last_npcs = nearby_npcs.into_iter()
+                            .map(|(id, n)| (id, n.clone()))
+                            .collect();
+                    }
                 }
             }
         }
+        drop(sync_states);
 
         let state_sync_ms = state_sync_start.elapsed().as_millis();
 

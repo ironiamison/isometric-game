@@ -1799,6 +1799,7 @@ async fn handle_socket(
         use crate::interior::InstanceType;
 
         let removed_instance_id = state.player_instances.write().await.remove(&player_id);
+        room.reset_sync_state(&player_id).await;
         if let Some(instance_id) = removed_instance_id {
             // Use get_by_instance_id (direct lookup) instead of find_player_instance (scan)
             if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
@@ -1909,6 +1910,7 @@ async fn auto_enter_instance(
         let mut player_instances = state.player_instances.write().await;
         player_instances.insert(player_id.to_string(), instance.id.clone());
     }
+    room.reset_sync_state(player_id).await;
 
     // Notify overworld players that this player has "left"
     room.send_to_overworld_players(
@@ -2321,6 +2323,7 @@ async fn handle_enter_portal(
         let mut player_instances = state.player_instances.write().await;
         player_instances.insert(player_id.to_string(), instance.id.clone());
     }
+    room.reset_sync_state(player_id).await;
 
     // Notify overworld players that this player has "left" (so they don't see a frozen sprite)
     room.send_to_overworld_players(

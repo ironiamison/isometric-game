@@ -86,6 +86,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     return;
                 }
 
+                // Delta sync: "full" field absent or true = full snapshot, false = delta
+                let is_full_sync = extract_bool(value, "full").unwrap_or(true);
+
                 // Update players (grid positions from server)
                 let mut player_regen_events: Vec<(String, f32, f32, i32)> = Vec::new();
                 let mut synced_player_ids: Vec<String> = Vec::new();
@@ -319,11 +322,25 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // In instances, the server sends ALL players in the group, so anyone
                 // missing has left. This prevents ghost players from lingering when a
                 // PlayerLeft message races with a StateSync that still included them.
-                if !sync_instance.is_empty() {
+                // Only reconcile on full syncs (delta syncs use explicit removal lists).
+                if is_full_sync && !sync_instance.is_empty() {
                     let local_id = state.local_player_id.clone().unwrap_or_default();
                     state.players.retain(|id, _| {
                         *id == local_id || synced_player_ids.contains(id)
                     });
+                }
+
+                // Delta sync: process explicit removal lists
+                if !is_full_sync {
+                    if let Some(removed) = extract_array(value, "removedPlayers") {
+                        for rv in removed {
+                            if let Some(id) = rv.as_str() {
+                                if state.local_player_id.as_deref() != Some(id) {
+                                    state.players.remove(id);
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Check if local player walked onto a portal (auto-trigger)
@@ -454,6 +471,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.no_shadow = no_shadow;
                             npc.render_offset_y = render_offset_y;
                             state.npcs.insert(id, npc);
+                        }
+                    }
+                }
+
+                // Delta sync: process explicit NPC removal list
+                if !is_full_sync {
+                    if let Some(removed) = extract_array(value, "removedNpcs") {
+                        for rv in removed {
+                            if let Some(id) = rv.as_str() {
+                                state.npcs.remove(id);
+                            }
                         }
                     }
                 }

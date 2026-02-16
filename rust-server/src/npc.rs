@@ -720,7 +720,7 @@ impl Npc {
 // NPC Update for Network Sync
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NpcUpdate {
     pub id: String,
     /// Entity prototype ID (e.g., "pig", "elder_villager") for client-side lookup

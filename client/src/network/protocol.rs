@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::io::Cursor;
+use std::io::Read;
 
 // Colyseus protocol codes (from colyseus/src/Protocol.ts)
 #[repr(u8)]
@@ -22,6 +23,27 @@ pub fn encode_message<T: Serialize>(message_type: &str, data: &T) -> Result<Vec<
     // Colyseus expects: [13, "type", data]
     let message: (u8, &str, &T) = (Protocol::RoomData as u8, message_type, data);
     rmp_serde::to_vec(&message)
+}
+
+/// Strip compression prefix and decompress if needed.
+/// - 0x00 prefix: uncompressed MessagePack follows
+/// - 0x01 prefix: deflate-compressed MessagePack follows
+/// - Other first byte: legacy uncompressed (pass through)
+pub fn maybe_decompress(data: &[u8]) -> Result<Vec<u8>, String> {
+    if data.is_empty() {
+        return Err("Empty message".to_string());
+    }
+    match data[0] {
+        0x00 => Ok(data[1..].to_vec()),
+        0x01 => {
+            let mut decoder = flate2::read::DeflateDecoder::new(&data[1..]);
+            let mut decompressed = Vec::new();
+            decoder.read_to_end(&mut decompressed)
+                .map_err(|e| format!("Deflate decompression failed: {}", e))?;
+            Ok(decompressed)
+        }
+        _ => Ok(data.to_vec()), // Legacy: no prefix, raw MessagePack
+    }
 }
 
 /// Decode a Colyseus message from MessagePack format

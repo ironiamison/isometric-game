@@ -391,7 +391,14 @@ impl NetworkClient {
 
     fn handle_binary_message(&self, data: &[u8], state: &mut GameState) {
         log::trace!("Received {} bytes: {:?}", data.len(), &data[..data.len().min(50)]);
-        match protocol::decode_message(data) {
+        let decompressed = match protocol::maybe_decompress(data) {
+            Ok(d) => d,
+            Err(e) => {
+                log::error!("Failed to decompress message: {}", e);
+                return;
+            }
+        };
+        match protocol::decode_message(&decompressed) {
             Ok(decoded) => {
                 match decoded {
                     DecodedMessage::RoomData { msg_type, data } => {
@@ -429,7 +436,8 @@ impl NetworkClient {
     /// Check if message is a stateSync and extract its tick number.
     /// Returns None if not a stateSync or couldn't parse.
     fn extract_state_sync_tick(&self, data: &[u8]) -> Option<u64> {
-        match protocol::decode_message(data) {
+        let decompressed = protocol::maybe_decompress(data).ok()?;
+        match protocol::decode_message(&decompressed) {
             Ok(DecodedMessage::RoomData { msg_type, data }) => {
                 if msg_type == "stateSync" {
                     data.as_ref().and_then(|v| protocol::extract_u64(v, "tick"))
