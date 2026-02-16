@@ -3717,16 +3717,18 @@ impl InputHandler {
         // Escape key - close any open panel first, then clear target, then open escape menu
         if is_key_pressed(KeyCode::Escape) {
             // Check if any panel is open and close it
-            if state.ui_state.inventory_open || state.ui_state.character_panel_open
+            if state.ui_state.quest_log_open {
+                audio.play_sfx("enter");
+                state.ui_state.quest_log_open = false;
+            } else if state.ui_state.inventory_open || state.ui_state.character_panel_open
                 || state.ui_state.social_open || state.ui_state.skills_open
-                || state.ui_state.prayer_book_open || state.ui_state.quest_log_open {
+                || state.ui_state.prayer_book_open {
                 audio.play_sfx("enter");
                 state.ui_state.inventory_open = false;
                 state.ui_state.character_panel_open = false;
                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
                 state.ui_state.prayer_book_open = false;
-                state.ui_state.quest_log_open = false;
                 // Reset social panel input state
                 state.social_state.add_friend_focused = false;
             } else if state.selected_entity_id.is_some() {
