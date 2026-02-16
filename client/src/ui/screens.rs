@@ -344,6 +344,8 @@ pub struct LoginScreen {
     loading: bool,
     // Remember me
     remember_me: bool,
+    // Auto-focus: show keyboard on first frame
+    keyboard_shown: bool,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -393,6 +395,7 @@ impl LoginScreen {
             #[cfg(target_arch = "wasm32")]
             loading: false,
             remember_me,
+            keyboard_shown: false,
         }
     }
 
@@ -470,6 +473,12 @@ impl Screen for LoginScreen {
         let (input_pos, clicked, _is_touch) = get_input_state();
         let mx = input_pos.x;
         let my = input_pos.y;
+
+        // Auto-focus: activate keyboard input on first frame so typing works immediately
+        if !self.keyboard_shown {
+            self.keyboard_shown = true;
+            show_keyboard(true);
+        }
 
         // Update animation
         let dt = get_frame_time();

@@ -337,10 +337,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         // Only check for portal if we moved to a different tile
                         let moved_tiles = prev_tile.map_or(false, |prev| prev != current_tile);
 
-                        let now = macroquad::time::get_time();
+                        // Clear the ignored portal tile once the player steps off it
+                        if moved_tiles {
+                            if let Some(ignored) = state.portal_ignore_tile {
+                                if current_tile != ignored {
+                                    state.portal_ignore_tile = None;
+                                }
+                            }
+                        }
+
                         if moved_tiles &&
                            state.pending_portal_id.is_none() &&
-                           now >= state.portal_cooldown_until &&
+                           state.portal_ignore_tile.map_or(true, |ignored| current_tile != ignored) &&
                            matches!(state.map_transition.state, TransitionState::None) {
                             if let Some(portal) = state.chunk_manager.get_portal_at(player.server_x, player.server_y) {
                                 state.pending_portal_id = Some(portal.id.clone());
@@ -1759,9 +1767,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.npcs.clear();
                     state.ground_items.clear();
 
-                    // Reset portal check position and set cooldown to prevent flip-flop re-entry
+                    // Reset portal check and ignore the spawn tile until player steps off
                     state.last_portal_check_pos = None;
-                    state.portal_cooldown_until = macroquad::time::get_time() + 1.0;
+                    let spawn_tile = (spawn_x.floor() as i32, spawn_y.floor() as i32);
+                    state.portal_ignore_tile = Some(spawn_tile);
 
                     // Update player position (both visual and server-authoritative)
                     if let Some(local_id) = &state.local_player_id {
@@ -1888,9 +1897,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.current_interior = Some(map_id.clone());
                 state.current_instance = Some(instance_id);
 
-                // Reset portal check position and set cooldown to prevent flip-flop re-entry
+                // Reset portal check and ignore the spawn tile until player steps off
                 state.last_portal_check_pos = None;
-                state.portal_cooldown_until = macroquad::time::get_time() + 1.0;
+                let spawn_tile = (spawn_x.floor() as i32, spawn_y.floor() as i32);
+                state.portal_ignore_tile = Some(spawn_tile);
 
                 // Update player position (both visual and server-authoritative)
                 if let Some(local_id) = &state.local_player_id {

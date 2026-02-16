@@ -7280,10 +7280,10 @@ impl GameRoom {
                 tick_telemetry.rejected_player_blocked += 1;
                 continue;
             }
-            // Players can walk onto NPC tiles — the NPC will be displaced afterward.
-            // Still count for diagnostics.
+            // Check if an NPC is on the target tile
             if npc_positions.contains(&(target_x, target_y)) {
                 tick_telemetry.rejected_npc_blocked += 1;
+                continue;
             }
             // Check if target tile is a chair (overworld only - instances have their own maps)
             if is_overworld {
@@ -7352,7 +7352,6 @@ impl GameRoom {
             (ids, stopped)
         };
 
-        let mut needs_npc_displacement = false;
         {
             let mut players = self.players.write().await;
 
@@ -7372,13 +7371,6 @@ impl GameRoom {
                         player.move_dy = 0;
                     }
 
-                    // Check if this move landed on an NPC tile
-                    if !needs_npc_displacement
-                        && !players_in_instances.contains(&id)
-                        && npc_positions.contains(&(target_x, target_y))
-                    {
-                        needs_npc_displacement = true;
-                    }
                 }
             }
 
@@ -7407,64 +7399,6 @@ impl GameRoom {
                     player.tick_buffs(current_time);
                 }
             }
-        }
-
-        // Displace NPCs that share a tile with a player.
-        // Instead of blocking player movement, NPCs yield and step to an adjacent free tile.
-        // Only acquire heavy locks when a player actually landed on an NPC tile.
-        if needs_npc_displacement {
-            let overworld_player_tiles: std::collections::HashSet<(i32, i32)> = {
-                let players = self.players.read().await;
-                players.values()
-                    .filter(|p| p.active && !p.is_dead)
-                    .filter(|p| !players_in_instances.contains(&p.id))
-                    .map(|p| (p.x, p.y))
-                    .collect()
-            };
-
-            let chunks_guard = self.world.chunks_read().await;
-            let mut npcs = self.npcs.write().await;
-
-            // Track occupied NPC tiles so displaced NPCs don't land on each other
-            let mut occupied_npc_tiles: std::collections::HashSet<(i32, i32)> = npcs.values()
-                .filter(|n| n.is_alive())
-                .map(|n| (n.x, n.y))
-                .collect();
-
-            for npc in npcs.values_mut() {
-                if !npc.is_alive() { continue; }
-                if !overworld_player_tiles.contains(&(npc.x, npc.y)) { continue; }
-
-                // NPC shares a tile with a player — find an adjacent free tile
-                occupied_npc_tiles.remove(&(npc.x, npc.y));
-                let directions: [(i32, i32); 4] = [(0, -1), (0, 1), (-1, 0), (1, 0)];
-
-                for (dx, dy) in &directions {
-                    let nx = npc.x + dx;
-                    let ny = npc.y + dy;
-
-                    let coord = crate::chunk::ChunkCoord::from_world(nx, ny);
-                    let walkable = if let Some(chunk) = chunks_guard.get(&coord) {
-                        let (lx, ly) = crate::chunk::world_to_local(nx, ny);
-                        chunk.is_walkable_local(lx, ly)
-                    } else {
-                        false
-                    };
-
-                    if walkable
-                        && !overworld_player_tiles.contains(&(nx, ny))
-                        && !occupied_npc_tiles.contains(&(nx, ny))
-                        && !self.portal_tiles.contains(&(nx, ny))
-                    {
-                        npc.x = nx;
-                        npc.y = ny;
-                        occupied_npc_tiles.insert((nx, ny));
-                        break;
-                    }
-                }
-                // If no free tile found, NPC stays put (player walks through)
-            }
-            drop(chunks_guard);
         }
 
         // Prayer drain + mana regen (every 60 ticks / 3 seconds)
