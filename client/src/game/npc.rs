@@ -125,6 +125,12 @@ impl Npc {
         self.hostile
     }
 
+    /// Returns true if this NPC can be attacked/targeted by players.
+    /// Quest givers, merchants, altars, and bankers cannot be attacked.
+    pub fn is_attackable(&self) -> bool {
+        !self.is_quest_giver && !self.is_merchant && !self.is_altar && !self.is_banker
+    }
+
     pub fn is_alive(&self) -> bool {
         self.state != NpcState::Dead
     }
