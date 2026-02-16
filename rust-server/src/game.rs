@@ -2704,6 +2704,81 @@ impl GameRoom {
             if target_id.is_some() { break; }
         }
 
+        // Fallback: if directional scan missed, check all 4 adjacent tiles for any attackable entity.
+        // This handles cases where facing direction doesn't perfectly match (e.g., NPC on collision tile).
+        if target_id.is_none() && weapon_range == 1 {
+            let adjacent = [
+                (attacker_x, attacker_y - 1),
+                (attacker_x, attacker_y + 1),
+                (attacker_x - 1, attacker_y),
+                (attacker_x + 1, attacker_y),
+            ];
+
+            // Check NPCs on adjacent tiles
+            if attacker_instance.is_none() {
+                let npcs = self.npcs.read().await;
+                for &(ax, ay) in &adjacent {
+                    if target_id.is_some() { break; }
+                    for (npc_id, npc) in npcs.iter() {
+                        if npc.is_alive() && npc.is_attackable() && npc.x == ax && npc.y == ay {
+                            // Auto-face the target
+                            let face_dir = Direction::from_velocity(
+                                (ax - attacker_x) as f32,
+                                (ay - attacker_y) as f32,
+                            );
+                            {
+                                let mut players = self.players.write().await;
+                                if let Some(player) = players.get_mut(player_id) {
+                                    player.direction = face_dir;
+                                }
+                            }
+                            target_id = Some(npc_id.clone());
+                            is_npc = true;
+                            target_tile_x = ax;
+                            target_tile_y = ay;
+                            tracing::info!("{} adjacent-scan hit NPC: {} at ({}, {})", attacker_name, npc.name(), ax, ay);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Check players on adjacent tiles
+            if target_id.is_none() {
+                let players = self.players.read().await;
+                let instances = self.player_instances.read().await;
+                for &(ax, ay) in &adjacent {
+                    if target_id.is_some() { break; }
+                    for (pid, player) in players.iter() {
+                        if pid != player_id && player.active && player.hp > 0 && player.x == ax && player.y == ay {
+                            let target_instance = instances.get(pid.as_str()).cloned();
+                            if target_instance != attacker_instance { continue; }
+                            target_id = Some(pid.clone());
+                            is_npc = false;
+                            target_tile_x = ax;
+                            target_tile_y = ay;
+                            tracing::info!("{} adjacent-scan hit player: {} at ({}, {})", attacker_name, player.name, ax, ay);
+                            break;
+                        }
+                    }
+                }
+                drop(instances);
+                drop(players);
+
+                // Auto-face if we found a target
+                if target_id.is_some() {
+                    let face_dir = Direction::from_velocity(
+                        (target_tile_x - attacker_x) as f32,
+                        (target_tile_y - attacker_y) as f32,
+                    );
+                    let mut players_w = self.players.write().await;
+                    if let Some(player) = players_w.get_mut(player_id) {
+                        player.direction = face_dir;
+                    }
+                }
+            }
+        }
+
         // No valid target found
         let target_id = match target_id {
             Some(id) => id,

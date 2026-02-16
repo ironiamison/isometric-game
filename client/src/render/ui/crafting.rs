@@ -477,8 +477,18 @@ impl Renderer {
             let mut section_y = desc_start_y + 14.0 + desc_height + 12.0;
 
             if recipe.level_required > 1 {
+                let skill_name = match recipe.category.as_str() {
+                    "smithing" => "Smithing",
+                    "alchemy" => "Alchemy",
+                    _ => "Combat",
+                };
                 let (level_color, level_icon) = if let Some(player) = state.get_local_player() {
-                    if player.combat_level() >= recipe.level_required {
+                    let player_level = match recipe.category.as_str() {
+                        "smithing" => player.skills.smithing.level,
+                        "alchemy" => player.skills.alchemy.level,
+                        _ => player.combat_level(),
+                    };
+                    if player_level >= recipe.level_required {
                         (Color::new(0.392, 0.784, 0.392, 1.0), "[OK]")
                     } else {
                         (Color::new(0.784, 0.314, 0.314, 1.0), "[!!]")
@@ -486,7 +496,7 @@ impl Renderer {
                 } else {
                     (TEXT_DIM, "[??]")
                 };
-                self.draw_text_sharp(&format!("{} Requires Level {}", level_icon, recipe.level_required), detail_x + 12.0, section_y, 16.0, level_color);
+                self.draw_text_sharp(&format!("{} Requires {} Level {}", level_icon, skill_name, recipe.level_required), detail_x + 12.0, section_y, 16.0, level_color);
                 section_y += 22.0;
             }
 
