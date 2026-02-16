@@ -105,10 +105,14 @@
       });
 
       // Prevent early focus events that cause RefCell double-borrow panic in miniquad.
-      // The canvas starts non-focusable; loading.js restores tabindex + focus
-      // after the user clicks "Click to Play" (provides required user gesture).
+      // The canvas starts non-focusable; we restore tabindex after WASM init settles.
       document.getElementById("glcanvas").removeAttribute("tabindex");
       load("isometric_client.wasm");
+      setTimeout(function () {
+        var canvas = document.getElementById("glcanvas");
+        canvas.setAttribute("tabindex", "1");
+        canvas.focus();
+      }, 500);
     </script>
   </body>
 </html>
