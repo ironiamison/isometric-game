@@ -3538,12 +3538,11 @@ impl InputHandler {
 
             // Prioritize NPC interaction over player targeting
             if let Some(npc_id) = clicked_npc {
-                // Check if NPC is attackable (hostile monsters + non-hostile non-service NPCs)
+                // Check if NPC can be targeted for combat (not a merchant/quest giver/banker/altar)
                 let is_attackable = state.npcs.get(&npc_id).map(|n| n.is_attackable()).unwrap_or(true);
-                let is_hostile = state.npcs.get(&npc_id).map(|n| n.is_hostile()).unwrap_or(true);
 
-                if is_hostile || (is_attackable && state.ui_state.spell_bar_active) {
-                    // Hostile NPC or attackable NPC when spell bar is active - target for combat
+                if is_attackable {
+                    // Attackable NPC (hostile or non-hostile) - target for combat
                     commands.push(InputCommand::Target { entity_id: npc_id });
                 } else {
                     // Friendly NPC - interact or pathfind-to-interact
