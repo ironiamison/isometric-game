@@ -349,10 +349,8 @@ gold_max = 0
 [farmer_grace.behaviors]
 hostile = false
 quest_giver = true
-wander_enabled = true
-wander_radius = 2
-wander_pause_min_ms = 5000
-wander_pause_max_ms = 10000
+wander_enabled = false
+facing = "right"
 
 [farmer_grace.quest_giver]
 available_quests = ["farm_pest_control"]

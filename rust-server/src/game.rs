@@ -8404,15 +8404,12 @@ impl GameRoom {
                     if let Err(e) = sender.try_send(bytes) {
                         tick_telemetry.state_sync_try_send_drops += 1;
                         tracing::debug!("StateSync drop for {}: {}", player_id, e);
-                    } else {
-                        // Only update sync state if send succeeded
-                        sync_state.last_players = nearby_players.into_iter()
-                            .map(|(id, p)| (id, p.clone()))
-                            .collect();
-                        sync_state.last_npcs = nearby_npcs.into_iter()
-                            .map(|(id, n)| (id, n.clone()))
-                            .collect();
                     }
+                    // NOTE: Do NOT update sync state on delta sends.
+                    // Deltas are always computed against the last full sync baseline.
+                    // This ensures client-side stateSync dedup (which drops all but the
+                    // latest tick) can't cause missed updates — if a delta is dropped,
+                    // the next delta still includes those changes.
                 }
             }
         }
