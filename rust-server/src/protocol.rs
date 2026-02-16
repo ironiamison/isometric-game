@@ -4271,6 +4271,7 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let dy = extract_f32(msg_data, "dy").unwrap_or(0.0);
             Ok(ClientMessage::Move { dx, dy })
         }
+        "dash" => Ok(ClientMessage::Dash),
         "face" => {
             let direction = msg_data
                 .as_map()

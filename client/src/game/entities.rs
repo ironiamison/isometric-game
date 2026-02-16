@@ -374,7 +374,7 @@ impl Player {
             self.is_dashing = false; // Dash slide complete
         } else {
             // Use fast speed during dash (24 tiles/sec vs normal 4)
-            let speed = if self.is_dashing { 24.0 } else { VISUAL_SPEED };
+            let speed = if self.is_dashing { 16.0 } else { VISUAL_SPEED };
             let mut budget = speed * delta;
 
             // Axis-aligned movement: resolve smaller displacement first,

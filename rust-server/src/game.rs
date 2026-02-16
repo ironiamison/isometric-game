@@ -26,9 +26,9 @@ const TICK_RATE: f32 = 20.0;
 // Grid-based movement: ticks between tile moves (5 ticks * 50ms = 250ms per tile)
 const MOVE_COOLDOWN_TICKS: u64 = 5;
 
-// Dash: 3 tiles forward, 3 second cooldown (60 ticks at 20Hz)
+// Dash: 2 tiles forward, 3 second cooldown (60 ticks at 20Hz)
 const DASH_COOLDOWN_TICKS: u64 = 60;
-const DASH_DISTANCE: i32 = 3;
+const DASH_DISTANCE: i32 = 2;
 
 const MAP_WIDTH: u32 = 32;
 const MAP_HEIGHT: u32 = 32;
