@@ -201,7 +201,7 @@ impl Renderer {
 
         if state.ui_state.active_quests.len() > 2 {
             let more = format!("...and {} more (Q to view)", state.ui_state.active_quests.len() - 2);
-            self.draw_text_sharp(&more, tracker_x, y, 16.0, GRAY);
+            self.draw_text_sharp(&more, tracker_x, y, 16.0, LIGHTGRAY);
         }
     }
 

@@ -7588,15 +7588,13 @@ impl GameRoom {
                     player.y = target_y;
                     player.last_move_tick = current_tick;
 
-                    // Stop movement on portal tiles so the player doesn't walk past
-                    // before the client can detect and trigger the portal
-                    if !player_instance_map.contains_key(&id)
-                        && self.portal_tiles.contains(&(target_x, target_y))
-                    {
-                        player.move_dx = 0;
-                        player.move_dy = 0;
-                    }
-
+                    // Clear movement intent after processing. The client re-sends
+                    // Move every 50ms while the key is held, so continuous movement
+                    // resumes within one tick. Without this, stale move_dx/move_dy
+                    // can cause an extra tile move if a direction change message
+                    // arrives after the next cooldown expires (race condition).
+                    player.move_dx = 0;
+                    player.move_dy = 0;
                 }
             }
 
