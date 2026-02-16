@@ -226,6 +226,8 @@ pub struct InventorySlotUpdate {
 // ============================================================================
 
 pub const BANK_SIZE: usize = 48;
+/// Bank stacks always go up to 99 regardless of the item's inventory max_stack
+pub const BANK_MAX_STACK: i32 = 99;
 
 #[derive(Debug, Clone)]
 pub struct Bank {
@@ -242,16 +244,14 @@ impl Bank {
     }
 
     /// Try to add an item to the bank. Returns the quantity that couldn't fit.
-    pub fn add_item(&mut self, item_id: &str, mut quantity: i32, registry: &ItemRegistry) -> i32 {
+    pub fn add_item(&mut self, item_id: &str, mut quantity: i32, _registry: &ItemRegistry) -> i32 {
         if item_id == GOLD_ITEM_ID {
             self.gold += quantity;
             return 0;
         }
 
-        let max_stack = registry
-            .get(item_id)
-            .map(|def| def.max_stack)
-            .unwrap_or(DEFAULT_MAX_STACK);
+        // Bank always uses 99 max stack regardless of item definition
+        let max_stack = BANK_MAX_STACK;
 
         // First, try to stack with existing items
         for slot in &mut self.slots {
@@ -327,15 +327,13 @@ impl Bank {
     }
 
     /// Check if bank has space for additional items
-    pub fn has_space_for(&self, item_id: &str, count: i32, registry: &ItemRegistry) -> bool {
+    pub fn has_space_for(&self, item_id: &str, count: i32, _registry: &ItemRegistry) -> bool {
         if item_id == GOLD_ITEM_ID {
             return true;
         }
 
-        let max_stack = registry
-            .get(item_id)
-            .map(|def| def.max_stack)
-            .unwrap_or(DEFAULT_MAX_STACK);
+        // Bank always uses 99 max stack regardless of item definition
+        let max_stack = BANK_MAX_STACK;
         let mut remaining = count;
 
         for slot in &self.slots {
