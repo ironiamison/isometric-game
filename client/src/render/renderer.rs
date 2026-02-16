@@ -65,15 +65,11 @@ const TILESET_COLUMNS: u32 = 32;
 pub const GENDERS: &[&str] = &["male", "female"];
 pub const SKINS: &[&str] = &["tan", "pale", "brown", "fish", "orc", "panda", "skeleton"];
 
-/// Objects tileset firstgid from objects.tsx (used to map gids to sprite filenames)
-const OBJECTS_FIRSTGID: u32 = 1249;
-/// Offset to convert local tile id to sprite filename number
-const OBJECTS_ID_OFFSET: u32 = 87;
+/// Objects tileset firstgid (GID = firstGid + spriteFileId, matching mapper-config.json)
+const OBJECTS_FIRSTGID: u32 = 1162;
 
-/// Walls tileset firstgid (walls use gid = firstGid + fileId, where firstGid=1)
+/// Walls tileset firstgid (GID = firstGid + spriteFileId, matching mapper-config.json)
 const WALLS_FIRSTGID: u32 = 1;
-/// Offset to convert wall gid to sprite filename (file IDs start at 101)
-const WALLS_ID_OFFSET: u32 = 101;
 
 // ============================================================================
 // Inventory UI Color Palette - Medieval Fantasy Theme
@@ -1117,26 +1113,26 @@ impl Renderer {
     }
 
     /// Get the sprite texture for a map object by its gid
+    /// sprite_id = gid - OBJECTS_FIRSTGID (e.g., gid 1263 → sprite "101")
     fn get_object_sprite(&self, gid: u32) -> Option<(&Texture2D, Option<Rect>)> {
         if gid < OBJECTS_FIRSTGID {
             return None;
         }
-        let local_id = gid - OBJECTS_FIRSTGID;
-        let sprite_number = local_id + OBJECTS_ID_OFFSET;
+        let sprite_id = gid - OBJECTS_FIRSTGID;
         let mut buf = [0u8; 12];
-        let key = u32_to_str(sprite_number, &mut buf);
+        let key = u32_to_str(sprite_id, &mut buf);
         self.object_sprites.get(key)
     }
 
     /// Get the sprite texture for a wall by its gid
-    /// Wall gid = WALLS_FIRSTGID + file_id, where file_id starts at 101
+    /// sprite_id = gid - WALLS_FIRSTGID (e.g., gid 102 → sprite "101")
     fn get_wall_sprite(&self, gid: u32) -> Option<(&Texture2D, Option<Rect>)> {
         if gid < WALLS_FIRSTGID {
             return None;
         }
-        let file_id = gid - WALLS_FIRSTGID;
+        let sprite_id = gid - WALLS_FIRSTGID;
         let mut buf = [0u8; 12];
-        let key = u32_to_str(file_id, &mut buf);
+        let key = u32_to_str(sprite_id, &mut buf);
         self.wall_sprites.get(key)
     }
 

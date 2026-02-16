@@ -398,6 +398,12 @@ impl QuestRunner {
             }
 
             // No choices dialogue
+            // If we're processing __continue__ and this dialogue is before the one
+            // we were waiting on, skip it silently (already shown)
+            if is_continue && counter < step {
+                return Ok(Value::Nil);
+            }
+
             // If we're processing __continue__ and this is the dialogue we were waiting on,
             // continue past it
             if is_continue && counter == step {
