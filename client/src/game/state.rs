@@ -847,6 +847,7 @@ pub struct UiState {
     pub active_quests: Vec<ActiveQuest>,
     pub quest_completed_events: Vec<QuestCompletedEvent>,
     pub quest_log_open: bool,
+    pub quest_log_scroll: f32,
     // Crafting UI state
     pub crafting_open: bool,
     pub crafting_selected_category: usize,
@@ -980,6 +981,7 @@ impl Default for UiState {
             active_quests: Vec::new(),
             quest_completed_events: Vec::new(),
             quest_log_open: false,
+            quest_log_scroll: 0.0,
             crafting_open: false,
             crafting_selected_category: 0,
             crafting_selected_recipe: 0,

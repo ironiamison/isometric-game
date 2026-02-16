@@ -3720,6 +3720,7 @@ impl InputHandler {
             if state.ui_state.quest_log_open {
                 audio.play_sfx("enter");
                 state.ui_state.quest_log_open = false;
+                state.ui_state.quest_log_scroll = 0.0;
             } else if state.ui_state.inventory_open || state.ui_state.character_panel_open
                 || state.ui_state.social_open || state.ui_state.skills_open
                 || state.ui_state.prayer_book_open {
@@ -4055,6 +4056,19 @@ impl InputHandler {
         // Toggle quest log (Q key)
         if !classic && is_key_pressed(KeyCode::Q) {
             state.ui_state.quest_log_open = !state.ui_state.quest_log_open;
+            if state.ui_state.quest_log_open {
+                state.ui_state.quest_log_scroll = 0.0;
+            }
+        }
+
+        // Quest log scrolling
+        if state.ui_state.quest_log_open {
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                const SCROLL_SPEED: f32 = 30.0;
+                state.ui_state.quest_log_scroll = (state.ui_state.quest_log_scroll - wheel_y * SCROLL_SPEED).max(0.0);
+                // max_scroll is clamped in the renderer
+            }
         }
 
         commands

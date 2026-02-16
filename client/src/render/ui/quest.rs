@@ -16,6 +16,10 @@ impl Renderer {
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 
+        let line_height = 17.0;
+        let objective_spacing = 16.0;
+        let entry_padding = 6.0;
+
         // Semi-transparent overlay
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
 
@@ -59,39 +63,74 @@ impl Renderer {
         draw_line(content_x + 2.0, content_y + 2.0, content_x + content_w - 2.0, content_y + 2.0, 2.0, SLOT_INNER_SHADOW);
         draw_line(content_x + 2.0, content_y + 2.0, content_x + 2.0, content_y + content_h - 2.0, 2.0, SLOT_INNER_SHADOW);
 
-        let mut y = content_y + 10.0;
-        let line_height = 17.0;
-        let objective_spacing = 16.0;
+        // Register scroll area for mouse wheel handling
+        layout.add(UiElementId::QuestLogScrollArea, Rect::new(content_x, content_y, content_w, content_h));
 
         if state.ui_state.active_quests.is_empty() {
+            let y = content_y + 10.0;
             // Empty state with themed styling
             self.draw_text_sharp("No Active Quests", content_x + 12.0, y + 10.0, 16.0, TEXT_DIM);
-            y += line_height + 8.0;
+            let y = y + line_height + 8.0;
             self.draw_text_sharp("Talk to NPCs with", content_x + 12.0, y + 10.0, 16.0, Color::new(0.392, 0.392, 0.431, 1.0));
             self.draw_text_sharp("!", content_x + 140.0, y + 10.0, 16.0, TEXT_GOLD);
             self.draw_text_sharp("above their heads", content_x + 155.0, y + 10.0, 16.0, Color::new(0.392, 0.392, 0.431, 1.0));
         } else {
+            // Calculate total content height for scrolling
+            let mut total_content_h = 10.0; // top padding
+            for (i, quest) in state.ui_state.active_quests.iter().enumerate() {
+                total_content_h += entry_padding + line_height + 4.0 + quest.objectives.len() as f32 * objective_spacing + entry_padding;
+                if i < state.ui_state.active_quests.len() - 1 {
+                    total_content_h += 8.0; // separator
+                }
+            }
+            total_content_h += 10.0; // bottom padding
+
+            let max_scroll = (total_content_h - content_h).max(0.0);
+            let scroll_offset = state.ui_state.quest_log_scroll.clamp(0.0, max_scroll);
+            let needs_scroll = max_scroll > 0.0;
+
+            // Enable scissor clipping for scrollable content
+            if needs_scroll {
+                let physical_w = screen_width();
+                let physical_h = screen_height();
+                let scale_x = physical_w / sw;
+                let scale_y = physical_h / sh;
+                let mut gl = unsafe { macroquad::window::get_internal_gl() };
+                gl.flush();
+                gl.quad_gl.scissor(Some((
+                    ((content_x + 2.0) * scale_x) as i32,
+                    ((content_y + 2.0) * scale_y) as i32,
+                    ((content_w - 4.0) * scale_x) as i32,
+                    ((content_h - 4.0) * scale_y) as i32,
+                )));
+            }
+
+            let mut y = content_y + 10.0 - scroll_offset;
+
             for (quest_idx, quest) in state.ui_state.active_quests.iter().enumerate() {
                 // Calculate entry height
-                let entry_padding = 6.0;
                 let title_height = line_height;
                 let objectives_height = quest.objectives.len() as f32 * objective_spacing;
                 let entry_height = entry_padding + title_height + 2.0 + objectives_height + entry_padding;
 
                 let entry_start_y = y;
 
-                // Check if we're about to overflow the panel
-                if y + entry_height > content_y + content_h - 20.0 {
-                    let remaining = state.ui_state.active_quests.len() - quest_idx;
-                    if remaining > 0 {
-                        self.draw_text_sharp(&format!("...and {} more quests", remaining), content_x + 12.0, y, 16.0, TEXT_DIM);
+                // Skip entries fully outside visible area
+                if y + entry_height < content_y || y > content_y + content_h {
+                    y += entry_height;
+                    if quest_idx < state.ui_state.active_quests.len() - 1 {
+                        y += 8.0;
                     }
-                    break;
+                    continue;
                 }
 
-                // Register quest entry bounds for hover detection
-                let bounds = Rect::new(content_x + 4.0, entry_start_y, content_w - 8.0, entry_height);
-                layout.add(UiElementId::QuestLogEntry(quest_idx), bounds);
+                // Register quest entry bounds for hover detection (clamped to visible area)
+                let vis_top = entry_start_y.max(content_y);
+                let vis_bottom = (entry_start_y + entry_height).min(content_y + content_h);
+                if vis_bottom > vis_top {
+                    let bounds = Rect::new(content_x + 4.0, vis_top, content_w - 8.0, vis_bottom - vis_top);
+                    layout.add(UiElementId::QuestLogEntry(quest_idx), bounds);
+                }
 
                 // Check if this quest is hovered
                 let is_hovered = matches!(hovered, Some(UiElementId::QuestLogEntry(idx)) if *idx == quest_idx);
@@ -139,6 +178,28 @@ impl Renderer {
                     draw_line(content_x + 20.0, y + 2.0, content_x + content_w - 20.0, y + 2.0, 1.0, SLOT_BORDER);
                     y += 8.0;
                 }
+            }
+
+            // Disable scissor clipping
+            if needs_scroll {
+                let mut gl = unsafe { macroquad::window::get_internal_gl() };
+                gl.flush();
+                gl.quad_gl.scissor(None);
+
+                // Draw scrollbar
+                let scrollbar_w = 4.0;
+                let scrollbar_x = content_x + content_w - scrollbar_w - 3.0;
+                let track_h = content_h - 4.0;
+                let track_y = content_y + 2.0;
+                let thumb_ratio = content_h / total_content_h;
+                let thumb_h = (track_h * thumb_ratio).max(20.0);
+                let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+                let thumb_y = track_y + (track_h - thumb_h) * scroll_ratio;
+
+                // Track
+                draw_rectangle(scrollbar_x, track_y, scrollbar_w, track_h, Color::new(1.0, 1.0, 1.0, 0.08));
+                // Thumb
+                draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, Color::new(1.0, 1.0, 1.0, 0.3));
             }
         }
 

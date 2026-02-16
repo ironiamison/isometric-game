@@ -25,6 +25,7 @@ pub enum UiElementId {
 
     // Quest Log
     QuestLogEntry(usize),
+    QuestLogScrollArea,
 
     // Context Menu
     ContextMenuOption(usize),
