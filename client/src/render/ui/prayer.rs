@@ -803,7 +803,18 @@ impl Renderer {
         let name = spell.name;
         let level_text = format!("Magic Level: {}", spell.magic_level_req);
         let mana_text = format!("Mana Cost: {}", spell.mana_cost);
-        let cooldown_text = format!("Cooldown: {:.1}s", spell.cooldown_ms as f64 / 1000.0);
+        let cooldown_secs = spell.cooldown_ms as f64 / 1000.0;
+        let cooldown_text = if cooldown_secs >= 60.0 {
+            let mins = (cooldown_secs / 60.0).floor() as u32;
+            let secs = (cooldown_secs % 60.0).floor() as u32;
+            if secs > 0 {
+                format!("Cooldown: {}m {}s", mins, secs)
+            } else {
+                format!("Cooldown: {}m", mins)
+            }
+        } else {
+            format!("Cooldown: {:.1}s", cooldown_secs)
+        };
         let desc = spell.description;
 
         // Calculate tooltip size

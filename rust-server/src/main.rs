@@ -2634,7 +2634,110 @@ async fn handle_client_message(
         }
         // Spell system messages
         ClientMessage::CastSpell { spell_id } => {
-            room.handle_cast_spell(player_id, &spell_id).await;
+            if spell_id == "return_home" {
+                // Return Home needs special instance cleanup handling
+                use crate::interior::InstanceType;
+
+                let spell_def = match crate::spell::get_spell(&spell_id) {
+                    Some(s) => s,
+                    None => {
+                        room.handle_cast_spell(player_id, &spell_id).await;
+                        return Ok(());
+                    }
+                };
+                let current_time = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+
+                let instance_id: Option<String> = {
+                    let instances = state.player_instances.read().await;
+                    instances.get(player_id).cloned()
+                };
+
+                let success = room.cast_return_home_spell(player_id, spell_def, current_time).await;
+
+                if success {
+                    if let Some(instance_id) = instance_id {
+                        // Player was in an instance - do instance cleanup
+                        {
+                            let mut instances = state.player_instances.write().await;
+                            instances.remove(player_id);
+                        }
+
+                        if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
+                            let other_players: Vec<String> = instance.get_player_ids().await
+                                .into_iter()
+                                .filter(|id| id != player_id)
+                                .collect();
+
+                            let remaining = instance.remove_player(player_id).await;
+                            if remaining == 0 && instance.instance_type == InstanceType::Private {
+                                if let Some(owner_id) = &instance.owner_id {
+                                    state.instance_manager.remove_private(owner_id, &instance.map_id);
+                                }
+                            }
+
+                            for other_id in &other_players {
+                                room.send_to_player(
+                                    other_id,
+                                    ServerMessage::PlayerLeft { id: player_id.to_string() },
+                                ).await;
+                                room.send_to_player(
+                                    player_id,
+                                    ServerMessage::PlayerLeft { id: other_id.clone() },
+                                ).await;
+                            }
+                        }
+
+                        // Clean up entrance position
+                        {
+                            let mut entrance_positions = state.player_entrance_positions.write().await;
+                            entrance_positions.remove(player_id);
+                        }
+
+                        // Send map transition to overworld
+                        let spawn_x = 15.0_f32;
+                        let spawn_y = 4.0_f32;
+                        room.send_to_player(
+                            player_id,
+                            ServerMessage::MapTransition {
+                                map_type: "overworld".to_string(),
+                                map_id: "world_0".to_string(),
+                                spawn_x,
+                                spawn_y,
+                                instance_id: String::new(),
+                            },
+                        ).await;
+
+                        // Re-send overworld data
+                        room.send_to_player(player_id, room.get_chair_positions_message().await).await;
+                        room.send_to_player(player_id, room.get_gathering_markers_message().await).await;
+
+                        // Notify overworld players
+                        {
+                            let player_name = room.get_player_name(player_id).await.unwrap_or_default();
+                            let (gender, skin) = room.get_player_appearance(player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                            let (hair_style, hair_color) = room.get_player_hair(player_id).await.unwrap_or((None, None));
+                            room.send_to_overworld_players(
+                                ServerMessage::PlayerJoined {
+                                    id: player_id.to_string(),
+                                    name: player_name,
+                                    x: spawn_x as i32,
+                                    y: spawn_y as i32,
+                                    gender,
+                                    skin,
+                                    hair_style,
+                                    hair_color,
+                                },
+                                Some(player_id),
+                            ).await;
+                        }
+                    }
+                }
+            } else {
+                room.handle_cast_spell(player_id, &spell_id).await;
+            }
         }
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         // ===== Bank Messages =====

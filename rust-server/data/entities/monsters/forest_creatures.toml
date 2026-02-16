@@ -195,7 +195,7 @@ description = "A giant worm that burrows through the earth."
 [worm.stats]
 level = 3
 max_hp = 30
-damage = 1
+damage = 2
 attack_bonus = 2
 defence_bonus = 0
 attack_range = 1
@@ -217,7 +217,7 @@ quantity_min = 1
 quantity_max = 2
 
 [worm.behaviors]
-hostile = true
+hostile = false
 wander_enabled = true
 wander_radius = 2
 wander_pause_min_ms = 3000
@@ -418,7 +418,7 @@ description = "A woolly sheep. Mostly harmless."
 [sheep.stats]
 level = 2
 max_hp = 12
-damage = 1
+damage = 2
 attack_bonus = -1
 defence_bonus = 0
 attack_range = 1
@@ -440,7 +440,7 @@ quantity_min = 1
 quantity_max = 1
 
 [sheep.behaviors]
-hostile = true
+hostile = false
 wander_enabled = true
 wander_radius = 5
 wander_pause_min_ms = 3000

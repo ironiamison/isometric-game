@@ -157,6 +157,7 @@ impl Renderer {
                     let color = match spell_def.spell_type {
                         crate::game::spell::SpellType::Damage => Color::new(0.6, 0.15, 0.15, 0.9),
                         crate::game::spell::SpellType::Heal => Color::new(0.15, 0.5, 0.15, 0.9),
+                        crate::game::spell::SpellType::Teleport => Color::new(0.2, 0.3, 0.6, 0.9),
                     };
                     let pad = 4.0;
                     draw_rectangle(x + pad, y + pad, slot_size - pad * 2.0, slot_size - pad * 2.0, color);
@@ -189,7 +190,13 @@ impl Renderer {
 
                     // Show remaining cooldown time
                     let remaining = state.spell_cooldowns.get(spell_def.id).map_or(0.0, |&t| (t - now).max(0.0));
-                    let cd_text = format!("{:.1}", remaining);
+                    let cd_text = if remaining >= 60.0 {
+                        let mins = (remaining / 60.0).floor() as u32;
+                        let secs = (remaining % 60.0).floor() as u32;
+                        format!("{}:{:02}", mins, secs)
+                    } else {
+                        format!("{:.1}", remaining)
+                    };
                     let cd_w = self.measure_text_sharp(&cd_text, 14.0).width;
                     self.draw_text_sharp(
                         &cd_text,

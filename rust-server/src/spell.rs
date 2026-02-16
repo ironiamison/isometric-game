@@ -6,6 +6,7 @@ use rand::Rng;
 pub enum SpellType {
     Damage,
     Heal,
+    Teleport,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +51,16 @@ pub const SPELLS: &[SpellDef] = &[
         cooldown_ms: 5000,
         base_power: 5,
         effect_sprite: "self_heal",
+    },
+    SpellDef {
+        id: "return_home",
+        name: "Return Home",
+        spell_type: SpellType::Teleport,
+        magic_level_req: 0,
+        mana_cost: 0,
+        cooldown_ms: 900_000,
+        base_power: 0,
+        effect_sprite: "teleport",
     },
 ];
 

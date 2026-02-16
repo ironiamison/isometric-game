@@ -949,6 +949,7 @@ impl Renderer {
                 ("dark_hand", "dark_hand"),
                 ("dark_eater", "dark_eater"),
                 ("heal", "self_heal"),
+                ("return_home", "return_home"),
             ];
             let mut icons = HashMap::new();
             for (spell_id, icon_name) in &spell_icon_mappings {
@@ -2540,7 +2541,7 @@ impl Renderer {
                 "dark_hand" => "dark_hand",
                 "dark_eater" => "dark_eater",
                 "heal" => "self_heal",
-                "teleport" => "bubbles_warp",
+                "teleport" | "return_home" => "bubbles_warp",
                 _ => continue,
             };
 

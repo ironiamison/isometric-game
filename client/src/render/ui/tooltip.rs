@@ -362,10 +362,12 @@ impl Renderer {
         let type_text = match spell_def.spell_type {
             crate::game::spell::SpellType::Damage => "DAMAGE",
             crate::game::spell::SpellType::Heal => "HEAL",
+            crate::game::spell::SpellType::Teleport => "TELEPORT",
         };
         let type_color = match spell_def.spell_type {
             crate::game::spell::SpellType::Damage => Color::new(0.824, 0.345, 0.345, 1.0),
             crate::game::spell::SpellType::Heal => Color::new(0.392, 0.784, 0.392, 1.0),
+            crate::game::spell::SpellType::Teleport => Color::new(0.4, 0.55, 0.9, 1.0),
         };
         let badge_w = self.measure_text_sharp(type_text, 16.0).width + 10.0;
         let badge_h = 20.0;

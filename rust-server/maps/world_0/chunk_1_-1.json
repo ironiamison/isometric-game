@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAgAAAAAAAAAADAADEAEABAkAAAECAQEAgAICAAQAAAAABAJAAAEQFAAAAAABAAEAIAAKAAAAAgAABAI/38AAQBAAgDARwAQYEYgBKBEAAAgRGgAIEQAAD9EAAB/RIIQwGQgAUpEAiBBRIAAQUQCAkFkAADgRAAAREQAAMFHAAA=",
+  "collision": "AAgAAAAAAAAAADAADEAEABAkAAAECAQEAgAICAAQAAAAABAJAAAEQFAAAAAABAAEAIAAKAAAAAgAABAI/38AAQBAAgDARwAQYEYgBKBEAAAgRGgAIEQAAD9EAAB/RIIQwGQgAUpEAiBBRIAAQUQCAkFkAADgRAAAQEQAAMBEAAA=",
   "entities": [
     {
       "entityId": "crow",
@@ -3121,6 +3121,24 @@
       "entityId": "crow",
       "x": 5,
       "y": 4,
+      "level": 1
+    },
+    {
+      "entityId": "slime",
+      "x": 16,
+      "y": 25,
+      "level": 1
+    },
+    {
+      "entityId": "slime",
+      "x": 31,
+      "y": 5,
+      "level": 1
+    },
+    {
+      "entityId": "slime",
+      "x": 19,
+      "y": 8,
       "level": 1
     },
     {
@@ -3167,7 +3185,7 @@
     },
     {
       "entityId": "lumberjack_pete",
-      "x": 0,
+      "x": 1,
       "y": 27,
       "level": 1
     }
@@ -3585,13 +3603,6 @@
       "y": 25,
       "width": 108,
       "height": 161
-    },
-    {
-      "gid": 1265,
-      "x": 0,
-      "y": 31,
-      "width": 72,
-      "height": 116
     },
     {
       "gid": 1265,

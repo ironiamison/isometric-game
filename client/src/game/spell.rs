@@ -4,6 +4,7 @@
 pub enum SpellType {
     Damage,
     Heal,
+    Teleport,
 }
 
 /// Static spell definition for UI display
@@ -20,7 +21,7 @@ pub struct SpellDef {
 }
 
 /// All spells in display order
-pub const SPELLS: [SpellDef; 3] = [
+pub const SPELLS: [SpellDef; 4] = [
     SpellDef {
         id: "dark_hand",
         name: "Dark Hand",
@@ -50,5 +51,15 @@ pub const SPELLS: [SpellDef; 3] = [
         cooldown_ms: 5000,
         description: "Restore your health",
         effect_sprite: "self_heal",
+    },
+    SpellDef {
+        id: "return_home",
+        name: "Return Home",
+        spell_type: SpellType::Teleport,
+        magic_level_req: 0,
+        mana_cost: 0,
+        cooldown_ms: 900_000,
+        description: "Teleport to the village spawn point",
+        effect_sprite: "teleport",
     },
 ];

@@ -9835,6 +9835,7 @@ impl GameRoom {
         match spell_def.spell_type {
             crate::spell::SpellType::Damage => self.cast_damage_spell(player_id, spell_def, current_time).await,
             crate::spell::SpellType::Heal => self.cast_heal_spell(player_id, spell_def, current_time).await,
+            crate::spell::SpellType::Teleport => { self.cast_return_home_spell(player_id, spell_def, current_time).await; },
         }
     }
 
@@ -10447,6 +10448,53 @@ impl GameRoom {
         }
 
         tracing::info!("Player {} healed for {} HP with spell {}", player_id, actual_heal, spell_def.name);
+    }
+
+    /// Cast the Return Home teleport spell. Returns true if the spell was successfully cast.
+    pub async fn cast_return_home_spell(&self, player_id: &str, spell_def: &crate::spell::SpellDef, current_time: u64) -> bool {
+        // Validate and set cooldown under write lock
+        {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) if !p.is_dead && p.active => p,
+                _ => return false,
+            };
+
+            // Check cooldown
+            if let Some(&last_cast) = player.spell_cooldowns.get(spell_def.id) {
+                if current_time < last_cast + spell_def.cooldown_ms {
+                    drop(players);
+                    self.send_to_player(player_id, ServerMessage::SpellResult {
+                        success: false,
+                        reason: Some("Spell on cooldown".to_string()),
+                    }).await;
+                    return false;
+                }
+            }
+
+            // Set cooldown and move player to spawn
+            player.spell_cooldowns.insert(spell_def.id.to_string(), current_time);
+            player.x = WORLD_SPAWN_X;
+            player.y = WORLD_SPAWN_Y;
+        }
+
+        // Send success result
+        self.send_to_player(player_id, ServerMessage::SpellResult {
+            success: true,
+            reason: None,
+        }).await;
+
+        // Send spell effect to the player
+        self.send_to_player(player_id, ServerMessage::SpellEffect {
+            caster_id: player_id.to_string(),
+            target_id: None,
+            spell_id: spell_def.id.to_string(),
+            target_x: WORLD_SPAWN_X,
+            target_y: WORLD_SPAWN_Y,
+        }).await;
+
+        tracing::info!("Player {} cast Return Home, teleporting to ({}, {})", player_id, WORLD_SPAWN_X, WORLD_SPAWN_Y);
+        true
     }
 
     /// Handle offering bones at an altar for bonus XP

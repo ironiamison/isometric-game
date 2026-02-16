@@ -9,7 +9,7 @@ description = "A wild piggy that roams the forest."
 [pig.stats]
 level = 1
 max_hp = 15
-damage = 2
+damage = 1
 attack_bonus = 0
 defence_bonus = 0
 attack_range = 1
@@ -49,7 +49,7 @@ quantity_min = 1
 quantity_max = 1
 
 [pig.behaviors]
-hostile = true
+hostile = false
 wander_enabled = true
 wander_radius = 4
 wander_pause_min_ms = 2000
