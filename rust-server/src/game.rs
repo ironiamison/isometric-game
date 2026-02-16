@@ -7352,6 +7352,7 @@ impl GameRoom {
             (ids, stopped)
         };
 
+        let mut needs_npc_displacement = false;
         {
             let mut players = self.players.write().await;
 
@@ -7369,6 +7370,14 @@ impl GameRoom {
                     {
                         player.move_dx = 0;
                         player.move_dy = 0;
+                    }
+
+                    // Check if this move landed on an NPC tile
+                    if !needs_npc_displacement
+                        && !players_in_instances.contains(&id)
+                        && npc_positions.contains(&(target_x, target_y))
+                    {
+                        needs_npc_displacement = true;
                     }
                 }
             }
@@ -7402,8 +7411,8 @@ impl GameRoom {
 
         // Displace NPCs that share a tile with a player.
         // Instead of blocking player movement, NPCs yield and step to an adjacent free tile.
-        if !moved_players.is_empty() {
-            // Only check overworld players (instance players have separate coordinate spaces)
+        // Only acquire heavy locks when a player actually landed on an NPC tile.
+        if needs_npc_displacement {
             let overworld_player_tiles: std::collections::HashSet<(i32, i32)> = {
                 let players = self.players.read().await;
                 players.values()
@@ -7434,7 +7443,6 @@ impl GameRoom {
                     let nx = npc.x + dx;
                     let ny = npc.y + dy;
 
-                    // Must be walkable, not on a player, not on another NPC, not a portal
                     let coord = crate::chunk::ChunkCoord::from_world(nx, ny);
                     let walkable = if let Some(chunk) = chunks_guard.get(&coord) {
                         let (lx, ly) = crate::chunk::world_to_local(nx, ny);

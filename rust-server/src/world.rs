@@ -228,7 +228,9 @@ impl World {
                 let world_x = coord.x * CHUNK_SIZE as i32 + local_x as i32;
                 let world_y = coord.y * CHUNK_SIZE as i32 + local_y as i32;
 
-                let level = entity["level"].as_i64().map(|l| l as i32);
+                // Level comes from the entity prototype (TOML definitions), not from chunk JSON.
+                // Chunk JSONs had "level": 1 for all entities which was overriding actual levels.
+                let level: Option<i32> = None;
                 let respawn = entity["respawn"].as_bool().unwrap_or(true);
                 let facing = entity["facing"].as_str().map(|s| s.to_string());
                 let unique_id = entity["uniqueId"].as_str().map(|s| s.to_string());

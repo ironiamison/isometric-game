@@ -55,13 +55,8 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
         }
     }
 
-    // Add all alive NPCs
-    for npc in state.npcs.values() {
-        if npc.is_alive() {
-            // Use server-authoritative coordinates to avoid interpolation skew.
-            occupied.insert((npc.server_x.round() as i32, npc.server_y.round() as i32));
-        }
-    }
+    // NPCs are NOT added to the occupied set — the server displaces NPCs
+    // when a player walks onto their tile, so paths can route through them.
 
     occupied
 }
