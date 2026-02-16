@@ -6919,8 +6919,9 @@ impl GameRoom {
                     }
                 }
 
-                // Fire quest event for harvesting
+                // Fire quest event for harvesting (prefixed for farming-specific quests, and raw for general collect quests)
                 self.process_quest_item_collect(player_id, &format!("harvest_{}", harvest.produce_item), harvest.amount).await;
+                self.process_quest_item_collect(player_id, &harvest.produce_item, harvest.amount).await;
 
                 // Track farming contract progress
                 {
