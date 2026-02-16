@@ -15,6 +15,7 @@ id = "find_the_map"
 type = "reach_location"
 target = "lost_map_location"
 description = "Find the lost map in the swamp"
+dialogue = "You spot a tattered map wedged between the roots of an old willow tree. This must be what the adventurer lost!"
 
 [[quest.objectives]]
 id = "return_to_adventurer"

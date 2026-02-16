@@ -3330,6 +3330,23 @@ impl GameRoom {
                         let _ = sender.send(data).await;
                     }
                 }
+
+                // Show dialogue if the objective has one
+                if result.objective_completed {
+                    if let Some(quest) = self.quest_registry.get(&result.quest_id).await {
+                        if let Some(obj) = quest.objectives.iter().find(|o| o.id == *objective_id) {
+                            if let Some(ref dlg) = obj.dialogue {
+                                self.send_to_player(player_id, ServerMessage::ShowDialogue {
+                                    quest_id: String::new(),
+                                    npc_id: String::new(),
+                                    speaker: String::new(),
+                                    text: dlg.clone(),
+                                    choices: vec![],
+                                }).await;
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -3788,6 +3805,7 @@ impl GameRoom {
 
         // Fire NpcInteraction event unconditionally so talk_to objectives
         // complete when talking to ANY NPC (not just the quest giver)
+        let mut talk_objective_dialogue: Option<String> = None;
         {
             let event = QuestEvent::NpcInteraction {
                 player_id: player_id.to_string(),
@@ -3813,6 +3831,17 @@ impl GameRoom {
                         };
                         if let Ok(data) = crate::protocol::encode_server_message(&msg) {
                             let _ = sender.send(data).await;
+                        }
+                    }
+
+                    // Check if this objective has dialogue to show
+                    if result.objective_completed {
+                        if let Some(quest) = self.quest_registry.get(&result.quest_id).await {
+                            if let Some(obj) = quest.objectives.iter().find(|o| o.id == *objective_id) {
+                                if let Some(ref dlg) = obj.dialogue {
+                                    talk_objective_dialogue = Some(dlg.clone());
+                                }
+                            }
                         }
                     }
                 }
@@ -4010,6 +4039,18 @@ impl GameRoom {
                     tracing::error!("Quest script error: {}", e);
                 }
             }
+        } else if let Some(dialogue_text) = talk_objective_dialogue {
+            // No quest from this NPC, but a talk_to objective completed with dialogue
+            let speaker = self.entity_registry.get(&entity_type)
+                .map(|p| p.display_name.clone())
+                .unwrap_or_else(|| entity_type.clone());
+            self.send_to_player(player_id, ServerMessage::ShowDialogue {
+                quest_id: String::new(),
+                npc_id: npc_id.to_string(),
+                speaker,
+                text: dialogue_text,
+                choices: vec![],
+            }).await;
         }
     }
 

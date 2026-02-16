@@ -62,6 +62,9 @@ pub struct RawObjective {
     /// Whether this objective must be completed in order
     #[serde(default)]
     pub sequential: bool,
+    /// Optional dialogue shown when this objective completes (for talk_to/reach_location)
+    #[serde(default)]
+    pub dialogue: Option<String>,
 }
 
 fn default_count() -> i32 {
@@ -141,6 +144,8 @@ pub struct Objective {
     pub description: String,
     /// Whether this must be completed before subsequent objectives
     pub sequential: bool,
+    /// Optional dialogue shown when this objective completes (for talk_to/reach_location)
+    pub dialogue: Option<String>,
 }
 
 impl Objective {
@@ -153,6 +158,7 @@ impl Objective {
             count: raw.count,
             description: raw.description.clone(),
             sequential: raw.sequential,
+            dialogue: raw.dialogue.clone(),
         })
     }
 }

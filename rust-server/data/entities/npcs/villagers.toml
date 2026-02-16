@@ -716,7 +716,7 @@ quest_complete = "My sister's broom arrived! Now then, let me show you my wares.
 # ============================================================================
 [witch_sister]
 display_name = "Witch Willow"
-sprite = "witch"
+sprite = "witch_willow"
 animation_type = "humanoid"
 description = "Witch Hazel's younger sister. She's been stuck in the swamp village without her magic broom."
 

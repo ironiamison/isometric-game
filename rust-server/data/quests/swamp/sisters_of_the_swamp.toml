@@ -18,6 +18,7 @@ id = "find_witch_sister"
 type = "talk_to"
 target = "witch_sister"
 description = "Find Witch Willow in the swamp village"
+dialogue = "Oh! You've come from my sister Hazel? I'm so glad she sent someone. Tell her I'm safe, but I need help getting home - I'll explain everything when you return!"
 
 [quest.rewards]
 exp = 100
