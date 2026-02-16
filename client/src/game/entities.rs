@@ -315,13 +315,24 @@ impl Player {
         // Detect velocity direction change (intent changed but server hasn't moved yet)
         let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
 
-        // vel_changed: immediately update target when direction intent changes,
-        // even if visual is mid-interpolation (axis-aligned interp prevents diagonals)
-        if server_moved || stopped || at_tile_center || vel_changed {
+        if vel_changed && !server_moved && !stopped {
+            // Direction intent changed during cooldown (server hasn't moved yet).
+            // Only predict ahead if visual is close to server position.
+            // This prevents drift accumulation from chasing multiple prediction
+            // targets during rapid direction changes.
+            let drift = (self.x - x).abs().max((self.y - y).abs());
+            if drift < 0.5 {
+                if vel_x != 0.0 || vel_y != 0.0 {
+                    self.target_x = x + vel_x;
+                    self.target_y = y + vel_y;
+                }
+            } else {
+                // Visual has drifted too far - converge to server position first
+                self.target_x = x;
+                self.target_y = y;
+            }
+        } else if server_moved || stopped || at_tile_center {
             if vel_x != 0.0 || vel_y != 0.0 {
-                // Always predict one tile ahead in the velocity direction.
-                // Axis-aligned interpolation ensures the visual reaches tile center
-                // on the minor axis first, then moves on the major axis — no diagonals.
                 self.target_x = x + vel_x;
                 self.target_y = y + vel_y;
             } else {

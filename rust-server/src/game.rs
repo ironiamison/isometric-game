@@ -3795,6 +3795,28 @@ impl GameRoom {
             };
             let talk_results = self.quest_registry.process_event(&event, quest_state).await;
             for result in talk_results {
+                if let (Some(objective_id), Some(current), Some(target)) =
+                    (&result.objective_id, result.new_progress, result.target)
+                {
+                    tracing::info!(
+                        "Player {} talked to NPC for quest objective {} in quest {}: {}/{}",
+                        player_id, objective_id, result.quest_id, current, target
+                    );
+
+                    // Send objective progress update to player
+                    if let Some(sender) = self.player_senders.read().await.get(player_id) {
+                        let msg = ServerMessage::QuestObjectiveProgress {
+                            quest_id: result.quest_id.clone(),
+                            objective_id: objective_id.clone(),
+                            current,
+                            target,
+                        };
+                        if let Ok(data) = crate::protocol::encode_server_message(&msg) {
+                            let _ = sender.send(data).await;
+                        }
+                    }
+                }
+
                 if result.quest_ready {
                     tracing::info!(
                         "Player {} quest {} is now ready to complete after talking to NPC",
