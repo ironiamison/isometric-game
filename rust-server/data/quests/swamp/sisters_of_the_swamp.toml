@@ -25,7 +25,7 @@ exp = 100
 gold = 50
 
 [quest.dialogue]
-offer = "My sister Willow is stuck in the swamp village. She wandered off weeks ago and I haven't heard from her since. Could you find her and make sure she's alright?"
+offer = "My sister Willow is stuck in the swamp village. She wandered off weeks ago and I haven't heard from her since. Could you find her and make sure she's alright? I've been so worried I can't even tend my alchemy shop. Help me reunite with her and I'll open it up to you - finest potions and supplies in the swamp!"
 accept = "Follow the path deeper into the swamp. The village is hidden among the willows. Tell Willow I sent you!"
 progress = "Have you found my sister yet? The village is deeper in the swamp."
 complete = "You found her! Oh, thank the stars. Is she well? What does she need?"
