@@ -605,8 +605,10 @@ impl World {
         let mut y = y0;
 
         loop {
-            // Don't check start position (attacker's tile)
-            if (x != x0 || y != y0) && !self.is_tile_walkable(x, y).await {
+            // Skip start and end positions — only check intermediate tiles for obstacles.
+            // The target tile may be a collision tile (e.g., NPC standing on rocks)
+            // but we still want to allow attacks to reach it.
+            if (x != x0 || y != y0) && (x != x1 || y != y1) && !self.is_tile_walkable(x, y).await {
                 return false;
             }
 
