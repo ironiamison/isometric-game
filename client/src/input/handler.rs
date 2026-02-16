@@ -423,10 +423,10 @@ impl InputHandler {
                                 let player_x = player.x.round() as i32;
                                 let player_y = player.y.round() as i32;
 
-                                // Check Chebyshev distance (must be exactly 1 - adjacent/diagonal)
+                                // Check Chebyshev distance (must be within 1 - own tile, adjacent, or diagonal)
                                 let dx = (tile_x - player_x).abs();
                                 let dy = (tile_y - player_y).abs();
-                                let is_adjacent = dx <= 1 && dy <= 1 && (dx > 0 || dy > 0);
+                                let is_adjacent = dx <= 1 && dy <= 1;
 
                                 if is_adjacent {
                                     // Check if dropping a seed onto a farming patch

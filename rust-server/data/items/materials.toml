@@ -179,6 +179,15 @@ category = "material"
 max_stack = 99
 base_price = 6
 
+[magic_broom]
+display_name = "Magic Broom"
+sprite = "magic_broom"
+description = "A broom enchanted with swamp magic. It hums with energy."
+category = "material"
+max_stack = 1
+base_price = 0
+sellable = false
+
 [hedgehog_spine]
 display_name = "Hedgehog Spine"
 sprite = "hedgehog_spine"

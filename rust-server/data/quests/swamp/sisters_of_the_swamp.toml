@@ -1,0 +1,30 @@
+# Sisters of the Swamp - Witch Hazel's introductory quest
+# Given by Witch Hazel at the swamp entrance
+
+[quest]
+id = "sisters_of_the_swamp"
+name = "Sisters of the Swamp"
+description = "Witch Hazel has lost contact with her sister in the swamp village. Find the village and speak to Witch Willow."
+giver_npc = "witch_hazel"
+level_required = 1
+repeatable = false
+lua_script = "swamp/sisters_of_the_swamp.lua"
+
+[quest.chain]
+next = "the_magic_broom"
+
+[[quest.objectives]]
+id = "find_witch_sister"
+type = "talk_to"
+target = "witch_sister"
+description = "Find Witch Willow in the swamp village"
+
+[quest.rewards]
+exp = 100
+gold = 50
+
+[quest.dialogue]
+offer = "My sister Willow is stuck in the swamp village. She wandered off weeks ago and I haven't heard from her since. Could you find her and make sure she's alright?"
+accept = "Follow the path deeper into the swamp. The village is hidden among the willows. Tell Willow I sent you!"
+progress = "Have you found my sister yet? The village is deeper in the swamp."
+complete = "You found her! Oh, thank the stars. Is she well? What does she need?"

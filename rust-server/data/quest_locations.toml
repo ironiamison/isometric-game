@@ -1,0 +1,7 @@
+# Quest Locations - Tile positions that trigger reach_location objectives
+# Each location has an ID (matching quest objective target), coordinates, and radius
+
+[lost_map_location]
+x = 15
+y = -50
+radius = 2

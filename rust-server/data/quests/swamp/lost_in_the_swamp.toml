@@ -1,0 +1,34 @@
+# Lost in the Swamp - Adventurer's standalone quest
+# Given by the Lost Adventurer in the swamp
+
+[quest]
+id = "lost_in_the_swamp"
+name = "Lost in the Swamp"
+description = "A lost adventurer dropped his map somewhere in the swamp. Find it and bring back news of its location."
+giver_npc = "swamp_adventurer"
+level_required = 1
+repeatable = false
+lua_script = "swamp/lost_in_the_swamp.lua"
+
+[[quest.objectives]]
+id = "find_the_map"
+type = "reach_location"
+target = "lost_map_location"
+description = "Find the lost map in the swamp"
+
+[[quest.objectives]]
+id = "return_to_adventurer"
+type = "talk_to"
+target = "swamp_adventurer"
+description = "Return to the Lost Adventurer"
+sequential = true
+
+[quest.rewards]
+exp = 200
+gold = 150
+
+[quest.dialogue]
+offer = "I dropped my map somewhere deeper in the swamp. Without it, I'm completely lost! Could you search for it?"
+accept = "I think I lost it somewhere to the south, near some old willow trees. If you find it, come straight back!"
+progress = "Any luck finding my map? I'm going in circles without it."
+complete = "You found it! I knew it had to be out there somewhere. Here, take this gold - you've saved me days of wandering!"

@@ -1,0 +1,31 @@
+# Lobster Feast - Swamp Hermit Part 3
+# Given by the Swamp Hermit (man on a log)
+
+[quest]
+id = "lobster_feast"
+name = "Lobster Feast"
+description = "The Swamp Hermit needs 50 lobsters to fuel up before he can start fighting swamp creatures again."
+giver_npc = "swamp_hermit"
+level_required = 7
+repeatable = false
+lua_script = "swamp/lobster_feast.lua"
+
+[quest.chain]
+previous = "forging_ahead"
+
+[[quest.objectives]]
+id = "collect_lobsters"
+type = "collect_item"
+target = "raw_lobster"
+count = 50
+description = "Fish 50 Raw Lobsters"
+
+[quest.rewards]
+exp = 500
+gold = 500
+
+[quest.dialogue]
+offer = "Armour? Fixed. Sword? Sharp. But I haven't eaten properly in weeks! The lobsters in the swamp village pond are magnificent. Bring me 50 and I'll have the energy to start slaying again."
+accept = "50 lobsters! I know it's a lot, but a warrior needs fuel. The fishing spots in the swamp village should have plenty."
+progress = "My stomach is rumbling just thinking about those lobsters. How many have you caught?"
+complete = "FIFTY LOBSTERS! You absolute legend! Come here, let me... no, I won't hug you. But thank you. I'm ready to take on the swamp again!"

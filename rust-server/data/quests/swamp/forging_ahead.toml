@@ -1,0 +1,46 @@
+# Forging Ahead - Swamp Hermit Part 2
+# Given by the Swamp Hermit (man on a log)
+
+[quest]
+id = "forging_ahead"
+name = "Forging Ahead"
+description = "The Swamp Hermit's sword is broken. He needs willow logs, slime cores, and marshbloom to repair it."
+giver_npc = "swamp_hermit"
+level_required = 5
+repeatable = false
+lua_script = "swamp/forging_ahead.lua"
+
+[quest.chain]
+previous = "shell_repairs"
+next = "lobster_feast"
+
+[[quest.objectives]]
+id = "collect_willow_logs"
+type = "collect_item"
+target = "willow_log"
+count = 30
+description = "Collect 30 Willow Logs"
+
+[[quest.objectives]]
+id = "collect_slime_cores"
+type = "collect_item"
+target = "slime_core"
+count = 10
+description = "Collect 10 Slime Cores"
+
+[[quest.objectives]]
+id = "collect_marshbloom"
+type = "collect_item"
+target = "marshbloom"
+count = 5
+description = "Collect 5 Marshbloom"
+
+[quest.rewards]
+exp = 350
+gold = 300
+
+[quest.dialogue]
+offer = "Armour's sorted, but my sword... it snapped clean in half fighting a swamper. I need willow wood for a new handle, slime cores for tempering, and marshbloom for the finishing oil."
+accept = "I'll need 30 willow logs, 10 slime cores, and 5 marshbloom. It's a big ask, but I'll make it worth your while!"
+progress = "That sword won't forge itself! How's the gathering going?"
+complete = "Now THAT'S what I call materials! Give me a moment to work... ha! A proper blade again. One more favour and I'll be ready to fight."

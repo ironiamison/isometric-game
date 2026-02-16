@@ -1,0 +1,52 @@
+# The Magic Broom - Witch Willow needs ingredients for an enchanted broom
+# Given by Witch Willow in the swamp village
+
+[quest]
+id = "the_magic_broom"
+name = "The Magic Broom"
+description = "Witch Willow needs ingredients to craft a magic broom so she can fly back to her sister at the swamp entrance."
+giver_npc = "witch_sister"
+level_required = 1
+repeatable = false
+lua_script = "swamp/the_magic_broom.lua"
+
+[quest.chain]
+previous = "sisters_of_the_swamp"
+
+[[quest.objectives]]
+id = "collect_willow_logs"
+type = "collect_item"
+target = "willow_log"
+count = 5
+description = "Collect 5 Willow Logs"
+
+[[quest.objectives]]
+id = "collect_marshbloom"
+type = "collect_item"
+target = "marshbloom"
+count = 3
+description = "Collect 3 Marshbloom"
+
+[[quest.objectives]]
+id = "collect_slime_cores"
+type = "collect_item"
+target = "slime_core"
+count = 2
+description = "Collect 2 Slime Cores"
+
+[[quest.objectives]]
+id = "return_to_willow"
+type = "talk_to"
+target = "witch_sister"
+description = "Return to Witch Willow"
+sequential = true
+
+[quest.rewards]
+exp = 200
+gold = 150
+
+[quest.dialogue]
+offer = "My sister sent you? Oh, wonderful! I need to get back to her, but I can't leave without a magic broom. Could you gather the ingredients for me?"
+accept = "I need 5 willow logs for the handle, 3 marshbloom for the enchantment, and 2 slime cores for the binding spell. Bring them back and I'll craft the broom!"
+progress = "Have you gathered all the ingredients? I need willow logs, marshbloom, and slime cores."
+complete = "Perfect! Let me work my magic... there! The broom is enchanted and on its way to my sister. You've done us both a great service!"

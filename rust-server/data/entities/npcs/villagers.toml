@@ -676,6 +676,7 @@ gold_max = 0
 [witch_hazel.behaviors]
 hostile = false
 merchant = true
+quest_giver = true
 wander_enabled = true
 wander_radius = 2
 wander_pause_min_ms = 6000
@@ -686,6 +687,10 @@ shop_id = "witch"
 buy_multiplier = 0.4
 sell_multiplier = 1.2
 restock_interval_minutes = 5
+required_quest = "the_magic_broom"
+
+[witch_hazel.quest_giver]
+available_quests = ["sisters_of_the_swamp"]
 
 [witch_hazel.speech]
 radius = 6
@@ -703,3 +708,151 @@ messages = [
 [witch_hazel.dialogue]
 greeting = "Welcome to my little shop, dearie. Looking for potions or supplies?"
 shop_open = "Take a peek at what I've got brewing."
+quest_available = "Dearie, I need your help with something. My sister is lost in the swamp village..."
+quest_complete = "My sister's broom arrived! Now then, let me show you my wares."
+
+# ============================================================================
+# Witch Willow - Swamp Village Witch (Witch Hazel's Sister)
+# ============================================================================
+[witch_sister]
+display_name = "Witch Willow"
+sprite = "witch"
+animation_type = "humanoid"
+description = "Witch Hazel's younger sister. She's been stuck in the swamp village without her magic broom."
+
+[witch_sister.stats]
+max_hp = 120
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[witch_sister.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[witch_sister.behaviors]
+hostile = false
+quest_giver = true
+wander_enabled = false
+
+[witch_sister.quest_giver]
+available_quests = ["the_magic_broom"]
+
+[witch_sister.speech]
+radius = 5
+interval_min_ms = 25000
+interval_max_ms = 45000
+messages = [
+    "I do miss my sister at the swamp entrance...",
+    "If only I had a broom, I could fly right out of here.",
+    "The swamp herbs here are wonderful for potions.",
+    "My cauldron needs tending... always bubbling.",
+]
+
+[witch_sister.dialogue]
+greeting = "Oh! A visitor! It's been so long since anyone found this village."
+quest_available = "You know my sister? Please, I need your help to get back to her."
+quest_complete = "The broom is on its way! Thank you so much, dearie!"
+
+# ============================================================================
+# Swamp Hermit - Man on a Log (3-Part Quest Chain)
+# ============================================================================
+[swamp_hermit]
+display_name = "Swamp Hermit"
+sprite = "wise_man"
+animation_type = "humanoid"
+description = "A grizzled warrior stranded on a log in the swamp. His equipment is in rough shape."
+
+[swamp_hermit.stats]
+max_hp = 200
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[swamp_hermit.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[swamp_hermit.behaviors]
+hostile = false
+quest_giver = true
+wander_enabled = false
+facing = "right"
+
+[swamp_hermit.quest_giver]
+available_quests = ["shell_repairs", "forging_ahead", "lobster_feast"]
+
+[swamp_hermit.speech]
+radius = 5
+interval_min_ms = 25000
+interval_max_ms = 45000
+messages = [
+    "These swamp creatures ruined my gear...",
+    "I used to be a great warrior, you know.",
+    "A man needs proper armour in a place like this.",
+    "The lobsters here are surprisingly tasty.",
+    "Don't mind the log. It's sturdy enough.",
+]
+
+[swamp_hermit.dialogue]
+greeting = "Oi! Over here! Don't mind the log - it's all I've got left."
+quest_available = "You look handy. I could use some help getting back on my feet."
+quest_complete = "You're a legend! I'll be back to fighting form in no time."
+
+# ============================================================================
+# Lost Adventurer - Swamp Explorer (Standalone Quest)
+# ============================================================================
+[swamp_adventurer]
+display_name = "Lost Adventurer"
+sprite = "lee"
+animation_type = "humanoid"
+description = "A young adventurer who got turned around in the swamp. He seems lost without his map."
+
+[swamp_adventurer.stats]
+max_hp = 100
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[swamp_adventurer.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[swamp_adventurer.behaviors]
+hostile = false
+quest_giver = true
+wander_enabled = false
+
+[swamp_adventurer.quest_giver]
+available_quests = ["lost_in_the_swamp"]
+
+[swamp_adventurer.speech]
+radius = 5
+interval_min_ms = 20000
+interval_max_ms = 40000
+messages = [
+    "I know I left my map around here somewhere...",
+    "Everything looks the same in this swamp!",
+    "I'm not lost, I'm... exploring. Thoroughly.",
+    "Watch your step - the ground gets marshy.",
+]
+
+[swamp_adventurer.dialogue]
+greeting = "Hey! Am I glad to see another person out here. This swamp is no joke."
+quest_available = "I lost my map somewhere in this swamp. Could you help me find it?"
+quest_complete = "My map! I thought I'd never see it again. Thank you!"

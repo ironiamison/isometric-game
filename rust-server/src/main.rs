@@ -1646,7 +1646,11 @@ async fn handle_socket(
     let mut send_task = tokio::spawn(async move {
         loop {
             tokio::select! {
-                // Handle direct messages to this client
+                // Bias toward unicast (StateSync) over broadcasts to prevent
+                // broadcast floods from starving position updates
+                biased;
+
+                // Handle direct messages to this client (StateSync, etc.)
                 Some(msg) = rx.recv() => {
                     let send_start = std::time::Instant::now();
                     let msg_len = msg.len();
@@ -1660,16 +1664,25 @@ async fn handle_socket(
                     }
                 }
                 // Handle broadcast messages (pre-encoded bytes)
-                Ok(bytes) = broadcast_rx.recv() => {
-                    let send_start = std::time::Instant::now();
-                    let msg_len = bytes.len();
-                    if sender.send(Message::Binary(bytes)).await.is_err() {
-                        break;
-                    }
-                    let send_ms = send_start.elapsed().as_secs_f64() * 1000.0;
-                    send_perf.record_ws_send("broadcast", send_ms, msg_len);
-                    if send_ms > 50.0 {
-                        tracing::warn!("Slow WS send (broadcast): {:.2}ms, {}B for {}", send_ms, msg_len, send_player_id);
+                result = broadcast_rx.recv() => {
+                    match result {
+                        Ok(bytes) => {
+                            let send_start = std::time::Instant::now();
+                            let msg_len = bytes.len();
+                            if sender.send(Message::Binary(bytes)).await.is_err() {
+                                break;
+                            }
+                            let send_ms = send_start.elapsed().as_secs_f64() * 1000.0;
+                            send_perf.record_ws_send("broadcast", send_ms, msg_len);
+                            if send_ms > 50.0 {
+                                tracing::warn!("Slow WS send (broadcast): {:.2}ms, {}B for {}", send_ms, msg_len, send_player_id);
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!("Broadcast lagged for {}: skipped {} messages", send_player_id, n);
+                            // Continue - receiver position was auto-advanced
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     }
                 }
                 else => break,
@@ -2683,6 +2696,9 @@ async fn main() {
     let tick_state = state.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(50)); // 20 Hz
+        // Delay (not Burst) prevents cascading catch-up ticks when a tick runs slow.
+        // Burst is the default and causes rapid-fire ticks after lag, making it worse.
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             interval.tick().await;
             let loop_start = std::time::Instant::now();

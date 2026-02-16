@@ -154,6 +154,9 @@ pub struct MerchantConfig {
     pub restock_interval_minutes: Option<u32>,
     #[serde(default = "default_show_crafting")]
     pub show_crafting: bool,
+    /// Quest that must be completed before this shop is accessible
+    #[serde(default)]
+    pub required_quest: Option<String>,
 }
 
 fn default_show_crafting() -> bool {

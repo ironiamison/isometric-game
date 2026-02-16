@@ -642,6 +642,17 @@ impl PlayerSyncState {
 }
 
 // ============================================================================
+// Quest Locations (reach_location objectives)
+// ============================================================================
+
+#[derive(Debug, Clone, Deserialize)]
+struct QuestLocation {
+    x: i32,
+    y: i32,
+    radius: i32,
+}
+
+// ============================================================================
 // Game Room
 // ============================================================================
 
@@ -698,6 +709,8 @@ pub struct GameRoom {
     farming: RwLock<crate::farming::FarmingSystem>,
     /// Cached portal tile positions (immutable after init, no lock needed)
     portal_tiles: std::collections::HashSet<(i32, i32)>,
+    /// Quest locations for reach_location objectives (location_id -> QuestLocation)
+    quest_locations: HashMap<String, QuestLocation>,
 }
 
 impl GameRoom {
@@ -814,6 +827,26 @@ impl GameRoom {
         if !portal_tiles.is_empty() {
             tracing::info!("Cached {} portal tiles for NPC collision", portal_tiles.len());
         }
+
+        // Load quest locations for reach_location objectives
+        let quest_locations: HashMap<String, QuestLocation> = match std::fs::read_to_string("data/quest_locations.toml") {
+            Ok(content) => {
+                match toml::from_str::<HashMap<String, QuestLocation>>(&content) {
+                    Ok(locs) => {
+                        tracing::info!("Loaded {} quest locations", locs.len());
+                        locs
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse quest_locations.toml: {}", e);
+                        HashMap::new()
+                    }
+                }
+            }
+            Err(_) => {
+                tracing::info!("No quest_locations.toml found, skipping");
+                HashMap::new()
+            }
+        };
 
         // Load woodcutting system
         let woodcutting = match crate::woodcutting::WoodcuttingSystem::load(std::path::Path::new("data")) {
@@ -966,6 +999,7 @@ impl GameRoom {
             chairs: RwLock::new(chairs),
             farming: RwLock::new(farming),
             portal_tiles,
+            quest_locations,
         }
     }
 
@@ -3261,6 +3295,45 @@ impl GameRoom {
         }
     }
 
+    /// Process quest location reached event
+    async fn process_quest_location_reached(&self, player_id: &str, location_id: &str, x: i32, y: i32) {
+        let mut quest_states = self.player_quest_states.write().await;
+        let quest_state = quest_states.entry(player_id.to_string())
+            .or_insert_with(PlayerQuestState::new);
+
+        let event = QuestEvent::LocationReached {
+            player_id: player_id.to_string(),
+            location_id: location_id.to_string(),
+            x,
+            y,
+        };
+
+        let results = self.quest_registry.process_event(&event, quest_state).await;
+
+        for result in results {
+            if let (Some(objective_id), Some(current), Some(target)) =
+                (&result.objective_id, result.new_progress, result.target)
+            {
+                tracing::info!(
+                    "Player {} reached location {} for quest {}: {}/{}",
+                    player_id, location_id, result.quest_id, current, target
+                );
+
+                if let Some(sender) = self.player_senders.read().await.get(player_id) {
+                    let msg = ServerMessage::QuestObjectiveProgress {
+                        quest_id: result.quest_id.clone(),
+                        objective_id: objective_id.clone(),
+                        current,
+                        target,
+                    };
+                    if let Ok(data) = crate::protocol::encode_server_message(&msg) {
+                        let _ = sender.send(data).await;
+                    }
+                }
+            }
+        }
+    }
+
     /// Check if two directions are close enough (within 45 degrees)
     fn directions_match(dir1: Direction, dir2: Direction) -> bool {
         // Convert to numeric for comparison
@@ -3625,7 +3698,29 @@ impl GameRoom {
             false
         };
 
-        if is_merchant && (quests.is_empty() || !is_quest_giver || all_quests_completed) {
+        // Check if merchant has a required_quest that must be completed first
+        let merchant_quest_met = if is_merchant {
+            if let Some(proto) = prototype.as_ref() {
+                if let Some(merchant_config) = &proto.merchant {
+                    if let Some(ref required_quest) = merchant_config.required_quest {
+                        let quest_states = self.player_quest_states.read().await;
+                        quest_states.get(player_id)
+                            .map(|qs| qs.is_quest_completed(required_quest))
+                            .unwrap_or(false)
+                    } else {
+                        true // No requirement
+                    }
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+
+        if is_merchant && merchant_quest_met && (quests.is_empty() || !is_quest_giver || all_quests_completed) {
             tracing::info!("Player {} opening shop with NPC {} ({})", player_id, npc_id, entity_type);
 
             // Get merchant config to load shop data
@@ -3691,6 +3786,24 @@ impl GameRoom {
         let quest_state = quest_states.entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
 
+        // Fire NpcInteraction event unconditionally so talk_to objectives
+        // complete when talking to ANY NPC (not just the quest giver)
+        {
+            let event = QuestEvent::NpcInteraction {
+                player_id: player_id.to_string(),
+                npc_id: entity_type.clone(),
+            };
+            let talk_results = self.quest_registry.process_event(&event, quest_state).await;
+            for result in talk_results {
+                if result.quest_ready {
+                    tracing::info!(
+                        "Player {} quest {} is now ready to complete after talking to NPC",
+                        player_id, result.quest_id
+                    );
+                }
+            }
+        }
+
         // Find the appropriate quest to interact with
         // Priority: 1) Active quest ready to complete, 2) Active quest in progress,
         //           3) Available new quest (or repeatable completed quest), 4) Completed quest (for post-completion dialogue)
@@ -3726,6 +3839,12 @@ impl GameRoom {
                 }
             } else {
                 // Player doesn't have this quest and hasn't completed it
+                // Check chain.previous prerequisite
+                if let Some(ref prev_id) = quest.chain.previous {
+                    if !quest_state.is_quest_completed(prev_id) {
+                        continue; // Skip - prerequisite not met
+                    }
+                }
                 if target_quest.is_none() {
                     target_quest = Some((quest_id.clone(), "not_started"));
                 }
@@ -3742,22 +3861,6 @@ impl GameRoom {
                 "Player {} interacting with quest {} (state: {})",
                 player_id, quest_id, state
             );
-
-            // Trigger NpcInteraction event to complete any talk_to objectives
-            // This must happen BEFORE running the script so the script sees the updated state
-            let event = QuestEvent::NpcInteraction {
-                player_id: player_id.to_string(),
-                npc_id: entity_type.clone(),
-            };
-            let talk_results = self.quest_registry.process_event(&event, quest_state).await;
-            for result in talk_results {
-                if result.quest_ready {
-                    tracing::info!(
-                        "Player {} quest {} is now ready to complete after talking to NPC",
-                        player_id, result.quest_id
-                    );
-                }
-            }
 
             // Run the quest script interaction
             let result = self.quest_runner.run_on_interact(
@@ -7258,26 +7361,36 @@ impl GameRoom {
         // Track all players with pending moves so we can clear rejected ones
         let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _)| id.clone()).collect();
 
-        // Collect current entity positions for collision checking
-        let player_positions: std::collections::HashSet<(i32, i32)> = {
-            let players = self.players.read().await;
-            players.values()
-                .filter(|p| p.active && !p.is_dead)
-                .map(|p| (p.x, p.y))
-                .collect()
+        // Snapshot which instance each player is in (None = overworld)
+        let player_instance_map: HashMap<String, String> = {
+            let instances = self.player_instances.read().await;
+            instances.clone()
         };
+
+        // Collect entity positions separated by context (overworld vs per-instance)
+        // so that overworld collision doesn't leak into instances and vice versa
+        let mut overworld_player_positions: std::collections::HashSet<(i32, i32)> = std::collections::HashSet::new();
+        let mut instance_player_positions: HashMap<String, std::collections::HashSet<(i32, i32)>> = HashMap::new();
+        {
+            let players = self.players.read().await;
+            for p in players.values().filter(|p| p.active && !p.is_dead) {
+                if let Some(inst_id) = player_instance_map.get(&p.id) {
+                    instance_player_positions
+                        .entry(inst_id.clone())
+                        .or_default()
+                        .insert((p.x, p.y));
+                } else {
+                    overworld_player_positions.insert((p.x, p.y));
+                }
+            }
+        }
+        // Overworld NPC positions only (instance NPCs live in Instance structs, checked client-side)
         let npc_positions: std::collections::HashSet<(i32, i32)> = {
             let npcs = self.npcs.read().await;
             npcs.values()
                 .filter(|n| n.is_alive())
                 .map(|n| (n.x, n.y))
                 .collect()
-        };
-
-        // Get players in instances to skip world collision for them
-        let players_in_instances: std::collections::HashSet<String> = {
-            let instances = self.player_instances.read().await;
-            instances.keys().cloned().collect()
         };
 
         // Snapshot chair state for collision checking (position -> (occupied_by, direction))
@@ -7292,7 +7405,8 @@ impl GameRoom {
         let mut valid_moves: Vec<(String, i32, i32)> = Vec::new();
         let mut auto_sit_requests: Vec<(String, i32, i32)> = Vec::new();
         for (id, target_x, target_y, move_dir) in pending_moves {
-            let is_overworld = !players_in_instances.contains(&id);
+            let player_inst = player_instance_map.get(&id);
+            let is_overworld = player_inst.is_none();
             // Skip world collision check for players in interiors
             // Interior collision is handled client-side for now
             // TODO: Add server-side interior collision checking
@@ -7310,13 +7424,20 @@ impl GameRoom {
                     continue;
                 }
             }
-            // Check if another player is on the target tile
-            if player_positions.contains(&(target_x, target_y)) {
+            // Check if another player is on the target tile (same context only)
+            let player_blocked = if is_overworld {
+                overworld_player_positions.contains(&(target_x, target_y))
+            } else {
+                player_inst
+                    .and_then(|iid| instance_player_positions.get(iid))
+                    .map_or(false, |positions| positions.contains(&(target_x, target_y)))
+            };
+            if player_blocked {
                 tick_telemetry.rejected_player_blocked += 1;
                 continue;
             }
-            // Check if an NPC is on the target tile
-            if npc_positions.contains(&(target_x, target_y)) {
+            // Check if an NPC is on the target tile (overworld only - instance NPCs checked client-side)
+            if is_overworld && npc_positions.contains(&(target_x, target_y)) {
                 tick_telemetry.rejected_npc_blocked += 1;
                 continue;
             }
@@ -7387,6 +7508,13 @@ impl GameRoom {
             (ids, stopped)
         };
 
+        // Snapshot moved positions for quest location checks (before valid_moves is consumed)
+        let moved_positions: Vec<(String, i32, i32)> = if !self.quest_locations.is_empty() {
+            valid_moves.iter().cloned().collect()
+        } else {
+            Vec::new()
+        };
+
         {
             let mut players = self.players.write().await;
 
@@ -7399,7 +7527,7 @@ impl GameRoom {
 
                     // Stop movement on portal tiles so the player doesn't walk past
                     // before the client can detect and trigger the portal
-                    if !players_in_instances.contains(&id)
+                    if !player_instance_map.contains_key(&id)
                         && self.portal_tiles.contains(&(target_x, target_y))
                     {
                         player.move_dx = 0;
@@ -7432,6 +7560,17 @@ impl GameRoom {
             for player in players.values_mut() {
                 if player.active {
                     player.tick_buffs(current_time);
+                }
+            }
+        }
+
+        // Check if any moved players reached a quest location
+        for (player_id, px, py) in &moved_positions {
+            for (loc_id, loc) in &self.quest_locations {
+                let dx = (px - loc.x).abs();
+                let dy = (py - loc.y).abs();
+                if dx <= loc.radius && dy <= loc.radius {
+                    self.process_quest_location_reached(player_id, loc_id, *px, *py).await;
                 }
             }
         }

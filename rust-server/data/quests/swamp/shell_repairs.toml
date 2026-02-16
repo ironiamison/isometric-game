@@ -1,0 +1,31 @@
+# Shell Repairs - Swamp Hermit Part 1
+# Given by the Swamp Hermit (man on a log)
+
+[quest]
+id = "shell_repairs"
+name = "Shell Repairs"
+description = "The Swamp Hermit's armour is in tatters. He needs snail shells to patch it up."
+giver_npc = "swamp_hermit"
+level_required = 3
+repeatable = false
+lua_script = "swamp/shell_repairs.lua"
+
+[quest.chain]
+next = "forging_ahead"
+
+[[quest.objectives]]
+id = "collect_snail_shells"
+type = "collect_item"
+target = "snail_shell"
+count = 10
+description = "Collect 10 Snail Shells"
+
+[quest.rewards]
+exp = 150
+gold = 100
+
+[quest.dialogue]
+offer = "Look at this armour - full of holes! The snails around here have the sturdiest shells I've ever seen. Bring me 10 and I can patch myself up."
+accept = "Smash those snails and bring me their shells. Should be plenty crawling around the swamp!"
+progress = "Still collecting shells? I'm not going anywhere - literally stuck on this log."
+complete = "Beautiful shells! Give me a moment... there, good as new. Well, good enough. Now about my sword..."
