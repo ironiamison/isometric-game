@@ -130,8 +130,6 @@ pub struct Player {
     pub woodcutting_started_at: f64,
     pub last_woodcutting_anim: f64,
 
-    // Last confirmed server move direction (for prediction gating)
-    last_confirmed_move_dir: (i32, i32),
 }
 
 impl Player {
@@ -177,7 +175,6 @@ impl Player {
             is_woodcutting: false,
             woodcutting_started_at: 0.0,
             last_woodcutting_anim: 0.0,
-            last_confirmed_move_dir: (0, 0),
         }
     }
 
@@ -308,14 +305,6 @@ impl Player {
         // Server position changed = server confirmed a move
         let server_moved = (x - old_server_x).abs() > 0.01 || (y - old_server_y).abs() > 0.01;
 
-        // Track the last direction the server actually moved (confirmed move)
-        if server_moved {
-            self.last_confirmed_move_dir = (
-                (x - old_server_x).round() as i32,
-                (y - old_server_y).round() as i32,
-            );
-        }
-
         // Stopped = always update target to server position
         let stopped = vel_x == 0.0 && vel_y == 0.0;
 
@@ -324,24 +313,32 @@ impl Player {
                           && (self.y - self.y.round()).abs() < 0.1;
 
         // Detect velocity direction change (intent changed but server hasn't moved yet)
-        let vel_dir = (vel_x as i32, vel_y as i32);
-        let old_vel_dir = (old_vel_x as i32, old_vel_y as i32);
-        let vel_changed = vel_dir != old_vel_dir;
+        let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
 
-        // Update target when: server moved, stopped, at tile center, OR velocity direction changed
-        // (vel_changed ensures we immediately redirect instead of continuing the old prediction)
         if server_moved || stopped || at_tile_center || vel_changed {
             if vel_x != 0.0 || vel_y != 0.0 {
-                // Only predict forward if velocity matches the last confirmed move direction.
-                // This prevents predicting in a new direction before the server has executed it
-                // (the "intent before execution" problem that causes diagonal corrections).
-                if vel_dir == self.last_confirmed_move_dir {
-                    self.target_x = x + vel_x;
-                    self.target_y = y + vel_y;
-                } else {
-                    // New direction not yet confirmed — target server position (tile center)
+                if server_moved {
+                    // Check if velocity continues the same direction as the move
+                    let move_dx = (x - old_server_x).round() as i32;
+                    let move_dy = (y - old_server_y).round() as i32;
+                    if (vel_x as i32, vel_y as i32) == (move_dx, move_dy) {
+                        // Same direction — predict next tile for smooth movement
+                        self.target_x = x + vel_x;
+                        self.target_y = y + vel_y;
+                    } else {
+                        // Direction changed on this move — go to server position
+                        self.target_x = x;
+                        self.target_y = y;
+                    }
+                } else if vel_changed {
+                    // Velocity intent changed but server hasn't moved yet.
+                    // Stop predicting in the old direction to prevent overshoot.
                     self.target_x = x;
                     self.target_y = y;
+                } else {
+                    // Same velocity, no server move — continue predicting
+                    self.target_x = x + vel_x;
+                    self.target_y = y + vel_y;
                 }
             } else {
                 self.target_x = x;
@@ -351,34 +348,60 @@ impl Player {
     }
 
     /// Smooth visual interpolation toward target position
-    /// Simple server-authoritative model - just interpolate toward target
+    /// Uses axis-aligned movement: moves one grid axis at a time to prevent
+    /// diagonal visual artifacts. Resolves the smaller displacement first
+    /// to reach tile alignment quickly, then moves on the remaining axis.
     pub fn interpolate_visual(&mut self, delta: f32) {
         let dx = self.target_x - self.x;
         let dy = self.target_y - self.y;
-        let dist = (dx * dx + dy * dy).sqrt();
 
-        // Calculate visual movement direction (for moonwalk prevention)
-        let movement_dir = if dist > 0.01 {
-            Some(Direction::from_velocity(dx, dy))
-        } else {
-            None
-        };
+        let old_x = self.x;
+        let old_y = self.y;
 
-        if dist < 0.01 {
+        if dx.abs() < 0.01 && dy.abs() < 0.01 {
             self.x = self.target_x;
             self.y = self.target_y;
             self.is_moving = false;
         } else {
-            let move_dist = VISUAL_SPEED * delta;
-            if dist <= move_dist {
-                self.x = self.target_x;
-                self.y = self.target_y;
+            let mut budget = VISUAL_SPEED * delta;
+
+            // Axis-aligned movement: resolve smaller displacement first,
+            // then use remaining budget on the larger axis.
+            if dx.abs() <= dy.abs() {
+                // X is smaller (or equal): resolve X, then Y
+                if dx.abs() > 0.01 {
+                    let step = budget.min(dx.abs());
+                    self.x += dx.signum() * step;
+                    budget -= step;
+                }
+                if budget > 0.01 && dy.abs() > 0.01 {
+                    let step = budget.min(dy.abs());
+                    self.y += dy.signum() * step;
+                }
             } else {
-                self.x += (dx / dist) * move_dist;
-                self.y += (dy / dist) * move_dist;
+                // Y is smaller: resolve Y, then X
+                if dy.abs() > 0.01 {
+                    let step = budget.min(dy.abs());
+                    self.y += dy.signum() * step;
+                    budget -= step;
+                }
+                if budget > 0.01 && dx.abs() > 0.01 {
+                    let step = budget.min(dx.abs());
+                    self.x += dx.signum() * step;
+                }
             }
+
             self.is_moving = true;
         }
+
+        // Compute movement direction from actual frame displacement
+        let moved_dx = self.x - old_x;
+        let moved_dy = self.y - old_y;
+        let movement_dir = if moved_dx.abs() > 0.001 || moved_dy.abs() > 0.001 {
+            Some(Direction::from_velocity(moved_dx, moved_dy))
+        } else {
+            None
+        };
 
         self.update_animation(delta, movement_dir);
     }
