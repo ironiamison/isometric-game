@@ -1,0 +1,70 @@
+# Farm Pest Control - Repeatable daily quest
+# Given by Farmer Grace at the farm pens
+
+[quest]
+id = "farm_pest_control"
+name = "Farm Pest Control"
+description = "Farmer Grace's pens are overrun with pigs, worms, and sheep. Clear out the pests and bring back proof of your work."
+giver_npc = "farmer_grace"
+level_required = 1
+repeatable = true
+lua_script = "cursed_lands/farm_pest_control.lua"
+
+[[quest.objectives]]
+id = "kill_pigs"
+type = "kill_monster"
+target = "pig"
+count = 15
+description = "Slay 15 Pigs"
+
+[[quest.objectives]]
+id = "kill_sheep"
+type = "kill_monster"
+target = "sheep"
+count = 10
+description = "Slay 10 Sheep"
+
+[[quest.objectives]]
+id = "kill_worms"
+type = "kill_monster"
+target = "worm"
+count = 10
+description = "Slay 10 Worms"
+
+[[quest.objectives]]
+id = "collect_worm_segments"
+type = "collect_item"
+target = "worm_segment"
+count = 3
+description = "Collect 3 Worm Segments"
+
+[[quest.objectives]]
+id = "collect_piglets"
+type = "collect_item"
+target = "piglet"
+count = 3
+description = "Collect 3 Piglets"
+
+[[quest.objectives]]
+id = "collect_scrap_leather"
+type = "collect_item"
+target = "scrap_leather"
+count = 3
+description = "Collect 3 Scrap Leather"
+
+[[quest.objectives]]
+id = "return_to_grace"
+type = "talk_to"
+target = "farmer_grace"
+description = "Return to Farmer Grace"
+sequential = true
+
+[quest.rewards]
+exp = 500
+gold = 500
+
+[quest.dialogue]
+offer = "My pens are completely overrun! Pigs, worms, sheep - they've all gone wild. I need someone to thin the herd and bring me back some materials. Can you help?"
+accept = "Bless you! Clear out 15 pigs, 10 sheep, and 10 worms. And bring me back 3 worm segments, 3 piglets, and 3 scraps of leather. I'll make it worth your while!"
+progress = "Still working on clearing the pens? Don't give up - those critters multiply fast!"
+complete = "You've done it! The pens are manageable again. Here's your pay - you've earned every coin. Come back tomorrow if they've gotten out of hand again!"

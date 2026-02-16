@@ -3182,6 +3182,12 @@
       "x": 9,
       "y": 31,
       "level": 1
+    },
+    {
+      "entityId": "farmer_grace",
+      "x": 2,
+      "y": 28,
+      "level": 1
     }
   ],
   "mapObjects": [
@@ -3534,13 +3540,6 @@
       "y": 26,
       "width": 44,
       "height": 91
-    },
-    {
-      "gid": 2118,
-      "x": 2,
-      "y": 28,
-      "width": 23,
-      "height": 74
     }
   ],
   "walls": [
