@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AUAAAAHwBwAIAAYAAAAGAAAABgAACAYAAAgGAAAIAgAACAIAAAgCAAAIAgAACAIAAAgCAAAIAgAECAIA5wgCAIAOAgCABgIAgAICAMAAAgCAAgIAwAICAIACAQDAAAEAggIBAMCAAgD7ggAAAIAAAACAAAAAgB8AAAARAAAAEQA=",
+  "collision": "AEAAAADwBwAAAAYAAAAGAAAABgAACAYAAAgGAAAIAgAACAIAAAgCAAAIAgAACAIAAAgCAAAIAgAACAIA5wgCAIAOAgCABgIAgAICAMAAAgCAAgIAwAICAIACAQDAAAEAggIBAMCAAgD7ggAAAIAAAACAAAAAgB8AAAARAAAAEQA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3192,13 +3192,6 @@
       "y": 22,
       "width": 39,
       "height": 36
-    },
-    {
-      "gid": 2095,
-      "x": 2,
-      "y": 14,
-      "width": 47,
-      "height": 72
     },
     {
       "gid": 1768,

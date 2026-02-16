@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAEMABPAHAAAAAAAA8AMAAcADAAAA9AECADwAAAAAAAAAAAAAAgAAAAAAAAIAAAAEAAAAAAAAAAAAAAAAAAAAAAEAAAAgAAAAIIABADAAAAEAAAA=",
+  "collision": "AAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAEMABPAHAAAAAAAA8AMAAcADAAAA9AECADwAAAAAAAAAAAAAAAAAAAAAAAIAAAAEAAAAAAAAAAAAAAAAAAAAAAEAAAAgAAAAIIABADAAAAEAAAA=",
   "entities": [
     {
       "entityId": "snail",
@@ -3118,7 +3118,7 @@
       "level": 1
     },
     {
-      "entityId": "slime_blue",
+      "entityId": "slime",
       "x": 2,
       "y": 21,
       "level": 1
@@ -3233,13 +3233,6 @@
       "y": 26,
       "width": 341,
       "height": 265
-    },
-    {
-      "gid": 2127,
-      "x": 11,
-      "y": 12,
-      "width": 30,
-      "height": 78
     },
     {
       "gid": 1694,

@@ -1121,6 +1121,16 @@
   ],
   "portals": [
     {
+      "id": "exit_starting_bank_x8",
+      "x": 8,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
       "id": "exit_1771197696791_iscwy2sre",
       "x": 7,
       "y": 15,

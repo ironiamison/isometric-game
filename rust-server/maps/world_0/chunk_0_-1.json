@@ -3085,17 +3085,11 @@
       0
     ]
   },
-  "collision": "AgBAABwAQAAcAEAAHABAAAwAQAAcAEAAAABAUBwAAAAcAABAHAAAAAwAACAcAEAAAABAAAAAOAAAACAA/v8/sAIAIEAKACBACgAgQAJ4IEACaCFAAiggQAIoIGAKaCTgAmSgYQMAAOEAAADAAAAAQAMAAIACAABAAwAAAAIACAA=",
+  "collision": "AgBAABwAQAAcAEAAHABAAAwAQAAcAEAAAABAUBwAAAAcAABAHAAAAAwAACAcAEAAAABAAAAAOAAAACAA/v8/sAIAIEAKACBACgAgQAJ4IEACaCFAAiggQAIoIGAKaCTgAmSgYQMAAOEAAADAAAAAQAMAAIACAABAAwAAAAIACBA=",
   "entities": [
     {
       "entityId": "crow",
       "x": 3,
-      "y": 26,
-      "level": 1
-    },
-    {
-      "entityId": "crow",
-      "x": 30,
       "y": 26,
       "level": 1
     },
@@ -3581,6 +3575,13 @@
       "y": 28,
       "width": 12,
       "height": 29
+    },
+    {
+      "gid": 1265,
+      "x": 28,
+      "y": 31,
+      "width": 72,
+      "height": 116
     }
   ],
   "walls": [
