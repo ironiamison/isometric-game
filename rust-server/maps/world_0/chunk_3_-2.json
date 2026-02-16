@@ -3086,7 +3086,13 @@
     ]
   },
   "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAACAAAAAgAAAAIAAAAAAAAAAAAAAP4AAAQBAAAIAYAACBXwAAgBgAAAAR8AAAEAgD8AESIAAAAEgI8AAABAAAAAQAAAAEAAAAAAAwgAAGAAAOAiAQAACgAAAAAAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "swamp_hermit",
+      "x": 3,
+      "y": 20
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1668,

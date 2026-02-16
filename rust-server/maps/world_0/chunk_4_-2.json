@@ -3104,6 +3104,11 @@
       "x": 25,
       "y": 15,
       "level": 1
+    },
+    {
+      "entityId": "swamp_adventurer",
+      "x": 2,
+      "y": 6
     }
   ],
   "mapObjects": [
