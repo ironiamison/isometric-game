@@ -315,12 +315,13 @@ export class IsometricRenderer {
       const drawX = screen.sx - scaledWidth / 2;
       const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
 
+      const r = objDef.atlasRect;
       this.ctx.drawImage(
         objDef.image,
-        0,
-        0,
-        objDef.image.width,
-        objDef.image.height,
+        r ? r.x : 0,
+        r ? r.y : 0,
+        r ? r.w : objDef.image.width,
+        r ? r.h : objDef.image.height,
         drawX,
         drawY,
         scaledWidth,
@@ -338,8 +339,11 @@ export class IsometricRenderer {
     const objDef = objectLoader.getWallByGid(wall.gid);
 
     if (objDef?.image) {
-      const scaledWidth = objDef.image.width * viewport.zoom;
-      const scaledHeight = objDef.image.height * viewport.zoom;
+      const r = objDef.atlasRect;
+      const spriteW = r ? r.w : objDef.image.width;
+      const spriteH = r ? r.h : objDef.image.height;
+      const scaledWidth = spriteW * viewport.zoom;
+      const scaledHeight = spriteH * viewport.zoom;
 
       const bottomVertexX = screen.sx;
       const bottomVertexY = screen.sy + TILE_HEIGHT * viewport.zoom;
@@ -357,10 +361,10 @@ export class IsometricRenderer {
 
       this.ctx.drawImage(
         objDef.image,
-        0,
-        0,
-        objDef.image.width,
-        objDef.image.height,
+        r ? r.x : 0,
+        r ? r.y : 0,
+        spriteW,
+        spriteH,
         drawX,
         drawY,
         scaledWidth,
@@ -648,12 +652,13 @@ export class IsometricRenderer {
       const drawX = screen.sx - scaledWidth / 2;
       const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
 
+      const r = objDef.atlasRect;
       this.ctx.drawImage(
         objDef.image,
-        0,
-        0,
-        objDef.image.width,
-        objDef.image.height,
+        r ? r.x : 0,
+        r ? r.y : 0,
+        r ? r.w : objDef.image.width,
+        r ? r.h : objDef.image.height,
         drawX,
         drawY,
         scaledWidth,
@@ -672,8 +677,11 @@ export class IsometricRenderer {
     const objDef = objectLoader.getWallByGid(wall.gid);
 
     if (objDef?.image) {
-      const scaledWidth = objDef.image.width * viewport.zoom;
-      const scaledHeight = objDef.image.height * viewport.zoom;
+      const r = objDef.atlasRect;
+      const spriteW = r ? r.w : objDef.image.width;
+      const spriteH = r ? r.h : objDef.image.height;
+      const scaledWidth = spriteW * viewport.zoom;
+      const scaledHeight = spriteH * viewport.zoom;
 
       // Bottom vertex of tile
       const bottomVertexX = screen.sx;
@@ -694,10 +702,10 @@ export class IsometricRenderer {
 
       this.ctx.drawImage(
         objDef.image,
-        0,
-        0,
-        objDef.image.width,
-        objDef.image.height,
+        r ? r.x : 0,
+        r ? r.y : 0,
+        spriteW,
+        spriteH,
         drawX,
         drawY,
         scaledWidth,

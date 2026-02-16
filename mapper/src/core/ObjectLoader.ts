@@ -1,43 +1,54 @@
 import type { ObjectDefinition, ObjectsConfig } from '@/types';
 
+interface SpriteManifestAtlas {
+  file: string;
+  sprites: Record<string, { x: number; y: number; w: number; h: number }>;
+}
+
+interface SpriteManifest {
+  objects_atlas: SpriteManifestAtlas;
+  walls_atlas: SpriteManifestAtlas;
+}
+
 export class ObjectLoader {
   private objects: Map<number, ObjectDefinition> = new Map();
   private walls: Map<number, ObjectDefinition> = new Map();
-  private basePath: string = '';
-  private wallsBasePath: string = '';
   private firstGid: number = 1001;
   private wallsFirstGid: number = 1;
+  private manifest: SpriteManifest | null = null;
+
+  private async loadManifest(): Promise<SpriteManifest> {
+    if (this.manifest) return this.manifest;
+    const resp = await fetch('/assets/sprite_manifest.json');
+    this.manifest = await resp.json();
+    return this.manifest!;
+  }
+
+  private loadImage(src: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`Failed to load: ${src}`));
+      img.src = src;
+    });
+  }
 
   async loadObjects(config: ObjectsConfig): Promise<void> {
-    this.basePath = config.basePath;
     this.firstGid = config.firstGid;
 
-    const loadPromises = config.items.map(async (item) => {
+    const manifest = await this.loadManifest();
+    const atlasInfo = manifest.objects_atlas;
+    const atlasImage = await this.loadImage(`/assets/${atlasInfo.file}`);
+
+    for (const item of config.items) {
+      const spriteData = atlasInfo.sprites[String(item.id)];
       const obj: ObjectDefinition = {
         ...item,
-        image: undefined,
+        image: spriteData ? atlasImage : undefined,
+        atlasRect: spriteData ? { x: spriteData.x, y: spriteData.y, w: spriteData.w, h: spriteData.h } : undefined,
       };
-
-      // Load the image
-      const image = new Image();
-      const loadPromise = new Promise<void>((resolve) => {
-        image.onload = () => {
-          obj.image = image;
-          resolve();
-        };
-        image.onerror = () => {
-          console.warn(`Failed to load object image: ${item.id}.png`);
-          resolve();
-        };
-      });
-
-      image.src = `${this.basePath}/${item.id}.png`;
-      await loadPromise;
-
       this.objects.set(item.id, obj);
-    });
-
-    await Promise.all(loadPromises);
+    }
   }
 
   getObject(id: number): ObjectDefinition | undefined {
@@ -66,41 +77,23 @@ export class ObjectLoader {
     return this.firstGid;
   }
 
-  getBasePath(): string {
-    return this.basePath;
-  }
-
   // Load wall sprites (separate from objects)
   async loadWalls(config: ObjectsConfig): Promise<void> {
-    this.wallsBasePath = config.basePath;
     this.wallsFirstGid = config.firstGid;
 
-    const loadPromises = config.items.map(async (item) => {
+    const manifest = await this.loadManifest();
+    const atlasInfo = manifest.walls_atlas;
+    const atlasImage = await this.loadImage(`/assets/${atlasInfo.file}`);
+
+    for (const item of config.items) {
+      const spriteData = atlasInfo.sprites[String(item.id)];
       const obj: ObjectDefinition = {
         ...item,
-        image: undefined,
+        image: spriteData ? atlasImage : undefined,
+        atlasRect: spriteData ? { x: spriteData.x, y: spriteData.y, w: spriteData.w, h: spriteData.h } : undefined,
       };
-
-      // Load the image
-      const image = new Image();
-      const loadPromise = new Promise<void>((resolve) => {
-        image.onload = () => {
-          obj.image = image;
-          resolve();
-        };
-        image.onerror = () => {
-          console.warn(`Failed to load wall image: ${item.id}.png`);
-          resolve();
-        };
-      });
-
-      image.src = `${this.wallsBasePath}/${item.id}.png`;
-      await loadPromise;
-
       this.walls.set(item.id, obj);
-    });
-
-    await Promise.all(loadPromises);
+    }
   }
 
   getWall(id: number): ObjectDefinition | undefined {
@@ -145,10 +138,6 @@ export class ObjectLoader {
 
   getWallsFirstGid(): number {
     return this.wallsFirstGid;
-  }
-
-  getWallsBasePath(): string {
-    return this.wallsBasePath;
   }
 }
 

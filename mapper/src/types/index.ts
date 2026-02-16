@@ -168,13 +168,22 @@ export interface World {
   };
 }
 
+// Sprite rect within an atlas
+export interface SpriteRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 // Object definition (for placeable map objects like trees, rocks)
 export interface ObjectDefinition {
   id: number; // File ID (e.g., 101 for 101.png)
   name: string;
   width: number;
   height: number;
-  image?: HTMLImageElement; // Loaded image
+  image?: HTMLImageElement; // Atlas image (shared) or individual image
+  atlasRect?: SpriteRect; // Source rect within atlas
 }
 
 export interface ObjectsConfig {

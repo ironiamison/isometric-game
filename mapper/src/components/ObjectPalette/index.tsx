@@ -54,13 +54,25 @@ export function ObjectPalette() {
 
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, maxSize, maxSize);
-      ctx.drawImage(
-        obj.image,
-        (maxSize - drawWidth) / 2,
-        maxSize - drawHeight,
-        drawWidth,
-        drawHeight
-      );
+      const r = obj.atlasRect;
+      if (r) {
+        ctx.drawImage(
+          obj.image,
+          r.x, r.y, r.w, r.h,
+          (maxSize - drawWidth) / 2,
+          maxSize - drawHeight,
+          drawWidth,
+          drawHeight
+        );
+      } else {
+        ctx.drawImage(
+          obj.image,
+          (maxSize - drawWidth) / 2,
+          maxSize - drawHeight,
+          drawWidth,
+          drawHeight
+        );
+      }
     }
   }, [currentItems]);
 
