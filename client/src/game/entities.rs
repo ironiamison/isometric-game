@@ -129,6 +129,9 @@ pub struct Player {
     pub is_woodcutting: bool,
     pub woodcutting_started_at: f64,
     pub last_woodcutting_anim: f64,
+
+    // Last confirmed server move direction (for prediction gating)
+    last_confirmed_move_dir: (i32, i32),
 }
 
 impl Player {
@@ -174,6 +177,7 @@ impl Player {
             is_woodcutting: false,
             woodcutting_started_at: 0.0,
             last_woodcutting_anim: 0.0,
+            last_confirmed_move_dir: (0, 0),
         }
     }
 
@@ -271,6 +275,8 @@ impl Player {
     pub fn set_server_state(&mut self, x: f32, y: f32, vel_x: f32, vel_y: f32, dir: Direction, is_local_player: bool) {
         let old_server_x = self.server_x;
         let old_server_y = self.server_y;
+        let old_vel_x = self.vel_x;
+        let old_vel_y = self.vel_y;
 
         self.server_x = x;
         self.server_y = y;
@@ -299,8 +305,16 @@ impl Player {
             return;
         }
 
-        // Server position changed = we moved on server, always update target
+        // Server position changed = server confirmed a move
         let server_moved = (x - old_server_x).abs() > 0.01 || (y - old_server_y).abs() > 0.01;
+
+        // Track the last direction the server actually moved (confirmed move)
+        if server_moved {
+            self.last_confirmed_move_dir = (
+                (x - old_server_x).round() as i32,
+                (y - old_server_y).round() as i32,
+            );
+        }
 
         // Stopped = always update target to server position
         let stopped = vel_x == 0.0 && vel_y == 0.0;
@@ -309,28 +323,25 @@ impl Player {
         let at_tile_center = (self.x - self.x.round()).abs() < 0.1
                           && (self.y - self.y.round()).abs() < 0.1;
 
-        if server_moved || stopped || at_tile_center {
+        // Detect velocity direction change (intent changed but server hasn't moved yet)
+        let vel_dir = (vel_x as i32, vel_y as i32);
+        let old_vel_dir = (old_vel_x as i32, old_vel_y as i32);
+        let vel_changed = vel_dir != old_vel_dir;
+
+        // Update target when: server moved, stopped, at tile center, OR velocity direction changed
+        // (vel_changed ensures we immediately redirect instead of continuing the old prediction)
+        if server_moved || stopped || at_tile_center || vel_changed {
             if vel_x != 0.0 || vel_y != 0.0 {
-                if server_moved {
-                    // Check if velocity continues the same direction as the move
-                    let move_dx = (x - old_server_x).round() as i32;
-                    let move_dy = (y - old_server_y).round() as i32;
-                    let vel_ix = vel_x as i32;
-                    let vel_iy = vel_y as i32;
-                    if (vel_ix, vel_iy) == (move_dx, move_dy) {
-                        // Same direction — predict next position for smooth movement
-                        self.target_x = x + vel_x;
-                        self.target_y = y + vel_y;
-                    } else {
-                        // Direction changed — go to server position first to avoid diagonal
-                        // Next sync at tile center will apply the new velocity
-                        self.target_x = x;
-                        self.target_y = y;
-                    }
-                } else {
-                    // No server move yet, predict based on velocity
+                // Only predict forward if velocity matches the last confirmed move direction.
+                // This prevents predicting in a new direction before the server has executed it
+                // (the "intent before execution" problem that causes diagonal corrections).
+                if vel_dir == self.last_confirmed_move_dir {
                     self.target_x = x + vel_x;
                     self.target_y = y + vel_y;
+                } else {
+                    // New direction not yet confirmed — target server position (tile center)
+                    self.target_x = x;
+                    self.target_y = y;
                 }
             } else {
                 self.target_x = x;
