@@ -43,6 +43,7 @@ body {
 
 .sidebar.right {
   border-left: 1px solid #3d3d5c;
+  overflow: hidden;
 }
 
 /* Resize handle */
