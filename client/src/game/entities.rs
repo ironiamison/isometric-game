@@ -315,31 +315,15 @@ impl Player {
         // Detect velocity direction change (intent changed but server hasn't moved yet)
         let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
 
+        // vel_changed: immediately update target when direction intent changes,
+        // even if visual is mid-interpolation (axis-aligned interp prevents diagonals)
         if server_moved || stopped || at_tile_center || vel_changed {
             if vel_x != 0.0 || vel_y != 0.0 {
-                if server_moved {
-                    // Check if velocity continues the same direction as the move
-                    let move_dx = (x - old_server_x).round() as i32;
-                    let move_dy = (y - old_server_y).round() as i32;
-                    if (vel_x as i32, vel_y as i32) == (move_dx, move_dy) {
-                        // Same direction — predict next tile for smooth movement
-                        self.target_x = x + vel_x;
-                        self.target_y = y + vel_y;
-                    } else {
-                        // Direction changed on this move — go to server position
-                        self.target_x = x;
-                        self.target_y = y;
-                    }
-                } else if vel_changed {
-                    // Velocity intent changed but server hasn't moved yet.
-                    // Stop predicting in the old direction to prevent overshoot.
-                    self.target_x = x;
-                    self.target_y = y;
-                } else {
-                    // Same velocity, no server move — continue predicting
-                    self.target_x = x + vel_x;
-                    self.target_y = y + vel_y;
-                }
+                // Always predict one tile ahead in the velocity direction.
+                // Axis-aligned interpolation ensures the visual reaches tile center
+                // on the minor axis first, then moves on the major axis — no diagonals.
+                self.target_x = x + vel_x;
+                self.target_y = y + vel_y;
             } else {
                 self.target_x = x;
                 self.target_y = y;
