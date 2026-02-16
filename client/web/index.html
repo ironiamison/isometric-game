@@ -109,7 +109,9 @@
       document.getElementById("glcanvas").removeAttribute("tabindex");
       load("isometric_client.wasm");
       setTimeout(function () {
-        document.getElementById("glcanvas").setAttribute("tabindex", "1");
+        var canvas = document.getElementById("glcanvas");
+        canvas.setAttribute("tabindex", "1");
+        canvas.focus();
       }, 500);
     </script>
   </body>
