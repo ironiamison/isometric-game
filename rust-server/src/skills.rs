@@ -291,9 +291,13 @@ impl LegacySkills {
 /// Calculate whether an attack hits using attack roll vs defence roll.
 /// Returns true if the attack hits.
 ///
-/// Formula: Roll attacker's combat (0 to combat_level * (attack_bonus + 20))
-///          Roll defender's combat (0 to combat_level * (defence_bonus + 20))
+/// Formula: Roll attacker's combat (0 to (combat_level + 20) * (attack_bonus + 20))
+///          Roll defender's combat (0 to (combat_level + 20) * (defence_bonus + 20))
 ///          Hit if attack_roll > defence_roll
+///
+/// The +20 base on level dampens level gaps so low-level NPCs can still
+/// land hits on higher-level players (and vice versa). Same-level fights
+/// remain 50/50 when bonuses are equal.
 pub fn calculate_hit(
     attacker_combat_level: i32,
     attack_bonus: i32,
@@ -302,8 +306,8 @@ pub fn calculate_hit(
 ) -> bool {
     let mut rng = rand::thread_rng();
 
-    let attack_max = attacker_combat_level * (attack_bonus + 20);
-    let defence_max = defender_combat_level * (defence_bonus + 20);
+    let attack_max = (attacker_combat_level + 20) * (attack_bonus + 20);
+    let defence_max = (defender_combat_level + 20) * (defence_bonus + 20);
 
     let attack_roll = rng.gen_range(0..=attack_max.max(1));
     let defence_roll = rng.gen_range(0..=defence_max.max(1));
@@ -313,13 +317,15 @@ pub fn calculate_hit(
 
 /// Calculate maximum hit based on combat level and equipment bonus.
 ///
-/// Formula: 1 + (combat_level / 8) + (strength_bonus / 4)
+/// Formula: 1 + (combat_level / 16) + (strength_bonus / 4)
 /// This gives roughly:
 /// - Level 1, no bonus: 1
-/// - Level 30, +10 bonus: 6
-/// - Level 70, +25 bonus: 15
+/// - Level 25, no bonus: 2
+/// - Level 25, +10 bonus: 5
+/// - Level 50, +20 bonus: 9
+/// - Level 70, +25 bonus: 11
 pub fn calculate_max_hit(combat_level: i32, strength_bonus: i32) -> i32 {
-    let base = 1.0 + (combat_level as f64 / 8.0);
+    let base = 1.0 + (combat_level as f64 / 16.0);
     let bonus = strength_bonus as f64 / 4.0;
     ((base + bonus).floor() as i32).max(1)
 }
