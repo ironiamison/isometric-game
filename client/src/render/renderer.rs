@@ -5614,16 +5614,47 @@ impl Renderer {
                 self.draw_text_sharp(&label, (bar_x + (bar_width - label_w) / 2.0).floor(), (gather_y + 15.0).floor(), 16.0, text_color);
             }
 
+            // ===== Dash cooldown indicator (below gathering status or prayer bar) =====
+            let dash_bar_y = if is_skilling {
+                prayer_bar_y + bar_height + 4.0 + 22.0 + 4.0 // Below gathering bar
+            } else {
+                prayer_bar_y + bar_height + 4.0 // Below prayer bar
+            };
+            let current_time = macroquad::time::get_time();
+            if state.dash_cooldown_end > current_time {
+                let remaining = (state.dash_cooldown_end - current_time) as f32;
+                let total_cooldown = 3.0f32;
+                let progress = 1.0 - (remaining / total_cooldown).clamp(0.0, 1.0);
+                let dash_h = 22.0;
+
+                // Background
+                let bg_color = Color::new(0.15, 0.08, 0.15, 0.7);
+                let border_color = Color::new(0.5, 0.25, 0.5, 0.5);
+                draw_rectangle(bar_x, dash_bar_y, bar_width, dash_h, bg_color);
+                draw_rectangle_lines(bar_x, dash_bar_y, bar_width, dash_h, 1.0, border_color);
+
+                // Fill bar
+                let fill_w = (bar_width - 4.0) * progress;
+                if fill_w > 0.0 {
+                    let fill_color = Color::new(0.6, 0.3, 0.8, 0.8);
+                    draw_rectangle(bar_x + 2.0, dash_bar_y + 2.0, fill_w, dash_h - 4.0, fill_color);
+                }
+
+                // Text
+                let remaining_text = format!("Dash {:.1}s", remaining);
+                let text_w = self.measure_text_sharp(&remaining_text, 16.0).width;
+                let text_color = Color::new(0.8, 0.6, 0.95, 0.9);
+                self.draw_text_sharp(&remaining_text, (bar_x + (bar_width - text_w) / 2.0).floor(), (dash_bar_y + 15.0).floor(), 16.0, text_color);
+            }
+
             // XP Globes (to the left of player stats)
             let globe_stats_y = tag_y + tag_height / 2.0 + 8.0; // Slightly below name tag center
             self.render_xp_globes(&state.xp_globes, bar_x, globe_stats_y);
 
             // XP Drop Feed (below gathering status or MP bar)
-            let drop_start_y = if is_skilling {
-                mp_bar_y + bar_height + 4.0 + 22.0 + 110.0 // ~100px below gathering box
-            } else {
-                mp_bar_y + bar_height + 110.0
-            };
+            let has_dash_bar = state.dash_cooldown_end > current_time;
+            let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 } + if has_dash_bar { 22.0 + 4.0 } else { 0.0 };
+            let drop_start_y = mp_bar_y + bar_height + extra_offset + 110.0;
             self.render_xp_drop_feed(&state.xp_drop_feed, bar_x, bar_width, drop_start_y);
         }
 
