@@ -4126,6 +4126,39 @@ impl InputHandler {
         (self.raw_facing_dx, self.raw_facing_dy)
     }
 
+    /// Read immediate direction from current key/dpad state.
+    /// Call BEFORE render to eliminate 1-frame direction lag.
+    /// Returns None if no direction input is active.
+    pub fn get_immediate_direction(&self, classic: bool) -> Option<crate::game::Direction> {
+        use macroquad::prelude::*;
+        use crate::game::Direction;
+        use crate::input::touch::DPadDirection;
+
+        // D-pad takes priority (touch input)
+        let dpad = self.touch_controls.get_direction();
+        if dpad != DPadDirection::None {
+            return Some(match dpad {
+                DPadDirection::Up => Direction::Up,
+                DPadDirection::Down => Direction::Down,
+                DPadDirection::Left => Direction::Left,
+                DPadDirection::Right => Direction::Right,
+                DPadDirection::None => unreachable!(),
+            });
+        }
+
+        // Keyboard (respects classic mode: arrows only vs WASD+arrows)
+        let down = if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) };
+        let up = if classic { is_key_down(KeyCode::Up) } else { is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) };
+        let left = if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) };
+        let right = if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) };
+
+        if down { Some(Direction::Down) }
+        else if up { Some(Direction::Up) }
+        else if left { Some(Direction::Left) }
+        else if right { Some(Direction::Right) }
+        else { None }
+    }
+
     /// Render touch controls overlay (call after all other rendering)
     /// Set hide_action_buttons to true when panels like inventory are open
     pub fn render_touch_controls(&self, hide_action_buttons: bool, hide_all_controls: bool, use_joystick: bool) {

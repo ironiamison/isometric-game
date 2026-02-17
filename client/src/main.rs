@@ -399,6 +399,28 @@ fn run_game_frame(
         audio.play_attack_sound(has_weapon);
     }
 
+    // 1.9. Update facing direction from raw input BEFORE render.
+    // The render reads animation.direction to pick sprite frames. Without this,
+    // there's a 1-frame lag where the old direction is rendered because input
+    // processing (step 3) happens after render (step 2).
+    if let Some(dir) = input_handler.get_immediate_direction(game_state.ui_state.classic_controls) {
+        if let Some(local_id) = &game_state.local_player_id {
+            if let Some(player) = game_state.players.get_mut(local_id) {
+                let in_action = matches!(
+                    player.animation.state,
+                    AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
+                    | AnimationState::SittingChair | AnimationState::SittingGround
+                );
+                if !in_action {
+                    player.direction = dir;
+                    if !player.is_moving {
+                        player.animation.direction = dir;
+                    }
+                }
+            }
+        }
+    }
+
     // 2. Render and get UI layout for hit detection
     clear_background(Color::from_rgba(30, 30, 40, 255));
     let (layout, render_timings) = renderer.render(game_state);

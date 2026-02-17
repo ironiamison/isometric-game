@@ -285,13 +285,14 @@ impl Player {
 
         // Direction handling:
         // - Remote players: always accept server direction
-        // - Local player: direction is controlled locally from input (state.rs update)
-        //   This prevents stale server direction (1-2 ticks behind) from overriding
-        //   the player's current input, which caused attack facing desync.
+        // - Local player when moving: accept server direction (confirms movement direction,
+        //   server direction always matches velocity since both come from the same Move command)
         // - Local player when sitting: accept server direction (chair controls it)
+        // - Local player when stationary: keep local direction (Face commands / input control it)
+        let is_vel_moving = vel_x != 0.0 || vel_y != 0.0;
         let is_sitting = matches!(self.animation.state,
             crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
-        if !is_local_player || is_sitting {
+        if !is_local_player || is_vel_moving || is_sitting {
             self.direction = dir;
         }
 
@@ -473,17 +474,18 @@ impl Player {
             return;
         }
 
-        // Animation direction follows actual movement to prevent moonwalking.
-        // When moving: face the direction the sprite is actually moving (not the
-        // logical player direction, which may update before the sprite turns).
-        // When stationary: face the logical player direction (from Face commands etc).
-        match movement_dir {
-            Some(move_dir) => {
-                self.animation.direction = move_dir;
-            }
-            None => {
-                self.animation.direction = self.direction;
-            }
+        // Sync animation direction only when safe (prevents moonwalking):
+        // - When stationary: always safe to sync
+        // - When moving: only if movement direction matches player direction
+        //   (keeps old animation direction when sprite is finishing a tile transit
+        //    in the old direction, preventing premature direction flip)
+        let should_sync_direction = match movement_dir {
+            None => true,  // Stationary - safe to sync
+            Some(move_dir) => move_dir == self.direction,  // Moving - only if aligned
+        };
+
+        if should_sync_direction {
+            self.animation.direction = self.direction;
         }
 
         // Handle movement animations
