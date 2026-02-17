@@ -80,6 +80,11 @@ pub struct Player {
     // Movement velocity (-1, 0, or 1 per axis, normalized for diagonal)
     pub vel_x: f32,
     pub vel_y: f32,
+    // Latest local movement intent from input (used to disambiguate stale server stops)
+    pub local_intent_dx: f32,
+    pub local_intent_dy: f32,
+    // Time when local prediction most recently started (seconds)
+    pub local_prediction_started_at: f64,
 
     pub direction: Direction,
     pub is_moving: bool,
@@ -147,6 +152,9 @@ impl Player {
             target_y: y,
             vel_x: 0.0,
             vel_y: 0.0,
+            local_intent_dx: 0.0,
+            local_intent_dy: 0.0,
+            local_prediction_started_at: 0.0,
             direction: Direction::Down,
             is_moving: false,
             hp: 10,
@@ -283,16 +291,16 @@ impl Player {
         self.vel_x = vel_x;
         self.vel_y = vel_y;
 
-        // Direction handling:
-        // - Remote players: always accept server direction
-        // - Local player when moving: accept server direction (confirms movement direction,
-        //   server direction always matches velocity since both come from the same Move command)
-        // - Local player when sitting: accept server direction (chair controls it)
-        // - Local player when stationary: keep local direction (Face commands / input control it)
-        let is_vel_moving = vel_x != 0.0 || vel_y != 0.0;
+        // --- Direction handling ---
+        // Remote players / sitting: always accept server direction.
+        // Local player: NEVER accept server direction. Direction is driven by:
+        //   - Physical movement direction during transit (update_animation)
+        //   - Player input at tile center (pre-render + state.rs)
+        // Server direction is always ~100ms stale and causes visible flashing
+        // when it briefly overrides the client's direction before input corrects it.
         let is_sitting = matches!(self.animation.state,
             crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
-        if !is_local_player || is_vel_moving || is_sitting {
+        if !is_local_player || is_sitting {
             self.direction = dir;
         }
 
@@ -308,9 +316,6 @@ impl Player {
         }
 
         // Teleport detection (>4 tiles = snap immediately)
-        // Raised from 2 to avoid snapping on rapid direction changes where
-        // the client finishes tile animations while the server moves elsewhere.
-        // Smaller drifts are handled by accelerated interpolation in interpolate_visual.
         let dist = ((self.x - x).powi(2) + (self.y - y).powi(2)).sqrt();
         if dist > 4.0 {
             self.x = x;
@@ -326,47 +331,84 @@ impl Player {
         // Stopped = always update target to server position
         let stopped = vel_x == 0.0 && vel_y == 0.0;
 
-        // At tile center = safe to update target
-        let at_tile_center = (self.x - self.x.round()).abs() < 0.1
-                          && (self.y - self.y.round()).abs() < 0.1;
-
         // Detect velocity direction change (intent changed but server hasn't moved yet)
         let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
 
-        // For local player: only predict from server velocity when it matches
-        // our local direction. Due to latency, the server velocity may be stale
-        // (from before it received our direction change). Predicting from stale
-        // velocity overshoots into the wrong direction, causing a visible "flash"
-        // as the sprite corrects back. When stale, just use server position.
-        let vel_matches_dir = if is_local_player && (vel_x != 0.0 || vel_y != 0.0) {
-            let vel_dir = Direction::from_velocity(vel_x, vel_y);
-            vel_dir == self.direction
+        // --- Target handling ---
+        // Rule: no mid-tile redirection. During transit, keep current target.
+        // Only apply new velocity when at/near tile center.
+        //
+        // Local prediction guard:
+        // Ignore stale "stopped at old tile" packets only during a short grace
+        // window right after local prediction starts, and only while local input
+        // intent still matches the predicted movement direction. This preserves
+        // the anti-flash fix without masking legitimate stop/cancel states.
+        let has_local_intent = self.local_intent_dx != 0.0 || self.local_intent_dy != 0.0;
+        let target_dx = self.target_x - self.x;
+        let target_dy = self.target_y - self.y;
+        let intent_matches_target = if has_local_intent && (target_dx.abs() > 0.01 || target_dy.abs() > 0.01) {
+            Direction::from_velocity(self.local_intent_dx, self.local_intent_dy)
+                == Direction::from_velocity(target_dx, target_dy)
         } else {
-            true // remote players or stopped: always trust server
+            false
         };
-
-        if vel_changed && !server_moved && !stopped {
-            // Direction intent changed during cooldown (server hasn't moved yet).
-            // Don't redirect the sprite mid-tile - let the current movement animation
-            // finish. The sprite continues to its current target (tile center).
-            // The next server update after arrival will apply the new direction.
-            let near_target = (self.x - self.target_x).abs() < 0.15
-                           && (self.y - self.target_y).abs() < 0.15;
-            if near_target && vel_matches_dir {
-                // Already at/near tile center - safe to apply new direction
+        let prediction_grace_active = self.local_prediction_started_at > 0.0
+            && (macroquad::time::get_time() - self.local_prediction_started_at) <= 0.20;
+        let stale_local_stop = is_local_player
+            && self.is_moving
+            && stopped
+            && !server_moved
+            && has_local_intent
+            && intent_matches_target
+            && prediction_grace_active;
+        if stale_local_stop {
+            // Keep predicted target until server confirms movement or a real stop.
+        } else if self.is_moving && !stopped {
+            // Mid-transit: only update if near target (about to arrive)
+            if vel_changed && !server_moved {
+                let near_target = (self.x - self.target_x).abs() < 0.15
+                               && (self.y - self.target_y).abs() < 0.15;
+                if near_target {
+                    if vel_x != 0.0 || vel_y != 0.0 {
+                        self.target_x = x + vel_x;
+                        self.target_y = y + vel_y;
+                    }
+                }
+                // Not near target: keep current, finish transit
+            } else if server_moved {
+                // Server confirmed a move - update target to track server
                 if vel_x != 0.0 || vel_y != 0.0 {
                     self.target_x = x + vel_x;
                     self.target_y = y + vel_y;
+                } else {
+                    self.target_x = x;
+                    self.target_y = y;
                 }
             }
-            // Otherwise: keep current target, sprite finishes movement to tile center
-        } else if server_moved || stopped || at_tile_center {
-            if (vel_x != 0.0 || vel_y != 0.0) && vel_matches_dir {
+            // Otherwise: keep current target during transit
+        } else {
+            // At tile center or stopped: apply new target freely
+            if vel_x != 0.0 || vel_y != 0.0 {
                 self.target_x = x + vel_x;
                 self.target_y = y + vel_y;
             } else {
                 self.target_x = x;
                 self.target_y = y;
+            }
+        }
+
+        // --- Immediate direction from target ---
+        // For local player: when a new target is set and we're at tile center,
+        // update direction NOW (before render) based on position→target vector.
+        // This closes the 1-frame gap where render sees the old direction because
+        // update_animation hasn't run yet.
+        if is_local_player && !is_sitting && !self.is_moving {
+            let target_dx = self.target_x - self.x;
+            let target_dy = self.target_y - self.y;
+            if target_dx.abs() > 0.01 || target_dy.abs() > 0.01 {
+                let target_dir = Direction::from_velocity(target_dx, target_dy);
+                self.direction = target_dir;
+                self.animation.direction = target_dir;
             }
         }
     }
@@ -474,18 +516,22 @@ impl Player {
             return;
         }
 
-        // Sync animation direction only when safe (prevents moonwalking):
-        // - When stationary: always safe to sync
-        // - When moving: only if movement direction matches player direction
-        //   (keeps old animation direction when sprite is finishing a tile transit
-        //    in the old direction, preventing premature direction flip)
-        let should_sync_direction = match movement_dir {
-            None => true,  // Stationary - safe to sync
-            Some(move_dir) => move_dir == self.direction,  // Moving - only if aligned
-        };
-
-        if should_sync_direction {
-            self.animation.direction = self.direction;
+        // Animation direction follows actual movement during transit,
+        // and follows logical direction (from input) when stationary.
+        // Input is locked during transit (pre-render/state.rs check !is_moving),
+        // so self.direction won't change mid-tile from player input — only from
+        // the physical movement direction reflected here.
+        match movement_dir {
+            Some(move_dir) => {
+                self.animation.direction = move_dir;
+                // Keep logical direction synced with physical movement.
+                // This ensures that when the sprite arrives at a tile center,
+                // self.direction matches the direction it was just moving.
+                self.direction = move_dir;
+            }
+            None => {
+                self.animation.direction = self.direction;
+            }
         }
 
         // Handle movement animations

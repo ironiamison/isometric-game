@@ -400,9 +400,7 @@ fn run_game_frame(
     }
 
     // 1.9. Update facing direction from raw input BEFORE render.
-    // The render reads animation.direction to pick sprite frames. Without this,
-    // there's a 1-frame lag where the old direction is rendered because input
-    // processing (step 3) happens after render (step 2).
+    // Only when at tile center (not mid-transit) - direction is locked during movement.
     if let Some(dir) = input_handler.get_immediate_direction(game_state.ui_state.classic_controls) {
         if let Some(local_id) = &game_state.local_player_id {
             if let Some(player) = game_state.players.get_mut(local_id) {
@@ -411,11 +409,9 @@ fn run_game_frame(
                     AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
                     | AnimationState::SittingChair | AnimationState::SittingGround
                 );
-                if !in_action {
+                if !in_action && !player.is_moving {
                     player.direction = dir;
-                    if !player.is_moving {
-                        player.animation.direction = dir;
-                    }
+                    player.animation.direction = dir;
                 }
             }
         }
@@ -434,9 +430,14 @@ fn run_game_frame(
                 // Predict target ahead for same-direction movement (keeps sprite in sync
                 // with server despite network latency). Skip prediction when direction
                 // changes - tile-commit logic in set_server_state handles that case.
-                if (*dx != 0.0 || *dy != 0.0) {
-                    if let Some(local_id) = &game_state.local_player_id {
-                        if let Some(player) = game_state.players.get_mut(local_id) {
+                if let Some(local_id) = &game_state.local_player_id {
+                    if let Some(player) = game_state.players.get_mut(local_id) {
+                        // Track local intent so set_server_state can distinguish
+                        // stale stop packets from genuine stop/cancel states.
+                        player.local_intent_dx = *dx;
+                        player.local_intent_dy = *dy;
+
+                        if *dx != 0.0 || *dy != 0.0 {
                             let moving_dir_x = (player.target_x - player.x).signum();
                             let moving_dir_y = (player.target_y - player.y).signum();
                             let move_dir_x = (*dx as f32).signum();
@@ -446,7 +447,10 @@ fn run_game_frame(
                             if same_dir {
                                 player.target_x = player.server_x + *dx;
                                 player.target_y = player.server_y + *dy;
+                                player.local_prediction_started_at = get_time();
                             }
+                        } else {
+                            player.local_prediction_started_at = 0.0;
                         }
                     }
                 }
@@ -477,6 +481,9 @@ fn run_game_frame(
                         let new_dir = game::Direction::from_u8(*direction);
                         player.direction = new_dir;
                         player.animation.direction = new_dir; // Also update animation direction for rendering
+                        player.local_intent_dx = 0.0;
+                        player.local_intent_dy = 0.0;
+                        player.local_prediction_started_at = 0.0;
                         log::info!("[MAIN] Updated local player direction: {:?} -> {:?}", old_dir, player.direction);
                     }
                 }
