@@ -3147,7 +3147,7 @@ impl InputHandler {
             let is_moving = self.last_dx != 0.0 || self.last_dy != 0.0;
             if is_moving && current_time >= state.dash_cooldown_end {
                 commands.push(InputCommand::Dash);
-                state.dash_cooldown_end = current_time + 3.0; // 3 second cooldown
+                state.dash_cooldown_end = current_time + 5.0; // 5 second cooldown
             }
         }
 

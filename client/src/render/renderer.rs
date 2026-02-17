@@ -5623,7 +5623,7 @@ impl Renderer {
             let current_time = macroquad::time::get_time();
             if state.dash_cooldown_end > current_time {
                 let remaining = (state.dash_cooldown_end - current_time) as f32;
-                let total_cooldown = 3.0f32;
+                let total_cooldown = 5.0f32;
                 let progress = 1.0 - (remaining / total_cooldown).clamp(0.0, 1.0);
                 let dash_h = 22.0;
 

@@ -382,7 +382,7 @@ impl Player {
             // - Normal: 4 tiles/sec
             let dist_to_target = dx.abs().max(dy.abs());
             let speed = if self.is_dashing {
-                16.0
+                10.0
             } else if dist_to_target > 1.5 {
                 VISUAL_SPEED * 3.0
             } else {
