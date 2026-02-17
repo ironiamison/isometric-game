@@ -152,15 +152,13 @@ pub struct MerchantConfig {
     #[serde(default = "default_sell_mult")]
     pub sell_multiplier: f32,
     pub restock_interval_minutes: Option<u32>,
-    #[serde(default = "default_show_crafting")]
-    pub show_crafting: bool,
+    /// Which recipe categories this merchant offers (e.g. ["smithing"], ["alchemy"])
+    /// Empty = no crafting tab shown
+    #[serde(default)]
+    pub crafting_categories: Vec<String>,
     /// Quest that must be completed before this shop is accessible
     #[serde(default)]
     pub required_quest: Option<String>,
-}
-
-fn default_show_crafting() -> bool {
-    true
 }
 
 fn default_buy_mult() -> f32 {

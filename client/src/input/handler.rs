@@ -2263,16 +2263,24 @@ impl InputHandler {
                 return commands;
             }
 
-            // Q switches between Recipes/Shop main tabs
+            // Q switches between Recipes/Shop main tabs (only if merchant has crafting categories)
             if is_key_pressed(KeyCode::Q) {
-                state.ui_state.shop_main_tab = if state.ui_state.shop_main_tab == 0 { 1 } else { 0 };
+                let has_crafting = state.ui_state.shop_data.as_ref()
+                    .map_or(false, |s| !s.crafting_categories.is_empty());
+                if has_crafting {
+                    state.ui_state.shop_main_tab = if state.ui_state.shop_main_tab == 0 { 1 } else { 0 };
+                }
             }
 
             if state.ui_state.shop_main_tab == 0 {
                 // Recipes tab keyboard controls
+                // Get merchant's allowed crafting categories
+                let allowed_cats: Vec<String> = state.ui_state.shop_data.as_ref()
+                    .map_or_else(Vec::new, |s| s.crafting_categories.clone());
                 // Get unique categories from recipes, merging consumables and materials
                 let categories: Vec<String> = {
                     let mut cats: Vec<String> = state.recipe_definitions.iter()
+                        .filter(|r| allowed_cats.is_empty() || allowed_cats.iter().any(|a| a == &r.category))
                         .map(|r| {
                             if r.category == "materials" || r.category == "consumables" {
                                 "supplies".to_string()
@@ -2309,6 +2317,10 @@ impl InputHandler {
                     let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
                     let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
                         .filter(|r| {
+                            // Check merchant allows this raw category
+                            if !allowed_cats.is_empty() && !allowed_cats.iter().any(|a| a == &r.category) {
+                                return false;
+                            }
                             let cat_match = if current_category == "supplies" {
                                 r.category == "consumables" || r.category == "materials"
                             } else {
@@ -2400,7 +2412,12 @@ impl InputHandler {
                     let sel_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
                     let cur_cat = categories.get(sel_idx).map(|s| s.as_str()).unwrap_or("supplies");
                     let total_visible: usize = state.recipe_definitions.iter()
-                        .filter(|r| if cur_cat == "supplies" { r.category == "consumables" || r.category == "materials" } else { r.category == cur_cat })
+                        .filter(|r| {
+                            if !allowed_cats.is_empty() && !allowed_cats.iter().any(|a| a == &r.category) {
+                                return false;
+                            }
+                            if cur_cat == "supplies" { r.category == "consumables" || r.category == "materials" } else { r.category == cur_cat }
+                        })
                         .count();
                     // Match renderer: list_content_height = list_height - 34, list_height = content_height - tab_height - 20
                     // content_height = panel_height - FRAME*2 - HEADER - FOOTER - 12, tab_height = 28

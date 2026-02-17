@@ -7,9 +7,11 @@ use crate::util::virtual_screen_size;
 use super::super::Renderer;
 use super::common::*;
 
-/// Helper to build the category list from recipes, grouping materials/consumables into "supplies"
-fn build_categories(recipes: &[RecipeDefinition]) -> Vec<String> {
+/// Helper to build the category list from recipes, grouping materials/consumables into "supplies".
+/// If `allowed` is non-empty, only include recipes whose raw category is in the allowed list.
+fn build_categories(recipes: &[RecipeDefinition], allowed: &[String]) -> Vec<String> {
     let mut cats: Vec<String> = recipes.iter()
+        .filter(|r| allowed.is_empty() || allowed.iter().any(|a| a == &r.category))
         .map(|r| {
             if r.category == "materials" || r.category == "consumables" {
                 "supplies".to_string()
@@ -23,10 +25,15 @@ fn build_categories(recipes: &[RecipeDefinition]) -> Vec<String> {
     cats
 }
 
-/// Helper to filter recipes for a given category (matching the supplies grouping)
-fn recipes_for_category<'a>(recipes: &'a [RecipeDefinition], category: &str) -> Vec<&'a RecipeDefinition> {
+/// Helper to filter recipes for a given display category, respecting the merchant's allowed list.
+fn recipes_for_category<'a>(recipes: &'a [RecipeDefinition], category: &str, allowed: &[String]) -> Vec<&'a RecipeDefinition> {
     recipes.iter()
         .filter(|r| {
+            // First check merchant allows this raw category
+            if !allowed.is_empty() && !allowed.iter().any(|a| a == &r.category) {
+                return false;
+            }
+            // Then match the display category grouping
             if category == "supplies" {
                 r.category == "consumables" || r.category == "materials"
             } else {
@@ -99,8 +106,10 @@ impl Renderer {
 
         main_tab_x += main_tab_width + 4.0;
 
-        // Crafting Tab (formerly Recipes) - only show if shop allows it
-        let show_crafting = state.ui_state.shop_data.as_ref().map_or(true, |s| s.show_crafting);
+        // Crafting Tab - only show if merchant has crafting categories
+        let allowed_cats: Vec<String> = state.ui_state.shop_data.as_ref()
+            .map_or_else(Vec::new, |s| s.crafting_categories.clone());
+        let show_crafting = !allowed_cats.is_empty();
         if show_crafting {
             let is_recipes_selected = state.ui_state.shop_main_tab == 0;
             let recipes_bounds = Rect::new(main_tab_x, main_tab_y, main_tab_width, main_tab_height);
@@ -155,7 +164,7 @@ impl Renderer {
 
         // Render appropriate tab content
         match state.ui_state.shop_main_tab {
-            0 if show_crafting => self.render_recipes_tab(state, hovered, layout, panel_x, content_y, content_width, content_height),
+            0 if show_crafting => self.render_recipes_tab(state, hovered, layout, panel_x, content_y, content_width, content_height, &allowed_cats),
             1 => self.render_shop_tab(state, hovered, layout, panel_x, content_y, content_width, content_height),
             _ => {}
         }
@@ -176,7 +185,7 @@ impl Renderer {
                 // Recipes tab controls
                 self.draw_text_sharp("[Q] Tab", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
 
-                let has_multiple_categories = build_categories(&state.recipe_definitions).len() > 1;
+                let has_multiple_categories = build_categories(&state.recipe_definitions, &allowed_cats).len() > 1;
 
                 if has_multiple_categories {
                     self.draw_text_sharp("[A/D] Category", footer_x + 100.0, footer_y + 20.0, 16.0, TEXT_DIM);
@@ -196,8 +205,8 @@ impl Renderer {
         }
     }
 
-    fn render_recipes_tab(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout, panel_x: f32, content_y: f32, content_width: f32, content_height: f32) {
-        let categories = build_categories(&state.recipe_definitions);
+    fn render_recipes_tab(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout, panel_x: f32, content_y: f32, content_width: f32, content_height: f32, allowed_cats: &[String]) {
+        let categories = build_categories(&state.recipe_definitions, allowed_cats);
 
         if categories.is_empty() {
             self.draw_text_sharp("No recipes available", panel_x + FRAME_THICKNESS + 20.0, content_y + 40.0, 16.0, TEXT_DIM);
@@ -251,7 +260,7 @@ impl Renderer {
         let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
 
         // Get all recipes for this category
-        let all_recipes = recipes_for_category(&state.recipe_definitions, current_category);
+        let all_recipes = recipes_for_category(&state.recipe_definitions, current_category, allowed_cats);
 
         // Task 15: Filter recipes by discovery status
         // - requires_discovery = false: always show

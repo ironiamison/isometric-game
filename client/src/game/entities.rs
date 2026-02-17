@@ -306,9 +306,12 @@ impl Player {
             return;
         }
 
-        // Teleport detection (>2 tiles = snap immediately)
+        // Teleport detection (>4 tiles = snap immediately)
+        // Raised from 2 to avoid snapping on rapid direction changes where
+        // the client finishes tile animations while the server moves elsewhere.
+        // Smaller drifts are handled by accelerated interpolation in interpolate_visual.
         let dist = ((self.x - x).powi(2) + (self.y - y).powi(2)).sqrt();
-        if dist > 2.0 {
+        if dist > 4.0 {
             self.x = x;
             self.y = y;
             self.target_x = x;
@@ -372,8 +375,19 @@ impl Player {
             self.is_moving = false;
             self.is_dashing = false; // Dash slide complete
         } else {
-            // Use fast speed during dash (24 tiles/sec vs normal 4)
-            let speed = if self.is_dashing { 16.0 } else { VISUAL_SPEED };
+            // Speed selection:
+            // - Dash: 16 tiles/sec (fast slide)
+            // - Catch-up: 3x speed when >1.5 tiles from target (smooth correction
+            //   after direction-change drift, prevents teleport snaps)
+            // - Normal: 4 tiles/sec
+            let dist_to_target = dx.abs().max(dy.abs());
+            let speed = if self.is_dashing {
+                16.0
+            } else if dist_to_target > 1.5 {
+                VISUAL_SPEED * 3.0
+            } else {
+                VISUAL_SPEED
+            };
             let mut budget = speed * delta;
 
             // Axis-aligned movement: resolve smaller displacement first,

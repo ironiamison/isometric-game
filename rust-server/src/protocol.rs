@@ -1017,7 +1017,7 @@ pub struct ShopData {
     pub display_name: String,
     pub buy_multiplier: f32,
     pub sell_multiplier: f32,
-    pub show_crafting: bool,
+    pub crafting_categories: Vec<String>,
     pub stock: Vec<ShopStockItemData>,
 }
 
@@ -2825,9 +2825,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::String("sellMultiplier".into()),
                 Value::F64(shop.sell_multiplier as f64),
             ));
+            let cat_values: Vec<Value> = shop.crafting_categories.iter()
+                .map(|c| Value::String(c.clone().into()))
+                .collect();
             shop_map.push((
-                Value::String("showCrafting".into()),
-                Value::Boolean(shop.show_crafting),
+                Value::String("craftingCategories".into()),
+                Value::Array(cat_values),
             ));
 
             let stock_values: Vec<Value> = shop

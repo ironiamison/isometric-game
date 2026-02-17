@@ -1702,7 +1702,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let display_name = extract_string(shop_value, "displayName").unwrap_or_else(|| "Shop".to_string());
                 let buy_multiplier = extract_f32(shop_value, "buyMultiplier").unwrap_or(0.5);
                 let sell_multiplier = extract_f32(shop_value, "sellMultiplier").unwrap_or(1.0);
-                let show_crafting = extract_bool(shop_value, "showCrafting").unwrap_or(true);
+                let crafting_categories = extract_array(shop_value, "craftingCategories")
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .unwrap_or_default();
 
                 let mut stock = Vec::new();
                 if let Some(stock_arr) = extract_array(shop_value, "stock") {
@@ -1726,7 +1728,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     display_name,
                     buy_multiplier,
                     sell_multiplier,
-                    show_crafting,
+                    crafting_categories,
                     stock,
                 });
                 state.ui_state.crafting_open = true; // Open crafting window (which has shop tab)
