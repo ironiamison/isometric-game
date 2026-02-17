@@ -177,6 +177,10 @@ pub struct InputHandler {
     move_sent: bool,
     // Touch controls for mobile devices
     pub touch_controls: TouchControls,
+    // Raw intended direction from key/dpad input (before FACE_THRESHOLD delay).
+    // Used by state.rs for immediate facing direction updates.
+    raw_facing_dx: f32,
+    raw_facing_dy: f32,
 }
 
 impl InputHandler {
@@ -193,6 +197,8 @@ impl InputHandler {
             dir_press_time: 0.0,
             move_sent: false,
             touch_controls: TouchControls::new(),
+            raw_facing_dx: 0.0,
+            raw_facing_dy: 0.0,
         }
     }
 
@@ -3041,6 +3047,12 @@ impl InputHandler {
             CardinalDir::None => (0.0, 0.0),
         };
 
+        // Store raw intended direction for immediate facing updates in state.rs.
+        // This is available before the FACE_THRESHOLD delay, preventing the
+        // 150ms flash of the old direction when changing facing.
+        self.raw_facing_dx = dx;
+        self.raw_facing_dy = dy;
+
         // Only send Move commands if held past the threshold
         // Don't move while attacking - check both attack key/touch button and animation state
         let attack_key_down = if classic {
@@ -4105,6 +4117,13 @@ impl InputHandler {
     /// Get current movement direction (for client-side prediction)
     pub fn get_movement(&self) -> (f32, f32) {
         (self.last_dx, self.last_dy)
+    }
+
+    /// Get raw intended direction from key/dpad input (before FACE_THRESHOLD).
+    /// Used for immediate facing direction so the sprite doesn't flash the old
+    /// direction during the 150ms threshold window.
+    pub fn get_raw_facing(&self) -> (f32, f32) {
+        (self.raw_facing_dx, self.raw_facing_dy)
     }
 
     /// Render touch controls overlay (call after all other rendering)

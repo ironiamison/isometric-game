@@ -601,8 +601,8 @@ fn run_game_frame(
 
     // 4. Update game state using raw delta (lerp-based interpolation handles smoothing)
     let update_start = get_time();
-    let (input_dx, input_dy) = input_handler.get_movement();
-    game_state.update(delta, input_dx, input_dy);
+    let (facing_dx, facing_dy) = input_handler.get_raw_facing();
+    game_state.update(delta, facing_dx, facing_dy);
     game_state.update_transition(delta);
     let update_ms = (get_time() - update_start) * 1000.0;
 
