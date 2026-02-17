@@ -1910,7 +1910,8 @@ impl Screen for CharacterCreateScreen {
             if let Some(result) = self.auth_client.poll() {
                 self.loading = false;
                 match result {
-                    AuthResult::CharacterCreated(Ok(_)) => {
+                    AuthResult::CharacterCreated(Ok(char_info)) => {
+                        self.session.characters.push(char_info);
                         return ScreenState::ToCharacterSelect(self.session.clone());
                     }
                     AuthResult::CharacterCreated(Err(e)) => {
@@ -2098,7 +2099,8 @@ impl Screen for CharacterCreateScreen {
 
                 #[cfg(not(target_arch = "wasm32"))]
                 match self.auth_client.create_character(&self.session.token, name, gender, skin, hair_style, hair_color) {
-                    Ok(_) => {
+                    Ok(char_info) => {
+                        self.session.characters.push(char_info);
                         return ScreenState::ToCharacterSelect(self.session.clone());
                     }
                     Err(e) => {
