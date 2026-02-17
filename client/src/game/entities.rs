@@ -332,6 +332,18 @@ impl Player {
         // Detect velocity direction change (intent changed but server hasn't moved yet)
         let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
 
+        // For local player: only predict from server velocity when it matches
+        // our local direction. Due to latency, the server velocity may be stale
+        // (from before it received our direction change). Predicting from stale
+        // velocity overshoots into the wrong direction, causing a visible "flash"
+        // as the sprite corrects back. When stale, just use server position.
+        let vel_matches_dir = if is_local_player && (vel_x != 0.0 || vel_y != 0.0) {
+            let vel_dir = Direction::from_velocity(vel_x, vel_y);
+            vel_dir == self.direction
+        } else {
+            true // remote players or stopped: always trust server
+        };
+
         if vel_changed && !server_moved && !stopped {
             // Direction intent changed during cooldown (server hasn't moved yet).
             // Don't redirect the sprite mid-tile - let the current movement animation
@@ -339,7 +351,7 @@ impl Player {
             // The next server update after arrival will apply the new direction.
             let near_target = (self.x - self.target_x).abs() < 0.15
                            && (self.y - self.target_y).abs() < 0.15;
-            if near_target {
+            if near_target && vel_matches_dir {
                 // Already at/near tile center - safe to apply new direction
                 if vel_x != 0.0 || vel_y != 0.0 {
                     self.target_x = x + vel_x;
@@ -348,7 +360,7 @@ impl Player {
             }
             // Otherwise: keep current target, sprite finishes movement to tile center
         } else if server_moved || stopped || at_tile_center {
-            if vel_x != 0.0 || vel_y != 0.0 {
+            if (vel_x != 0.0 || vel_y != 0.0) && vel_matches_dir {
                 self.target_x = x + vel_x;
                 self.target_y = y + vel_y;
             } else {
