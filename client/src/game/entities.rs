@@ -331,6 +331,18 @@ impl Player {
 
         if vel_changed && !server_moved && !stopped {
             // Direction intent changed during cooldown (server hasn't moved yet).
+            // Snap visual position to grid on the non-movement axis to prevent
+            // brief moonwalking from axis-aligned interpolation correction.
+            // e.g. moving Right→Down: sprite at (5.3, 3) snaps X to 5.0 so it
+            // moves purely Down instead of correcting Left first.
+            if vel_x != 0.0 && vel_y == 0.0 {
+                // Moving horizontally - snap Y to grid
+                self.y = self.y.round();
+            } else if vel_y != 0.0 && vel_x == 0.0 {
+                // Moving vertically - snap X to grid
+                self.x = self.x.round();
+            }
+
             // Only predict ahead if visual is close to server position.
             // This prevents drift accumulation from chasing multiple prediction
             // targets during rapid direction changes.
@@ -347,6 +359,13 @@ impl Player {
             }
         } else if server_moved || stopped || at_tile_center {
             if vel_x != 0.0 || vel_y != 0.0 {
+                // Snap non-movement axis to grid when server confirmed a move
+                // with new velocity, preventing moonwalk from axis correction
+                if vel_x != 0.0 && vel_y == 0.0 {
+                    self.y = self.y.round();
+                } else if vel_y != 0.0 && vel_x == 0.0 {
+                    self.x = self.x.round();
+                }
                 self.target_x = x + vel_x;
                 self.target_y = y + vel_y;
             } else {
