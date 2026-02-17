@@ -408,20 +408,7 @@ fn run_game_frame(
     for cmd in &commands {
         use network::messages::ClientMessage;
         let msg = match cmd {
-            InputCommand::Move { dx, dy } => {
-                // Client-side prediction: immediately update target for responsive turning.
-                // Without this, the sprite continues in the old direction for 50-150ms
-                // until the server confirms the new velocity (causes moonwalking).
-                if (*dx != 0.0 || *dy != 0.0) {
-                    if let Some(local_id) = &game_state.local_player_id {
-                        if let Some(player) = game_state.players.get_mut(local_id) {
-                            player.target_x = player.server_x + *dx;
-                            player.target_y = player.server_y + *dy;
-                        }
-                    }
-                }
-                ClientMessage::Move { dx: *dx, dy: *dy }
-            },
+            InputCommand::Move { dx, dy } => ClientMessage::Move { dx: *dx, dy: *dy },
             InputCommand::Face { direction } => {
                 log::info!("[MAIN] Processing Face command: direction={}", direction);
                 // Skip direction update if sitting or attacking

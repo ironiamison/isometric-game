@@ -331,20 +331,19 @@ impl Player {
 
         if vel_changed && !server_moved && !stopped {
             // Direction intent changed during cooldown (server hasn't moved yet).
-            // Only predict ahead if visual is close to server position.
-            // This prevents drift accumulation from chasing multiple prediction
-            // targets during rapid direction changes.
-            let drift = (self.x - x).abs().max((self.y - y).abs());
-            if drift < 0.5 {
+            // Don't redirect the sprite mid-tile - let the current movement animation
+            // finish. The sprite continues to its current target (tile center).
+            // The next server update after arrival will apply the new direction.
+            let near_target = (self.x - self.target_x).abs() < 0.15
+                           && (self.y - self.target_y).abs() < 0.15;
+            if near_target {
+                // Already at/near tile center - safe to apply new direction
                 if vel_x != 0.0 || vel_y != 0.0 {
                     self.target_x = x + vel_x;
                     self.target_y = y + vel_y;
                 }
-            } else {
-                // Visual has drifted too far - converge to server position first
-                self.target_x = x;
-                self.target_y = y;
             }
+            // Otherwise: keep current target, sprite finishes movement to tile center
         } else if server_moved || stopped || at_tile_center {
             if vel_x != 0.0 || vel_y != 0.0 {
                 self.target_x = x + vel_x;
@@ -446,16 +445,17 @@ impl Player {
             return;
         }
 
-        // Sync animation direction only when safe (prevents moonwalking):
-        // - When stationary: always safe to sync
-        // - When moving: only if movement direction matches player direction
-        let should_sync_direction = match movement_dir {
-            None => true,  // Stationary - safe to sync
-            Some(move_dir) => move_dir == self.direction,  // Moving - only if aligned
-        };
-
-        if should_sync_direction {
-            self.animation.direction = self.direction;
+        // Animation direction follows actual movement to prevent moonwalking.
+        // When moving: face the direction the sprite is actually moving (not the
+        // logical player direction, which may update before the sprite turns).
+        // When stationary: face the logical player direction (from Face commands etc).
+        match movement_dir {
+            Some(move_dir) => {
+                self.animation.direction = move_dir;
+            }
+            None => {
+                self.animation.direction = self.direction;
+            }
         }
 
         // Handle movement animations
