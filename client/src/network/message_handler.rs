@@ -133,24 +133,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             // Direction from server
                             let dir = direction.map(|d| Direction::from_u8(d as u8)).unwrap_or(player.direction);
 
-                            // If local player recently sent a Face command, preserve local direction
-                            // (prevents stale server stateSyncs from undoing the face direction)
-                            // Only applies when stationary - when moving, always trust server direction
-                            // Exception: when sitting, always use server direction (chair controls it)
-                            let is_sitting = matches!(player.animation.state,
-                                crate::render::animation::AnimationState::SittingChair |
-                                crate::render::animation::AnimationState::SittingGround);
-                            let is_server_moving = vel_x != 0.0 || vel_y != 0.0;
-                            let dir = if is_local_player && !is_sitting && !is_server_moving {
-                                let elapsed = macroquad::time::get_time() - state.last_face_command_time;
-                                if elapsed < 0.5 {
-                                    player.direction // keep local direction
-                                } else {
-                                    dir
-                                }
-                            } else {
-                                dir
-                            };
+                            // Local player direction is fully controlled locally (input + face commands).
+                            // set_server_state only applies direction for remote players and sitting.
+                            // No face protection window needed - server direction is never applied
+                            // to local player during normal play.
 
                             // Check if player is dashing (set before set_server_state so it handles interpolation)
                             let dashing = extract_bool(player_value, "dashing").unwrap_or(false);

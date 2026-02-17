@@ -1091,8 +1091,6 @@ pub struct GameState {
     pub selected_character_name: Option<String>,
     pub disconnect_requested: bool,
     pub reconnection_failed: bool,
-    /// Timestamp of last Face command sent (to ignore stale server direction updates)
-    pub last_face_command_time: f64,
 
     // World
     pub tilemap: Tilemap,
@@ -1252,7 +1250,6 @@ impl GameState {
             selected_character_name: None,
             disconnect_requested: false,
             reconnection_failed: false,
-            last_face_command_time: 0.0,
             tilemap,
             chunk_manager: ChunkManager::new(),
             players: HashMap::new(),
@@ -1344,11 +1341,10 @@ impl GameState {
         // Use smoothed delta for visual interpolation (reduces jitter from frame variance)
         let visual_delta = self.frame_timings.smoothed_delta;
 
-        // Update local player facing immediately when stationary (responsive feel)
+        // Update local player facing from input (responsive feel)
         // Skip when sitting - chair controls direction
         if let Some(local_id) = &self.local_player_id {
             if let Some(player) = self.players.get_mut(local_id) {
-                // Only update direction from input when stationary and not attacking/sitting
                 let is_stationary = !player.is_moving && player.vel_x == 0.0 && player.vel_y == 0.0;
                 let is_attacking = matches!(
                     player.animation.state,
@@ -1358,10 +1354,14 @@ impl GameState {
                     player.animation.state,
                     AnimationState::SittingChair | AnimationState::SittingGround
                 );
-                if is_stationary && !is_attacking && !is_sitting && (input_dx != 0.0 || input_dy != 0.0) {
+                if !is_attacking && !is_sitting && (input_dx != 0.0 || input_dy != 0.0) {
                     let new_dir = super::entities::Direction::from_velocity(input_dx, input_dy);
                     player.direction = new_dir;
-                    player.animation.direction = new_dir;
+                    // Only update animation direction when stationary - during movement,
+                    // the anti-moonwalk logic in update_animation controls it
+                    if is_stationary {
+                        player.animation.direction = new_dir;
+                    }
                 }
             }
         }

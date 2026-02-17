@@ -184,8 +184,7 @@ pub fn run_game_frame(
                         }
                     }
                 }
-                // Record when we sent Face to ignore stale server updates
-                game_state.last_face_command_time = get_time();
+                // (Direction is now fully controlled locally, no stale-server protection needed)
                 // Immediately update local player direction for responsiveness
                 if let Some(local_id) = &game_state.local_player_id {
                     if let Some(player) = game_state.players.get_mut(local_id) {
