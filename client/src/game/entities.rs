@@ -376,14 +376,16 @@ impl Player {
             self.is_dashing = false; // Dash slide complete
         } else {
             // Speed selection:
-            // - Dash: 16 tiles/sec (fast slide)
-            // - Catch-up: 3x speed when >1.5 tiles from target (smooth correction
+            // - Dash: 10 tiles/sec (fast slide)
+            // - Catch-up: 3x speed when >2.5 tiles from target (smooth correction
             //   after direction-change drift, prevents teleport snaps)
+            //   Normal movement peaks at ~1.5 tiles from target with latency,
+            //   so 2.5 avoids false triggers during straight-line movement.
             // - Normal: 4 tiles/sec
             let dist_to_target = dx.abs().max(dy.abs());
             let speed = if self.is_dashing {
                 10.0
-            } else if dist_to_target > 1.5 {
+            } else if dist_to_target > 2.5 {
                 VISUAL_SPEED * 3.0
             } else {
                 VISUAL_SPEED
