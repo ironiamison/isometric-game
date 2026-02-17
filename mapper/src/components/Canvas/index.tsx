@@ -295,9 +295,10 @@ export function Canvas() {
             break;
           }
           case Tool.Object: {
-            // Check for existing object to select
+            // Check for existing object at this tile (including multi-tile objects)
             const existingInteriorObj = currentInterior.mapObjects.find(
-              (o) => o.x === worldTile.wx && o.y === worldTile.wy
+              (o) => worldTile.wx >= o.x && worldTile.wx < o.x + (o.width || 1) &&
+                     worldTile.wy >= o.y && worldTile.wy < o.y + (o.height || 1)
             );
             if (existingInteriorObj) {
               setSelectedInteriorMapObject(existingInteriorObj.id);
@@ -306,6 +307,30 @@ export function Canvas() {
               const objDef = objectLoader.getObject(selectedObjectId);
               if (objDef) {
                 addInteriorMapObject(worldTile.wx, worldTile.wy, selectedObjectId, objDef.width, objDef.height);
+              }
+            }
+            break;
+          }
+          case Tool.Select: {
+            // Select entities or map objects in interior mode
+            const entityAtInteriorPos = currentInterior.entities.find(
+              (e) => e.x === worldTile.wx && e.y === worldTile.wy
+            );
+            if (entityAtInteriorPos) {
+              setSelectedInteriorEntity(entityAtInteriorPos.id);
+              setSelectedInteriorMapObject(null);
+            } else {
+              const objAtInteriorPos = currentInterior.mapObjects.find(
+                (o) => worldTile.wx >= o.x && worldTile.wx < o.x + (o.width || 1) &&
+                       worldTile.wy >= o.y && worldTile.wy < o.y + (o.height || 1)
+              );
+              if (objAtInteriorPos) {
+                setSelectedInteriorMapObject(objAtInteriorPos.id);
+                setSelectedInteriorEntity(null);
+              } else {
+                // Nothing at position, clear selection
+                setSelectedInteriorEntity(null);
+                setSelectedInteriorMapObject(null);
               }
             }
             break;
