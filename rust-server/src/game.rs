@@ -7552,20 +7552,28 @@ impl GameRoom {
             }).await;
         }
 
-        // Collect pending moves (id, target_x, target_y)
+        // Collect pending moves from a snapshot.
+        // Include the sampled move vector so we can later avoid clearing newer
+        // input that may arrive mid-tick after this snapshot is taken.
         // Use tick-based cooldown for deterministic timing (5 ticks = 250ms)
-        let pending_moves: Vec<(String, i32, i32, Direction)> = {
+        let pending_moves: Vec<(String, i32, i32, Direction, i32, i32)> = {
             let players = self.players.read().await;
             players.values()
                 .filter(|p| p.active && !p.is_dead)
                 .filter(|p| p.move_dx != 0 || p.move_dy != 0)
                 .filter(|p| current_tick - p.last_move_tick >= MOVE_COOLDOWN_TICKS)
-                .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.direction))
+                .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.direction, p.move_dx, p.move_dy))
                 .collect()
         };
         tick_telemetry.pending_moves = pending_moves.len();
-        // Track all players with pending moves so we can clear rejected ones
-        let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _)| id.clone()).collect();
+        // Track all players with pending moves so we can clear rejected ones.
+        let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _, _, _)| id.clone()).collect();
+        // Snapshot vectors used for stale-intent clearing without clobbering
+        // movement messages that arrive after the pending-move snapshot.
+        let pending_move_vectors: HashMap<String, (i32, i32)> = pending_moves
+            .iter()
+            .map(|(id, _, _, _, dx, dy)| (id.clone(), (*dx, *dy)))
+            .collect();
 
         // Snapshot which instance each player is in (None = overworld)
         let player_instance_map: HashMap<String, String> = {
@@ -7610,7 +7618,7 @@ impl GameRoom {
         let chunks_guard = self.world.chunks_read().await;
         let mut valid_moves: Vec<(String, i32, i32)> = Vec::new();
         let mut auto_sit_requests: Vec<(String, i32, i32)> = Vec::new();
-        for (id, target_x, target_y, move_dir) in pending_moves {
+        for (id, target_x, target_y, move_dir, _, _) in pending_moves {
             let player_inst = player_instance_map.get(&id);
             let is_overworld = player_inst.is_none();
             // Skip world collision check for players in interiors
@@ -7731,24 +7739,30 @@ impl GameRoom {
                     player.y = target_y;
                     player.last_move_tick = current_tick;
 
-                    // Clear movement intent after processing. The client re-sends
-                    // Move every 50ms while the key is held, so continuous movement
-                    // resumes within one tick. Without this, stale move_dx/move_dy
-                    // can cause an extra tile move if a direction change message
-                    // arrives after the next cooldown expires (race condition).
-                    player.move_dx = 0;
-                    player.move_dy = 0;
+                    // Clear only if this is still the same sampled intent.
+                    // If a new Move message arrived after we built pending_moves,
+                    // preserve it so rapid direction changes are not lost.
+                    if let Some((sample_dx, sample_dy)) = pending_move_vectors.get(&id) {
+                        if player.move_dx == *sample_dx && player.move_dy == *sample_dy {
+                            player.move_dx = 0;
+                            player.move_dy = 0;
+                        }
+                    }
                 }
             }
 
-            // Clear movement intent for players whose moves were rejected
-            // This prevents broadcasting stale velocity (which causes client-side
-            // prediction into walls) and stops the server from retrying invalid moves
+            // Clear movement intent for players whose sampled moves were rejected.
+            // Use the same sampled-intent guard so we don't wipe newer input that
+            // arrived after the pending-move snapshot.
             for player_id in &pending_player_ids {
                 if !moved_players.contains(player_id) {
                     if let Some(player) = players.get_mut(player_id) {
-                        player.move_dx = 0;
-                        player.move_dy = 0;
+                        if let Some((sample_dx, sample_dy)) = pending_move_vectors.get(player_id) {
+                            if player.move_dx == *sample_dx && player.move_dy == *sample_dy {
+                                player.move_dx = 0;
+                                player.move_dy = 0;
+                            }
+                        }
                     }
                 }
             }
