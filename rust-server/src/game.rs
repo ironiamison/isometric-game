@@ -2987,6 +2987,7 @@ impl GameRoom {
             };
 
             if let Some(results) = xp_results {
+                let mut progression_needs_sync = false;
                 for (skill_type, xp_gained, total_xp, level, leveled_up) in results {
                     self.send_to_player(player_id, ServerMessage::SkillXp {
                         player_id: player_id.to_string(),
@@ -3003,7 +3004,12 @@ impl GameRoom {
                             skill: skill_type.as_str().to_string(),
                             new_level: level,
                         }).await;
+                        progression_needs_sync = true;
                     }
+                }
+
+                if progression_needs_sync {
+                    self.process_quest_progression_snapshot(player_id).await;
                 }
             }
         }
@@ -10372,6 +10378,7 @@ impl GameRoom {
             };
 
             if let Some(results) = xp_results {
+                let mut progression_needs_sync = false;
                 for (skill_type, xp_gained, total_xp, level, leveled_up) in results {
                     self.send_to_player(player_id, ServerMessage::SkillXp {
                         player_id: player_id.to_string(),
@@ -10388,7 +10395,12 @@ impl GameRoom {
                             skill: skill_type.as_str().to_string(),
                             new_level: level,
                         }).await;
+                        progression_needs_sync = true;
                     }
+                }
+
+                if progression_needs_sync {
+                    self.process_quest_progression_snapshot(player_id).await;
                 }
             }
         }
@@ -10737,6 +10749,7 @@ impl GameRoom {
                         skill: skill_type.as_str().to_string(),
                         new_level: level,
                     }).await;
+                    self.process_quest_progression_snapshot(player_id).await;
                 }
             }
         }
