@@ -295,10 +295,9 @@ export function Canvas() {
             break;
           }
           case Tool.Object: {
-            // Check for existing object at this tile (including multi-tile objects)
+            // Check for existing object at this exact tile
             const existingInteriorObj = currentInterior.mapObjects.find(
-              (o) => worldTile.wx >= o.x && worldTile.wx < o.x + (o.width || 1) &&
-                     worldTile.wy >= o.y && worldTile.wy < o.y + (o.height || 1)
+              (o) => o.x === worldTile.wx && o.y === worldTile.wy
             );
             if (existingInteriorObj) {
               setSelectedInteriorMapObject(existingInteriorObj.id);
@@ -321,8 +320,7 @@ export function Canvas() {
               setSelectedInteriorMapObject(null);
             } else {
               const objAtInteriorPos = currentInterior.mapObjects.find(
-                (o) => worldTile.wx >= o.x && worldTile.wx < o.x + (o.width || 1) &&
-                       worldTile.wy >= o.y && worldTile.wy < o.y + (o.height || 1)
+                (o) => o.x === worldTile.wx && o.y === worldTile.wy
               );
               if (objAtInteriorPos) {
                 setSelectedInteriorMapObject(objAtInteriorPos.id);
