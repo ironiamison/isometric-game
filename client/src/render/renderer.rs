@@ -2073,8 +2073,9 @@ impl Renderer {
 
             let footer_left = panel_rect.x + 14.0;
             let footer_width = panel_rect.w - 28.0;
-            let status_y = panel_rect.y + panel_rect.h - 38.0;
-            let legend_y = panel_rect.y + panel_rect.h - 16.0;
+            let footer_text_size = 14.0;
+            let status_y = panel_rect.y + panel_rect.h - 34.0;
+            let legend_y = panel_rect.y + panel_rect.h - 14.0;
             let legend_items = [
                 (MinimapMarkerKind::Teleport, "Teleport"),
                 (MinimapMarkerKind::Enemy, "Enemy"),
@@ -2082,29 +2083,20 @@ impl Renderer {
                 (MinimapMarkerKind::Quest, "Quest"),
             ];
             let slot_width = footer_width / legend_items.len() as f32;
-            let icon_radius = 4.0;
-            let icon_gap = 8.0;
-
-            draw_line(
-                footer_left,
-                status_y - 8.0,
-                footer_left + footer_width,
-                status_y - 8.0,
-                1.0,
-                Color::new(0.35, 0.40, 0.47, 0.35),
-            );
+            let icon_radius = 3.0;
+            let icon_gap = 6.0;
 
             for (idx, (kind, label)) in legend_items.iter().enumerate() {
                 let (color, _) = Self::minimap_marker_style(*kind);
-                let label_w = self.measure_text_sharp(label, MINIMAP_WORLD_TEXT_SIZE).width;
+                let label_w = self.measure_text_sharp(label, footer_text_size).width;
                 let slot_center_x = footer_left + slot_width * (idx as f32 + 0.5);
                 let group_w = icon_radius * 2.0 + icon_gap + label_w;
                 let group_left = slot_center_x - group_w / 2.0;
                 let icon_x = group_left + icon_radius;
                 let text_x = icon_x + icon_radius + icon_gap;
 
-                draw_circle(icon_x, legend_y - 5.0, icon_radius, color);
-                self.draw_text_sharp(label, text_x, legend_y, MINIMAP_WORLD_TEXT_SIZE, TEXT_NORMAL);
+                draw_circle(icon_x, legend_y - 4.0, icon_radius, color);
+                self.draw_text_sharp(label, text_x, legend_y, footer_text_size, TEXT_NORMAL);
             }
 
             let (status_text, status_color) = if let Some(idx) = hovered_marker_idx {
@@ -2116,12 +2108,12 @@ impl Renderer {
             } else {
                 ("Hover markers for details".to_string(), TEXT_DIM)
             };
-            let status_w = self.measure_text_sharp(&status_text, MINIMAP_WORLD_TEXT_SIZE).width;
+            let status_w = self.measure_text_sharp(&status_text, footer_text_size).width;
             self.draw_text_sharp(
                 &status_text,
                 panel_rect.x + (panel_rect.w - status_w) * 0.5,
                 status_y,
-                MINIMAP_WORLD_TEXT_SIZE,
+                footer_text_size,
                 status_color,
             );
         } else {
@@ -6470,13 +6462,14 @@ impl Renderer {
             // XP Globes (to the left of minimap)
             let preview = self.minimap_preview_rect();
             let globe_anchor_x = preview.x;
-            let globe_stats_y = preview.y + 42.0;
+            // Align globe top edge with minimap top edge.
+            let globe_stats_y = preview.y + 20.0;
             self.render_xp_globes(&state.xp_globes, globe_anchor_x, globe_stats_y);
 
             // XP Drop Feed (below gathering status or MP bar)
             let has_dash_bar = state.dash_cooldown_end > current_time;
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 } + if has_dash_bar { 22.0 + 4.0 } else { 0.0 };
-            let drop_start_y = mp_bar_y + bar_height + extra_offset + 110.0;
+            let drop_start_y = mp_bar_y + bar_height + extra_offset + 145.0;
             self.render_xp_drop_feed(&state.xp_drop_feed, 10.0, drop_start_y);
         }
 
@@ -6780,7 +6773,7 @@ impl Renderer {
             if state.get_local_player().is_some() {
                 let preview = self.minimap_preview_rect();
                 let globe_anchor_x = preview.x;
-                let globe_stats_y = preview.y + 42.0;
+                let globe_stats_y = preview.y + 20.0;
                 self.render_xp_globe_tooltip(&state.xp_globes, globe_anchor_x, globe_stats_y);
             }
         }
