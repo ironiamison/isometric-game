@@ -1,5 +1,6 @@
-import type { Chunk, ChunkCoord } from '@/types';
+import type { Chunk, ChunkCoord, SerializedInteriorMap } from '@/types';
 import { chunkKey } from './coords';
+import { interiorStorage } from './InteriorStorage';
 
 const DB_NAME = 'mapper-storage';
 const DB_VERSION = 1;
@@ -405,6 +406,32 @@ class StorageManager {
     }, null, 2);
   }
 
+  async exportMapDataWithInteriors(): Promise<string> {
+    // Export chunks
+    const chunks = await this.loadAllChunksLocal();
+    const chunksPayload: Record<string, object> = {};
+    for (const [key, chunk] of chunks) {
+      chunksPayload[key] = this.chunkToStorable(chunk);
+    }
+
+    // Load all interiors from server and serialize
+    const interiorIds = await interiorStorage.loadInteriorList();
+    const interiorsPayload: Record<string, object> = {};
+    for (const id of interiorIds) {
+      const interior = await interiorStorage.loadInterior(id);
+      if (interior) {
+        interiorsPayload[id] = interiorStorage.serializeInterior(interior);
+      }
+    }
+
+    return JSON.stringify({
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      chunks: chunksPayload,
+      interiors: interiorsPayload,
+    }, null, 2);
+  }
+
   async importMapData(jsonString: string): Promise<number> {
     const data = JSON.parse(jsonString);
     const { chunks } = data;
@@ -426,6 +453,37 @@ class StorageManager {
     await this.saveAllChunksToServer(chunkMap);
 
     return chunkMap.size;
+  }
+
+  async importMapDataWithInteriors(jsonString: string): Promise<{ chunks: number; interiors: number }> {
+    const data = JSON.parse(jsonString);
+    const { chunks, interiors } = data;
+
+    if (!chunks || typeof chunks !== 'object') {
+      throw new Error('Invalid import format: missing chunks');
+    }
+
+    // Import chunks
+    const chunkMap = new Map<string, Chunk>();
+    for (const [key, stored] of Object.entries(chunks)) {
+      chunkMap.set(key, this.storableToChunk(stored as Record<string, unknown>));
+    }
+
+    await this.clearLocal();
+    await this.saveAllChunksLocal(chunkMap);
+    await this.saveAllChunksToServer(chunkMap);
+
+    // Import interiors
+    let interiorCount = 0;
+    if (interiors && typeof interiors === 'object') {
+      for (const [, serialized] of Object.entries(interiors)) {
+        const interior = interiorStorage.loadFromSerialized(serialized as SerializedInteriorMap);
+        await interiorStorage.saveInterior(interior);
+        interiorCount++;
+      }
+    }
+
+    return { chunks: chunkMap.size, interiors: interiorCount };
   }
 
   async importToServer(jsonString: string): Promise<number> {

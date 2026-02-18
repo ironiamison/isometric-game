@@ -55,6 +55,18 @@ class InteriorStorageManager {
     return interior;
   }
 
+  // Load interior from serialized data and register it in the cache
+  loadFromSerialized(data: SerializedInteriorMap): InteriorMap {
+    const interior = this.deserializeInterior(data);
+    interior.dirty = true; // Mark dirty so saveInterior will push to server
+    this.interiors.set(interior.id, interior);
+    if (!this.interiorIds.includes(interior.id)) {
+      this.interiorIds.push(interior.id);
+      this.interiorIds.sort();
+    }
+    return interior;
+  }
+
   // Load interior from serialized format
   private deserializeInterior(data: SerializedInteriorMap): InteriorMap {
     const { width, height } = data.size;

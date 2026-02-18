@@ -47,6 +47,7 @@ export function MenuBar() {
   } = useEditorStore();
 
   const importInputRef = useRef<HTMLInputElement>(null);
+  const importFullInputRef = useRef<HTMLInputElement>(null);
   const importChunkInputRef = useRef<HTMLInputElement>(null);
 
   // Store the directory handle for reuse
@@ -297,6 +298,22 @@ export function MenuBar() {
     }
   };
 
+  const handleExportMapWithInteriors = async () => {
+    try {
+      const jsonData = await storage.exportMapDataWithInteriors();
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `map-full-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert(`Export failed: ${(err as Error).message}`);
+    }
+  };
+
   const handleImportMap = () => {
     importInputRef.current?.click();
   };
@@ -338,6 +355,55 @@ export function MenuBar() {
       });
 
       alert(`Imported ${count} chunks successfully.`);
+    } catch (err) {
+      console.error('Import failed:', err);
+      alert(`Import failed: ${(err as Error).message}`);
+    }
+
+    e.target.value = '';
+  };
+
+  const handleImportFullMap = () => {
+    importFullInputRef.current?.click();
+  };
+
+  const handleImportFullFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const confirmed = window.confirm(
+      'This will replace all map data AND interiors with the imported file.\n\nAre you sure?'
+    );
+    if (!confirmed) {
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const result = await storage.importMapDataWithInteriors(text);
+
+      // Reload chunks into editor
+      const loadedChunks = await storage.loadAllChunks();
+      setChunks(loadedChunks, true);
+
+      // Recalculate bounds
+      let minCx = Infinity, maxCx = -Infinity;
+      let minCy = Infinity, maxCy = -Infinity;
+      for (const chunk of loadedChunks.values()) {
+        minCx = Math.min(minCx, chunk.coord.cx);
+        maxCx = Math.max(maxCx, chunk.coord.cx);
+        minCy = Math.min(minCy, chunk.coord.cy);
+        maxCy = Math.max(maxCy, chunk.coord.cy);
+      }
+      setWorldBounds({
+        minCx: minCx === Infinity ? 0 : minCx,
+        maxCx: maxCx === -Infinity ? 0 : maxCx,
+        minCy: minCy === Infinity ? 0 : minCy,
+        maxCy: maxCy === -Infinity ? 0 : maxCy,
+      });
+
+      alert(`Imported ${result.chunks} chunks and ${result.interiors} interiors successfully.`);
     } catch (err) {
       console.error('Import failed:', err);
       alert(`Import failed: ${(err as Error).message}`);
@@ -590,6 +656,13 @@ export function MenuBar() {
         onChange={handleImportFile}
       />
       <input
+        ref={importFullInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={handleImportFullFile}
+      />
+      <input
         ref={importChunkInputRef}
         type="file"
         accept=".json"
@@ -618,8 +691,14 @@ export function MenuBar() {
                 <button className={styles.dropdownItem} onClick={handleExportMap}>
                   Export Map (JSON)
                 </button>
+                <button className={styles.dropdownItem} onClick={handleExportMapWithInteriors}>
+                  Export Map + Interiors (JSON)
+                </button>
                 <button className={styles.dropdownItem} onClick={handleImportMap}>
                   Import Map (JSON)
+                </button>
+                <button className={styles.dropdownItem} onClick={handleImportFullMap}>
+                  Import Map + Interiors (JSON)
                 </button>
                 <button className={styles.dropdownItem} onClick={handleImportChunk}>
                   Import Chunk (JSON)
