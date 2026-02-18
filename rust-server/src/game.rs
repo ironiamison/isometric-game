@@ -1862,12 +1862,10 @@ impl GameRoom {
                         move_dy = 0;
                     }
 
+                    // Queue movement intent only. Facing updates when a move is
+                    // actually applied in the tick loop.
                     player.move_dx = move_dx;
                     player.move_dy = move_dy;
-
-                    if move_dx != 0 || move_dy != 0 {
-                        player.direction = Direction::from_velocity(move_dx as f32, move_dy as f32);
-                    }
                 }
             }
         }
@@ -7645,23 +7643,23 @@ impl GameRoom {
         // Include the sampled move vector so we can later avoid clearing newer
         // input that may arrive mid-tick after this snapshot is taken.
         // Use tick-based cooldown for deterministic timing (5 ticks = 250ms)
-        let pending_moves: Vec<(String, i32, i32, Direction, i32, i32)> = {
+        let pending_moves: Vec<(String, i32, i32, i32, i32)> = {
             let players = self.players.read().await;
             players.values()
                 .filter(|p| p.active && !p.is_dead)
                 .filter(|p| p.move_dx != 0 || p.move_dy != 0)
                 .filter(|p| current_tick - p.last_move_tick >= MOVE_COOLDOWN_TICKS)
-                .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.direction, p.move_dx, p.move_dy))
+                .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.move_dx, p.move_dy))
                 .collect()
         };
         tick_telemetry.pending_moves = pending_moves.len();
         // Track all players with pending moves so we can clear rejected ones.
-        let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _, _, _)| id.clone()).collect();
+        let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _, _)| id.clone()).collect();
         // Snapshot vectors used for stale-intent clearing without clobbering
         // movement messages that arrive after the pending-move snapshot.
         let pending_move_vectors: HashMap<String, (i32, i32)> = pending_moves
             .iter()
-            .map(|(id, _, _, _, dx, dy)| (id.clone(), (*dx, *dy)))
+            .map(|(id, _, _, dx, dy)| (id.clone(), (*dx, *dy)))
             .collect();
 
         // Snapshot which instance each player is in (None = overworld)
@@ -7705,11 +7703,12 @@ impl GameRoom {
         // Check walkability and entity collision for each pending move
         // Grab chunks lock once for all walkability checks (avoids per-move lock acquisition)
         let chunks_guard = self.world.chunks_read().await;
-        let mut valid_moves: Vec<(String, i32, i32)> = Vec::new();
+        let mut valid_moves: Vec<(String, i32, i32, i32, i32)> = Vec::new();
         let mut auto_sit_requests: Vec<(String, i32, i32)> = Vec::new();
-        for (id, target_x, target_y, move_dir, _, _) in pending_moves {
+        for (id, target_x, target_y, sampled_dx, sampled_dy) in pending_moves {
             let player_inst = player_instance_map.get(&id);
             let is_overworld = player_inst.is_none();
+            let move_dir = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
             // Skip world collision check for players in interiors
             // Interior collision is handled client-side for now
             // TODO: Add server-side interior collision checking
@@ -7777,7 +7776,7 @@ impl GameRoom {
                     }
                 }
             }
-            valid_moves.push((id, target_x, target_y));
+            valid_moves.push((id, target_x, target_y, sampled_dx, sampled_dy));
         }
         drop(chunks_guard); // Release before NPC AI section acquires its own
 
@@ -7787,7 +7786,7 @@ impl GameRoom {
         }
 
         // Track which players moved this tick
-        let moved_players: std::collections::HashSet<String> = valid_moves.iter().map(|(id, _, _)| id.clone()).collect();
+        let moved_players: std::collections::HashSet<String> = valid_moves.iter().map(|(id, _, _, _, _)| id.clone()).collect();
         tick_telemetry.rejected_moves = pending_player_ids.len().saturating_sub(moved_players.len());
 
         // Get set of gathering player IDs for state sync
@@ -7813,7 +7812,10 @@ impl GameRoom {
 
         // Snapshot moved positions for quest location checks (before valid_moves is consumed)
         let moved_positions: Vec<(String, i32, i32)> = if !self.quest_locations.is_empty() {
-            valid_moves.iter().cloned().collect()
+            valid_moves
+                .iter()
+                .map(|(id, x, y, _, _)| (id.clone(), *x, *y))
+                .collect()
         } else {
             Vec::new()
         };
@@ -7822,8 +7824,12 @@ impl GameRoom {
             let mut players = self.players.write().await;
 
             // Apply valid moves
-            for (id, target_x, target_y) in valid_moves {
+            for (id, target_x, target_y, sampled_dx, sampled_dy) in valid_moves {
                 if let Some(player) = players.get_mut(&id) {
+                    if sampled_dx != 0 || sampled_dy != 0 {
+                        // Facing changes only when movement is actually applied.
+                        player.direction = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
+                    }
                     player.x = target_x;
                     player.y = target_y;
                     player.last_move_tick = current_tick;
