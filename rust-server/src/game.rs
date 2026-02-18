@@ -8680,56 +8680,82 @@ impl GameRoom {
             // Both read locks released here
         };
 
-        // Per-player lookup: quest giver prototype IDs that currently have turn-ins available.
+        // Per-player lookup: quest giver prototype IDs that should show turn-in check icons.
+        // Includes:
+        // 1) Quests already in ReadyToComplete
+        // 2) Active quests where all non-giver objectives are complete and the only
+        //    remaining step is "talk_to" the giver (return-to-giver prompt)
         let ready_turnin_npc_types_by_player: HashMap<String, HashSet<String>> = {
-            let ready_quests_by_player: Vec<(String, Vec<String>)> = {
-                let quest_states = self.player_quest_states.read().await;
-                quest_states
-                    .iter()
-                    .filter_map(|(player_id, state)| {
-                        let ready_ids: Vec<String> = state
-                            .active_quests
-                            .iter()
-                            .filter_map(|(quest_id, progress)| {
-                                if progress.status == crate::quest::QuestStatus::ReadyToComplete {
-                                    Some(quest_id.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        if ready_ids.is_empty() {
-                            None
-                        } else {
-                            Some((player_id.clone(), ready_ids))
-                        }
-                    })
-                    .collect()
-            };
-
-            let mut quest_to_giver_cache: HashMap<String, Option<String>> = HashMap::new();
             let mut out: HashMap<String, HashSet<String>> = HashMap::new();
+            let mut quest_to_giver_cache: HashMap<String, Option<String>> = HashMap::new();
 
-            for (player_id, ready_quests) in ready_quests_by_player {
+            let quest_states = self.player_quest_states.read().await;
+            for (player_id, state) in quest_states.iter() {
                 let mut givers: HashSet<String> = HashSet::new();
-                for quest_id in ready_quests {
-                    let giver_npc = if let Some(cached) = quest_to_giver_cache.get(&quest_id) {
-                        cached.clone()
-                    } else {
-                        let resolved = self
-                            .quest_registry
-                            .get(&quest_id)
-                            .await
-                            .map(|q| q.giver_npc.clone());
-                        quest_to_giver_cache.insert(quest_id.clone(), resolved.clone());
-                        resolved
+
+                for (quest_id, progress) in state.active_quests.iter() {
+                    // Fast path: quest already ready to complete
+                    if progress.status == crate::quest::QuestStatus::ReadyToComplete {
+                        let giver_npc = if let Some(cached) = quest_to_giver_cache.get(quest_id) {
+                            cached.clone()
+                        } else {
+                            let resolved = self
+                                .quest_registry
+                                .get(quest_id)
+                                .await
+                                .map(|q| q.giver_npc.clone());
+                            quest_to_giver_cache.insert(quest_id.clone(), resolved.clone());
+                            resolved
+                        };
+                        if let Some(giver) = giver_npc {
+                            givers.insert(giver);
+                        }
+                        continue;
+                    }
+
+                    if progress.status != crate::quest::QuestStatus::Active {
+                        continue;
+                    }
+
+                    let Some(quest_def) = self.quest_registry.get(quest_id).await else {
+                        continue;
                     };
-                    if let Some(giver) = giver_npc {
-                        givers.insert(giver);
+
+                    let giver_npc = quest_def.giver_npc.clone();
+                    if giver_npc.is_empty() {
+                        continue;
+                    }
+
+                    let mut has_incomplete_return_to_giver = false;
+                    let mut all_other_objectives_complete = true;
+
+                    for objective in &quest_def.objectives {
+                        let completed = progress
+                            .objectives
+                            .get(&objective.id)
+                            .map(|o| o.completed)
+                            .unwrap_or(false);
+
+                        let is_return_to_giver = objective.objective_type == ObjectiveType::TalkTo
+                            && objective.target == giver_npc;
+
+                        if is_return_to_giver {
+                            if !completed {
+                                has_incomplete_return_to_giver = true;
+                            }
+                        } else if !completed {
+                            all_other_objectives_complete = false;
+                            break;
+                        }
+                    }
+
+                    if has_incomplete_return_to_giver && all_other_objectives_complete {
+                        givers.insert(giver_npc);
                     }
                 }
+
                 if !givers.is_empty() {
-                    out.insert(player_id, givers);
+                    out.insert(player_id.clone(), givers);
                 }
             }
 
