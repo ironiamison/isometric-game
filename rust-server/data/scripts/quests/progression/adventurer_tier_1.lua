@@ -20,7 +20,6 @@ function show_offer_dialogue(ctx)
         text = "No fluff, just progress. Tier I has three milestones: defeat 8 crows, reach Combat level 8, and build up 150 gold. Complete all three, then report back.",
         choices = {
             { id = "accept", text = "Assign me Tier I." },
-            { id = "decline", text = "Not yet." },
             { id = "ask_tips", text = "Any route advice?" }
         }
     })
@@ -38,10 +37,7 @@ function show_offer_dialogue(ctx)
         })
         return show_offer_dialogue(ctx)
     else
-        ctx:show_dialogue({
-            speaker = "Adventurer Guide",
-            text = "Come back when you want structure."
-        })
+        return show_offer_dialogue(ctx)
     end
 end
 

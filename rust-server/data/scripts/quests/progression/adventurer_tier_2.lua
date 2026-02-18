@@ -20,7 +20,6 @@ function show_offer_dialogue(ctx)
         text = "Tier II raises the bar: defeat 24 blue slimes and 16 crows, reach Woodcutting 8 and Combat 14, then build your gold reserve to 1,200.",
         choices = {
             { id = "accept", text = "Start Tier II." },
-            { id = "decline", text = "Later." },
             { id = "ask_tips", text = "What's the efficient route?" }
         }
     })
@@ -38,10 +37,7 @@ function show_offer_dialogue(ctx)
         })
         return show_offer_dialogue(ctx)
     else
-        ctx:show_dialogue({
-            speaker = "Adventurer Guide",
-            text = "No rush. Return when you're focused."
-        })
+        return show_offer_dialogue(ctx)
     end
 end
 

@@ -20,7 +20,6 @@ function show_offer_dialogue(ctx)
         text = "Tier III benchmark: defeat 30 pigs and 20 wild boars, reach Farming 12 and Combat 25, and hold 2,600 gold. This is your early-game competency check.",
         choices = {
             { id = "accept", text = "I'll clear Tier III." },
-            { id = "decline", text = "Not right now." },
             { id = "ask_tips", text = "How should I pace this?" }
         }
     })
@@ -38,10 +37,7 @@ function show_offer_dialogue(ctx)
         })
         return show_offer_dialogue(ctx)
     else
-        ctx:show_dialogue({
-            speaker = "Adventurer Guide",
-            text = "Come back when you're ready for a full benchmark run."
-        })
+        return show_offer_dialogue(ctx)
     end
 end
 

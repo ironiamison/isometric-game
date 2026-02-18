@@ -59,6 +59,38 @@ fn mark_chat_channel_as_read(state: &mut GameState, channel: ChatChannel) {
     }
 }
 
+fn is_adventurer_guide_dialogue(speaker: &str) -> bool {
+    speaker.eq_ignore_ascii_case("Adventurer Guide")
+}
+
+fn adventurer_guide_tier_id(tab_idx: usize, tier_idx: usize) -> Option<&'static str> {
+    match (tab_idx, tier_idx) {
+        (0, 0) => Some("adventurer_tier_1"),
+        (0, 1) => Some("adventurer_tier_2"),
+        (0, 2) => Some("adventurer_tier_3"),
+        (1, 0) => Some("skilling_tier_1"),
+        (1, 1) => Some("skilling_tier_2"),
+        (1, 2) => Some("skilling_tier_3"),
+        _ => None,
+    }
+}
+
+fn sync_adventurer_guide_dialogue_target(state: &mut GameState) {
+    let selected_id = adventurer_guide_tier_id(
+        state.ui_state.adventurer_selected_tab,
+        state.ui_state.adventurer_selected_tier,
+    );
+
+    if let Some(dialogue) = state.ui_state.active_dialogue.as_mut() {
+        if is_adventurer_guide_dialogue(&dialogue.speaker) && dialogue.choices.is_empty() {
+            if let Some(quest_id) = selected_id {
+                dialogue.quest_id = quest_id.to_string();
+                dialogue.text = "Select a tier to review progress. Talk to the guide to start or complete tiers.".to_string();
+            }
+        }
+    }
+}
+
 /// Build set of tiles occupied by entities (other players + NPCs) for pathfinding
 fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
     let mut occupied = HashSet::new();
@@ -1610,10 +1642,12 @@ impl InputHandler {
                         UiElementId::AdventurerTab(idx) => {
                             state.ui_state.adventurer_selected_tab = *idx;
                             state.ui_state.adventurer_selected_tier = 0;
+                            sync_adventurer_guide_dialogue_target(state);
                             return commands;
                         }
                         UiElementId::AdventurerTier(idx) => {
                             state.ui_state.adventurer_selected_tier = *idx;
+                            sync_adventurer_guide_dialogue_target(state);
                             return commands;
                         }
                         UiElementId::DialogueChoice(idx) => {
@@ -1675,9 +1709,18 @@ impl InputHandler {
                 }
             } else {
                 // No choices - Escape, Enter, or Space to continue/close
+                if is_key_pressed(KeyCode::Escape)
+                    && dialogue.quest_id != "__control_scheme__"
+                    && is_adventurer_guide_dialogue(&dialogue.speaker)
+                {
+                    commands.push(InputCommand::CloseDialogue);
+                    state.ui_state.active_dialogue = None;
+                    return commands;
+                }
+
                 // Send __continue__ to server so Lua script can resume execution
                 // Don't clear dialogue here - wait for server response (either new dialogue or close)
-                if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) {
+                if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Escape) {
                     commands.push(InputCommand::DialogueChoice {
                         quest_id: dialogue.quest_id.clone(),
                         choice_id: "__continue__".to_string(),
@@ -4185,80 +4228,6 @@ impl InputHandler {
         }
 
         commands
-    }
-
-    /// Get current movement direction (for client-side prediction)
-    pub fn get_movement(&self) -> (f32, f32) {
-        (self.last_dx, self.last_dy)
-    }
-
-    /// Read immediate direction from current key/dpad state.
-    /// Call before render to eliminate one-frame facing lag.
-    pub fn get_immediate_direction(&self, classic: bool) -> Option<crate::game::Direction> {
-        use crate::game::Direction;
-        use crate::input::touch::DPadDirection;
-        use macroquad::prelude::*;
-
-        let dpad = self.touch_controls.get_direction();
-        if dpad != DPadDirection::None {
-            return Some(match dpad {
-                DPadDirection::Up => Direction::Up,
-                DPadDirection::Down => Direction::Down,
-                DPadDirection::Left => Direction::Left,
-                DPadDirection::Right => Direction::Right,
-                DPadDirection::None => unreachable!(),
-            });
-        }
-
-        let up = if classic { is_key_down(KeyCode::Up) } else { is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) };
-        let down = if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) };
-        let left = if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) };
-        let right = if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) };
-
-        let up_just = if classic { is_key_pressed(KeyCode::Up) } else { is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up) };
-        let down_just = if classic { is_key_pressed(KeyCode::Down) } else { is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down) };
-        let left_just = if classic { is_key_pressed(KeyCode::Left) } else { is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left) };
-        let right_just = if classic { is_key_pressed(KeyCode::Right) } else { is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right) };
-
-        // Match movement arbitration so pre-render facing doesn't disagree with
-        // the direction process() will use in the same frame.
-        let keyboard_dir = if up_just {
-            CardinalDir::Up
-        } else if down_just {
-            CardinalDir::Down
-        } else if left_just {
-            CardinalDir::Left
-        } else if right_just {
-            CardinalDir::Right
-        } else {
-            match self.current_dir {
-                CardinalDir::Up if up => CardinalDir::Up,
-                CardinalDir::Down if down => CardinalDir::Down,
-                CardinalDir::Left if left => CardinalDir::Left,
-                CardinalDir::Right if right => CardinalDir::Right,
-                _ => {
-                    if up {
-                        CardinalDir::Up
-                    } else if down {
-                        CardinalDir::Down
-                    } else if left {
-                        CardinalDir::Left
-                    } else if right {
-                        CardinalDir::Right
-                    } else {
-                        CardinalDir::None
-                    }
-                }
-            }
-        };
-
-        match keyboard_dir {
-            CardinalDir::Up => Some(Direction::Up),
-            CardinalDir::Down => Some(Direction::Down),
-            CardinalDir::Left => Some(Direction::Left),
-            CardinalDir::Right => Some(Direction::Right),
-            CardinalDir::None => None,
-        }
     }
 
     /// Render touch controls overlay (call after all other rendering)

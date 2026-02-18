@@ -399,29 +399,6 @@ fn run_game_frame(
         audio.play_attack_sound(has_weapon);
     }
 
-    // 1.9. Update local facing from immediate input before render.
-    // Only at tile center (not mid-transit) to avoid moonwalking.
-    if let Some(dir) = input_handler.get_immediate_direction(game_state.ui_state.classic_controls) {
-        if let Some(local_id) = &game_state.local_player_id {
-            if let Some(player) = game_state.players.get_mut(local_id) {
-                let in_action = matches!(
-                    player.animation.state,
-                    AnimationState::Attacking
-                        | AnimationState::Casting
-                        | AnimationState::ShootingBow
-                        | AnimationState::SittingChair
-                        | AnimationState::SittingGround
-                );
-                let in_transit = (player.target_x - player.x).abs() > 0.01
-                    || (player.target_y - player.y).abs() > 0.01;
-                if !in_action && !in_transit {
-                    player.direction = dir;
-                    player.animation.direction = dir;
-                }
-            }
-        }
-    }
-
     // 2. Render and get UI layout for hit detection
     clear_background(Color::from_rgba(30, 30, 40, 255));
     let (layout, render_timings) = renderer.render(game_state);
@@ -449,14 +426,16 @@ fn run_game_frame(
                         }
                     }
                 }
-                // (Direction is now fully controlled locally, no stale-server protection needed)
-                // Immediately update local player direction for responsiveness
+                // Optimistic local face update for responsiveness.
+                // Server state sync remains authoritative.
                 if let Some(local_id) = &game_state.local_player_id {
                     if let Some(player) = game_state.players.get_mut(local_id) {
                         let old_dir = player.direction;
                         let new_dir = game::Direction::from_u8(*direction);
                         player.direction = new_dir;
                         player.animation.direction = new_dir; // Also update animation direction for rendering
+                        game_state.local_face_lock_dir = Some(new_dir);
+                        game_state.local_face_lock_until = get_time() + 0.30;
                         log::info!("[MAIN] Updated local player direction: {:?} -> {:?}", old_dir, player.direction);
                     }
                 }
@@ -601,10 +580,9 @@ fn run_game_frame(
     // Record delta for diagnostics
     game_state.frame_timings.record_delta(delta as f64 * 1000.0);
 
-    // 4. Update game state using raw delta (lerp-based interpolation handles smoothing)
+    // 4. Update game state
     let update_start = get_time();
-    let (input_dx, input_dy) = input_handler.get_movement();
-    game_state.update(delta, input_dx, input_dy);
+    game_state.update(delta);
     game_state.update_transition(delta);
     let update_ms = (get_time() - update_start) * 1000.0;
 

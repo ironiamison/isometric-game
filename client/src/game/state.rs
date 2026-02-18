@@ -7,7 +7,6 @@ use super::tilemap::Tilemap;
 use super::chunk::ChunkManager;
 use super::pathfinding::PathState;
 use super::shop::{ShopData, ShopSubTab};
-use crate::render::animation::AnimationState;
 use crate::render::XpGlobesManager;
 use crate::ui::UiElementId;
 use crate::render::AreaBanner;
@@ -1103,6 +1102,11 @@ pub struct GameState {
     // Connection
     pub connection_status: ConnectionStatus,
     pub local_player_id: Option<String>,
+    /// Short lock to prevent stale server snapshots from briefly reverting
+    /// a just-issued local face direction.
+    pub local_face_lock_dir: Option<super::entities::Direction>,
+    /// Client time when local_face_lock_dir expires.
+    pub local_face_lock_until: f64,
     pub selected_character_name: Option<String>,
     pub disconnect_requested: bool,
     pub reconnection_failed: bool,
@@ -1262,6 +1266,8 @@ impl GameState {
         Self {
             connection_status: ConnectionStatus::Disconnected,
             local_player_id: None,
+            local_face_lock_dir: None,
+            local_face_lock_until: 0.0,
             selected_character_name: None,
             disconnect_requested: false,
             reconnection_failed: false,
@@ -1339,9 +1345,8 @@ impl GameState {
         self.auto_path = None;
     }
 
-    /// Update all players - simple server-authoritative model
-    /// Local player facing is immediate when stationary, movement direction from server
-    pub fn update(&mut self, delta: f32, input_dx: f32, input_dy: f32) {
+    /// Update all players in a server-authoritative step model.
+    pub fn update(&mut self, delta: f32) {
         // Trigger fade-in when world first becomes ready
         if !self.world_was_ready && self.is_world_ready() {
             self.world_was_ready = true;
@@ -1355,31 +1360,6 @@ impl GameState {
 
         // Use smoothed delta for visual interpolation (reduces jitter from frame variance)
         let visual_delta = self.frame_timings.smoothed_delta;
-
-        // Update local player facing from input (responsive feel)
-        // Skip when sitting - chair controls direction
-        if let Some(local_id) = &self.local_player_id {
-            if let Some(player) = self.players.get_mut(local_id) {
-                let is_stationary = !player.is_moving && player.vel_x == 0.0 && player.vel_y == 0.0;
-                let is_attacking = matches!(
-                    player.animation.state,
-                    AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
-                );
-                let is_sitting = matches!(
-                    player.animation.state,
-                    AnimationState::SittingChair | AnimationState::SittingGround
-                );
-                if !is_attacking && !is_sitting && (input_dx != 0.0 || input_dy != 0.0) {
-                    let new_dir = super::entities::Direction::from_velocity(input_dx, input_dy);
-                    player.direction = new_dir;
-                    // Only update animation direction when stationary - during movement,
-                    // the anti-moonwalk logic in update_animation controls it
-                    if is_stationary {
-                        player.animation.direction = new_dir;
-                    }
-                }
-            }
-        }
 
         // Update all players (smooth interpolation toward server positions)
         // Note: woodcutting animations are now driven by server WoodcuttingSwing messages

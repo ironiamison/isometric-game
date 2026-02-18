@@ -636,6 +636,10 @@ impl Renderer {
         let tier = selected_track.tiers[selected_idx];
         let completed = state.ui_state.completed_quest_ids.contains(tier.id);
         let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == tier.id);
+        let unlocked = selected_idx == 0
+            || state.ui_state.completed_quest_ids.contains(selected_track.tiers[selected_idx - 1].id)
+            || active_quest.is_some()
+            || completed;
 
         let right_subtitle_w = self.measure_text_sharp(tier.subtitle, 16.0).width;
         let right_subtitle_x = right_x + right_w - right_subtitle_w - 12.0;
@@ -738,14 +742,16 @@ impl Renderer {
                 }
             }
         } else {
-            let hint = self.truncate_text_to_width(selected_track.no_action_hint, 268.0, 16.0);
-            self.draw_text_sharp(
-                &hint,
-                right_x + right_w - 280.0,
-                action_base_y + 20.0,
-                16.0,
-                TEXT_DIM,
-            );
+            if unlocked && !completed {
+                let hint = self.truncate_text_to_width(selected_track.no_action_hint, 268.0, 16.0);
+                self.draw_text_sharp(
+                    &hint,
+                    right_x + right_w - 280.0,
+                    action_base_y + 20.0,
+                    16.0,
+                    TEXT_DIM,
+                );
+            }
         }
     }
 }

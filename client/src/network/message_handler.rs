@@ -3,6 +3,18 @@ use crate::game::npc::{Npc, NpcState};
 use crate::render::OVERWORLD_NAME;
 use super::protocol::{extract_string, extract_f32, extract_i32, extract_u32, extract_u64, extract_array, extract_u8, extract_bool};
 
+fn adventurer_guide_tier_id(tab_idx: usize, tier_idx: usize) -> Option<&'static str> {
+    match (tab_idx, tier_idx) {
+        (0, 0) => Some("adventurer_tier_1"),
+        (0, 1) => Some("adventurer_tier_2"),
+        (0, 2) => Some("adventurer_tier_3"),
+        (1, 0) => Some("skilling_tier_1"),
+        (1, 1) => Some("skilling_tier_2"),
+        (1, 2) => Some("skilling_tier_3"),
+        _ => None,
+    }
+}
+
 fn reset_adventurer_guide_dialogue(state: &mut GameState) -> bool {
     let is_guide = state
         .ui_state
@@ -16,12 +28,17 @@ fn reset_adventurer_guide_dialogue(state: &mut GameState) -> bool {
     }
 
     if let Some(dialogue) = state.ui_state.active_dialogue.as_mut() {
-        dialogue.quest_id.clear();
+        if let Some(tier_id) = adventurer_guide_tier_id(
+            state.ui_state.adventurer_selected_tab,
+            state.ui_state.adventurer_selected_tier,
+        ) {
+            dialogue.quest_id = tier_id.to_string();
+        } else {
+            dialogue.quest_id.clear();
+        }
         dialogue.choices.clear();
         dialogue.text = "Select a tier to review progress. Talk to the guide to start or complete tiers.".to_string();
     }
-    state.ui_state.adventurer_selected_tab = 0;
-    state.ui_state.adventurer_selected_tier = 0;
     state.ui_state.dialogue_scroll_offset = 0.0;
     state.ui_state.dialogue_touch_scroll_id = None;
     state.ui_state.dialogue_touch_dragged = false;
@@ -150,6 +167,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let is_admin = extract_bool(player_value, "is_admin").unwrap_or(false);
 
                         let is_local_player = state.local_player_id.as_ref() == Some(&id);
+                        let now = macroquad::time::get_time();
+                        if is_local_player
+                            && state.local_face_lock_dir.is_some()
+                            && now >= state.local_face_lock_until
+                        {
+                            state.local_face_lock_dir = None;
+                            state.local_face_lock_until = 0.0;
+                        }
 
                         if let Some(player) = state.players.get_mut(&id) {
                             // Read velocity (movement intent) from server
@@ -158,11 +183,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             // Direction from server
                             let dir = direction.map(|d| Direction::from_u8(d as u8)).unwrap_or(player.direction);
 
-                            // Local player direction is fully controlled locally (input + face commands).
-                            // set_server_state only applies direction for remote players and sitting.
-                            // No face protection window needed - server direction is never applied
-                            // to local player during normal play.
-
                             // Check if player is dashing (set before set_server_state so it handles interpolation)
                             let dashing = extract_bool(player_value, "dashing").unwrap_or(false);
                             if dashing {
@@ -170,12 +190,43 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             }
 
                             if let (Some(x), Some(y)) = (x, y) {
-                                // Set server state - local player direction only updates when moving
-                                player.set_server_state(x as f32, y as f32, vel_x, vel_y, dir, is_local_player);
-                            } else if direction.is_some() && !is_local_player {
-                                // Direction-only update for remote players
-                                // Local player direction is controlled locally when stationary
-                                player.direction = dir;
+                                let mut effective_dir = dir;
+                                if is_local_player {
+                                    let server_moved = (x as f32 - player.server_x).abs() > 0.01
+                                        || (y as f32 - player.server_y).abs() > 0.01;
+                                    if server_moved {
+                                        state.local_face_lock_dir = None;
+                                        state.local_face_lock_until = 0.0;
+                                    } else if let Some(locked_dir) = state.local_face_lock_dir {
+                                        if now < state.local_face_lock_until && dir != locked_dir {
+                                            // Stale pre-face snapshot: keep local facing until fresh sync arrives.
+                                            effective_dir = player.direction;
+                                        } else if dir == locked_dir {
+                                            state.local_face_lock_dir = None;
+                                            state.local_face_lock_until = 0.0;
+                                        }
+                                    }
+                                }
+                                player.set_server_state(x as f32, y as f32, vel_x, vel_y, effective_dir);
+                            } else if direction.is_some() {
+                                // Direction-only update when no position fields are present.
+                                if is_local_player {
+                                    if let Some(locked_dir) = state.local_face_lock_dir {
+                                        if now < state.local_face_lock_until && dir != locked_dir {
+                                            // Ignore stale direction-only update during local face lock.
+                                        } else {
+                                            player.direction = dir;
+                                            if dir == locked_dir {
+                                                state.local_face_lock_dir = None;
+                                                state.local_face_lock_until = 0.0;
+                                            }
+                                        }
+                                    } else {
+                                        player.direction = dir;
+                                    }
+                                } else {
+                                    player.direction = dir;
+                                }
                             }
                             if let Some(hp) = hp {
                                 // Update last_damage_time if HP decreased (ensures HP bar shows)

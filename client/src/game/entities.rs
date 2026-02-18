@@ -266,34 +266,19 @@ impl Player {
 
     /// Set server-authoritative position (convenience method for stopped state)
     pub fn set_server_position(&mut self, new_x: f32, new_y: f32) {
-        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction, false);
+        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction);
     }
 
-    /// Set server state - simple server-authoritative model
-    /// Server is single source of truth, client just animates smoothly
-    /// is_local_player: if true, only update direction when moving (stationary direction controlled locally)
-    pub fn set_server_state(&mut self, x: f32, y: f32, vel_x: f32, vel_y: f32, dir: Direction, is_local_player: bool) {
+    /// Set server state in a strict step-confirmed model.
+    /// Facing only changes on confirmed movement, or explicit face updates while idle.
+    pub fn set_server_state(&mut self, x: f32, y: f32, vel_x: f32, vel_y: f32, dir: Direction) {
         let old_server_x = self.server_x;
         let old_server_y = self.server_y;
-        let old_vel_x = self.vel_x;
-        let old_vel_y = self.vel_y;
 
         self.server_x = x;
         self.server_y = y;
         self.vel_x = vel_x;
         self.vel_y = vel_y;
-
-        // Direction handling:
-        // - Remote players: always accept server direction
-        // - Local player: direction is controlled locally from input (state.rs update)
-        //   This prevents stale server direction (1-2 ticks behind) from overriding
-        //   the player's current input, which caused attack facing desync.
-        // - Local player when sitting: accept server direction (chair controls it)
-        let is_sitting = matches!(self.animation.state,
-            crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
-        if !is_local_player || is_sitting {
-            self.direction = dir;
-        }
 
         // If dashing, set target to new position for fast slide interpolation (don't snap)
         if self.is_dashing {
@@ -313,95 +298,61 @@ impl Player {
             self.y = y;
             self.target_x = x;
             self.target_y = y;
+            self.direction = dir;
+            self.animation.direction = dir;
+            self.is_moving = false;
             return;
         }
 
-        // Server position changed = server confirmed a move
-        let server_moved = (x - old_server_x).abs() > 0.01 || (y - old_server_y).abs() > 0.01;
+        // Server position changed = server confirmed a tile step.
+        let step_dx = x - old_server_x;
+        let step_dy = y - old_server_y;
+        let server_moved = step_dx.abs() > 0.01 || step_dy.abs() > 0.01;
 
-        // Stopped = always update target to server position
-        let stopped = vel_x == 0.0 && vel_y == 0.0;
+        if server_moved {
+            self.target_x = x;
+            self.target_y = y;
+            self.direction = Direction::from_velocity(step_dx, step_dy);
+            return;
+        }
 
-        // At tile center = safe to update target
-        let at_tile_center = (self.x - self.x.round()).abs() < 0.1
-                          && (self.y - self.y.round()).abs() < 0.1;
-
-        // Detect velocity direction change (intent changed but server hasn't moved yet)
-        let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
-
-        if vel_changed && !server_moved && !stopped {
-            // Direction intent changed during cooldown (server hasn't moved yet).
-            // Don't redirect the sprite mid-tile - let the current movement animation
-            // finish. The sprite continues to its current target (tile center).
-            // The next server update after arrival will apply the new direction.
-            let near_target = (self.x - self.target_x).abs() < 0.15
-                           && (self.y - self.target_y).abs() < 0.15;
-            if near_target {
-                // Already at/near tile center - safe to apply new direction
-                if vel_x != 0.0 || vel_y != 0.0 {
-                    self.target_x = x + vel_x;
-                    self.target_y = y + vel_y;
-                }
-            }
-            // Otherwise: keep current target, sprite finishes movement to tile center
-        } else if server_moved || stopped || at_tile_center {
-            if vel_x != 0.0 || vel_y != 0.0 {
-                self.target_x = x + vel_x;
-                self.target_y = y + vel_y;
-            } else {
-                self.target_x = x;
-                self.target_y = y;
-            }
+        // No confirmed step: keep current movement target to avoid pre-turns.
+        // Allow explicit face updates only when idle.
+        let idle_intent = vel_x == 0.0 && vel_y == 0.0;
+        if idle_intent {
+            self.target_x = x;
+            self.target_y = y;
+            self.direction = dir;
         }
     }
 
     /// Smooth visual interpolation toward target position
-    /// Uses axis-aligned movement: moves one grid axis at a time to prevent
-    /// diagonal visual artifacts. Resolves the smaller displacement first
-    /// to reach tile alignment quickly, then moves on the remaining axis.
+    /// Linear constant-speed interpolation keeps stepping smooth without prediction.
     pub fn interpolate_visual(&mut self, delta: f32) {
         let dx = self.target_x - self.x;
         let dy = self.target_y - self.y;
+        let dist = (dx * dx + dy * dy).sqrt();
 
         let old_x = self.x;
         let old_y = self.y;
 
-        if dx.abs() < 0.01 && dy.abs() < 0.01 {
+        if dist < 0.01 {
             self.x = self.target_x;
             self.y = self.target_y;
             self.is_moving = false;
             self.is_dashing = false; // Dash slide complete
         } else {
-            // Use fast speed during dash (24 tiles/sec vs normal 4)
+            // Use fast speed during dash (normal movement remains 4 tiles/sec).
             let speed = if self.is_dashing { 16.0 } else { VISUAL_SPEED };
-            let mut budget = speed * delta;
+            let move_dist = speed * delta;
 
-            // Axis-aligned movement: resolve smaller displacement first,
-            // then use remaining budget on the larger axis.
-            if dx.abs() <= dy.abs() {
-                // X is smaller (or equal): resolve X, then Y
-                if dx.abs() > 0.01 {
-                    let step = budget.min(dx.abs());
-                    self.x += dx.signum() * step;
-                    budget -= step;
-                }
-                if budget > 0.01 && dy.abs() > 0.01 {
-                    let step = budget.min(dy.abs());
-                    self.y += dy.signum() * step;
-                }
+            if dist <= move_dist {
+                self.x = self.target_x;
+                self.y = self.target_y;
             } else {
-                // Y is smaller: resolve Y, then X
-                if dy.abs() > 0.01 {
-                    let step = budget.min(dy.abs());
-                    self.y += dy.signum() * step;
-                    budget -= step;
-                }
-                if budget > 0.01 && dx.abs() > 0.01 {
-                    let step = budget.min(dx.abs());
-                    self.x += dx.signum() * step;
-                }
+                self.x += (dx / dist) * move_dist;
+                self.y += (dy / dist) * move_dist;
             }
-
             self.is_moving = true;
         }
 
