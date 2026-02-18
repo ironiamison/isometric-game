@@ -3118,12 +3118,6 @@
       "level": 1
     },
     {
-      "entityId": "slime",
-      "x": 2,
-      "y": 21,
-      "level": 1
-    },
-    {
       "entityId": "snail",
       "x": 25,
       "y": 27,
