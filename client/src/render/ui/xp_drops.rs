@@ -15,7 +15,7 @@ use super::super::Renderer;
 
 impl Renderer {
     /// Render XP drop feed: each drop shows a skill icon + "+X XP", floating upward and fading out
-    pub fn render_xp_drop_feed(&self, feed: &XpDropFeed, right_edge_x: f32, bar_width: f32, start_y: f32) {
+    pub fn render_xp_drop_feed(&self, feed: &XpDropFeed, left_edge_x: f32, start_y: f32) {
         let current_time = macroquad::time::get_time();
 
         // Sort drops by time so we can detect groups and assign slot offsets
@@ -48,9 +48,7 @@ impl Renderer {
             let y = start_y + y_offset;
             let text = format!("+{} XP", drop.xp_gained);
             let text_w = self.measure_text_sharp(&text, 16.0).width;
-            let total_w = ICON_SIZE + 4.0 + text_w;
-
-            let x = right_edge_x + bar_width - total_w;
+            let x = left_edge_x;
 
             self.draw_xp_drop_icon(drop.skill_type, x, y - ICON_SIZE / 2.0 - 2.0, opacity);
 

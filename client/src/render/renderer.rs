@@ -6467,15 +6467,17 @@ impl Renderer {
                 self.draw_text_sharp(&remaining_text, (bar_x + (bar_width - text_w) / 2.0).floor(), (dash_bar_y + 15.0).floor(), 16.0, text_color);
             }
 
-            // XP Globes (to the left of player stats)
-            let globe_stats_y = hp_bar_y + bar_height / 2.0;
-            self.render_xp_globes(&state.xp_globes, bar_x, globe_stats_y);
+            // XP Globes (to the left of minimap)
+            let preview = self.minimap_preview_rect();
+            let globe_anchor_x = preview.x;
+            let globe_stats_y = preview.y + 42.0;
+            self.render_xp_globes(&state.xp_globes, globe_anchor_x, globe_stats_y);
 
             // XP Drop Feed (below gathering status or MP bar)
             let has_dash_bar = state.dash_cooldown_end > current_time;
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 } + if has_dash_bar { 22.0 + 4.0 } else { 0.0 };
             let drop_start_y = mp_bar_y + bar_height + extra_offset + 110.0;
-            self.render_xp_drop_feed(&state.xp_drop_feed, bar_x, bar_width, drop_start_y);
+            self.render_xp_drop_feed(&state.xp_drop_feed, 10.0, drop_start_y);
         }
 
         // Note: Interactive UI (inventory, crafting, dialogue, quick slots) is rendered
@@ -6775,22 +6777,11 @@ impl Renderer {
             self.render_prayer_tooltip(state, hovered);
 
             // XP globe tooltip (calculate position to match render_ui exactly)
-            if let Some(player) = state.get_local_player() {
-                let padding = 6.0;
-                let font_size = 16.0;
-                let bar_height = 18.0;
-
-                // Calculate bar_width based on player name (same as render_ui)
-                let name = &player.name;
-                let level_text = format!(" Lv.{}", player.skills.total_level());
-                let name_w = self.measure_text_sharp(name, font_size).width;
-                let level_w = self.measure_text_sharp(&level_text, font_size).width;
-                let total_text_w = name_w + level_w;
-                let bar_width = (total_text_w + padding * 2.0).max(120.0);
-
-                let (bar_x, stats_y) = self.minimap_stats_stack_position(bar_width);
-                let globe_stats_y = stats_y + bar_height / 2.0;
-                self.render_xp_globe_tooltip(&state.xp_globes, bar_x, globe_stats_y);
+            if state.get_local_player().is_some() {
+                let preview = self.minimap_preview_rect();
+                let globe_anchor_x = preview.x;
+                let globe_stats_y = preview.y + 42.0;
+                self.render_xp_globe_tooltip(&state.xp_globes, globe_anchor_x, globe_stats_y);
             }
         }
 
