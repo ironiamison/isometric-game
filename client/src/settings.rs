@@ -36,7 +36,7 @@ impl Default for UiSettings {
             tap_to_pathfind: true,
             use_joystick: false,
             graphics_low: false,
-            chat_log_background: false,
+            chat_log_background: true,
         }
     }
 }
