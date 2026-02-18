@@ -2302,12 +2302,9 @@ impl Renderer {
                     let player_x = player.x.round() as i32;
                     let player_y = player.y.round() as i32;
 
-                    // Render the 8 adjacent tiles as drop zones
+                    // Render the 9 tiles (player tile + 8 adjacent) as drop zones
                     for dy in -1..=1 {
                         for dx in -1..=1 {
-                            if dx == 0 && dy == 0 {
-                                continue; // Skip player's tile
-                            }
                             let tile_x = player_x + dx;
                             let tile_y = player_y + dy;
 
