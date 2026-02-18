@@ -2,14 +2,94 @@
 
 use macroquad::prelude::*;
 use macroquad::window::get_internal_gl;
-use crate::game::ActiveDialogue;
+use crate::game::{ActiveDialogue, GameState};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use super::super::Renderer;
 use super::common::*;
 
+#[derive(Clone, Copy)]
+struct GuideObjectiveTemplate {
+    id: &'static str,
+    label: &'static str,
+    target: i32,
+}
+
+#[derive(Clone, Copy)]
+struct GuideTierTemplate {
+    id: &'static str,
+    title: &'static str,
+    subtitle: &'static str,
+    description: &'static str,
+    reward_exp: i32,
+    reward_gold: i32,
+    reward_items: &'static [&'static str],
+    objectives: &'static [GuideObjectiveTemplate],
+}
+
+const GUIDE_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+    GuideObjectiveTemplate { id: "kill_crows", label: "Defeat crows", target: 8 },
+    GuideObjectiveTemplate { id: "reach_combat_8", label: "Reach Combat level", target: 8 },
+    GuideObjectiveTemplate { id: "gather_gold_150", label: "Accumulate gold", target: 150 },
+];
+const GUIDE_T2_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+    GuideObjectiveTemplate { id: "kill_blue_slimes", label: "Defeat blue slimes", target: 12 },
+    GuideObjectiveTemplate { id: "reach_woodcutting_5", label: "Reach Woodcutting level", target: 5 },
+    GuideObjectiveTemplate { id: "gather_gold_400", label: "Accumulate gold", target: 400 },
+];
+const GUIDE_T3_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+    GuideObjectiveTemplate { id: "kill_pigs", label: "Defeat pigs", target: 15 },
+    GuideObjectiveTemplate { id: "reach_farming_8", label: "Reach Farming level", target: 8 },
+    GuideObjectiveTemplate { id: "gather_gold_900", label: "Accumulate gold", target: 900 },
+];
+
+const GUIDE_T1_REWARDS: [&str; 1] = ["3x Weak Health Potion"];
+const GUIDE_T2_REWARDS: [&str; 2] = ["2x Health Potion", "2x Weak Mana Potion"];
+const GUIDE_T3_REWARDS: [&str; 2] = ["2x Strong Health Potion", "2x Prayer Potion"];
+
+const GUIDE_TIERS: [GuideTierTemplate; 3] = [
+    GuideTierTemplate {
+        id: "adventurer_tier_1",
+        title: "Getting a Grip on It",
+        subtitle: "Tier I",
+        description: "Build your baseline with combat, monster clears, and early money control.",
+        reward_exp: 300,
+        reward_gold: 120,
+        reward_items: &GUIDE_T1_REWARDS,
+        objectives: &GUIDE_T1_OBJECTIVES,
+    },
+    GuideTierTemplate {
+        id: "adventurer_tier_2",
+        title: "Building Consistency",
+        subtitle: "Tier II",
+        description: "Balance combat and gathering while keeping momentum across objectives.",
+        reward_exp: 450,
+        reward_gold: 220,
+        reward_items: &GUIDE_T2_REWARDS,
+        objectives: &GUIDE_T2_OBJECTIVES,
+    },
+    GuideTierTemplate {
+        id: "adventurer_tier_3",
+        title: "Early Mastery",
+        subtitle: "Tier III",
+        description: "Prove discipline across combat, farming growth, and wealth management.",
+        reward_exp: 700,
+        reward_gold: 400,
+        reward_items: &GUIDE_T3_REWARDS,
+        objectives: &GUIDE_T3_OBJECTIVES,
+    },
+];
+
+fn is_adventurer_guide_dialogue(dialogue: &ActiveDialogue) -> bool {
+    dialogue.speaker.eq_ignore_ascii_case("Adventurer Guide")
+}
+
 impl Renderer {
-    pub(crate) fn render_dialogue(&self, dialogue: &ActiveDialogue, hovered: &Option<UiElementId>, layout: &mut UiLayout, scroll_offset: f32, scrollbar_dragging: bool) {
+    pub(crate) fn render_dialogue(&self, state: &GameState, dialogue: &ActiveDialogue, hovered: &Option<UiElementId>, layout: &mut UiLayout, scroll_offset: f32, scrollbar_dragging: bool) {
+        if is_adventurer_guide_dialogue(dialogue) {
+            self.render_adventurer_guide_dialogue(state, dialogue, hovered, layout);
+            return;
+        }
         let (sw, sh) = virtual_screen_size();
 
         let is_mobile = cfg!(target_os = "android");
@@ -316,6 +396,211 @@ impl Renderer {
             let hint_y = box_y + box_height - FRAME_THICKNESS - 10.0;
             self.draw_text_sharp("[1-4] Select", content_x, hint_y, 16.0, TEXT_DIM);
             self.draw_text_sharp("[Esc] Close", content_x + content_width - 75.0, hint_y, 16.0, TEXT_DIM);
+        }
+    }
+
+    fn render_adventurer_guide_dialogue(
+        &self,
+        state: &GameState,
+        dialogue: &ActiveDialogue,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
+        let (sw, sh) = virtual_screen_size();
+        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.55));
+
+        let panel_w = sw.min(780.0);
+        let panel_h = sh.min(470.0);
+        let panel_x = ((sw - panel_w) * 0.5).floor();
+        let panel_y = ((sh - panel_h) * 0.5).floor();
+        self.draw_panel_frame(panel_x, panel_y, panel_w, panel_h);
+        self.draw_corner_accents(panel_x, panel_y, panel_w, panel_h);
+
+        self.draw_text_sharp("ADVENTURE PATHS", panel_x + 18.0, panel_y + 28.0, 18.0, TEXT_TITLE);
+        self.draw_text_sharp("Custom progression milestones", panel_x + 220.0, panel_y + 28.0, 16.0, TEXT_DIM);
+
+        let close_x = panel_x + panel_w - 32.0;
+        let close_y = panel_y + 8.0;
+        let close_bounds = Rect::new(close_x, close_y, 20.0, 16.0);
+        layout.add(UiElementId::DialogueClose, close_bounds);
+        let close_hovered = matches!(hovered, Some(UiElementId::DialogueClose));
+        draw_rectangle(close_x, close_y, 20.0, 16.0, if close_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID });
+        draw_rectangle(close_x + 1.0, close_y + 1.0, 18.0, 14.0, if close_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY });
+        self.draw_text_sharp("X", close_x + 7.0, close_y + 12.0, 16.0, if close_hovered { TEXT_TITLE } else { TEXT_DIM });
+
+        let left_w = 220.0;
+        let left_x = panel_x + 12.0;
+        let left_y = panel_y + 42.0;
+        let left_h = panel_h - 54.0;
+        draw_rectangle(left_x, left_y, left_w, left_h, SLOT_BORDER);
+        draw_rectangle(left_x + 1.0, left_y + 1.0, left_w - 2.0, left_h - 2.0, SLOT_BG_EMPTY);
+
+        let selected_idx = state.ui_state.adventurer_selected_tier.min(GUIDE_TIERS.len().saturating_sub(1));
+
+        let mut row_y = left_y + 8.0;
+        for (idx, tier) in GUIDE_TIERS.iter().enumerate() {
+            let is_selected = idx == selected_idx;
+            let completed = state.ui_state.completed_quest_ids.contains(tier.id);
+            let is_active = state.ui_state.active_quests.iter().any(|q| q.id == tier.id);
+            let unlocked = idx == 0
+                || state.ui_state.completed_quest_ids.contains(GUIDE_TIERS[idx - 1].id)
+                || is_active
+                || completed;
+
+            let row_h = 52.0;
+            let row_bounds = Rect::new(left_x + 6.0, row_y, left_w - 12.0, row_h);
+            layout.add(UiElementId::AdventurerTier(idx), row_bounds);
+            let row_hovered = matches!(hovered, Some(UiElementId::AdventurerTier(i)) if *i == idx);
+
+            let row_bg = if is_selected {
+                SLOT_HOVER_BG
+            } else if row_hovered {
+                Color::new(0.14, 0.14, 0.20, 1.0)
+            } else {
+                Color::new(0.10, 0.10, 0.14, 1.0)
+            };
+            let row_border = if is_selected { SLOT_SELECTED_BORDER } else { SLOT_BORDER };
+            draw_rectangle(row_bounds.x, row_bounds.y, row_bounds.w, row_bounds.h, row_border);
+            draw_rectangle(row_bounds.x + 1.0, row_bounds.y + 1.0, row_bounds.w - 2.0, row_bounds.h - 2.0, row_bg);
+
+            let status = if completed {
+                "COMPLETED"
+            } else if is_active {
+                "ACTIVE"
+            } else if unlocked {
+                "AVAILABLE"
+            } else {
+                "LOCKED"
+            };
+            let status_color = if completed {
+                Color::new(0.40, 0.80, 0.40, 1.0)
+            } else if is_active {
+                TEXT_GOLD
+            } else if unlocked {
+                TEXT_NORMAL
+            } else {
+                TEXT_DIM
+            };
+            self.draw_text_sharp(tier.subtitle, row_bounds.x + 8.0, row_bounds.y + 16.0, 15.0, TEXT_DIM);
+            self.draw_text_sharp(tier.title, row_bounds.x + 8.0, row_bounds.y + 32.0, 16.0, if unlocked { TEXT_NORMAL } else { TEXT_DIM });
+            self.draw_text_sharp(status, row_bounds.x + row_bounds.w - 84.0, row_bounds.y + 32.0, 14.0, status_color);
+
+            row_y += row_h + 8.0;
+        }
+
+        let right_x = left_x + left_w + 12.0;
+        let right_y = left_y;
+        let right_w = panel_x + panel_w - right_x - 12.0;
+        let right_h = left_h;
+        draw_rectangle(right_x, right_y, right_w, right_h, SLOT_BORDER);
+        draw_rectangle(right_x + 1.0, right_y + 1.0, right_w - 2.0, right_h - 2.0, Color::new(0.09, 0.09, 0.13, 1.0));
+
+        let tier = GUIDE_TIERS[selected_idx];
+        let completed = state.ui_state.completed_quest_ids.contains(tier.id);
+        let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == tier.id);
+
+        self.draw_text_sharp(tier.title, right_x + 12.0, right_y + 26.0, 20.0, TEXT_TITLE);
+        self.draw_text_sharp(tier.subtitle, right_x + right_w - 82.0, right_y + 26.0, 16.0, FRAME_MID);
+
+        let mut desc_y = right_y + 48.0;
+        for line in self.wrap_text(tier.description, right_w - 24.0, 16.0).iter().take(3) {
+            self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_NORMAL);
+            desc_y += 18.0;
+        }
+        for line in self.wrap_text(&dialogue.text, right_w - 24.0, 16.0).iter().take(2) {
+            self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_DIM);
+            desc_y += 17.0;
+        }
+
+        draw_line(right_x + 12.0, desc_y + 4.0, right_x + right_w - 12.0, desc_y + 4.0, 1.0, HEADER_BORDER);
+        let mut y = desc_y + 24.0;
+
+        self.draw_text_sharp("Objectives", right_x + 12.0, y, 16.0, FRAME_INNER);
+        y += 18.0;
+
+        let mut completed_count = 0;
+        for objective in tier.objectives {
+            let (mut current, mut target, mut done) = (0, objective.target, false);
+            if completed {
+                current = objective.target;
+                done = true;
+            } else if let Some(quest) = active_quest {
+                if let Some(obj) = quest.objectives.iter().find(|o| o.id == objective.id) {
+                    current = obj.current;
+                    target = obj.target;
+                    done = obj.completed;
+                }
+            }
+
+            if done {
+                completed_count += 1;
+            }
+
+            let line = format!(
+                "{} {} ({}/{})",
+                if done { "[+]" } else { "[ ]" },
+                objective.label,
+                current,
+                target
+            );
+            self.draw_text_sharp(
+                &line,
+                right_x + 14.0,
+                y,
+                16.0,
+                if done { Color::new(0.42, 0.82, 0.42, 1.0) } else { TEXT_NORMAL },
+            );
+            y += 18.0;
+        }
+
+        let progress = format!("Progress: {}/{}", completed_count, tier.objectives.len());
+        self.draw_text_sharp(&progress, right_x + 12.0, y + 6.0, 16.0, TEXT_GOLD);
+        y += 26.0;
+
+        self.draw_text_sharp("Rewards", right_x + 12.0, y, 16.0, FRAME_INNER);
+        y += 18.0;
+        self.draw_text_sharp(
+            &format!("EXP: {}   Gold: {}", tier.reward_exp, tier.reward_gold),
+            right_x + 14.0,
+            y,
+            16.0,
+            TEXT_NORMAL,
+        );
+        y += 18.0;
+        for reward in tier.reward_items.iter().take(3) {
+            self.draw_text_sharp(&format!("* {}", reward), right_x + 14.0, y, 16.0, TEXT_DIM);
+            y += 16.0;
+        }
+
+        let action_base_y = right_y + right_h - 72.0;
+        if dialogue.quest_id == tier.id {
+            if dialogue.choices.is_empty() {
+                let btn = Rect::new(right_x + right_w - 170.0, action_base_y, 150.0, 30.0);
+                layout.add(UiElementId::DialogueContinue, btn);
+                let hovered_continue = matches!(hovered, Some(UiElementId::DialogueContinue));
+                draw_rectangle(btn.x, btn.y, btn.w, btn.h, if hovered_continue { SLOT_SELECTED_BORDER } else { FRAME_MID });
+                draw_rectangle(btn.x + 1.0, btn.y + 1.0, btn.w - 2.0, btn.h - 2.0, if hovered_continue { SLOT_HOVER_BG } else { SLOT_BG_EMPTY });
+                self.draw_text_sharp("Continue", btn.x + 46.0, btn.y + 20.0, 16.0, if hovered_continue { TEXT_TITLE } else { TEXT_NORMAL });
+            } else {
+                let mut btn_y = action_base_y - ((dialogue.choices.len().saturating_sub(1) as f32) * 34.0);
+                for (i, choice) in dialogue.choices.iter().enumerate() {
+                    let btn = Rect::new(right_x + right_w - 260.0, btn_y, 240.0, 30.0);
+                    layout.add(UiElementId::DialogueChoice(i), btn);
+                    let btn_hovered = matches!(hovered, Some(UiElementId::DialogueChoice(idx)) if *idx == i);
+                    draw_rectangle(btn.x, btn.y, btn.w, btn.h, if btn_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID });
+                    draw_rectangle(btn.x + 1.0, btn.y + 1.0, btn.w - 2.0, btn.h - 2.0, if btn_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY });
+                    self.draw_text_sharp(&choice.text, btn.x + 12.0, btn.y + 20.0, 16.0, if btn_hovered { TEXT_TITLE } else { TEXT_NORMAL });
+                    btn_y += 34.0;
+                }
+            }
+        } else {
+            self.draw_text_sharp(
+                "Select this tier in dialogue to take action.",
+                right_x + right_w - 280.0,
+                action_base_y + 20.0,
+                16.0,
+                TEXT_DIM,
+            );
         }
     }
 }

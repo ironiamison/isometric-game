@@ -8,6 +8,7 @@ pub enum UiElementId {
     DialogueContinue,
     DialogueClose,
     DialogueScrollbar,
+    AdventurerTier(usize),
 
     // Crafting
     CraftingCategoryTab(usize),

@@ -845,6 +845,8 @@ pub struct UiState {
     // Quest UI state
     pub active_dialogue: Option<ActiveDialogue>,
     pub active_quests: Vec<ActiveQuest>,
+    pub completed_quest_ids: HashSet<String>,
+    pub adventurer_selected_tier: usize,
     pub quest_completed_events: Vec<QuestCompletedEvent>,
     pub quest_log_open: bool,
     pub quest_log_scroll: f32,
@@ -984,6 +986,8 @@ impl Default for UiState {
             inventory_open: false,
             active_dialogue: None,
             active_quests: Vec::new(),
+            completed_quest_ids: HashSet::new(),
+            adventurer_selected_tier: 0,
             quest_completed_events: Vec::new(),
             quest_log_open: false,
             quest_log_scroll: 0.0,

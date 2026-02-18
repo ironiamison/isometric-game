@@ -1,0 +1,54 @@
+# Adventurer Tasks I - Entry milestone track
+
+[quest]
+id = "adventurer_tier_1"
+name = "Adventurer Tasks I"
+description = "The Adventurer Guide wants you to build fundamentals: train combat, cull crows, and build a gold cushion."
+giver_npc = "adventurer_guide"
+level_required = 1
+repeatable = false
+lua_script = "progression/adventurer_tier_1.lua"
+
+[quest.chain]
+next = "adventurer_tier_2"
+
+[[quest.objectives]]
+id = "kill_crows"
+type = "kill_monster"
+target = "crow"
+count = 8
+description = "Defeat 8 crows"
+
+[[quest.objectives]]
+id = "reach_combat_8"
+type = "reach_level"
+target = "combat"
+count = 8
+description = "Reach Combat level 8"
+
+[[quest.objectives]]
+id = "gather_gold_150"
+type = "reach_gold"
+target = "gold"
+count = 150
+description = "Accumulate 150 gold"
+
+[[quest.objectives]]
+id = "return_to_guide"
+type = "talk_to"
+target = "adventurer_guide"
+description = "Return to the Adventurer Guide"
+sequential = true
+
+[quest.rewards]
+exp = 300
+gold = 120
+items = [
+    { id = "weak_health_potion", count = 3 },
+]
+
+[quest.dialogue]
+offer = "Time for your first structured tier."
+accept = "Good. Build your baseline and report back."
+progress = "Steady progress wins long campaigns."
+complete = "Solid fundamentals. You're ready for Tier II."

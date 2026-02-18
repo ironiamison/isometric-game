@@ -1200,6 +1200,22 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     choices,
                     show_time: macroquad::time::get_time(),
                 });
+
+                // Keep the custom Adventurer Guide panel focused on the quest currently discussed.
+                if let Some(dialogue) = &state.ui_state.active_dialogue {
+                    if dialogue.speaker.eq_ignore_ascii_case("Adventurer Guide") {
+                        let selected = match dialogue.quest_id.as_str() {
+                            "adventurer_tier_1" => Some(0),
+                            "adventurer_tier_2" => Some(1),
+                            "adventurer_tier_3" => Some(2),
+                            _ => None,
+                        };
+                        if let Some(idx) = selected {
+                            state.ui_state.adventurer_selected_tier = idx;
+                        }
+                    }
+                }
+
                 if !already_open {
                     state.pending_sfx.push("ui_open".to_string());
                 }
@@ -1210,6 +1226,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             if let Some(value) = data {
                 let quest_id = extract_string(value, "quest_id").unwrap_or_default();
                 let quest_name = extract_string(value, "quest_name").unwrap_or_default();
+                let accepted_id = quest_id.clone();
 
                 // Parse objectives
                 let mut objectives = Vec::new();
@@ -1241,6 +1258,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         objectives,
                     });
                 }
+                state.ui_state.completed_quest_ids.remove(&accepted_id);
 
                 // Don't close dialogue here - let user read the quest acceptance message
                 // Dialogue will close when user presses continue or server sends dialogueClosed
@@ -1273,6 +1291,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let quest_name = extract_string(value, "quest_name").unwrap_or_default();
                 let exp_reward = extract_i32(value, "rewards_exp").unwrap_or(0);
                 let gold_reward = extract_i32(value, "rewards_gold").unwrap_or(0);
+                let completed_id = quest_id.clone();
 
                 log::info!("Quest completed: {} - {} (EXP: {}, Gold: {})", quest_id, quest_name, exp_reward, gold_reward);
 
@@ -1295,6 +1314,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     gold_reward,
                     time: macroquad::time::get_time(),
                 });
+                state.ui_state.completed_quest_ids.insert(completed_id);
 
                 // Close any open dialogue
                 state.ui_state.active_dialogue = None;

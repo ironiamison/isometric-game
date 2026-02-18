@@ -52,6 +52,22 @@ pub enum QuestEvent {
         y: i32,
     },
 
+    /// Player reached a specific level in a skill
+    SkillLevelChanged {
+        player_id: String,
+        /// Skill identifier (e.g., "combat", "fishing")
+        skill: String,
+        /// Current level in that skill
+        level: i32,
+    },
+
+    /// Player's gold amount changed
+    GoldAmountChanged {
+        player_id: String,
+        /// Current gold amount (inventory gold)
+        amount: i32,
+    },
+
     /// Player accepted a quest (from dialogue)
     QuestAccepted { player_id: String, quest_id: String },
 
@@ -75,6 +91,8 @@ impl QuestEvent {
             QuestEvent::NpcInteraction { player_id, .. } => player_id,
             QuestEvent::LocationReached { player_id, .. } => player_id,
             QuestEvent::TreeDepleted { player_id, .. } => player_id,
+            QuestEvent::SkillLevelChanged { player_id, .. } => player_id,
+            QuestEvent::GoldAmountChanged { player_id, .. } => player_id,
             QuestEvent::QuestAccepted { player_id, .. } => player_id,
             QuestEvent::QuestAbandoned { player_id, .. } => player_id,
             QuestEvent::DialogueChoice { player_id, .. } => player_id,
@@ -89,6 +107,8 @@ impl QuestEvent {
             QuestEvent::NpcInteraction { .. } => "npc_interaction",
             QuestEvent::LocationReached { .. } => "location_reached",
             QuestEvent::TreeDepleted { .. } => "tree_depleted",
+            QuestEvent::SkillLevelChanged { .. } => "skill_level_changed",
+            QuestEvent::GoldAmountChanged { .. } => "gold_amount_changed",
             QuestEvent::QuestAccepted { .. } => "quest_accepted",
             QuestEvent::QuestAbandoned { .. } => "quest_abandoned",
             QuestEvent::DialogueChoice { .. } => "dialogue_choice",

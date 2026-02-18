@@ -283,6 +283,18 @@ impl QuestRegistry {
                         .await,
                 );
             }
+            QuestEvent::SkillLevelChanged { skill, level, .. } => {
+                results.extend(
+                    self.update_level_objectives(player_state, skill, *level)
+                        .await,
+                );
+            }
+            QuestEvent::GoldAmountChanged { amount, .. } => {
+                results.extend(
+                    self.update_gold_objectives(player_state, *amount)
+                        .await,
+                );
+            }
             _ => {}
         }
 
@@ -342,6 +354,43 @@ impl QuestRegistry {
         };
 
         // Check if all objectives are now complete (separate borrow)
+        let quest_ready = !was_complete && progress.objectives.values().all(|o| o.completed);
+        if quest_ready {
+            progress.status = super::state::QuestStatus::ReadyToComplete;
+        }
+
+        Some(QuestEventResult::objective_updated(
+            quest_id,
+            objective_id,
+            current,
+            target,
+            newly_completed,
+            quest_ready,
+        ))
+    }
+
+    /// Helper to set objective progress to an absolute value (non-decreasing).
+    fn set_objective_progress(
+        &self,
+        player_state: &mut PlayerQuestState,
+        quest_id: &str,
+        objective_id: &str,
+        value: i32,
+    ) -> Option<QuestEventResult> {
+        let progress = player_state.get_quest_mut(quest_id)?;
+        let was_complete = progress.status == super::state::QuestStatus::ReadyToComplete;
+
+        let (current, target, newly_completed) = {
+            let obj = progress.objectives.get_mut(objective_id)?;
+            let clamped = value.clamp(0, obj.target);
+            if clamped <= obj.current {
+                return None;
+            }
+            let was_completed = obj.completed;
+            obj.set_progress(clamped);
+            (obj.current, obj.target, !was_completed && obj.completed)
+        };
+
         let quest_ready = !was_complete && progress.objectives.values().all(|o| o.completed);
         if quest_ready {
             progress.status = super::state::QuestStatus::ReadyToComplete;
@@ -538,6 +587,69 @@ impl QuestRegistry {
                         if let Some(result) =
                             self.update_single_objective(player_state, &quest_id, &objective.id, 1)
                         {
+                            results.push(result);
+                        }
+                    }
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Update reach_level objectives for active quests.
+    async fn update_level_objectives(
+        &self,
+        player_state: &mut PlayerQuestState,
+        skill: &str,
+        level: i32,
+    ) -> Vec<QuestEventResult> {
+        let mut results = Vec::new();
+        let quests = self.quests.read().await;
+
+        let quest_ids: Vec<String> = player_state.active_quests.keys().cloned().collect();
+        for quest_id in quest_ids {
+            if let Some(quest) = quests.get(&quest_id) {
+                for objective in &quest.objectives {
+                    if objective.objective_type == ObjectiveType::ReachLevel
+                        && objective.target.eq_ignore_ascii_case(skill)
+                    {
+                        if let Some(result) = self.set_objective_progress(
+                            player_state,
+                            &quest_id,
+                            &objective.id,
+                            level,
+                        ) {
+                            results.push(result);
+                        }
+                    }
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Update reach_gold objectives for active quests.
+    async fn update_gold_objectives(
+        &self,
+        player_state: &mut PlayerQuestState,
+        gold_amount: i32,
+    ) -> Vec<QuestEventResult> {
+        let mut results = Vec::new();
+        let quests = self.quests.read().await;
+
+        let quest_ids: Vec<String> = player_state.active_quests.keys().cloned().collect();
+        for quest_id in quest_ids {
+            if let Some(quest) = quests.get(&quest_id) {
+                for objective in &quest.objectives {
+                    if objective.objective_type == ObjectiveType::ReachGold {
+                        if let Some(result) = self.set_objective_progress(
+                            player_state,
+                            &quest_id,
+                            &objective.id,
+                            gold_amount,
+                        ) {
                             results.push(result);
                         }
                     }

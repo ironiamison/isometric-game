@@ -3473,6 +3473,81 @@ impl GameRoom {
         }
     }
 
+    /// Sync level/gold milestone objectives against the player's current state.
+    async fn process_quest_progression_snapshot(&self, player_id: &str) {
+        let player_snapshot = {
+            let players = self.players.read().await;
+            players.get(player_id).map(|p| {
+                (
+                    p.inventory.gold,
+                    vec![
+                        ("hitpoints", p.skills.hitpoints.level),
+                        ("combat", p.skills.combat.level),
+                        ("fishing", p.skills.fishing.level),
+                        ("farming", p.skills.farming.level),
+                        ("smithing", p.skills.smithing.level),
+                        ("prayer", p.skills.prayer.level),
+                        ("magic", p.skills.magic.level),
+                        ("woodcutting", p.skills.woodcutting.level),
+                        ("alchemy", p.skills.alchemy.level),
+                    ],
+                )
+            })
+        };
+
+        let (gold, skill_levels) = match player_snapshot {
+            Some(snapshot) => snapshot,
+            None => return,
+        };
+
+        let results = {
+            let mut quest_states = self.player_quest_states.write().await;
+            let quest_state = quest_states
+                .entry(player_id.to_string())
+                .or_insert_with(PlayerQuestState::new);
+
+            let mut results = Vec::new();
+            for (skill, level) in &skill_levels {
+                let event = QuestEvent::SkillLevelChanged {
+                    player_id: player_id.to_string(),
+                    skill: (*skill).to_string(),
+                    level: *level,
+                };
+                results.extend(self.quest_registry.process_event(&event, quest_state).await);
+            }
+
+            let gold_event = QuestEvent::GoldAmountChanged {
+                player_id: player_id.to_string(),
+                amount: gold,
+            };
+            results.extend(self.quest_registry.process_event(&gold_event, quest_state).await);
+            results
+        };
+
+        for result in results {
+            if let (Some(objective_id), Some(current), Some(target)) =
+                (&result.objective_id, result.new_progress, result.target)
+            {
+                tracing::info!(
+                    "Player {} progression objective {} for quest {}: {}/{}",
+                    player_id, objective_id, result.quest_id, current, target
+                );
+
+                if let Some(sender) = self.player_senders.read().await.get(player_id) {
+                    let msg = ServerMessage::QuestObjectiveProgress {
+                        quest_id: result.quest_id.clone(),
+                        objective_id: objective_id.clone(),
+                        current,
+                        target,
+                    };
+                    if let Ok(data) = crate::protocol::encode_server_message(&msg) {
+                        let _ = sender.send(data).await;
+                    }
+                }
+            }
+        }
+    }
+
     /// Check if two directions are close enough (within 45 degrees)
     fn directions_match(dir1: Direction, dir2: Direction) -> bool {
         // Convert to numeric for comparison
@@ -3919,6 +3994,9 @@ impl GameRoom {
             // Could show generic dialogue here
             return;
         }
+
+        // Bring level/gold milestone objectives up to date before quest interaction.
+        self.process_quest_progression_snapshot(player_id).await;
 
         // Get or create player quest state
         let mut quest_states = self.player_quest_states.write().await;

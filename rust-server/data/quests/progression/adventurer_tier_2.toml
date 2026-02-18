@@ -1,0 +1,56 @@
+# Adventurer Tasks II - Mid early-game milestone track
+
+[quest]
+id = "adventurer_tier_2"
+name = "Adventurer Tasks II"
+description = "The Adventurer Guide pushes you toward better consistency: slime hunting, woodcutting growth, and stronger finances."
+giver_npc = "adventurer_guide"
+level_required = 5
+repeatable = false
+lua_script = "progression/adventurer_tier_2.lua"
+
+[quest.chain]
+previous = "adventurer_tier_1"
+next = "adventurer_tier_3"
+
+[[quest.objectives]]
+id = "kill_blue_slimes"
+type = "kill_monster"
+target = "slime_blue"
+count = 12
+description = "Defeat 12 blue slimes"
+
+[[quest.objectives]]
+id = "reach_woodcutting_5"
+type = "reach_level"
+target = "woodcutting"
+count = 5
+description = "Reach Woodcutting level 5"
+
+[[quest.objectives]]
+id = "gather_gold_400"
+type = "reach_gold"
+target = "gold"
+count = 400
+description = "Accumulate 400 gold"
+
+[[quest.objectives]]
+id = "return_to_guide"
+type = "talk_to"
+target = "adventurer_guide"
+description = "Return to the Adventurer Guide"
+sequential = true
+
+[quest.rewards]
+exp = 450
+gold = 220
+items = [
+    { id = "health_potion", count = 2 },
+    { id = "weak_mana_potion", count = 2 },
+]
+
+[quest.dialogue]
+offer = "Tier II focuses on consistency and resource flow."
+accept = "Push these milestones and your pace will accelerate."
+progress = "Don't rush. Complete each category properly."
+complete = "Well executed. Tier III is now open."

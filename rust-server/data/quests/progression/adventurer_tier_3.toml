@@ -1,0 +1,55 @@
+# Adventurer Tasks III - Strong early progression benchmark
+
+[quest]
+id = "adventurer_tier_3"
+name = "Adventurer Tasks III"
+description = "The Adventurer Guide's third tier tests discipline across combat, farming growth, and money management."
+giver_npc = "adventurer_guide"
+level_required = 8
+repeatable = false
+lua_script = "progression/adventurer_tier_3.lua"
+
+[quest.chain]
+previous = "adventurer_tier_2"
+
+[[quest.objectives]]
+id = "kill_pigs"
+type = "kill_monster"
+target = "pig"
+count = 15
+description = "Defeat 15 pigs"
+
+[[quest.objectives]]
+id = "reach_farming_8"
+type = "reach_level"
+target = "farming"
+count = 8
+description = "Reach Farming level 8"
+
+[[quest.objectives]]
+id = "gather_gold_900"
+type = "reach_gold"
+target = "gold"
+count = 900
+description = "Accumulate 900 gold"
+
+[[quest.objectives]]
+id = "return_to_guide"
+type = "talk_to"
+target = "adventurer_guide"
+description = "Return to the Adventurer Guide"
+sequential = true
+
+[quest.rewards]
+exp = 700
+gold = 400
+items = [
+    { id = "strong_health_potion", count = 2 },
+    { id = "prayer_potion", count = 2 },
+]
+
+[quest.dialogue]
+offer = "Tier III is where real adventurers separate themselves."
+accept = "Finish this tier and your foundation is battle-ready."
+progress = "Stay on target. Every category matters."
+complete = "Excellent execution. You're ready to branch into any path you want."

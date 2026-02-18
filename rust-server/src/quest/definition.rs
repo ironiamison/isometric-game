@@ -116,6 +116,10 @@ pub enum ObjectiveType {
     ReachLocation,
     /// Deplete X trees of type Y (chop them down completely)
     DepleteTree,
+    /// Reach level X in a specific skill
+    ReachLevel,
+    /// Reach (or earn up to) X gold
+    ReachGold,
 }
 
 impl ObjectiveType {
@@ -126,6 +130,8 @@ impl ObjectiveType {
             "talk_to" | "talk" => Some(ObjectiveType::TalkTo),
             "reach_location" | "reach" | "location" => Some(ObjectiveType::ReachLocation),
             "deplete_tree" | "chop_tree" | "deplete" => Some(ObjectiveType::DepleteTree),
+            "reach_level" | "level" | "skill_level" => Some(ObjectiveType::ReachLevel),
+            "reach_gold" | "gold" | "gather_gold" => Some(ObjectiveType::ReachGold),
             _ => None,
         }
     }
@@ -357,6 +363,14 @@ mod tests {
         assert_eq!(
             ObjectiveType::from_str("chop_tree"),
             Some(ObjectiveType::DepleteTree)
+        );
+        assert_eq!(
+            ObjectiveType::from_str("reach_level"),
+            Some(ObjectiveType::ReachLevel)
+        );
+        assert_eq!(
+            ObjectiveType::from_str("reach_gold"),
+            Some(ObjectiveType::ReachGold)
         );
         assert_eq!(ObjectiveType::from_str("invalid"), None);
     }
