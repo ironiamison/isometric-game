@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
 pub const CHUNK_SIZE: u32 = 32;
+const WORLD_VIEW_RADIUS: i32 = 2;
+const MINIMAP_VISIBLE_RADIUS: i32 = 2;
+const MINIMAP_PRELOAD_RING: i32 = 1;
 
 /// Chunk coordinates in the world grid
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -217,7 +220,8 @@ impl ChunkManager {
             chunks: HashMap::new(),
             pending_requests: HashMap::new(),
             current_chunk: ChunkCoord::new(0, 0),
-            view_radius: 2, // Load 5x5 chunks around player
+            // Keep one extra chunk ring loaded beyond the visible minimap edge.
+            view_radius: WORLD_VIEW_RADIUS.max(MINIMAP_VISIBLE_RADIUS + MINIMAP_PRELOAD_RING),
             interior_size: None,
         }
     }

@@ -248,6 +248,9 @@ const MINIMAP_PREVIEW_Y: f32 = 8.0;
 const MINIMAP_PREVIEW_WIDTH: f32 = 188.0;
 const MINIMAP_PREVIEW_HEIGHT: f32 = 140.0;
 const MINIMAP_WORLD_TEXT_SIZE: f32 = 16.0;
+const MINIMAP_VISIBLE_CHUNK_RADIUS: f32 = 2.0;
+const MINIMAP_PREVIEW_TILE_BUDGET: usize = 9_000;
+const MINIMAP_PANEL_TILE_BUDGET: usize = 16_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MinimapMarkerKind {
@@ -1482,6 +1485,18 @@ impl Renderer {
         Some(bounds)
     }
 
+    fn minimap_preview_bounds(&self, state: &GameState) -> Option<MinimapBounds> {
+        let player = state.get_local_player()?;
+        let half_span = CHUNK_SIZE as f32 * (MINIMAP_VISIBLE_CHUNK_RADIUS + 0.5);
+
+        Some(MinimapBounds {
+            min_x: player.x - half_span,
+            min_y: player.y - half_span,
+            max_x: player.x + half_span,
+            max_y: player.y + half_span,
+        })
+    }
+
     fn minimap_marker_style(kind: MinimapMarkerKind) -> (Color, f32) {
         match kind {
             MinimapMarkerKind::Player => (Color::new(0.95, 0.95, 1.0, 1.0), 3.6),
@@ -1644,9 +1659,11 @@ impl Renderer {
         )
     }
 
-    fn collect_minimap_markers(&self, state: &GameState) -> Vec<MinimapMarker> {
+    fn collect_minimap_markers(&self, state: &GameState, bounds: Option<&MinimapBounds>) -> Vec<MinimapMarker> {
         let mut markers: Vec<MinimapMarker> = Vec::new();
         let player_pos = state.get_local_player().map(|p| (p.x, p.y));
+        let bounds = bounds.copied();
+        let bounds_margin = CHUNK_SIZE as f32 * 0.5;
 
         let distance_sq = |x: f32, y: f32| -> f32 {
             if let Some((px, py)) = player_pos {
@@ -1655,6 +1672,16 @@ impl Renderer {
                 dx * dx + dy * dy
             } else {
                 0.0
+            }
+        };
+        let in_bounds = |x: f32, y: f32| -> bool {
+            if let Some(b) = bounds {
+                x >= b.min_x - bounds_margin
+                    && x <= b.max_x + bounds_margin
+                    && y >= b.min_y - bounds_margin
+                    && y <= b.max_y + bounds_margin
+            } else {
+                true
             }
         };
 
@@ -1671,9 +1698,25 @@ impl Renderer {
         for (coord, chunk) in state.chunk_manager.chunks().iter() {
             let base_x = coord.x * CHUNK_SIZE as i32;
             let base_y = coord.y * CHUNK_SIZE as i32;
+            if let Some(b) = bounds {
+                let chunk_min_x = base_x as f32;
+                let chunk_min_y = base_y as f32;
+                let chunk_max_x = chunk_min_x + CHUNK_SIZE as f32;
+                let chunk_max_y = chunk_min_y + CHUNK_SIZE as f32;
+                if chunk_max_x < b.min_x - bounds_margin
+                    || chunk_min_x > b.max_x + bounds_margin
+                    || chunk_max_y < b.min_y - bounds_margin
+                    || chunk_min_y > b.max_y + bounds_margin
+                {
+                    continue;
+                }
+            }
             for portal in &chunk.portals {
                 let world_x = base_x as f32 + portal.x as f32 + portal.width.max(1) as f32 * 0.5;
                 let world_y = base_y as f32 + portal.y as f32 + portal.height.max(1) as f32 * 0.5;
+                if !in_bounds(world_x, world_y) {
+                    continue;
+                }
                 let target = Self::format_map_display_name(&portal.target_map);
                 teleport_markers.push(MinimapMarker {
                     kind: MinimapMarkerKind::Teleport,
@@ -1693,6 +1736,9 @@ impl Renderer {
         let mut enemy_markers: Vec<(f32, MinimapMarker)> = Vec::new();
         for npc in state.npcs.values() {
             if !npc.is_alive() {
+                continue;
+            }
+            if !in_bounds(npc.x, npc.y) {
                 continue;
             }
             if npc.is_quest_giver {
@@ -1735,6 +1781,9 @@ impl Renderer {
                 if let Some(tree_info) = get_tree_info(obj.gid) {
                     let wx = obj.tile_x as f32 + 0.5;
                     let wy = obj.tile_y as f32 + 0.5;
+                    if !in_bounds(wx, wy) {
+                        continue;
+                    }
                     tree_markers.push((
                         distance_sq(wx, wy),
                         MinimapMarker {
@@ -1768,7 +1817,8 @@ impl Renderer {
         marker_scale: f32,
         hovered_marker: Option<usize>,
         capture_hitboxes: bool,
-    ) -> Vec<Rect> {
+        tile_budget: usize,
+    ) -> Vec<(usize, Rect)> {
         draw_rectangle(
             map_rect.x,
             map_rect.y,
@@ -1777,8 +1827,12 @@ impl Renderer {
             Color::new(0.045, 0.065, 0.075, 0.95),
         );
 
-        let sample_step_x = (bounds.width() / map_rect.w).ceil().max(1.0) as usize;
-        let sample_step_y = (bounds.height() / map_rect.h).ceil().max(1.0) as usize;
+        let base_step_x = (bounds.width() / map_rect.w.max(1.0)).ceil().max(1.0) as usize;
+        let base_step_y = (bounds.height() / map_rect.h.max(1.0)).ceil().max(1.0) as usize;
+        let visible_tiles = (bounds.width().ceil().max(1.0) * bounds.height().ceil().max(1.0)) as usize;
+        let budget_step = ((visible_tiles as f32 / tile_budget.max(1) as f32).sqrt().ceil().max(1.0)) as usize;
+        let sample_step_x = base_step_x.max(budget_step);
+        let sample_step_y = base_step_y.max(budget_step);
 
         let interior_size = state.chunk_manager.get_interior_size();
         // Draw a primitive world raster by sampling the ground tile color per tile.
@@ -1801,6 +1855,17 @@ impl Renderer {
                         coord.y * CHUNK_SIZE as i32,
                     )
                 };
+                let chunk_min_x = base_x as f32;
+                let chunk_min_y = base_y as f32;
+                let chunk_max_x = chunk_min_x + tile_w as f32;
+                let chunk_max_y = chunk_min_y + tile_h as f32;
+                if chunk_max_x <= bounds.min_x
+                    || chunk_min_x >= bounds.max_x
+                    || chunk_max_y <= bounds.min_y
+                    || chunk_min_y >= bounds.max_y
+                {
+                    continue;
+                }
 
                 for y in (0..tile_h).step_by(sample_step_y) {
                     let row_start = y * tile_w;
@@ -1819,14 +1884,25 @@ impl Renderer {
 
                         let world_x = base_x + x as i32;
                         let world_y = base_y + y as i32;
-                        let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, world_x as f32, world_y as f32);
                         let tile_span_x = sample_step_x.min(tile_w.saturating_sub(x).max(1));
                         let tile_span_y = sample_step_y.min(tile_h.saturating_sub(y).max(1));
+                        let tile_min_x = world_x as f32;
+                        let tile_min_y = world_y as f32;
+                        let tile_max_x = (world_x + tile_span_x as i32) as f32;
+                        let tile_max_y = (world_y + tile_span_y as i32) as f32;
+                        if tile_max_x <= bounds.min_x
+                            || tile_min_x >= bounds.max_x
+                            || tile_max_y <= bounds.min_y
+                            || tile_min_y >= bounds.max_y
+                        {
+                            continue;
+                        }
+                        let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, tile_min_x, tile_min_y);
                         let (sx2, sy2) = self.minimap_world_to_screen(
                             bounds,
                             map_rect,
-                            (world_x + tile_span_x as i32) as f32,
-                            (world_y + tile_span_y as i32) as f32,
+                            tile_max_x,
+                            tile_max_y,
                         );
                         let rect_x = sx1.min(sx2);
                         let rect_y = sy1.min(sy2);
@@ -1856,14 +1932,25 @@ impl Renderer {
                             continue;
                         }
 
-                        let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, x as f32, y as f32);
                         let tile_span_x = sample_step_x.min(width.saturating_sub(x).max(1));
                         let tile_span_y = sample_step_y.min(height.saturating_sub(y).max(1));
+                        let tile_min_x = x as f32;
+                        let tile_min_y = y as f32;
+                        let tile_max_x = (x + tile_span_x) as f32;
+                        let tile_max_y = (y + tile_span_y) as f32;
+                        if tile_max_x <= bounds.min_x
+                            || tile_min_x >= bounds.max_x
+                            || tile_max_y <= bounds.min_y
+                            || tile_min_y >= bounds.max_y
+                        {
+                            continue;
+                        }
+                        let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, tile_min_x, tile_min_y);
                         let (sx2, sy2) = self.minimap_world_to_screen(
                             bounds,
                             map_rect,
-                            (x + tile_span_x) as f32,
-                            (y + tile_span_y) as f32,
+                            tile_max_x,
+                            tile_max_y,
                         );
                         let rect_x = sx1.min(sx2);
                         let rect_y = sy1.min(sy2);
@@ -1896,6 +1983,13 @@ impl Renderer {
                     CHUNK_SIZE as f32,
                 )
             };
+            if chunk_x + chunk_w <= bounds.min_x
+                || chunk_x >= bounds.max_x
+                || chunk_y + chunk_h <= bounds.min_y
+                || chunk_y >= bounds.max_y
+            {
+                continue;
+            }
 
             let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, chunk_x, chunk_y);
             let (sx2, sy2) = self.minimap_world_to_screen(bounds, map_rect, chunk_x + chunk_w, chunk_y + chunk_h);
@@ -1921,8 +2015,15 @@ impl Renderer {
             );
         }
 
-        let mut hitboxes: Vec<Rect> = Vec::with_capacity(if capture_hitboxes { markers.len() } else { 0 });
+        let mut hitboxes: Vec<(usize, Rect)> = Vec::with_capacity(if capture_hitboxes { markers.len() } else { 0 });
         for (idx, marker) in markers.iter().enumerate() {
+            if marker.x < bounds.min_x
+                || marker.x > bounds.max_x
+                || marker.y < bounds.min_y
+                || marker.y > bounds.max_y
+            {
+                continue;
+            }
             let (sx, sy) = self.minimap_world_to_screen(bounds, map_rect, marker.x, marker.y);
             let (color, base_radius) = Self::minimap_marker_style(marker.kind);
             let hovered = hovered_marker == Some(idx);
@@ -1935,11 +2036,14 @@ impl Renderer {
             }
 
             if capture_hitboxes {
-                hitboxes.push(Rect::new(
-                    sx - radius - 3.0,
-                    sy - radius - 3.0,
-                    (radius + 3.0) * 2.0,
-                    (radius + 3.0) * 2.0,
+                hitboxes.push((
+                    idx,
+                    Rect::new(
+                        sx - radius - 3.0,
+                        sy - radius - 3.0,
+                        (radius + 3.0) * 2.0,
+                        (radius + 3.0) * 2.0,
+                    ),
                 ));
             }
         }
@@ -1976,8 +2080,8 @@ impl Renderer {
             preview_rect.h - 30.0,
         );
 
-        if let Some(bounds) = self.minimap_bounds(state) {
-            let markers = self.collect_minimap_markers(state);
+        if let Some(bounds) = self.minimap_preview_bounds(state) {
+            let markers = self.collect_minimap_markers(state, Some(&bounds));
             self.draw_minimap_contents(
                 state,
                 &bounds,
@@ -1986,6 +2090,7 @@ impl Renderer {
                 0.8,
                 None,
                 false,
+                MINIMAP_PREVIEW_TILE_BUDGET,
             );
         } else {
             draw_rectangle(
@@ -2056,7 +2161,7 @@ impl Renderer {
         };
 
         if let Some(bounds) = self.minimap_bounds(state) {
-            let markers = self.collect_minimap_markers(state);
+            let markers = self.collect_minimap_markers(state, Some(&bounds));
             let marker_hitboxes = self.draw_minimap_contents(
                 state,
                 &bounds,
@@ -2065,10 +2170,11 @@ impl Renderer {
                 1.0,
                 hovered_marker_idx,
                 true,
+                MINIMAP_PANEL_TILE_BUDGET,
             );
 
-            for (idx, hitbox) in marker_hitboxes.into_iter().enumerate() {
-                layout.add(UiElementId::MinimapMarker(idx), hitbox);
+            for (marker_idx, hitbox) in marker_hitboxes {
+                layout.add(UiElementId::MinimapMarker(marker_idx), hitbox);
             }
 
             let footer_left = panel_rect.x + 14.0;
@@ -6071,18 +6177,19 @@ impl Renderer {
             // Layout: BG bottom aligned with hotkey bar bottom, text inside with padding
             let bg_padding = 6.0 * zoom;
             let line_height = 18.0 * zoom;
-            let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 220.0 } else { 400.0 * zoom };
+            let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 260.0 } else { 360.0 * zoom };
             let font_size = 16.0 * zoom;
-            let max_visible_lines: usize = if zoom >= 2.0 { 7 } else { 9 };
+            let max_visible_lines: usize = if zoom >= 2.0 { 6 } else { 7 };
             let chat_area_h = max_visible_lines as f32 * line_height;
 
             // BG rectangle positioned from the hotkey bar bottom edge
-            // Push chat log up when input bar is open to avoid overlap
             let chat_input_open = state.ui_state.chat_open && !matches!(state.ui_state.chat_active_tab, ChatChannel::System);
-            let bg_bottom = if chat_input_open {
-                chat_sh - 54.0 * zoom
+            let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
+            // When input bar is open, shrink visible area so messages don't render behind it
+            let effective_bottom = if chat_input_open {
+                bg_bottom - 28.0 * zoom
             } else {
-                chat_sh - EXP_BAR_GAP * scale
+                bg_bottom
             };
             let clip_h = chat_area_h + bg_padding * 2.0;
             let clip_x = chat_x - bg_padding;
@@ -6090,11 +6197,11 @@ impl Renderer {
             let clip_w = max_chat_width + bg_padding * 2.0;
 
             // Text baselines inside the BG, bg_padding from edges
-            let chat_bottom_y = bg_bottom - bg_padding;
+            let chat_bottom_y = effective_bottom - bg_padding;
             let chat_top_y = clip_y + bg_padding;
 
             // Tab bar above chat log
-            let tab_h = 22.0 * zoom;
+            let tab_h = 18.0 * zoom;
             let tab_names = ["Public", "Global", "System"];
             let tab_channels = [ChatChannel::Local, ChatChannel::Global, ChatChannel::System];
             let num_tabs = 3.0f32;
@@ -6487,8 +6594,9 @@ impl Renderer {
             let zoom = state.camera.zoom;
             let (_, input_sh) = virtual_screen_size();
             let input_x = 10.0;
-            let input_y = input_sh - 50.0 * zoom;
-            let input_width = 400.0 * zoom;
+            let scale = state.ui_state.ui_scale;
+            let input_y = input_sh - EXP_BAR_GAP * scale - 24.0 * zoom - 4.0 * zoom;
+            let input_width = 360.0 * zoom;
             let input_height = 24.0 * zoom;
             let text_padding = 5.0 * zoom;
             let font_size = 16.0 * zoom;
@@ -6586,13 +6694,6 @@ impl Renderer {
                 );
             }
 
-            // Hint
-            let hint = if state.ui_state.classic_controls {
-                "Press Enter to send"
-            } else {
-                "Press Enter to send, Escape to cancel"
-            };
-            self.draw_text_sharp(hint, input_x, input_y + input_height + 12.0 * zoom, font_size, LIGHTGRAY);
         }
     }
 
@@ -6656,19 +6757,14 @@ impl Renderer {
             let (_, chat_sh) = virtual_screen_size();
             let bg_padding = 6.0 * zoom;
             let line_height = 18.0 * zoom;
-            let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 220.0 } else { 400.0 * zoom };
-            let max_visible_lines: usize = if zoom >= 2.0 { 7 } else { 9 };
+            let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 260.0 } else { 360.0 * zoom };
+            let max_visible_lines: usize = if zoom >= 2.0 { 6 } else { 7 };
             let chat_area_h = max_visible_lines as f32 * line_height;
-            let chat_input_open = state.ui_state.chat_open && !matches!(state.ui_state.chat_active_tab, ChatChannel::System);
-            let bg_bottom = if chat_input_open {
-                chat_sh - 54.0 * zoom
-            } else {
-                chat_sh - EXP_BAR_GAP * scale
-            };
+            let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
             let clip_h = chat_area_h + bg_padding * 2.0;
             let clip_y = bg_bottom - clip_h;
 
-            let tab_h = 22.0 * zoom;
+            let tab_h = 18.0 * zoom;
             let num_tabs = 3.0f32;
             let tab_w = (max_chat_width / num_tabs).floor();
             let tab_bar_y = clip_y - tab_h;
@@ -6717,10 +6813,11 @@ impl Renderer {
 
         // Quest objective tracker / contract tracker below minimap on the right side.
         let preview = self.minimap_preview_rect();
-        let tracker_x = preview.x.floor();
+        let tracker_right = (preview.x + preview.w).floor();
         let tracker_y = (preview.y + preview.h + 14.0).floor();
-        let (sw, _) = virtual_screen_size();
-        let tracker_width = (sw - tracker_x - 8.0).max(120.0);
+        // Keep the tracker right edge flush with the minimap right edge, but allow extra room by expanding left.
+        let tracker_width = (preview.w + 88.0).max(120.0).min(tracker_right - 10.0);
+        let tracker_x = (tracker_right - tracker_width).floor();
         self.render_quest_tracker(state, tracker_x, tracker_y, tracker_width);
 
         // Farming contract tracker (shown in farming area)
