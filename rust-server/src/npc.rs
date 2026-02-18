@@ -725,6 +725,8 @@ pub struct NpcUpdate {
     pub id: String,
     /// Entity prototype ID (e.g., "pig", "elder_villager") for client-side lookup
     pub entity_type: String,
+    /// NPC prototype ID used by quest definitions (giver_npc)
+    pub prototype_id: String,
     /// Display name to show above NPC
     pub display_name: String,
     pub x: i32, // Grid position
@@ -738,6 +740,8 @@ pub struct NpcUpdate {
     pub hostile: bool,
     /// Whether this NPC offers quests
     pub is_quest_giver: bool,
+    /// True when this NPC currently has a quest ready to turn in for the receiving player
+    pub can_turn_in_quest: bool,
     /// Whether this NPC is a merchant
     pub is_merchant: bool,
     /// Whether this NPC is an altar
@@ -767,6 +771,7 @@ impl From<&Npc> for NpcUpdate {
         Self {
             id: npc.id.clone(),
             entity_type: npc.stats.sprite.clone(),
+            prototype_id: npc.prototype_id.clone(),
             display_name: npc.stats.display_name.clone(),
             x: npc.x,
             y: npc.y,
@@ -777,6 +782,7 @@ impl From<&Npc> for NpcUpdate {
             state: npc.state as u8,
             hostile: npc.is_hostile(),
             is_quest_giver: npc.is_quest_giver(),
+            can_turn_in_quest: false,
             is_merchant: npc.is_merchant(),
             is_altar: npc.is_altar(),
             is_banker: npc.is_banker(),

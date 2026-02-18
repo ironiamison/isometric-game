@@ -407,6 +407,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let npc_state = extract_u8(npc_value, "state").unwrap_or(0);
                         let hostile = extract_bool(npc_value, "hostile").unwrap_or(true);
                         let is_quest_giver = extract_bool(npc_value, "is_quest_giver").unwrap_or(false);
+                        let can_turn_in_quest = extract_bool(npc_value, "can_turn_in_quest").unwrap_or(false);
                         let is_merchant = extract_bool(npc_value, "is_merchant").unwrap_or(false);
                         let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
                         let is_banker = extract_bool(npc_value, "is_banker").unwrap_or(false);
@@ -445,6 +446,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.display_name = display_name;
                             npc.hostile = hostile;
                             npc.is_quest_giver = is_quest_giver;
+                            npc.can_turn_in_quest = can_turn_in_quest;
                             npc.is_merchant = is_merchant;
                             npc.is_altar = is_altar;
                             npc.is_banker = is_banker;
@@ -462,6 +464,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.state = NpcState::from_u8(npc_state);
                             npc.hostile = hostile;
                             npc.is_quest_giver = is_quest_giver;
+                            npc.can_turn_in_quest = can_turn_in_quest;
                             npc.is_merchant = is_merchant;
                             npc.is_altar = is_altar;
                             npc.is_banker = is_banker;
@@ -1205,13 +1208,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if let Some(dialogue) = &state.ui_state.active_dialogue {
                     if dialogue.speaker.eq_ignore_ascii_case("Adventurer Guide") {
                         let selected = match dialogue.quest_id.as_str() {
-                            "adventurer_tier_1" => Some(0),
-                            "adventurer_tier_2" => Some(1),
-                            "adventurer_tier_3" => Some(2),
+                            "adventurer_tier_1" => Some((0, 0)),
+                            "adventurer_tier_2" => Some((0, 1)),
+                            "adventurer_tier_3" => Some((0, 2)),
+                            "skilling_tier_1" | "woodcutting_tier_1" | "fishing_tier_1" | "alchemy_tier_1" => Some((1, 0)),
+                            "skilling_tier_2" | "woodcutting_tier_2" | "fishing_tier_2" | "alchemy_tier_2" => Some((1, 1)),
+                            "skilling_tier_3" | "woodcutting_tier_3" | "fishing_tier_3" | "alchemy_tier_3" => Some((1, 2)),
                             _ => None,
                         };
-                        if let Some(idx) = selected {
-                            state.ui_state.adventurer_selected_tier = idx;
+                        if let Some((tab_idx, tier_idx)) = selected {
+                            state.ui_state.adventurer_selected_tab = tab_idx;
+                            state.ui_state.adventurer_selected_tier = tier_idx;
                         }
                     }
                 }

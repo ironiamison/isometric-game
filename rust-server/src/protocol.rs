@@ -1298,7 +1298,7 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
 /// Pre-encode an NpcUpdate to rmpv::Value for reuse across per-player StateSync messages.
 pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
     use rmpv::Value;
-    let mut nmap = Vec::with_capacity(16);
+    let mut nmap = Vec::with_capacity(20);
     nmap.push((
         Value::String("id".into()),
         Value::String(n.id.clone().into()),
@@ -1306,6 +1306,10 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
     nmap.push((
         Value::String("entity_type".into()),
         Value::String(n.entity_type.clone().into()),
+    ));
+    nmap.push((
+        Value::String("prototype_id".into()),
+        Value::String(n.prototype_id.clone().into()),
     ));
     nmap.push((
         Value::String("display_name".into()),
@@ -1343,6 +1347,10 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
     nmap.push((
         Value::String("is_quest_giver".into()),
         Value::Boolean(n.is_quest_giver),
+    ));
+    nmap.push((
+        Value::String("can_turn_in_quest".into()),
+        Value::Boolean(n.can_turn_in_quest),
     ));
     nmap.push((
         Value::String("is_merchant".into()),
@@ -1710,6 +1718,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::String(n.entity_type.clone().into()),
                     ));
                     nmap.push((
+                        Value::String("prototype_id".into()),
+                        Value::String(n.prototype_id.clone().into()),
+                    ));
+                    nmap.push((
                         Value::String("display_name".into()),
                         Value::String(n.display_name.clone().into()),
                     ));
@@ -1745,6 +1757,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     nmap.push((
                         Value::String("is_quest_giver".into()),
                         Value::Boolean(n.is_quest_giver),
+                    ));
+                    nmap.push((
+                        Value::String("can_turn_in_quest".into()),
+                        Value::Boolean(n.can_turn_in_quest),
                     ));
                     nmap.push((
                         Value::String("is_merchant".into()),

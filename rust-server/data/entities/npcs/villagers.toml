@@ -887,10 +887,7 @@ gold_max = 0
 [adventurer_guide.behaviors]
 hostile = false
 quest_giver = true
-wander_enabled = true
-wander_radius = 1
-wander_pause_min_ms = 12000
-wander_pause_max_ms = 24000
+wander_enabled = false
 facing = "right"
 
 [adventurer_guide.quest_giver]

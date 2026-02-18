@@ -1607,6 +1607,11 @@ impl InputHandler {
             if !was_touch_drag && !was_scrollbar && mouse_clicked {
                 if let Some(ref element) = clicked_element {
                     match element {
+                        UiElementId::AdventurerTab(idx) => {
+                            state.ui_state.adventurer_selected_tab = *idx;
+                            state.ui_state.adventurer_selected_tier = 0;
+                            return commands;
+                        }
                         UiElementId::AdventurerTier(idx) => {
                             state.ui_state.adventurer_selected_tier = *idx;
                             return commands;

@@ -2977,16 +2977,24 @@ impl Renderer {
             let name_y = top_y - 5.0 * zoom;
             let padding = 4.0 * zoom;
 
-            let small_icon: Option<&Texture2D> = if npc.is_quest_giver {
+            let show_turn_in_check = npc.is_quest_giver && npc.can_turn_in_quest;
+            let small_icon: Option<&Texture2D> = if npc.is_quest_giver && !show_turn_in_check {
                 self.chat_small_icon.as_ref()
             } else {
                 None
+            };
+            let check_icon_width = if show_turn_in_check {
+                16.0 * zoom
+            } else {
+                0.0
             };
 
             let icon_gap = 4.0 * zoom;
             let (total_width, icon_width) = if let Some(tex) = small_icon {
                 let w = tex.width() * zoom;
                 (w + icon_gap + name_width, w)
+            } else if show_turn_in_check {
+                (check_icon_width + icon_gap + name_width, check_icon_width)
             } else {
                 (name_width, 0.0)
             };
@@ -3009,9 +3017,23 @@ impl Renderer {
                     dest_size: Some(Vec2::new(tex.width() * zoom, icon_h)),
                     ..Default::default()
                 });
+            } else if show_turn_in_check {
+                if let Some(ref texture) = self.ui_icons {
+                    let src_rect = Rect::new(24.0, 216.0, 24.0, 24.0); // row 10, col 2 (1-based)
+                    let icon_size = 16.0 * zoom;
+                    let bar_top = name_y - 14.0 * zoom;
+                    let icon_y = bar_top + (bar_height - icon_size) / 2.0;
+                    draw_texture_ex(texture, content_x, icon_y, WHITE, DrawTextureParams {
+                        source: Some(src_rect),
+                        dest_size: Some(Vec2::new(icon_size, icon_size)),
+                        ..Default::default()
+                    });
+                } else {
+                    self.draw_text_sharp("✓", content_x, name_y, font_size, Color::from_rgba(120, 255, 140, 255));
+                }
             }
 
-            let text_x = if small_icon.is_some() {
+            let text_x = if small_icon.is_some() || show_turn_in_check {
                 content_x + icon_width + icon_gap
             } else {
                 content_x
@@ -4994,7 +5016,7 @@ impl Renderer {
         let top_y = screen_y - sprite_height + 4.0 * zoom;
 
         // Determine icon coords for friendly NPCs (quest givers only)
-        let icon_coords: Option<(u32, u32)> = if !npc.is_hostile() && npc.is_quest_giver {
+        let icon_coords: Option<(u32, u32)> = if !npc.is_hostile() && npc.is_quest_giver && !npc.can_turn_in_quest {
             Some((8, 3))  // Quest giver icon
         } else {
             None
@@ -5002,37 +5024,62 @@ impl Renderer {
 
         // Floating icon indicator - only when NOT hovered (when hovered, icon is in name bar)
         if !is_hovered && !is_selected {
-            if let (Some((icon_col, icon_row)), Some(ref texture)) = (icon_coords, &self.ui_icons) {
-                let icon_size = 24.0;
-                let time = macroquad::time::get_time();
+            let icon_size = 24.0;
+            let time = macroquad::time::get_time();
 
-                // Use NPC position as offset so icons don't animate in sync
-                let phase_offset = (npc.x + npc.y * 1.7) as f64;
+            // Use NPC position as offset so icons don't animate in sync
+            let phase_offset = (npc.x + npc.y * 1.7) as f64;
 
-                // Pulsing transparency (2 second cycle, 80-100% opacity)
-                let alpha_pulse = ((time * 3.14 + phase_offset).sin() * 0.5 + 0.5) as f32;
-                let mut alpha = (204.0 + alpha_pulse * 51.0) as u8; // 204-255 (80-100%)
+            // Pulsing transparency (2 second cycle, 80-100% opacity)
+            let alpha_pulse = ((time * 3.14 + phase_offset).sin() * 0.5 + 0.5) as f32;
+            let mut alpha = (204.0 + alpha_pulse * 51.0) as u8; // 204-255 (80-100%)
 
-                // Fade icon out when speech bubble appears, fade back in when it disappears
-                if let Some((_, bubble_time)) = &npc.speech_bubble {
-                    let age = (time - bubble_time) as f32;
-                    let icon_alpha = if age < 0.5 {
-                        // Fade out over first 0.5s as bubble appears
-                        ((1.0 - age / 0.5) * 255.0) as u8
-                    } else if age > 4.0 && age <= 5.0 {
-                        // Fade back in during last second as bubble fades out
-                        (((age - 4.0)) * 255.0) as u8
-                    } else if age > 5.0 {
-                        255 // Fully visible after bubble is gone
-                    } else {
-                        0 // Hidden while bubble is showing
-                    };
-                    alpha = alpha.min(icon_alpha);
+            // Fade icon out when speech bubble appears, fade back in when it disappears
+            if let Some((_, bubble_time)) = &npc.speech_bubble {
+                let age = (time - bubble_time) as f32;
+                let icon_alpha = if age < 0.5 {
+                    // Fade out over first 0.5s as bubble appears
+                    ((1.0 - age / 0.5) * 255.0) as u8
+                } else if age > 4.0 && age <= 5.0 {
+                    // Fade back in during last second as bubble fades out
+                    (((age - 4.0)) * 255.0) as u8
+                } else if age > 5.0 {
+                    255 // Fully visible after bubble is gone
+                } else {
+                    0 // Hidden while bubble is showing
+                };
+                alpha = alpha.min(icon_alpha);
+            }
+
+            let icon_x = screen_x - (icon_size * zoom) / 2.0;
+            let icon_y = top_y - 20.0 * zoom;
+
+            if npc.is_quest_giver && npc.can_turn_in_quest {
+                if let Some(ref texture) = self.ui_icons {
+                    let src_rect = Rect::new(24.0, 216.0, 24.0, 24.0); // row 10, col 2 (1-based)
+                    draw_texture_ex(
+                        texture,
+                        icon_x,
+                        icon_y,
+                        Color::from_rgba(255, 255, 255, alpha),
+                        DrawTextureParams {
+                            source: Some(src_rect),
+                            dest_size: Some(Vec2::new(icon_size * zoom, icon_size * zoom)),
+                            ..Default::default()
+                        },
+                    );
+                } else {
+                    let check_size = 18.0 * zoom;
+                    let check_dims = self.measure_text_sharp("✓", check_size);
+                    self.draw_text_sharp(
+                        "✓",
+                        icon_x + (icon_size * zoom - check_dims.width) / 2.0,
+                        icon_y + (icon_size * zoom + check_dims.height) / 2.0 - 2.0 * zoom,
+                        check_size,
+                        Color::from_rgba(120, 255, 140, alpha),
+                    );
                 }
-
-                let icon_x = screen_x - (icon_size * zoom) / 2.0;
-                let icon_y = top_y - 20.0 * zoom;
-
+            } else if let (Some((icon_col, icon_row)), Some(ref texture)) = (icon_coords, &self.ui_icons) {
                 let src_rect = Rect::new(
                     icon_col as f32 * icon_size,
                     icon_row as f32 * icon_size,

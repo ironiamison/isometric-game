@@ -27,27 +27,54 @@ struct GuideTierTemplate {
     objectives: &'static [GuideObjectiveTemplate],
 }
 
-const GUIDE_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+#[derive(Clone, Copy)]
+struct GuideTrackTemplate {
+    title: &'static str,
+    tiers: &'static [GuideTierTemplate],
+    no_action_hint: &'static str,
+}
+
+const COMBAT_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
     GuideObjectiveTemplate { id: "kill_crows", label: "Defeat crows", target: 8 },
     GuideObjectiveTemplate { id: "reach_combat_8", label: "Reach Combat level", target: 8 },
     GuideObjectiveTemplate { id: "gather_gold_150", label: "Accumulate gold", target: 150 },
 ];
-const GUIDE_T2_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+const COMBAT_T2_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
     GuideObjectiveTemplate { id: "kill_blue_slimes", label: "Defeat blue slimes", target: 12 },
     GuideObjectiveTemplate { id: "reach_woodcutting_5", label: "Reach Woodcutting level", target: 5 },
     GuideObjectiveTemplate { id: "gather_gold_400", label: "Accumulate gold", target: 400 },
 ];
-const GUIDE_T3_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+const COMBAT_T3_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
     GuideObjectiveTemplate { id: "kill_pigs", label: "Defeat pigs", target: 15 },
     GuideObjectiveTemplate { id: "reach_farming_8", label: "Reach Farming level", target: 8 },
     GuideObjectiveTemplate { id: "gather_gold_900", label: "Accumulate gold", target: 900 },
 ];
 
-const GUIDE_T1_REWARDS: [&str; 1] = ["3x Weak Health Potion"];
-const GUIDE_T2_REWARDS: [&str; 2] = ["2x Health Potion", "2x Weak Mana Potion"];
-const GUIDE_T3_REWARDS: [&str; 2] = ["2x Strong Health Potion", "2x Prayer Potion"];
+const SKILLING_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+    GuideObjectiveTemplate { id: "reach_woodcutting_5", label: "Reach Woodcutting level", target: 5 },
+    GuideObjectiveTemplate { id: "catch_fish_25", label: "Catch fish", target: 25 },
+    GuideObjectiveTemplate { id: "brew_potions_10", label: "Brew alchemy potions", target: 10 },
+];
+const SKILLING_T2_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+    GuideObjectiveTemplate { id: "reach_woodcutting_10", label: "Reach Woodcutting level", target: 10 },
+    GuideObjectiveTemplate { id: "catch_fish_75", label: "Catch fish", target: 75 },
+    GuideObjectiveTemplate { id: "brew_potions_30", label: "Brew alchemy potions", target: 30 },
+];
+const SKILLING_T3_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
+    GuideObjectiveTemplate { id: "reach_woodcutting_15", label: "Reach Woodcutting level", target: 15 },
+    GuideObjectiveTemplate { id: "catch_fish_150", label: "Catch fish", target: 150 },
+    GuideObjectiveTemplate { id: "brew_potions_60", label: "Brew alchemy potions", target: 60 },
+];
 
-const GUIDE_TIERS: [GuideTierTemplate; 3] = [
+const COMBAT_T1_REWARDS: [&str; 1] = ["3x Weak Health Potion"];
+const COMBAT_T2_REWARDS: [&str; 2] = ["2x Health Potion", "2x Weak Mana Potion"];
+const COMBAT_T3_REWARDS: [&str; 2] = ["2x Strong Health Potion", "2x Prayer Potion"];
+
+const SKILLING_T1_REWARDS: [&str; 2] = ["1x Bronze Axe", "1x Small Bait Pack"];
+const SKILLING_T2_REWARDS: [&str; 2] = ["2x Focus Tonic", "1x Iron Axe"];
+const SKILLING_T3_REWARDS: [&str; 2] = ["3x Alchemy Catalyst", "1x Master Angler Bait Pack"];
+
+const COMBAT_TIERS: [GuideTierTemplate; 3] = [
     GuideTierTemplate {
         id: "adventurer_tier_1",
         title: "Getting a Grip on It",
@@ -55,8 +82,8 @@ const GUIDE_TIERS: [GuideTierTemplate; 3] = [
         description: "Build your baseline with combat, monster clears, and early money control.",
         reward_exp: 300,
         reward_gold: 120,
-        reward_items: &GUIDE_T1_REWARDS,
-        objectives: &GUIDE_T1_OBJECTIVES,
+        reward_items: &COMBAT_T1_REWARDS,
+        objectives: &COMBAT_T1_OBJECTIVES,
     },
     GuideTierTemplate {
         id: "adventurer_tier_2",
@@ -65,8 +92,8 @@ const GUIDE_TIERS: [GuideTierTemplate; 3] = [
         description: "Balance combat and gathering while keeping momentum across objectives.",
         reward_exp: 450,
         reward_gold: 220,
-        reward_items: &GUIDE_T2_REWARDS,
-        objectives: &GUIDE_T2_OBJECTIVES,
+        reward_items: &COMBAT_T2_REWARDS,
+        objectives: &COMBAT_T2_OBJECTIVES,
     },
     GuideTierTemplate {
         id: "adventurer_tier_3",
@@ -75,8 +102,54 @@ const GUIDE_TIERS: [GuideTierTemplate; 3] = [
         description: "Prove discipline across combat, farming growth, and wealth management.",
         reward_exp: 700,
         reward_gold: 400,
-        reward_items: &GUIDE_T3_REWARDS,
-        objectives: &GUIDE_T3_OBJECTIVES,
+        reward_items: &COMBAT_T3_REWARDS,
+        objectives: &COMBAT_T3_OBJECTIVES,
+    },
+];
+
+const SKILLING_TIERS: [GuideTierTemplate; 3] = [
+    GuideTierTemplate {
+        id: "skilling_tier_1",
+        title: "Skilling Foundations",
+        subtitle: "Tier I",
+        description: "Focus on gathering loops: woodcutting, fishing, and beginner alchemy output.",
+        reward_exp: 260,
+        reward_gold: 100,
+        reward_items: &SKILLING_T1_REWARDS,
+        objectives: &SKILLING_T1_OBJECTIVES,
+    },
+    GuideTierTemplate {
+        id: "skilling_tier_2",
+        title: "Skilling Routine",
+        subtitle: "Tier II",
+        description: "Scale your production rhythm and sustain resources through better efficiency.",
+        reward_exp: 420,
+        reward_gold: 180,
+        reward_items: &SKILLING_T2_REWARDS,
+        objectives: &SKILLING_T2_OBJECTIVES,
+    },
+    GuideTierTemplate {
+        id: "skilling_tier_3",
+        title: "Skilling Specialist",
+        subtitle: "Tier III",
+        description: "Commit to a long-term skilling route with high-output gathering and crafting.",
+        reward_exp: 620,
+        reward_gold: 320,
+        reward_items: &SKILLING_T3_REWARDS,
+        objectives: &SKILLING_T3_OBJECTIVES,
+    },
+];
+
+const GUIDE_TRACKS: [GuideTrackTemplate; 2] = [
+    GuideTrackTemplate {
+        title: "Combat",
+        tiers: &COMBAT_TIERS,
+        no_action_hint: "Talk to the guide about this combat tier to take action.",
+    },
+    GuideTrackTemplate {
+        title: "Skilling",
+        tiers: &SKILLING_TIERS,
+        no_action_hint: "Skilling tiers unlock from skilling quest dialogue.",
     },
 ];
 
@@ -85,6 +158,35 @@ fn is_adventurer_guide_dialogue(dialogue: &ActiveDialogue) -> bool {
 }
 
 impl Renderer {
+    fn truncate_text_to_width(&self, text: &str, max_width: f32, font_size: f32) -> String {
+        if self.measure_text_sharp(text, font_size).width <= max_width {
+            return text.to_string();
+        }
+
+        let ellipsis = "...";
+        let ellipsis_w = self.measure_text_sharp(ellipsis, font_size).width;
+        if ellipsis_w > max_width {
+            return String::new();
+        }
+
+        let mut out = String::new();
+        for ch in text.chars() {
+            let mut candidate = out.clone();
+            candidate.push(ch);
+            let with_ellipsis = format!("{}{}", candidate, ellipsis);
+            if self.measure_text_sharp(&with_ellipsis, font_size).width > max_width {
+                break;
+            }
+            out.push(ch);
+        }
+
+        if out.is_empty() {
+            ellipsis.to_string()
+        } else {
+            format!("{}{}", out, ellipsis)
+        }
+    }
+
     pub(crate) fn render_dialogue(&self, state: &GameState, dialogue: &ActiveDialogue, hovered: &Option<UiElementId>, layout: &mut UiLayout, scroll_offset: f32, scrollbar_dragging: bool) {
         if is_adventurer_guide_dialogue(dialogue) {
             self.render_adventurer_guide_dialogue(state, dialogue, hovered, layout);
@@ -416,8 +518,7 @@ impl Renderer {
         self.draw_panel_frame(panel_x, panel_y, panel_w, panel_h);
         self.draw_corner_accents(panel_x, panel_y, panel_w, panel_h);
 
-        self.draw_text_sharp("ADVENTURE PATHS", panel_x + 18.0, panel_y + 28.0, 18.0, TEXT_TITLE);
-        self.draw_text_sharp("Custom progression milestones", panel_x + 220.0, panel_y + 28.0, 16.0, TEXT_DIM);
+        self.draw_text_sharp("ADVENTURE PATHS", panel_x + 18.0, panel_y + 28.0, 16.0, TEXT_TITLE);
 
         let close_x = panel_x + panel_w - 32.0;
         let close_y = panel_y + 8.0;
@@ -428,22 +529,49 @@ impl Renderer {
         draw_rectangle(close_x + 1.0, close_y + 1.0, 18.0, 14.0, if close_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY });
         self.draw_text_sharp("X", close_x + 7.0, close_y + 12.0, 16.0, if close_hovered { TEXT_TITLE } else { TEXT_DIM });
 
+        let selected_track_idx = state.ui_state.adventurer_selected_tab.min(GUIDE_TRACKS.len().saturating_sub(1));
+        let selected_track = GUIDE_TRACKS[selected_track_idx];
+
+        let tab_y = panel_y + 36.0;
+        let tab_h = 28.0;
+        let tab_w = 116.0;
+        let mut tab_x = panel_x + 18.0;
+        for (idx, track) in GUIDE_TRACKS.iter().enumerate() {
+            let tab_bounds = Rect::new(tab_x, tab_y, tab_w, tab_h);
+            layout.add(UiElementId::AdventurerTab(idx), tab_bounds);
+            let tab_selected = idx == selected_track_idx;
+            let tab_hovered = matches!(hovered, Some(UiElementId::AdventurerTab(i)) if *i == idx);
+            let tab_border = if tab_selected || tab_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID };
+            let tab_bg = if tab_selected {
+                SLOT_HOVER_BG
+            } else if tab_hovered {
+                Color::new(0.14, 0.14, 0.20, 1.0)
+            } else {
+                SLOT_BG_EMPTY
+            };
+            draw_rectangle(tab_x, tab_y, tab_w, tab_h, tab_border);
+            draw_rectangle(tab_x + 1.0, tab_y + 1.0, tab_w - 2.0, tab_h - 2.0, tab_bg);
+            let label_w = self.measure_text_sharp(track.title, 16.0).width;
+            self.draw_text_sharp(track.title, tab_x + (tab_w - label_w) * 0.5, tab_y + 19.0, 16.0, if tab_selected { TEXT_TITLE } else { TEXT_NORMAL });
+            tab_x += tab_w + 8.0;
+        }
+
         let left_w = 220.0;
         let left_x = panel_x + 12.0;
-        let left_y = panel_y + 42.0;
-        let left_h = panel_h - 54.0;
+        let left_y = tab_y + tab_h + 8.0;
+        let left_h = panel_y + panel_h - left_y - 12.0;
         draw_rectangle(left_x, left_y, left_w, left_h, SLOT_BORDER);
         draw_rectangle(left_x + 1.0, left_y + 1.0, left_w - 2.0, left_h - 2.0, SLOT_BG_EMPTY);
 
-        let selected_idx = state.ui_state.adventurer_selected_tier.min(GUIDE_TIERS.len().saturating_sub(1));
+        let selected_idx = state.ui_state.adventurer_selected_tier.min(selected_track.tiers.len().saturating_sub(1));
 
         let mut row_y = left_y + 8.0;
-        for (idx, tier) in GUIDE_TIERS.iter().enumerate() {
+        for (idx, tier) in selected_track.tiers.iter().enumerate() {
             let is_selected = idx == selected_idx;
             let completed = state.ui_state.completed_quest_ids.contains(tier.id);
             let is_active = state.ui_state.active_quests.iter().any(|q| q.id == tier.id);
             let unlocked = idx == 0
-                || state.ui_state.completed_quest_ids.contains(GUIDE_TIERS[idx - 1].id)
+                || state.ui_state.completed_quest_ids.contains(selected_track.tiers[idx - 1].id)
                 || is_active
                 || completed;
 
@@ -481,9 +609,15 @@ impl Renderer {
             } else {
                 TEXT_DIM
             };
-            self.draw_text_sharp(tier.subtitle, row_bounds.x + 8.0, row_bounds.y + 16.0, 15.0, TEXT_DIM);
-            self.draw_text_sharp(tier.title, row_bounds.x + 8.0, row_bounds.y + 32.0, 16.0, if unlocked { TEXT_NORMAL } else { TEXT_DIM });
-            self.draw_text_sharp(status, row_bounds.x + row_bounds.w - 84.0, row_bounds.y + 32.0, 14.0, status_color);
+            let status_w = self.measure_text_sharp(status, 16.0).width;
+            let status_x = row_bounds.x + row_bounds.w - status_w - 8.0;
+            let title_x = row_bounds.x + 8.0;
+            let title_max_w = (status_x - title_x - 10.0).max(20.0);
+            let title_text = self.truncate_text_to_width(tier.title, title_max_w, 16.0);
+
+            self.draw_text_sharp(tier.subtitle, row_bounds.x + 8.0, row_bounds.y + 16.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp(&title_text, title_x, row_bounds.y + 32.0, 16.0, if unlocked { TEXT_NORMAL } else { TEXT_DIM });
+            self.draw_text_sharp(status, status_x, row_bounds.y + 32.0, 16.0, status_color);
 
             row_y += row_h + 8.0;
         }
@@ -495,12 +629,18 @@ impl Renderer {
         draw_rectangle(right_x, right_y, right_w, right_h, SLOT_BORDER);
         draw_rectangle(right_x + 1.0, right_y + 1.0, right_w - 2.0, right_h - 2.0, Color::new(0.09, 0.09, 0.13, 1.0));
 
-        let tier = GUIDE_TIERS[selected_idx];
+        let tier = selected_track.tiers[selected_idx];
         let completed = state.ui_state.completed_quest_ids.contains(tier.id);
         let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == tier.id);
 
-        self.draw_text_sharp(tier.title, right_x + 12.0, right_y + 26.0, 20.0, TEXT_TITLE);
-        self.draw_text_sharp(tier.subtitle, right_x + right_w - 82.0, right_y + 26.0, 16.0, FRAME_MID);
+        let right_subtitle_w = self.measure_text_sharp(tier.subtitle, 16.0).width;
+        let right_subtitle_x = right_x + right_w - right_subtitle_w - 12.0;
+        let right_title_x = right_x + 12.0;
+        let right_title_max_w = (right_subtitle_x - right_title_x - 12.0).max(20.0);
+        let right_title = self.truncate_text_to_width(tier.title, right_title_max_w, 16.0);
+
+        self.draw_text_sharp(&right_title, right_title_x, right_y + 26.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(tier.subtitle, right_subtitle_x, right_y + 26.0, 16.0, FRAME_MID);
 
         let mut desc_y = right_y + 48.0;
         for line in self.wrap_text(tier.description, right_w - 24.0, 16.0).iter().take(3) {
@@ -594,8 +734,9 @@ impl Renderer {
                 }
             }
         } else {
+            let hint = self.truncate_text_to_width(selected_track.no_action_hint, 268.0, 16.0);
             self.draw_text_sharp(
-                "Select this tier in dialogue to take action.",
+                &hint,
                 right_x + right_w - 280.0,
                 action_base_y + 20.0,
                 16.0,

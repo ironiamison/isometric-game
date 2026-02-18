@@ -8680,6 +8680,62 @@ impl GameRoom {
             // Both read locks released here
         };
 
+        // Per-player lookup: quest giver prototype IDs that currently have turn-ins available.
+        let ready_turnin_npc_types_by_player: HashMap<String, HashSet<String>> = {
+            let ready_quests_by_player: Vec<(String, Vec<String>)> = {
+                let quest_states = self.player_quest_states.read().await;
+                quest_states
+                    .iter()
+                    .filter_map(|(player_id, state)| {
+                        let ready_ids: Vec<String> = state
+                            .active_quests
+                            .iter()
+                            .filter_map(|(quest_id, progress)| {
+                                if progress.status == crate::quest::QuestStatus::ReadyToComplete {
+                                    Some(quest_id.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        if ready_ids.is_empty() {
+                            None
+                        } else {
+                            Some((player_id.clone(), ready_ids))
+                        }
+                    })
+                    .collect()
+            };
+
+            let mut quest_to_giver_cache: HashMap<String, Option<String>> = HashMap::new();
+            let mut out: HashMap<String, HashSet<String>> = HashMap::new();
+
+            for (player_id, ready_quests) in ready_quests_by_player {
+                let mut givers: HashSet<String> = HashSet::new();
+                for quest_id in ready_quests {
+                    let giver_npc = if let Some(cached) = quest_to_giver_cache.get(&quest_id) {
+                        cached.clone()
+                    } else {
+                        let resolved = self
+                            .quest_registry
+                            .get(&quest_id)
+                            .await
+                            .map(|q| q.giver_npc.clone());
+                        quest_to_giver_cache.insert(quest_id.clone(), resolved.clone());
+                        resolved
+                    };
+                    if let Some(giver) = giver_npc {
+                        givers.insert(giver);
+                    }
+                }
+                if !givers.is_empty() {
+                    out.insert(player_id, givers);
+                }
+            }
+
+            out
+        };
+
         // Build position lookup for O(1) access during culling
         let player_pos_map: HashMap<&str, (i32, i32)> = player_updates.iter()
             .map(|p| (p.id.as_str(), (p.x, p.y)))
@@ -8705,9 +8761,14 @@ impl GameRoom {
             }
         }
 
-        // Instance groups: encode once per instance, send to all players in that instance
+        // Instance groups: per-player encode because quest turn-in indicators are player-specific.
         for (inst_id, group_senders) in &instance_groups {
-            if !group_senders.iter().any(|(_, sender)| sender.capacity() > 0) {
+            let active_receivers: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = group_senders
+                .iter()
+                .copied()
+                .filter(|(_, sender)| sender.capacity() > 0)
+                .collect();
+            if active_receivers.is_empty() {
                 tick_telemetry.state_sync_capacity_skips += group_senders.len();
                 continue;
             }
@@ -8717,23 +8778,35 @@ impl GameRoom {
                 .map(|ps| ps.iter().map(|p| crate::protocol::player_update_to_value(p)).collect())
                 .unwrap_or_default();
 
-            let npc_values: Vec<rmpv::Value> = if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
-                instance.get_npc_updates().await.iter()
-                    .map(|n| crate::protocol::npc_update_to_value(n))
-                    .collect()
+            let instance_npcs: Vec<NpcUpdate> = if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                instance.get_npc_updates().await
             } else {
                 Vec::new()
             };
 
-            if let Ok(raw) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, inst_id) {
-                let bytes = crate::protocol::maybe_compress(raw);
-                for (pid, sender) in group_senders {
-                    if sender.capacity() == 0 {
-                        tick_telemetry.state_sync_capacity_skips += 1;
-                        continue;
-                    }
+            for (pid, sender) in active_receivers {
+                let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(pid.as_str());
+                let npc_values: Vec<rmpv::Value> = instance_npcs
+                    .iter()
+                    .map(|n| {
+                        let mut n_for_player = n.clone();
+                        n_for_player.can_turn_in_quest = n_for_player.is_quest_giver
+                            && ready_turnin_npcs
+                                .map(|set| set.contains(n_for_player.prototype_id.as_str()))
+                                .unwrap_or(false);
+                        crate::protocol::npc_update_to_value(&n_for_player)
+                    })
+                    .collect();
+
+                if let Ok(raw) = crate::protocol::encode_state_sync_from_values(
+                    tick,
+                    player_values.clone(),
+                    npc_values,
+                    inst_id,
+                ) {
+                    let bytes = crate::protocol::maybe_compress(raw);
                     tick_telemetry.state_sync_send_attempts += 1;
-                    if let Err(e) = sender.try_send(bytes.clone()) {
+                    if let Err(e) = sender.try_send(bytes) {
                         tick_telemetry.state_sync_try_send_drops += 1;
                         tracing::debug!("StateSync drop for {}: {}", pid, e);
                     }
@@ -8769,9 +8842,17 @@ impl GameRoom {
                 .filter(|(_, p)| (p.x - px).abs().max((p.y - py).abs()) <= VIEW_DISTANCE)
                 .map(|(_, p)| (p.id.clone(), *p))
                 .collect();
-            let nearby_npcs: HashMap<String, &NpcUpdate> = npc_map.iter()
+            let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(player_id.as_str());
+            let nearby_npcs: HashMap<String, NpcUpdate> = npc_map.iter()
                 .filter(|(_, n)| (n.x - px).abs().max((n.y - py).abs()) <= VIEW_DISTANCE)
-                .map(|(_, n)| (n.id.clone(), *n))
+                .map(|(_, n)| {
+                    let mut n_for_player = (*n).clone();
+                    n_for_player.can_turn_in_quest = n_for_player.is_quest_giver
+                        && ready_turnin_npcs
+                            .map(|set| set.contains(n_for_player.prototype_id.as_str()))
+                            .unwrap_or(false);
+                    (n_for_player.id.clone(), n_for_player)
+                })
                 .collect();
 
             let sync_state = sync_states.entry(player_id.to_string()).or_insert_with(PlayerSyncState::new);
@@ -8799,9 +8880,7 @@ impl GameRoom {
                         sync_state.last_players = nearby_players.into_iter()
                             .map(|(id, p)| (id, p.clone()))
                             .collect();
-                        sync_state.last_npcs = nearby_npcs.into_iter()
-                            .map(|(id, n)| (id, n.clone()))
-                            .collect();
+                        sync_state.last_npcs = nearby_npcs;
                     }
                 }
             } else {
@@ -8824,7 +8903,7 @@ impl GameRoom {
                 let mut changed_npcs: Vec<rmpv::Value> = Vec::new();
                 for (id, update) in &nearby_npcs {
                     match sync_state.last_npcs.get(id) {
-                        Some(last) if last == *update => {} // unchanged, skip
+                        Some(last) if last == update => {} // unchanged, skip
                         _ => changed_npcs.push(crate::protocol::npc_update_to_value(update)),
                     }
                 }

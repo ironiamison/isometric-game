@@ -57,6 +57,8 @@ pub struct Npc {
     pub hostile: bool,
     /// Whether this NPC offers quests
     pub is_quest_giver: bool,
+    /// Whether this quest giver currently has a quest ready to turn in
+    pub can_turn_in_quest: bool,
     /// Whether this NPC is a merchant
     pub is_merchant: bool,
     /// Whether this NPC is an altar
@@ -99,6 +101,7 @@ impl Npc {
             animation: NpcAnimation::default(),
             hostile: true,
             is_quest_giver: false,
+            can_turn_in_quest: false,
             is_merchant: false,
             is_altar: false,
             is_banker: false,
