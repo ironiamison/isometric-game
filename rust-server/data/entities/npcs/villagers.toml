@@ -889,8 +889,8 @@ hostile = false
 quest_giver = true
 wander_enabled = false
 facing = "right"
-ui_anchor_offset_x = -6.0
-ui_icon_offset_x = -6.0
+ui_anchor_offset_x = 10.0
+ui_icon_offset_x = 10.0
 
 [adventurer_guide.quest_giver]
 available_quests = ["adventurer_tier_1", "adventurer_tier_2", "adventurer_tier_3"]
