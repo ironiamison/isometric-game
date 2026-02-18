@@ -1381,6 +1381,10 @@ impl Renderer {
         )
     }
 
+    fn minimap_preview_enabled(&self, state: &GameState) -> bool {
+        !state.ui_state.graphics_low
+    }
+
     fn minimap_panel_rect(&self) -> Rect {
         let (sw, sh) = virtual_screen_size();
         let panel_w = (sw * 0.72).clamp(420.0, 760.0);
@@ -1393,7 +1397,7 @@ impl Renderer {
         )
     }
 
-    fn local_name_tag_position(&self) -> (f32, f32) {
+    fn local_name_tag_position(&self, _state: &GameState) -> (f32, f32) {
         #[cfg(target_os = "android")]
         {
             (10.0, 46.0)
@@ -1404,9 +1408,9 @@ impl Renderer {
         }
     }
 
-    fn minimap_stats_stack_position(&self, bar_width: f32) -> (f32, f32) {
+    fn minimap_stats_stack_position(&self, state: &GameState, bar_width: f32) -> (f32, f32) {
         let _ = bar_width;
-        let (name_tag_x, name_tag_y) = self.local_name_tag_position();
+        let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
         (
             name_tag_x.floor(),
             (name_tag_y + 22.0 + 4.0).floor(),
@@ -2016,35 +2020,42 @@ impl Renderer {
         }
 
         let mut hitboxes: Vec<(usize, Rect)> = Vec::with_capacity(if capture_hitboxes { markers.len() } else { 0 });
-        for (idx, marker) in markers.iter().enumerate() {
-            if marker.x < bounds.min_x
-                || marker.x > bounds.max_x
-                || marker.y < bounds.min_y
-                || marker.y > bounds.max_y
-            {
-                continue;
-            }
-            let (sx, sy) = self.minimap_world_to_screen(bounds, map_rect, marker.x, marker.y);
-            let (color, base_radius) = Self::minimap_marker_style(marker.kind);
-            let hovered = hovered_marker == Some(idx);
-            let radius = base_radius * marker_scale + if hovered { 1.4 } else { 0.0 };
+        // Draw player markers in a second pass so they always stay above other marker types.
+        for draw_player_pass in [false, true] {
+            for (idx, marker) in markers.iter().enumerate() {
+                let is_player = marker.kind == MinimapMarkerKind::Player;
+                if is_player != draw_player_pass {
+                    continue;
+                }
+                if marker.x < bounds.min_x
+                    || marker.x > bounds.max_x
+                    || marker.y < bounds.min_y
+                    || marker.y > bounds.max_y
+                {
+                    continue;
+                }
+                let (sx, sy) = self.minimap_world_to_screen(bounds, map_rect, marker.x, marker.y);
+                let (color, base_radius) = Self::minimap_marker_style(marker.kind);
+                let hovered = hovered_marker == Some(idx);
+                let radius = base_radius * marker_scale + if hovered { 1.4 } else { 0.0 };
 
-            draw_circle(sx, sy, radius + 1.2, Color::new(0.0, 0.0, 0.0, 0.65));
-            draw_circle(sx, sy, radius, color);
-            if hovered {
-                draw_circle_lines(sx, sy, radius + 1.6, 1.0, Color::new(1.0, 1.0, 1.0, 0.9));
-            }
+                draw_circle(sx, sy, radius + 1.2, Color::new(0.0, 0.0, 0.0, 0.65));
+                draw_circle(sx, sy, radius, color);
+                if hovered {
+                    draw_circle_lines(sx, sy, radius + 1.6, 1.0, Color::new(1.0, 1.0, 1.0, 0.9));
+                }
 
-            if capture_hitboxes {
-                hitboxes.push((
-                    idx,
-                    Rect::new(
-                        sx - radius - 3.0,
-                        sy - radius - 3.0,
-                        (radius + 3.0) * 2.0,
-                        (radius + 3.0) * 2.0,
-                    ),
-                ));
+                if capture_hitboxes {
+                    hitboxes.push((
+                        idx,
+                        Rect::new(
+                            sx - radius - 3.0,
+                            sy - radius - 3.0,
+                            (radius + 3.0) * 2.0,
+                            (radius + 3.0) * 2.0,
+                        ),
+                    ));
+                }
             }
         }
 
@@ -2109,7 +2120,9 @@ impl Renderer {
             return;
         }
 
-        layout.add(UiElementId::MinimapToggle, self.minimap_preview_rect());
+        if self.minimap_preview_enabled(state) {
+            layout.add(UiElementId::MinimapToggle, self.minimap_preview_rect());
+        }
 
         if !state.ui_state.minimap_panel_open {
             return;
@@ -6396,10 +6409,12 @@ impl Renderer {
             let tag_height = 22.0;
             let bar_height = 18.0;
 
-            self.render_minimap_preview(state);
+            if self.minimap_preview_enabled(state) {
+                self.render_minimap_preview(state);
+            }
 
             // ===== NAME TAG (top-left) =====
-            let (name_tag_x, name_tag_y) = self.local_name_tag_position();
+            let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
             draw_rectangle(
                 name_tag_x,
                 name_tag_y,
@@ -6415,7 +6430,7 @@ impl Renderer {
             self.draw_text_sharp(&level_text, text_x + name_w, text_y, font_size, TEXT_DIM);
 
             // Place stat bars directly below the top-left name tag.
-            let (bar_x, stats_y) = self.minimap_stats_stack_position(bar_width);
+            let (bar_x, stats_y) = self.minimap_stats_stack_position(state, bar_width);
 
             // ===== HP BAR (below name tag) =====
             let hp_bar_x = bar_x;
@@ -6612,7 +6627,6 @@ impl Renderer {
 
             // Background
             draw_rectangle(input_x, input_y, input_width, input_height, Color::from_rgba(0, 0, 0, 180));
-            draw_rectangle_lines(input_x, input_y, input_width, input_height, 1.0, WHITE);
 
             let input_text = &state.ui_state.chat_input;
             let cursor_pos = state.ui_state.chat_cursor;
@@ -6814,7 +6828,11 @@ impl Renderer {
         // Quest objective tracker / contract tracker below minimap on the right side.
         let preview = self.minimap_preview_rect();
         let tracker_right = (preview.x + preview.w).floor();
-        let tracker_y = (preview.y + preview.h + 14.0).floor();
+        let tracker_y = if self.minimap_preview_enabled(state) {
+            (preview.y + preview.h + 16.0).floor()
+        } else {
+            (MINIMAP_PREVIEW_Y + 14.0).floor()
+        };
         // Keep the tracker right edge flush with the minimap right edge, but allow extra room by expanding left.
         let tracker_width = (preview.w + 88.0).max(120.0).min(tracker_right - 10.0);
         let tracker_x = (tracker_right - tracker_width).floor();
