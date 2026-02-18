@@ -1093,6 +1093,9 @@ impl Renderer {
             .iter()
             .find(|q| q.id == tier.id);
         let tier_is_active = active_quest.is_some();
+        let tier_is_completable = active_quest
+            .map(|q| q.objectives.iter().all(|o| o.completed))
+            .unwrap_or(false);
         let unlocked = is_tier_unlocked(
             state,
             selected_track_idx,
@@ -1237,7 +1240,46 @@ impl Renderer {
         let action_base_y = right_y + right_h - 72.0;
         let actions_locked_by_active_task = has_active_guide_task && !tier_is_active;
         if dialogue.quest_id == tier.id && !actions_locked_by_active_task {
-            if dialogue.choices.is_empty() {
+            if tier_is_active {
+                if tier_is_completable && dialogue.choices.is_empty() {
+                    let btn = Rect::new(right_x + right_w - 170.0, action_base_y, 150.0, 30.0);
+                    layout.add(UiElementId::DialogueContinue, btn);
+                    let hovered_continue = matches!(hovered, Some(UiElementId::DialogueContinue));
+                    draw_rectangle(
+                        btn.x,
+                        btn.y,
+                        btn.w,
+                        btn.h,
+                        if hovered_continue {
+                            SLOT_SELECTED_BORDER
+                        } else {
+                            FRAME_MID
+                        },
+                    );
+                    draw_rectangle(
+                        btn.x + 1.0,
+                        btn.y + 1.0,
+                        btn.w - 2.0,
+                        btn.h - 2.0,
+                        if hovered_continue {
+                            SLOT_HOVER_BG
+                        } else {
+                            SLOT_BG_EMPTY
+                        },
+                    );
+                    self.draw_text_sharp(
+                        "Complete",
+                        btn.x + 46.0,
+                        btn.y + 20.0,
+                        16.0,
+                        if hovered_continue {
+                            TEXT_TITLE
+                        } else {
+                            TEXT_NORMAL
+                        },
+                    );
+                }
+            } else if dialogue.choices.is_empty() {
                 let btn = Rect::new(right_x + right_w - 170.0, action_base_y, 150.0, 30.0);
                 layout.add(UiElementId::DialogueContinue, btn);
                 let hovered_continue = matches!(hovered, Some(UiElementId::DialogueContinue));

@@ -109,6 +109,23 @@ fn is_selected_adventurer_guide_tier_active(state: &GameState) -> bool {
     state.ui_state.active_quests.iter().any(|q| q.id == selected_id)
 }
 
+fn is_selected_adventurer_guide_tier_completable(state: &GameState) -> bool {
+    let Some(selected_id) = adventurer_guide_tier_id(
+        state.ui_state.adventurer_selected_tab,
+        state.ui_state.adventurer_selected_tier,
+    ) else {
+        return false;
+    };
+
+    state
+        .ui_state
+        .active_quests
+        .iter()
+        .find(|q| q.id == selected_id)
+        .map(|q| q.objectives.iter().all(|o| o.completed))
+        .unwrap_or(false)
+}
+
 fn adventurer_guide_actions_locked(state: &GameState) -> bool {
     has_active_adventurer_guide_task(state) && !is_selected_adventurer_guide_tier_active(state)
 }
@@ -2090,8 +2107,12 @@ impl InputHandler {
 
         // Handle dialogue mode - intercept input when dialogue is open
         if let Some(dialogue) = &state.ui_state.active_dialogue {
-            let guide_actions_locked =
-                is_adventurer_guide_dialogue(&dialogue.speaker) && adventurer_guide_actions_locked(state);
+            let is_guide_dialogue = is_adventurer_guide_dialogue(&dialogue.speaker);
+            let guide_actions_locked = is_guide_dialogue && adventurer_guide_actions_locked(state);
+            let guide_selected_active_tier =
+                is_guide_dialogue && is_selected_adventurer_guide_tier_active(state);
+            let guide_selected_tier_completable =
+                is_guide_dialogue && is_selected_adventurer_guide_tier_completable(state);
 
             // Touch drag scrolling for dialogue choices on mobile
             let all_touches: Vec<Touch> = touches();
@@ -2193,7 +2214,7 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::DialogueChoice(idx) => {
-                            if guide_actions_locked {
+                            if guide_actions_locked || guide_selected_active_tier {
                                 return commands;
                             }
                             if *idx < dialogue.choices.len() {
@@ -2206,7 +2227,9 @@ impl InputHandler {
                             }
                         }
                         UiElementId::DialogueContinue => {
-                            if guide_actions_locked {
+                            if guide_actions_locked
+                                || (guide_selected_active_tier && !guide_selected_tier_completable)
+                            {
                                 return commands;
                             }
                             commands.push(InputCommand::DialogueChoice {
@@ -2238,7 +2261,7 @@ impl InputHandler {
                 }
 
                 // Number keys (1-4) select dialogue choices
-                if !guide_actions_locked {
+                if !guide_actions_locked && !guide_selected_active_tier {
                     let choice_keys = [KeyCode::Key1, KeyCode::Key2, KeyCode::Key3, KeyCode::Key4];
                     for (i, key) in choice_keys.iter().enumerate() {
                         if i < dialogue.choices.len() && is_key_pressed(*key) {
@@ -2272,6 +2295,7 @@ impl InputHandler {
                 // Send __continue__ to server so Lua script can resume execution
                 // Don't clear dialogue here - wait for server response (either new dialogue or close)
                 if !guide_actions_locked
+                    && (!guide_selected_active_tier || guide_selected_tier_completable)
                     && (is_key_pressed(KeyCode::Enter)
                         || is_key_pressed(KeyCode::Space)
                         || is_key_pressed(KeyCode::Escape))
