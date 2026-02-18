@@ -344,6 +344,16 @@ impl Player {
         // intent still matches the predicted movement direction. This preserves
         // the anti-flash fix without masking legitimate stop/cancel states.
         let has_local_intent = self.local_intent_dx != 0.0 || self.local_intent_dy != 0.0;
+        // Local-player chaining source for server-confirmed move ticks:
+        // the server often reports vel=(0,0) on the exact tick position advances.
+        // On those ticks, prefer current local intent to avoid stop/start flip.
+        let mut chained_vel_x = vel_x;
+        let mut chained_vel_y = vel_y;
+        if is_local_player && server_moved && has_local_intent {
+            chained_vel_x = self.local_intent_dx.signum();
+            chained_vel_y = self.local_intent_dy.signum();
+        }
+        let has_chained_vel = chained_vel_x != 0.0 || chained_vel_y != 0.0;
         let target_dx = self.target_x - self.x;
         let target_dy = self.target_y - self.y;
         let intent_matches_target = if has_local_intent && (target_dx.abs() > 0.01 || target_dy.abs() > 0.01) {
@@ -377,9 +387,9 @@ impl Player {
                 // Not near target: keep current, finish transit
             } else if server_moved {
                 // Server confirmed a move - update target to track server
-                if vel_x != 0.0 || vel_y != 0.0 {
-                    self.target_x = x + vel_x;
-                    self.target_y = y + vel_y;
+                if has_chained_vel {
+                    self.target_x = x + chained_vel_x;
+                    self.target_y = y + chained_vel_y;
                 } else {
                     self.target_x = x;
                     self.target_y = y;
@@ -388,9 +398,9 @@ impl Player {
             // Otherwise: keep current target during transit
         } else {
             // At tile center or stopped: apply new target freely
-            if vel_x != 0.0 || vel_y != 0.0 {
-                self.target_x = x + vel_x;
-                self.target_y = y + vel_y;
+            if has_chained_vel {
+                self.target_x = x + chained_vel_x;
+                self.target_y = y + chained_vel_y;
             } else {
                 self.target_x = x;
                 self.target_y = y;

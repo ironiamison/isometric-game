@@ -7752,17 +7752,13 @@ impl GameRoom {
             }
 
             // Clear movement intent for players whose sampled moves were rejected.
-            // Use the same sampled-intent guard so we don't wipe newer input that
-            // arrived after the pending-move snapshot.
+            // Rejected intents should not persist, otherwise stale velocity can
+            // produce client-side jitter/flip-flop near obstacles.
             for player_id in &pending_player_ids {
                 if !moved_players.contains(player_id) {
                     if let Some(player) = players.get_mut(player_id) {
-                        if let Some((sample_dx, sample_dy)) = pending_move_vectors.get(player_id) {
-                            if player.move_dx == *sample_dx && player.move_dy == *sample_dy {
-                                player.move_dx = 0;
-                                player.move_dy = 0;
-                            }
-                        }
+                        player.move_dx = 0;
+                        player.move_dy = 0;
                     }
                 }
             }
