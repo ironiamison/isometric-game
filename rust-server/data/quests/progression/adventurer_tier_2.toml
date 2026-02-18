@@ -3,7 +3,7 @@
 [quest]
 id = "adventurer_tier_2"
 name = "Adventurer Tasks II"
-description = "The Adventurer Guide pushes you toward better consistency: slime hunting, woodcutting growth, and stronger finances."
+description = "The Adventurer Guide pushes you toward stronger consistency: clear multiple enemy packs, push combat and woodcutting, and build a serious gold reserve."
 giver_npc = "adventurer_guide"
 level_required = 5
 repeatable = false
@@ -17,22 +17,36 @@ next = "adventurer_tier_3"
 id = "kill_blue_slimes"
 type = "kill_monster"
 target = "slime_blue"
-count = 12
-description = "Defeat 12 blue slimes"
+count = 24
+description = "Defeat 24 blue slimes"
 
 [[quest.objectives]]
-id = "reach_woodcutting_5"
+id = "kill_crows"
+type = "kill_monster"
+target = "crow"
+count = 16
+description = "Defeat 16 crows"
+
+[[quest.objectives]]
+id = "reach_woodcutting_8"
 type = "reach_level"
 target = "woodcutting"
-count = 5
-description = "Reach Woodcutting level 5"
+count = 8
+description = "Reach Woodcutting level 8"
 
 [[quest.objectives]]
-id = "gather_gold_400"
+id = "reach_combat_14"
+type = "reach_level"
+target = "combat"
+count = 14
+description = "Reach Combat level 14"
+
+[[quest.objectives]]
+id = "gather_gold_1200"
 type = "reach_gold"
 target = "gold"
-count = 400
-description = "Accumulate 400 gold"
+count = 1200
+description = "Accumulate 1,200 gold"
 
 [[quest.objectives]]
 id = "return_to_guide"

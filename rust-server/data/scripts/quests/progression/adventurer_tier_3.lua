@@ -17,7 +17,7 @@ end
 function show_offer_dialogue(ctx)
     local choice = ctx:show_dialogue({
         speaker = "Adventurer Guide",
-        text = "Tier III benchmark: defeat 15 pigs, reach Farming level 8, and hold 900 gold. This is your early-game competency check.",
+        text = "Tier III benchmark: defeat 30 pigs and 20 wild boars, reach Farming 12 and Combat 25, and hold 2,600 gold. This is your early-game competency check.",
         choices = {
             { id = "accept", text = "I'll clear Tier III." },
             { id = "decline", text = "Not right now." },
@@ -47,13 +47,17 @@ end
 
 function show_progress_dialogue(ctx)
     local pigs = ctx:get_objective_progress("kill_pigs")
-    local farming = ctx:get_objective_progress("reach_farming_8")
-    local gold = ctx:get_objective_progress("gather_gold_900")
+    local boars = ctx:get_objective_progress("kill_wild_boars")
+    local farming = ctx:get_objective_progress("reach_farming_12")
+    local combat = ctx:get_objective_progress("reach_combat_25")
+    local gold = ctx:get_objective_progress("gather_gold_2600")
 
     local text = string.format(
-        "Tier III status:\n- Pigs defeated: %d/15\n- Farming level: %d/8\n- Gold: %d/900",
+        "Tier III status:\n- Pigs defeated: %d/30\n- Wild boars defeated: %d/20\n- Farming level: %d/12\n- Combat level: %d/25\n- Gold: %d/2600",
         pigs.current,
+        boars.current,
         farming.current,
+        combat.current,
         gold.current
     )
 

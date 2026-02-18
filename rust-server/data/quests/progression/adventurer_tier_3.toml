@@ -16,22 +16,36 @@ previous = "adventurer_tier_2"
 id = "kill_pigs"
 type = "kill_monster"
 target = "pig"
-count = 15
-description = "Defeat 15 pigs"
+count = 30
+description = "Defeat 30 pigs"
 
 [[quest.objectives]]
-id = "reach_farming_8"
+id = "kill_wild_boars"
+type = "kill_monster"
+target = "wild_boar"
+count = 20
+description = "Defeat 20 wild boars"
+
+[[quest.objectives]]
+id = "reach_farming_12"
 type = "reach_level"
 target = "farming"
-count = 8
-description = "Reach Farming level 8"
+count = 12
+description = "Reach Farming level 12"
 
 [[quest.objectives]]
-id = "gather_gold_900"
+id = "reach_combat_25"
+type = "reach_level"
+target = "combat"
+count = 25
+description = "Reach Combat level 25"
+
+[[quest.objectives]]
+id = "gather_gold_2600"
 type = "reach_gold"
 target = "gold"
-count = 900
-description = "Accumulate 900 gold"
+count = 2600
+description = "Accumulate 2,600 gold"
 
 [[quest.objectives]]
 id = "return_to_guide"
