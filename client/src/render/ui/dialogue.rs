@@ -34,6 +34,8 @@ struct GuideTrackTemplate {
     no_action_hint: &'static str,
 }
 
+type QuestRequirement = (&'static str, &'static str);
+
 const COMBAT_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
     GuideObjectiveTemplate { id: "kill_crows", label: "Defeat crows", target: 8 },
     GuideObjectiveTemplate { id: "reach_combat_8", label: "Reach Combat level", target: 8 },
@@ -77,6 +79,19 @@ const COMBAT_T3_REWARDS: [&str; 2] = ["2x Strong Health Potion", "2x Prayer Poti
 const SKILLING_T1_REWARDS: [&str; 2] = ["1x Bronze Axe", "1x Small Bait Pack"];
 const SKILLING_T2_REWARDS: [&str; 2] = ["2x Focus Tonic", "1x Iron Axe"];
 const SKILLING_T3_REWARDS: [&str; 2] = ["3x Alchemy Catalyst", "1x Master Angler Bait Pack"];
+
+const SKILLING_T1_REQUIREMENTS: [QuestRequirement; 2] = [
+    ("green_thumb", "Green Thumb"),
+    ("axe_to_grind", "Axe to Grind"),
+];
+const SKILLING_T2_REQUIREMENTS: [QuestRequirement; 2] = [
+    ("shell_repairs", "Shell Repairs"),
+    ("forging_ahead", "Forging Ahead"),
+];
+const SKILLING_T3_REQUIREMENTS: [QuestRequirement; 2] = [
+    ("lobster_feast", "Lobster Feast"),
+    ("the_magic_broom", "The Magic Broom"),
+];
 
 const COMBAT_TIERS: [GuideTierTemplate; 3] = [
     GuideTierTemplate {
@@ -153,12 +168,78 @@ const GUIDE_TRACKS: [GuideTrackTemplate; 2] = [
     GuideTrackTemplate {
         title: "Skilling",
         tiers: &SKILLING_TIERS,
-        no_action_hint: "Skilling tiers unlock from skilling quest dialogue.",
+        no_action_hint: "",
     },
 ];
 
 fn is_adventurer_guide_dialogue(dialogue: &ActiveDialogue) -> bool {
     dialogue.speaker.eq_ignore_ascii_case("Adventurer Guide")
+}
+
+fn skilling_tier_requirements(tier_id: &str) -> &'static [QuestRequirement] {
+    match tier_id {
+        "skilling_tier_1" => &SKILLING_T1_REQUIREMENTS,
+        "skilling_tier_2" => &SKILLING_T2_REQUIREMENTS,
+        "skilling_tier_3" => &SKILLING_T3_REQUIREMENTS,
+        _ => &[],
+    }
+}
+
+fn is_tier_completed(state: &GameState, track_idx: usize, tier: &GuideTierTemplate) -> bool {
+    if track_idx == 1 {
+        let reqs = skilling_tier_requirements(tier.id);
+        !reqs.is_empty()
+            && reqs
+                .iter()
+                .all(|(quest_id, _)| state.ui_state.completed_quest_ids.contains(*quest_id))
+    } else {
+        state.ui_state.completed_quest_ids.contains(tier.id)
+    }
+}
+
+fn is_tier_unlocked(
+    state: &GameState,
+    track_idx: usize,
+    tiers: &[GuideTierTemplate],
+    idx: usize,
+) -> bool {
+    let tier = tiers[idx];
+    let completed = is_tier_completed(state, track_idx, &tier);
+    let is_active = state.ui_state.active_quests.iter().any(|q| q.id == tier.id);
+
+    if idx == 0 || is_active || completed {
+        return true;
+    }
+
+    if track_idx == 1 {
+        is_tier_completed(state, track_idx, &tiers[idx - 1])
+    } else {
+        state
+            .ui_state
+            .completed_quest_ids
+            .contains(tiers[idx - 1].id)
+    }
+}
+
+fn skilling_missing_unlock_requirements(
+    state: &GameState,
+    tiers: &[GuideTierTemplate],
+    idx: usize,
+) -> Vec<&'static str> {
+    if idx == 0 {
+        return Vec::new();
+    }
+
+    skilling_tier_requirements(tiers[idx - 1].id)
+        .iter()
+        .filter_map(|(quest_id, quest_name)| {
+            if state.ui_state.completed_quest_ids.contains(*quest_id) {
+                None
+            } else {
+                Some(*quest_name)
+            }
+        })
+        .collect()
 }
 
 impl Renderer {
@@ -572,12 +653,9 @@ impl Renderer {
         let mut row_y = left_y + 8.0;
         for (idx, tier) in selected_track.tiers.iter().enumerate() {
             let is_selected = idx == selected_idx;
-            let completed = state.ui_state.completed_quest_ids.contains(tier.id);
+            let completed = is_tier_completed(state, selected_track_idx, tier);
             let is_active = state.ui_state.active_quests.iter().any(|q| q.id == tier.id);
-            let unlocked = idx == 0
-                || state.ui_state.completed_quest_ids.contains(selected_track.tiers[idx - 1].id)
-                || is_active
-                || completed;
+            let unlocked = is_tier_unlocked(state, selected_track_idx, selected_track.tiers, idx);
 
             let row_h = 52.0;
             let row_bounds = Rect::new(left_x + 6.0, row_y, left_w - 12.0, row_h);
@@ -634,12 +712,9 @@ impl Renderer {
         draw_rectangle(right_x + 1.0, right_y + 1.0, right_w - 2.0, right_h - 2.0, Color::new(0.09, 0.09, 0.13, 1.0));
 
         let tier = selected_track.tiers[selected_idx];
-        let completed = state.ui_state.completed_quest_ids.contains(tier.id);
+        let completed = is_tier_completed(state, selected_track_idx, &tier);
         let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == tier.id);
-        let unlocked = selected_idx == 0
-            || state.ui_state.completed_quest_ids.contains(selected_track.tiers[selected_idx - 1].id)
-            || active_quest.is_some()
-            || completed;
+        let unlocked = is_tier_unlocked(state, selected_track_idx, selected_track.tiers, selected_idx);
 
         let right_subtitle_w = self.measure_text_sharp(tier.subtitle, 16.0).width;
         let right_subtitle_x = right_x + right_w - right_subtitle_w - 12.0;
@@ -743,14 +818,29 @@ impl Renderer {
             }
         } else {
             if unlocked && !completed {
-                let hint = self.truncate_text_to_width(selected_track.no_action_hint, 268.0, 16.0);
-                self.draw_text_sharp(
-                    &hint,
-                    right_x + right_w - 280.0,
-                    action_base_y + 20.0,
-                    16.0,
-                    TEXT_DIM,
-                );
+                if !selected_track.no_action_hint.is_empty() {
+                    let hint = self.truncate_text_to_width(selected_track.no_action_hint, 268.0, 16.0);
+                    self.draw_text_sharp(
+                        &hint,
+                        right_x + right_w - 280.0,
+                        action_base_y + 20.0,
+                        16.0,
+                        TEXT_DIM,
+                    );
+                }
+            } else if !unlocked && selected_track_idx == 1 {
+                let missing = skilling_missing_unlock_requirements(state, selected_track.tiers, selected_idx);
+                if !missing.is_empty() {
+                    let missing_text = format!("Missing: {}", missing.join(", "));
+                    let hint = self.truncate_text_to_width(&missing_text, 268.0, 16.0);
+                    self.draw_text_sharp(
+                        &hint,
+                        right_x + right_w - 280.0,
+                        action_base_y + 20.0,
+                        16.0,
+                        TEXT_DIM,
+                    );
+                }
             }
         }
     }
