@@ -2073,7 +2073,7 @@ impl Renderer {
 
             let footer_left = panel_rect.x + 14.0;
             let footer_width = panel_rect.w - 28.0;
-            let footer_text_size = 14.0;
+            let footer_text_size = MINIMAP_WORLD_TEXT_SIZE;
             let status_y = panel_rect.y + panel_rect.h - 34.0;
             let legend_y = panel_rect.y + panel_rect.h - 14.0;
             let legend_items = [
