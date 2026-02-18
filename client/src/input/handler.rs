@@ -1,14 +1,19 @@
-use macroquad::prelude::*;
-use std::collections::HashSet;
-use crate::game::{GameState, ChatChannel, ContextMenu, ContextMenuTarget, DragState, DragSource, GoldDropDialog, BankQuantityDialog, BankQuantityAction, PathState, pathfinding};
+use super::touch::TouchControls;
+use crate::audio::AudioManager;
+use crate::game::{
+    pathfinding, BankQuantityAction, BankQuantityDialog, ChatChannel, ContextMenu,
+    ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState, CHUNK_SIZE,
+};
+use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
 use crate::render::isometric::screen_to_world;
+use crate::settings::{save_ui_settings, UiSettings};
 use crate::ui::{UiElementId, UiLayout};
-use crate::network::messages::ClientMessage;
-use crate::audio::AudioManager;
 use crate::util::virtual_screen_size;
-use crate::settings::{UiSettings, save_ui_settings};
-use super::touch::TouchControls;
+use macroquad::prelude::*;
+use std::collections::HashSet;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+use std::sync::OnceLock;
 
 /// Save current UI settings to persistent storage
 fn save_current_ui_settings(state: &GameState) {
@@ -75,6 +80,41 @@ fn adventurer_guide_tier_id(tab_idx: usize, tier_idx: usize) -> Option<&'static 
     }
 }
 
+fn is_adventurer_guide_tier_id(quest_id: &str) -> bool {
+    matches!(
+        quest_id,
+        "adventurer_tier_1"
+            | "adventurer_tier_2"
+            | "adventurer_tier_3"
+            | "skilling_tier_1"
+            | "skilling_tier_2"
+            | "skilling_tier_3"
+    )
+}
+
+fn has_active_adventurer_guide_task(state: &GameState) -> bool {
+    state
+        .ui_state
+        .active_quests
+        .iter()
+        .any(|q| is_adventurer_guide_tier_id(&q.id))
+}
+
+fn is_selected_adventurer_guide_tier_active(state: &GameState) -> bool {
+    let Some(selected_id) = adventurer_guide_tier_id(
+        state.ui_state.adventurer_selected_tab,
+        state.ui_state.adventurer_selected_tier,
+    ) else {
+        return false;
+    };
+
+    state.ui_state.active_quests.iter().any(|q| q.id == selected_id)
+}
+
+fn adventurer_guide_actions_locked(state: &GameState) -> bool {
+    has_active_adventurer_guide_task(state) && !is_selected_adventurer_guide_tier_active(state)
+}
+
 fn sync_adventurer_guide_dialogue_target(state: &mut GameState) {
     let selected_id = adventurer_guide_tier_id(
         state.ui_state.adventurer_selected_tab,
@@ -108,7 +148,10 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
             }
             if !player.is_dead {
                 // Use server-authoritative coordinates to match server-side collision checks.
-                occupied.insert((player.server_x.round() as i32, player.server_y.round() as i32));
+                occupied.insert((
+                    player.server_x.round() as i32,
+                    player.server_y.round() as i32,
+                ));
             }
         }
     }
@@ -127,64 +170,157 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
 /// Input commands that can be sent to the server
 #[derive(Debug, Clone)]
 pub enum InputCommand {
-    Move { dx: f32, dy: f32 },
-    Face { direction: u8 },
+    Move {
+        dx: f32,
+        dy: f32,
+    },
+    Face {
+        direction: u8,
+    },
     Attack,
-    Target { entity_id: String },
+    Target {
+        entity_id: String,
+    },
     ClearTarget,
-    Chat { text: String, channel: String },
-    Pickup { item_id: String },
-    UseItem { slot_index: u8 },
+    Chat {
+        text: String,
+        channel: String,
+    },
+    Pickup {
+        item_id: String,
+    },
+    UseItem {
+        slot_index: u8,
+    },
     // Quest commands
-    Interact { npc_id: String },
-    DialogueChoice { quest_id: String, choice_id: String },
+    Interact {
+        npc_id: String,
+    },
+    DialogueChoice {
+        quest_id: String,
+        choice_id: String,
+    },
     CloseDialogue,
     // Crafting commands
-    Craft { recipe_id: String },
+    Craft {
+        recipe_id: String,
+    },
     CancelCraft,
     // Equipment commands
-    Equip { slot_index: u8 },
-    Unequip { slot_type: String, target_slot: Option<u8> },
+    Equip {
+        slot_index: u8,
+    },
+    Unequip {
+        slot_type: String,
+        target_slot: Option<u8>,
+    },
     // Inventory commands
-    DropItem { slot_index: u8, quantity: u32, target_x: Option<i32>, target_y: Option<i32> },
-    DropGold { amount: i32 },
-    SwapSlots { from_slot: u8, to_slot: u8 },
+    DropItem {
+        slot_index: u8,
+        quantity: u32,
+        target_x: Option<i32>,
+        target_y: Option<i32>,
+    },
+    DropGold {
+        amount: i32,
+    },
+    SwapSlots {
+        from_slot: u8,
+        to_slot: u8,
+    },
     // Shop commands
-    ShopBuy { npc_id: String, item_id: String, quantity: u32 },
-    ShopSell { npc_id: String, item_id: String, quantity: u32 },
+    ShopBuy {
+        npc_id: String,
+        item_id: String,
+        quantity: u32,
+    },
+    ShopSell {
+        npc_id: String,
+        item_id: String,
+        quantity: u32,
+    },
     // Bank commands
-    BankDeposit { item_id: String, quantity: i32 },
-    BankWithdraw { item_id: String, quantity: i32 },
-    BankDepositGold { amount: i32 },
-    BankWithdrawGold { amount: i32 },
+    BankDeposit {
+        item_id: String,
+        quantity: i32,
+    },
+    BankWithdraw {
+        item_id: String,
+        quantity: i32,
+    },
+    BankDepositGold {
+        amount: i32,
+    },
+    BankWithdrawGold {
+        amount: i32,
+    },
     // Portal commands
-    EnterPortal { portal_id: String },
+    EnterPortal {
+        portal_id: String,
+    },
     // Gathering commands
-    StartGathering { marker_x: i32, marker_y: i32 },
+    StartGathering {
+        marker_x: i32,
+        marker_y: i32,
+    },
     StopGathering,
     // Woodcutting commands
-    ChopTree { tree_x: i32, tree_y: i32, tree_gid: u32 },
+    ChopTree {
+        tree_x: i32,
+        tree_y: i32,
+        tree_gid: u32,
+    },
     // Chair commands
-    SitChair { tile_x: i32, tile_y: i32 },
+    SitChair {
+        tile_x: i32,
+        tile_y: i32,
+    },
     StandUp,
     // Farming commands
-    PlantSeed { patch_id: String, item_id: String },
-    HarvestCrop { patch_id: String },
+    PlantSeed {
+        patch_id: String,
+        item_id: String,
+    },
+    HarvestCrop {
+        patch_id: String,
+    },
     // Friend system commands
-    SendFriendRequest { target_name: String },
-    AcceptFriendRequest { requester_id: i64 },
-    DeclineFriendRequest { requester_id: i64 },
-    RemoveFriend { friend_id: i64 },
+    SendFriendRequest {
+        target_name: String,
+    },
+    AcceptFriendRequest {
+        requester_id: i64,
+    },
+    DeclineFriendRequest {
+        requester_id: i64,
+    },
+    RemoveFriend {
+        friend_id: i64,
+    },
     GetOnlinePlayers,
     // Prayer commands
-    TogglePrayer { prayer_id: String },
-    BuryBones { slot: u8 },
+    TogglePrayer {
+        prayer_id: String,
+    },
+    BuryBones {
+        slot: u8,
+    },
     // Altar commands
-    OfferBones { slot: u8, altar_id: String },
-    OfferAllBones { item_id: String, altar_id: String },
-    PrayAtAltar { altar_id: String },
+    OfferBones {
+        slot: u8,
+        altar_id: String,
+    },
+    OfferAllBones {
+        item_id: String,
+        altar_id: String,
+    },
+    PrayAtAltar {
+        altar_id: String,
+    },
     // Spell commands
-    CastSpell { spell_id: String },
+    CastSpell {
+        spell_id: String,
+    },
     // Movement abilities
     Dash,
 }
@@ -214,6 +350,250 @@ impl CardinalDir {
 
 /// Threshold for distinguishing face vs move (in seconds)
 const FACE_THRESHOLD: f64 = 0.15; // 150ms - time to hold before movement starts (taps shorter than this = face only)
+const MINIMAP_PANEL_MIN_ZOOM: f32 = 1.0;
+const MINIMAP_PANEL_MAX_ZOOM: f32 = 6.0;
+
+#[derive(Clone, Copy, Debug)]
+struct MinimapBounds {
+    min_x: f32,
+    min_y: f32,
+    max_x: f32,
+    max_y: f32,
+}
+
+impl MinimapBounds {
+    fn width(&self) -> f32 {
+        (self.max_x - self.min_x).max(1.0)
+    }
+
+    fn height(&self) -> f32 {
+        (self.max_y - self.min_y).max(1.0)
+    }
+}
+
+fn minimap_panel_rect() -> Rect {
+    let (sw, sh) = virtual_screen_size();
+    let panel_w = (sw * 0.72).clamp(420.0, 760.0);
+    let panel_h = (sh * 0.72).clamp(320.0, 620.0);
+    Rect::new(
+        ((sw - panel_w) * 0.5).floor(),
+        ((sh - panel_h) * 0.5).floor(),
+        panel_w,
+        panel_h,
+    )
+}
+
+fn minimap_map_rect(panel_rect: Rect) -> Rect {
+    Rect::new(
+        panel_rect.x + 14.0,
+        panel_rect.y + 34.0,
+        panel_rect.w - 28.0,
+        panel_rect.h - 86.0,
+    )
+}
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+fn minimap_static_world_bounds() -> Option<MinimapBounds> {
+    static CACHE: OnceLock<Option<MinimapBounds>> = OnceLock::new();
+    *CACHE.get_or_init(|| {
+        let world_dir = std::path::Path::new("rust-server/maps/world_0");
+        let entries = std::fs::read_dir(world_dir).ok()?;
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+        let mut found = false;
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            let Some(raw) = name.strip_prefix("chunk_").and_then(|s| s.strip_suffix(".json")) else {
+                continue;
+            };
+            let mut parts = raw.splitn(2, '_');
+            let Some(cx_raw) = parts.next() else {
+                continue;
+            };
+            let Some(cy_raw) = parts.next() else {
+                continue;
+            };
+            let Ok(cx) = cx_raw.parse::<i32>() else {
+                continue;
+            };
+            let Ok(cy) = cy_raw.parse::<i32>() else {
+                continue;
+            };
+
+            let chunk_x = (cx * CHUNK_SIZE as i32) as f32;
+            let chunk_y = (cy * CHUNK_SIZE as i32) as f32;
+            min_x = min_x.min(chunk_x);
+            min_y = min_y.min(chunk_y);
+            max_x = max_x.max(chunk_x + CHUNK_SIZE as f32);
+            max_y = max_y.max(chunk_y + CHUNK_SIZE as f32);
+            found = true;
+        }
+
+        if !found {
+            None
+        } else {
+            Some(MinimapBounds {
+                min_x,
+                min_y,
+                max_x,
+                max_y,
+            })
+        }
+    })
+}
+
+#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+fn minimap_static_world_bounds() -> Option<MinimapBounds> {
+    None
+}
+
+fn minimap_world_bounds(state: &GameState) -> Option<MinimapBounds> {
+    let mut bounds = if let Some((width, height)) = state.chunk_manager.get_interior_size() {
+        MinimapBounds {
+            min_x: 0.0,
+            min_y: 0.0,
+            max_x: width as f32,
+            max_y: height as f32,
+        }
+    } else if !state.chunk_manager.chunks().is_empty() {
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+
+        for coord in state.chunk_manager.chunks().keys() {
+            let chunk_x = (coord.x * CHUNK_SIZE as i32) as f32;
+            let chunk_y = (coord.y * CHUNK_SIZE as i32) as f32;
+            min_x = min_x.min(chunk_x);
+            min_y = min_y.min(chunk_y);
+            max_x = max_x.max(chunk_x + CHUNK_SIZE as f32);
+            max_y = max_y.max(chunk_y + CHUNK_SIZE as f32);
+        }
+
+        MinimapBounds {
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        }
+    } else if let Some(player) = state.get_local_player() {
+        let radius = 24.0;
+        MinimapBounds {
+            min_x: player.x - radius,
+            min_y: player.y - radius,
+            max_x: player.x + radius,
+            max_y: player.y + radius,
+        }
+    } else {
+        return None;
+    };
+
+    if let Some(player) = state.get_local_player() {
+        bounds.min_x = bounds.min_x.min(player.x);
+        bounds.min_y = bounds.min_y.min(player.y);
+        bounds.max_x = bounds.max_x.max(player.x);
+        bounds.max_y = bounds.max_y.max(player.y);
+    }
+
+    if state.chunk_manager.get_interior_size().is_none() {
+        if let Some(static_bounds) = minimap_static_world_bounds() {
+            bounds.min_x = bounds.min_x.min(static_bounds.min_x);
+            bounds.min_y = bounds.min_y.min(static_bounds.min_y);
+            bounds.max_x = bounds.max_x.max(static_bounds.max_x);
+            bounds.max_y = bounds.max_y.max(static_bounds.max_y);
+        }
+    }
+
+    let padding = 2.0;
+    bounds.min_x -= padding;
+    bounds.min_y -= padding;
+    bounds.max_x += padding;
+    bounds.max_y += padding;
+    if bounds.max_x <= bounds.min_x {
+        bounds.max_x = bounds.min_x + 1.0;
+    }
+    if bounds.max_y <= bounds.min_y {
+        bounds.max_y = bounds.min_y + 1.0;
+    }
+    Some(bounds)
+}
+
+fn minimap_view_size(world_bounds: MinimapBounds, zoom: f32) -> (f32, f32) {
+    let clamped_zoom = zoom.clamp(MINIMAP_PANEL_MIN_ZOOM, MINIMAP_PANEL_MAX_ZOOM);
+    (
+        (world_bounds.width() / clamped_zoom).clamp(1.0, world_bounds.width()),
+        (world_bounds.height() / clamped_zoom).clamp(1.0, world_bounds.height()),
+    )
+}
+
+fn minimap_clamp_center(
+    world_bounds: MinimapBounds,
+    view_w: f32,
+    view_h: f32,
+    center_x: f32,
+    center_y: f32,
+) -> (f32, f32) {
+    let half_w = view_w * 0.5;
+    let half_h = view_h * 0.5;
+    let min_cx = world_bounds.min_x + half_w;
+    let max_cx = world_bounds.max_x - half_w;
+    let min_cy = world_bounds.min_y + half_h;
+    let max_cy = world_bounds.max_y - half_h;
+    (
+        center_x.clamp(min_cx, max_cx),
+        center_y.clamp(min_cy, max_cy),
+    )
+}
+
+fn minimap_panel_view_bounds(state: &GameState, world_bounds: MinimapBounds) -> MinimapBounds {
+    let (view_w, view_h) = minimap_view_size(world_bounds, state.ui_state.minimap_panel_zoom);
+    let default_center = state.get_local_player().map(|p| (p.x, p.y)).unwrap_or((
+        (world_bounds.min_x + world_bounds.max_x) * 0.5,
+        (world_bounds.min_y + world_bounds.max_y) * 0.5,
+    ));
+    let center_x = state
+        .ui_state
+        .minimap_panel_center_x
+        .unwrap_or(default_center.0);
+    let center_y = state
+        .ui_state
+        .minimap_panel_center_y
+        .unwrap_or(default_center.1);
+    let (center_x, center_y) =
+        minimap_clamp_center(world_bounds, view_w, view_h, center_x, center_y);
+    let half_w = view_w * 0.5;
+    let half_h = view_h * 0.5;
+
+    MinimapBounds {
+        min_x: center_x - half_w,
+        min_y: center_y - half_h,
+        max_x: center_x + half_w,
+        max_y: center_y + half_h,
+    }
+}
+
+fn minimap_screen_to_world(
+    bounds: MinimapBounds,
+    map_rect: Rect,
+    screen_x: f32,
+    screen_y: f32,
+) -> (f32, f32) {
+    let nx = ((screen_x - map_rect.x) / map_rect.w.max(1.0)).clamp(0.0, 1.0);
+    let ny = ((screen_y - map_rect.y) / map_rect.h.max(1.0)).clamp(0.0, 1.0);
+    (
+        bounds.min_x + nx * bounds.width(),
+        bounds.min_y + ny * bounds.height(),
+    )
+}
 
 pub struct InputHandler {
     // Track last sent velocity to detect changes
@@ -259,7 +639,12 @@ impl InputHandler {
         self.touch_controls.load_icons().await;
     }
 
-    pub fn process(&mut self, state: &mut GameState, layout: &UiLayout, audio: &mut AudioManager) -> Vec<InputCommand> {
+    pub fn process(
+        &mut self,
+        state: &mut GameState,
+        layout: &UiLayout,
+        audio: &mut AudioManager,
+    ) -> Vec<InputCommand> {
         let mut commands = Vec::new();
         let current_time = get_time();
 
@@ -286,7 +671,12 @@ impl InputHandler {
             || state.ui_state.minimap_panel_open
             || state.ui_state.quest_log_open
             || in_dialogue;
-        self.touch_controls.update(current_time, hide_action_buttons, hide_direction_controls, state.ui_state.use_joystick);
+        self.touch_controls.update(
+            current_time,
+            hide_action_buttons,
+            hide_direction_controls,
+            state.ui_state.use_joystick,
+        );
 
         // Get current mouse/touch position in virtual coordinates (for UI hit detection)
         let (raw_mx, raw_my) = mouse_position();
@@ -385,8 +775,18 @@ impl InputHandler {
                                 DragSource::Equipment(slot_type) => {
                                     // Dragging from equipment to inventory - unequip to specific slot
                                     // Optimistic update: immediately move to inventory and clear equipment
-                                    if state.inventory.slots.get(*to_idx).map(|s| s.is_none()).unwrap_or(false) {
-                                        state.inventory.set_slot(*to_idx, drag.item_id.clone(), drag.quantity);
+                                    if state
+                                        .inventory
+                                        .slots
+                                        .get(*to_idx)
+                                        .map(|s| s.is_none())
+                                        .unwrap_or(false)
+                                    {
+                                        state.inventory.set_slot(
+                                            *to_idx,
+                                            drag.item_id.clone(),
+                                            drag.quantity,
+                                        );
 
                                         // Update player's equipped state optimistically
                                         if let Some(local_id) = &state.local_player_id.clone() {
@@ -424,13 +824,17 @@ impl InputHandler {
                                 DragSource::Inventory(from_idx) => {
                                     // Dragging from inventory to equipment - equip if valid slot type
                                     // First check if player meets requirements before optimistic update
-                                    let item_def = state.item_registry.get_or_placeholder(&drag.item_id);
+                                    let item_def =
+                                        state.item_registry.get_or_placeholder(&drag.item_id);
                                     let can_equip = if let Some(ref equip) = item_def.equipment {
                                         // Check slot type matches target
                                         let slot_matches = equip.slot_type == *target_slot_type;
                                         // Check level requirement - combat level covers all requirements
-                                        let level_required = equip.attack_level_required.max(equip.defence_level_required);
-                                        let level_ok = state.get_local_player()
+                                        let level_required = equip
+                                            .attack_level_required
+                                            .max(equip.defence_level_required);
+                                        let level_ok = state
+                                            .get_local_player()
                                             .map(|p| p.skills.combat.level >= level_required)
                                             .unwrap_or(false);
                                         slot_matches && level_ok
@@ -443,15 +847,42 @@ impl InputHandler {
                                         if let Some(local_id) = &state.local_player_id.clone() {
                                             if let Some(player) = state.players.get_mut(local_id) {
                                                 match target_slot_type.as_str() {
-                                                    "head" => player.equipped_head = Some(drag.item_id.clone()),
-                                                    "body" => player.equipped_body = Some(drag.item_id.clone()),
-                                                    "weapon" => player.equipped_weapon = Some(drag.item_id.clone()),
-                                                    "back" => player.equipped_back = Some(drag.item_id.clone()),
-                                                    "feet" => player.equipped_feet = Some(drag.item_id.clone()),
-                                                    "ring" => player.equipped_ring = Some(drag.item_id.clone()),
-                                                    "gloves" => player.equipped_gloves = Some(drag.item_id.clone()),
-                                                    "necklace" => player.equipped_necklace = Some(drag.item_id.clone()),
-                                                    "belt" => player.equipped_belt = Some(drag.item_id.clone()),
+                                                    "head" => {
+                                                        player.equipped_head =
+                                                            Some(drag.item_id.clone())
+                                                    }
+                                                    "body" => {
+                                                        player.equipped_body =
+                                                            Some(drag.item_id.clone())
+                                                    }
+                                                    "weapon" => {
+                                                        player.equipped_weapon =
+                                                            Some(drag.item_id.clone())
+                                                    }
+                                                    "back" => {
+                                                        player.equipped_back =
+                                                            Some(drag.item_id.clone())
+                                                    }
+                                                    "feet" => {
+                                                        player.equipped_feet =
+                                                            Some(drag.item_id.clone())
+                                                    }
+                                                    "ring" => {
+                                                        player.equipped_ring =
+                                                            Some(drag.item_id.clone())
+                                                    }
+                                                    "gloves" => {
+                                                        player.equipped_gloves =
+                                                            Some(drag.item_id.clone())
+                                                    }
+                                                    "necklace" => {
+                                                        player.equipped_necklace =
+                                                            Some(drag.item_id.clone())
+                                                    }
+                                                    "belt" => {
+                                                        player.equipped_belt =
+                                                            Some(drag.item_id.clone())
+                                                    }
                                                     _ => {}
                                                 }
                                             }
@@ -459,7 +890,9 @@ impl InputHandler {
                                         state.inventory.clear_slot(*from_idx);
                                         audio.play_sfx("item_put");
 
-                                        commands.push(InputCommand::Equip { slot_index: *from_idx as u8 });
+                                        commands.push(InputCommand::Equip {
+                                            slot_index: *from_idx as u8,
+                                        });
                                     }
                                     // If can't equip, drag is cancelled - item stays in inventory
                                 }
@@ -494,11 +927,15 @@ impl InputHandler {
 
                                 if is_adjacent {
                                     // Check if dropping a seed onto a farming patch
-                                    let is_seed_on_patch = if let Some(patch_id) = state.farming_patch_positions.get(&(tile_x, tile_y)) {
+                                    let is_seed_on_patch = if let Some(patch_id) =
+                                        state.farming_patch_positions.get(&(tile_x, tile_y))
+                                    {
                                         if let Some(patch) = state.farming_patches.get(patch_id) {
                                             if patch.state == "empty" {
                                                 // Check if dragged item is a seed
-                                                if let Some(Some(slot)) = state.inventory.slots.get(*from_idx) {
+                                                if let Some(Some(slot)) =
+                                                    state.inventory.slots.get(*from_idx)
+                                                {
                                                     if slot.item_id.ends_with("_seed") {
                                                         commands.push(InputCommand::PlantSeed {
                                                             patch_id: patch_id.clone(),
@@ -506,15 +943,27 @@ impl InputHandler {
                                                         });
                                                         audio.play_sfx("item_put");
                                                         true
-                                                    } else { false }
-                                                } else { false }
-                                            } else { false }
-                                        } else { false }
-                                    } else { false };
+                                                    } else {
+                                                        false
+                                                    }
+                                                } else {
+                                                    false
+                                                }
+                                            } else {
+                                                false
+                                            }
+                                        } else {
+                                            false
+                                        }
+                                    } else {
+                                        false
+                                    };
 
                                     // Check if dropping bones onto an altar NPC
                                     let is_bones_on_altar = if !is_seed_on_patch {
-                                        if let Some(Some(slot)) = state.inventory.slots.get(*from_idx) {
+                                        if let Some(Some(slot)) =
+                                            state.inventory.slots.get(*from_idx)
+                                        {
                                             if slot.item_id.contains("bones") {
                                                 // Find altar NPC at this tile
                                                 let mut altar_id = None;
@@ -534,10 +983,18 @@ impl InputHandler {
                                                     });
                                                     audio.play_sfx("item_put");
                                                     true
-                                                } else { false }
-                                            } else { false }
-                                        } else { false }
-                                    } else { false };
+                                                } else {
+                                                    false
+                                                }
+                                            } else {
+                                                false
+                                            }
+                                        } else {
+                                            false
+                                        }
+                                    } else {
+                                        false
+                                    };
 
                                     if !is_seed_on_patch && !is_bones_on_altar {
                                         // Check for Ctrl/Cmd modifier for single item drop
@@ -546,7 +1003,8 @@ impl InputHandler {
                                             || is_key_down(KeyCode::LeftSuper)
                                             || is_key_down(KeyCode::RightSuper);
 
-                                        let quantity = if ctrl_held { 1 } else { drag.quantity as u32 };
+                                        let quantity =
+                                            if ctrl_held { 1 } else { drag.quantity as u32 };
 
                                         commands.push(InputCommand::DropItem {
                                             slot_index: *from_idx as u8,
@@ -579,7 +1037,8 @@ impl InputHandler {
                         // Check if slot has an item
                         if let Some(Some(slot)) = state.inventory.slots.get(*idx) {
                             // Check for shift+click to drop (if enabled)
-                            let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                            let shift_held =
+                                is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
                             if shift_held && state.ui_state.shift_drop_enabled {
                                 // Drop the entire stack at player position
                                 commands.push(InputCommand::DropItem {
@@ -593,8 +1052,10 @@ impl InputHandler {
                             }
 
                             // Check for double-click
-                            let is_double_click = state.ui_state.double_click_state.last_click_slot == Some(*idx)
-                                && current_time - state.ui_state.double_click_state.last_click_time < DOUBLE_CLICK_THRESHOLD;
+                            let is_double_click = state.ui_state.double_click_state.last_click_slot
+                                == Some(*idx)
+                                && current_time - state.ui_state.double_click_state.last_click_time
+                                    < DOUBLE_CLICK_THRESHOLD;
 
                             if is_double_click {
                                 // Reset double-click state
@@ -602,14 +1063,19 @@ impl InputHandler {
                                 state.ui_state.double_click_state.last_click_time = 0.0;
 
                                 // Check if item is equippable
-                                let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
+                                let item_def =
+                                    state.item_registry.get_or_placeholder(&slot.item_id);
                                 if item_def.equipment.is_some() {
                                     // Equip the item
-                                    commands.push(InputCommand::Equip { slot_index: *idx as u8 });
+                                    commands.push(InputCommand::Equip {
+                                        slot_index: *idx as u8,
+                                    });
                                     return commands;
                                 } else {
                                     // Not equippable - use the item instead (e.g., health potion)
-                                    commands.push(InputCommand::UseItem { slot_index: *idx as u8 });
+                                    commands.push(InputCommand::UseItem {
+                                        slot_index: *idx as u8,
+                                    });
                                     return commands;
                                 }
                             } else {
@@ -635,7 +1101,8 @@ impl InputHandler {
                             let inv_idx = *idx;
                             if let Some(Some(slot)) = state.inventory.slots.get(inv_idx) {
                                 // Check for shift+click to drop (if enabled)
-                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                let shift_held = is_key_down(KeyCode::LeftShift)
+                                    || is_key_down(KeyCode::RightShift);
                                 if shift_held && state.ui_state.shift_drop_enabled {
                                     commands.push(InputCommand::DropItem {
                                         slot_index: inv_idx as u8,
@@ -662,15 +1129,33 @@ impl InputHandler {
                     UiElementId::EquipmentSlot(slot_type) => {
                         // Check if equipment slot has an item
                         let equipped_item = match slot_type.as_str() {
-                            "head" => state.get_local_player().and_then(|p| p.equipped_head.clone()),
-                            "body" => state.get_local_player().and_then(|p| p.equipped_body.clone()),
-                            "weapon" => state.get_local_player().and_then(|p| p.equipped_weapon.clone()),
-                            "back" => state.get_local_player().and_then(|p| p.equipped_back.clone()),
-                            "feet" => state.get_local_player().and_then(|p| p.equipped_feet.clone()),
-                            "ring" => state.get_local_player().and_then(|p| p.equipped_ring.clone()),
-                            "gloves" => state.get_local_player().and_then(|p| p.equipped_gloves.clone()),
-                            "necklace" => state.get_local_player().and_then(|p| p.equipped_necklace.clone()),
-                            "belt" => state.get_local_player().and_then(|p| p.equipped_belt.clone()),
+                            "head" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_head.clone()),
+                            "body" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_body.clone()),
+                            "weapon" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_weapon.clone()),
+                            "back" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_back.clone()),
+                            "feet" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_feet.clone()),
+                            "ring" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_ring.clone()),
+                            "gloves" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_gloves.clone()),
+                            "necklace" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_necklace.clone()),
+                            "belt" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_belt.clone()),
                             _ => None,
                         };
                         if let Some(item_id) = equipped_item {
@@ -700,9 +1185,12 @@ impl InputHandler {
             // Calculate number of options (same logic as render_context_menu)
             let num_options = match &menu.target {
                 ContextMenuTarget::EquipmentSlot(_) => 1, // Unequip only
-                ContextMenuTarget::Gold => 1, // Drop only
+                ContextMenuTarget::Gold => 1,             // Drop only
                 ContextMenuTarget::InventorySlot(slot_index) => {
-                    let (is_equippable, is_bones) = state.inventory.slots.get(*slot_index)
+                    let (is_equippable, is_bones) = state
+                        .inventory
+                        .slots
+                        .get(*slot_index)
                         .and_then(|s| s.as_ref())
                         .map(|slot| {
                             let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
@@ -776,10 +1264,15 @@ impl InputHandler {
                                 ContextMenuTarget::InventorySlot(slot_index) => {
                                     // Inventory slot context menu
                                     // Determine menu options based on item type
-                                    let (is_equippable, is_bones) = state.inventory.slots.get(*slot_index)
+                                    let (is_equippable, is_bones) = state
+                                        .inventory
+                                        .slots
+                                        .get(*slot_index)
                                         .and_then(|s| s.as_ref())
                                         .map(|slot| {
-                                            let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
+                                            let item_def = state
+                                                .item_registry
+                                                .get_or_placeholder(&slot.item_id);
                                             let equippable = item_def.equipment.is_some();
                                             let bones = slot.item_id.contains("bones");
                                             (equippable, bones)
@@ -788,17 +1281,43 @@ impl InputHandler {
 
                                     // Build option index mapping: [Equip?] [Bury?] Drop
                                     let mut current_idx = 0usize;
-                                    let equip_idx = if is_equippable { let idx = current_idx; current_idx += 1; Some(idx) } else { None };
-                                    let bury_idx = if is_bones { let idx = current_idx; current_idx += 1; Some(idx) } else { None };
+                                    let equip_idx = if is_equippable {
+                                        let idx = current_idx;
+                                        current_idx += 1;
+                                        Some(idx)
+                                    } else {
+                                        None
+                                    };
+                                    let bury_idx = if is_bones {
+                                        let idx = current_idx;
+                                        current_idx += 1;
+                                        Some(idx)
+                                    } else {
+                                        None
+                                    };
                                     let drop_idx = current_idx;
 
                                     if Some(*option_idx) == equip_idx {
-                                        commands.push(InputCommand::Equip { slot_index: *slot_index as u8 });
+                                        commands.push(InputCommand::Equip {
+                                            slot_index: *slot_index as u8,
+                                        });
                                     } else if Some(*option_idx) == bury_idx {
-                                        commands.push(InputCommand::BuryBones { slot: *slot_index as u8 });
+                                        commands.push(InputCommand::BuryBones {
+                                            slot: *slot_index as u8,
+                                        });
                                     } else if *option_idx == drop_idx {
-                                        if let Some(slot) = state.inventory.slots.get(*slot_index).and_then(|s| s.as_ref()) {
-                                            commands.push(InputCommand::DropItem { slot_index: *slot_index as u8, quantity: slot.quantity as u32, target_x: None, target_y: None });
+                                        if let Some(slot) = state
+                                            .inventory
+                                            .slots
+                                            .get(*slot_index)
+                                            .and_then(|s| s.as_ref())
+                                        {
+                                            commands.push(InputCommand::DropItem {
+                                                slot_index: *slot_index as u8,
+                                                quantity: slot.quantity as u32,
+                                                target_x: None,
+                                                target_y: None,
+                                            });
                                         }
                                     }
                                 }
@@ -939,17 +1458,21 @@ impl InputHandler {
                             state.ui_state.quest_log_open = false;
                             state.ui_state.chat_panel_open = false;
                             state.ui_state.chat_open = false;
+                            state.ui_state.minimap_panel_zoom = 1.0;
+                            state.ui_state.minimap_panel_center_x = None;
+                            state.ui_state.minimap_panel_center_y = None;
+                            state.ui_state.minimap_panel_dragging = false;
                         }
                         return commands;
                     }
                     UiElementId::MinimapClose => {
                         audio.play_sfx("enter");
                         state.ui_state.minimap_panel_open = false;
+                        state.ui_state.minimap_panel_dragging = false;
                         return commands;
                     }
                     UiElementId::MinimapPanel | UiElementId::MinimapMarker(_) => {
-                        // Consume click while minimap panel is open.
-                        return commands;
+                        // Handled by dedicated minimap modal logic below.
                     }
                     UiElementId::ChatTabLocal => {
                         audio.play_sfx("enter");
@@ -989,7 +1512,10 @@ impl InputHandler {
                             };
                             if !send_text.is_empty() {
                                 audio.play_sfx("send_message");
-                                commands.push(InputCommand::Chat { text: send_text, channel });
+                                commands.push(InputCommand::Chat {
+                                    text: send_text,
+                                    channel,
+                                });
                             }
                             state.ui_state.chat_input.clear();
                             state.ui_state.chat_cursor = 0;
@@ -1040,14 +1566,18 @@ impl InputHandler {
                             crate::game::SocialTab::Nearby => {
                                 // Get player from nearby list (state.players minus local player)
                                 let local_id = state.local_player_id.as_ref();
-                                let nearby: Vec<_> = state.players.values()
+                                let nearby: Vec<_> = state
+                                    .players
+                                    .values()
                                     .filter(|p| Some(&p.id) != local_id)
                                     .collect();
                                 nearby.get(*idx).map(|p| p.name.clone())
                             }
-                            crate::game::SocialTab::Online => {
-                                state.social_state.online_players.get(*idx).map(|p| p.name.clone())
-                            }
+                            crate::game::SocialTab::Online => state
+                                .social_state
+                                .online_players
+                                .get(*idx)
+                                .map(|p| p.name.clone()),
                             _ => None,
                         };
                         if let Some(name) = player_name {
@@ -1056,15 +1586,23 @@ impl InputHandler {
                     }
                     UiElementId::SocialRequestAccept(idx) => {
                         audio.play_sfx("enter");
-                        if let Some(request) = state.social_state.pending_requests.get(*idx).cloned() {
+                        if let Some(request) =
+                            state.social_state.pending_requests.get(*idx).cloned()
+                        {
                             let requester_id = request.from_id;
                             let requester_name = request.from_name.clone();
                             commands.push(InputCommand::AcceptFriendRequest { requester_id });
                             // Remove from pending list immediately for responsive UI
                             state.social_state.pending_requests.remove(*idx);
-                            state.social_state.pending_request_count = state.social_state.pending_requests.len();
+                            state.social_state.pending_request_count =
+                                state.social_state.pending_requests.len();
                             // Also add to friends list immediately (they're online since they sent the request)
-                            if !state.social_state.friends.iter().any(|f| f.id == requester_id) {
+                            if !state
+                                .social_state
+                                .friends
+                                .iter()
+                                .any(|f| f.id == requester_id)
+                            {
                                 state.social_state.friends.push(crate::game::FriendInfo {
                                     id: requester_id,
                                     name: requester_name,
@@ -1088,7 +1626,8 @@ impl InputHandler {
                             commands.push(InputCommand::DeclineFriendRequest { requester_id });
                             // Remove from local list immediately
                             state.social_state.pending_requests.remove(*idx);
-                            state.social_state.pending_request_count = state.social_state.pending_requests.len();
+                            state.social_state.pending_request_count =
+                                state.social_state.pending_requests.len();
                         }
                     }
                     UiElementId::SocialRemoveFriend(idx) => {
@@ -1175,17 +1714,21 @@ impl InputHandler {
                         // Toggle prayer at this slot
                         if *slot_idx < crate::game::prayer::PRAYERS.len() {
                             let prayer = &crate::game::prayer::PRAYERS[*slot_idx];
-                            let prayer_level = state.get_local_player()
+                            let prayer_level = state
+                                .get_local_player()
                                 .map(|p| p.skills.prayer.level)
                                 .unwrap_or(1);
 
                             // Check if player meets level requirement
                             if prayer_level >= prayer.level_req {
                                 // Check if we have prayer points (can only activate if we have points)
-                                let is_active = state.active_prayers.contains(&prayer.id.to_string());
+                                let is_active =
+                                    state.active_prayers.contains(&prayer.id.to_string());
                                 if is_active || state.prayer_points > 0 {
                                     audio.play_sfx("enter");
-                                    commands.push(InputCommand::TogglePrayer { prayer_id: prayer.id.to_string() });
+                                    commands.push(InputCommand::TogglePrayer {
+                                        prayer_id: prayer.id.to_string(),
+                                    });
                                 } else {
                                     // No prayer points, play error sound
                                     audio.play_sfx("error");
@@ -1216,7 +1759,11 @@ impl InputHandler {
                     let (mouse_x, _) = mouse_position();
                     match state.ui_state.settings_slider_dragging {
                         Some(UiElementId::EscapeMenuMusicSlider) => {
-                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuMusicSlider) {
+                            if let Some(slider_elem) = layout
+                                .elements
+                                .iter()
+                                .find(|e| e.id == UiElementId::EscapeMenuMusicSlider)
+                            {
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let volume = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
                                 state.ui_state.audio_volume = volume;
@@ -1224,7 +1771,11 @@ impl InputHandler {
                             }
                         }
                         Some(UiElementId::EscapeMenuSfxSlider) => {
-                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuSfxSlider) {
+                            if let Some(slider_elem) = layout
+                                .elements
+                                .iter()
+                                .find(|e| e.id == UiElementId::EscapeMenuSfxSlider)
+                            {
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let volume = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
                                 state.ui_state.audio_sfx_volume = volume;
@@ -1232,9 +1783,14 @@ impl InputHandler {
                             }
                         }
                         Some(UiElementId::EscapeMenuUiScaleSlider) => {
-                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuUiScaleSlider) {
+                            if let Some(slider_elem) = layout
+                                .elements
+                                .iter()
+                                .find(|e| e.id == UiElementId::EscapeMenuUiScaleSlider)
+                            {
                                 let relative_x = mouse_x - slider_elem.bounds.x;
-                                let normalized = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
+                                let normalized =
+                                    (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
                                 state.ui_state.ui_scale = 0.75 + normalized * 0.5;
                             }
                         }
@@ -1275,8 +1831,13 @@ impl InputHandler {
                         }
                         UiElementId::EscapeMenuMusicSlider => {
                             // Start dragging and set initial value
-                            state.ui_state.settings_slider_dragging = Some(UiElementId::EscapeMenuMusicSlider);
-                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuMusicSlider) {
+                            state.ui_state.settings_slider_dragging =
+                                Some(UiElementId::EscapeMenuMusicSlider);
+                            if let Some(slider_elem) = layout
+                                .elements
+                                .iter()
+                                .find(|e| e.id == UiElementId::EscapeMenuMusicSlider)
+                            {
                                 let (mouse_x, _) = mouse_position();
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let volume = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
@@ -1287,8 +1848,13 @@ impl InputHandler {
                         }
                         UiElementId::EscapeMenuSfxSlider => {
                             // Start dragging and set initial value
-                            state.ui_state.settings_slider_dragging = Some(UiElementId::EscapeMenuSfxSlider);
-                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuSfxSlider) {
+                            state.ui_state.settings_slider_dragging =
+                                Some(UiElementId::EscapeMenuSfxSlider);
+                            if let Some(slider_elem) = layout
+                                .elements
+                                .iter()
+                                .find(|e| e.id == UiElementId::EscapeMenuSfxSlider)
+                            {
                                 let (mouse_x, _) = mouse_position();
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let volume = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
@@ -1299,11 +1865,17 @@ impl InputHandler {
                         }
                         UiElementId::EscapeMenuUiScaleSlider => {
                             // Start dragging and set initial value
-                            state.ui_state.settings_slider_dragging = Some(UiElementId::EscapeMenuUiScaleSlider);
-                            if let Some(slider_elem) = layout.elements.iter().find(|e| e.id == UiElementId::EscapeMenuUiScaleSlider) {
+                            state.ui_state.settings_slider_dragging =
+                                Some(UiElementId::EscapeMenuUiScaleSlider);
+                            if let Some(slider_elem) = layout
+                                .elements
+                                .iter()
+                                .find(|e| e.id == UiElementId::EscapeMenuUiScaleSlider)
+                            {
                                 let (mouse_x, _) = mouse_position();
                                 let relative_x = mouse_x - slider_elem.bounds.x;
-                                let normalized = (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
+                                let normalized =
+                                    (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
                                 state.ui_state.ui_scale = 0.75 + normalized * 0.5;
                             }
                             return commands;
@@ -1328,7 +1900,8 @@ impl InputHandler {
                         }
                         UiElementId::EscapeMenuChatBgToggle => {
                             audio.play_sfx("enter");
-                            state.ui_state.chat_log_background = !state.ui_state.chat_log_background;
+                            state.ui_state.chat_log_background =
+                                !state.ui_state.chat_log_background;
                             save_current_ui_settings(state);
                             return commands;
                         }
@@ -1355,7 +1928,8 @@ impl InputHandler {
                             state.ui_state.classic_controls = !state.ui_state.classic_controls;
                             if state.ui_state.classic_controls {
                                 state.ui_state.chat_open = true;
-                                state.ui_state.chat_cursor = state.ui_state.chat_input.chars().count();
+                                state.ui_state.chat_cursor =
+                                    state.ui_state.chat_input.chars().count();
                             } else {
                                 state.ui_state.chat_open = false;
                             }
@@ -1435,13 +2009,25 @@ impl InputHandler {
 
             // Number key input
             let number_keys = [
-                (KeyCode::Key0, '0'), (KeyCode::Key1, '1'), (KeyCode::Key2, '2'),
-                (KeyCode::Key3, '3'), (KeyCode::Key4, '4'), (KeyCode::Key5, '5'),
-                (KeyCode::Key6, '6'), (KeyCode::Key7, '7'), (KeyCode::Key8, '8'),
+                (KeyCode::Key0, '0'),
+                (KeyCode::Key1, '1'),
+                (KeyCode::Key2, '2'),
+                (KeyCode::Key3, '3'),
+                (KeyCode::Key4, '4'),
+                (KeyCode::Key5, '5'),
+                (KeyCode::Key6, '6'),
+                (KeyCode::Key7, '7'),
+                (KeyCode::Key8, '8'),
                 (KeyCode::Key9, '9'),
-                (KeyCode::Kp0, '0'), (KeyCode::Kp1, '1'), (KeyCode::Kp2, '2'),
-                (KeyCode::Kp3, '3'), (KeyCode::Kp4, '4'), (KeyCode::Kp5, '5'),
-                (KeyCode::Kp6, '6'), (KeyCode::Kp7, '7'), (KeyCode::Kp8, '8'),
+                (KeyCode::Kp0, '0'),
+                (KeyCode::Kp1, '1'),
+                (KeyCode::Kp2, '2'),
+                (KeyCode::Kp3, '3'),
+                (KeyCode::Kp4, '4'),
+                (KeyCode::Kp5, '5'),
+                (KeyCode::Kp6, '6'),
+                (KeyCode::Kp7, '7'),
+                (KeyCode::Kp8, '8'),
                 (KeyCode::Kp9, '9'),
             ];
 
@@ -1515,13 +2101,24 @@ impl InputHandler {
                 if let Some(ref element) = clicked_element {
                     match element {
                         UiElementId::AltarOfferAll(idx) => {
-                            let altar_npc_id = state.ui_state.altar_panel.as_ref().unwrap().altar_npc_id.clone();
+                            let altar_npc_id = state
+                                .ui_state
+                                .altar_panel
+                                .as_ref()
+                                .unwrap()
+                                .altar_npc_id
+                                .clone();
                             // Build bone rows to find item_id at index (mirrors renderer logic: dedup by item_id)
                             let mut bone_items: Vec<String> = Vec::new();
                             for slot in state.inventory.slots.iter().flatten() {
-                                if !slot.item_id.contains("bones") { continue; }
-                                let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
-                                if item_def.prayer_xp <= 0 { continue; }
+                                if !slot.item_id.contains("bones") {
+                                    continue;
+                                }
+                                let item_def =
+                                    state.item_registry.get_or_placeholder(&slot.item_id);
+                                if item_def.prayer_xp <= 0 {
+                                    continue;
+                                }
                                 if !bone_items.contains(&slot.item_id) {
                                     bone_items.push(slot.item_id.clone());
                                 }
@@ -1536,8 +2133,16 @@ impl InputHandler {
                             }
                         }
                         UiElementId::AltarPray => {
-                            let altar_npc_id = state.ui_state.altar_panel.as_ref().unwrap().altar_npc_id.clone();
-                            commands.push(InputCommand::PrayAtAltar { altar_id: altar_npc_id });
+                            let altar_npc_id = state
+                                .ui_state
+                                .altar_panel
+                                .as_ref()
+                                .unwrap()
+                                .altar_npc_id
+                                .clone();
+                            commands.push(InputCommand::PrayAtAltar {
+                                altar_id: altar_npc_id,
+                            });
                             audio.play_sfx("enter");
                         }
                         UiElementId::AltarClose => {
@@ -1560,13 +2165,17 @@ impl InputHandler {
 
         // Handle dialogue mode - intercept input when dialogue is open
         if let Some(dialogue) = &state.ui_state.active_dialogue {
+            let guide_actions_locked =
+                is_adventurer_guide_dialogue(&dialogue.speaker) && adventurer_guide_actions_locked(state);
+
             // Touch drag scrolling for dialogue choices on mobile
             let all_touches: Vec<Touch> = touches();
             if let Some(tracking_id) = state.ui_state.dialogue_touch_scroll_id {
                 if let Some(touch) = all_touches.iter().find(|t| t.id == tracking_id) {
                     match touch.phase {
                         TouchPhase::Moved | TouchPhase::Stationary => {
-                            let (_, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
+                            let (_, vy) =
+                                screen_to_virtual_coords(touch.position.x, touch.position.y);
                             let dy = state.ui_state.dialogue_touch_last_y - vy;
                             if !state.ui_state.dialogue_touch_dragged {
                                 let total_dy = (state.ui_state.dialogue_touch_start_y - vy).abs();
@@ -1575,7 +2184,8 @@ impl InputHandler {
                                 }
                             }
                             if state.ui_state.dialogue_touch_dragged {
-                                state.ui_state.dialogue_scroll_offset = (state.ui_state.dialogue_scroll_offset + dy).max(0.0);
+                                state.ui_state.dialogue_scroll_offset =
+                                    (state.ui_state.dialogue_scroll_offset + dy).max(0.0);
                             }
                             state.ui_state.dialogue_touch_last_y = vy;
                         }
@@ -1594,7 +2204,8 @@ impl InputHandler {
                         let hit = layout.hit_test(vx, vy);
                         let over_scrollable = matches!(
                             hit,
-                            Some(UiElementId::DialogueChoice(_)) | Some(UiElementId::DialogueScrollbar)
+                            Some(UiElementId::DialogueChoice(_))
+                                | Some(UiElementId::DialogueScrollbar)
                         );
                         if over_scrollable {
                             state.ui_state.dialogue_touch_scroll_id = Some(touch.id);
@@ -1612,10 +2223,15 @@ impl InputHandler {
                 if is_mouse_button_down(MouseButton::Left) {
                     let dy = my - state.ui_state.dialogue_scrollbar_drag_last_y;
                     if let Some(track_bounds) = layout.get_bounds(&UiElementId::DialogueScrollbar) {
-                        let choice_spacing: f32 = if cfg!(target_os = "android") { 38.0 } else { 32.0 };
+                        let choice_spacing: f32 = if cfg!(target_os = "android") {
+                            38.0
+                        } else {
+                            32.0
+                        };
                         let total_content = dialogue.choices.len() as f32 * choice_spacing;
                         let scale = total_content / track_bounds.h;
-                        state.ui_state.dialogue_scroll_offset = (state.ui_state.dialogue_scroll_offset + dy * scale).max(0.0);
+                        state.ui_state.dialogue_scroll_offset =
+                            (state.ui_state.dialogue_scroll_offset + dy * scale).max(0.0);
                     }
                     state.ui_state.dialogue_scrollbar_drag_last_y = my;
                 } else {
@@ -1630,7 +2246,8 @@ impl InputHandler {
 
             // Handle mouse/touch clicks on dialogue elements
             // Skip if touch was a drag (scroll gesture) or scrollbar interaction
-            let was_touch_drag = state.ui_state.dialogue_touch_dragged && state.ui_state.dialogue_touch_scroll_id.is_none();
+            let was_touch_drag = state.ui_state.dialogue_touch_dragged
+                && state.ui_state.dialogue_touch_scroll_id.is_none();
             if was_touch_drag {
                 state.ui_state.dialogue_touch_dragged = false;
             }
@@ -1651,6 +2268,9 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::DialogueChoice(idx) => {
+                            if guide_actions_locked {
+                                return commands;
+                            }
                             if *idx < dialogue.choices.len() {
                                 let choice = &dialogue.choices[*idx];
                                 commands.push(InputCommand::DialogueChoice {
@@ -1661,6 +2281,9 @@ impl InputHandler {
                             }
                         }
                         UiElementId::DialogueContinue => {
+                            if guide_actions_locked {
+                                return commands;
+                            }
                             commands.push(InputCommand::DialogueChoice {
                                 quest_id: dialogue.quest_id.clone(),
                                 choice_id: "__continue__".to_string(),
@@ -1690,22 +2313,25 @@ impl InputHandler {
                 }
 
                 // Number keys (1-4) select dialogue choices
-                let choice_keys = [KeyCode::Key1, KeyCode::Key2, KeyCode::Key3, KeyCode::Key4];
-                for (i, key) in choice_keys.iter().enumerate() {
-                    if i < dialogue.choices.len() && is_key_pressed(*key) {
-                        let choice = &dialogue.choices[i];
-                        commands.push(InputCommand::DialogueChoice {
-                            quest_id: dialogue.quest_id.clone(),
-                            choice_id: choice.id.clone(),
-                        });
-                        // Don't clear dialogue here - wait for server response
-                        return commands;
+                if !guide_actions_locked {
+                    let choice_keys = [KeyCode::Key1, KeyCode::Key2, KeyCode::Key3, KeyCode::Key4];
+                    for (i, key) in choice_keys.iter().enumerate() {
+                        if i < dialogue.choices.len() && is_key_pressed(*key) {
+                            let choice = &dialogue.choices[i];
+                            commands.push(InputCommand::DialogueChoice {
+                                quest_id: dialogue.quest_id.clone(),
+                                choice_id: choice.id.clone(),
+                            });
+                            // Don't clear dialogue here - wait for server response
+                            return commands;
+                        }
                     }
                 }
                 // Handle scroll wheel for dialogue choices
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y.abs() > 0.0 {
-                    state.ui_state.dialogue_scroll_offset = (state.ui_state.dialogue_scroll_offset - wheel_y * 20.0).max(0.0);
+                    state.ui_state.dialogue_scroll_offset =
+                        (state.ui_state.dialogue_scroll_offset - wheel_y * 20.0).max(0.0);
                 }
             } else {
                 // No choices - Escape, Enter, or Space to continue/close
@@ -1720,7 +2346,11 @@ impl InputHandler {
 
                 // Send __continue__ to server so Lua script can resume execution
                 // Don't clear dialogue here - wait for server response (either new dialogue or close)
-                if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Escape) {
+                if !guide_actions_locked
+                    && (is_key_pressed(KeyCode::Enter)
+                        || is_key_pressed(KeyCode::Space)
+                        || is_key_pressed(KeyCode::Escape))
+                {
                     commands.push(InputCommand::DialogueChoice {
                         quest_id: dialogue.quest_id.clone(),
                         choice_id: "__continue__".to_string(),
@@ -1743,7 +2373,10 @@ impl InputHandler {
                     }
                 }
             }
-            if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) {
+            if is_key_pressed(KeyCode::Escape)
+                || is_key_pressed(KeyCode::Enter)
+                || is_key_pressed(KeyCode::Space)
+            {
                 state.ui_state.bank_help_open = false;
                 return commands;
             }
@@ -1781,7 +2414,8 @@ impl InputHandler {
                                             commands.push(InputCommand::BankDepositGold { amount });
                                         }
                                         BankQuantityAction::WithdrawGold => {
-                                            commands.push(InputCommand::BankWithdrawGold { amount });
+                                            commands
+                                                .push(InputCommand::BankWithdrawGold { amount });
                                         }
                                     }
                                     state.pending_sfx.push("enter".to_string());
@@ -1842,13 +2476,25 @@ impl InputHandler {
 
             // Number key input
             let number_keys = [
-                (KeyCode::Key0, '0'), (KeyCode::Key1, '1'), (KeyCode::Key2, '2'),
-                (KeyCode::Key3, '3'), (KeyCode::Key4, '4'), (KeyCode::Key5, '5'),
-                (KeyCode::Key6, '6'), (KeyCode::Key7, '7'), (KeyCode::Key8, '8'),
+                (KeyCode::Key0, '0'),
+                (KeyCode::Key1, '1'),
+                (KeyCode::Key2, '2'),
+                (KeyCode::Key3, '3'),
+                (KeyCode::Key4, '4'),
+                (KeyCode::Key5, '5'),
+                (KeyCode::Key6, '6'),
+                (KeyCode::Key7, '7'),
+                (KeyCode::Key8, '8'),
                 (KeyCode::Key9, '9'),
-                (KeyCode::Kp0, '0'), (KeyCode::Kp1, '1'), (KeyCode::Kp2, '2'),
-                (KeyCode::Kp3, '3'), (KeyCode::Kp4, '4'), (KeyCode::Kp5, '5'),
-                (KeyCode::Kp6, '6'), (KeyCode::Kp7, '7'), (KeyCode::Kp8, '8'),
+                (KeyCode::Kp0, '0'),
+                (KeyCode::Kp1, '1'),
+                (KeyCode::Kp2, '2'),
+                (KeyCode::Kp3, '3'),
+                (KeyCode::Kp4, '4'),
+                (KeyCode::Kp5, '5'),
+                (KeyCode::Kp6, '6'),
+                (KeyCode::Kp7, '7'),
+                (KeyCode::Kp8, '8'),
                 (KeyCode::Kp9, '9'),
             ];
 
@@ -1936,13 +2582,18 @@ impl InputHandler {
                         let total_rows = (state.ui_state.bank_slots.len() + 5) / 6; // BANK_COLS=6
                         let total_h = total_rows as f32 * row_height;
                         let max_scroll = (total_h - 200.0).max(0.0);
-                        state.ui_state.bank_scroll = (state.ui_state.bank_scroll - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                        state.ui_state.bank_scroll = (state.ui_state.bank_scroll
+                            - wheel_y * SCROLL_SPEED)
+                            .clamp(0.0, max_scroll);
                     }
-                    Some(UiElementId::BankInvScrollArea) | Some(UiElementId::BankInventorySlot(_)) => {
+                    Some(UiElementId::BankInvScrollArea)
+                    | Some(UiElementId::BankInventorySlot(_)) => {
                         let total_rows = (20 + 3) / 4; // 20 slots, INV_COLS=4
                         let total_h = total_rows as f32 * row_height;
                         let max_scroll = (total_h - 200.0).max(0.0);
-                        state.ui_state.bank_inv_scroll = (state.ui_state.bank_inv_scroll - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                        state.ui_state.bank_inv_scroll = (state.ui_state.bank_inv_scroll
+                            - wheel_y * SCROLL_SPEED)
+                            .clamp(0.0, max_scroll);
                     }
                     _ => {}
                 }
@@ -1967,8 +2618,10 @@ impl InputHandler {
                         UiElementId::BankInventorySlot(slot_idx) => {
                             // Deposit item from inventory to bank
                             if let Some(Some(inv_slot)) = state.inventory.slots.get(*slot_idx) {
-                                let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
-                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                let ctrl_held = is_key_down(KeyCode::LeftControl)
+                                    || is_key_down(KeyCode::RightControl);
+                                let shift_held = is_key_down(KeyCode::LeftShift)
+                                    || is_key_down(KeyCode::RightShift);
                                 if shift_held {
                                     // Shift+Click = deposit all
                                     commands.push(InputCommand::BankDeposit {
@@ -1985,22 +2638,26 @@ impl InputHandler {
                                     state.pending_sfx.push("enter".to_string());
                                 } else {
                                     // Click = open quantity dialog
-                                    state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
-                                        input: String::new(),
-                                        cursor: 0,
-                                        action: BankQuantityAction::DepositItem,
-                                        item_id: Some(inv_slot.item_id.clone()),
-                                        max_quantity: inv_slot.quantity,
-                                    });
+                                    state.ui_state.bank_quantity_dialog =
+                                        Some(BankQuantityDialog {
+                                            input: String::new(),
+                                            cursor: 0,
+                                            action: BankQuantityAction::DepositItem,
+                                            item_id: Some(inv_slot.item_id.clone()),
+                                            max_quantity: inv_slot.quantity,
+                                        });
                                 }
                             }
                             return commands;
                         }
                         UiElementId::BankSlot(idx) => {
                             // Withdraw item from bank to inventory
-                            if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(*idx) {
-                                let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
-                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                            if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(*idx)
+                            {
+                                let ctrl_held = is_key_down(KeyCode::LeftControl)
+                                    || is_key_down(KeyCode::RightControl);
+                                let shift_held = is_key_down(KeyCode::LeftShift)
+                                    || is_key_down(KeyCode::RightShift);
                                 if shift_held {
                                     // Shift+Click = withdraw all
                                     commands.push(InputCommand::BankWithdraw {
@@ -2017,57 +2674,68 @@ impl InputHandler {
                                     state.pending_sfx.push("enter".to_string());
                                 } else {
                                     // Click = open quantity dialog
-                                    state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
-                                        input: String::new(),
-                                        cursor: 0,
-                                        action: BankQuantityAction::WithdrawItem,
-                                        item_id: Some(item_id.clone()),
-                                        max_quantity: *qty,
-                                    });
+                                    state.ui_state.bank_quantity_dialog =
+                                        Some(BankQuantityDialog {
+                                            input: String::new(),
+                                            cursor: 0,
+                                            action: BankQuantityAction::WithdrawItem,
+                                            item_id: Some(item_id.clone()),
+                                            max_quantity: *qty,
+                                        });
                                 }
                             }
                             return commands;
                         }
                         UiElementId::BankDepositGoldButton => {
                             if state.inventory.gold > 0 {
-                                let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
-                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                let ctrl_held = is_key_down(KeyCode::LeftControl)
+                                    || is_key_down(KeyCode::RightControl);
+                                let shift_held = is_key_down(KeyCode::LeftShift)
+                                    || is_key_down(KeyCode::RightShift);
                                 if shift_held {
-                                    commands.push(InputCommand::BankDepositGold { amount: state.inventory.gold });
+                                    commands.push(InputCommand::BankDepositGold {
+                                        amount: state.inventory.gold,
+                                    });
                                     state.pending_sfx.push("enter".to_string());
                                 } else if ctrl_held {
                                     commands.push(InputCommand::BankDepositGold { amount: 1 });
                                     state.pending_sfx.push("enter".to_string());
                                 } else {
-                                    state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
-                                        input: String::new(),
-                                        cursor: 0,
-                                        action: BankQuantityAction::DepositGold,
-                                        item_id: None,
-                                        max_quantity: state.inventory.gold,
-                                    });
+                                    state.ui_state.bank_quantity_dialog =
+                                        Some(BankQuantityDialog {
+                                            input: String::new(),
+                                            cursor: 0,
+                                            action: BankQuantityAction::DepositGold,
+                                            item_id: None,
+                                            max_quantity: state.inventory.gold,
+                                        });
                                 }
                             }
                             return commands;
                         }
                         UiElementId::BankWithdrawGoldButton => {
                             if state.ui_state.bank_gold > 0 {
-                                let ctrl_held = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
-                                let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+                                let ctrl_held = is_key_down(KeyCode::LeftControl)
+                                    || is_key_down(KeyCode::RightControl);
+                                let shift_held = is_key_down(KeyCode::LeftShift)
+                                    || is_key_down(KeyCode::RightShift);
                                 if shift_held {
-                                    commands.push(InputCommand::BankWithdrawGold { amount: state.ui_state.bank_gold });
+                                    commands.push(InputCommand::BankWithdrawGold {
+                                        amount: state.ui_state.bank_gold,
+                                    });
                                     state.pending_sfx.push("enter".to_string());
                                 } else if ctrl_held {
                                     commands.push(InputCommand::BankWithdrawGold { amount: 1 });
                                     state.pending_sfx.push("enter".to_string());
                                 } else {
-                                    state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
-                                        input: String::new(),
-                                        cursor: 0,
-                                        action: BankQuantityAction::WithdrawGold,
-                                        item_id: None,
-                                        max_quantity: state.ui_state.bank_gold,
-                                    });
+                                    state.ui_state.bank_quantity_dialog =
+                                        Some(BankQuantityDialog {
+                                            input: String::new(),
+                                            cursor: 0,
+                                            action: BankQuantityAction::WithdrawGold,
+                                            item_id: None,
+                                            max_quantity: state.ui_state.bank_gold,
+                                        });
                                 }
                             }
                             return commands;
@@ -2096,8 +2764,10 @@ impl InputHandler {
             if let Some(tracking_id) = state.ui_state.shop_touch_scroll_id {
                 if let Some(touch) = all_touches.iter().find(|t| t.id == tracking_id) {
                     match touch.phase {
-                        macroquad::input::TouchPhase::Moved | macroquad::input::TouchPhase::Stationary => {
-                            let (_, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
+                        macroquad::input::TouchPhase::Moved
+                        | macroquad::input::TouchPhase::Stationary => {
+                            let (_, vy) =
+                                screen_to_virtual_coords(touch.position.x, touch.position.y);
                             let dy = state.ui_state.shop_touch_last_y - vy;
                             if !state.ui_state.shop_touch_dragged {
                                 let total_dy = (state.ui_state.shop_touch_start_y - vy).abs();
@@ -2108,19 +2778,35 @@ impl InputHandler {
                             if state.ui_state.shop_touch_dragged {
                                 let item_height = 48.0 + 4.0; // SHOP_ITEM_HEIGHT + SHOP_ITEM_SPACING
                                 if state.ui_state.shop_touch_scroll_column == 0 {
-                                    let max_scroll = state.ui_state.shop_data.as_ref()
-                                        .map(|d| ((d.stock.len() as f32) * item_height - 200.0).max(0.0))
+                                    let max_scroll = state
+                                        .ui_state
+                                        .shop_data
+                                        .as_ref()
+                                        .map(|d| {
+                                            ((d.stock.len() as f32) * item_height - 200.0).max(0.0)
+                                        })
                                         .unwrap_or(0.0);
-                                    state.ui_state.shop_buy_scroll = (state.ui_state.shop_buy_scroll + dy).clamp(0.0, max_scroll);
+                                    state.ui_state.shop_buy_scroll =
+                                        (state.ui_state.shop_buy_scroll + dy)
+                                            .clamp(0.0, max_scroll);
                                 } else {
-                                    let inventory_count = state.inventory.slots.iter().filter(|s| s.is_some()).count();
-                                    let max_scroll = ((inventory_count as f32) * item_height - 200.0).max(0.0);
-                                    state.ui_state.shop_sell_scroll = (state.ui_state.shop_sell_scroll + dy).clamp(0.0, max_scroll);
+                                    let inventory_count = state
+                                        .inventory
+                                        .slots
+                                        .iter()
+                                        .filter(|s| s.is_some())
+                                        .count();
+                                    let max_scroll =
+                                        ((inventory_count as f32) * item_height - 200.0).max(0.0);
+                                    state.ui_state.shop_sell_scroll =
+                                        (state.ui_state.shop_sell_scroll + dy)
+                                            .clamp(0.0, max_scroll);
                                 }
                             }
                             state.ui_state.shop_touch_last_y = vy;
                         }
-                        macroquad::input::TouchPhase::Ended | macroquad::input::TouchPhase::Cancelled => {
+                        macroquad::input::TouchPhase::Ended
+                        | macroquad::input::TouchPhase::Cancelled => {
                             state.ui_state.shop_touch_scroll_id = None;
                         }
                         _ => {}
@@ -2133,8 +2819,16 @@ impl InputHandler {
                     if touch.phase == macroquad::input::TouchPhase::Started {
                         let (vx, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
                         let hit = layout.hit_test(vx, vy);
-                        let buy_area = matches!(hit, Some(UiElementId::ShopBuyScrollArea) | Some(UiElementId::ShopBuyItem(_)));
-                        let sell_area = matches!(hit, Some(UiElementId::ShopSellScrollArea) | Some(UiElementId::ShopSellItem(_)));
+                        let buy_area = matches!(
+                            hit,
+                            Some(UiElementId::ShopBuyScrollArea)
+                                | Some(UiElementId::ShopBuyItem(_))
+                        );
+                        let sell_area = matches!(
+                            hit,
+                            Some(UiElementId::ShopSellScrollArea)
+                                | Some(UiElementId::ShopSellItem(_))
+                        );
                         if buy_area || sell_area {
                             state.ui_state.shop_touch_scroll_id = Some(touch.id);
                             state.ui_state.shop_touch_scroll_column = if buy_area { 0 } else { 1 };
@@ -2148,7 +2842,8 @@ impl InputHandler {
             }
 
             // Suppress click actions if the touch was a scroll drag
-            let was_shop_touch_drag = state.ui_state.shop_touch_dragged && state.ui_state.shop_touch_scroll_id.is_none();
+            let was_shop_touch_drag =
+                state.ui_state.shop_touch_dragged && state.ui_state.shop_touch_scroll_id.is_none();
             if was_shop_touch_drag {
                 state.ui_state.shop_touch_dragged = false;
             }
@@ -2157,168 +2852,200 @@ impl InputHandler {
             if mouse_clicked && !was_shop_touch_drag {
                 if let Some(ref element) = clicked_element {
                     match element {
-                    UiElementId::ShopCraftingCloseButton => {
-                        state.ui_state.crafting_open = false;
-                        state.ui_state.crafting_npc_id = None;
-                        state.ui_state.shop_data = None;
-                        state.ui_state.shop_quantity_hold_element = None;
-                        state.pending_sfx.push("enter".to_string());
-                        return commands;
-                    }
-                    UiElementId::MainTab(idx) => {
-                        state.ui_state.shop_main_tab = *idx;
-                        state.pending_sfx.push("enter".to_string());
-                        return commands;
-                    }
-                    UiElementId::CraftingCategoryTab(idx) => {
-                        // Disable category switching during crafting
-                        if !state.ui_state.crafting_in_progress {
-                            if *idx != state.ui_state.crafting_selected_category {
-                                state.ui_state.crafting_selected_category = *idx;
-                                state.ui_state.crafting_selected_recipe = 0;
-                                state.ui_state.crafting_scroll_offset = 0.0;
-                                state.pending_sfx.push("enter".to_string());
-                            }
-                        }
-                        return commands;
-                    }
-                    UiElementId::CraftingRecipeItem(idx) => {
-                        // Disable recipe selection during crafting
-                        if !state.ui_state.crafting_in_progress {
-                            state.ui_state.crafting_selected_recipe = *idx;
+                        UiElementId::ShopCraftingCloseButton => {
+                            state.ui_state.crafting_open = false;
+                            state.ui_state.crafting_npc_id = None;
+                            state.ui_state.shop_data = None;
+                            state.ui_state.shop_quantity_hold_element = None;
                             state.pending_sfx.push("enter".to_string());
-                        }
-                        return commands;
-                    }
-                    UiElementId::CraftingButton => {
-                        // Don't allow crafting while already in progress
-                        if state.ui_state.crafting_in_progress {
                             return commands;
                         }
-                        // Get unique categories from recipes (matching renderer grouping)
-                        let categories: Vec<String> = {
-                            let mut cats: Vec<String> = state.recipe_definitions.iter()
-                                .map(|r| {
-                                    if r.category == "materials" || r.category == "consumables" {
-                                        "supplies".to_string()
+                        UiElementId::MainTab(idx) => {
+                            state.ui_state.shop_main_tab = *idx;
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
+                        }
+                        UiElementId::CraftingCategoryTab(idx) => {
+                            // Disable category switching during crafting
+                            if !state.ui_state.crafting_in_progress {
+                                if *idx != state.ui_state.crafting_selected_category {
+                                    state.ui_state.crafting_selected_category = *idx;
+                                    state.ui_state.crafting_selected_recipe = 0;
+                                    state.ui_state.crafting_scroll_offset = 0.0;
+                                    state.pending_sfx.push("enter".to_string());
+                                }
+                            }
+                            return commands;
+                        }
+                        UiElementId::CraftingRecipeItem(idx) => {
+                            // Disable recipe selection during crafting
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.crafting_selected_recipe = *idx;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::CraftingButton => {
+                            // Don't allow crafting while already in progress
+                            if state.ui_state.crafting_in_progress {
+                                return commands;
+                            }
+                            // Get unique categories from recipes (matching renderer grouping)
+                            let categories: Vec<String> = {
+                                let mut cats: Vec<String> = state
+                                    .recipe_definitions
+                                    .iter()
+                                    .map(|r| {
+                                        if r.category == "materials" || r.category == "consumables"
+                                        {
+                                            "supplies".to_string()
+                                        } else {
+                                            r.category.clone()
+                                        }
+                                    })
+                                    .collect();
+                                cats.sort();
+                                cats.dedup();
+                                cats
+                            };
+                            let selected_idx = state
+                                .ui_state
+                                .crafting_selected_category
+                                .min(categories.len().saturating_sub(1));
+                            let current_category = categories
+                                .get(selected_idx)
+                                .map(|s| s.as_str())
+                                .unwrap_or("supplies");
+                            let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state
+                                .recipe_definitions
+                                .iter()
+                                .filter(|r| {
+                                    let cat_match = if current_category == "supplies" {
+                                        r.category == "consumables" || r.category == "materials"
                                     } else {
-                                        r.category.clone()
-                                    }
+                                        r.category == current_category
+                                    };
+                                    // Only include discovered recipes (matching renderer)
+                                    let is_discovered = !r.requires_discovery
+                                        || state.discovered_recipes.contains(&r.id);
+                                    cat_match && is_discovered
                                 })
                                 .collect();
-                            cats.sort();
-                            cats.dedup();
-                            cats
-                        };
-                        let selected_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
-                        let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
-                        let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
-                            .filter(|r| {
-                                let cat_match = if current_category == "supplies" {
-                                    r.category == "consumables" || r.category == "materials"
-                                } else {
-                                    r.category == current_category
-                                };
-                                // Only include discovered recipes (matching renderer)
-                                let is_discovered = !r.requires_discovery || state.discovered_recipes.contains(&r.id);
-                                cat_match && is_discovered
-                            })
-                            .collect();
-                        if let Some(recipe) = recipes_in_category.get(state.ui_state.crafting_selected_recipe) {
-                            log::info!("Crafting (click): {}", recipe.id);
-                            commands.push(InputCommand::Craft { recipe_id: recipe.id.clone() });
+                            if let Some(recipe) =
+                                recipes_in_category.get(state.ui_state.crafting_selected_recipe)
+                            {
+                                log::info!("Crafting (click): {}", recipe.id);
+                                commands.push(InputCommand::Craft {
+                                    recipe_id: recipe.id.clone(),
+                                });
+                            }
+                            return commands;
                         }
-                        return commands;
-                    }
-                    UiElementId::CraftingCancelButton => {
-                        if state.ui_state.crafting_in_progress {
-                            commands.push(InputCommand::CancelCraft);
+                        UiElementId::CraftingCancelButton => {
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            return commands;
                         }
-                        return commands;
-                    }
-                    UiElementId::ShopBuyItem(idx) => {
-                        state.ui_state.shop_selected_buy_index = *idx;
-                        state.ui_state.shop_buy_quantity = 1;
-                        state.pending_sfx.push("enter".to_string());
-                        return commands;
-                    }
-                    UiElementId::ShopSellItem(idx) => {
-                        state.ui_state.shop_selected_sell_index = *idx;
-                        state.ui_state.shop_sell_quantity = 1;
-                        state.pending_sfx.push("enter".to_string());
-                        return commands;
-                    }
-                    UiElementId::ShopBuyQuantityMinus => {
-                        if state.ui_state.shop_buy_quantity > 1 {
-                            state.ui_state.shop_buy_quantity -= 1;
+                        UiElementId::ShopBuyItem(idx) => {
+                            state.ui_state.shop_selected_buy_index = *idx;
+                            state.ui_state.shop_buy_quantity = 1;
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
                         }
-                        state.ui_state.shop_quantity_hold_element = Some(UiElementId::ShopBuyQuantityMinus);
-                        state.ui_state.shop_quantity_hold_start = current_time;
-                        state.ui_state.shop_quantity_hold_last_repeat = current_time;
-                        return commands;
-                    }
-                    UiElementId::ShopBuyQuantityPlus => {
-                        state.ui_state.shop_buy_quantity += 1;
-                        state.ui_state.shop_quantity_hold_element = Some(UiElementId::ShopBuyQuantityPlus);
-                        state.ui_state.shop_quantity_hold_start = current_time;
-                        state.ui_state.shop_quantity_hold_last_repeat = current_time;
-                        return commands;
-                    }
-                    UiElementId::ShopSellQuantityMinus => {
-                        if state.ui_state.shop_sell_quantity > 1 {
-                            state.ui_state.shop_sell_quantity -= 1;
+                        UiElementId::ShopSellItem(idx) => {
+                            state.ui_state.shop_selected_sell_index = *idx;
+                            state.ui_state.shop_sell_quantity = 1;
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
                         }
-                        state.ui_state.shop_quantity_hold_element = Some(UiElementId::ShopSellQuantityMinus);
-                        state.ui_state.shop_quantity_hold_start = current_time;
-                        state.ui_state.shop_quantity_hold_last_repeat = current_time;
-                        return commands;
-                    }
-                    UiElementId::ShopSellQuantityPlus => {
-                        state.ui_state.shop_sell_quantity += 1;
-                        state.ui_state.shop_quantity_hold_element = Some(UiElementId::ShopSellQuantityPlus);
-                        state.ui_state.shop_quantity_hold_start = current_time;
-                        state.ui_state.shop_quantity_hold_last_repeat = current_time;
-                        return commands;
-                    }
-                    UiElementId::ShopSellQuantityMax => {
-                        let inventory_items: Vec<_> = state.inventory.slots.iter()
-                            .filter_map(|slot| slot.as_ref())
-                            .collect();
-                        if let Some(inv_slot) = inventory_items.get(state.ui_state.shop_selected_sell_index) {
-                            state.ui_state.shop_sell_quantity = inv_slot.quantity.max(1);
+                        UiElementId::ShopBuyQuantityMinus => {
+                            if state.ui_state.shop_buy_quantity > 1 {
+                                state.ui_state.shop_buy_quantity -= 1;
+                            }
+                            state.ui_state.shop_quantity_hold_element =
+                                Some(UiElementId::ShopBuyQuantityMinus);
+                            state.ui_state.shop_quantity_hold_start = current_time;
+                            state.ui_state.shop_quantity_hold_last_repeat = current_time;
+                            return commands;
                         }
-                        return commands;
-                    }
-                    UiElementId::ShopBuyConfirmButton => {
-                        if let Some(ref shop_data) = state.ui_state.shop_data {
+                        UiElementId::ShopBuyQuantityPlus => {
+                            state.ui_state.shop_buy_quantity += 1;
+                            state.ui_state.shop_quantity_hold_element =
+                                Some(UiElementId::ShopBuyQuantityPlus);
+                            state.ui_state.shop_quantity_hold_start = current_time;
+                            state.ui_state.shop_quantity_hold_last_repeat = current_time;
+                            return commands;
+                        }
+                        UiElementId::ShopSellQuantityMinus => {
+                            if state.ui_state.shop_sell_quantity > 1 {
+                                state.ui_state.shop_sell_quantity -= 1;
+                            }
+                            state.ui_state.shop_quantity_hold_element =
+                                Some(UiElementId::ShopSellQuantityMinus);
+                            state.ui_state.shop_quantity_hold_start = current_time;
+                            state.ui_state.shop_quantity_hold_last_repeat = current_time;
+                            return commands;
+                        }
+                        UiElementId::ShopSellQuantityPlus => {
+                            state.ui_state.shop_sell_quantity += 1;
+                            state.ui_state.shop_quantity_hold_element =
+                                Some(UiElementId::ShopSellQuantityPlus);
+                            state.ui_state.shop_quantity_hold_start = current_time;
+                            state.ui_state.shop_quantity_hold_last_repeat = current_time;
+                            return commands;
+                        }
+                        UiElementId::ShopSellQuantityMax => {
+                            let inventory_items: Vec<_> = state
+                                .inventory
+                                .slots
+                                .iter()
+                                .filter_map(|slot| slot.as_ref())
+                                .collect();
+                            if let Some(inv_slot) =
+                                inventory_items.get(state.ui_state.shop_selected_sell_index)
+                            {
+                                state.ui_state.shop_sell_quantity = inv_slot.quantity.max(1);
+                            }
+                            return commands;
+                        }
+                        UiElementId::ShopBuyConfirmButton => {
+                            if let Some(ref shop_data) = state.ui_state.shop_data {
+                                if let Some(ref npc_id) = state.ui_state.shop_npc_id {
+                                    if let Some(stock_item) =
+                                        shop_data.stock.get(state.ui_state.shop_selected_buy_index)
+                                    {
+                                        audio.play_sfx("buy");
+                                        commands.push(InputCommand::ShopBuy {
+                                            npc_id: npc_id.clone(),
+                                            item_id: stock_item.item_id.clone(),
+                                            quantity: state.ui_state.shop_buy_quantity as u32,
+                                        });
+                                    }
+                                }
+                            }
+                            return commands;
+                        }
+                        UiElementId::ShopSellConfirmButton => {
                             if let Some(ref npc_id) = state.ui_state.shop_npc_id {
-                                if let Some(stock_item) = shop_data.stock.get(state.ui_state.shop_selected_buy_index) {
-                                    audio.play_sfx("buy");
-                                    commands.push(InputCommand::ShopBuy {
+                                let inventory_items: Vec<_> = state
+                                    .inventory
+                                    .slots
+                                    .iter()
+                                    .filter_map(|slot| slot.as_ref())
+                                    .collect();
+                                if let Some(inv_slot) =
+                                    inventory_items.get(state.ui_state.shop_selected_sell_index)
+                                {
+                                    commands.push(InputCommand::ShopSell {
                                         npc_id: npc_id.clone(),
-                                        item_id: stock_item.item_id.clone(),
-                                        quantity: state.ui_state.shop_buy_quantity as u32,
+                                        item_id: inv_slot.item_id.clone(),
+                                        quantity: state.ui_state.shop_sell_quantity as u32,
                                     });
                                 }
                             }
+                            return commands;
                         }
-                        return commands;
-                    }
-                    UiElementId::ShopSellConfirmButton => {
-                        if let Some(ref npc_id) = state.ui_state.shop_npc_id {
-                            let inventory_items: Vec<_> = state.inventory.slots.iter()
-                                .filter_map(|slot| slot.as_ref())
-                                .collect();
-                            if let Some(inv_slot) = inventory_items.get(state.ui_state.shop_selected_sell_index) {
-                                commands.push(InputCommand::ShopSell {
-                                    npc_id: npc_id.clone(),
-                                    item_id: inv_slot.item_id.clone(),
-                                    quantity: state.ui_state.shop_sell_quantity as u32,
-                                });
-                            }
-                        }
-                        return commands;
-                    }
                         _ => {}
                     }
                 }
@@ -2334,7 +3061,8 @@ impl InputHandler {
                         const REPEAT_INTERVAL: f64 = 0.06;
                         let held_duration = current_time - state.ui_state.shop_quantity_hold_start;
                         if held_duration >= INITIAL_DELAY {
-                            let since_last = current_time - state.ui_state.shop_quantity_hold_last_repeat;
+                            let since_last =
+                                current_time - state.ui_state.shop_quantity_hold_last_repeat;
                             if since_last >= REPEAT_INTERVAL {
                                 state.ui_state.shop_quantity_hold_last_repeat = current_time;
                                 match hold_elem {
@@ -2381,14 +3109,20 @@ impl InputHandler {
 
             // Q switches between Recipes/Shop main tabs
             if is_key_pressed(KeyCode::Q) {
-                state.ui_state.shop_main_tab = if state.ui_state.shop_main_tab == 0 { 1 } else { 0 };
+                state.ui_state.shop_main_tab = if state.ui_state.shop_main_tab == 0 {
+                    1
+                } else {
+                    0
+                };
             }
 
             if state.ui_state.shop_main_tab == 0 {
                 // Recipes tab keyboard controls
                 // Get unique categories from recipes, merging consumables and materials
                 let categories: Vec<String> = {
-                    let mut cats: Vec<String> = state.recipe_definitions.iter()
+                    let mut cats: Vec<String> = state
+                        .recipe_definitions
+                        .iter()
                         .map(|r| {
                             if r.category == "materials" || r.category == "consumables" {
                                 "supplies".to_string()
@@ -2413,7 +3147,9 @@ impl InputHandler {
                         }
                     }
                     if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
-                        if state.ui_state.crafting_selected_category < categories.len().saturating_sub(1) {
+                        if state.ui_state.crafting_selected_category
+                            < categories.len().saturating_sub(1)
+                        {
                             state.ui_state.crafting_selected_category += 1;
                             state.ui_state.crafting_selected_recipe = 0;
                             state.ui_state.crafting_scroll_offset = 0.0;
@@ -2421,9 +3157,17 @@ impl InputHandler {
                     }
 
                     // Get discovered recipes for current category (matches renderer filtering)
-                    let selected_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
-                    let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
-                    let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
+                    let selected_idx = state
+                        .ui_state
+                        .crafting_selected_category
+                        .min(categories.len().saturating_sub(1));
+                    let current_category = categories
+                        .get(selected_idx)
+                        .map(|s| s.as_str())
+                        .unwrap_or("supplies");
+                    let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state
+                        .recipe_definitions
+                        .iter()
                         .filter(|r| {
                             let cat_match = if current_category == "supplies" {
                                 r.category == "consumables" || r.category == "materials"
@@ -2431,7 +3175,8 @@ impl InputHandler {
                                 r.category == current_category
                             };
                             // Only include discovered recipes (matching renderer)
-                            let is_discovered = !r.requires_discovery || state.discovered_recipes.contains(&r.id);
+                            let is_discovered =
+                                !r.requires_discovery || state.discovered_recipes.contains(&r.id);
                             cat_match && is_discovered
                         })
                         .collect();
@@ -2445,7 +3190,9 @@ impl InputHandler {
                         }
                     }
                     if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                        if state.ui_state.crafting_selected_recipe < recipes_in_category.len().saturating_sub(1) {
+                        if state.ui_state.crafting_selected_recipe
+                            < recipes_in_category.len().saturating_sub(1)
+                        {
                             state.ui_state.crafting_selected_recipe += 1;
                             key_navigated = true;
                         }
@@ -2457,7 +3204,9 @@ impl InputHandler {
                         // Count the actual row position including undiscovered "????" entries
                         // The renderer shows ALL recipes (discovered + undiscovered) in order,
                         // but selection index only counts discovered ones
-                        let all_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
+                        let all_in_category: Vec<&crate::game::RecipeDefinition> = state
+                            .recipe_definitions
+                            .iter()
                             .filter(|r| {
                                 if current_category == "supplies" {
                                     r.category == "consumables" || r.category == "materials"
@@ -2469,7 +3218,8 @@ impl InputHandler {
                         let mut row = 0usize;
                         let mut discovered_idx = 0usize;
                         for r in &all_in_category {
-                            let is_disc = !r.requires_discovery || state.discovered_recipes.contains(&r.id);
+                            let is_disc =
+                                !r.requires_discovery || state.discovered_recipes.contains(&r.id);
                             if is_disc {
                                 if discovered_idx == state.ui_state.crafting_selected_recipe {
                                     break;
@@ -2494,9 +3244,13 @@ impl InputHandler {
 
                     // Enter or C crafts selected recipe
                     if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::C) {
-                        if let Some(recipe) = recipes_in_category.get(state.ui_state.crafting_selected_recipe) {
+                        if let Some(recipe) =
+                            recipes_in_category.get(state.ui_state.crafting_selected_recipe)
+                        {
                             log::info!("Crafting: {}", recipe.id);
-                            commands.push(InputCommand::Craft { recipe_id: recipe.id.clone() });
+                            commands.push(InputCommand::Craft {
+                                recipe_id: recipe.id.clone(),
+                            });
                         }
                     }
                 } else {
@@ -2513,10 +3267,24 @@ impl InputHandler {
                     const SCROLL_SPEED: f32 = 30.0;
                     let line_height = 28.0;
                     // Count all recipes in category (discovered + undiscovered) to match renderer
-                    let sel_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
-                    let cur_cat = categories.get(sel_idx).map(|s| s.as_str()).unwrap_or("supplies");
-                    let total_visible: usize = state.recipe_definitions.iter()
-                        .filter(|r| if cur_cat == "supplies" { r.category == "consumables" || r.category == "materials" } else { r.category == cur_cat })
+                    let sel_idx = state
+                        .ui_state
+                        .crafting_selected_category
+                        .min(categories.len().saturating_sub(1));
+                    let cur_cat = categories
+                        .get(sel_idx)
+                        .map(|s| s.as_str())
+                        .unwrap_or("supplies");
+                    let total_visible: usize = state
+                        .recipe_definitions
+                        .iter()
+                        .filter(|r| {
+                            if cur_cat == "supplies" {
+                                r.category == "consumables" || r.category == "materials"
+                            } else {
+                                r.category == cur_cat
+                            }
+                        })
                         .count();
                     // Match renderer: list_content_height = list_height - 34, list_height = content_height - tab_height - 20
                     // content_height = panel_height - FRAME*2 - HEADER - FOOTER - 12, tab_height = 28
@@ -2527,7 +3295,9 @@ impl InputHandler {
                     let list_content_height = list_height - 34.0;
                     let total_content = total_visible as f32 * line_height;
                     let max_scroll = (total_content - list_content_height).max(0.0);
-                    state.ui_state.crafting_scroll_offset = (state.ui_state.crafting_scroll_offset - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                    state.ui_state.crafting_scroll_offset = (state.ui_state.crafting_scroll_offset
+                        - wheel_y * SCROLL_SPEED)
+                        .clamp(0.0, max_scroll);
                 }
             } else if state.ui_state.shop_main_tab == 1 {
                 // Shop tab - side-by-side Buy/Sell layout
@@ -2539,16 +3309,25 @@ impl InputHandler {
 
                     // Check which area is being hovered
                     match &state.ui_state.hovered_element {
-                        Some(UiElementId::ShopBuyScrollArea) | Some(UiElementId::ShopBuyItem(_)) => {
+                        Some(UiElementId::ShopBuyScrollArea)
+                        | Some(UiElementId::ShopBuyItem(_)) => {
                             if let Some(ref shop_data) = state.ui_state.shop_data {
-                                let max_scroll = ((shop_data.stock.len() as f32) * item_height - 200.0).max(0.0);
-                                state.ui_state.shop_buy_scroll = (state.ui_state.shop_buy_scroll - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                                let max_scroll =
+                                    ((shop_data.stock.len() as f32) * item_height - 200.0).max(0.0);
+                                state.ui_state.shop_buy_scroll = (state.ui_state.shop_buy_scroll
+                                    - wheel_y * SCROLL_SPEED)
+                                    .clamp(0.0, max_scroll);
                             }
                         }
-                        Some(UiElementId::ShopSellScrollArea) | Some(UiElementId::ShopSellItem(_)) => {
-                            let inventory_count = state.inventory.slots.iter().filter(|s| s.is_some()).count();
-                            let max_scroll = ((inventory_count as f32) * item_height - 200.0).max(0.0);
-                            state.ui_state.shop_sell_scroll = (state.ui_state.shop_sell_scroll - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                        Some(UiElementId::ShopSellScrollArea)
+                        | Some(UiElementId::ShopSellItem(_)) => {
+                            let inventory_count =
+                                state.inventory.slots.iter().filter(|s| s.is_some()).count();
+                            let max_scroll =
+                                ((inventory_count as f32) * item_height - 200.0).max(0.0);
+                            state.ui_state.shop_sell_scroll = (state.ui_state.shop_sell_scroll
+                                - wheel_y * SCROLL_SPEED)
+                                .clamp(0.0, max_scroll);
                         }
                         _ => {}
                     }
@@ -2575,7 +3354,10 @@ impl InputHandler {
                 // Up/Down or W/S to navigate items in the active panel
                 match state.ui_state.shop_sub_tab {
                     ShopSubTab::Buy => {
-                        let item_count = state.ui_state.shop_data.as_ref()
+                        let item_count = state
+                            .ui_state
+                            .shop_data
+                            .as_ref()
                             .map(|d| d.stock.len())
                             .unwrap_or(0);
 
@@ -2586,7 +3368,8 @@ impl InputHandler {
                             }
                         }
                         if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                            if state.ui_state.shop_selected_buy_index < item_count.saturating_sub(1) {
+                            if state.ui_state.shop_selected_buy_index < item_count.saturating_sub(1)
+                            {
                                 state.ui_state.shop_selected_buy_index += 1;
                                 state.ui_state.shop_buy_quantity = 1;
                             }
@@ -2606,7 +3389,9 @@ impl InputHandler {
                         if is_key_pressed(KeyCode::Enter) {
                             if let Some(ref shop_data) = state.ui_state.shop_data {
                                 if let Some(ref npc_id) = state.ui_state.shop_npc_id {
-                                    if let Some(stock_item) = shop_data.stock.get(state.ui_state.shop_selected_buy_index) {
+                                    if let Some(stock_item) =
+                                        shop_data.stock.get(state.ui_state.shop_selected_buy_index)
+                                    {
                                         audio.play_sfx("buy");
                                         commands.push(InputCommand::ShopBuy {
                                             npc_id: npc_id.clone(),
@@ -2619,7 +3404,10 @@ impl InputHandler {
                         }
                     }
                     ShopSubTab::Sell => {
-                        let inventory_items: Vec<_> = state.inventory.slots.iter()
+                        let inventory_items: Vec<_> = state
+                            .inventory
+                            .slots
+                            .iter()
                             .filter_map(|slot| slot.as_ref())
                             .collect();
                         let item_count = inventory_items.len();
@@ -2631,7 +3419,9 @@ impl InputHandler {
                             }
                         }
                         if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                            if state.ui_state.shop_selected_sell_index < item_count.saturating_sub(1) {
+                            if state.ui_state.shop_selected_sell_index
+                                < item_count.saturating_sub(1)
+                            {
                                 state.ui_state.shop_selected_sell_index += 1;
                                 state.ui_state.shop_sell_quantity = 1;
                             }
@@ -2650,7 +3440,9 @@ impl InputHandler {
                         // Enter to confirm sell
                         if is_key_pressed(KeyCode::Enter) {
                             if let Some(ref npc_id) = state.ui_state.shop_npc_id {
-                                if let Some(inv_slot) = inventory_items.get(state.ui_state.shop_selected_sell_index) {
+                                if let Some(inv_slot) =
+                                    inventory_items.get(state.ui_state.shop_selected_sell_index)
+                                {
                                     commands.push(InputCommand::ShopSell {
                                         npc_id: npc_id.clone(),
                                         item_id: inv_slot.item_id.clone(),
@@ -2676,7 +3468,8 @@ impl InputHandler {
                 if let Some(touch) = all_touches.iter().find(|t| t.id == tracking_id) {
                     match touch.phase {
                         TouchPhase::Moved | TouchPhase::Stationary => {
-                            let (_, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
+                            let (_, vy) =
+                                screen_to_virtual_coords(touch.position.x, touch.position.y);
                             let dy = state.social_state.touch_last_y - vy;
                             if !state.social_state.touch_dragged {
                                 let total_dy = (state.social_state.touch_start_y - vy).abs();
@@ -2687,11 +3480,15 @@ impl InputHandler {
                             if state.social_state.touch_dragged {
                                 // Update scroll offset based on active tab
                                 match state.social_state.active_tab {
-                                    crate::game::SocialTab::Nearby | crate::game::SocialTab::Online => {
-                                        state.social_state.list_scroll_offset = (state.social_state.list_scroll_offset + dy).max(0.0);
+                                    crate::game::SocialTab::Nearby
+                                    | crate::game::SocialTab::Online => {
+                                        state.social_state.list_scroll_offset =
+                                            (state.social_state.list_scroll_offset + dy).max(0.0);
                                     }
                                     crate::game::SocialTab::Friends => {
-                                        state.social_state.friends_scroll_offset = (state.social_state.friends_scroll_offset + dy).max(0.0);
+                                        state.social_state.friends_scroll_offset =
+                                            (state.social_state.friends_scroll_offset + dy)
+                                                .max(0.0);
                                     }
                                 }
                             }
@@ -2711,7 +3508,12 @@ impl InputHandler {
                     if touch.phase == TouchPhase::Started {
                         let (vx, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
                         let hit = layout.hit_test(vx, vy);
-                        if matches!(hit, Some(UiElementId::SocialScrollArea) | Some(UiElementId::SocialPlayerRow(_)) | Some(UiElementId::SocialFriendRow(_))) {
+                        if matches!(
+                            hit,
+                            Some(UiElementId::SocialScrollArea)
+                                | Some(UiElementId::SocialPlayerRow(_))
+                                | Some(UiElementId::SocialFriendRow(_))
+                        ) {
                             state.social_state.touch_scroll_id = Some(touch.id);
                             state.social_state.touch_last_y = vy;
                             state.social_state.touch_start_y = vy;
@@ -2728,10 +3530,14 @@ impl InputHandler {
                 let scroll_speed = 30.0;
                 match state.social_state.active_tab {
                     crate::game::SocialTab::Nearby | crate::game::SocialTab::Online => {
-                        state.social_state.list_scroll_offset = (state.social_state.list_scroll_offset - wheel_y * scroll_speed).max(0.0);
+                        state.social_state.list_scroll_offset =
+                            (state.social_state.list_scroll_offset - wheel_y * scroll_speed)
+                                .max(0.0);
                     }
                     crate::game::SocialTab::Friends => {
-                        state.social_state.friends_scroll_offset = (state.social_state.friends_scroll_offset - wheel_y * scroll_speed).max(0.0);
+                        state.social_state.friends_scroll_offset =
+                            (state.social_state.friends_scroll_offset - wheel_y * scroll_speed)
+                                .max(0.0);
                     }
                 }
             }
@@ -2769,7 +3575,9 @@ impl InputHandler {
             // Capture typed characters
             while let Some(c) = get_char_pressed() {
                 // Filter control characters
-                if c.is_control() || !c.is_ascii_graphic() && !c.is_ascii_whitespace() && !c.is_alphanumeric() {
+                if c.is_control()
+                    || !c.is_ascii_graphic() && !c.is_ascii_whitespace() && !c.is_alphanumeric()
+                {
                     continue;
                 }
                 // Limit input length
@@ -2841,7 +3649,10 @@ impl InputHandler {
                     };
                     if !send_text.is_empty() {
                         audio.play_sfx("send_message");
-                        commands.push(InputCommand::Chat { text: send_text, channel });
+                        commands.push(InputCommand::Chat {
+                            text: send_text,
+                            channel,
+                        });
                     }
                     state.ui_state.chat_input.clear();
                     state.ui_state.chat_cursor = 0;
@@ -2865,7 +3676,12 @@ impl InputHandler {
                 // In classic mode, arrow keys are for movement, not chat cursor
                 vec![KeyCode::Backspace, KeyCode::Delete]
             } else {
-                vec![KeyCode::Left, KeyCode::Right, KeyCode::Backspace, KeyCode::Delete]
+                vec![
+                    KeyCode::Left,
+                    KeyCode::Right,
+                    KeyCode::Backspace,
+                    KeyCode::Delete,
+                ]
             };
             let any_repeatable_held = repeatable_keys.iter().any(|k| is_key_down(*k));
 
@@ -2883,7 +3699,11 @@ impl InputHandler {
                     return true;
                 } else if is_key_down(key) {
                     // Key held - check repeat timing
-                    let delay = if state.ui_state.chat_key_initial_delay { INITIAL_DELAY } else { REPEAT_RATE };
+                    let delay = if state.ui_state.chat_key_initial_delay {
+                        INITIAL_DELAY
+                    } else {
+                        REPEAT_RATE
+                    };
                     if current_time - state.ui_state.chat_key_repeat_time >= delay {
                         state.ui_state.chat_key_repeat_time = current_time;
                         state.ui_state.chat_key_initial_delay = false;
@@ -2923,7 +3743,10 @@ impl InputHandler {
             // Backspace removes character before cursor
             if should_fire(KeyCode::Backspace, state, current_time) {
                 if state.ui_state.chat_cursor > 0 {
-                    let byte_idx = char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor - 1);
+                    let byte_idx = char_to_byte_index(
+                        &state.ui_state.chat_input,
+                        state.ui_state.chat_cursor - 1,
+                    );
                     state.ui_state.chat_input.remove(byte_idx);
                     state.ui_state.chat_cursor -= 1;
                 }
@@ -2933,7 +3756,8 @@ impl InputHandler {
             if should_fire(KeyCode::Delete, state, current_time) {
                 let char_count = state.ui_state.chat_input.chars().count();
                 if state.ui_state.chat_cursor < char_count {
-                    let byte_idx = char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
+                    let byte_idx =
+                        char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
                     state.ui_state.chat_input.remove(byte_idx);
                 }
             }
@@ -2941,12 +3765,15 @@ impl InputHandler {
             // Capture typed characters - insert at cursor position
             while let Some(c) = get_char_pressed() {
                 // Filter control characters and non-printable special chars (like arrow key ghosts)
-                if c.is_control() || !c.is_ascii_graphic() && !c.is_ascii_whitespace() && !c.is_alphanumeric() {
+                if c.is_control()
+                    || !c.is_ascii_graphic() && !c.is_ascii_whitespace() && !c.is_alphanumeric()
+                {
                     continue;
                 }
                 // Limit chat message length (by character count)
                 if state.ui_state.chat_input.chars().count() < 200 {
-                    let byte_idx = char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
+                    let byte_idx =
+                        char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
                     state.ui_state.chat_input.insert(byte_idx, c);
                     state.ui_state.chat_cursor += 1;
                 }
@@ -2964,7 +3791,8 @@ impl InputHandler {
             if wheel_y != 0.0 {
                 const SCROLL_SPEED: f32 = 40.0; // Pixels per scroll tick
                 let delta = wheel_y * SCROLL_SPEED;
-                state.ui_state.chat_message_scroll = (state.ui_state.chat_message_scroll + delta).max(0.0);
+                state.ui_state.chat_message_scroll =
+                    (state.ui_state.chat_message_scroll + delta).max(0.0);
             }
             return commands;
         }
@@ -2974,7 +3802,89 @@ impl InputHandler {
             if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::M) {
                 audio.play_sfx("enter");
                 state.ui_state.minimap_panel_open = false;
+                state.ui_state.minimap_panel_dragging = false;
+                return commands;
             }
+
+            let panel_rect = minimap_panel_rect();
+            let map_rect = minimap_map_rect(panel_rect);
+            let over_map = mx >= map_rect.x
+                && mx <= map_rect.x + map_rect.w
+                && my >= map_rect.y
+                && my <= map_rect.y + map_rect.h;
+
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y.abs() > 0.0 && over_map {
+                if let Some(world_bounds) = minimap_world_bounds(state) {
+                    let old_zoom = state
+                        .ui_state
+                        .minimap_panel_zoom
+                        .clamp(MINIMAP_PANEL_MIN_ZOOM, MINIMAP_PANEL_MAX_ZOOM);
+                    let zoom_factor = (1.0 + wheel_y * 0.12).max(0.1);
+                    let new_zoom = (old_zoom * zoom_factor)
+                        .clamp(MINIMAP_PANEL_MIN_ZOOM, MINIMAP_PANEL_MAX_ZOOM);
+
+                    if (new_zoom - old_zoom).abs() > f32::EPSILON {
+                        let view_bounds = minimap_panel_view_bounds(state, world_bounds);
+                        let anchor_world = minimap_screen_to_world(view_bounds, map_rect, mx, my);
+                        let (new_view_w, new_view_h) = minimap_view_size(world_bounds, new_zoom);
+                        let nx = ((mx - map_rect.x) / map_rect.w.max(1.0)).clamp(0.0, 1.0);
+                        let ny = ((my - map_rect.y) / map_rect.h.max(1.0)).clamp(0.0, 1.0);
+                        let target_center_x = anchor_world.0 - (nx - 0.5) * new_view_w;
+                        let target_center_y = anchor_world.1 - (ny - 0.5) * new_view_h;
+                        let (center_x, center_y) = minimap_clamp_center(
+                            world_bounds,
+                            new_view_w,
+                            new_view_h,
+                            target_center_x,
+                            target_center_y,
+                        );
+
+                        state.ui_state.minimap_panel_zoom = new_zoom;
+                        state.ui_state.minimap_panel_center_x = Some(center_x);
+                        state.ui_state.minimap_panel_center_y = Some(center_y);
+                    }
+                }
+            }
+
+            if mouse_clicked && over_map {
+                state.ui_state.minimap_panel_dragging = true;
+                state.ui_state.minimap_panel_drag_last_x = mx;
+                state.ui_state.minimap_panel_drag_last_y = my;
+            }
+
+            if state.ui_state.minimap_panel_dragging {
+                if is_mouse_button_down(MouseButton::Left) {
+                    if let Some(world_bounds) = minimap_world_bounds(state) {
+                        let view_bounds = minimap_panel_view_bounds(state, world_bounds);
+                        let dx_pixels = mx - state.ui_state.minimap_panel_drag_last_x;
+                        let dy_pixels = my - state.ui_state.minimap_panel_drag_last_y;
+
+                        if dx_pixels.abs() > 0.0 || dy_pixels.abs() > 0.0 {
+                            let view_w = view_bounds.width();
+                            let view_h = view_bounds.height();
+                            let world_dx = dx_pixels / map_rect.w.max(1.0) * view_w;
+                            let world_dy = dy_pixels / map_rect.h.max(1.0) * view_h;
+                            let center_x = (view_bounds.min_x + view_bounds.max_x) * 0.5 - world_dx;
+                            let center_y = (view_bounds.min_y + view_bounds.max_y) * 0.5 - world_dy;
+                            let (center_x, center_y) = minimap_clamp_center(
+                                world_bounds,
+                                view_w,
+                                view_h,
+                                center_x,
+                                center_y,
+                            );
+                            state.ui_state.minimap_panel_center_x = Some(center_x);
+                            state.ui_state.minimap_panel_center_y = Some(center_y);
+                        }
+                    }
+                    state.ui_state.minimap_panel_drag_last_x = mx;
+                    state.ui_state.minimap_panel_drag_last_y = my;
+                } else {
+                    state.ui_state.minimap_panel_dragging = false;
+                }
+            }
+
             return commands;
         }
 
@@ -2982,7 +3892,10 @@ impl InputHandler {
 
         // Enter key opens chat (not in classic mode - chat is always open)
         // Don't open chat on System tab (read-only)
-        if !classic && is_key_pressed(KeyCode::Enter) && !matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
+        if !classic
+            && is_key_pressed(KeyCode::Enter)
+            && !matches!(state.ui_state.chat_active_tab, ChatChannel::System)
+        {
             state.ui_state.chat_open = true;
             state.ui_state.chat_input.clear();
             state.ui_state.chat_cursor = 0;
@@ -2996,16 +3909,48 @@ impl InputHandler {
         while get_char_pressed().is_some() {}
 
         // Read which keys are held (in classic mode, only arrow keys - WASD goes to chat)
-        let up = if classic { is_key_down(KeyCode::Up) } else { is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) };
-        let down = if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) };
-        let left = if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) };
-        let right = if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) };
+        let up = if classic {
+            is_key_down(KeyCode::Up)
+        } else {
+            is_key_down(KeyCode::W) || is_key_down(KeyCode::Up)
+        };
+        let down = if classic {
+            is_key_down(KeyCode::Down)
+        } else {
+            is_key_down(KeyCode::S) || is_key_down(KeyCode::Down)
+        };
+        let left = if classic {
+            is_key_down(KeyCode::Left)
+        } else {
+            is_key_down(KeyCode::A) || is_key_down(KeyCode::Left)
+        };
+        let right = if classic {
+            is_key_down(KeyCode::Right)
+        } else {
+            is_key_down(KeyCode::D) || is_key_down(KeyCode::Right)
+        };
 
         // Check for newly pressed keys this frame (last-key-wins priority)
-        let up_just = if classic { is_key_pressed(KeyCode::Up) } else { is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up) };
-        let down_just = if classic { is_key_pressed(KeyCode::Down) } else { is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down) };
-        let left_just = if classic { is_key_pressed(KeyCode::Left) } else { is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left) };
-        let right_just = if classic { is_key_pressed(KeyCode::Right) } else { is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right) };
+        let up_just = if classic {
+            is_key_pressed(KeyCode::Up)
+        } else {
+            is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up)
+        };
+        let down_just = if classic {
+            is_key_pressed(KeyCode::Down)
+        } else {
+            is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down)
+        };
+        let left_just = if classic {
+            is_key_pressed(KeyCode::Left)
+        } else {
+            is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left)
+        };
+        let right_just = if classic {
+            is_key_pressed(KeyCode::Right)
+        } else {
+            is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right)
+        };
 
         // Get touch D-pad input (for mobile)
         use crate::input::touch::DPadDirection;
@@ -3021,21 +3966,32 @@ impl InputHandler {
         // Determine new direction from keyboard - only one direction at a time
         // Newly pressed keys override current direction (last-key-wins),
         // then keep current direction if still held, then fall back to any held key
-        let keyboard_dir = if up_just { CardinalDir::Up }
-            else if down_just { CardinalDir::Down }
-            else if left_just { CardinalDir::Left }
-            else if right_just { CardinalDir::Right }
-            else { match self.current_dir {
+        let keyboard_dir = if up_just {
+            CardinalDir::Up
+        } else if down_just {
+            CardinalDir::Down
+        } else if left_just {
+            CardinalDir::Left
+        } else if right_just {
+            CardinalDir::Right
+        } else {
+            match self.current_dir {
                 CardinalDir::Up if up => CardinalDir::Up,
                 CardinalDir::Down if down => CardinalDir::Down,
                 CardinalDir::Left if left => CardinalDir::Left,
                 CardinalDir::Right if right => CardinalDir::Right,
                 _ => {
-                    if up { CardinalDir::Up }
-                    else if down { CardinalDir::Down }
-                    else if left { CardinalDir::Left }
-                    else if right { CardinalDir::Right }
-                    else { CardinalDir::None }
+                    if up {
+                        CardinalDir::Up
+                    } else if down {
+                        CardinalDir::Down
+                    } else if left {
+                        CardinalDir::Left
+                    } else if right {
+                        CardinalDir::Right
+                    } else {
+                        CardinalDir::None
+                    }
                 }
             }
         };
@@ -3065,8 +4021,12 @@ impl InputHandler {
             } else if keyboard_dir == CardinalDir::None && self.prev_dir != CardinalDir::None {
                 // Direction released
                 let hold_duration = current_time - self.dir_press_time;
-                log::info!("[INPUT] Key released: hold_duration={:.3}s, threshold={:.3}s, move_sent={}",
-                    hold_duration, FACE_THRESHOLD, self.move_sent);
+                log::info!(
+                    "[INPUT] Key released: hold_duration={:.3}s, threshold={:.3}s, move_sent={}",
+                    hold_duration,
+                    FACE_THRESHOLD,
+                    self.move_sent
+                );
                 if self.move_sent {
                     // Was moving, now stopped - send stop command
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
@@ -3079,12 +4039,18 @@ impl InputHandler {
                     let attack_anim = state.get_local_player().map_or(false, |p| {
                         matches!(
                             p.animation.state,
-                            AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
+                            AnimationState::Attacking
+                                | AnimationState::Casting
+                                | AnimationState::ShootingBow
                         )
                     });
                     if !attack_anim && !state.is_sitting {
                         let dir = self.prev_dir.to_direction_u8();
-                        log::info!("[INPUT] Sending Face command: direction={} (prev_dir={:?})", dir, self.prev_dir);
+                        log::info!(
+                            "[INPUT] Sending Face command: direction={} (prev_dir={:?})",
+                            dir,
+                            self.prev_dir
+                        );
                         commands.push(InputCommand::Face { direction: dir });
                         self.last_send_time = current_time;
                     }
@@ -3117,12 +4083,18 @@ impl InputHandler {
                 let attack_anim = state.get_local_player().map_or(false, |p| {
                     matches!(
                         p.animation.state,
-                        AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
+                        AnimationState::Attacking
+                            | AnimationState::Casting
+                            | AnimationState::ShootingBow
                     )
                 });
                 if !attack_anim && !state.is_sitting {
                     let dir = dpad_released.to_direction_u8();
-                    log::info!("[INPUT] D-pad tap - sending Face command: direction={} (hold={:.0}ms)", dir, hold_duration * 1000.0);
+                    log::info!(
+                        "[INPUT] D-pad tap - sending Face command: direction={} (hold={:.0}ms)",
+                        dir,
+                        hold_duration * 1000.0
+                    );
                     commands.push(InputCommand::Face { direction: dir });
                     self.last_send_time = current_time;
                 }
@@ -3156,12 +4128,16 @@ impl InputHandler {
         } else {
             is_key_down(KeyCode::Space)
         };
-        let is_attacking = attack_key_down || self.touch_controls.attack_pressed() || state.get_local_player().map_or(false, |p| {
-            matches!(
-                p.animation.state,
-                AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
-            )
-        });
+        let is_attacking = attack_key_down
+            || self.touch_controls.attack_pressed()
+            || state.get_local_player().map_or(false, |p| {
+                matches!(
+                    p.animation.state,
+                    AnimationState::Attacking
+                        | AnimationState::Casting
+                        | AnimationState::ShootingBow
+                )
+            });
 
         // Check if we have any movement input (keyboard or D-pad)
         let has_movement_input = new_dir != CardinalDir::None;
@@ -3199,7 +4175,9 @@ impl InputHandler {
                     let target_y = player_y + dy as i32;
 
                     // Check static tile collision
-                    let tile_walkable = state.chunk_manager.is_walkable(target_x as f32, target_y as f32);
+                    let tile_walkable = state
+                        .chunk_manager
+                        .is_walkable(target_x as f32, target_y as f32);
 
                     // Check entity collision
                     let occupied = build_occupied_set(state);
@@ -3210,7 +4188,8 @@ impl InputHandler {
                     false
                 };
 
-                let direction_changed = (dx - self.last_dx).abs() > 0.01 || (dy - self.last_dy).abs() > 0.01;
+                let direction_changed =
+                    (dx - self.last_dx).abs() > 0.01 || (dy - self.last_dy).abs() > 0.01;
                 let time_elapsed = current_time - self.last_send_time >= self.send_interval;
                 let should_send = direction_changed || time_elapsed;
 
@@ -3236,7 +4215,9 @@ impl InputHandler {
                     }
                     if should_send && !state.is_sitting {
                         let face_dir = new_dir.to_direction_u8();
-                        commands.push(InputCommand::Face { direction: face_dir });
+                        commands.push(InputCommand::Face {
+                            direction: face_dir,
+                        });
                         self.last_dx = dx;
                         self.last_dy = dy;
                         self.last_send_time = current_time;
@@ -3263,11 +4244,15 @@ impl InputHandler {
         // Only follow path if not manually moving and not attacking
         if dx == 0.0 && dy == 0.0 && !is_attacking {
             // Get player position from SERVER state (not visual) to avoid getting ahead of server
-            let player_pos = state.get_local_player().map(|p| (p.server_x.round() as i32, p.server_y.round() as i32));
+            let player_pos = state
+                .get_local_player()
+                .map(|p| (p.server_x.round() as i32, p.server_y.round() as i32));
 
             // Check if next waypoint is blocked by an entity - if so, cancel path
             let mut path_blocked = false;
-            if let (Some((player_x, player_y)), Some(ref path_state)) = (player_pos, &state.auto_path) {
+            if let (Some((player_x, player_y)), Some(ref path_state)) =
+                (player_pos, &state.auto_path)
+            {
                 if path_state.current_index < path_state.path.len() {
                     let (next_x, next_y) = path_state.path[path_state.current_index];
 
@@ -3288,7 +4273,9 @@ impl InputHandler {
                 return commands;
             }
 
-            if let (Some((player_x, player_y)), Some(ref mut path_state)) = (player_pos, &mut state.auto_path) {
+            if let (Some((player_x, player_y)), Some(ref mut path_state)) =
+                (player_pos, &mut state.auto_path)
+            {
                 // Check if we've reached the current waypoint
                 if path_state.current_index < path_state.path.len() {
                     let (target_x, target_y) = path_state.path[path_state.current_index];
@@ -3306,20 +4293,33 @@ impl InputHandler {
 
                         // Only move in one direction at a time (grid-based movement)
                         if move_dx != 0.0 {
-                            commands.push(InputCommand::Move { dx: move_dx, dy: 0.0 });
+                            commands.push(InputCommand::Move {
+                                dx: move_dx,
+                                dy: 0.0,
+                            });
                         } else if move_dy != 0.0 {
-                            commands.push(InputCommand::Move { dx: 0.0, dy: move_dy });
+                            commands.push(InputCommand::Move {
+                                dx: 0.0,
+                                dy: move_dy,
+                            });
                         }
                     }
                 }
             }
 
             // Check if path completed and handle pickup/interact if needed
-            if state.auto_path.as_ref().map(|p| p.current_index >= p.path.len()).unwrap_or(false) {
+            if state
+                .auto_path
+                .as_ref()
+                .map(|p| p.current_index >= p.path.len())
+                .unwrap_or(false)
+            {
                 // Path completed - check for pickup target
                 if let Some(ref path_state) = state.auto_path {
                     if let Some(ref item_id) = path_state.pickup_target {
-                        commands.push(InputCommand::Pickup { item_id: item_id.clone() });
+                        commands.push(InputCommand::Pickup {
+                            item_id: item_id.clone(),
+                        });
                     }
                     // Handle interact target (NPC)
                     if let Some(ref npc_id) = path_state.interact_target {
@@ -3331,16 +4331,23 @@ impl InputHandler {
                                     altar_name: npc.display_name.clone(),
                                 });
                             } else if npc.is_alive() {
-                                commands.push(InputCommand::Interact { npc_id: npc_id.clone() });
+                                commands.push(InputCommand::Interact {
+                                    npc_id: npc_id.clone(),
+                                });
                             }
                         } else {
-                            commands.push(InputCommand::Interact { npc_id: npc_id.clone() });
+                            commands.push(InputCommand::Interact {
+                                npc_id: npc_id.clone(),
+                            });
                         }
                     }
                 }
                 // Handle chair sit target
                 if let Some((cx, cy)) = state.pending_chair_sit.take() {
-                    commands.push(InputCommand::SitChair { tile_x: cx, tile_y: cy });
+                    commands.push(InputCommand::SitChair {
+                        tile_x: cx,
+                        tile_y: cy,
+                    });
                 }
                 // Handle farming harvest target
                 if let Some(patch_id) = state.pending_harvest_patch.take() {
@@ -3378,9 +4385,11 @@ impl InputHandler {
                         let face_x = px + fdx as i32;
                         let face_y = py + fdy as i32;
                         // Check if the tile we're facing is a fishing marker
-                        state.gathering_markers.iter().find(|m| {
-                            m.skill == "fishing" && m.x == face_x && m.y == face_y
-                        }).map(|m| (m.x, m.y))
+                        state
+                            .gathering_markers
+                            .iter()
+                            .find(|m| m.skill == "fishing" && m.x == face_x && m.y == face_y)
+                            .map(|m| (m.x, m.y))
                     } else {
                         None
                     }
@@ -3392,17 +4401,24 @@ impl InputHandler {
                 let should_woodcut = if should_gather.is_none() {
                     if let Some(player) = state.get_local_player() {
                         // Check if player has an axe equipped (chop_speed_multiplier > 0)
-                        let (has_axe, chop_speed) = if let Some(ref weapon_id) = player.equipped_weapon {
-                            let speed = state.item_registry.get(weapon_id)
-                                .and_then(|item| item.equipment.as_ref())
-                                .map(|eq| eq.chop_speed_multiplier)
-                                .unwrap_or(0.0);
-                            log::info!("Woodcutting check: weapon={} chop_speed={}", weapon_id, speed);
-                            (speed > 0.0, speed)
-                        } else {
-                            log::info!("Woodcutting check: no weapon equipped");
-                            (false, 0.0)
-                        };
+                        let (has_axe, chop_speed) =
+                            if let Some(ref weapon_id) = player.equipped_weapon {
+                                let speed = state
+                                    .item_registry
+                                    .get(weapon_id)
+                                    .and_then(|item| item.equipment.as_ref())
+                                    .map(|eq| eq.chop_speed_multiplier)
+                                    .unwrap_or(0.0);
+                                log::info!(
+                                    "Woodcutting check: weapon={} chop_speed={}",
+                                    weapon_id,
+                                    speed
+                                );
+                                (speed > 0.0, speed)
+                            } else {
+                                log::info!("Woodcutting check: no weapon equipped");
+                                (false, 0.0)
+                            };
 
                         if has_axe {
                             let px = player.x.round() as i32;
@@ -3411,13 +4427,24 @@ impl InputHandler {
                             let face_x = px + fdx as i32;
                             let face_y = py + fdy as i32;
 
-                            log::info!("Axe detected (speed={}), checking tile ({}, {})", chop_speed, face_x, face_y);
+                            log::info!(
+                                "Axe detected (speed={}), checking tile ({}, {})",
+                                chop_speed,
+                                face_x,
+                                face_y
+                            );
 
                             // Check if facing tile has a tree object and is not depleted
                             if !state.depleted_trees.contains_key(&(face_x, face_y)) {
-                                let obj_result = state.chunk_manager.get_object_at_exact(face_x, face_y);
+                                let obj_result =
+                                    state.chunk_manager.get_object_at_exact(face_x, face_y);
                                 if let Some(obj) = obj_result {
-                                    log::info!("Found object at ({}, {}): gid={}", face_x, face_y, obj.gid);
+                                    log::info!(
+                                        "Found object at ({}, {}): gid={}",
+                                        face_x,
+                                        face_y,
+                                        obj.gid
+                                    );
                                     Some((face_x, face_y, obj.gid))
                                 } else {
                                     log::info!("No object found at ({}, {})", face_x, face_y);
@@ -3439,14 +4466,20 @@ impl InputHandler {
 
                 if let Some((marker_x, marker_y)) = should_gather {
                     if !state.is_gathering {
-                        log::info!("Fishing rod equipped near fishing spot - sending StartGathering");
+                        log::info!(
+                            "Fishing rod equipped near fishing spot - sending StartGathering"
+                        );
                         commands.push(InputCommand::StartGathering { marker_x, marker_y });
                         self.last_attack_time = current_time;
                     }
                 } else if let Some((tree_x, tree_y, tree_gid)) = should_woodcut {
                     // Send chop command on each attack press when facing a tree with an axe
                     log::info!("Axe equipped near tree - sending ChopTree");
-                    commands.push(InputCommand::ChopTree { tree_x, tree_y, tree_gid });
+                    commands.push(InputCommand::ChopTree {
+                        tree_x,
+                        tree_y,
+                        tree_gid,
+                    });
                     self.last_attack_time = current_time;
                 } else {
                     log::info!("Space held - sending Attack command");
@@ -3489,26 +4522,38 @@ impl InputHandler {
                     if mouse_clicked {
                         if state.ui_state.spell_bar_active {
                             // Spell mode: cast the spell at this index
-                            let magic_level = state.get_local_player()
+                            let magic_level = state
+                                .get_local_player()
                                 .map(|p| p.skills.magic.level)
                                 .unwrap_or(1);
-                            let unlocked_spells: Vec<_> = crate::game::spell::SPELLS.iter()
+                            let unlocked_spells: Vec<_> = crate::game::spell::SPELLS
+                                .iter()
                                 .filter(|s| magic_level >= s.magic_level_req)
                                 .collect();
                             if let Some(spell_def) = unlocked_spells.get(*idx) {
-                                commands.push(InputCommand::CastSpell { spell_id: spell_def.id.to_string() });
-                                let cooldown_end = macroquad::time::get_time() + (spell_def.cooldown_ms as f64 / 1000.0);
-                                state.spell_cooldowns.insert(spell_def.id.to_string(), cooldown_end);
+                                commands.push(InputCommand::CastSpell {
+                                    spell_id: spell_def.id.to_string(),
+                                });
+                                let cooldown_end = macroquad::time::get_time()
+                                    + (spell_def.cooldown_ms as f64 / 1000.0);
+                                state
+                                    .spell_cooldowns
+                                    .insert(spell_def.id.to_string(), cooldown_end);
                             }
                         } else {
                             // Item mode: use/equip item at inventory slot idx
                             let slot_idx = *idx;
                             if let Some(Some(slot)) = state.inventory.slots.get(slot_idx) {
-                                let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
+                                let item_def =
+                                    state.item_registry.get_or_placeholder(&slot.item_id);
                                 if item_def.equipment.is_some() {
-                                    commands.push(InputCommand::Equip { slot_index: slot_idx as u8 });
+                                    commands.push(InputCommand::Equip {
+                                        slot_index: slot_idx as u8,
+                                    });
                                 } else {
-                                    commands.push(InputCommand::UseItem { slot_index: slot_idx as u8 });
+                                    commands.push(InputCommand::UseItem {
+                                        slot_index: slot_idx as u8,
+                                    });
                                 }
                             }
                         }
@@ -3516,7 +4561,13 @@ impl InputHandler {
                         // Right-click on quick slot opens context menu (item mode only)
                         if !state.ui_state.spell_bar_active {
                             let inv_idx = *idx;
-                            if state.inventory.slots.get(inv_idx).and_then(|s| s.as_ref()).is_some() {
+                            if state
+                                .inventory
+                                .slots
+                                .get(inv_idx)
+                                .and_then(|s| s.as_ref())
+                                .is_some()
+                            {
                                 state.ui_state.context_menu = Some(ContextMenu {
                                     target: ContextMenuTarget::InventorySlot(inv_idx),
                                     x: mx,
@@ -3530,7 +4581,13 @@ impl InputHandler {
                 UiElementId::InventorySlot(idx) => {
                     if mouse_right_clicked {
                         // Right-click opens context menu (if item exists)
-                        if state.inventory.slots.get(*idx).and_then(|s| s.as_ref()).is_some() {
+                        if state
+                            .inventory
+                            .slots
+                            .get(*idx)
+                            .and_then(|s| s.as_ref())
+                            .is_some()
+                        {
                             state.ui_state.context_menu = Some(ContextMenu {
                                 target: ContextMenuTarget::InventorySlot(*idx),
                                 x: mx,
@@ -3544,15 +4601,42 @@ impl InputHandler {
                     if mouse_right_clicked {
                         // Right-click on equipment slot opens context menu (if something is equipped)
                         let has_item = match slot_type.as_str() {
-                            "head" => state.get_local_player().and_then(|p| p.equipped_head.as_ref()).is_some(),
-                            "body" => state.get_local_player().and_then(|p| p.equipped_body.as_ref()).is_some(),
-                            "weapon" => state.get_local_player().and_then(|p| p.equipped_weapon.as_ref()).is_some(),
-                            "back" => state.get_local_player().and_then(|p| p.equipped_back.as_ref()).is_some(),
-                            "feet" => state.get_local_player().and_then(|p| p.equipped_feet.as_ref()).is_some(),
-                            "ring" => state.get_local_player().and_then(|p| p.equipped_ring.as_ref()).is_some(),
-                            "gloves" => state.get_local_player().and_then(|p| p.equipped_gloves.as_ref()).is_some(),
-                            "necklace" => state.get_local_player().and_then(|p| p.equipped_necklace.as_ref()).is_some(),
-                            "belt" => state.get_local_player().and_then(|p| p.equipped_belt.as_ref()).is_some(),
+                            "head" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_head.as_ref())
+                                .is_some(),
+                            "body" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_body.as_ref())
+                                .is_some(),
+                            "weapon" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_weapon.as_ref())
+                                .is_some(),
+                            "back" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_back.as_ref())
+                                .is_some(),
+                            "feet" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_feet.as_ref())
+                                .is_some(),
+                            "ring" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_ring.as_ref())
+                                .is_some(),
+                            "gloves" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_gloves.as_ref())
+                                .is_some(),
+                            "necklace" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_necklace.as_ref())
+                                .is_some(),
+                            "belt" => state
+                                .get_local_player()
+                                .and_then(|p| p.equipped_belt.as_ref())
+                                .is_some(),
                             _ => false,
                         };
                         if has_item {
@@ -3588,7 +4672,9 @@ impl InputHandler {
 
                                     const PICKUP_RANGE: f32 = 2.0;
                                     if dist < PICKUP_RANGE {
-                                        commands.push(InputCommand::Pickup { item_id: item_id.clone() });
+                                        commands.push(InputCommand::Pickup {
+                                            item_id: item_id.clone(),
+                                        });
                                     } else {
                                         // Out of range - path to an adjacent tile
                                         let player_x = player.x.round() as i32;
@@ -3600,13 +4686,15 @@ impl InputHandler {
                                         let occupied = build_occupied_set(state);
 
                                         const MAX_PATH_DISTANCE: i32 = 32;
-                                        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                            (player_x, player_y),
-                                            (item_x, item_y),
-                                            &state.chunk_manager,
-                                            &occupied,
-                                            MAX_PATH_DISTANCE,
-                                        ) {
+                                        if let Some((dest, path)) =
+                                            pathfinding::find_path_to_adjacent(
+                                                (player_x, player_y),
+                                                (item_x, item_y),
+                                                &state.chunk_manager,
+                                                &occupied,
+                                                MAX_PATH_DISTANCE,
+                                            )
+                                        {
                                             state.auto_path = Some(PathState {
                                                 path,
                                                 current_index: 0,
@@ -3675,7 +4763,11 @@ impl InputHandler {
             // Prioritize NPC interaction over player targeting
             if let Some(npc_id) = clicked_npc {
                 // Check if NPC can be targeted for combat (not a merchant/quest giver/banker/altar)
-                let is_attackable = state.npcs.get(&npc_id).map(|n| n.is_attackable()).unwrap_or(true);
+                let is_attackable = state
+                    .npcs
+                    .get(&npc_id)
+                    .map(|n| n.is_attackable())
+                    .unwrap_or(true);
 
                 if is_attackable {
                     // Attackable NPC (hostile or non-hostile) - target for combat
@@ -3693,10 +4785,11 @@ impl InputHandler {
                                 if dist_to_player < INTERACT_RANGE {
                                     // Check if NPC is an altar - open altar panel instead of dialogue
                                     if npc.is_altar {
-                                        state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
-                                            altar_npc_id: npc_id.clone(),
-                                            altar_name: npc.display_name.clone(),
-                                        });
+                                        state.ui_state.altar_panel =
+                                            Some(crate::game::AltarPanelState {
+                                                altar_npc_id: npc_id.clone(),
+                                                altar_name: npc.display_name.clone(),
+                                            });
                                     } else {
                                         commands.push(InputCommand::Interact { npc_id });
                                     }
@@ -3734,7 +4827,11 @@ impl InputHandler {
             } else if let Some(entity_id) = clicked_player {
                 // Player clicked - target them
                 commands.push(InputCommand::Target { entity_id });
-            } else if let Some(patch_id) = state.farming_patch_positions.get(&(clicked_tile_x, clicked_tile_y)).cloned() {
+            } else if let Some(patch_id) = state
+                .farming_patch_positions
+                .get(&(clicked_tile_x, clicked_tile_y))
+                .cloned()
+            {
                 // Clicked on a farming patch
                 if let Some(patch) = state.farming_patches.get(&patch_id) {
                     if patch.state == "harvestable" {
@@ -3771,7 +4868,10 @@ impl InputHandler {
                         }
                     }
                 }
-            } else if state.chair_positions.contains(&(clicked_tile_x, clicked_tile_y)) {
+            } else if state
+                .chair_positions
+                .contains(&(clicked_tile_x, clicked_tile_y))
+            {
                 // Clicked on a chair - try to sit
                 if !state.is_sitting {
                     if let Some(local_id) = &state.local_player_id {
@@ -3782,7 +4882,10 @@ impl InputHandler {
                             let cdy = (py - clicked_tile_y).abs();
                             if cdx <= 1 && cdy <= 1 {
                                 // Within range - sit immediately
-                                commands.push(InputCommand::SitChair { tile_x: clicked_tile_x, tile_y: clicked_tile_y });
+                                commands.push(InputCommand::SitChair {
+                                    tile_x: clicked_tile_x,
+                                    tile_y: clicked_tile_y,
+                                });
                             } else {
                                 // Out of range - pathfind to adjacent tile, then sit
                                 let occupied = build_occupied_set(state);
@@ -3801,7 +4904,8 @@ impl InputHandler {
                                         pickup_target: None,
                                         interact_target: None,
                                     });
-                                    state.pending_chair_sit = Some((clicked_tile_x, clicked_tile_y));
+                                    state.pending_chair_sit =
+                                        Some((clicked_tile_x, clicked_tile_y));
                                 }
                             }
                         }
@@ -3820,7 +4924,11 @@ impl InputHandler {
                     let player_y = player.y.round() as i32;
                     let dist = (tile_x - player_x).abs().max((tile_y - player_y).abs());
 
-                    if dist <= MAX_PATH_DISTANCE && state.chunk_manager.is_walkable(tile_x as f32, tile_y as f32) {
+                    if dist <= MAX_PATH_DISTANCE
+                        && state
+                            .chunk_manager
+                            .is_walkable(tile_x as f32, tile_y as f32)
+                    {
                         // Build occupied set (other players + NPCs)
                         let occupied = build_occupied_set(state);
 
@@ -3857,9 +4965,12 @@ impl InputHandler {
                 audio.play_sfx("enter");
                 state.ui_state.quest_log_open = false;
                 state.ui_state.quest_log_scroll = 0.0;
-            } else if state.ui_state.inventory_open || state.ui_state.character_panel_open
-                || state.ui_state.social_open || state.ui_state.skills_open
-                || state.ui_state.prayer_book_open {
+            } else if state.ui_state.inventory_open
+                || state.ui_state.character_panel_open
+                || state.ui_state.social_open
+                || state.ui_state.skills_open
+                || state.ui_state.prayer_book_open
+            {
                 audio.play_sfx("enter");
                 state.ui_state.inventory_open = false;
                 state.ui_state.character_panel_open = false;
@@ -3910,12 +5021,15 @@ impl InputHandler {
                 let chat_area_h = max_visible_lines as f32 * line_height;
                 let chat_bottom_y = box_bottom - bg_padding;
                 let chat_top_y = chat_bottom_y - chat_area_h + line_height;
-                let over_chat = vmx >= 10.0 - bg_padding && vmx <= 10.0 + 400.0 + bg_padding
-                    && vmy >= chat_top_y - bg_padding && vmy <= box_bottom;
+                let over_chat = vmx >= 10.0 - bg_padding
+                    && vmx <= 10.0 + 400.0 + bg_padding
+                    && vmy >= chat_top_y - bg_padding
+                    && vmy <= box_bottom;
                 if over_chat {
                     const SCROLL_SPEED: f32 = 40.0; // Pixels per scroll tick
                     let delta = wheel_y * SCROLL_SPEED;
-                    state.ui_state.chat_message_scroll = (state.ui_state.chat_message_scroll + delta).max(0.0);
+                    state.ui_state.chat_message_scroll =
+                        (state.ui_state.chat_message_scroll + delta).max(0.0);
                 }
             }
         }
@@ -3931,7 +5045,8 @@ impl InputHandler {
                 );
                 if over_inventory {
                     const SCROLL_SPEED: f32 = 30.0;
-                    state.ui_state.inventory_scroll_offset = (state.ui_state.inventory_scroll_offset - wheel_y * SCROLL_SPEED).max(0.0);
+                    state.ui_state.inventory_scroll_offset =
+                        (state.ui_state.inventory_scroll_offset - wheel_y * SCROLL_SPEED).max(0.0);
                     // Max scroll will be clamped during rendering
                 }
             }
@@ -3940,11 +5055,13 @@ impl InputHandler {
             if state.ui_state.inventory_scrollbar_dragging {
                 if is_mouse_button_down(MouseButton::Left) {
                     let dy = my - state.ui_state.inventory_scrollbar_drag_last_y;
-                    if let Some(track_bounds) = layout.get_bounds(&UiElementId::InventoryScrollbar) {
+                    if let Some(track_bounds) = layout.get_bounds(&UiElementId::InventoryScrollbar)
+                    {
                         // Scale: moving across the full track scrolls all content
                         // Use a reasonable estimate for total content height
                         let scale = 500.0 / track_bounds.h;
-                        state.ui_state.inventory_scroll_offset = (state.ui_state.inventory_scroll_offset + dy * scale).max(0.0);
+                        state.ui_state.inventory_scroll_offset =
+                            (state.ui_state.inventory_scroll_offset + dy * scale).max(0.0);
                     }
                     state.ui_state.inventory_scrollbar_drag_last_y = my;
                 } else {
@@ -3964,9 +5081,11 @@ impl InputHandler {
                 if let Some(touch) = all_touches.iter().find(|t| t.id == tracking_id) {
                     match touch.phase {
                         TouchPhase::Moved | TouchPhase::Stationary => {
-                            let (_, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
+                            let (_, vy) =
+                                screen_to_virtual_coords(touch.position.x, touch.position.y);
                             let dy = state.ui_state.inventory_touch_last_y - vy;
-                            state.ui_state.inventory_scroll_offset = (state.ui_state.inventory_scroll_offset + dy).max(0.0);
+                            state.ui_state.inventory_scroll_offset =
+                                (state.ui_state.inventory_scroll_offset + dy).max(0.0);
                             state.ui_state.inventory_touch_last_y = vy;
                         }
                         TouchPhase::Ended | TouchPhase::Cancelled => {
@@ -3984,7 +5103,9 @@ impl InputHandler {
                         let (vx, vy) = screen_to_virtual_coords(touch.position.x, touch.position.y);
                         let over_grid = matches!(
                             layout.hit_test(vx, vy),
-                            Some(UiElementId::InventoryGridArea) | Some(UiElementId::InventorySlot(_)) | Some(UiElementId::InventoryScrollbar)
+                            Some(UiElementId::InventoryGridArea)
+                                | Some(UiElementId::InventorySlot(_))
+                                | Some(UiElementId::InventoryScrollbar)
                         );
                         if over_grid {
                             state.ui_state.inventory_touch_scroll_id = Some(touch.id);
@@ -4043,7 +5164,11 @@ impl InputHandler {
                 state.ui_state.quest_log_open = false;
                 state.ui_state.chat_panel_open = false;
                 state.ui_state.chat_open = false;
+                state.ui_state.minimap_panel_zoom = 1.0;
+                state.ui_state.minimap_panel_center_x = None;
+                state.ui_state.minimap_panel_center_y = None;
             }
+            state.ui_state.minimap_panel_dragging = false;
             return commands;
         }
 
@@ -4059,25 +5184,36 @@ impl InputHandler {
             if !classic && is_key_pressed(key) {
                 if state.ui_state.spell_bar_active {
                     // Spell mode: cast the spell at this index
-                    let magic_level = state.get_local_player()
+                    let magic_level = state
+                        .get_local_player()
                         .map(|p| p.skills.magic.level)
                         .unwrap_or(1);
-                    let unlocked_spells: Vec<_> = crate::game::spell::SPELLS.iter()
+                    let unlocked_spells: Vec<_> = crate::game::spell::SPELLS
+                        .iter()
                         .filter(|s| magic_level >= s.magic_level_req)
                         .collect();
                     if let Some(spell_def) = unlocked_spells.get(slot_idx) {
-                        commands.push(InputCommand::CastSpell { spell_id: spell_def.id.to_string() });
-                        let cooldown_end = macroquad::time::get_time() + (spell_def.cooldown_ms as f64 / 1000.0);
-                        state.spell_cooldowns.insert(spell_def.id.to_string(), cooldown_end);
+                        commands.push(InputCommand::CastSpell {
+                            spell_id: spell_def.id.to_string(),
+                        });
+                        let cooldown_end =
+                            macroquad::time::get_time() + (spell_def.cooldown_ms as f64 / 1000.0);
+                        state
+                            .spell_cooldowns
+                            .insert(spell_def.id.to_string(), cooldown_end);
                     }
                 } else {
                     // Item mode: use/equip from inventory slot directly
                     if let Some(Some(slot)) = state.inventory.slots.get(slot_idx) {
                         let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
                         if item_def.equipment.is_some() {
-                            commands.push(InputCommand::Equip { slot_index: slot_idx as u8 });
+                            commands.push(InputCommand::Equip {
+                                slot_index: slot_idx as u8,
+                            });
                         } else {
-                            commands.push(InputCommand::UseItem { slot_index: slot_idx as u8 });
+                            commands.push(InputCommand::UseItem {
+                                slot_index: slot_idx as u8,
+                            });
                         }
                     }
                 }
@@ -4115,7 +5251,8 @@ impl InputHandler {
 
         // Interact with nearest NPC (E key or touch interact button)
         // Touch interact button also picks up items if no NPC nearby
-        let interact_pressed = (!classic && is_key_pressed(KeyCode::E)) || self.touch_controls.interact_pressed();
+        let interact_pressed =
+            (!classic && is_key_pressed(KeyCode::E)) || self.touch_controls.interact_pressed();
         if interact_pressed {
             // If sitting, stand up
             if state.is_sitting {
@@ -4144,66 +5281,72 @@ impl InputHandler {
                         }
                     }
                     if let Some(((cx, cy), _)) = nearest_chair {
-                        commands.push(InputCommand::SitChair { tile_x: cx, tile_y: cy });
+                        commands.push(InputCommand::SitChair {
+                            tile_x: cx,
+                            tile_y: cy,
+                        });
                         sat_on_chair = true;
                     }
                 }
                 if !sat_on_chair {
                     if let Some(player) = state.players.get(local_id) {
-                    // Find nearest NPC within interaction range (2.5 tiles)
-                    const INTERACT_RANGE: f32 = 2.5;
-                    let mut nearest_npc: Option<(String, f32)> = None;
+                        // Find nearest NPC within interaction range (2.5 tiles)
+                        const INTERACT_RANGE: f32 = 2.5;
+                        let mut nearest_npc: Option<(String, f32)> = None;
 
-                    for (id, npc) in &state.npcs {
-                        // Only interact with alive NPCs
-                        if !npc.is_alive() {
-                            continue;
-                        }
-
-                        let dx = npc.x - player.x;
-                        let dy = npc.y - player.y;
-                        let dist = (dx * dx + dy * dy).sqrt();
-
-                        if dist < INTERACT_RANGE {
-                            if nearest_npc.is_none() || dist < nearest_npc.as_ref().unwrap().1 {
-                                nearest_npc = Some((id.clone(), dist));
+                        for (id, npc) in &state.npcs {
+                            // Only interact with alive NPCs
+                            if !npc.is_alive() {
+                                continue;
                             }
-                        }
-                    }
 
-                    if let Some((npc_id, _)) = nearest_npc {
-                        log::info!("Interacting with NPC: {}", npc_id);
-                        // Check if NPC is an altar - open altar panel instead of dialogue
-                        if let Some(npc) = state.npcs.get(&npc_id) {
-                            if npc.is_altar {
-                                state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
-                                    altar_npc_id: npc_id.clone(),
-                                    altar_name: npc.display_name.clone(),
-                                });
-                            } else {
-                                commands.push(InputCommand::Interact { npc_id });
-                            }
-                        } else {
-                            commands.push(InputCommand::Interact { npc_id });
-                        }
-                    } else if self.touch_controls.interact_pressed() {
-                        // Touch interact fallback: pickup item if no NPC nearby
-                        const PICKUP_RANGE: f32 = 2.0;
-                        let mut nearest_item: Option<(String, f32)> = None;
-                        for (id, item) in &state.ground_items {
-                            let dx = item.x - player.x;
-                            let dy = item.y - player.y;
+                            let dx = npc.x - player.x;
+                            let dy = npc.y - player.y;
                             let dist = (dx * dx + dy * dy).sqrt();
-                            if dist < PICKUP_RANGE {
-                                if nearest_item.is_none() || dist < nearest_item.as_ref().unwrap().1 {
-                                    nearest_item = Some((id.clone(), dist));
+
+                            if dist < INTERACT_RANGE {
+                                if nearest_npc.is_none() || dist < nearest_npc.as_ref().unwrap().1 {
+                                    nearest_npc = Some((id.clone(), dist));
                                 }
                             }
                         }
-                        if let Some((item_id, _)) = nearest_item {
-                            commands.push(InputCommand::Pickup { item_id });
+
+                        if let Some((npc_id, _)) = nearest_npc {
+                            log::info!("Interacting with NPC: {}", npc_id);
+                            // Check if NPC is an altar - open altar panel instead of dialogue
+                            if let Some(npc) = state.npcs.get(&npc_id) {
+                                if npc.is_altar {
+                                    state.ui_state.altar_panel =
+                                        Some(crate::game::AltarPanelState {
+                                            altar_npc_id: npc_id.clone(),
+                                            altar_name: npc.display_name.clone(),
+                                        });
+                                } else {
+                                    commands.push(InputCommand::Interact { npc_id });
+                                }
+                            } else {
+                                commands.push(InputCommand::Interact { npc_id });
+                            }
+                        } else if self.touch_controls.interact_pressed() {
+                            // Touch interact fallback: pickup item if no NPC nearby
+                            const PICKUP_RANGE: f32 = 2.0;
+                            let mut nearest_item: Option<(String, f32)> = None;
+                            for (id, item) in &state.ground_items {
+                                let dx = item.x - player.x;
+                                let dy = item.y - player.y;
+                                let dist = (dx * dx + dy * dy).sqrt();
+                                if dist < PICKUP_RANGE {
+                                    if nearest_item.is_none()
+                                        || dist < nearest_item.as_ref().unwrap().1
+                                    {
+                                        nearest_item = Some((id.clone(), dist));
+                                    }
+                                }
+                            }
+                            if let Some((item_id, _)) = nearest_item {
+                                commands.push(InputCommand::Pickup { item_id });
+                            }
                         }
-                    }
                     }
                 }
             }
@@ -4222,7 +5365,8 @@ impl InputHandler {
             let (_wheel_x, wheel_y) = mouse_wheel();
             if wheel_y != 0.0 {
                 const SCROLL_SPEED: f32 = 30.0;
-                state.ui_state.quest_log_scroll = (state.ui_state.quest_log_scroll - wheel_y * SCROLL_SPEED).max(0.0);
+                state.ui_state.quest_log_scroll =
+                    (state.ui_state.quest_log_scroll - wheel_y * SCROLL_SPEED).max(0.0);
                 // max_scroll is clamped in the renderer
             }
         }
@@ -4232,12 +5376,23 @@ impl InputHandler {
 
     /// Render touch controls overlay (call after all other rendering)
     /// Set hide_action_buttons to true when panels like inventory are open
-    pub fn render_touch_controls(&self, hide_action_buttons: bool, hide_all_controls: bool, use_joystick: bool) {
-        self.touch_controls.render(hide_action_buttons, hide_all_controls, use_joystick);
+    pub fn render_touch_controls(
+        &self,
+        hide_action_buttons: bool,
+        hide_all_controls: bool,
+        use_joystick: bool,
+    ) {
+        self.touch_controls
+            .render(hide_action_buttons, hide_all_controls, use_joystick);
     }
 
     /// Update attack button to show the currently equipped weapon sprite
-    pub fn update_attack_button_icon(&mut self, weapon_id: Option<&str>, item_sprites: &crate::render::SpriteStore) {
-        self.touch_controls.update_attack_icon(weapon_id, item_sprites);
+    pub fn update_attack_button_icon(
+        &mut self,
+        weapon_id: Option<&str>,
+        item_sprites: &crate::render::SpriteStore,
+    ) {
+        self.touch_controls
+            .update_attack_icon(weapon_id, item_sprites);
     }
 }

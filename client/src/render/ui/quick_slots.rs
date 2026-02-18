@@ -1,16 +1,21 @@
 //! Quick slots bar rendering - toggleable between items and spells
 
-use macroquad::prelude::*;
-use crate::game::GameState;
+use super::super::isometric::world_to_screen;
+use super::super::Renderer;
+use super::common::*;
 use crate::game::spell::SPELLS;
+use crate::game::GameState;
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
-use super::super::Renderer;
-use super::super::isometric::world_to_screen;
-use super::common::*;
+use macroquad::prelude::*;
 
 impl Renderer {
-    pub(crate) fn render_quick_slots(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_quick_slots(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         if state.ui_state.spell_bar_active {
             self.render_spell_bar(state, hovered, layout);
         } else {
@@ -21,7 +26,12 @@ impl Renderer {
     }
 
     /// Render item bar: slots 0-4 of inventory directly
-    fn render_item_bar(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    fn render_item_bar(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         let scale = state.ui_state.ui_scale;
         let slot_size = (QUICK_SLOT_SIZE * scale).max(MIN_SLOT_SIZE);
         let spacing = QUICK_SLOT_SPACING * scale;
@@ -55,7 +65,12 @@ impl Renderer {
                 SlotState::Normal
             };
 
-            let has_item = state.inventory.slots.get(i).map(|s| s.is_some()).unwrap_or(false);
+            let has_item = state
+                .inventory
+                .slots
+                .get(i)
+                .map(|s| s.is_some())
+                .unwrap_or(false);
             self.draw_inventory_slot(x, y, slot_size, has_item, slot_state);
 
             // Draw item if present (hide if being dragged)
@@ -66,8 +81,20 @@ impl Renderer {
                     // Quantity badge (bottom-left with shadow)
                     if slot.quantity > 1 {
                         let qty_text = slot.quantity.to_string();
-                        self.draw_text_sharp(&qty_text, x + 3.0 * scale, y + slot_size - 4.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
-                        self.draw_text_sharp(&qty_text, x + 2.0 * scale, y + slot_size - 5.0, 16.0, TEXT_NORMAL);
+                        self.draw_text_sharp(
+                            &qty_text,
+                            x + 3.0 * scale,
+                            y + slot_size - 4.0,
+                            16.0,
+                            Color::new(0.0, 0.0, 0.0, 0.8),
+                        );
+                        self.draw_text_sharp(
+                            &qty_text,
+                            x + 2.0 * scale,
+                            y + slot_size - 5.0,
+                            16.0,
+                            TEXT_NORMAL,
+                        );
                     }
                 }
             }
@@ -75,8 +102,21 @@ impl Renderer {
             // Shift-drop indicator overlay
             let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
             if shift_held && state.ui_state.shift_drop_enabled && has_item && is_hovered {
-                draw_rectangle(x + 2.0, y + 2.0, slot_size - 4.0, slot_size - 4.0, Color::new(0.8, 0.2, 0.2, 0.35));
-                draw_rectangle_lines(x + 1.0, y + 1.0, slot_size - 2.0, slot_size - 2.0, 2.0, Color::new(0.9, 0.3, 0.3, 0.9));
+                draw_rectangle(
+                    x + 2.0,
+                    y + 2.0,
+                    slot_size - 4.0,
+                    slot_size - 4.0,
+                    Color::new(0.8, 0.2, 0.2, 0.35),
+                );
+                draw_rectangle_lines(
+                    x + 1.0,
+                    y + 1.0,
+                    slot_size - 2.0,
+                    slot_size - 2.0,
+                    2.0,
+                    Color::new(0.9, 0.3, 0.3, 0.9),
+                );
             }
 
             // Slot number badge (top-right)
@@ -86,13 +126,24 @@ impl Renderer {
             let badge_h = 13.0;
             let num_x = x + slot_size - badge_w - 1.0;
             let num_y = y + 1.0;
-            draw_rectangle(num_x, num_y, badge_w, badge_h, Color::new(0.0, 0.0, 0.0, 0.5));
+            draw_rectangle(
+                num_x,
+                num_y,
+                badge_w,
+                badge_h,
+                Color::new(0.0, 0.0, 0.0, 0.5),
+            );
             self.draw_text_sharp(&num_text, num_x + 1.0, num_y + 11.0, 16.0, TEXT_NORMAL);
         }
     }
 
     /// Render spell bar: unlocked spells in up to 5 slots
-    fn render_spell_bar(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    fn render_spell_bar(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         let scale = state.ui_state.ui_scale;
         let slot_size = (QUICK_SLOT_SIZE * scale).max(MIN_SLOT_SIZE);
         let spacing = QUICK_SLOT_SPACING * scale;
@@ -103,12 +154,14 @@ impl Renderer {
         let start_y = sh - EXP_BAR_GAP * scale - slot_size;
 
         // Get player magic level
-        let magic_level = state.get_local_player()
+        let magic_level = state
+            .get_local_player()
             .map(|p| p.skills.magic.level)
             .unwrap_or(1);
 
         // Collect unlocked spells
-        let unlocked_spells: Vec<_> = SPELLS.iter()
+        let unlocked_spells: Vec<_> = SPELLS
+            .iter()
             .filter(|s| magic_level >= s.magic_level_req)
             .collect();
 
@@ -160,7 +213,13 @@ impl Renderer {
                         crate::game::spell::SpellType::Teleport => Color::new(0.2, 0.3, 0.6, 0.9),
                     };
                     let pad = 4.0;
-                    draw_rectangle(x + pad, y + pad, slot_size - pad * 2.0, slot_size - pad * 2.0, color);
+                    draw_rectangle(
+                        x + pad,
+                        y + pad,
+                        slot_size - pad * 2.0,
+                        slot_size - pad * 2.0,
+                        color,
+                    );
 
                     // Draw spell first letter centered
                     let letter = &spell_def.name[..1];
@@ -177,19 +236,43 @@ impl Renderer {
 
                 // Mana cost badge (bottom-left with shadow)
                 let mana_text = spell_def.mana_cost.to_string();
-                self.draw_text_sharp(&mana_text, x + 3.0 * scale, y + slot_size - 4.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
-                self.draw_text_sharp(&mana_text, x + 2.0 * scale, y + slot_size - 5.0, 16.0, Color::new(0.4, 0.6, 1.0, 1.0));
+                self.draw_text_sharp(
+                    &mana_text,
+                    x + 3.0 * scale,
+                    y + slot_size - 4.0,
+                    16.0,
+                    Color::new(0.0, 0.0, 0.0, 0.8),
+                );
+                self.draw_text_sharp(
+                    &mana_text,
+                    x + 2.0 * scale,
+                    y + slot_size - 5.0,
+                    16.0,
+                    Color::new(0.4, 0.6, 1.0, 1.0),
+                );
 
                 // Check cooldown
-                let on_cooldown = state.spell_cooldowns.get(spell_def.id).map_or(false, |&t| now < t);
+                let on_cooldown = state
+                    .spell_cooldowns
+                    .get(spell_def.id)
+                    .map_or(false, |&t| now < t);
                 let insufficient_mana = player_mp < spell_def.mana_cost;
 
                 if on_cooldown {
                     // Dark semi-transparent overlay for cooldown
-                    draw_rectangle(x + 2.0, y + 2.0, slot_size - 4.0, slot_size - 4.0, Color::new(0.0, 0.0, 0.0, 0.55));
+                    draw_rectangle(
+                        x + 2.0,
+                        y + 2.0,
+                        slot_size - 4.0,
+                        slot_size - 4.0,
+                        Color::new(0.0, 0.0, 0.0, 0.55),
+                    );
 
                     // Show remaining cooldown time
-                    let remaining = state.spell_cooldowns.get(spell_def.id).map_or(0.0, |&t| (t - now).max(0.0));
+                    let remaining = state
+                        .spell_cooldowns
+                        .get(spell_def.id)
+                        .map_or(0.0, |&t| (t - now).max(0.0));
                     let cd_text = if remaining >= 60.0 {
                         let mins = (remaining / 60.0).floor() as u32;
                         let secs = (remaining % 60.0).floor() as u32;
@@ -207,7 +290,13 @@ impl Renderer {
                     );
                 } else if insufficient_mana {
                     // Red-tinted overlay for insufficient mana
-                    draw_rectangle(x + 2.0, y + 2.0, slot_size - 4.0, slot_size - 4.0, Color::new(0.6, 0.1, 0.1, 0.45));
+                    draw_rectangle(
+                        x + 2.0,
+                        y + 2.0,
+                        slot_size - 4.0,
+                        slot_size - 4.0,
+                        Color::new(0.6, 0.1, 0.1, 0.45),
+                    );
                 }
             } else {
                 // Empty spell slot (no unlocked spell at this index)
@@ -221,13 +310,24 @@ impl Renderer {
             let badge_h = 13.0;
             let num_x = x + slot_size - badge_w - 1.0;
             let num_y = y + 1.0;
-            draw_rectangle(num_x, num_y, badge_w, badge_h, Color::new(0.0, 0.0, 0.0, 0.5));
+            draw_rectangle(
+                num_x,
+                num_y,
+                badge_w,
+                badge_h,
+                Color::new(0.0, 0.0, 0.0, 0.5),
+            );
             self.draw_text_sharp(&num_text, num_x + 1.0, num_y + 11.0, 16.0, TEXT_NORMAL);
         }
     }
 
     /// Render the toggle button between items and spells bar
-    fn render_bar_toggle_button(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    fn render_bar_toggle_button(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         let scale = state.ui_state.ui_scale;
         let slot_size = (QUICK_SLOT_SIZE * scale).max(MIN_SLOT_SIZE);
         let spacing = QUICK_SLOT_SPACING * scale;
@@ -292,9 +392,22 @@ impl Renderer {
             let glow_color = Color::new(0.6, 0.4, 0.9, 0.3 + 0.4 * pulse);
             let border_glow = Color::new(0.7, 0.5, 1.0, 0.6 + 0.4 * pulse);
             // Outer glow
-            draw_rectangle(btn_x - 3.0, btn_y - 3.0, btn_w + 6.0, btn_h + 6.0, glow_color);
+            draw_rectangle(
+                btn_x - 3.0,
+                btn_y - 3.0,
+                btn_w + 6.0,
+                btn_h + 6.0,
+                glow_color,
+            );
             // Pulsing border
-            draw_rectangle_lines(btn_x - 2.0, btn_y - 2.0, btn_w + 4.0, btn_h + 4.0, 2.0, border_glow);
+            draw_rectangle_lines(
+                btn_x - 2.0,
+                btn_y - 2.0,
+                btn_w + 4.0,
+                btn_h + 4.0,
+                2.0,
+                border_glow,
+            );
         }
 
         // Tooltip on hover
@@ -311,7 +424,13 @@ impl Renderer {
             let tip_x = (btn_x + btn_w / 2.0 - tip_w / 2.0).floor();
             let tip_y = (btn_y - tip_h - 4.0).floor();
 
-            draw_rectangle(tip_x - 1.0, tip_y - 1.0, tip_w + 2.0, tip_h + 2.0, SLOT_BORDER);
+            draw_rectangle(
+                tip_x - 1.0,
+                tip_y - 1.0,
+                tip_w + 2.0,
+                tip_h + 2.0,
+                SLOT_BORDER,
+            );
             draw_rectangle(tip_x, tip_y, tip_w, tip_h, SLOT_BG_FILLED);
             self.draw_text_sharp(
                 tooltip_text,
@@ -323,7 +442,12 @@ impl Renderer {
         }
     }
 
-    pub(crate) fn render_ground_item_overlays(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_ground_item_overlays(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         let zoom = state.camera.zoom;
 
         for (item_id, item) in &state.ground_items {
@@ -362,7 +486,11 @@ impl Renderer {
                 let label_width = self.measure_text_sharp(&label, font_size).width;
                 let label_x = screen_x - label_width / 2.0;
                 // Gold piles sit lower, so offset label down by 12px
-                let gold_offset = if item.item_id == "gold" { 22.0 * zoom } else { 0.0 };
+                let gold_offset = if item.item_id == "gold" {
+                    22.0 * zoom
+                } else {
+                    0.0
+                };
                 let label_y = screen_y - click_height - 16.0 * zoom + gold_offset;
 
                 // Background for readability

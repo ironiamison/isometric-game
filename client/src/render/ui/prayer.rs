@@ -3,14 +3,14 @@
 //! Click to toggle prayers (sends TogglePrayer message)
 //! Tabs switch between Prayers and Spells views
 
-use macroquad::prelude::*;
-use crate::game::GameState;
-use crate::game::prayer::{PrayerCategory, PrayerDef, PRAYERS};
-use crate::game::spell::{SpellDef, SPELLS};
-use crate::ui::{UiElementId, UiLayout};
-use crate::util::virtual_screen_size;
 use super::super::Renderer;
 use super::common::*;
+use crate::game::prayer::{PrayerCategory, PrayerDef, PRAYERS};
+use crate::game::spell::{SpellDef, SPELLS};
+use crate::game::GameState;
+use crate::ui::{UiElementId, UiLayout};
+use crate::util::virtual_screen_size;
+use macroquad::prelude::*;
 
 /// Prayer panel dimensions
 const PRAYER_PANEL_PADDING: f32 = 8.0;
@@ -18,14 +18,22 @@ const PRAYER_GRID_COLS: usize = 4;
 const PRAYER_GRID_ROWS: usize = 4; // 14 prayers + 2 empty slots
 const PRAYER_SLOT_SIZE: f32 = 36.0;
 const PRAYER_SLOT_SPACING: f32 = 4.0;
-const PRAYER_GRID_WIDTH: f32 = PRAYER_GRID_COLS as f32 * PRAYER_SLOT_SIZE + (PRAYER_GRID_COLS - 1) as f32 * PRAYER_SLOT_SPACING;
+const PRAYER_GRID_WIDTH: f32 = PRAYER_GRID_COLS as f32 * PRAYER_SLOT_SIZE
+    + (PRAYER_GRID_COLS - 1) as f32 * PRAYER_SLOT_SPACING;
 const PRAYER_HEADER_HEIGHT: f32 = 24.0;
 const PRAYER_TAB_HEIGHT: f32 = 22.0;
 const PRAYER_POINTS_HEIGHT: f32 = 20.0;
-const PRAYER_PANEL_WIDTH: f32 = PRAYER_GRID_WIDTH + PRAYER_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0;
-const PRAYER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0 + PRAYER_HEADER_HEIGHT + PRAYER_TAB_HEIGHT + PRAYER_PANEL_PADDING +
-    (PRAYER_GRID_ROWS as f32 * PRAYER_SLOT_SIZE + (PRAYER_GRID_ROWS - 1) as f32 * PRAYER_SLOT_SPACING) +
-    PRAYER_PANEL_PADDING + PRAYER_POINTS_HEIGHT + PRAYER_PANEL_PADDING;
+const PRAYER_PANEL_WIDTH: f32 =
+    PRAYER_GRID_WIDTH + PRAYER_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0;
+const PRAYER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
+    + PRAYER_HEADER_HEIGHT
+    + PRAYER_TAB_HEIGHT
+    + PRAYER_PANEL_PADDING
+    + (PRAYER_GRID_ROWS as f32 * PRAYER_SLOT_SIZE
+        + (PRAYER_GRID_ROWS - 1) as f32 * PRAYER_SLOT_SPACING)
+    + PRAYER_PANEL_PADDING
+    + PRAYER_POINTS_HEIGHT
+    + PRAYER_PANEL_PADDING;
 
 /// Spell theme color (purple/arcane)
 const SPELL_COLOR: Color = Color::new(0.6, 0.4, 0.9, 1.0);
@@ -33,18 +41,23 @@ const SPELL_COLOR: Color = Color::new(0.6, 0.4, 0.9, 1.0);
 /// Get the color for a prayer category
 fn category_color(category: PrayerCategory) -> Color {
     match category {
-        PrayerCategory::Attack => Color::new(0.9, 0.3, 0.3, 1.0),      // Red
-        PrayerCategory::Defence => Color::new(0.3, 0.5, 0.9, 1.0),     // Blue
-        PrayerCategory::Strength => Color::new(0.3, 0.8, 0.3, 1.0),    // Green
-        PrayerCategory::Gathering => Color::new(0.8, 0.7, 0.2, 1.0),   // Gold
-        PrayerCategory::HpRegen => Color::new(0.9, 0.5, 0.7, 1.0),     // Pink
-        PrayerCategory::Protection => Color::new(0.9, 0.9, 0.5, 1.0),  // Light yellow
+        PrayerCategory::Attack => Color::new(0.9, 0.3, 0.3, 1.0), // Red
+        PrayerCategory::Defence => Color::new(0.3, 0.5, 0.9, 1.0), // Blue
+        PrayerCategory::Strength => Color::new(0.3, 0.8, 0.3, 1.0), // Green
+        PrayerCategory::Gathering => Color::new(0.8, 0.7, 0.2, 1.0), // Gold
+        PrayerCategory::HpRegen => Color::new(0.9, 0.5, 0.7, 1.0), // Pink
+        PrayerCategory::Protection => Color::new(0.9, 0.9, 0.5, 1.0), // Light yellow
     }
 }
 
 impl Renderer {
     /// Render the prayer/spell book panel when open
-    pub(crate) fn render_prayer_panel(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_prayer_panel(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         if !state.ui_state.prayer_book_open {
             return;
         }
@@ -91,17 +104,34 @@ impl Renderer {
 
         // Header text - show active tab name
         let active_tab = state.ui_state.prayer_spell_tab;
-        let header_text = if active_tab == 0 { "Prayer Book" } else { "Spell Book" };
+        let header_text = if active_tab == 0 {
+            "Prayer Book"
+        } else {
+            "Spell Book"
+        };
         let text_dims = self.measure_text_sharp(header_text, 16.0);
         let text_x = header_x + (header_w - text_dims.width) / 2.0;
-        self.draw_text_sharp(header_text, text_x, header_y + (header_height + 12.0) / 2.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            header_text,
+            text_x,
+            header_y + (header_height + 12.0) / 2.0,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Help button (?) in header right side
         let help_btn_size = (header_height - 4.0).min(18.0 * scale);
         let help_btn_x = header_x + header_w - help_btn_size - 4.0 * scale;
         let help_btn_y = header_y + (header_height - help_btn_size) / 2.0;
-        let help_id = if active_tab == 0 { UiElementId::PrayerHelpButton } else { UiElementId::SpellHelpButton };
-        layout.add(help_id.clone(), Rect::new(help_btn_x, help_btn_y, help_btn_size, help_btn_size));
+        let help_id = if active_tab == 0 {
+            UiElementId::PrayerHelpButton
+        } else {
+            UiElementId::SpellHelpButton
+        };
+        layout.add(
+            help_id.clone(),
+            Rect::new(help_btn_x, help_btn_y, help_btn_size, help_btn_size),
+        );
 
         let help_hovered = matches!(hovered, Some(id) if *id == help_id);
         let help_bg = if help_hovered {
@@ -114,8 +144,20 @@ impl Renderer {
         } else {
             Color::new(0.35, 0.32, 0.40, 1.0)
         };
-        draw_rectangle(help_btn_x, help_btn_y, help_btn_size, help_btn_size, help_border);
-        draw_rectangle(help_btn_x + 1.0, help_btn_y + 1.0, help_btn_size - 2.0, help_btn_size - 2.0, help_bg);
+        draw_rectangle(
+            help_btn_x,
+            help_btn_y,
+            help_btn_size,
+            help_btn_size,
+            help_border,
+        );
+        draw_rectangle(
+            help_btn_x + 1.0,
+            help_btn_y + 1.0,
+            help_btn_size - 2.0,
+            help_btn_size - 2.0,
+            help_bg,
+        );
         let q_dims = self.measure_text_sharp("?", 14.0);
         self.draw_text_sharp(
             "?",
@@ -133,7 +175,8 @@ impl Renderer {
         for (i, label) in tab_labels.iter().enumerate() {
             let tx = header_x + i as f32 * tab_w;
             let is_active_tab = active_tab == i;
-            let is_hovered_tab = matches!(hovered, Some(UiElementId::PrayerSpellTab(idx)) if *idx == i);
+            let is_hovered_tab =
+                matches!(hovered, Some(UiElementId::PrayerSpellTab(idx)) if *idx == i);
 
             // Tab background
             let tab_bg = if is_active_tab {
@@ -152,17 +195,32 @@ impl Renderer {
                 } else {
                     SPELL_COLOR // Purple for spells
                 };
-                draw_rectangle(tx, tab_y + tab_height - 2.0 * scale, tab_w, 2.0 * scale, accent);
+                draw_rectangle(
+                    tx,
+                    tab_y + tab_height - 2.0 * scale,
+                    tab_w,
+                    2.0 * scale,
+                    accent,
+                );
             }
 
             // Tab text
             let label_dims = self.measure_text_sharp(label, 16.0);
             let label_x = tx + (tab_w - label_dims.width) / 2.0;
             let label_color = if is_active_tab { TEXT_NORMAL } else { TEXT_DIM };
-            self.draw_text_sharp(label, label_x, tab_y + (tab_height + 12.0) / 2.0, 16.0, label_color);
+            self.draw_text_sharp(
+                label,
+                label_x,
+                tab_y + (tab_height + 12.0) / 2.0,
+                16.0,
+                label_color,
+            );
 
             // Register tab bounds
-            layout.add(UiElementId::PrayerSpellTab(i), Rect::new(tx, tab_y, tab_w, tab_height));
+            layout.add(
+                UiElementId::PrayerSpellTab(i),
+                Rect::new(tx, tab_y, tab_w, tab_height),
+            );
         }
 
         // Separator line below tabs
@@ -182,7 +240,8 @@ impl Renderer {
         // Render content based on active tab
         if active_tab == 0 {
             // === PRAYERS TAB ===
-            let prayer_level = state.get_local_player()
+            let prayer_level = state
+                .get_local_player()
                 .map(|p| p.skills.prayer.level)
                 .unwrap_or(1);
 
@@ -201,26 +260,58 @@ impl Renderer {
                 let is_locked = prayer_level < prayer.level_req;
                 let has_points = state.prayer_points > 0;
 
-                self.draw_prayer_slot(slot_x, slot_y, slot_size, prayer, is_locked, is_active, is_hovered, has_points, scale);
+                self.draw_prayer_slot(
+                    slot_x, slot_y, slot_size, prayer, is_locked, is_active, is_hovered,
+                    has_points, scale,
+                );
             }
 
             // Prayer points bar
-            let points_y = grid_y + PRAYER_GRID_ROWS as f32 * (slot_size + slot_spacing) - slot_spacing + panel_padding;
+            let points_y = grid_y + PRAYER_GRID_ROWS as f32 * (slot_size + slot_spacing)
+                - slot_spacing
+                + panel_padding;
             let points_bar_width = panel_width - frame_thickness * 2.0 - panel_padding * 2.0;
-            self.draw_prayer_points_bar(grid_x, points_y, points_bar_width, points_height, state, scale);
+            self.draw_prayer_points_bar(
+                grid_x,
+                points_y,
+                points_bar_width,
+                points_height,
+                state,
+                scale,
+            );
         } else {
             // === SPELLS TAB ===
-            let magic_level = state.get_local_player()
+            let magic_level = state
+                .get_local_player()
                 .map(|p| p.skills.magic.level)
                 .unwrap_or(1);
 
             // Draw spell slots
-            self.render_spell_grid(grid_x, grid_y, slot_size, slot_spacing, magic_level, state, hovered, layout, scale);
+            self.render_spell_grid(
+                grid_x,
+                grid_y,
+                slot_size,
+                slot_spacing,
+                magic_level,
+                state,
+                hovered,
+                layout,
+                scale,
+            );
 
             // Mana bar (replaces prayer points bar)
-            let points_y = grid_y + PRAYER_GRID_ROWS as f32 * (slot_size + slot_spacing) - slot_spacing + panel_padding;
+            let points_y = grid_y + PRAYER_GRID_ROWS as f32 * (slot_size + slot_spacing)
+                - slot_spacing
+                + panel_padding;
             let points_bar_width = panel_width - frame_thickness * 2.0 - panel_padding * 2.0;
-            self.draw_mana_bar(grid_x, points_y, points_bar_width, points_height, state, scale);
+            self.draw_mana_bar(
+                grid_x,
+                points_y,
+                points_bar_width,
+                points_height,
+                state,
+                scale,
+            );
         }
     }
 
@@ -249,7 +340,9 @@ impl Renderer {
             let is_hovered = matches!(hovered, Some(UiElementId::SpellSlot(idx)) if *idx == i);
             let is_locked = magic_level < spell.magic_level_req;
 
-            self.draw_spell_slot(slot_x, slot_y, slot_size, spell, is_locked, is_hovered, scale);
+            self.draw_spell_slot(
+                slot_x, slot_y, slot_size, spell, is_locked, is_hovered, scale,
+            );
         }
 
         // Fill remaining empty slots in the grid for visual consistency
@@ -261,10 +354,36 @@ impl Renderer {
             let slot_y = grid_y + row as f32 * (slot_size + slot_spacing);
 
             // Draw empty slot
-            draw_rectangle(slot_x, slot_y, slot_size, slot_size, Color::new(0.15, 0.14, 0.13, 1.0));
-            draw_rectangle(slot_x + 1.0, slot_y + 1.0, slot_size - 2.0, slot_size - 2.0, Color::new(0.055, 0.055, 0.075, 1.0));
-            draw_line(slot_x + 2.0, slot_y + 2.0, slot_x + slot_size - 2.0, slot_y + 2.0, 2.0, SLOT_INNER_SHADOW);
-            draw_line(slot_x + 2.0, slot_y + 2.0, slot_x + 2.0, slot_y + slot_size - 2.0, 2.0, SLOT_INNER_SHADOW);
+            draw_rectangle(
+                slot_x,
+                slot_y,
+                slot_size,
+                slot_size,
+                Color::new(0.15, 0.14, 0.13, 1.0),
+            );
+            draw_rectangle(
+                slot_x + 1.0,
+                slot_y + 1.0,
+                slot_size - 2.0,
+                slot_size - 2.0,
+                Color::new(0.055, 0.055, 0.075, 1.0),
+            );
+            draw_line(
+                slot_x + 2.0,
+                slot_y + 2.0,
+                slot_x + slot_size - 2.0,
+                slot_y + 2.0,
+                2.0,
+                SLOT_INNER_SHADOW,
+            );
+            draw_line(
+                slot_x + 2.0,
+                slot_y + 2.0,
+                slot_x + 2.0,
+                slot_y + slot_size - 2.0,
+                2.0,
+                SLOT_INNER_SHADOW,
+            );
         }
     }
 
@@ -305,8 +424,22 @@ impl Renderer {
         draw_rectangle(x + 1.0, y + 1.0, size - 2.0, size - 2.0, bg_color);
 
         // Inner shadow
-        draw_line(x + 2.0, y + 2.0, x + size - 2.0, y + 2.0, 2.0, SLOT_INNER_SHADOW);
-        draw_line(x + 2.0, y + 2.0, x + 2.0, y + size - 2.0, 2.0, SLOT_INNER_SHADOW);
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + size - 2.0,
+            y + 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + 2.0,
+            y + size - 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
 
         // Draw spell icon from texture
         let icon_size = 20.0 * scale;
@@ -334,7 +467,9 @@ impl Renderer {
             );
         } else {
             // Fallback: draw initials if texture not found
-            let initials: String = spell.name.split_whitespace()
+            let initials: String = spell
+                .name
+                .split_whitespace()
                 .map(|w| w.chars().next().unwrap_or('?'))
                 .collect();
             let initial_dims = self.measure_text_sharp(&initials, 14.0);
@@ -351,7 +486,13 @@ impl Renderer {
         let cost_y = y + size - 2.0;
 
         // Shadow
-        self.draw_text_sharp(&cost_text, cost_x + 1.0, cost_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+        self.draw_text_sharp(
+            &cost_text,
+            cost_x + 1.0,
+            cost_y + 1.0,
+            16.0,
+            Color::new(0.0, 0.0, 0.0, 0.8),
+        );
         self.draw_text_sharp(&cost_text, cost_x, cost_y, 16.0, cost_color);
 
         // Level requirement in top-left corner (if locked)
@@ -362,9 +503,21 @@ impl Renderer {
             let level_y = y + 14.0;
 
             // Shadow
-            self.draw_text_sharp(&level_text, level_x + 1.0, level_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+            self.draw_text_sharp(
+                &level_text,
+                level_x + 1.0,
+                level_y + 1.0,
+                16.0,
+                Color::new(0.0, 0.0, 0.0, 0.8),
+            );
             // Text (red for locked)
-            self.draw_text_sharp(&level_text, level_x, level_y, 16.0, Color::new(0.8, 0.3, 0.3, 1.0));
+            self.draw_text_sharp(
+                &level_text,
+                level_x,
+                level_y,
+                16.0,
+                Color::new(0.8, 0.3, 0.3, 1.0),
+            );
         }
     }
 
@@ -378,13 +531,20 @@ impl Renderer {
         state: &GameState,
         _scale: f32,
     ) {
-        let (mp, max_mp) = state.get_local_player()
+        let (mp, max_mp) = state
+            .get_local_player()
             .map(|p| (p.mp, p.max_mp))
             .unwrap_or((0, 1));
 
         // Background
         draw_rectangle(x, y, width, height, Color::new(0.1, 0.1, 0.15, 1.0));
-        draw_rectangle(x + 1.0, y + 1.0, width - 2.0, height - 2.0, Color::new(0.05, 0.05, 0.08, 1.0));
+        draw_rectangle(
+            x + 1.0,
+            y + 1.0,
+            width - 2.0,
+            height - 2.0,
+            Color::new(0.05, 0.05, 0.08, 1.0),
+        );
 
         // Fill bar
         let fill_ratio = if max_mp > 0 {
@@ -401,7 +561,13 @@ impl Renderer {
 
             draw_rectangle(x + 2.0, y + 2.0, fill_width, height - 4.0, fill_color);
             // Highlight on top
-            draw_rectangle(x + 2.0, y + 2.0, fill_width, (height - 4.0) * 0.3, fill_highlight);
+            draw_rectangle(
+                x + 2.0,
+                y + 2.0,
+                fill_width,
+                (height - 4.0) * 0.3,
+                fill_highlight,
+            );
         }
 
         // Text
@@ -411,7 +577,13 @@ impl Renderer {
         let text_y = y + (height + 12.0) / 2.0;
 
         // Shadow
-        self.draw_text_sharp(&mana_text, text_x + 1.0, text_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+        self.draw_text_sharp(
+            &mana_text,
+            text_x + 1.0,
+            text_y + 1.0,
+            16.0,
+            Color::new(0.0, 0.0, 0.0, 0.8),
+        );
         // Text
         self.draw_text_sharp(&mana_text, text_x, text_y, 16.0, TEXT_NORMAL);
     }
@@ -456,8 +628,22 @@ impl Renderer {
         draw_rectangle(x + 1.0, y + 1.0, size - 2.0, size - 2.0, bg_color);
 
         // Inner shadow
-        draw_line(x + 2.0, y + 2.0, x + size - 2.0, y + 2.0, 2.0, SLOT_INNER_SHADOW);
-        draw_line(x + 2.0, y + 2.0, x + 2.0, y + size - 2.0, 2.0, SLOT_INNER_SHADOW);
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + size - 2.0,
+            y + 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + 2.0,
+            y + size - 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
 
         // Active glow effect
         if is_active {
@@ -496,9 +682,21 @@ impl Renderer {
             let level_y = y + size - 2.0;
 
             // Shadow
-            self.draw_text_sharp(&level_text, level_x + 1.0, level_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+            self.draw_text_sharp(
+                &level_text,
+                level_x + 1.0,
+                level_y + 1.0,
+                16.0,
+                Color::new(0.0, 0.0, 0.0, 0.8),
+            );
             // Text (red for locked)
-            self.draw_text_sharp(&level_text, level_x, level_y, 16.0, Color::new(0.8, 0.3, 0.3, 1.0));
+            self.draw_text_sharp(
+                &level_text,
+                level_x,
+                level_y,
+                16.0,
+                Color::new(0.8, 0.3, 0.3, 1.0),
+            );
         }
     }
 
@@ -536,7 +734,13 @@ impl Renderer {
     ) {
         // Background
         draw_rectangle(x, y, width, height, Color::new(0.1, 0.1, 0.15, 1.0));
-        draw_rectangle(x + 1.0, y + 1.0, width - 2.0, height - 2.0, Color::new(0.05, 0.05, 0.08, 1.0));
+        draw_rectangle(
+            x + 1.0,
+            y + 1.0,
+            width - 2.0,
+            height - 2.0,
+            Color::new(0.05, 0.05, 0.08, 1.0),
+        );
 
         // Fill bar
         let fill_ratio = if state.max_prayer_points > 0 {
@@ -553,7 +757,13 @@ impl Renderer {
 
             draw_rectangle(x + 2.0, y + 2.0, fill_width, height - 4.0, fill_color);
             // Highlight on top
-            draw_rectangle(x + 2.0, y + 2.0, fill_width, (height - 4.0) * 0.3, fill_highlight);
+            draw_rectangle(
+                x + 2.0,
+                y + 2.0,
+                fill_width,
+                (height - 4.0) * 0.3,
+                fill_highlight,
+            );
         }
 
         // Text
@@ -563,7 +773,13 @@ impl Renderer {
         let text_y = y + (height + 12.0) / 2.0;
 
         // Shadow
-        self.draw_text_sharp(&points_text, text_x + 1.0, text_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+        self.draw_text_sharp(
+            &points_text,
+            text_x + 1.0,
+            text_y + 1.0,
+            16.0,
+            Color::new(0.0, 0.0, 0.0, 0.8),
+        );
         // Text
         self.draw_text_sharp(&points_text, text_x, text_y, 16.0, TEXT_NORMAL);
     }
@@ -622,7 +838,8 @@ impl Renderer {
         let desc_dims = self.measure_text_sharp(prayer.description, font_size);
         let status_dims = self.measure_text_sharp(&status_text, font_size);
 
-        let max_width = name_dims.width
+        let max_width = name_dims
+            .width
             .max(level_dims.width)
             .max(desc_dims.width)
             .max(status_dims.width);
@@ -636,33 +853,86 @@ impl Renderer {
         let tooltip_y = (mouse_y + 16.0).min(sh - tooltip_height - 8.0).floor();
 
         // Draw tooltip background
-        draw_rectangle(tooltip_x - 1.0, tooltip_y - 1.0, tooltip_width + 2.0, tooltip_height + 2.0, TOOLTIP_FRAME);
-        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
+        draw_rectangle(
+            tooltip_x - 1.0,
+            tooltip_y - 1.0,
+            tooltip_width + 2.0,
+            tooltip_height + 2.0,
+            TOOLTIP_FRAME,
+        );
+        draw_rectangle(
+            tooltip_x,
+            tooltip_y,
+            tooltip_width,
+            tooltip_height,
+            TOOLTIP_BG,
+        );
 
         // Draw text
         let mut text_y = (tooltip_y + padding + 14.0).floor();
 
         // Prayer name (colored by category)
-        let name_color = if is_locked { TEXT_DIM } else { category_color(prayer.category) };
-        self.draw_text_sharp(name, (tooltip_x + padding).floor(), text_y, font_size, name_color);
+        let name_color = if is_locked {
+            TEXT_DIM
+        } else {
+            category_color(prayer.category)
+        };
+        self.draw_text_sharp(
+            name,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            name_color,
+        );
         text_y += line_height;
 
         // Level
-        let level_color = if is_locked { Color::new(0.8, 0.3, 0.3, 1.0) } else { TEXT_NORMAL };
-        self.draw_text_sharp(&level_text, (tooltip_x + padding).floor(), text_y, font_size, level_color);
+        let level_color = if is_locked {
+            Color::new(0.8, 0.3, 0.3, 1.0)
+        } else {
+            TEXT_NORMAL
+        };
+        self.draw_text_sharp(
+            &level_text,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            level_color,
+        );
         text_y += line_height;
 
         // Description
-        self.draw_text_sharp(prayer.description, (tooltip_x + padding).floor(), text_y, font_size, TEXT_NORMAL);
+        self.draw_text_sharp(
+            prayer.description,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
         text_y += line_height;
 
         // Status
-        let status_color = if is_active { Color::new(0.3, 0.8, 0.3, 1.0) } else { TEXT_DIM };
-        self.draw_text_sharp(&status_text, (tooltip_x + padding).floor(), text_y, font_size, status_color);
+        let status_color = if is_active {
+            Color::new(0.3, 0.8, 0.3, 1.0)
+        } else {
+            TEXT_DIM
+        };
+        self.draw_text_sharp(
+            &status_text,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            status_color,
+        );
     }
 
     /// Render prayer or spell help overlay if open
-    pub(crate) fn render_prayer_help_overlay(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_prayer_help_overlay(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         if !state.ui_state.prayer_book_open {
             return;
         }
@@ -752,15 +1022,33 @@ impl Renderer {
         } else {
             SPELL_COLOR
         };
-        draw_rectangle(overlay_x - 2.0, overlay_y - 2.0, overlay_w + 4.0, overlay_h + 4.0, accent);
-        draw_rectangle(overlay_x - 1.0, overlay_y - 1.0, overlay_w + 2.0, overlay_h + 2.0, TOOLTIP_FRAME);
+        draw_rectangle(
+            overlay_x - 2.0,
+            overlay_y - 2.0,
+            overlay_w + 4.0,
+            overlay_h + 4.0,
+            accent,
+        );
+        draw_rectangle(
+            overlay_x - 1.0,
+            overlay_y - 1.0,
+            overlay_w + 2.0,
+            overlay_h + 2.0,
+            TOOLTIP_FRAME,
+        );
         draw_rectangle(overlay_x, overlay_y, overlay_w, overlay_h, TOOLTIP_BG);
 
         // Draw text lines
         let mut text_y = overlay_y + padding + 12.0;
         for (text, color) in &lines {
             if !text.is_empty() {
-                self.draw_text_sharp(text, (overlay_x + padding).floor(), text_y.floor(), font_size, *color);
+                self.draw_text_sharp(
+                    text,
+                    (overlay_x + padding).floor(),
+                    text_y.floor(),
+                    font_size,
+                    *color,
+                );
             }
             text_y += line_height;
         }
@@ -773,17 +1061,50 @@ impl Renderer {
         let close_btn_x = overlay_x + (overlay_w - close_btn_w) / 2.0;
         let close_btn_y = text_y;
 
-        let close_id = if is_prayer { UiElementId::PrayerHelpClose } else { UiElementId::SpellHelpClose };
-        layout.add(close_id.clone(), Rect::new(close_btn_x, close_btn_y, close_btn_w, close_btn_height));
+        let close_id = if is_prayer {
+            UiElementId::PrayerHelpClose
+        } else {
+            UiElementId::SpellHelpClose
+        };
+        layout.add(
+            close_id.clone(),
+            Rect::new(close_btn_x, close_btn_y, close_btn_w, close_btn_height),
+        );
 
         let close_hovered = matches!(hovered, Some(id) if *id == close_id);
-        let close_bg = if close_hovered { accent } else { Color::new(0.15, 0.13, 0.18, 1.0) };
-        let close_text_color = if close_hovered { Color::new(0.05, 0.05, 0.07, 1.0) } else { accent };
+        let close_bg = if close_hovered {
+            accent
+        } else {
+            Color::new(0.15, 0.13, 0.18, 1.0)
+        };
+        let close_text_color = if close_hovered {
+            Color::new(0.05, 0.05, 0.07, 1.0)
+        } else {
+            accent
+        };
 
-        draw_rectangle(close_btn_x, close_btn_y, close_btn_w, close_btn_height, Color::new(0.3, 0.28, 0.35, 1.0));
-        draw_rectangle(close_btn_x + 1.0, close_btn_y + 1.0, close_btn_w - 2.0, close_btn_height - 2.0, close_bg);
+        draw_rectangle(
+            close_btn_x,
+            close_btn_y,
+            close_btn_w,
+            close_btn_height,
+            Color::new(0.3, 0.28, 0.35, 1.0),
+        );
+        draw_rectangle(
+            close_btn_x + 1.0,
+            close_btn_y + 1.0,
+            close_btn_w - 2.0,
+            close_btn_height - 2.0,
+            close_bg,
+        );
         let close_text_x = close_btn_x + (close_btn_w - close_dims.width) / 2.0;
-        self.draw_text_sharp(close_text, close_text_x.floor(), (close_btn_y + (close_btn_height + 12.0) / 2.0).floor(), 16.0, close_text_color);
+        self.draw_text_sharp(
+            close_text,
+            close_text_x.floor(),
+            (close_btn_y + (close_btn_height + 12.0) / 2.0).floor(),
+            16.0,
+            close_text_color,
+        );
     }
 
     /// Render tooltip for a spell slot
@@ -828,7 +1149,8 @@ impl Renderer {
         let cooldown_dims = self.measure_text_sharp(&cooldown_text, font_size);
         let desc_dims = self.measure_text_sharp(desc, font_size);
 
-        let max_width = name_dims.width
+        let max_width = name_dims
+            .width
             .max(level_dims.width)
             .max(mana_dims.width)
             .max(cooldown_dims.width)
@@ -843,32 +1165,78 @@ impl Renderer {
         let tooltip_y = (mouse_y + 16.0).min(sh - tooltip_height - 8.0).floor();
 
         // Draw tooltip background
-        draw_rectangle(tooltip_x - 1.0, tooltip_y - 1.0, tooltip_width + 2.0, tooltip_height + 2.0, TOOLTIP_FRAME);
-        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
+        draw_rectangle(
+            tooltip_x - 1.0,
+            tooltip_y - 1.0,
+            tooltip_width + 2.0,
+            tooltip_height + 2.0,
+            TOOLTIP_FRAME,
+        );
+        draw_rectangle(
+            tooltip_x,
+            tooltip_y,
+            tooltip_width,
+            tooltip_height,
+            TOOLTIP_BG,
+        );
 
         // Draw text
         let mut text_y = (tooltip_y + padding + 14.0).floor();
 
         // Spell name (purple if available, grey if locked)
         let name_color = if is_locked { TEXT_DIM } else { SPELL_COLOR };
-        self.draw_text_sharp(name, (tooltip_x + padding).floor(), text_y, font_size, name_color);
+        self.draw_text_sharp(
+            name,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            name_color,
+        );
         text_y += line_height;
 
         // Magic level requirement
-        let level_color = if is_locked { Color::new(0.8, 0.3, 0.3, 1.0) } else { TEXT_NORMAL };
-        self.draw_text_sharp(&level_text, (tooltip_x + padding).floor(), text_y, font_size, level_color);
+        let level_color = if is_locked {
+            Color::new(0.8, 0.3, 0.3, 1.0)
+        } else {
+            TEXT_NORMAL
+        };
+        self.draw_text_sharp(
+            &level_text,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            level_color,
+        );
         text_y += line_height;
 
         // Mana cost
         let mana_color = Color::new(0.4, 0.5, 0.9, 1.0);
-        self.draw_text_sharp(&mana_text, (tooltip_x + padding).floor(), text_y, font_size, mana_color);
+        self.draw_text_sharp(
+            &mana_text,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            mana_color,
+        );
         text_y += line_height;
 
         // Cooldown
-        self.draw_text_sharp(&cooldown_text, (tooltip_x + padding).floor(), text_y, font_size, TEXT_NORMAL);
+        self.draw_text_sharp(
+            &cooldown_text,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
         text_y += line_height;
 
         // Description
-        self.draw_text_sharp(desc, (tooltip_x + padding).floor(), text_y, font_size, TEXT_NORMAL);
+        self.draw_text_sharp(
+            desc,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
     }
 }

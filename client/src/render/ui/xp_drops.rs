@@ -1,8 +1,8 @@
 //! XP drop feed - floating "+X XP" notifications with skill icons
 
-use macroquad::prelude::*;
 use crate::game::state::XpDropFeed;
 use crate::game::SkillType;
+use macroquad::prelude::*;
 
 const DROP_LIFETIME: f64 = 2.0;
 const FLOAT_DISTANCE: f32 = 120.0; // How far drops travel upward
@@ -19,7 +19,9 @@ impl Renderer {
         let current_time = macroquad::time::get_time();
 
         // Sort drops by time so we can detect groups and assign slot offsets
-        let mut sorted: Vec<_> = feed.drops.iter()
+        let mut sorted: Vec<_> = feed
+            .drops
+            .iter()
             .filter(|d| current_time - d.time < DROP_LIFETIME)
             .collect();
         sorted.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
@@ -69,10 +71,16 @@ impl Renderer {
 
         if skill_type == SkillType::Fishing {
             if let Some(ref tex) = self.fishing_skill_icon {
-                draw_texture_ex(tex, x, y, tint, DrawTextureParams {
-                    dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
-                    ..Default::default()
-                });
+                draw_texture_ex(
+                    tex,
+                    x,
+                    y,
+                    tint,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
+                        ..Default::default()
+                    },
+                );
                 return;
             }
         }
@@ -92,11 +100,17 @@ impl Renderer {
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
 
-            draw_texture_ex(texture, x, y, tint, DrawTextureParams {
-                source: Some(Rect::new(src_x, src_y, UI_ICON_SIZE, UI_ICON_SIZE)),
-                dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
-                ..Default::default()
-            });
+            draw_texture_ex(
+                texture,
+                x,
+                y,
+                tint,
+                DrawTextureParams {
+                    source: Some(Rect::new(src_x, src_y, UI_ICON_SIZE, UI_ICON_SIZE)),
+                    dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
+                    ..Default::default()
+                },
+            );
             return;
         }
 
@@ -113,7 +127,13 @@ impl Renderer {
             SkillType::Woodcutting => "Wc",
             SkillType::Alchemy => "Al",
         };
-        self.draw_text_sharp(letter, x, y + 12.0, 16.0, Color::new(color.r, color.g, color.b, opacity));
+        self.draw_text_sharp(
+            letter,
+            x,
+            y + 12.0,
+            16.0,
+            Color::new(color.r, color.g, color.b, opacity),
+        );
     }
 
     fn get_xp_drop_skill_color(&self, skill_type: SkillType) -> Color {

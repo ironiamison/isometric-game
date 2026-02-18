@@ -40,7 +40,9 @@ impl AuthClient {
                 characters: auth_resp.characters.unwrap_or_default(),
             })
         } else {
-            let error = auth_resp.error.unwrap_or_else(|| "Unknown error".to_string());
+            let error = auth_resp
+                .error
+                .unwrap_or_else(|| "Unknown error".to_string());
             if error.contains("already exists") {
                 Err(AuthError::UsernameTaken)
             } else {
@@ -77,7 +79,9 @@ impl AuthClient {
                 characters: auth_resp.characters.unwrap_or_default(),
             })
         } else {
-            let error = auth_resp.error.unwrap_or_else(|| "Unknown error".to_string());
+            let error = auth_resp
+                .error
+                .unwrap_or_else(|| "Unknown error".to_string());
             if error.contains("Invalid") {
                 Err(AuthError::InvalidCredentials)
             } else {
@@ -120,12 +124,22 @@ impl AuthClient {
         if resp.success {
             Ok(resp.characters.unwrap_or_default())
         } else {
-            Err(AuthError::ServerError(resp.error.unwrap_or_else(|| "Unknown error".to_string())))
+            Err(AuthError::ServerError(
+                resp.error.unwrap_or_else(|| "Unknown error".to_string()),
+            ))
         }
     }
 
     /// Create a new character
-    pub fn create_character(&self, token: &str, name: &str, gender: &str, skin: &str, hair_style: Option<i32>, hair_color: Option<i32>) -> Result<CharacterInfo, AuthError> {
+    pub fn create_character(
+        &self,
+        token: &str,
+        name: &str,
+        gender: &str,
+        skin: &str,
+        hair_style: Option<i32>,
+        hair_color: Option<i32>,
+    ) -> Result<CharacterInfo, AuthError> {
         let url = format!("{}/api/characters", self.base_url);
 
         let mut body = ureq::json!({
@@ -165,7 +179,8 @@ impl AuthClient {
             .map_err(|e| AuthError::NetworkError(e.to_string()))?;
 
         if resp.success {
-            resp.character.ok_or_else(|| AuthError::ServerError("No character returned".to_string()))
+            resp.character
+                .ok_or_else(|| AuthError::ServerError("No character returned".to_string()))
         } else {
             let error = resp.error.unwrap_or_else(|| "Unknown error".to_string());
             if error.contains("already exists") {
@@ -196,7 +211,12 @@ impl AuthClient {
     }
 
     /// Request matchmaking with a specific character
-    pub fn matchmake(&self, token: &str, character_id: i64, room_type: &str) -> Result<(String, String), AuthError> {
+    pub fn matchmake(
+        &self,
+        token: &str,
+        character_id: i64,
+        room_type: &str,
+    ) -> Result<(String, String), AuthError> {
         let url = format!("{}/matchmake/joinOrCreate/{}", self.base_url, room_type);
 
         let response = ureq::post(&url)
@@ -219,8 +239,12 @@ impl AuthClient {
             .into_json()
             .map_err(|e| AuthError::NetworkError(e.to_string()))?;
 
-        let room = resp.room.ok_or_else(|| AuthError::ServerError("No room returned".to_string()))?;
-        let session_token = resp.session_token.ok_or_else(|| AuthError::ServerError("No session returned".to_string()))?;
+        let room = resp
+            .room
+            .ok_or_else(|| AuthError::ServerError("No room returned".to_string()))?;
+        let session_token = resp
+            .session_token
+            .ok_or_else(|| AuthError::ServerError("No session returned".to_string()))?;
 
         Ok((room.room_id, session_token))
     }

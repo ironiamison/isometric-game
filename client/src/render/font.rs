@@ -2,10 +2,10 @@
 //!
 //! Pre-loads a pixel font at multiple native sizes to avoid scaling artifacts.
 
-use macroquad::prelude::*;
-use macroquad::file::load_file;
-use std::collections::HashMap;
 use crate::util::asset_path;
+use macroquad::file::load_file;
+use macroquad::prelude::*;
+use std::collections::HashMap;
 
 /// Available font sizes - these are pre-loaded at native resolution
 pub const FONT_SIZES: &[u16] = &[8, 10, 12, 16, 20, 24, 32];
@@ -112,7 +112,7 @@ impl BitmapFont {
         if let Some(font) = self.fonts.get(&native_size) {
             draw_text_ex(
                 text,
-                x.floor(),  // Pixel-perfect positioning
+                x.floor(), // Pixel-perfect positioning
                 y.floor(),
                 TextParams {
                     font: Some(font),
@@ -133,7 +133,7 @@ impl BitmapFont {
         if let Some(font) = self.fonts.get(&size) {
             draw_text_ex(
                 text,
-                x.floor(),  // Pixel-perfect positioning
+                x.floor(), // Pixel-perfect positioning
                 y.floor(),
                 TextParams {
                     font: Some(font),

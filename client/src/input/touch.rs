@@ -1,8 +1,8 @@
 // Touch input handling for mobile devices
 // Provides virtual joystick and touch buttons
 
-use macroquad::prelude::*;
 use crate::mobile_scale::VIRTUAL_WIDTH;
+use macroquad::prelude::*;
 
 /// Convert screen coordinates to virtual coordinates (for Android scaling)
 #[cfg(target_os = "android")]
@@ -140,7 +140,12 @@ impl VirtualDPad {
 
     /// Check which direction a point is in
     fn hit_test(&self, x: f32, y: f32) -> DPadDirection {
-        for dir in [DPadDirection::Up, DPadDirection::Down, DPadDirection::Left, DPadDirection::Right] {
+        for dir in [
+            DPadDirection::Up,
+            DPadDirection::Down,
+            DPadDirection::Left,
+            DPadDirection::Right,
+        ] {
             let (rx, ry, rw, rh) = self.get_button_rect(dir);
             if x >= rx && x < rx + rw && y >= ry && y < ry + rh {
                 return dir;
@@ -213,7 +218,8 @@ impl VirtualDPad {
                         // Check if this same touch also ended in this frame (very quick tap)
                         // This happens when Started and Ended occur in the same frame
                         let also_ended = touches.iter().any(|t| {
-                            t.id == touch.id && matches!(t.phase, TouchPhase::Ended | TouchPhase::Cancelled)
+                            t.id == touch.id
+                                && matches!(t.phase, TouchPhase::Ended | TouchPhase::Cancelled)
                         });
                         if also_ended {
                             self.just_released_dir = dir;
@@ -269,7 +275,12 @@ impl VirtualDPad {
 
     /// Render the D-pad
     pub fn render(&self) {
-        let directions = [DPadDirection::Up, DPadDirection::Down, DPadDirection::Left, DPadDirection::Right];
+        let directions = [
+            DPadDirection::Up,
+            DPadDirection::Down,
+            DPadDirection::Left,
+            DPadDirection::Right,
+        ];
         let arrows = ["^", "v", "<", ">"];
 
         for (dir, arrow) in directions.iter().zip(arrows.iter()) {
@@ -377,30 +388,28 @@ impl VirtualJoystick {
             let tracked = touches.iter().find(|t| t.id == tracking_id);
 
             match tracked {
-                Some(touch) => {
-                    match touch.phase {
-                        TouchPhase::Moved | TouchPhase::Stationary => {
-                            let (vx, vy) = to_virtual_coords(touch.position.x, touch.position.y);
-                            self.touch_pos = vec2(vx, vy);
-                            let delta = self.touch_pos - self.center;
-                            let dist = delta.length();
-                            if dist > self.dead_zone {
-                                let new_dir = Self::angle_to_direction(delta.x, delta.y);
-                                if new_dir != self.current_dir && !self.move_sent {
-                                    self.press_time = current_time;
-                                }
-                                self.current_dir = new_dir;
-                            } else {
-                                self.current_dir = DPadDirection::None;
+                Some(touch) => match touch.phase {
+                    TouchPhase::Moved | TouchPhase::Stationary => {
+                        let (vx, vy) = to_virtual_coords(touch.position.x, touch.position.y);
+                        self.touch_pos = vec2(vx, vy);
+                        let delta = self.touch_pos - self.center;
+                        let dist = delta.length();
+                        if dist > self.dead_zone {
+                            let new_dir = Self::angle_to_direction(delta.x, delta.y);
+                            if new_dir != self.current_dir && !self.move_sent {
+                                self.press_time = current_time;
                             }
+                            self.current_dir = new_dir;
+                        } else {
+                            self.current_dir = DPadDirection::None;
                         }
-                        TouchPhase::Ended | TouchPhase::Cancelled => {
-                            self.just_released_dir = self.current_dir;
-                            self.release();
-                        }
-                        _ => {}
                     }
-                }
+                    TouchPhase::Ended | TouchPhase::Cancelled => {
+                        self.just_released_dir = self.current_dir;
+                        self.release();
+                    }
+                    _ => {}
+                },
                 None => {
                     self.just_released_dir = self.current_dir;
                     self.release();
@@ -423,7 +432,8 @@ impl VirtualJoystick {
 
                     // Check for same-frame end
                     let also_ended = touches.iter().any(|t| {
-                        t.id == touch.id && matches!(t.phase, TouchPhase::Ended | TouchPhase::Cancelled)
+                        t.id == touch.id
+                            && matches!(t.phase, TouchPhase::Ended | TouchPhase::Cancelled)
                     });
                     if also_ended {
                         self.just_released_dir = self.current_dir;
@@ -474,12 +484,17 @@ impl VirtualJoystick {
         if let Some(_) = self.touch_id {
             // Outer circle
             draw_circle(
-                self.center.x, self.center.y, self.outer_radius,
+                self.center.x,
+                self.center.y,
+                self.outer_radius,
                 Color::new(1.0, 1.0, 1.0, 0.1),
             );
             draw_circle_lines(
-                self.center.x, self.center.y, self.outer_radius,
-                2.0, Color::new(1.0, 1.0, 1.0, 0.25),
+                self.center.x,
+                self.center.y,
+                self.outer_radius,
+                2.0,
+                Color::new(1.0, 1.0, 1.0, 0.25),
             );
 
             // Inner circle (thumb position, clamped to outer radius)
@@ -492,12 +507,17 @@ impl VirtualJoystick {
             };
             let inner_alpha = if dist > self.dead_zone { 0.5 } else { 0.25 };
             draw_circle(
-                clamped.x, clamped.y, 20.0,
+                clamped.x,
+                clamped.y,
+                20.0,
                 Color::new(1.0, 1.0, 1.0, inner_alpha),
             );
             draw_circle_lines(
-                clamped.x, clamped.y, 20.0,
-                2.0, Color::new(1.0, 1.0, 1.0, 0.6),
+                clamped.x,
+                clamped.y,
+                20.0,
+                2.0,
+                Color::new(1.0, 1.0, 1.0, 0.6),
             );
         }
     }
@@ -555,15 +575,13 @@ impl TouchButton {
             let tracked = touches.iter().find(|t| t.id == tracking_id);
 
             match tracked {
-                Some(touch) => {
-                    match touch.phase {
-                        TouchPhase::Ended | TouchPhase::Cancelled => {
-                            self.pressed = false;
-                            self.touch_id = None;
-                        }
-                        _ => {}
+                Some(touch) => match touch.phase {
+                    TouchPhase::Ended | TouchPhase::Cancelled => {
+                        self.pressed = false;
+                        self.touch_id = None;
                     }
-                }
+                    _ => {}
+                },
                 None => {
                     self.pressed = false;
                     self.touch_id = None;
@@ -625,7 +643,12 @@ impl TouchButton {
         draw_circle(self.position.x, self.position.y, self.radius - 2.0, bg);
         // Press highlight
         if self.pressed {
-            draw_circle(self.position.x, self.position.y, self.radius - 4.0, highlight);
+            draw_circle(
+                self.position.x,
+                self.position.y,
+                self.radius - 4.0,
+                highlight,
+            );
         }
 
         let content_alpha = if self.pressed { 0.7 } else { 0.55 };
@@ -633,7 +656,11 @@ impl TouchButton {
         // Draw icon if available, otherwise fall back to text label
         if let Some(tex) = &self.icon {
             let has_sub = self.sub_label.is_some();
-            let icon_size = if has_sub { self.radius * 1.0 } else { self.radius * 1.2 };
+            let icon_size = if has_sub {
+                self.radius * 1.0
+            } else {
+                self.radius * 1.2
+            };
             let icon_y_offset = if has_sub { -8.0 } else { 0.0 };
             draw_texture_ex(
                 tex,
@@ -725,7 +752,11 @@ impl TouchControls {
     }
 
     /// Update the attack button icon to show the currently equipped weapon
-    pub fn update_attack_icon(&mut self, weapon_id: Option<&str>, item_sprites: &crate::render::SpriteStore) {
+    pub fn update_attack_icon(
+        &mut self,
+        weapon_id: Option<&str>,
+        item_sprites: &crate::render::SpriteStore,
+    ) {
         if let Some(id) = weapon_id {
             if let Some((tex, source_rect)) = item_sprites.get(id) {
                 self.attack_button.icon = Some(tex.clone());
@@ -742,7 +773,13 @@ impl TouchControls {
 
     /// Update all touch controls
     /// Set hide_action_buttons to true when panels like inventory are open
-    pub fn update(&mut self, current_time: f64, hide_action_buttons: bool, hide_all_controls: bool, use_joystick: bool) {
+    pub fn update(
+        &mut self,
+        current_time: f64,
+        hide_action_buttons: bool,
+        hide_all_controls: bool,
+        use_joystick: bool,
+    ) {
         self.touch_consumed = false;
 
         if !self.enabled {
@@ -751,8 +788,10 @@ impl TouchControls {
 
         // Update positions for current virtual screen size
         let (screen_w, screen_h) = virtual_screen_size();
-        self.attack_button.set_position(screen_w - 55.0, screen_h - 130.0);
-        self.interact_button.set_position(screen_w - 115.0, screen_h - 85.0);
+        self.attack_button
+            .set_position(screen_w - 55.0, screen_h - 130.0);
+        self.interact_button
+            .set_position(screen_w - 115.0, screen_h - 85.0);
         self.dpad.update_position();
 
         // Get all current touches
@@ -770,11 +809,13 @@ impl TouchControls {
         };
 
         // Only count as consumed when the controls are visible
-        self.touch_consumed =
-            (!hide_action_buttons && (attack_consumed || interact_consumed
-                || self.attack_button.is_pressed() || self.interact_button.is_pressed()))
-            || (!hide_all_controls && (direction_consumed
-                || self.dpad.is_active() || self.joystick.is_active()));
+        self.touch_consumed = (!hide_action_buttons
+            && (attack_consumed
+                || interact_consumed
+                || self.attack_button.is_pressed()
+                || self.interact_button.is_pressed()))
+            || (!hide_all_controls
+                && (direction_consumed || self.dpad.is_active() || self.joystick.is_active()));
     }
 
     /// Check if touch input was consumed by controls this frame

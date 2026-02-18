@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use crate::render::animation::{PlayerAnimation, AnimationState};
-use super::skills::Skills;
 use super::item_registry::ItemRegistry;
+use super::skills::Skills;
+use crate::render::animation::{AnimationState, PlayerAnimation};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Direction {
@@ -37,9 +37,17 @@ impl Direction {
 
         // 4 quadrants: vertical takes priority when |dy| > |dx|
         if dy.abs() > dx.abs() {
-            if dy < 0.0 { Direction::Up } else { Direction::Down }
+            if dy < 0.0 {
+                Direction::Up
+            } else {
+                Direction::Down
+            }
         } else {
-            if dx < 0.0 { Direction::Left } else { Direction::Right }
+            if dx < 0.0 {
+                Direction::Left
+            } else {
+                Direction::Right
+            }
         }
     }
 
@@ -96,21 +104,21 @@ pub struct Player {
     pub death_time: f64, // When the player died (game time)
 
     // Appearance
-    pub gender: String, // "male" or "female"
-    pub skin: String,   // "tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"
+    pub gender: String,          // "male" or "female"
+    pub skin: String,            // "tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"
     pub hair_style: Option<i32>, // 0-2 (or None for bald)
     pub hair_color: Option<i32>, // 0-6 (color variant index)
 
     // Equipment
-    pub equipped_head: Option<String>,   // Item ID of equipped helmet/hat
-    pub equipped_body: Option<String>,   // Item ID of equipped body armor
+    pub equipped_head: Option<String>, // Item ID of equipped helmet/hat
+    pub equipped_body: Option<String>, // Item ID of equipped body armor
     pub equipped_weapon: Option<String>, // Item ID of equipped weapon (sword/bow/etc)
-    pub equipped_back: Option<String>,   // Item ID of equipped back item (cape/quiver/etc)
-    pub equipped_feet: Option<String>,   // Item ID of equipped boots
-    pub equipped_ring: Option<String>,   // Item ID of equipped ring
+    pub equipped_back: Option<String>, // Item ID of equipped back item (cape/quiver/etc)
+    pub equipped_feet: Option<String>, // Item ID of equipped boots
+    pub equipped_ring: Option<String>, // Item ID of equipped ring
     pub equipped_gloves: Option<String>, // Item ID of equipped gloves
     pub equipped_necklace: Option<String>, // Item ID of equipped necklace
-    pub equipped_belt: Option<String>,   // Item ID of equipped belt
+    pub equipped_belt: Option<String>, // Item ID of equipped belt
 
     // Admin status
     pub is_admin: bool,

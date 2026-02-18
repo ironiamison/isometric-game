@@ -1,12 +1,12 @@
 //! NPC dialogue panel rendering
 
-use macroquad::prelude::*;
-use macroquad::window::get_internal_gl;
+use super::super::Renderer;
+use super::common::*;
 use crate::game::{ActiveDialogue, GameState};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
-use super::super::Renderer;
-use super::common::*;
+use macroquad::prelude::*;
+use macroquad::window::get_internal_gl;
 
 #[derive(Clone, Copy)]
 struct GuideObjectiveTemplate {
@@ -37,39 +37,127 @@ struct GuideTrackTemplate {
 type QuestRequirement = (&'static str, &'static str);
 
 const COMBAT_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
-    GuideObjectiveTemplate { id: "kill_crows", label: "Defeat crows", target: 8 },
-    GuideObjectiveTemplate { id: "reach_combat_8", label: "Reach Combat level", target: 8 },
-    GuideObjectiveTemplate { id: "gather_gold_150", label: "Accumulate gold", target: 150 },
+    GuideObjectiveTemplate {
+        id: "kill_crows",
+        label: "Defeat crows",
+        target: 8,
+    },
+    GuideObjectiveTemplate {
+        id: "reach_combat_8",
+        label: "Reach Combat level",
+        target: 8,
+    },
+    GuideObjectiveTemplate {
+        id: "gather_gold_150",
+        label: "Accumulate gold",
+        target: 150,
+    },
 ];
 const COMBAT_T2_OBJECTIVES: [GuideObjectiveTemplate; 5] = [
-    GuideObjectiveTemplate { id: "kill_blue_slimes", label: "Defeat blue slimes", target: 24 },
-    GuideObjectiveTemplate { id: "kill_crows", label: "Defeat crows", target: 16 },
-    GuideObjectiveTemplate { id: "reach_woodcutting_8", label: "Reach Woodcutting level", target: 8 },
-    GuideObjectiveTemplate { id: "reach_combat_14", label: "Reach Combat level", target: 14 },
-    GuideObjectiveTemplate { id: "gather_gold_1200", label: "Accumulate gold", target: 1200 },
+    GuideObjectiveTemplate {
+        id: "kill_blue_slimes",
+        label: "Defeat blue slimes",
+        target: 24,
+    },
+    GuideObjectiveTemplate {
+        id: "kill_crows",
+        label: "Defeat crows",
+        target: 16,
+    },
+    GuideObjectiveTemplate {
+        id: "reach_woodcutting_8",
+        label: "Reach Woodcutting level",
+        target: 8,
+    },
+    GuideObjectiveTemplate {
+        id: "reach_combat_14",
+        label: "Reach Combat level",
+        target: 14,
+    },
+    GuideObjectiveTemplate {
+        id: "gather_gold_1200",
+        label: "Accumulate gold",
+        target: 1200,
+    },
 ];
 const COMBAT_T3_OBJECTIVES: [GuideObjectiveTemplate; 5] = [
-    GuideObjectiveTemplate { id: "kill_pigs", label: "Defeat pigs", target: 30 },
-    GuideObjectiveTemplate { id: "kill_wild_boars", label: "Defeat wild boars", target: 20 },
-    GuideObjectiveTemplate { id: "reach_farming_12", label: "Reach Farming level", target: 12 },
-    GuideObjectiveTemplate { id: "reach_combat_25", label: "Reach Combat level", target: 25 },
-    GuideObjectiveTemplate { id: "gather_gold_2600", label: "Accumulate gold", target: 2600 },
+    GuideObjectiveTemplate {
+        id: "kill_pigs",
+        label: "Defeat pigs",
+        target: 30,
+    },
+    GuideObjectiveTemplate {
+        id: "kill_wild_boars",
+        label: "Defeat wild boars",
+        target: 20,
+    },
+    GuideObjectiveTemplate {
+        id: "reach_farming_12",
+        label: "Reach Farming level",
+        target: 12,
+    },
+    GuideObjectiveTemplate {
+        id: "reach_combat_25",
+        label: "Reach Combat level",
+        target: 25,
+    },
+    GuideObjectiveTemplate {
+        id: "gather_gold_2600",
+        label: "Accumulate gold",
+        target: 2600,
+    },
 ];
 
 const SKILLING_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
-    GuideObjectiveTemplate { id: "reach_woodcutting_5", label: "Reach Woodcutting level", target: 5 },
-    GuideObjectiveTemplate { id: "catch_fish_25", label: "Catch fish", target: 25 },
-    GuideObjectiveTemplate { id: "brew_potions_10", label: "Brew alchemy potions", target: 10 },
+    GuideObjectiveTemplate {
+        id: "reach_woodcutting_5",
+        label: "Reach Woodcutting level",
+        target: 5,
+    },
+    GuideObjectiveTemplate {
+        id: "catch_fish_25",
+        label: "Catch fish",
+        target: 25,
+    },
+    GuideObjectiveTemplate {
+        id: "brew_potions_10",
+        label: "Brew alchemy potions",
+        target: 10,
+    },
 ];
 const SKILLING_T2_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
-    GuideObjectiveTemplate { id: "reach_woodcutting_10", label: "Reach Woodcutting level", target: 10 },
-    GuideObjectiveTemplate { id: "catch_fish_75", label: "Catch fish", target: 75 },
-    GuideObjectiveTemplate { id: "brew_potions_30", label: "Brew alchemy potions", target: 30 },
+    GuideObjectiveTemplate {
+        id: "reach_woodcutting_10",
+        label: "Reach Woodcutting level",
+        target: 10,
+    },
+    GuideObjectiveTemplate {
+        id: "catch_fish_75",
+        label: "Catch fish",
+        target: 75,
+    },
+    GuideObjectiveTemplate {
+        id: "brew_potions_30",
+        label: "Brew alchemy potions",
+        target: 30,
+    },
 ];
 const SKILLING_T3_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
-    GuideObjectiveTemplate { id: "reach_woodcutting_15", label: "Reach Woodcutting level", target: 15 },
-    GuideObjectiveTemplate { id: "catch_fish_150", label: "Catch fish", target: 150 },
-    GuideObjectiveTemplate { id: "brew_potions_60", label: "Brew alchemy potions", target: 60 },
+    GuideObjectiveTemplate {
+        id: "reach_woodcutting_15",
+        label: "Reach Woodcutting level",
+        target: 15,
+    },
+    GuideObjectiveTemplate {
+        id: "catch_fish_150",
+        label: "Catch fish",
+        target: 150,
+    },
+    GuideObjectiveTemplate {
+        id: "brew_potions_60",
+        label: "Brew alchemy potions",
+        target: 60,
+    },
 ];
 
 const COMBAT_T1_REWARDS: [&str; 1] = ["3x Weak Health Potion"];
@@ -141,7 +229,8 @@ const SKILLING_TIERS: [GuideTierTemplate; 3] = [
         id: "skilling_tier_2",
         title: "Skilling Routine",
         subtitle: "Tier II",
-        description: "Scale your production rhythm and sustain resources through better efficiency.",
+        description:
+            "Scale your production rhythm and sustain resources through better efficiency.",
         reward_exp: 840,
         reward_gold: 360,
         reward_items: &SKILLING_T2_REWARDS,
@@ -151,7 +240,8 @@ const SKILLING_TIERS: [GuideTierTemplate; 3] = [
         id: "skilling_tier_3",
         title: "Skilling Specialist",
         subtitle: "Tier III",
-        description: "Commit to a long-term skilling route with high-output gathering and crafting.",
+        description:
+            "Commit to a long-term skilling route with high-output gathering and crafting.",
         reward_exp: 1240,
         reward_gold: 640,
         reward_items: &SKILLING_T3_REWARDS,
@@ -174,6 +264,26 @@ const GUIDE_TRACKS: [GuideTrackTemplate; 2] = [
 
 fn is_adventurer_guide_dialogue(dialogue: &ActiveDialogue) -> bool {
     dialogue.speaker.eq_ignore_ascii_case("Adventurer Guide")
+}
+
+fn is_adventurer_guide_tier_id(quest_id: &str) -> bool {
+    matches!(
+        quest_id,
+        "adventurer_tier_1"
+            | "adventurer_tier_2"
+            | "adventurer_tier_3"
+            | "skilling_tier_1"
+            | "skilling_tier_2"
+            | "skilling_tier_3"
+    )
+}
+
+fn has_active_adventurer_guide_task(state: &GameState) -> bool {
+    state
+        .ui_state
+        .active_quests
+        .iter()
+        .any(|q| is_adventurer_guide_tier_id(&q.id))
 }
 
 fn skilling_tier_requirements(tier_id: &str) -> &'static [QuestRequirement] {
@@ -285,7 +395,15 @@ impl Renderer {
         }
     }
 
-    pub(crate) fn render_dialogue(&self, state: &GameState, dialogue: &ActiveDialogue, hovered: &Option<UiElementId>, layout: &mut UiLayout, scroll_offset: f32, scrollbar_dragging: bool) {
+    pub(crate) fn render_dialogue(
+        &self,
+        state: &GameState,
+        dialogue: &ActiveDialogue,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+        scroll_offset: f32,
+        scrollbar_dragging: bool,
+    ) {
         if is_adventurer_guide_dialogue(dialogue) {
             self.render_adventurer_guide_dialogue(state, dialogue, hovered, layout);
             return;
@@ -328,7 +446,11 @@ impl Renderer {
                 }
                 let mut cur = String::new();
                 for word in words {
-                    let test = if cur.is_empty() { word.to_string() } else { format!("{} {}", cur, word) };
+                    let test = if cur.is_empty() {
+                        word.to_string()
+                    } else {
+                        format!("{} {}", cur, word)
+                    };
                     let w = self.measure_text_sharp(&test, 16.0).width;
                     if w > temp_max_width && !cur.is_empty() {
                         count += 1;
@@ -369,20 +491,43 @@ impl Renderer {
 
             let is_hovered = matches!(hovered, Some(UiElementId::DialogueClose));
             let (btn_bg, btn_border) = if is_hovered {
-                (Color::new(0.4, 0.15, 0.15, 1.0), Color::new(0.6, 0.2, 0.2, 1.0))
+                (
+                    Color::new(0.4, 0.15, 0.15, 1.0),
+                    Color::new(0.6, 0.2, 0.2, 1.0),
+                )
             } else {
                 (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
             };
 
             draw_rectangle(close_x, close_y, close_size, close_size, btn_border);
-            draw_rectangle(close_x + 1.0, close_y + 1.0, close_size - 2.0, close_size - 2.0, btn_bg);
+            draw_rectangle(
+                close_x + 1.0,
+                close_y + 1.0,
+                close_size - 2.0,
+                close_size - 2.0,
+                btn_bg,
+            );
 
             let cx = close_x + close_size / 2.0;
             let cy = close_y + close_size / 2.0;
             let cross = close_size * 0.25;
             let cross_color = if is_hovered { TEXT_TITLE } else { TEXT_DIM };
-            draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
-            draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
+            draw_line(
+                cx - cross,
+                cy - cross,
+                cx + cross,
+                cy + cross,
+                2.0,
+                cross_color,
+            );
+            draw_line(
+                cx + cross,
+                cy - cross,
+                cx - cross,
+                cy + cross,
+                2.0,
+                cross_color,
+            );
         }
 
         // ===== SPEAKER NAME TAB =====
@@ -393,19 +538,50 @@ impl Renderer {
         let speaker_h = 26.0;
 
         // Speaker tab with beveled effect
-        draw_rectangle(speaker_x - 1.0, speaker_y - 1.0, speaker_width + 2.0, speaker_h + 2.0, FRAME_OUTER);
+        draw_rectangle(
+            speaker_x - 1.0,
+            speaker_y - 1.0,
+            speaker_width + 2.0,
+            speaker_h + 2.0,
+            FRAME_OUTER,
+        );
         draw_rectangle(speaker_x, speaker_y, speaker_width, speaker_h, HEADER_BG);
-        draw_rectangle(speaker_x + 1.0, speaker_y + 1.0, speaker_width - 2.0, speaker_h - 2.0, Color::new(0.165, 0.149, 0.188, 1.0));
+        draw_rectangle(
+            speaker_x + 1.0,
+            speaker_y + 1.0,
+            speaker_width - 2.0,
+            speaker_h - 2.0,
+            Color::new(0.165, 0.149, 0.188, 1.0),
+        );
 
         // Speaker tab inner highlight
-        draw_line(speaker_x + 2.0, speaker_y + 2.0, speaker_x + speaker_width - 2.0, speaker_y + 2.0, 1.0, FRAME_INNER);
+        draw_line(
+            speaker_x + 2.0,
+            speaker_y + 2.0,
+            speaker_x + speaker_width - 2.0,
+            speaker_y + 2.0,
+            1.0,
+            FRAME_INNER,
+        );
 
         // Speaker name in gold
-        self.draw_text_sharp(&speaker_text, speaker_x + 14.0, speaker_y + 18.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            &speaker_text,
+            speaker_x + 14.0,
+            speaker_y + 18.0,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Small decorative accent on speaker tab corners
         draw_rectangle(speaker_x, speaker_y, 3.0, 1.0, FRAME_ACCENT);
-        draw_rectangle(speaker_x + speaker_width - 3.0, speaker_y, 3.0, 1.0, FRAME_ACCENT);
+        draw_rectangle(
+            speaker_x + speaker_width - 3.0,
+            speaker_y,
+            3.0,
+            1.0,
+            FRAME_ACCENT,
+        );
 
         // ===== DIALOGUE CONTENT AREA =====
         let content_x = box_x + FRAME_THICKNESS + 12.0;
@@ -419,7 +595,14 @@ impl Renderer {
         } else {
             content_x + content_width
         };
-        draw_line(content_x, content_y, line_end, content_y, 1.0, HEADER_BORDER);
+        draw_line(
+            content_x,
+            content_y,
+            line_end,
+            content_y,
+            1.0,
+            HEADER_BORDER,
+        );
 
         // Dialogue text with word wrap
         let text_x = content_x;
@@ -481,13 +664,26 @@ impl Renderer {
             draw_rectangle(hint_x + 1.0, hint_y + 1.0, hint_width - 2.0, 22.0, btn_bg);
 
             if is_hovered {
-                draw_line(hint_x + 2.0, hint_y + 2.0, hint_x + hint_width - 2.0, hint_y + 2.0, 1.0, FRAME_INNER);
+                draw_line(
+                    hint_x + 2.0,
+                    hint_y + 2.0,
+                    hint_x + hint_width - 2.0,
+                    hint_y + 2.0,
+                    1.0,
+                    FRAME_INNER,
+                );
             }
 
             let text_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
             self.draw_text_sharp(hint, hint_x + 10.0, hint_y + 17.0, 16.0, text_color);
 
-            self.draw_text_sharp("[Enter]", box_x + FRAME_THICKNESS + 15.0, hint_y + 17.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                "[Enter]",
+                box_x + FRAME_THICKNESS + 15.0,
+                hint_y + 17.0,
+                16.0,
+                TEXT_DIM,
+            );
         } else {
             // ===== CHOICE BUTTONS =====
             let choice_start_y = box_y + FRAME_THICKNESS + 70.0 + text_margin_bottom;
@@ -527,17 +723,25 @@ impl Renderer {
                 let choice_y = choice_start_y + (i as f32 * choice_spacing) - clamped_scroll;
 
                 // Skip rendering if outside visible area
-                if needs_scroll && (choice_y + choice_btn_height < choice_area_top || choice_y > choice_area_bottom) {
+                if needs_scroll
+                    && (choice_y + choice_btn_height < choice_area_top
+                        || choice_y > choice_area_bottom)
+                {
                     continue;
                 }
 
-                let choice_width = if needs_scroll { content_width - scrollbar_width - 4.0 } else { content_width };
+                let choice_width = if needs_scroll {
+                    content_width - scrollbar_width - 4.0
+                } else {
+                    content_width
+                };
                 let choice_x = content_x;
 
                 let bounds = Rect::new(choice_x, choice_y, choice_width, choice_btn_height);
                 layout.add(UiElementId::DialogueChoice(i), bounds);
 
-                let is_hovered = matches!(hovered, Some(UiElementId::DialogueChoice(idx)) if *idx == i);
+                let is_hovered =
+                    matches!(hovered, Some(UiElementId::DialogueChoice(idx)) if *idx == i);
 
                 let (bg_color, border_color) = if is_hovered {
                     (SLOT_HOVER_BG, SLOT_SELECTED_BORDER)
@@ -545,20 +749,58 @@ impl Renderer {
                     (SLOT_BG_EMPTY, SLOT_BORDER)
                 };
 
-                draw_rectangle(choice_x, choice_y, choice_width, choice_btn_height, border_color);
-                draw_rectangle(choice_x + 1.0, choice_y + 1.0, choice_width - 2.0, choice_btn_height - 2.0, bg_color);
+                draw_rectangle(
+                    choice_x,
+                    choice_y,
+                    choice_width,
+                    choice_btn_height,
+                    border_color,
+                );
+                draw_rectangle(
+                    choice_x + 1.0,
+                    choice_y + 1.0,
+                    choice_width - 2.0,
+                    choice_btn_height - 2.0,
+                    bg_color,
+                );
 
                 if is_hovered {
-                    draw_line(choice_x + 2.0, choice_y + 2.0, choice_x + choice_width - 2.0, choice_y + 2.0, 1.0, FRAME_INNER);
-                    draw_line(choice_x + 2.0, choice_y + 2.0, choice_x + 2.0, choice_y + choice_btn_height - 2.0, 1.0, FRAME_INNER);
+                    draw_line(
+                        choice_x + 2.0,
+                        choice_y + 2.0,
+                        choice_x + choice_width - 2.0,
+                        choice_y + 2.0,
+                        1.0,
+                        FRAME_INNER,
+                    );
+                    draw_line(
+                        choice_x + 2.0,
+                        choice_y + 2.0,
+                        choice_x + 2.0,
+                        choice_y + choice_btn_height - 2.0,
+                        1.0,
+                        FRAME_INNER,
+                    );
                 }
 
                 let num_text = format!("[{}]", i + 1);
                 let num_color = if is_hovered { TEXT_GOLD } else { FRAME_MID };
-                self.draw_text_sharp(&num_text, choice_x + 8.0, choice_y + choice_btn_height * 0.65, 16.0, num_color);
+                self.draw_text_sharp(
+                    &num_text,
+                    choice_x + 8.0,
+                    choice_y + choice_btn_height * 0.65,
+                    16.0,
+                    num_color,
+                );
 
                 let text_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
-                self.draw_text_sharp(&choice.text, choice_x + 40.0, choice_y + choice_btn_height * 0.65, 16.0, text_color);
+                self.draw_text_sharp(
+                    &choice.text,
+                    choice_x + 40.0,
+                    choice_y + choice_btn_height * 0.65,
+                    16.0,
+                    text_color,
+                );
             }
 
             if needs_scroll {
@@ -572,15 +814,28 @@ impl Renderer {
                 let track_h = visible_choice_height;
 
                 // Register scrollbar hit area
-                layout.add(UiElementId::DialogueScrollbar, Rect::new(track_x, track_y, scrollbar_width, track_h));
+                layout.add(
+                    UiElementId::DialogueScrollbar,
+                    Rect::new(track_x, track_y, scrollbar_width, track_h),
+                );
 
                 // Draw track background
-                draw_rectangle(track_x, track_y, scrollbar_width, track_h, Color::new(0.1, 0.09, 0.12, 0.6));
+                draw_rectangle(
+                    track_x,
+                    track_y,
+                    scrollbar_width,
+                    track_h,
+                    Color::new(0.1, 0.09, 0.12, 0.6),
+                );
 
                 // Draw thumb
                 let thumb_ratio = visible_choice_height / total_choice_content;
                 let thumb_h = (track_h * thumb_ratio).max(20.0);
-                let scroll_ratio = if max_scroll > 0.0 { clamped_scroll / max_scroll } else { 0.0 };
+                let scroll_ratio = if max_scroll > 0.0 {
+                    clamped_scroll / max_scroll
+                } else {
+                    0.0
+                };
                 let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
 
                 let thumb_color = if scrollbar_dragging {
@@ -590,12 +845,24 @@ impl Renderer {
                 } else {
                     Color::new(0.3, 0.27, 0.35, 0.8)
                 };
-                draw_rectangle(track_x + 2.0, thumb_y, scrollbar_width - 4.0, thumb_h, thumb_color);
+                draw_rectangle(
+                    track_x + 2.0,
+                    thumb_y,
+                    scrollbar_width - 4.0,
+                    thumb_h,
+                    thumb_color,
+                );
             }
 
             let hint_y = box_y + box_height - FRAME_THICKNESS - 10.0;
             self.draw_text_sharp("[1-4] Select", content_x, hint_y, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[Esc] Close", content_x + content_width - 75.0, hint_y, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                "[Esc] Close",
+                content_x + content_width - 75.0,
+                hint_y,
+                16.0,
+                TEXT_DIM,
+            );
         }
     }
 
@@ -616,19 +883,55 @@ impl Renderer {
         self.draw_panel_frame(panel_x, panel_y, panel_w, panel_h);
         self.draw_corner_accents(panel_x, panel_y, panel_w, panel_h);
 
-        self.draw_text_sharp("ADVENTURE PATHS", panel_x + 18.0, panel_y + 28.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            "ADVENTURE PATHS",
+            panel_x + 18.0,
+            panel_y + 28.0,
+            16.0,
+            TEXT_TITLE,
+        );
 
         let close_x = panel_x + panel_w - 32.0;
         let close_y = panel_y + 8.0;
         let close_bounds = Rect::new(close_x, close_y, 20.0, 16.0);
         layout.add(UiElementId::DialogueClose, close_bounds);
         let close_hovered = matches!(hovered, Some(UiElementId::DialogueClose));
-        draw_rectangle(close_x, close_y, 20.0, 16.0, if close_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID });
-        draw_rectangle(close_x + 1.0, close_y + 1.0, 18.0, 14.0, if close_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY });
-        self.draw_text_sharp("X", close_x + 7.0, close_y + 12.0, 16.0, if close_hovered { TEXT_TITLE } else { TEXT_DIM });
+        draw_rectangle(
+            close_x,
+            close_y,
+            20.0,
+            16.0,
+            if close_hovered {
+                SLOT_SELECTED_BORDER
+            } else {
+                FRAME_MID
+            },
+        );
+        draw_rectangle(
+            close_x + 1.0,
+            close_y + 1.0,
+            18.0,
+            14.0,
+            if close_hovered {
+                SLOT_HOVER_BG
+            } else {
+                SLOT_BG_EMPTY
+            },
+        );
+        self.draw_text_sharp(
+            "X",
+            close_x + 7.0,
+            close_y + 12.0,
+            16.0,
+            if close_hovered { TEXT_TITLE } else { TEXT_DIM },
+        );
 
-        let selected_track_idx = state.ui_state.adventurer_selected_tab.min(GUIDE_TRACKS.len().saturating_sub(1));
+        let selected_track_idx = state
+            .ui_state
+            .adventurer_selected_tab
+            .min(GUIDE_TRACKS.len().saturating_sub(1));
         let selected_track = GUIDE_TRACKS[selected_track_idx];
+        let has_active_guide_task = has_active_adventurer_guide_task(state);
 
         let tab_y = panel_y + 36.0;
         let tab_h = 28.0;
@@ -639,7 +942,11 @@ impl Renderer {
             layout.add(UiElementId::AdventurerTab(idx), tab_bounds);
             let tab_selected = idx == selected_track_idx;
             let tab_hovered = matches!(hovered, Some(UiElementId::AdventurerTab(i)) if *i == idx);
-            let tab_border = if tab_selected || tab_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID };
+            let tab_border = if tab_selected || tab_hovered {
+                SLOT_SELECTED_BORDER
+            } else {
+                FRAME_MID
+            };
             let tab_bg = if tab_selected {
                 SLOT_HOVER_BG
             } else if tab_hovered {
@@ -650,7 +957,17 @@ impl Renderer {
             draw_rectangle(tab_x, tab_y, tab_w, tab_h, tab_border);
             draw_rectangle(tab_x + 1.0, tab_y + 1.0, tab_w - 2.0, tab_h - 2.0, tab_bg);
             let label_w = self.measure_text_sharp(track.title, 16.0).width;
-            self.draw_text_sharp(track.title, tab_x + (tab_w - label_w) * 0.5, tab_y + 19.0, 16.0, if tab_selected { TEXT_TITLE } else { TEXT_NORMAL });
+            self.draw_text_sharp(
+                track.title,
+                tab_x + (tab_w - label_w) * 0.5,
+                tab_y + 19.0,
+                16.0,
+                if tab_selected {
+                    TEXT_TITLE
+                } else {
+                    TEXT_NORMAL
+                },
+            );
             tab_x += tab_w + 8.0;
         }
 
@@ -659,16 +976,26 @@ impl Renderer {
         let left_y = tab_y + tab_h + 8.0;
         let left_h = panel_y + panel_h - left_y - 12.0;
         draw_rectangle(left_x, left_y, left_w, left_h, SLOT_BORDER);
-        draw_rectangle(left_x + 1.0, left_y + 1.0, left_w - 2.0, left_h - 2.0, SLOT_BG_EMPTY);
+        draw_rectangle(
+            left_x + 1.0,
+            left_y + 1.0,
+            left_w - 2.0,
+            left_h - 2.0,
+            SLOT_BG_EMPTY,
+        );
 
-        let selected_idx = state.ui_state.adventurer_selected_tier.min(selected_track.tiers.len().saturating_sub(1));
+        let selected_idx = state
+            .ui_state
+            .adventurer_selected_tier
+            .min(selected_track.tiers.len().saturating_sub(1));
 
         let mut row_y = left_y + 8.0;
         for (idx, tier) in selected_track.tiers.iter().enumerate() {
             let is_selected = idx == selected_idx;
             let completed = is_tier_completed(state, selected_track_idx, tier);
             let is_active = state.ui_state.active_quests.iter().any(|q| q.id == tier.id);
-            let unlocked = is_tier_unlocked(state, selected_track_idx, selected_track.tiers, idx);
+            let unlocked = is_tier_unlocked(state, selected_track_idx, selected_track.tiers, idx)
+                && (!has_active_guide_task || is_active || completed);
 
             let row_h = 52.0;
             let row_bounds = Rect::new(left_x + 6.0, row_y, left_w - 12.0, row_h);
@@ -682,9 +1009,25 @@ impl Renderer {
             } else {
                 Color::new(0.10, 0.10, 0.14, 1.0)
             };
-            let row_border = if is_selected { SLOT_SELECTED_BORDER } else { SLOT_BORDER };
-            draw_rectangle(row_bounds.x, row_bounds.y, row_bounds.w, row_bounds.h, row_border);
-            draw_rectangle(row_bounds.x + 1.0, row_bounds.y + 1.0, row_bounds.w - 2.0, row_bounds.h - 2.0, row_bg);
+            let row_border = if is_selected {
+                SLOT_SELECTED_BORDER
+            } else {
+                SLOT_BORDER
+            };
+            draw_rectangle(
+                row_bounds.x,
+                row_bounds.y,
+                row_bounds.w,
+                row_bounds.h,
+                row_border,
+            );
+            draw_rectangle(
+                row_bounds.x + 1.0,
+                row_bounds.y + 1.0,
+                row_bounds.w - 2.0,
+                row_bounds.h - 2.0,
+                row_bg,
+            );
 
             let status = if completed {
                 "COMPLETED"
@@ -710,8 +1053,20 @@ impl Renderer {
             let title_max_w = (status_x - title_x - 10.0).max(20.0);
             let title_text = self.truncate_text_to_width(tier.title, title_max_w, 16.0);
 
-            self.draw_text_sharp(tier.subtitle, row_bounds.x + 8.0, row_bounds.y + 16.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp(&title_text, title_x, row_bounds.y + 32.0, 16.0, if unlocked { TEXT_NORMAL } else { TEXT_DIM });
+            self.draw_text_sharp(
+                tier.subtitle,
+                row_bounds.x + 8.0,
+                row_bounds.y + 16.0,
+                16.0,
+                TEXT_DIM,
+            );
+            self.draw_text_sharp(
+                &title_text,
+                title_x,
+                row_bounds.y + 32.0,
+                16.0,
+                if unlocked { TEXT_NORMAL } else { TEXT_DIM },
+            );
             self.draw_text_sharp(status, status_x, row_bounds.y + 32.0, 16.0, status_color);
 
             row_y += row_h + 8.0;
@@ -722,12 +1077,28 @@ impl Renderer {
         let right_w = panel_x + panel_w - right_x - 12.0;
         let right_h = left_h;
         draw_rectangle(right_x, right_y, right_w, right_h, SLOT_BORDER);
-        draw_rectangle(right_x + 1.0, right_y + 1.0, right_w - 2.0, right_h - 2.0, Color::new(0.09, 0.09, 0.13, 1.0));
+        draw_rectangle(
+            right_x + 1.0,
+            right_y + 1.0,
+            right_w - 2.0,
+            right_h - 2.0,
+            Color::new(0.09, 0.09, 0.13, 1.0),
+        );
 
         let tier = selected_track.tiers[selected_idx];
         let completed = is_tier_completed(state, selected_track_idx, &tier);
-        let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == tier.id);
-        let unlocked = is_tier_unlocked(state, selected_track_idx, selected_track.tiers, selected_idx);
+        let active_quest = state
+            .ui_state
+            .active_quests
+            .iter()
+            .find(|q| q.id == tier.id);
+        let tier_is_active = active_quest.is_some();
+        let unlocked = is_tier_unlocked(
+            state,
+            selected_track_idx,
+            selected_track.tiers,
+            selected_idx,
+        ) && (!has_active_guide_task || tier_is_active || completed);
 
         let right_subtitle_w = self.measure_text_sharp(tier.subtitle, 16.0).width;
         let right_subtitle_x = right_x + right_w - right_subtitle_w - 12.0;
@@ -735,11 +1106,27 @@ impl Renderer {
         let right_title_max_w = (right_subtitle_x - right_title_x - 12.0).max(20.0);
         let right_title = self.truncate_text_to_width(tier.title, right_title_max_w, 16.0);
 
-        self.draw_text_sharp(&right_title, right_title_x, right_y + 26.0, 16.0, TEXT_TITLE);
-        self.draw_text_sharp(tier.subtitle, right_subtitle_x, right_y + 26.0, 16.0, FRAME_MID);
+        self.draw_text_sharp(
+            &right_title,
+            right_title_x,
+            right_y + 26.0,
+            16.0,
+            TEXT_TITLE,
+        );
+        self.draw_text_sharp(
+            tier.subtitle,
+            right_subtitle_x,
+            right_y + 26.0,
+            16.0,
+            FRAME_MID,
+        );
 
         let mut desc_y = right_y + 48.0;
-        for line in self.wrap_text(tier.description, right_w - 24.0, 16.0).iter().take(3) {
+        for line in self
+            .wrap_text(tier.description, right_w - 24.0, 16.0)
+            .iter()
+            .take(3)
+        {
             self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_NORMAL);
             desc_y += 18.0;
         }
@@ -766,13 +1153,24 @@ impl Renderer {
                 }
             }
         } else if dialogue.quest_id == tier.id {
-            for line in self.wrap_text(&dialogue.text, right_w - 24.0, 16.0).iter().take(2) {
+            for line in self
+                .wrap_text(&dialogue.text, right_w - 24.0, 16.0)
+                .iter()
+                .take(2)
+            {
                 self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_DIM);
                 desc_y += 17.0;
             }
         }
 
-        draw_line(right_x + 12.0, desc_y + 4.0, right_x + right_w - 12.0, desc_y + 4.0, 1.0, HEADER_BORDER);
+        draw_line(
+            right_x + 12.0,
+            desc_y + 4.0,
+            right_x + right_w - 12.0,
+            desc_y + 4.0,
+            1.0,
+            HEADER_BORDER,
+        );
         let mut y = desc_y + 24.0;
 
         self.draw_text_sharp("Objectives", right_x + 12.0, y, 16.0, FRAME_INNER);
@@ -808,7 +1206,11 @@ impl Renderer {
                 right_x + 14.0,
                 y,
                 16.0,
-                if done { Color::new(0.42, 0.82, 0.42, 1.0) } else { TEXT_NORMAL },
+                if done {
+                    Color::new(0.42, 0.82, 0.42, 1.0)
+                } else {
+                    TEXT_NORMAL
+                },
             );
             y += 18.0;
         }
@@ -833,30 +1235,98 @@ impl Renderer {
         }
 
         let action_base_y = right_y + right_h - 72.0;
-        if dialogue.quest_id == tier.id {
+        let actions_locked_by_active_task = has_active_guide_task && !tier_is_active;
+        if dialogue.quest_id == tier.id && !actions_locked_by_active_task {
             if dialogue.choices.is_empty() {
                 let btn = Rect::new(right_x + right_w - 170.0, action_base_y, 150.0, 30.0);
                 layout.add(UiElementId::DialogueContinue, btn);
                 let hovered_continue = matches!(hovered, Some(UiElementId::DialogueContinue));
-                draw_rectangle(btn.x, btn.y, btn.w, btn.h, if hovered_continue { SLOT_SELECTED_BORDER } else { FRAME_MID });
-                draw_rectangle(btn.x + 1.0, btn.y + 1.0, btn.w - 2.0, btn.h - 2.0, if hovered_continue { SLOT_HOVER_BG } else { SLOT_BG_EMPTY });
-                self.draw_text_sharp("Continue", btn.x + 46.0, btn.y + 20.0, 16.0, if hovered_continue { TEXT_TITLE } else { TEXT_NORMAL });
+                draw_rectangle(
+                    btn.x,
+                    btn.y,
+                    btn.w,
+                    btn.h,
+                    if hovered_continue {
+                        SLOT_SELECTED_BORDER
+                    } else {
+                        FRAME_MID
+                    },
+                );
+                draw_rectangle(
+                    btn.x + 1.0,
+                    btn.y + 1.0,
+                    btn.w - 2.0,
+                    btn.h - 2.0,
+                    if hovered_continue {
+                        SLOT_HOVER_BG
+                    } else {
+                        SLOT_BG_EMPTY
+                    },
+                );
+                self.draw_text_sharp(
+                    "Continue",
+                    btn.x + 46.0,
+                    btn.y + 20.0,
+                    16.0,
+                    if hovered_continue {
+                        TEXT_TITLE
+                    } else {
+                        TEXT_NORMAL
+                    },
+                );
             } else {
-                let mut btn_y = action_base_y - ((dialogue.choices.len().saturating_sub(1) as f32) * 34.0);
+                let mut btn_y =
+                    action_base_y - ((dialogue.choices.len().saturating_sub(1) as f32) * 34.0);
                 for (i, choice) in dialogue.choices.iter().enumerate() {
                     let btn = Rect::new(right_x + right_w - 260.0, btn_y, 240.0, 30.0);
                     layout.add(UiElementId::DialogueChoice(i), btn);
-                    let btn_hovered = matches!(hovered, Some(UiElementId::DialogueChoice(idx)) if *idx == i);
-                    draw_rectangle(btn.x, btn.y, btn.w, btn.h, if btn_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID });
-                    draw_rectangle(btn.x + 1.0, btn.y + 1.0, btn.w - 2.0, btn.h - 2.0, if btn_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY });
-                    self.draw_text_sharp(&choice.text, btn.x + 12.0, btn.y + 20.0, 16.0, if btn_hovered { TEXT_TITLE } else { TEXT_NORMAL });
+                    let btn_hovered =
+                        matches!(hovered, Some(UiElementId::DialogueChoice(idx)) if *idx == i);
+                    draw_rectangle(
+                        btn.x,
+                        btn.y,
+                        btn.w,
+                        btn.h,
+                        if btn_hovered {
+                            SLOT_SELECTED_BORDER
+                        } else {
+                            FRAME_MID
+                        },
+                    );
+                    draw_rectangle(
+                        btn.x + 1.0,
+                        btn.y + 1.0,
+                        btn.w - 2.0,
+                        btn.h - 2.0,
+                        if btn_hovered {
+                            SLOT_HOVER_BG
+                        } else {
+                            SLOT_BG_EMPTY
+                        },
+                    );
+                    self.draw_text_sharp(
+                        &choice.text,
+                        btn.x + 12.0,
+                        btn.y + 20.0,
+                        16.0,
+                        if btn_hovered { TEXT_TITLE } else { TEXT_NORMAL },
+                    );
                     btn_y += 34.0;
                 }
             }
         } else {
-            if unlocked && !completed {
+            if actions_locked_by_active_task {
+                self.draw_text_sharp(
+                    "Finish your active Adventurer task first.",
+                    right_x + right_w - 300.0,
+                    action_base_y + 20.0,
+                    16.0,
+                    TEXT_DIM,
+                );
+            } else if unlocked && !completed {
                 if !selected_track.no_action_hint.is_empty() {
-                    let hint = self.truncate_text_to_width(selected_track.no_action_hint, 268.0, 16.0);
+                    let hint =
+                        self.truncate_text_to_width(selected_track.no_action_hint, 268.0, 16.0);
                     self.draw_text_sharp(
                         &hint,
                         right_x + right_w - 280.0,
@@ -866,7 +1336,8 @@ impl Renderer {
                     );
                 }
             } else if !unlocked && selected_track_idx == 1 {
-                let missing = skilling_missing_unlock_requirements(state, selected_track.tiers, selected_idx);
+                let missing =
+                    skilling_missing_unlock_requirements(state, selected_track.tiers, selected_idx);
                 if !missing.is_empty() {
                     let missing_text = format!("Missing: {}", missing.join(", "));
                     let hint = self.truncate_text_to_width(&missing_text, 268.0, 16.0);

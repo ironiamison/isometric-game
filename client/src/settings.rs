@@ -1,5 +1,4 @@
 /// Settings persistence for control scheme (classic vs modern) and UI settings
-
 use serde::{Deserialize, Serialize};
 
 /// UI settings that should be persisted across sessions
@@ -155,7 +154,11 @@ pub fn save_classic_controls(classic: bool) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let contents = if classic { "classic = true\n" } else { "classic = false\n" };
+    let contents = if classic {
+        "classic = true\n"
+    } else {
+        "classic = false\n"
+    };
     let _ = std::fs::write(&path, contents);
 }
 
@@ -175,7 +178,11 @@ pub fn save_classic_controls(classic: bool) {
     let Some(path) = controls_path() else {
         return;
     };
-    let contents = if classic { "classic = true\n" } else { "classic = false\n" };
+    let contents = if classic {
+        "classic = true\n"
+    } else {
+        "classic = false\n"
+    };
     let _ = std::fs::write(&path, contents);
 }
 

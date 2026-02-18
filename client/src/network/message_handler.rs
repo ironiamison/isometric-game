@@ -1,7 +1,17 @@
-use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState, GatheringMarker, BonusTile, GatheringBuff, FarmingPatch, FriendInfo, PendingRequestInfo, OnlinePlayerInfo, SpellEffect};
+use super::protocol::{
+    extract_array, extract_bool, extract_f32, extract_i32, extract_string, extract_u32,
+    extract_u64, extract_u8,
+};
 use crate::game::npc::{Npc, NpcState};
+use crate::game::{
+    ActiveDialogue, ActiveQuest, BonusTile, ChatBubble, ChatChannel, ChatMessage, ConnectionStatus,
+    DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch, FriendInfo, GameState,
+    GatheringBuff, GatheringMarker, GroundItem, InventorySlot, ItemDefinition, LevelUpEvent,
+    MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal, QuestCompletedEvent,
+    QuestObjective, RecipeDefinition, RecipeIngredient, RecipeResult, ShopData, ShopStockItem,
+    SkillType, SkillXpEvent, SpellEffect, TransitionState, Wall, WallEdge,
+};
 use crate::render::OVERWORLD_NAME;
-use super::protocol::{extract_string, extract_f32, extract_i32, extract_u32, extract_u64, extract_array, extract_u8, extract_bool};
 
 fn adventurer_guide_tier_id(tab_idx: usize, tier_idx: usize) -> Option<&'static str> {
     match (tab_idx, tier_idx) {
@@ -37,7 +47,9 @@ fn reset_adventurer_guide_dialogue(state: &mut GameState) -> bool {
             dialogue.quest_id.clear();
         }
         dialogue.choices.clear();
-        dialogue.text = "Select a tier to review progress. Talk to the guide to start or complete tiers.".to_string();
+        dialogue.text =
+            "Select a tier to review progress. Talk to the guide to start or complete tiers."
+                .to_string();
     }
     state.ui_state.dialogue_scroll_offset = 0.0;
     state.ui_state.dialogue_touch_scroll_id = None;
@@ -70,19 +82,35 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let hair_style = extract_i32(value, "hair_style");
                 let hair_color = extract_i32(value, "hair_color");
                 // Equipment (filter empty strings to None)
-                let equipped_head = extract_string(value, "equipped_head").filter(|s| !s.is_empty());
-                let equipped_body = extract_string(value, "equipped_body").filter(|s| !s.is_empty());
-                let equipped_weapon = extract_string(value, "equipped_weapon").filter(|s| !s.is_empty());
-                let equipped_back = extract_string(value, "equipped_back").filter(|s| !s.is_empty());
-                let equipped_feet = extract_string(value, "equipped_feet").filter(|s| !s.is_empty());
-                let equipped_ring = extract_string(value, "equipped_ring").filter(|s| !s.is_empty());
-                let equipped_gloves = extract_string(value, "equipped_gloves").filter(|s| !s.is_empty());
-                let equipped_necklace = extract_string(value, "equipped_necklace").filter(|s| !s.is_empty());
-                let equipped_belt = extract_string(value, "equipped_belt").filter(|s| !s.is_empty());
+                let equipped_head =
+                    extract_string(value, "equipped_head").filter(|s| !s.is_empty());
+                let equipped_body =
+                    extract_string(value, "equipped_body").filter(|s| !s.is_empty());
+                let equipped_weapon =
+                    extract_string(value, "equipped_weapon").filter(|s| !s.is_empty());
+                let equipped_back =
+                    extract_string(value, "equipped_back").filter(|s| !s.is_empty());
+                let equipped_feet =
+                    extract_string(value, "equipped_feet").filter(|s| !s.is_empty());
+                let equipped_ring =
+                    extract_string(value, "equipped_ring").filter(|s| !s.is_empty());
+                let equipped_gloves =
+                    extract_string(value, "equipped_gloves").filter(|s| !s.is_empty());
+                let equipped_necklace =
+                    extract_string(value, "equipped_necklace").filter(|s| !s.is_empty());
+                let equipped_belt =
+                    extract_string(value, "equipped_belt").filter(|s| !s.is_empty());
                 // Admin status
                 let is_admin = extract_bool(value, "is_admin").unwrap_or(false);
 
-                log::info!("Player joined: {} at ({}, {}) [{}/{}]", name, x, y, gender, skin);
+                log::info!(
+                    "Player joined: {} at ({}, {}) [{}/{}]",
+                    name,
+                    x,
+                    y,
+                    gender,
+                    skin
+                );
                 let mut player = Player::new(id.clone(), name, x, y, gender, skin);
                 player.hair_style = hair_style;
                 player.hair_color = hair_color;
@@ -151,19 +179,30 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let hitpoints_level = extract_i32(player_value, "hitpointsLevel");
                         let combat_skill_level = extract_i32(player_value, "combatSkillLevel");
                         let gold = extract_i32(player_value, "gold");
-                        let gender = extract_string(player_value, "gender").unwrap_or_else(|| "male".to_string());
-                        let skin = extract_string(player_value, "skin").unwrap_or_else(|| "tan".to_string());
+                        let gender = extract_string(player_value, "gender")
+                            .unwrap_or_else(|| "male".to_string());
+                        let skin = extract_string(player_value, "skin")
+                            .unwrap_or_else(|| "tan".to_string());
                         let hair_style = extract_i32(player_value, "hair_style");
                         let hair_color = extract_i32(player_value, "hair_color");
-                        let equipped_head = extract_string(player_value, "equipped_head").filter(|s| !s.is_empty());
-                        let equipped_body = extract_string(player_value, "equipped_body").filter(|s| !s.is_empty());
-                        let equipped_weapon = extract_string(player_value, "equipped_weapon").filter(|s| !s.is_empty());
-                        let equipped_back = extract_string(player_value, "equipped_back").filter(|s| !s.is_empty());
-                        let equipped_feet = extract_string(player_value, "equipped_feet").filter(|s| !s.is_empty());
-                        let equipped_ring = extract_string(player_value, "equipped_ring").filter(|s| !s.is_empty());
-                        let equipped_gloves = extract_string(player_value, "equipped_gloves").filter(|s| !s.is_empty());
-                        let equipped_necklace = extract_string(player_value, "equipped_necklace").filter(|s| !s.is_empty());
-                        let equipped_belt = extract_string(player_value, "equipped_belt").filter(|s| !s.is_empty());
+                        let equipped_head =
+                            extract_string(player_value, "equipped_head").filter(|s| !s.is_empty());
+                        let equipped_body =
+                            extract_string(player_value, "equipped_body").filter(|s| !s.is_empty());
+                        let equipped_weapon = extract_string(player_value, "equipped_weapon")
+                            .filter(|s| !s.is_empty());
+                        let equipped_back =
+                            extract_string(player_value, "equipped_back").filter(|s| !s.is_empty());
+                        let equipped_feet =
+                            extract_string(player_value, "equipped_feet").filter(|s| !s.is_empty());
+                        let equipped_ring =
+                            extract_string(player_value, "equipped_ring").filter(|s| !s.is_empty());
+                        let equipped_gloves = extract_string(player_value, "equipped_gloves")
+                            .filter(|s| !s.is_empty());
+                        let equipped_necklace = extract_string(player_value, "equipped_necklace")
+                            .filter(|s| !s.is_empty());
+                        let equipped_belt =
+                            extract_string(player_value, "equipped_belt").filter(|s| !s.is_empty());
                         let is_admin = extract_bool(player_value, "is_admin").unwrap_or(false);
 
                         let is_local_player = state.local_player_id.as_ref() == Some(&id);
@@ -181,7 +220,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             let vel_x = extract_i32(player_value, "velX").unwrap_or(0) as f32;
                             let vel_y = extract_i32(player_value, "velY").unwrap_or(0) as f32;
                             // Direction from server
-                            let dir = direction.map(|d| Direction::from_u8(d as u8)).unwrap_or(player.direction);
+                            let dir = direction
+                                .map(|d| Direction::from_u8(d as u8))
+                                .unwrap_or(player.direction);
 
                             // Check if player is dashing (set before set_server_state so it handles interpolation)
                             let dashing = extract_bool(player_value, "dashing").unwrap_or(false);
@@ -207,7 +248,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                         }
                                     }
                                 }
-                                player.set_server_state(x as f32, y as f32, vel_x, vel_y, effective_dir);
+                                player.set_server_state(
+                                    x as f32,
+                                    y as f32,
+                                    vel_x,
+                                    vel_y,
+                                    effective_dir,
+                                );
                             } else if direction.is_some() {
                                 // Direction-only update when no position fields are present.
                                 if is_local_player {
@@ -235,7 +282,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 } else if hp > player.hp && player.hp > 0 {
                                     // HP increased (regen) - record for floating text
                                     let heal_amount = hp - player.hp;
-                                    player_regen_events.push((id.clone(), player.x, player.y, heal_amount));
+                                    player_regen_events.push((
+                                        id.clone(),
+                                        player.x,
+                                        player.y,
+                                        heal_amount,
+                                    ));
                                 }
                                 player.hp = hp;
                             }
@@ -272,7 +324,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.is_admin = is_admin;
                             // Update sitting state
                             let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
-                            if sitting && player.animation.state != crate::render::animation::AnimationState::SittingChair {
+                            if sitting
+                                && player.animation.state
+                                    != crate::render::animation::AnimationState::SittingChair
+                            {
                                 // Snap position immediately so remote players don't "walk" to the chair
                                 if !is_local_player {
                                     player.x = player.target_x;
@@ -291,7 +346,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 if is_local_player {
                                     state.is_sitting = true;
                                 }
-                            } else if !sitting && player.animation.state == crate::render::animation::AnimationState::SittingChair {
+                            } else if !sitting
+                                && player.animation.state
+                                    == crate::render::animation::AnimationState::SittingChair
+                            {
                                 player.stand_up();
                                 if is_local_player {
                                     state.is_sitting = false;
@@ -299,7 +357,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             }
 
                             // Update gathering state (for players who started fishing before we logged in)
-                            let server_is_gathering = extract_bool(player_value, "is_gathering").unwrap_or(false);
+                            let server_is_gathering =
+                                extract_bool(player_value, "is_gathering").unwrap_or(false);
                             if server_is_gathering && !player.is_gathering {
                                 player.is_gathering = true;
                                 player.gathering_started_at = macroquad::time::get_time();
@@ -310,7 +369,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 }
                             } else if !server_is_gathering && player.is_gathering {
                                 // Don't reset if gathering was started very recently (grace period to avoid race condition)
-                                let recently_started = macroquad::time::get_time() - player.gathering_started_at < 1.0;
+                                let recently_started =
+                                    macroquad::time::get_time() - player.gathering_started_at < 1.0;
                                 if !recently_started {
                                     player.is_gathering = false;
                                     if is_local_player {
@@ -318,12 +378,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     }
                                 }
                             }
-
                         } else if state.local_player_id.as_ref() != Some(&id) && !id.is_empty() {
                             // Player not in our map - create them from stateSync data
                             // This handles players re-appearing after map transitions
                             if let (Some(px), Some(py)) = (x, y) {
-                                log::info!("Creating player from stateSync: {} at ({}, {})", name, px, py);
+                                log::info!(
+                                    "Creating player from stateSync: {} at ({}, {})",
+                                    name,
+                                    px,
+                                    py
+                                );
                                 let mut new_player = Player::new(
                                     id.clone(),
                                     name.clone(),
@@ -344,21 +408,25 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 new_player.equipped_necklace = equipped_necklace;
                                 new_player.equipped_belt = equipped_belt;
                                 new_player.is_admin = is_admin;
-                                let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
+                                let sitting =
+                                    extract_bool(player_value, "sitting").unwrap_or(false);
                                 if sitting {
                                     new_player.sit_chair();
                                 }
-                                let is_gathering = extract_bool(player_value, "is_gathering").unwrap_or(false);
+                                let is_gathering =
+                                    extract_bool(player_value, "is_gathering").unwrap_or(false);
                                 if is_gathering {
                                     new_player.is_gathering = true;
                                     new_player.gathering_started_at = macroquad::time::get_time();
                                 }
-                                let is_woodcutting = extract_bool(player_value, "is_woodcutting").unwrap_or(false);
+                                let is_woodcutting =
+                                    extract_bool(player_value, "is_woodcutting").unwrap_or(false);
                                 if is_woodcutting {
                                     new_player.is_woodcutting = true;
                                     new_player.woodcutting_started_at = macroquad::time::get_time();
                                 }
-                                let dashing = extract_bool(player_value, "dashing").unwrap_or(false);
+                                let dashing =
+                                    extract_bool(player_value, "dashing").unwrap_or(false);
                                 if dashing {
                                     new_player.is_dashing = true;
                                 }
@@ -399,9 +467,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // Only reconcile on full syncs (delta syncs use explicit removal lists).
                 if is_full_sync && !sync_instance.is_empty() {
                     let local_id = state.local_player_id.clone().unwrap_or_default();
-                    state.players.retain(|id, _| {
-                        *id == local_id || synced_player_ids.contains(id)
-                    });
+                    state
+                        .players
+                        .retain(|id, _| *id == local_id || synced_player_ids.contains(id));
                 }
 
                 // Delta sync: process explicit removal lists
@@ -422,7 +490,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // to detect portals immediately when the server confirms the move
                 if let Some(local_id) = &state.local_player_id {
                     if let Some(player) = state.players.get(local_id) {
-                        let current_tile = (player.server_x.floor() as i32, player.server_y.floor() as i32);
+                        let current_tile = (
+                            player.server_x.floor() as i32,
+                            player.server_y.floor() as i32,
+                        );
                         let prev_tile = state.last_portal_check_pos;
 
                         // Only check for portal if we moved to a different tile
@@ -437,11 +508,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             }
                         }
 
-                        if moved_tiles &&
-                           state.pending_portal_id.is_none() &&
-                           state.portal_ignore_tile.map_or(true, |ignored| current_tile != ignored) &&
-                           matches!(state.map_transition.state, TransitionState::None) {
-                            if let Some(portal) = state.chunk_manager.get_portal_at(player.server_x, player.server_y) {
+                        if moved_tiles
+                            && state.pending_portal_id.is_none()
+                            && state
+                                .portal_ignore_tile
+                                .map_or(true, |ignored| current_tile != ignored)
+                            && matches!(state.map_transition.state, TransitionState::None)
+                        {
+                            if let Some(portal) = state
+                                .chunk_manager
+                                .get_portal_at(player.server_x, player.server_y)
+                            {
                                 state.pending_portal_id = Some(portal.id.clone());
                             }
                         }
@@ -471,8 +548,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     for npc_value in npcs {
                         let id = extract_string(npc_value, "id").unwrap_or_default();
                         let npc_type = extract_u8(npc_value, "npc_type").unwrap_or(0);
-                        let entity_type = extract_string(npc_value, "entity_type").unwrap_or_else(|| "pig".to_string());
-                        let display_name = extract_string(npc_value, "display_name").unwrap_or_else(|| "???".to_string());
+                        let entity_type = extract_string(npc_value, "entity_type")
+                            .unwrap_or_else(|| "pig".to_string());
+                        let display_name = extract_string(npc_value, "display_name")
+                            .unwrap_or_else(|| "???".to_string());
                         // Server sends i32 grid positions
                         let x = extract_i32(npc_value, "x").unwrap_or(0) as f32;
                         let y = extract_i32(npc_value, "y").unwrap_or(0) as f32;
@@ -482,14 +561,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let level = extract_i32(npc_value, "level").unwrap_or(1);
                         let npc_state = extract_u8(npc_value, "state").unwrap_or(0);
                         let hostile = extract_bool(npc_value, "hostile").unwrap_or(true);
-                        let is_quest_giver = extract_bool(npc_value, "is_quest_giver").unwrap_or(false);
-                        let can_turn_in_quest = extract_bool(npc_value, "can_turn_in_quest").unwrap_or(false);
+                        let is_quest_giver =
+                            extract_bool(npc_value, "is_quest_giver").unwrap_or(false);
+                        let can_turn_in_quest =
+                            extract_bool(npc_value, "can_turn_in_quest").unwrap_or(false);
                         let is_merchant = extract_bool(npc_value, "is_merchant").unwrap_or(false);
                         let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
                         let is_banker = extract_bool(npc_value, "is_banker").unwrap_or(false);
                         let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
                         let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
-                        let render_offset_y = extract_f32(npc_value, "render_offset_y").unwrap_or(0.0);
+                        let render_offset_y =
+                            extract_f32(npc_value, "render_offset_y").unwrap_or(0.0);
 
                         if let Some(npc) = state.npcs.get_mut(&id) {
                             // Update existing NPC - interpolate toward new grid position
@@ -611,7 +693,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Chat bubbles only for public/nearby messages
                 if matches!(channel, ChatChannel::Local) {
-                    if let Some((player_id, _)) = state.players.iter().find(|(_, p)| p.name == sender_name) {
+                    if let Some((player_id, _)) =
+                        state.players.iter().find(|(_, p)| p.name == sender_name)
+                    {
                         let player_id = player_id.clone();
                         state.chat_bubbles.retain(|b| b.player_id != player_id);
                         state.chat_bubbles.push(ChatBubble {
@@ -651,7 +735,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "playerAttack" => {
             if let Some(value) = data {
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
-                let attack_type = extract_string(value, "attack_type").unwrap_or_else(|| "melee".to_string());
+                let attack_type =
+                    extract_string(value, "attack_type").unwrap_or_else(|| "melee".to_string());
 
                 // Trigger attack animation for remote players (local player handles own animation)
                 if state.local_player_id.as_ref() != Some(&player_id) {
@@ -676,7 +761,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let target_y = extract_f32(value, "target_y").unwrap_or(0.0);
                 let projectile = extract_string(value, "projectile");
 
-                log::debug!("Damage event: {} took {} damage from {:?} (HP: {})", target_id, damage, source_id, target_hp);
+                log::debug!(
+                    "Damage event: {} took {} damage from {:?} (HP: {})",
+                    target_id,
+                    damage,
+                    source_id,
+                    target_hp
+                );
 
                 // Trigger attack animation for NPCs (players use playerAttack event)
                 if let Some(ref src_id) = source_id {
@@ -828,7 +919,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "attackResult" => {
             if let Some(value) = data {
-                let success = value.as_map()
+                let success = value
+                    .as_map()
                     .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("success")))
                     .and_then(|(_, v)| v.as_bool())
                     .unwrap_or(false);
@@ -850,8 +942,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let total_xp = extract_i32(value, "total_xp").unwrap_or(0) as i64;
                 let level = extract_i32(value, "level").unwrap_or(1);
 
-                log::debug!("Player {} gained {} {} XP (total: {}, level: {})",
-                    player_id, xp_gained, skill_name, total_xp, level);
+                log::debug!(
+                    "Player {} gained {} {} XP (total: {}, level: {})",
+                    player_id,
+                    xp_gained,
+                    skill_name,
+                    total_xp,
+                    level
+                );
 
                 if let Some(player) = state.players.get_mut(&player_id) {
                     // Update the specific skill
@@ -869,9 +967,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     // Create floating XP event and system message for local player
                     if state.local_player_id.as_ref() == Some(&player_id) {
                         // Add system chat message
-                        state.ui_state.chat_messages.push(ChatMessage::system(
-                            format!("+{} {} XP", xp_gained, skill_name)
-                        ));
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push(ChatMessage::system(format!(
+                                "+{} {} XP",
+                                xp_gained, skill_name
+                            )));
 
                         state.skill_xp_events.push(SkillXpEvent {
                             x: player.x,
@@ -884,7 +986,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         // Update XP globes and drop feed
                         if let Some(skill_type) = SkillType::from_str(&skill_name) {
                             let xp_for_next = crate::game::skills::total_xp_for_level(level + 1);
-                            state.xp_globes.on_xp_gain(skill_type, total_xp, xp_for_next, level);
+                            state
+                                .xp_globes
+                                .on_xp_gain(skill_type, total_xp, xp_for_next, level);
                             state.xp_drop_feed.push(skill_type, xp_gained);
                         }
                     }
@@ -971,10 +1075,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.skills.alchemy.level
                         );
                     } else {
-                        log::warn!("skillsSync: player {} not found in state.players", player_id);
+                        log::warn!(
+                            "skillsSync: player {} not found in state.players",
+                            player_id
+                        );
                     }
                 } else {
-                    log::warn!("skillsSync: player_id {} doesn't match local_player_id {:?}", player_id, state.local_player_id);
+                    log::warn!(
+                        "skillsSync: player_id {} doesn't match local_player_id {:?}",
+                        player_id,
+                        state.local_player_id
+                    );
                 }
             }
         }
@@ -985,7 +1096,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let skill_name = extract_string(value, "skill").unwrap_or_default();
                 let new_level = extract_i32(value, "new_level").unwrap_or(1);
 
-                log::info!("Player {} leveled up {} to {}!", player_id, skill_name, new_level);
+                log::info!(
+                    "Player {} leveled up {} to {}!",
+                    player_id,
+                    skill_name,
+                    new_level
+                );
 
                 // Get player position for floating text
                 if let Some(player) = state.players.get_mut(&player_id) {
@@ -1005,9 +1121,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                     // Create floating level up event and system message for local player
                     if state.local_player_id.as_ref() == Some(&player_id) {
-                        state.ui_state.chat_messages.push(ChatMessage::system(
-                            format!("{} leveled up to {}!", skill_name, new_level)
-                        ));
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push(ChatMessage::system(format!(
+                                "{} leveled up to {}!",
+                                skill_name, new_level
+                            )));
                         state.pending_sfx.push("level_up".to_string());
                     }
 
@@ -1022,7 +1142,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         new_level,
                         time: now,
                     });
-
                 }
             }
         }
@@ -1030,7 +1149,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "itemDropped" => {
             if let Some(value) = data {
                 let id = extract_string(value, "id").unwrap_or_default();
-                let item_id = extract_string(value, "item_id").unwrap_or_else(|| "unknown".to_string());
+                let item_id =
+                    extract_string(value, "item_id").unwrap_or_else(|| "unknown".to_string());
                 let x = extract_f32(value, "x").unwrap_or(0.0);
                 let y = extract_f32(value, "y").unwrap_or(0.0);
                 let quantity = extract_i32(value, "quantity").unwrap_or(1);
@@ -1115,8 +1235,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
                         let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
 
-                        if slot_idx < state.inventory.slots.len() && !item_id.is_empty() && quantity > 0 {
-                            state.inventory.slots[slot_idx] = Some(InventorySlot::new(item_id, quantity));
+                        if slot_idx < state.inventory.slots.len()
+                            && !item_id.is_empty()
+                            && quantity > 0
+                        {
+                            state.inventory.slots[slot_idx] =
+                                Some(InventorySlot::new(item_id, quantity));
                         }
                     }
                 }
@@ -1126,7 +1250,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.inventory.gold = gold;
                 }
 
-                log::debug!("Inventory updated: {} gold, {} items",
+                log::debug!(
+                    "Inventory updated: {} gold, {} items",
                     state.inventory.gold,
                     state.inventory.slots.iter().filter(|s| s.is_some()).count()
                 );
@@ -1139,7 +1264,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let slot = extract_u8(value, "slot").unwrap_or(0);
                 let item_id = extract_string(value, "item_id").unwrap_or_default();
                 let effect = extract_string(value, "effect").unwrap_or_default();
-                log::debug!("Item used: slot {} item {} effect {}", slot, item_id, effect);
+                log::debug!(
+                    "Item used: slot {} item {} effect {}",
+                    slot,
+                    item_id,
+                    effect
+                );
             }
         }
 
@@ -1154,9 +1284,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     for layer_value in layers_arr {
                         let layer_type = extract_u8(layer_value, "layerType").unwrap_or(0);
                         let tiles: Vec<u32> = extract_array(layer_value, "tiles")
-                            .map(|arr| arr.iter()
-                                .filter_map(|v| v.as_u64().map(|u| u as u32))
-                                .collect())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_u64().map(|u| u as u32))
+                                    .collect()
+                            })
                             .unwrap_or_default();
                         layers.push((layer_type, tiles));
                     }
@@ -1164,9 +1296,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Parse collision bytes
                 let collision: Vec<u8> = extract_array(value, "collision")
-                    .map(|arr| arr.iter()
-                        .filter_map(|v| v.as_u64().map(|u| u as u8))
-                        .collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|u| u as u8))
+                            .collect()
+                    })
                     .unwrap_or_default();
 
                 // Parse map objects
@@ -1178,7 +1312,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let tile_y = obj_value["tileY"].as_i64().unwrap_or(0) as i32;
                         let width = obj_value["width"].as_u64().unwrap_or(0) as u32;
                         let height = obj_value["height"].as_u64().unwrap_or(0) as u32;
-                        log::info!("CLIENT received object gid {} at WORLD tile ({}, {})", gid, tile_x, tile_y);
+                        log::info!(
+                            "CLIENT received object gid {} at WORLD tile ({}, {})",
+                            gid,
+                            tile_x,
+                            tile_y
+                        );
                         objects.push(MapObject {
                             gid,
                             tile_x,
@@ -1201,7 +1340,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             "right" => WallEdge::Right,
                             _ => WallEdge::Down,
                         };
-                        walls.push(Wall { gid, tile_x, tile_y, edge });
+                        walls.push(Wall {
+                            gid,
+                            tile_x,
+                            tile_y,
+                            edge,
+                        });
                     }
                 }
 
@@ -1231,7 +1375,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 log::debug!("Received chunk data: ({}, {}) with {} layers, {} collision bytes, {} objects, {} walls, {} portals",
                     chunk_x, chunk_y, layers.len(), collision.len(), objects.len(), walls.len(), portals.len());
 
-                state.chunk_manager.load_chunk(chunk_x, chunk_y, layers, &collision, objects, walls, portals);
+                state.chunk_manager.load_chunk(
+                    chunk_x, chunk_y, layers, &collision, objects, walls, portals,
+                );
             }
         }
 
@@ -1244,7 +1390,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         }
 
         // ========== Quest System Messages ==========
-
         "showDialogue" => {
             if let Some(value) = data {
                 let quest_id = extract_string(value, "quest_id").unwrap_or_default();
@@ -1258,13 +1403,24 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     for choice_value in choices_arr {
                         let id = extract_string(choice_value, "id").unwrap_or_default();
                         let choice_text = extract_string(choice_value, "text").unwrap_or_default();
-                        choices.push(DialogueChoice { id, text: choice_text });
+                        choices.push(DialogueChoice {
+                            id,
+                            text: choice_text,
+                        });
                     }
                 }
 
-                log::info!("Showing dialogue from {}: {} ({} choices)", speaker, text, choices.len());
+                log::info!(
+                    "Showing dialogue from {}: {} ({} choices)",
+                    speaker,
+                    text,
+                    choices.len()
+                );
 
-                let already_open = state.ui_state.active_dialogue.as_ref()
+                let already_open = state
+                    .ui_state
+                    .active_dialogue
+                    .as_ref()
                     .map(|d| d.npc_id == npc_id)
                     .unwrap_or(false);
 
@@ -1287,9 +1443,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             "adventurer_tier_1" => Some((0, 0)),
                             "adventurer_tier_2" => Some((0, 1)),
                             "adventurer_tier_3" => Some((0, 2)),
-                            "skilling_tier_1" | "woodcutting_tier_1" | "fishing_tier_1" | "alchemy_tier_1" => Some((1, 0)),
-                            "skilling_tier_2" | "woodcutting_tier_2" | "fishing_tier_2" | "alchemy_tier_2" => Some((1, 1)),
-                            "skilling_tier_3" | "woodcutting_tier_3" | "fishing_tier_3" | "alchemy_tier_3" => Some((1, 2)),
+                            "skilling_tier_1" | "woodcutting_tier_1" | "fishing_tier_1"
+                            | "alchemy_tier_1" => Some((1, 0)),
+                            "skilling_tier_2" | "woodcutting_tier_2" | "fishing_tier_2"
+                            | "alchemy_tier_2" => Some((1, 1)),
+                            "skilling_tier_3" | "woodcutting_tier_3" | "fishing_tier_3"
+                            | "alchemy_tier_3" => Some((1, 2)),
                             _ => None,
                         };
                         if let Some((tab_idx, tier_idx)) = selected {
@@ -1316,7 +1475,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if let Some(obj_arr) = extract_array(value, "objectives") {
                     for obj_value in obj_arr {
                         let id = extract_string(obj_value, "id").unwrap_or_default();
-                        let description = extract_string(obj_value, "description").unwrap_or_default();
+                        let description =
+                            extract_string(obj_value, "description").unwrap_or_default();
                         let current = extract_i32(obj_value, "current").unwrap_or(0);
                         let target = extract_i32(obj_value, "target").unwrap_or(1);
                         objectives.push(QuestObjective {
@@ -1332,7 +1492,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 log::info!("Quest accepted: {} - {}", quest_id, quest_name);
 
                 // Add to active quests (or update if exists)
-                if let Some(existing) = state.ui_state.active_quests.iter_mut().find(|q| q.id == quest_id) {
+                if let Some(existing) = state
+                    .ui_state
+                    .active_quests
+                    .iter_mut()
+                    .find(|q| q.id == quest_id)
+                {
                     existing.objectives = objectives;
                 } else {
                     state.ui_state.active_quests.push(ActiveQuest {
@@ -1368,10 +1533,21 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let current = extract_i32(value, "current").unwrap_or(0);
                 let target = extract_i32(value, "target").unwrap_or(1);
 
-                log::debug!("Quest objective progress: {}:{} = {}/{}", quest_id, objective_id, current, target);
+                log::debug!(
+                    "Quest objective progress: {}:{} = {}/{}",
+                    quest_id,
+                    objective_id,
+                    current,
+                    target
+                );
 
                 // Update the objective in the active quest
-                if let Some(quest) = state.ui_state.active_quests.iter_mut().find(|q| q.id == quest_id) {
+                if let Some(quest) = state
+                    .ui_state
+                    .active_quests
+                    .iter_mut()
+                    .find(|q| q.id == quest_id)
+                {
                     if let Some(obj) = quest.objectives.iter_mut().find(|o| o.id == objective_id) {
                         obj.current = current;
                         obj.target = target;
@@ -1389,12 +1565,22 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let gold_reward = extract_i32(value, "rewards_gold").unwrap_or(0);
                 let completed_id = quest_id.clone();
 
-                log::info!("Quest completed: {} - {} (EXP: {}, Gold: {})", quest_id, quest_name, exp_reward, gold_reward);
+                log::info!(
+                    "Quest completed: {} - {} (EXP: {}, Gold: {})",
+                    quest_id,
+                    quest_name,
+                    exp_reward,
+                    gold_reward
+                );
 
                 // Add system chat message
-                state.ui_state.chat_messages.push(ChatMessage::system(
-                    format!("Quest '{}' complete!", quest_name)
-                ));
+                state
+                    .ui_state
+                    .chat_messages
+                    .push(ChatMessage::system(format!(
+                        "Quest '{}' complete!",
+                        quest_name
+                    )));
 
                 // Remove from active quests
                 state.ui_state.active_quests.retain(|q| q.id != quest_id);
@@ -1403,13 +1589,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.pending_sfx.push("quest_complete".to_string());
 
                 // Add completion notification
-                state.ui_state.quest_completed_events.push(QuestCompletedEvent {
-                    quest_id,
-                    quest_name,
-                    exp_reward,
-                    gold_reward,
-                    time: macroquad::time::get_time(),
-                });
+                state
+                    .ui_state
+                    .quest_completed_events
+                    .push(QuestCompletedEvent {
+                        quest_id,
+                        quest_name,
+                        exp_reward,
+                        gold_reward,
+                        time: macroquad::time::get_time(),
+                    });
                 state.ui_state.completed_quest_ids.insert(completed_id);
 
                 // Keep Adventurer Guide UI open and reset it after completion.
@@ -1427,7 +1616,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         }
 
         // ========== Item Definition Messages ==========
-
         "itemDefinitions" => {
             if let Some(value) = data {
                 let mut items = Vec::new();
@@ -1435,29 +1623,52 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if let Some(items_arr) = extract_array(value, "items") {
                     for item_value in items_arr {
                         let id = extract_string(item_value, "id").unwrap_or_default();
-                        let display_name = extract_string(item_value, "displayName").unwrap_or_default();
+                        let display_name =
+                            extract_string(item_value, "displayName").unwrap_or_default();
                         let sprite = extract_string(item_value, "sprite").unwrap_or_default();
-                        let category = extract_string(item_value, "category").unwrap_or_else(|| "material".to_string());
+                        let category = extract_string(item_value, "category")
+                            .unwrap_or_else(|| "material".to_string());
                         let max_stack = extract_i32(item_value, "maxStack").unwrap_or(99);
-                        let description = extract_string(item_value, "description").unwrap_or_default();
+                        let description =
+                            extract_string(item_value, "description").unwrap_or_default();
                         let base_price = extract_i32(item_value, "basePrice").unwrap_or(0);
                         let sellable = extract_bool(item_value, "sellable").unwrap_or(false);
 
                         // Parse equipment stats if present
-                        let equipment = extract_string(item_value, "equipment_slot")
-                            .map(|slot_type| {
-                                let chop_speed = extract_f32(item_value, "chop_speed_multiplier").unwrap_or(0.0);
+                        let equipment =
+                            extract_string(item_value, "equipment_slot").map(|slot_type| {
+                                let chop_speed =
+                                    extract_f32(item_value, "chop_speed_multiplier").unwrap_or(0.0);
                                 if chop_speed > 0.0 {
-                                    log::info!("Loaded item {} with chop_speed_multiplier={}", id, chop_speed);
+                                    log::info!(
+                                        "Loaded item {} with chop_speed_multiplier={}",
+                                        id,
+                                        chop_speed
+                                    );
                                 }
                                 EquipmentStats {
                                     slot_type,
-                                    attack_level_required: extract_i32(item_value, "attack_level_required").unwrap_or(1),
-                                    defence_level_required: extract_i32(item_value, "defence_level_required").unwrap_or(1),
-                                    attack_bonus: extract_i32(item_value, "attack_bonus").unwrap_or(0),
-                                    strength_bonus: extract_i32(item_value, "strength_bonus").unwrap_or(0),
-                                    defence_bonus: extract_i32(item_value, "defence_bonus").unwrap_or(0),
-                                    woodcutting_level_required: extract_i32(item_value, "woodcutting_level_required").unwrap_or(1),
+                                    attack_level_required: extract_i32(
+                                        item_value,
+                                        "attack_level_required",
+                                    )
+                                    .unwrap_or(1),
+                                    defence_level_required: extract_i32(
+                                        item_value,
+                                        "defence_level_required",
+                                    )
+                                    .unwrap_or(1),
+                                    attack_bonus: extract_i32(item_value, "attack_bonus")
+                                        .unwrap_or(0),
+                                    strength_bonus: extract_i32(item_value, "strength_bonus")
+                                        .unwrap_or(0),
+                                    defence_bonus: extract_i32(item_value, "defence_bonus")
+                                        .unwrap_or(0),
+                                    woodcutting_level_required: extract_i32(
+                                        item_value,
+                                        "woodcutting_level_required",
+                                    )
+                                    .unwrap_or(1),
                                     chop_speed_multiplier: chop_speed,
                                 }
                             });
@@ -1488,7 +1699,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         }
 
         // ========== Crafting System Messages ==========
-
         "recipeDefinitions" => {
             if let Some(value) = data {
                 state.recipe_definitions.clear();
@@ -1496,23 +1706,34 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if let Some(recipes_arr) = extract_array(value, "recipes") {
                     for recipe_value in recipes_arr {
                         let id = extract_string(recipe_value, "id").unwrap_or_default();
-                        let display_name = extract_string(recipe_value, "display_name").unwrap_or_default();
-                        let description = extract_string(recipe_value, "description").unwrap_or_default();
-                        let category = extract_string(recipe_value, "category").unwrap_or_else(|| "consumables".to_string());
-                        let level_required = extract_i32(recipe_value, "level_required").unwrap_or(1);
+                        let display_name =
+                            extract_string(recipe_value, "display_name").unwrap_or_default();
+                        let description =
+                            extract_string(recipe_value, "description").unwrap_or_default();
+                        let category = extract_string(recipe_value, "category")
+                            .unwrap_or_else(|| "consumables".to_string());
+                        let level_required =
+                            extract_i32(recipe_value, "level_required").unwrap_or(1);
                         let station = extract_string(recipe_value, "station");
                         let craft_time_ms = extract_u64(recipe_value, "craft_time_ms").unwrap_or(0);
                         let xp = extract_u32(recipe_value, "xp").unwrap_or(0);
-                        let requires_discovery = extract_bool(recipe_value, "requires_discovery").unwrap_or(false);
+                        let requires_discovery =
+                            extract_bool(recipe_value, "requires_discovery").unwrap_or(false);
 
                         // Parse ingredients
                         let mut ingredients = Vec::new();
                         if let Some(ing_arr) = extract_array(recipe_value, "ingredients") {
                             for ing_value in ing_arr {
-                                let item_id = extract_string(ing_value, "item_id").unwrap_or_default();
-                                let item_name = extract_string(ing_value, "item_name").unwrap_or_default();
+                                let item_id =
+                                    extract_string(ing_value, "item_id").unwrap_or_default();
+                                let item_name =
+                                    extract_string(ing_value, "item_name").unwrap_or_default();
                                 let count = extract_i32(ing_value, "count").unwrap_or(1);
-                                ingredients.push(RecipeIngredient { item_id, item_name, count });
+                                ingredients.push(RecipeIngredient {
+                                    item_id,
+                                    item_name,
+                                    count,
+                                });
                             }
                         }
 
@@ -1520,10 +1741,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let mut results = Vec::new();
                         if let Some(res_arr) = extract_array(recipe_value, "results") {
                             for res_value in res_arr {
-                                let item_id = extract_string(res_value, "item_id").unwrap_or_default();
-                                let item_name = extract_string(res_value, "item_name").unwrap_or_default();
+                                let item_id =
+                                    extract_string(res_value, "item_id").unwrap_or_default();
+                                let item_name =
+                                    extract_string(res_value, "item_name").unwrap_or_default();
                                 let count = extract_i32(res_value, "count").unwrap_or(1);
-                                results.push(RecipeResult { item_id, item_name, count });
+                                results.push(RecipeResult {
+                                    item_id,
+                                    item_name,
+                                    count,
+                                });
                             }
                         }
 
@@ -1543,7 +1770,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
-                log::info!("Received {} recipe definitions", state.recipe_definitions.len());
+                log::info!(
+                    "Received {} recipe definitions",
+                    state.recipe_definitions.len()
+                );
             }
         }
 
@@ -1561,7 +1791,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "craftResult" => {
             if let Some(value) = data {
-                let success = value.as_map()
+                let success = value
+                    .as_map()
                     .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("success")))
                     .and_then(|(_, v)| v.as_bool())
                     .unwrap_or(false);
@@ -1574,9 +1805,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 } else {
                     log::warn!("Crafting failed: {} - {:?}", recipe_id, error);
                     if let Some(err) = error {
-                        state.ui_state.chat_messages.push(ChatMessage::system(
-                            format!("Crafting failed: {}", err)
-                        ));
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push(ChatMessage::system(format!("Crafting failed: {}", err)));
                     }
                 }
             }
@@ -1591,7 +1823,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             state.discovered_recipes.insert(recipe_id.to_string());
                         }
                     }
-                    log::info!("Received {} discovered recipes", state.discovered_recipes.len());
+                    log::info!(
+                        "Received {} discovered recipes",
+                        state.discovered_recipes.len()
+                    );
                 }
             }
         }
@@ -1603,14 +1838,20 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.discovered_recipes.insert(recipe_id.clone());
 
                     // Look up display name from recipe definitions
-                    let display_name = state.recipe_definitions.iter()
+                    let display_name = state
+                        .recipe_definitions
+                        .iter()
                         .find(|r| r.id == recipe_id)
                         .map(|r| r.display_name.clone())
                         .unwrap_or_else(|| recipe_id.clone());
 
-                    state.ui_state.chat_messages.push(ChatMessage::system(
-                        format!("Recipe learned: {}", display_name)
-                    ));
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!(
+                            "Recipe learned: {}",
+                            display_name
+                        )));
                     log::info!("Recipe discovered: {}", recipe_id);
                 }
             }
@@ -1641,9 +1882,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.crafting_progress = 0.0;
 
                 if !reason.is_empty() {
-                    state.ui_state.chat_messages.push(ChatMessage::system(
-                        format!("Crafting cancelled: {}", reason)
-                    ));
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!(
+                            "Crafting cancelled: {}",
+                            reason
+                        )));
                 }
             }
         }
@@ -1665,33 +1910,44 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.crafting_complete_animation = Some((recipe_id.clone(), 0.0));
 
                 // Look up display name from recipe definitions
-                let display_name = state.recipe_definitions.iter()
+                let display_name = state
+                    .recipe_definitions
+                    .iter()
                     .find(|r| r.id == recipe_id)
                     .map(|r| r.display_name.clone())
                     .unwrap_or_else(|| recipe_id.clone());
 
-                state.ui_state.chat_messages.push(ChatMessage::system(
-                    format!("Crafted: {}", display_name)
-                ));
+                state
+                    .ui_state
+                    .chat_messages
+                    .push(ChatMessage::system(format!("Crafted: {}", display_name)));
 
                 // Inventory update and XP will come via separate messages
             }
         }
 
         // ========== Equipment Messages ==========
-
         "equipmentUpdate" => {
             if let Some(value) = data {
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
-                let equipped_head = extract_string(value, "equipped_head").filter(|s| !s.is_empty());
-                let equipped_body = extract_string(value, "equipped_body").filter(|s| !s.is_empty());
-                let equipped_weapon = extract_string(value, "equipped_weapon").filter(|s| !s.is_empty());
-                let equipped_back = extract_string(value, "equipped_back").filter(|s| !s.is_empty());
-                let equipped_feet = extract_string(value, "equipped_feet").filter(|s| !s.is_empty());
-                let equipped_ring = extract_string(value, "equipped_ring").filter(|s| !s.is_empty());
-                let equipped_gloves = extract_string(value, "equipped_gloves").filter(|s| !s.is_empty());
-                let equipped_necklace = extract_string(value, "equipped_necklace").filter(|s| !s.is_empty());
-                let equipped_belt = extract_string(value, "equipped_belt").filter(|s| !s.is_empty());
+                let equipped_head =
+                    extract_string(value, "equipped_head").filter(|s| !s.is_empty());
+                let equipped_body =
+                    extract_string(value, "equipped_body").filter(|s| !s.is_empty());
+                let equipped_weapon =
+                    extract_string(value, "equipped_weapon").filter(|s| !s.is_empty());
+                let equipped_back =
+                    extract_string(value, "equipped_back").filter(|s| !s.is_empty());
+                let equipped_feet =
+                    extract_string(value, "equipped_feet").filter(|s| !s.is_empty());
+                let equipped_ring =
+                    extract_string(value, "equipped_ring").filter(|s| !s.is_empty());
+                let equipped_gloves =
+                    extract_string(value, "equipped_gloves").filter(|s| !s.is_empty());
+                let equipped_necklace =
+                    extract_string(value, "equipped_necklace").filter(|s| !s.is_empty());
+                let equipped_belt =
+                    extract_string(value, "equipped_belt").filter(|s| !s.is_empty());
 
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.equipped_head = equipped_head.clone();
@@ -1710,7 +1966,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "equipResult" => {
             if let Some(value) = data {
-                let success = value.as_map()
+                let success = value
+                    .as_map()
                     .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("success")))
                     .and_then(|(_, v)| v.as_bool())
                     .unwrap_or(false);
@@ -1728,15 +1985,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         }
 
         // ========== Admin Messages ==========
-
         "announcement" => {
             if let Some(value) = data {
                 let text = extract_string(value, "text").unwrap_or_default();
                 log::info!("Server announcement: {}", text);
-                state.ui_state.announcements.push(crate::game::Announcement {
-                    text,
-                    time: macroquad::time::get_time(),
-                });
+                state
+                    .ui_state
+                    .announcements
+                    .push(crate::game::Announcement {
+                        text,
+                        time: macroquad::time::get_time(),
+                    });
                 state.pending_sfx.push("announce".to_string());
             }
         }
@@ -1744,7 +2003,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         // ========== Shop System Messages ==========
 
         // ========== Bank System Messages ==========
-
         "bankOpen" => {
             if let Some(value) = data {
                 let mut slots = Vec::new();
@@ -1761,7 +2019,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let gold = extract_i32(value, "gold").unwrap_or(0);
                 let max_slots = extract_i32(value, "max_slots").unwrap_or(48) as u32;
 
-                log::info!("Bank opened: {} items, {}g, {} max slots", slots.len(), gold, max_slots);
+                log::info!(
+                    "Bank opened: {} items, {}g, {} max slots",
+                    slots.len(),
+                    gold,
+                    max_slots
+                );
                 state.ui_state.bank_open = true;
                 state.ui_state.bank_slots = vec![None; max_slots as usize];
                 for (slot, item_id, quantity) in slots {
@@ -1784,13 +2047,15 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let slot = extract_i32(slot_value, "slot").unwrap_or(0) as u8;
                         let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
                         let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
-                        if !item_id.is_empty() && quantity > 0 && (slot as usize) < new_slots.len() {
+                        if !item_id.is_empty() && quantity > 0 && (slot as usize) < new_slots.len()
+                        {
                             new_slots[slot as usize] = Some((item_id, quantity));
                         }
                     }
                 }
                 state.ui_state.bank_slots = new_slots;
-                state.ui_state.bank_gold = extract_i32(value, "gold").unwrap_or(state.ui_state.bank_gold);
+                state.ui_state.bank_gold =
+                    extract_i32(value, "gold").unwrap_or(state.ui_state.bank_gold);
             }
         }
 
@@ -1801,9 +2066,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 if !success {
                     if let Some(err) = error {
-                        state.ui_state.chat_messages.push(ChatMessage::system(
-                            format!("Bank: {}", err)
-                        ));
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push(ChatMessage::system(format!("Bank: {}", err)));
                     }
                 }
             }
@@ -1815,7 +2081,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let npc_id = extract_string(value, "npcId").unwrap_or_default();
 
                 // Extract shop data from nested "shop" field
-                let shop_value = value.as_map()
+                let shop_value = value
+                    .as_map()
                     .and_then(|m| {
                         m.iter()
                             .find(|(k, _)| k.as_str() == Some("shop"))
@@ -1824,7 +2091,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .unwrap_or(value);
 
                 let shop_id = extract_string(shop_value, "shopId").unwrap_or_default();
-                let display_name = extract_string(shop_value, "displayName").unwrap_or_else(|| "Shop".to_string());
+                let display_name =
+                    extract_string(shop_value, "displayName").unwrap_or_else(|| "Shop".to_string());
                 let buy_multiplier = extract_f32(shop_value, "buyMultiplier").unwrap_or(0.5);
                 let sell_multiplier = extract_f32(shop_value, "sellMultiplier").unwrap_or(1.0);
                 let show_crafting = extract_bool(shop_value, "showCrafting").unwrap_or(true);
@@ -1844,7 +2112,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
-                log::info!("Shop data received: {} items from {} (npc: {})", stock.len(), display_name, npc_id);
+                log::info!(
+                    "Shop data received: {} items from {} (npc: {})",
+                    stock.len(),
+                    display_name,
+                    npc_id
+                );
                 state.ui_state.shop_npc_id = Some(npc_id);
                 state.ui_state.shop_data = Some(ShopData {
                     shop_id,
@@ -1862,7 +2135,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "shopResult" => {
             if let Some(value) = data {
-                let success = value.as_map()
+                let success = value
+                    .as_map()
                     .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("success")))
                     .and_then(|(_, v)| v.as_bool())
                     .unwrap_or(false);
@@ -1876,23 +2150,39 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     log::info!("Shop transaction successful");
 
                     // Get item display name from registry
-                    let item_name = state.item_registry.get(&item_id)
+                    let item_name = state
+                        .item_registry
+                        .get(&item_id)
                         .map(|def| def.display_name.clone())
                         .unwrap_or_else(|| item_id.clone());
 
                     // Add system chat message
                     let message = if action == "buy" {
-                        format!("Bought {}x {} for {}g", quantity, item_name, gold_change.abs())
+                        format!(
+                            "Bought {}x {} for {}g",
+                            quantity,
+                            item_name,
+                            gold_change.abs()
+                        )
                     } else {
-                        format!("Sold {}x {} for {}g", quantity, item_name, gold_change.abs())
+                        format!(
+                            "Sold {}x {} for {}g",
+                            quantity,
+                            item_name,
+                            gold_change.abs()
+                        )
                     };
-                    state.ui_state.chat_messages.push(ChatMessage::system(message));
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(message));
                 } else if let Some(err) = error {
                     log::warn!("Shop transaction failed: {}", err);
                     // Show error in system chat
-                    state.ui_state.chat_messages.push(ChatMessage::system(
-                        format!("Transaction failed: {}", err)
-                    ));
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!("Transaction failed: {}", err)));
                 }
             }
         }
@@ -1906,7 +2196,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if let Some(shop_data) = &mut state.ui_state.shop_data {
                     if let Some(item) = shop_data.stock.iter_mut().find(|i| i.item_id == item_id) {
                         item.quantity = new_quantity;
-                        log::debug!("Shop stock updated: {} now has {} in stock", item_id, new_quantity);
+                        log::debug!(
+                            "Shop stock updated: {} now has {} in stock",
+                            item_id,
+                            new_quantity
+                        );
                     }
                 }
             }
@@ -1983,7 +2277,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     for layer_data in layers_arr {
                         let layer_type = extract_u8(layer_data, "layerType").unwrap_or(0);
                         let tiles: Vec<u32> = extract_array(layer_data, "tiles")
-                            .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u32)).collect())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_u64().map(|n| n as u32))
+                                    .collect()
+                            })
                             .unwrap_or_default();
                         layers.push((layer_type, tiles));
                     }
@@ -1991,7 +2289,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Parse collision
                 let collision: Vec<u8> = extract_array(value, "collision")
-                    .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as u8))
+                            .collect()
+                    })
                     .unwrap_or_default();
 
                 // Parse portals
@@ -2061,7 +2363,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 }
 
                 // Load the interior
-                state.chunk_manager.load_interior(width, height, layers, &collision, portals, objects, walls);
+                state
+                    .chunk_manager
+                    .load_interior(width, height, layers, &collision, portals, objects, walls);
                 state.current_interior = Some(map_id.clone());
                 state.current_instance = Some(instance_id);
 
@@ -2147,7 +2451,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let y = extract_i32(m, "y").unwrap_or(0);
                         let zone_id = extract_string(m, "zone_id").unwrap_or_default();
                         let skill = extract_string(m, "skill").unwrap_or_default();
-                        markers.push(GatheringMarker { x, y, zone_id, skill });
+                        markers.push(GatheringMarker {
+                            x,
+                            y,
+                            zone_id,
+                            skill,
+                        });
                     }
                     log::info!("Received {} gathering markers", markers.len());
                     state.gathering_markers = markers;
@@ -2159,7 +2468,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             if let Some(value) = data {
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
                 let zone_id = extract_string(value, "zone_id").unwrap_or_default();
-                log::info!("Gathering started for player {} in zone {}", player_id, zone_id);
+                log::info!(
+                    "Gathering started for player {} in zone {}",
+                    player_id,
+                    zone_id
+                );
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.is_gathering = true;
                     player.gathering_started_at = macroquad::time::get_time();
@@ -2177,9 +2490,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
                 let item_id = extract_string(value, "item_id").unwrap_or_default();
                 let xp_gained = extract_i32(value, "xp_gained").unwrap_or(0) as i64;
-                log::info!("Gathering result: player {} got {} (+{}xp)", player_id, item_id, xp_gained);
+                log::info!(
+                    "Gathering result: player {} got {} (+{}xp)",
+                    player_id,
+                    item_id,
+                    xp_gained
+                );
                 if state.local_player_id.as_deref() == Some(&player_id) {
-                    let item_name = state.item_registry.get(&item_id)
+                    let item_name = state
+                        .item_registry
+                        .get(&item_id)
                         .map(|d| d.display_name.clone())
                         .unwrap_or(item_id.clone());
                     // Add XP event for floating text
@@ -2193,9 +2513,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         });
                     }
                     // Add chat message about the catch
-                    state.ui_state.chat_messages.push(ChatMessage::system(
-                        format!("You caught a {}!", item_name)
-                    ));
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!("You caught a {}!", item_name)));
                 }
             }
         }
@@ -2211,9 +2532,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.is_gathering = false;
                     if reason == "inventory_full" {
-                        state.ui_state.chat_messages.push(ChatMessage::system(
-                            "Your inventory is full!".to_string()
-                        ));
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push(ChatMessage::system("Your inventory is full!".to_string()));
                     }
                 }
             }
@@ -2224,10 +2546,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let x = extract_i32(value, "x").unwrap_or(0);
                 let y = extract_i32(value, "y").unwrap_or(0);
                 let zone_id = extract_string(value, "zone_id").unwrap_or_default();
-                let telegraph_duration = extract_u64(value, "telegraph_duration").unwrap_or(5) as f64;
+                let telegraph_duration =
+                    extract_u64(value, "telegraph_duration").unwrap_or(5) as f64;
                 log::info!("Bonus tile spawned at ({}, {}) in zone {}", x, y, zone_id);
                 state.bonus_tiles.push(BonusTile {
-                    x, y, zone_id,
+                    x,
+                    y,
+                    zone_id,
                     spawn_time: macroquad::time::get_time(),
                     telegraph_duration,
                 });
@@ -2244,7 +2569,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.bonus_tiles.retain(|t| t.x != x || t.y != y);
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.ui_state.chat_messages.push(ChatMessage::system(
-                        "You claimed the bonus spot! 2x gathering speed for 30s!".to_string()
+                        "You claimed the bonus spot! 2x gathering speed for 30s!".to_string(),
                     ));
                 }
             }
@@ -2264,7 +2589,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
                 let buff_type = extract_string(value, "buff_type").unwrap_or_default();
                 let duration = extract_u64(value, "duration").unwrap_or(30) as f64;
-                log::info!("Buff {} applied to player {} for {}s", buff_type, player_id, duration);
+                log::info!(
+                    "Buff {} applied to player {} for {}s",
+                    buff_type,
+                    player_id,
+                    duration
+                );
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.gathering_buff = Some(GatheringBuff {
                         buff_type,
@@ -2289,7 +2619,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         // =====================================================================
         // Woodcutting Messages
         // =====================================================================
-
         "woodcuttingSwing" => {
             if let Some(value) = data {
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
@@ -2297,7 +2626,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let tree_y = extract_i32(value, "tree_y").unwrap_or(0);
 
                 // Server says player swung - play attack animation and sound
-                let has_weapon = state.players.get(&player_id)
+                let has_weapon = state
+                    .players
+                    .get(&player_id)
                     .map(|p| p.equipped_weapon.is_some())
                     .unwrap_or(false);
                 if let Some(player) = state.players.get_mut(&player_id) {
@@ -2309,17 +2640,21 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.pending_sfx.push("woodcut".to_string());
 
                 // Add tree shake effect
-                state.tree_shake_effects.push(
-                    crate::game::state::TreeShakeEffect::new(tree_x, tree_y)
-                );
+                state
+                    .tree_shake_effects
+                    .push(crate::game::state::TreeShakeEffect::new(tree_x, tree_y));
 
                 // Spawn leaf particles at the top of the tree
                 // Tree sprites are typically ~64-80 pixels tall
                 let tree_height = 60.0;
                 for _ in 0..3 {
-                    state.leaf_particles.push(
-                        crate::game::state::LeafParticle::new_at_tree(tree_x, tree_y, tree_height)
-                    );
+                    state
+                        .leaf_particles
+                        .push(crate::game::state::LeafParticle::new_at_tree(
+                            tree_x,
+                            tree_y,
+                            tree_height,
+                        ));
                 }
             }
         }
@@ -2334,14 +2669,20 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // This handler just shows the item feedback
 
                 if state.local_player_id.as_deref() == Some(player_id.as_str()) {
-                    let item_name = state.item_registry.get(&item_id)
+                    let item_name = state
+                        .item_registry
+                        .get(&item_id)
                         .map(|d| d.display_name.clone())
                         .unwrap_or(item_id.clone());
 
                     // Add chat message about the chop
-                    state.ui_state.chat_messages.push(ChatMessage::system(
-                        format!("You chopped some {}!", item_name)
-                    ));
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!(
+                            "You chopped some {}!",
+                            item_name
+                        )));
                 }
             }
         }
@@ -2353,27 +2694,39 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let gid = extract_u32(value, "gid").unwrap_or(0);
                 let respawn_delay_ms = extract_u64(value, "respawn_delay_ms").unwrap_or(7500);
                 let now = macroquad::time::get_time();
-                log::info!("Tree depleted at ({}, {}), respawn in {}ms", x, y, respawn_delay_ms);
+                log::info!(
+                    "Tree depleted at ({}, {}), respawn in {}ms",
+                    x,
+                    y,
+                    respawn_delay_ms
+                );
 
                 // Add falling tree effect
-                state.falling_trees.push(
-                    crate::game::state::FallingTreeEffect::new(x, y, gid)
-                );
+                state
+                    .falling_trees
+                    .push(crate::game::state::FallingTreeEffect::new(x, y, gid));
 
                 // Spawn a burst of leaves when tree falls
                 let tree_height = 60.0;
                 for _ in 0..10 {
-                    state.leaf_particles.push(
-                        crate::game::state::LeafParticle::new_at_tree(x, y, tree_height)
-                    );
+                    state
+                        .leaf_particles
+                        .push(crate::game::state::LeafParticle::new_at_tree(
+                            x,
+                            y,
+                            tree_height,
+                        ));
                 }
 
                 // Mark tree as depleted (hides the static tree, shows respawn timer)
-                state.depleted_trees.insert((x, y), crate::game::state::DepletedTreeInfo {
-                    gid,
-                    depleted_at: now,
-                    respawn_at: now + (respawn_delay_ms as f64 / 1000.0),
-                });
+                state.depleted_trees.insert(
+                    (x, y),
+                    crate::game::state::DepletedTreeInfo {
+                        gid,
+                        depleted_at: now,
+                        respawn_at: now + (respawn_delay_ms as f64 / 1000.0),
+                    },
+                );
             }
         }
 
@@ -2396,11 +2749,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let y = extract_i32(tree, "y").unwrap_or(0);
                         let gid = extract_u32(tree, "gid").unwrap_or(0);
                         // For sync, we don't know exact respawn time, use a short default
-                        state.depleted_trees.insert((x, y), crate::game::state::DepletedTreeInfo {
-                            gid,
-                            depleted_at: now,
-                            respawn_at: now + 5.0, // Default 5 seconds remaining
-                        });
+                        state.depleted_trees.insert(
+                            (x, y),
+                            crate::game::state::DepletedTreeInfo {
+                                gid,
+                                depleted_at: now,
+                                respawn_at: now + 5.0, // Default 5 seconds remaining
+                            },
+                        );
                     }
                     log::info!("Synced {} depleted trees", state.depleted_trees.len());
                 }
@@ -2416,24 +2772,31 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let patch_id = extract_string(p, "patch_id").unwrap_or_default();
                         let x = extract_i32(p, "x").unwrap_or(0);
                         let y = extract_i32(p, "y").unwrap_or(0);
-                        let patch_state = extract_string(p, "state").unwrap_or_else(|| "empty".to_string());
+                        let patch_state =
+                            extract_string(p, "state").unwrap_or_else(|| "empty".to_string());
                         let crop_id = extract_string(p, "crop_id").unwrap_or_default();
                         let growth_stage = extract_u32(p, "growth_stage").unwrap_or(0);
                         let owner_id = extract_string(p, "owner_id").unwrap_or_default();
-                        state.farming_patch_positions.insert((x, y), patch_id.clone());
-                        state.farming_patches.insert(patch_id.clone(), FarmingPatch {
-                            patch_id,
-                            x,
-                            y,
-                            state: patch_state,
-                            crop_id,
-                            growth_stage,
-                            owner_id,
-                        });
+                        state
+                            .farming_patch_positions
+                            .insert((x, y), patch_id.clone());
+                        state.farming_patches.insert(
+                            patch_id.clone(),
+                            FarmingPatch {
+                                patch_id,
+                                x,
+                                y,
+                                state: patch_state,
+                                crop_id,
+                                growth_stage,
+                                owner_id,
+                            },
+                        );
                     }
                     // Parse unlocked plots
                     if let Some(plots_arr) = extract_array(value, "unlocked_plots") {
-                        state.unlocked_farming_plots = plots_arr.iter()
+                        state.unlocked_farming_plots = plots_arr
+                            .iter()
                             .filter_map(|v| v.as_u64().map(|u| u as u32))
                             .collect();
                     } else {
@@ -2451,7 +2814,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         }
                     }
 
-                    log::info!("Received {} farming patches, {} tile overrides", state.farming_patches.len(), state.ground_tile_overrides.len());
+                    log::info!(
+                        "Received {} farming patches, {} tile overrides",
+                        state.farming_patches.len(),
+                        state.ground_tile_overrides.len()
+                    );
                 }
             }
         }
@@ -2459,7 +2826,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "patchStateUpdate" => {
             if let Some(value) = data {
                 let patch_id = extract_string(value, "patch_id").unwrap_or_default();
-                let patch_state = extract_string(value, "state").unwrap_or_else(|| "empty".to_string());
+                let patch_state =
+                    extract_string(value, "state").unwrap_or_else(|| "empty".to_string());
                 let crop_id = extract_string(value, "crop_id").unwrap_or_default();
                 let growth_stage = extract_u32(value, "growth_stage").unwrap_or(0);
                 let owner_id = extract_string(value, "owner_id").unwrap_or_default();
@@ -2496,7 +2864,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         // =====================================================================
         // Friend System Messages
         // =====================================================================
-
         "friendsList" => {
             if let Some(value) = data {
                 if let Some(friends_array) = extract_array(value, "friends") {
@@ -2512,14 +2879,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         });
                     }
                     // Sort: online friends first, then alphabetical
-                    state.social_state.friends.sort_by(|a, b| {
-                        match (a.online, b.online) {
+                    state
+                        .social_state
+                        .friends
+                        .sort_by(|a, b| match (a.online, b.online) {
                             (true, false) => std::cmp::Ordering::Less,
                             (false, true) => std::cmp::Ordering::Greater,
                             _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                        }
-                    });
-                    log::info!("Received friends list: {} friends", state.social_state.friends.len());
+                        });
+                    log::info!(
+                        "Received friends list: {} friends",
+                        state.social_state.friends.len()
+                    );
                 }
             }
         }
@@ -2531,13 +2902,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     for req_value in requests_array {
                         let from_id = extract_i32(req_value, "from_id").unwrap_or(0) as i64;
                         let from_name = extract_string(req_value, "from_name").unwrap_or_default();
-                        state.social_state.pending_requests.push(crate::game::PendingRequestInfo {
-                            from_id,
-                            from_name,
-                        });
+                        state
+                            .social_state
+                            .pending_requests
+                            .push(crate::game::PendingRequestInfo { from_id, from_name });
                     }
-                    state.social_state.pending_request_count = state.social_state.pending_requests.len();
-                    log::info!("Received {} pending friend requests", state.social_state.pending_request_count);
+                    state.social_state.pending_request_count =
+                        state.social_state.pending_requests.len();
+                    log::info!(
+                        "Received {} pending friend requests",
+                        state.social_state.pending_request_count
+                    );
                 }
             }
         }
@@ -2550,17 +2925,24 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let id = extract_i32(player_value, "id").unwrap_or(0) as i64;
                         let name = extract_string(player_value, "name").unwrap_or_default();
                         let is_friend = extract_bool(player_value, "is_friend").unwrap_or(false);
-                        state.social_state.online_players.push(crate::game::OnlinePlayerInfo {
-                            id,
-                            name,
-                            is_friend,
-                        });
+                        state
+                            .social_state
+                            .online_players
+                            .push(crate::game::OnlinePlayerInfo {
+                                id,
+                                name,
+                                is_friend,
+                            });
                     }
                     // Sort alphabetically
-                    state.social_state.online_players.sort_by(|a, b| {
-                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
-                    });
-                    log::info!("Received online players list: {} players", state.social_state.online_players.len());
+                    state
+                        .social_state
+                        .online_players
+                        .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                    log::info!(
+                        "Received online players list: {} players",
+                        state.social_state.online_players.len()
+                    );
                 }
             }
         }
@@ -2571,12 +2953,21 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let from_name = extract_string(value, "from_name").unwrap_or_default();
 
                 // Add to pending requests if not already there
-                if !state.social_state.pending_requests.iter().any(|r| r.from_id == from_id) {
-                    state.social_state.pending_requests.push(crate::game::PendingRequestInfo {
-                        from_id,
-                        from_name: from_name.clone(),
-                    });
-                    state.social_state.pending_request_count = state.social_state.pending_requests.len();
+                if !state
+                    .social_state
+                    .pending_requests
+                    .iter()
+                    .any(|r| r.from_id == from_id)
+                {
+                    state
+                        .social_state
+                        .pending_requests
+                        .push(crate::game::PendingRequestInfo {
+                            from_id,
+                            from_name: from_name.clone(),
+                        });
+                    state.social_state.pending_request_count =
+                        state.social_state.pending_requests.len();
                 }
                 log::info!("Received friend request from {}", from_name);
             }
@@ -2595,13 +2986,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         online: true, // They just accepted, so they're online
                     });
                     // Re-sort friends list
-                    state.social_state.friends.sort_by(|a, b| {
-                        match (a.online, b.online) {
+                    state
+                        .social_state
+                        .friends
+                        .sort_by(|a, b| match (a.online, b.online) {
                             (true, false) => std::cmp::Ordering::Less,
                             (false, true) => std::cmp::Ordering::Greater,
                             _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                        }
-                    });
+                        });
                 }
                 log::info!("Friend request accepted by {}", friend_name);
             }
@@ -2628,19 +3020,29 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let online = extract_bool(value, "online").unwrap_or(false);
 
                 // Update friend's online status
-                if let Some(friend) = state.social_state.friends.iter_mut().find(|f| f.id == friend_id) {
+                if let Some(friend) = state
+                    .social_state
+                    .friends
+                    .iter_mut()
+                    .find(|f| f.id == friend_id)
+                {
                     friend.online = online;
-                    log::info!("Friend {} is now {}", friend.name, if online { "online" } else { "offline" });
+                    log::info!(
+                        "Friend {} is now {}",
+                        friend.name,
+                        if online { "online" } else { "offline" }
+                    );
                 }
 
                 // Re-sort friends list
-                state.social_state.friends.sort_by(|a, b| {
-                    match (a.online, b.online) {
+                state
+                    .social_state
+                    .friends
+                    .sort_by(|a, b| match (a.online, b.online) {
                         (true, false) => std::cmp::Ordering::Less,
                         (false, true) => std::cmp::Ordering::Greater,
                         _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-                    }
-                });
+                    });
             }
         }
 
@@ -2663,7 +3065,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         // =====================================================================
         // Prayer System Messages
         // =====================================================================
-
         "prayerStateUpdate" => {
             if let Some(value) = data {
                 let points = extract_i32(value, "points").unwrap_or(0);
@@ -2679,8 +3080,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
-                log::info!("Prayer state update: {}/{} points, {} active prayers",
-                    points, max_points, active_prayers.len());
+                log::info!(
+                    "Prayer state update: {}/{} points, {} active prayers",
+                    points,
+                    max_points,
+                    active_prayers.len()
+                );
 
                 state.prayer_points = points;
                 state.max_prayer_points = max_points;
@@ -2696,8 +3101,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let target_x = extract_i32(value, "target_x").unwrap_or(0);
                 let target_y = extract_i32(value, "target_y").unwrap_or(0);
 
-                log::info!("Spell effect: {} cast {} at ({}, {}), target: {:?}",
-                    caster_id, spell_id, target_x, target_y, target_id);
+                log::info!(
+                    "Spell effect: {} cast {} at ({}, {}), target: {:?}",
+                    caster_id,
+                    spell_id,
+                    target_x,
+                    target_y,
+                    target_id
+                );
 
                 // Trigger casting animation on caster
                 if let Some(player) = state.players.get_mut(&caster_id) {
@@ -2725,9 +3136,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     if let Some(reason) = &reason {
                         log::info!("Spell cast failed: {}", reason);
                         // Add system chat message for failure feedback
-                        state.ui_state.chat_messages.push(ChatMessage::system(
-                            format!("Spell failed: {}", reason)
-                        ));
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push(ChatMessage::system(format!("Spell failed: {}", reason)));
                     }
                 }
             }
@@ -2741,9 +3153,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ping_stats.record(latency_ms);
                 // Only show in chat if it was a manual /ping (not auto-ping)
                 if !state.debug_mode {
-                    state.ui_state.chat_messages.push(
-                        ChatMessage::system(format!("Ping: {}ms", latency_ms.round() as i32))
-                    );
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!(
+                            "Ping: {}ms",
+                            latency_ms.round() as i32
+                        )));
                 }
             }
         }

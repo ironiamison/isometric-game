@@ -74,7 +74,11 @@ mod tests {
 
     #[test]
     fn test_world_to_screen_origin() {
-        let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+        let camera = Camera {
+            x: 0.0,
+            y: 0.0,
+            zoom: 1.0,
+        };
         let (sx, sy) = world_to_screen(0.0, 0.0, &camera);
         // At origin with centered camera, should be at screen center
         // This will depend on screen size, so just check it's reasonable
@@ -84,7 +88,11 @@ mod tests {
 
     #[test]
     fn test_roundtrip() {
-        let camera = Camera { x: 5.0, y: 3.0, zoom: 1.5 };
+        let camera = Camera {
+            x: 5.0,
+            y: 3.0,
+            zoom: 1.5,
+        };
         let world_x = 10.0;
         let world_y = 7.0;
 

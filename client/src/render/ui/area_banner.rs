@@ -1,8 +1,8 @@
 //! Area banner UI - displays location name during map transitions
 
-use macroquad::prelude::*;
 use crate::render::Renderer;
 use crate::util::virtual_screen_size;
+use macroquad::prelude::*;
 
 /// Banner display phase
 #[derive(Debug, Clone, PartialEq)]
@@ -131,16 +131,52 @@ impl Renderer {
         draw_rectangle(frame_left, frame_top, thickness, corner_len, corner_color);
 
         // Top-right corner
-        draw_rectangle(frame_right - corner_len, frame_top, corner_len, thickness, corner_color);
-        draw_rectangle(frame_right - thickness, frame_top, thickness, corner_len, corner_color);
+        draw_rectangle(
+            frame_right - corner_len,
+            frame_top,
+            corner_len,
+            thickness,
+            corner_color,
+        );
+        draw_rectangle(
+            frame_right - thickness,
+            frame_top,
+            thickness,
+            corner_len,
+            corner_color,
+        );
 
         // Bottom-left corner
-        draw_rectangle(frame_left, frame_bottom - thickness, corner_len, thickness, corner_color);
-        draw_rectangle(frame_left, frame_bottom - corner_len, thickness, corner_len, corner_color);
+        draw_rectangle(
+            frame_left,
+            frame_bottom - thickness,
+            corner_len,
+            thickness,
+            corner_color,
+        );
+        draw_rectangle(
+            frame_left,
+            frame_bottom - corner_len,
+            thickness,
+            corner_len,
+            corner_color,
+        );
 
         // Bottom-right corner
-        draw_rectangle(frame_right - corner_len, frame_bottom - thickness, corner_len, thickness, corner_color);
-        draw_rectangle(frame_right - thickness, frame_bottom - corner_len, thickness, corner_len, corner_color);
+        draw_rectangle(
+            frame_right - corner_len,
+            frame_bottom - thickness,
+            corner_len,
+            thickness,
+            corner_color,
+        );
+        draw_rectangle(
+            frame_right - thickness,
+            frame_bottom - corner_len,
+            thickness,
+            corner_len,
+            corner_color,
+        );
 
         // Draw text (perfectly centered in banner)
         let text_x = (banner_x + (banner_width - text_dims.width) / 2.0).floor();

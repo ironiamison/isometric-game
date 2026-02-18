@@ -29,7 +29,7 @@ pub const BOOT_SPRITE_WIDTH: f32 = 34.0;
 pub const BOOT_SPRITE_HEIGHT: f32 = 27.0;
 
 // Body armor sprite dimensions (single row format, 22 frames per armor)
-pub const BODY_ARMOR_SPRITE_WIDTH: f32 = 34.0;  // Same as player sprite width
+pub const BODY_ARMOR_SPRITE_WIDTH: f32 = 34.0; // Same as player sprite width
 pub const BODY_ARMOR_SPRITE_HEIGHT: f32 = 77.0;
 
 // Head equipment sprite dimensions (single row format, 2 frames: front/back)
@@ -70,8 +70,20 @@ pub struct AnimationConfig {
 }
 
 impl AnimationConfig {
-    const fn new(base_row: u32, frame_count: u32, fps: f32, looping: bool, directional: bool) -> Self {
-        Self { base_row, frame_count, fps, looping, directional }
+    const fn new(
+        base_row: u32,
+        frame_count: u32,
+        fps: f32,
+        looping: bool,
+        directional: bool,
+    ) -> Self {
+        Self {
+            base_row,
+            frame_count,
+            fps,
+            looping,
+            directional,
+        }
     }
 }
 
@@ -347,7 +359,11 @@ impl NpcAnimation {
         match self.state {
             NpcAnimationState::Idle => {
                 // Use only first idle frame (not all enemies have 2 idle frames)
-                if use_up_left { 2 } else { 0 }
+                if use_up_left {
+                    2
+                } else {
+                    0
+                }
             }
             NpcAnimationState::Walking => {
                 let base = if use_up_left { 8 } else { 4 };
@@ -398,13 +414,21 @@ pub struct WeaponFrameResult {
 /// - 15: Attack frame 2 back
 /// - 16: Attack frame 2 front overlay (rendered OVER player - hilt erased)
 /// - 17: ShootingBow (ranged weapons only)
-pub fn get_weapon_frame(state: AnimationState, direction: Direction, anim_frame: u32) -> WeaponFrameResult {
+pub fn get_weapon_frame(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+) -> WeaponFrameResult {
     let use_back = is_up_or_left_direction(direction);
     let flip_h = should_flip_horizontal(direction);
 
     let (frame_under, frame_over) = match state {
         AnimationState::Idle => {
-            if use_back { (1, None) } else { (0, None) }
+            if use_back {
+                (1, None)
+            } else {
+                (0, None)
+            }
         }
         AnimationState::Walking => {
             let frame_in_walk = anim_frame % 4;
@@ -415,13 +439,21 @@ pub fn get_weapon_frame(state: AnimationState, direction: Direction, anim_frame:
             }
         }
         AnimationState::Casting => {
-            if use_back { (11, None) } else { (10, None) }
+            if use_back {
+                (11, None)
+            } else {
+                (10, None)
+            }
         }
         AnimationState::Attacking => {
             let attack_frame = anim_frame % 2;
             if use_back {
                 // Back attack: frames 14-15, no overlay
-                if attack_frame == 0 { (14, None) } else { (15, None) }
+                if attack_frame == 0 {
+                    (14, None)
+                } else {
+                    (15, None)
+                }
             } else {
                 // Front attack: frame 0 uses 12, frame 1 uses 13 under + 16 over
                 if attack_frame == 0 {
@@ -437,7 +469,11 @@ pub fn get_weapon_frame(state: AnimationState, direction: Direction, anim_frame:
         }
         // Sitting animations don't show weapons
         AnimationState::SittingGround | AnimationState::SittingChair => {
-            if use_back { (1, None) } else { (0, None) }
+            if use_back {
+                (1, None)
+            } else {
+                (0, None)
+            }
         }
     };
 
@@ -456,7 +492,12 @@ pub fn get_weapon_frame(state: AnimationState, direction: Direction, anim_frame:
 /// Gender parameter allows for different positioning based on character model.
 ///
 /// Initial values are conservative defaults - tune visually during testing.
-pub fn get_weapon_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
+pub fn get_weapon_offset(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+    _gender: Gender,
+) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset to center the larger weapon sprite over the player
@@ -469,7 +510,11 @@ pub fn get_weapon_offset(state: AnimationState, direction: Direction, anim_frame
     let (state_x, state_y) = match state {
         AnimationState::Idle => {
             // Raise weapon to align with hand
-            if use_back { (-8.0, -8.0) } else { (-7.0, -6.0) }
+            if use_back {
+                (-8.0, -8.0)
+            } else {
+                (-7.0, -6.0)
+            }
         }
         AnimationState::Walking => {
             // Raise weapon + slight bounce during walk cycle
@@ -496,10 +541,18 @@ pub fn get_weapon_offset(state: AnimationState, direction: Direction, anim_frame
             let attack_frame = anim_frame % 2;
             if use_back {
                 // Shift for back-facing attacks
-                if attack_frame == 0 { (-7.0, -6.0) } else { (-7.0, -6.0) }
+                if attack_frame == 0 {
+                    (-7.0, -6.0)
+                } else {
+                    (-7.0, -6.0)
+                }
             } else {
                 // Shift left for front-facing attacks
-                if attack_frame == 0 { (-5.0, 0.0) } else { (-5.0, 0.0) }
+                if attack_frame == 0 {
+                    (-5.0, 0.0)
+                } else {
+                    (-5.0, 0.0)
+                }
             }
         }
         AnimationState::Casting => (0.0, 0.0),
@@ -544,13 +597,21 @@ pub struct BootFrameResult {
 /// - 13: Sit chair back
 /// - 14: Sit ground front
 /// - 15: Sit ground back
-pub fn get_boot_frame(state: AnimationState, direction: Direction, anim_frame: u32) -> BootFrameResult {
+pub fn get_boot_frame(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+) -> BootFrameResult {
     let use_back = is_up_or_left_direction(direction);
     let flip_h = should_flip_horizontal(direction);
 
     let frame = match state {
         AnimationState::Idle => {
-            if use_back { 1 } else { 0 }
+            if use_back {
+                1
+            } else {
+                0
+            }
         }
         AnimationState::Walking => {
             let frame_in_walk = anim_frame % 4;
@@ -565,25 +626,49 @@ pub fn get_boot_frame(state: AnimationState, direction: Direction, anim_frame: u
             let attack_frame = anim_frame % 2;
             if attack_frame == 0 {
                 // 1st attack frame: use idle
-                if use_back { 1 } else { 0 }
+                if use_back {
+                    1
+                } else {
+                    0
+                }
             } else {
                 // 2nd attack frame: use attack
-                if use_back { 11 } else { 10 }
+                if use_back {
+                    11
+                } else {
+                    10
+                }
             }
         }
         AnimationState::Casting => {
             // Use standing frame for casting
-            if use_back { 1 } else { 0 }
+            if use_back {
+                1
+            } else {
+                0
+            }
         }
         AnimationState::ShootingBow => {
             // Use attack frames for shooting
-            if use_back { 11 } else { 10 }
+            if use_back {
+                11
+            } else {
+                10
+            }
         }
         AnimationState::SittingChair => {
-            if use_back { 13 } else { 12 }
+            if use_back {
+                13
+            } else {
+                12
+            }
         }
         AnimationState::SittingGround => {
-            if use_back { 15 } else { 14 }
+            if use_back {
+                15
+            } else {
+                14
+            }
         }
     };
 
@@ -595,7 +680,12 @@ pub fn get_boot_frame(state: AnimationState, direction: Direction, anim_frame: u
 /// Boots are positioned at the player's feet. These offsets adjust the boot sprite
 /// to align properly with the player's foot position in each animation frame.
 /// Gender parameter allows for different positioning based on character model.
-pub fn get_boot_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
+pub fn get_boot_offset(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+    _gender: Gender,
+) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: boots are 34 wide (same as player), so center them
@@ -610,7 +700,11 @@ pub fn get_boot_offset(state: AnimationState, direction: Direction, anim_frame: 
         AnimationState::Idle => {
             // Up/Left: down 1, left 1 for left (mirrored for up)
             // Down/Right: no offset
-            if use_back { (-1.0, 1.0) } else { (0.0, 0.0) }
+            if use_back {
+                (-1.0, 1.0)
+            } else {
+                (0.0, 0.0)
+            }
         }
         AnimationState::Walking => {
             let walk_frame = anim_frame % 4;
@@ -640,16 +734,28 @@ pub fn get_boot_offset(state: AnimationState, direction: Direction, anim_frame: 
             let attack_frame = anim_frame % 2;
             if attack_frame == 0 {
                 // 1st frame: same as idle
-                if use_back { (-1.0, 1.0) } else { (0.0, 0.0) }
+                if use_back {
+                    (-1.0, 1.0)
+                } else {
+                    (0.0, 0.0)
+                }
             } else {
                 // 2nd frame: left 3, down 1 for left (mirrored for up); left 4, up 1 for down (mirrored for right)
-                if use_back { (-3.0, 1.0) } else { (-4.0, -1.0) }
+                if use_back {
+                    (-3.0, 1.0)
+                } else {
+                    (-4.0, -1.0)
+                }
             }
         }
         AnimationState::Casting => (0.0, 0.0),
         AnimationState::ShootingBow => {
             // Same offsets as 2nd attack frame
-            if use_back { (-3.0, 1.0) } else { (-4.0, -1.0) }
+            if use_back {
+                (-3.0, 1.0)
+            } else {
+                (-4.0, -1.0)
+            }
         }
         AnimationState::SittingChair => (0.0, 0.0),
         AnimationState::SittingGround => (0.0, 0.0),
@@ -689,13 +795,21 @@ pub struct BodyArmorFrameResult {
 /// - 16-17: Sitting in chair front/back
 /// - 18-19: Sitting on ground front/back
 /// - 20-21: Archery front/back
-pub fn get_body_armor_frame(state: AnimationState, direction: Direction, anim_frame: u32) -> BodyArmorFrameResult {
+pub fn get_body_armor_frame(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+) -> BodyArmorFrameResult {
     let use_back = is_up_or_left_direction(direction);
     let flip_h = should_flip_horizontal(direction);
 
     let frame = match state {
         AnimationState::Idle => {
-            if use_back { 1 } else { 0 }
+            if use_back {
+                1
+            } else {
+                0
+            }
         }
         AnimationState::Walking => {
             let frame_in_walk = anim_frame % 4;
@@ -710,27 +824,51 @@ pub fn get_body_armor_frame(state: AnimationState, direction: Direction, anim_fr
             let attack_frame = anim_frame % 2;
             if attack_frame == 0 {
                 // Frame 1: use idle
-                if use_back { 1 } else { 0 }
+                if use_back {
+                    1
+                } else {
+                    0
+                }
             } else {
                 // Frame 2: use attack (13 for front, 15 for back)
-                if use_back { 15 } else { 13 }
+                if use_back {
+                    15
+                } else {
+                    13
+                }
             }
         }
         AnimationState::Casting => {
             // Magic frames 10-11
-            if use_back { 11 } else { 10 }
+            if use_back {
+                11
+            } else {
+                10
+            }
         }
         AnimationState::ShootingBow => {
             // Archery frames 20-21
-            if use_back { 21 } else { 20 }
+            if use_back {
+                21
+            } else {
+                20
+            }
         }
         AnimationState::SittingChair => {
             // Sitting chair frames 16-17
-            if use_back { 17 } else { 16 }
+            if use_back {
+                17
+            } else {
+                16
+            }
         }
         AnimationState::SittingGround => {
             // Sitting ground frames 18-19
-            if use_back { 19 } else { 18 }
+            if use_back {
+                19
+            } else {
+                18
+            }
         }
     };
 
@@ -742,44 +880,69 @@ pub fn get_body_armor_frame(state: AnimationState, direction: Direction, anim_fr
 /// Body armor covers the torso and should align with the player's body in each animation frame.
 /// These offsets are similar to boots but positioned higher to cover the torso.
 /// Gender parameter allows for different positioning based on character model.
-pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_frame: u32, gender: Gender) -> (f32, f32) {
+pub fn get_body_armor_offset(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+    gender: Gender,
+) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: body armor is 34 wide (same as player's 34)
     // Body armor is 77 tall, player is 78, nearly same height
-    let base_x = 0.0;   // Same width as player, no centering needed
-    let base_y = 0.0;   // Start at top of player sprite
+    let base_x = 0.0; // Same width as player, no centering needed
+    let base_y = 0.0; // Start at top of player sprite
 
     // Per-state offsets for alignment (similar to boots but for torso)
     let (state_x, state_y) = match state {
         AnimationState::Idle => {
             // Up/Left: right 1px for up (mirrored left for left), up 2px
             // Down/Right: up 3px (mirrored)
-            if use_back { (-1.0, -2.0) } else { (0.0, -3.0) }
+            if use_back {
+                (-1.0, -2.0)
+            } else {
+                (0.0, -3.0)
+            }
         }
         AnimationState::Walking => {
             // Up/Left: right 1px for up (mirrored left for left), up 3px
             // Down/Right: up 4px (mirrored)
-            if use_back { (-1.0, -3.0) } else { (0.0, -4.0) }
+            if use_back {
+                (-1.0, -3.0)
+            } else {
+                (0.0, -4.0)
+            }
         }
         AnimationState::Attacking => {
             let attack_frame = anim_frame % 2;
             if attack_frame == 0 {
                 // Frame 1: right 1px for up (mirrored left for left), up 2px
                 // Down/Right: up 3px (mirrored)
-                if use_back { (-1.0, -2.0) } else { (0.0, -3.0) }
+                if use_back {
+                    (-1.0, -2.0)
+                } else {
+                    (0.0, -3.0)
+                }
             } else {
                 // Frame 2:
                 // Up/Left: right 4px, up 2px for up (mirrored for left)
                 // Down/Right: left 2px, up 3px (mirrored for right)
-                if use_back { (-4.0, -2.0) } else { (-2.0, -3.0) }
+                if use_back {
+                    (-4.0, -2.0)
+                } else {
+                    (-2.0, -3.0)
+                }
             }
         }
         AnimationState::Casting => (0.0, 0.0),
         AnimationState::ShootingBow => {
             // Up/Left: right 1px for up (mirrored left for left), up 2px
             // Down/Right: left 4px, up 3px (mirrored for right)
-            if use_back { (-1.0, -2.0) } else { (-4.0, -3.0) }
+            if use_back {
+                (-1.0, -2.0)
+            } else {
+                (-4.0, -3.0)
+            }
         }
         AnimationState::SittingChair => (0.0, -2.0),
         AnimationState::SittingGround => (0.0, 0.0),
@@ -798,17 +961,24 @@ pub fn get_body_armor_offset(state: AnimationState, direction: Direction, anim_f
         Gender::Female => {
             // Female body armor needs adjustment for up and left directions
             let x_adj = match direction {
-                Direction::Up => -2.0,   // Move 2px to the left
-                Direction::Left => 2.0,  // Mirror: move 2px to the right (since sprite is flipped)
+                Direction::Up => -2.0,  // Move 2px to the left
+                Direction::Left => 2.0, // Mirror: move 2px to the right (since sprite is flipped)
                 _ => 0.0,
             };
             // Female body armor needs to be 2px higher when sitting on chair
-            let y_adj = if state == AnimationState::SittingChair { -2.0 } else { 0.0 };
+            let y_adj = if state == AnimationState::SittingChair {
+                -2.0
+            } else {
+                0.0
+            };
             (x_adj, y_adj)
         }
     };
 
-    (base_x + adjusted_state_x + gender_adjust_x, base_y + state_y + gender_adjust_y)
+    (
+        base_x + adjusted_state_x + gender_adjust_x,
+        base_y + state_y + gender_adjust_y,
+    )
 }
 
 // ============================================================================
@@ -844,36 +1014,61 @@ pub fn get_head_frame(direction: Direction) -> HeadFrameResult {
 /// Head equipment is positioned at the top of the player sprite and follows the same
 /// offset patterns as hair during animations.
 /// Gender parameter allows for different positioning based on character model.
-pub fn get_head_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
+pub fn get_head_offset(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+    _gender: Gender,
+) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: head is 30 wide, player is 34, center it
     // Head starts at top of player
-    let base_x = 2.0;  // (34 - 30) / 2 = 2
+    let base_x = 2.0; // (34 - 30) / 2 = 2
     let base_y = -7.0; // Align with top of head, moved up 4px from hair
 
     // Per-state offsets (mirroring hair offsets)
     // Note: Up/Left directions get -1 X adjustment across all states
     let (state_x, state_y) = match state {
         AnimationState::Idle => {
-            if use_back { (-3.0, 0.0) } else { (-1.0, 0.0) }
+            if use_back {
+                (-3.0, 0.0)
+            } else {
+                (-1.0, 0.0)
+            }
         }
         AnimationState::Walking => {
-            if use_back { (-3.0, 0.0) } else { (-1.0, 0.0) }
+            if use_back {
+                (-3.0, 0.0)
+            } else {
+                (-1.0, 0.0)
+            }
         }
         AnimationState::Attacking => {
             let attack_frame = anim_frame % 2;
             if attack_frame == 0 {
                 // Frame 1: same as idle
-                if use_back { (-3.0, 0.0) } else { (-1.0, 0.0) }
+                if use_back {
+                    (-3.0, 0.0)
+                } else {
+                    (-1.0, 0.0)
+                }
             } else {
                 // Frame 2: more dramatic shift
                 // Up/Left: down 2px from previous, Down/Right: down 1px from previous
-                if use_back { (-6.0, 0.0) } else { (-6.0, 3.0) }
+                if use_back {
+                    (-6.0, 0.0)
+                } else {
+                    (-6.0, 3.0)
+                }
             }
         }
         AnimationState::Casting => {
-            if use_back { (-1.0, 0.0) } else { (0.0, 0.0) }
+            if use_back {
+                (-1.0, 0.0)
+            } else {
+                (0.0, 0.0)
+            }
         }
         AnimationState::ShootingBow => {
             if use_back {
@@ -885,10 +1080,18 @@ pub fn get_head_offset(state: AnimationState, direction: Direction, anim_frame: 
             }
         }
         AnimationState::SittingChair => {
-            if use_back { (-1.0, 7.0) } else { (0.0, 7.0) }
+            if use_back {
+                (-1.0, 7.0)
+            } else {
+                (0.0, 7.0)
+            }
         }
         AnimationState::SittingGround => {
-            if use_back { (-1.0, 0.0) } else { (0.0, 0.0) }
+            if use_back {
+                (-1.0, 0.0)
+            } else {
+                (0.0, 0.0)
+            }
         }
     };
 
@@ -901,12 +1104,15 @@ pub fn get_head_offset(state: AnimationState, direction: Direction, anim_frame: 
 
     // Direction-specific adjustments
     let direction_adjust = match direction {
-        Direction::Left => 1.0,   // 1px to the right
-        Direction::Up => -2.0,    // 2px to the left
+        Direction::Left => 1.0, // 1px to the right
+        Direction::Up => -2.0,  // 2px to the left
         _ => 0.0,
     };
 
-    (base_x + adjusted_state_x + direction_adjust, base_y + state_y)
+    (
+        base_x + adjusted_state_x + direction_adjust,
+        base_y + state_y,
+    )
 }
 
 // ============================================================================
@@ -968,7 +1174,12 @@ pub fn get_back_static_frame(direction: Direction) -> BackStaticFrameResult {
 /// Back items sit on the player's back/shoulder area. These offsets align the item
 /// with the player's back position in each animation frame.
 /// Gender parameter allows for different positioning based on character model.
-pub fn get_back_static_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
+pub fn get_back_static_offset(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+    _gender: Gender,
+) -> (f32, f32) {
     // Base offset: position varies by direction
     // Quiver is 50 wide, 63 tall
     // Right/Up show on left side (mirrored), Down/Left show on right side
@@ -986,7 +1197,7 @@ pub fn get_back_static_offset(state: AnimationState, direction: Direction, anim_
             // Shift during attack swing
             let attack_frame = anim_frame % 2;
             if attack_frame == 1 {
-                (-2.0, 1.0)  // Shift with body during swing
+                (-2.0, 1.0) // Shift with body during swing
             } else {
                 (0.0, 0.0)
             }
@@ -995,10 +1206,10 @@ pub fn get_back_static_offset(state: AnimationState, direction: Direction, anim_
         AnimationState::ShootingBow => {
             // Direction-specific shift when drawing bow
             match direction {
-                Direction::Up => (-1.0, 0.0),     // Left 1px
-                Direction::Left => (1.0, 0.0),   // Right 1px (mirrored from Up)
-                Direction::Down => (-1.0, 0.0),  // Left 1px
-                Direction::Right => (1.0, 0.0),  // Right 1px (mirrored from Down)
+                Direction::Up => (-1.0, 0.0),   // Left 1px
+                Direction::Left => (1.0, 0.0),  // Right 1px (mirrored from Up)
+                Direction::Down => (-1.0, 0.0), // Left 1px
+                Direction::Right => (1.0, 0.0), // Right 1px (mirrored from Down)
             }
         }
         AnimationState::SittingChair => (0.0, 7.0),
@@ -1007,7 +1218,7 @@ pub fn get_back_static_offset(state: AnimationState, direction: Direction, anim_
 
     // Invert x offset when flipped (skip for ShootingBow which handles direction itself)
     let adjusted_state_x = if state == AnimationState::ShootingBow {
-        state_x  // Already direction-specific
+        state_x // Already direction-specific
     } else if should_flip_horizontal(direction) {
         -state_x
     } else {
@@ -1039,13 +1250,21 @@ pub struct OffhandFrameResult {
 /// - 13: Sit chair back
 /// - 14: Sit ground front
 /// - 15: Sit ground back
-pub fn get_offhand_frame(state: AnimationState, direction: Direction, anim_frame: u32) -> OffhandFrameResult {
+pub fn get_offhand_frame(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+) -> OffhandFrameResult {
     let use_back = is_up_or_left_direction(direction);
     let flip_h = should_flip_horizontal(direction);
 
     let frame = match state {
         AnimationState::Idle => {
-            if use_back { 1 } else { 0 }
+            if use_back {
+                1
+            } else {
+                0
+            }
         }
         AnimationState::Walking => {
             let frame_in_walk = anim_frame % 4;
@@ -1059,24 +1278,48 @@ pub fn get_offhand_frame(state: AnimationState, direction: Direction, anim_frame
             // Only use attack frame for 2nd attack frame, use idle for 1st
             let attack_frame = anim_frame % 2;
             if attack_frame == 0 {
-                if use_back { 1 } else { 0 }
+                if use_back {
+                    1
+                } else {
+                    0
+                }
             } else {
-                if use_back { 11 } else { 10 }
+                if use_back {
+                    11
+                } else {
+                    10
+                }
             }
         }
         AnimationState::Casting => {
             // Use standing frame for casting
-            if use_back { 1 } else { 0 }
+            if use_back {
+                1
+            } else {
+                0
+            }
         }
         AnimationState::ShootingBow => {
             // Use attack frames for shooting
-            if use_back { 11 } else { 10 }
+            if use_back {
+                11
+            } else {
+                10
+            }
         }
         AnimationState::SittingChair => {
-            if use_back { 13 } else { 12 }
+            if use_back {
+                13
+            } else {
+                12
+            }
         }
         AnimationState::SittingGround => {
-            if use_back { 15 } else { 14 }
+            if use_back {
+                15
+            } else {
+                14
+            }
         }
     };
 
@@ -1088,18 +1331,27 @@ pub fn get_offhand_frame(state: AnimationState, direction: Direction, anim_frame
 /// Offhand items (shields) are held on the off-hand side. These offsets align the item
 /// with the player's off-hand position in each animation frame.
 /// Gender parameter allows for different positioning based on character model.
-pub fn get_offhand_offset(state: AnimationState, direction: Direction, anim_frame: u32, _gender: Gender) -> (f32, f32) {
+pub fn get_offhand_offset(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+    _gender: Gender,
+) -> (f32, f32) {
     let use_back = is_up_or_left_direction(direction);
 
     // Base offset: position on off-hand side
     // Offhand is ~38 wide, player is 34, center it: (34 - 38) / 2 = -2
-    let base_x = -2.0;  // Slight offset to off-hand side
-    let base_y = 20.0;  // Position at arm/torso level (shield is 38 tall)
+    let base_x = -2.0; // Slight offset to off-hand side
+    let base_y = 20.0; // Position at arm/torso level (shield is 38 tall)
 
     // Per-state offsets
     let (state_x, state_y) = match state {
         AnimationState::Idle => {
-            if use_back { (-1.0, 0.0) } else { (0.0, 0.0) }
+            if use_back {
+                (-1.0, 0.0)
+            } else {
+                (0.0, 0.0)
+            }
         }
         AnimationState::Walking => {
             let walk_frame = anim_frame % 4;
@@ -1124,16 +1376,28 @@ pub fn get_offhand_offset(state: AnimationState, direction: Direction, anim_fram
         AnimationState::Attacking => {
             let attack_frame = anim_frame % 2;
             if attack_frame == 0 {
-                if use_back { (-1.0, 0.0) } else { (0.0, 0.0) }
+                if use_back {
+                    (-1.0, 0.0)
+                } else {
+                    (0.0, 0.0)
+                }
             } else {
                 // Shield moves during attack
-                if use_back { (-3.0, 1.0) } else { (-4.0, -1.0) }
+                if use_back {
+                    (-3.0, 1.0)
+                } else {
+                    (-4.0, -1.0)
+                }
             }
         }
         AnimationState::Casting => (0.0, 0.0),
         AnimationState::ShootingBow => {
             // Shield on back/side during bow shooting
-            if use_back { (-3.0, 1.0) } else { (-4.0, -1.0) }
+            if use_back {
+                (-3.0, 1.0)
+            } else {
+                (-4.0, -1.0)
+            }
         }
         AnimationState::SittingChair => (0.0, 0.0),
         AnimationState::SittingGround => (0.0, 0.0),
@@ -1162,7 +1426,13 @@ pub const HAIR_SPRITE_HEIGHT: f32 = 54.0;
 /// Hair is positioned at the top of the player sprite. These offsets adjust the hair
 /// to align properly with the player's head in each animation frame.
 /// Gender-specific offsets allow for different head shapes/positions.
-pub fn get_hair_offset(state: AnimationState, direction: Direction, anim_frame: u32, gender: Gender, flip_h: bool) -> (f32, f32) {
+pub fn get_hair_offset(
+    state: AnimationState,
+    direction: Direction,
+    anim_frame: u32,
+    gender: Gender,
+    flip_h: bool,
+) -> (f32, f32) {
     let is_back = is_up_or_left_direction(direction);
     let is_attack_frame_2 = state == AnimationState::Attacking && (anim_frame % 2) == 1;
     let is_shooting_bow = state == AnimationState::ShootingBow;
@@ -1174,23 +1444,47 @@ pub fn get_hair_offset(state: AnimationState, direction: Direction, anim_frame: 
     let (base_x, base_y) = if is_attack_frame_2 {
         let y_offset = if is_back { -2.0 } else { 2.0 };
         let x_offset = if is_back {
-            if flip_h { 5.0 } else { -5.0 }
+            if flip_h {
+                5.0
+            } else {
+                -5.0
+            }
         } else {
-            if flip_h { 6.0 } else { -6.0 }
+            if flip_h {
+                6.0
+            } else {
+                -6.0
+            }
         };
         (x_offset, y_offset)
     } else if is_shooting_bow {
         let x_offset = if is_back {
-            if flip_h { 1.0 } else { -1.0 }
+            if flip_h {
+                1.0
+            } else {
+                -1.0
+            }
         } else {
-            if flip_h { 2.0 } else { -2.0 }
+            if flip_h {
+                2.0
+            } else {
+                -2.0
+            }
         };
         (x_offset, -3.0)
     } else {
         let x_offset = if is_back {
-            if flip_h { 2.0 } else { -2.0 }
+            if flip_h {
+                2.0
+            } else {
+                -2.0
+            }
         } else {
-            if flip_h { 1.0 } else { -1.0 }
+            if flip_h {
+                1.0
+            } else {
+                -1.0
+            }
         };
         (x_offset, -3.0)
     };
@@ -1201,8 +1495,8 @@ pub fn get_hair_offset(state: AnimationState, direction: Direction, anim_frame: 
         Gender::Female => {
             // Female hair needs adjustment for left and up directions
             match direction {
-                Direction::Up => -1.0,   // Move 1px to the left
-                Direction::Left => 1.0,  // Mirror: move 1px to the right (since sprite is flipped)
+                Direction::Up => -1.0,  // Move 1px to the left
+                Direction::Left => 1.0, // Mirror: move 1px to the right (since sprite is flipped)
                 _ => 0.0,
             }
         }

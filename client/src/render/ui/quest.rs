@@ -1,11 +1,11 @@
 //! Quest UI rendering (quest log, tracker, completion notifications)
 
-use macroquad::prelude::*;
+use super::super::Renderer;
+use super::common::*;
 use crate::game::GameState;
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
-use super::super::Renderer;
-use super::common::*;
+use macroquad::prelude::*;
 
 impl Renderer {
     fn quest_tracker_height(&self, state: &GameState, tracker_width: f32) -> f32 {
@@ -33,7 +33,10 @@ impl Renderer {
         }
 
         if state.ui_state.active_quests.len() > 2 {
-            let more = format!("...and {} more (Q to view)", state.ui_state.active_quests.len() - 2);
+            let more = format!(
+                "...and {} more (Q to view)",
+                state.ui_state.active_quests.len() - 2
+            );
             let more_lines = self.wrap_text(&more, title_wrap_width, 16.0);
             height += more_lines.len().max(1) as f32 * line_height;
         }
@@ -41,7 +44,12 @@ impl Renderer {
         height
     }
 
-    pub(crate) fn render_quest_log(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_quest_log(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         let (sw, sh) = virtual_screen_size();
 
         let panel_width = 380.0;
@@ -69,18 +77,37 @@ impl Renderer {
         draw_rectangle(header_x, header_y, header_w, HEADER_HEIGHT, HEADER_BG);
 
         // Header bottom separator with decorative dots
-        draw_line(header_x + 10.0, header_y + HEADER_HEIGHT, header_x + header_w - 10.0, header_y + HEADER_HEIGHT, 2.0, HEADER_BORDER);
+        draw_line(
+            header_x + 10.0,
+            header_y + HEADER_HEIGHT,
+            header_x + header_w - 10.0,
+            header_y + HEADER_HEIGHT,
+            2.0,
+            HEADER_BORDER,
+        );
 
         let dot_spacing = 50.0;
         let num_dots = ((header_w - 40.0) / dot_spacing) as i32;
         let start_dot_x = header_x + 20.0;
         for i in 0..num_dots {
             let dot_x = start_dot_x + i as f32 * dot_spacing;
-            draw_rectangle(dot_x - 1.5, header_y + HEADER_HEIGHT - 1.5, 3.0, 3.0, FRAME_ACCENT);
+            draw_rectangle(
+                dot_x - 1.5,
+                header_y + HEADER_HEIGHT - 1.5,
+                3.0,
+                3.0,
+                FRAME_ACCENT,
+            );
         }
 
         // Title
-        self.draw_text_sharp("QUEST LOG", header_x + 12.0, header_y + 26.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            "QUEST LOG",
+            header_x + 12.0,
+            header_y + 26.0,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // ===== CONTENT AREA =====
         let content_x = panel_x + FRAME_THICKNESS + 8.0;
@@ -90,28 +117,73 @@ impl Renderer {
 
         // Quest list panel with inset effect
         draw_rectangle(content_x, content_y, content_w, content_h, SLOT_BORDER);
-        draw_rectangle(content_x + 1.0, content_y + 1.0, content_w - 2.0, content_h - 2.0, SLOT_BG_EMPTY);
+        draw_rectangle(
+            content_x + 1.0,
+            content_y + 1.0,
+            content_w - 2.0,
+            content_h - 2.0,
+            SLOT_BG_EMPTY,
+        );
 
         // Inner shadow (top/left)
-        draw_line(content_x + 2.0, content_y + 2.0, content_x + content_w - 2.0, content_y + 2.0, 2.0, SLOT_INNER_SHADOW);
-        draw_line(content_x + 2.0, content_y + 2.0, content_x + 2.0, content_y + content_h - 2.0, 2.0, SLOT_INNER_SHADOW);
+        draw_line(
+            content_x + 2.0,
+            content_y + 2.0,
+            content_x + content_w - 2.0,
+            content_y + 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
+        draw_line(
+            content_x + 2.0,
+            content_y + 2.0,
+            content_x + 2.0,
+            content_y + content_h - 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
 
         // Register scroll area for mouse wheel handling
-        layout.add(UiElementId::QuestLogScrollArea, Rect::new(content_x, content_y, content_w, content_h));
+        layout.add(
+            UiElementId::QuestLogScrollArea,
+            Rect::new(content_x, content_y, content_w, content_h),
+        );
 
         if state.ui_state.active_quests.is_empty() {
             let y = content_y + 10.0;
             // Empty state with themed styling
-            self.draw_text_sharp("No Active Quests", content_x + 12.0, y + 10.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                "No Active Quests",
+                content_x + 12.0,
+                y + 10.0,
+                16.0,
+                TEXT_DIM,
+            );
             let y = y + line_height + 8.0;
-            self.draw_text_sharp("Talk to NPCs with", content_x + 12.0, y + 10.0, 16.0, Color::new(0.392, 0.392, 0.431, 1.0));
+            self.draw_text_sharp(
+                "Talk to NPCs with",
+                content_x + 12.0,
+                y + 10.0,
+                16.0,
+                Color::new(0.392, 0.392, 0.431, 1.0),
+            );
             self.draw_text_sharp("!", content_x + 140.0, y + 10.0, 16.0, TEXT_GOLD);
-            self.draw_text_sharp("above their heads", content_x + 155.0, y + 10.0, 16.0, Color::new(0.392, 0.392, 0.431, 1.0));
+            self.draw_text_sharp(
+                "above their heads",
+                content_x + 155.0,
+                y + 10.0,
+                16.0,
+                Color::new(0.392, 0.392, 0.431, 1.0),
+            );
         } else {
             // Calculate total content height for scrolling
             let mut total_content_h = 10.0; // top padding
             for (i, quest) in state.ui_state.active_quests.iter().enumerate() {
-                total_content_h += entry_padding + line_height + 4.0 + quest.objectives.len() as f32 * objective_spacing + entry_padding;
+                total_content_h += entry_padding
+                    + line_height
+                    + 4.0
+                    + quest.objectives.len() as f32 * objective_spacing
+                    + entry_padding;
                 if i < state.ui_state.active_quests.len() - 1 {
                     total_content_h += 8.0; // separator
                 }
@@ -144,7 +216,8 @@ impl Renderer {
                 // Calculate entry height
                 let title_height = line_height;
                 let objectives_height = quest.objectives.len() as f32 * objective_spacing;
-                let entry_height = entry_padding + title_height + 2.0 + objectives_height + entry_padding;
+                let entry_height =
+                    entry_padding + title_height + 2.0 + objectives_height + entry_padding;
 
                 let entry_start_y = y;
 
@@ -161,17 +234,35 @@ impl Renderer {
                 let vis_top = entry_start_y.max(content_y);
                 let vis_bottom = (entry_start_y + entry_height).min(content_y + content_h);
                 if vis_bottom > vis_top {
-                    let bounds = Rect::new(content_x + 4.0, vis_top, content_w - 8.0, vis_bottom - vis_top);
+                    let bounds = Rect::new(
+                        content_x + 4.0,
+                        vis_top,
+                        content_w - 8.0,
+                        vis_bottom - vis_top,
+                    );
                     layout.add(UiElementId::QuestLogEntry(quest_idx), bounds);
                 }
 
                 // Check if this quest is hovered
-                let is_hovered = matches!(hovered, Some(UiElementId::QuestLogEntry(idx)) if *idx == quest_idx);
+                let is_hovered =
+                    matches!(hovered, Some(UiElementId::QuestLogEntry(idx)) if *idx == quest_idx);
 
                 // Draw quest entry background with slot-like styling
                 if is_hovered {
-                    draw_rectangle(content_x + 4.0, entry_start_y, content_w - 8.0, entry_height, SLOT_HOVER_BORDER);
-                    draw_rectangle(content_x + 5.0, entry_start_y + 1.0, content_w - 10.0, entry_height - 2.0, SLOT_HOVER_BG);
+                    draw_rectangle(
+                        content_x + 4.0,
+                        entry_start_y,
+                        content_w - 8.0,
+                        entry_height,
+                        SLOT_HOVER_BORDER,
+                    );
+                    draw_rectangle(
+                        content_x + 5.0,
+                        entry_start_y + 1.0,
+                        content_w - 10.0,
+                        entry_height - 2.0,
+                        SLOT_HOVER_BG,
+                    );
                 }
 
                 // Move y inside the entry box with padding
@@ -191,7 +282,13 @@ impl Renderer {
                         ("[ ]", Color::new(0.502, 0.502, 0.541, 1.0))
                     };
 
-                    self.draw_text_sharp(check_icon, content_x + 20.0, y + 12.0, 16.0, status_color);
+                    self.draw_text_sharp(
+                        check_icon,
+                        content_x + 20.0,
+                        y + 12.0,
+                        16.0,
+                        status_color,
+                    );
 
                     let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
                     let text_color = if obj.completed {
@@ -208,7 +305,14 @@ impl Renderer {
 
                 // Decorative separator between quests
                 if quest_idx < state.ui_state.active_quests.len() - 1 {
-                    draw_line(content_x + 20.0, y + 2.0, content_x + content_w - 20.0, y + 2.0, 1.0, SLOT_BORDER);
+                    draw_line(
+                        content_x + 20.0,
+                        y + 2.0,
+                        content_x + content_w - 20.0,
+                        y + 2.0,
+                        1.0,
+                        SLOT_BORDER,
+                    );
                     y += 8.0;
                 }
             }
@@ -226,13 +330,29 @@ impl Renderer {
                 let track_y = content_y + 2.0;
                 let thumb_ratio = content_h / total_content_h;
                 let thumb_h = (track_h * thumb_ratio).max(20.0);
-                let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+                let scroll_ratio = if max_scroll > 0.0 {
+                    scroll_offset / max_scroll
+                } else {
+                    0.0
+                };
                 let thumb_y = track_y + (track_h - thumb_h) * scroll_ratio;
 
                 // Track
-                draw_rectangle(scrollbar_x, track_y, scrollbar_w, track_h, Color::new(1.0, 1.0, 1.0, 0.08));
+                draw_rectangle(
+                    scrollbar_x,
+                    track_y,
+                    scrollbar_w,
+                    track_h,
+                    Color::new(1.0, 1.0, 1.0, 0.08),
+                );
                 // Thumb
-                draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, Color::new(1.0, 1.0, 1.0, 0.3));
+                draw_rectangle(
+                    scrollbar_x,
+                    thumb_y,
+                    scrollbar_w,
+                    thumb_h,
+                    Color::new(1.0, 1.0, 1.0, 0.3),
+                );
             }
         }
 
@@ -242,15 +362,34 @@ impl Renderer {
         let footer_w = panel_width - FRAME_THICKNESS * 2.0;
 
         draw_rectangle(footer_x, footer_y, footer_w, FOOTER_HEIGHT, FOOTER_BG);
-        draw_line(footer_x + 10.0, footer_y, footer_x + footer_w - 10.0, footer_y, 1.0, HEADER_BORDER);
+        draw_line(
+            footer_x + 10.0,
+            footer_y,
+            footer_x + footer_w - 10.0,
+            footer_y,
+            1.0,
+            HEADER_BORDER,
+        );
 
         let quest_count = state.ui_state.active_quests.len();
         let count_text = format!("{} Active", quest_count);
         let count_width = self.measure_text_sharp(&count_text, 16.0).width;
-        self.draw_text_sharp(&count_text, footer_x + footer_w - count_width - 10.0, footer_y + 20.0, 16.0, FRAME_MID);
+        self.draw_text_sharp(
+            &count_text,
+            footer_x + footer_w - count_width - 10.0,
+            footer_y + 20.0,
+            16.0,
+            FRAME_MID,
+        );
     }
 
-    pub(crate) fn render_quest_tracker(&self, state: &GameState, tracker_x: f32, tracker_y: f32, tracker_width: f32) {
+    pub(crate) fn render_quest_tracker(
+        &self,
+        state: &GameState,
+        tracker_x: f32,
+        tracker_y: f32,
+        tracker_width: f32,
+    ) {
         if state.ui_state.active_quests.is_empty() {
             return;
         }
@@ -304,7 +443,10 @@ impl Renderer {
         }
 
         if state.ui_state.active_quests.len() > 2 {
-            let more = format!("...and {} more (Q to view)", state.ui_state.active_quests.len() - 2);
+            let more = format!(
+                "...and {} more (Q to view)",
+                state.ui_state.active_quests.len() - 2
+            );
             for line in self.wrap_text(&more, title_wrap_width, 16.0).iter().take(2) {
                 draw_right(self, line, y, LIGHTGRAY);
                 y += line_height;
@@ -313,7 +455,13 @@ impl Renderer {
     }
 
     /// Render farming contract tracker (left-aligned, below stat bars)
-    pub(crate) fn render_farming_contract_tracker(&self, state: &GameState, x: f32, y_start: f32, max_width: f32) {
+    pub(crate) fn render_farming_contract_tracker(
+        &self,
+        state: &GameState,
+        x: f32,
+        y_start: f32,
+        max_width: f32,
+    ) {
         let contract = match &state.farming_contract {
             Some(c) => c,
             None => return,
@@ -341,8 +489,15 @@ impl Renderer {
         } else {
             ("[ ]", Color::from_rgba(200, 200, 200, 255))
         };
-        let progress_text = format!("{} {}/{} harvested", check, contract.amount_harvested, contract.amount_required);
-        for line in self.wrap_text(&progress_text, max_width, 16.0).iter().take(2) {
+        let progress_text = format!(
+            "{} {}/{} harvested",
+            check, contract.amount_harvested, contract.amount_required
+        );
+        for line in self
+            .wrap_text(&progress_text, max_width, 16.0)
+            .iter()
+            .take(2)
+        {
             self.draw_text_sharp(line, x, y, 16.0, status_color);
             y += objective_line_height;
         }

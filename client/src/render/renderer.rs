@@ -1,21 +1,38 @@
-use macroquad::prelude::*;
-use macroquad::models::{Mesh, Vertex, draw_mesh};
-use macroquad::material::{load_material, gl_use_material, gl_use_default_material, Material, MaterialParams};
-use macroquad::miniquad::UniformDesc;
-use macroquad::miniquad::ShaderSource;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use crate::util::{asset_path, SpriteManifest, SpriteAtlasInfo, virtual_screen_size};
-use crate::game::{GameState, Player, Camera, ConnectionStatus, LayerType, GroundItem, ChunkLayerType, CHUNK_SIZE, MapObject, ChatChannel, Direction, DragSource, Wall, WallEdge};
-use crate::game::tree_types::get_tree_info;
+use super::animation::{
+    get_back_static_frame, get_back_static_offset, get_body_armor_frame, get_body_armor_offset,
+    get_boot_frame, get_boot_offset, get_hair_offset, get_head_frame, get_head_offset,
+    get_offhand_frame, get_offhand_offset, get_weapon_frame, get_weapon_offset, AnimationState,
+    Gender, NpcAnimation, BACK_STATIC_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH,
+    BODY_ARMOR_SPRITE_HEIGHT, BODY_ARMOR_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT, BOOT_SPRITE_WIDTH,
+    HAIR_SPRITE_HEIGHT, HAIR_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT, HEAD_SPRITE_WIDTH,
+    OFFHAND_SPRITE_HEIGHT, OFFHAND_SPRITE_WIDTH, SPRITE_HEIGHT, SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT,
+    WEAPON_SPRITE_WIDTH,
+};
+use super::font::BitmapFont;
+use super::isometric::{
+    calculate_depth, screen_to_world, world_to_screen, world_to_screen_exact, TILE_HEIGHT,
+    TILE_WIDTH,
+};
+use super::shaders;
+use super::ui::common::{SlotState, CORNER_ACCENT_SIZE, EXP_BAR_GAP};
 use crate::game::npc::{Npc, NpcState};
 use crate::game::tilemap::get_tile_color;
+use crate::game::tree_types::get_tree_info;
+use crate::game::{
+    Camera, ChatChannel, ChunkLayerType, ConnectionStatus, Direction, DragSource, GameState,
+    GroundItem, LayerType, MapObject, Player, Wall, WallEdge, CHUNK_SIZE,
+};
 use crate::ui::{UiElementId, UiLayout};
-use super::ui::common::{SlotState, CORNER_ACCENT_SIZE, EXP_BAR_GAP};
-use super::isometric::{world_to_screen, world_to_screen_exact, screen_to_world, TILE_WIDTH, TILE_HEIGHT, calculate_depth};
-use super::animation::{SPRITE_WIDTH, SPRITE_HEIGHT, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT, NpcAnimation, get_weapon_frame, get_weapon_offset, get_boot_frame, get_boot_offset, get_body_armor_frame, get_body_armor_offset, get_head_frame, get_head_offset, get_back_static_frame, get_back_static_offset, get_offhand_frame, get_offhand_offset, get_hair_offset, AnimationState, Gender};
-use super::font::BitmapFont;
-use super::shaders;
+use crate::util::{asset_path, virtual_screen_size, SpriteAtlasInfo, SpriteManifest};
+use macroquad::material::{
+    gl_use_default_material, gl_use_material, load_material, Material, MaterialParams,
+};
+use macroquad::miniquad::ShaderSource;
+use macroquad::miniquad::UniformDesc;
+use macroquad::models::{draw_mesh, Mesh, Vertex};
+use macroquad::prelude::*;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 
 /// Format a u32 into a stack-allocated buffer, returning a &str.
 /// Avoids heap allocation from .to_string() in hot paths.
@@ -76,32 +93,32 @@ const WALLS_FIRSTGID: u32 = 1;
 // ============================================================================
 
 // Panel backgrounds (darker to lighter for depth)
-const PANEL_BG_DARK: Color = Color::new(0.071, 0.071, 0.094, 0.961);    // rgba(18, 18, 24, 245)
-const PANEL_BG_MID: Color = Color::new(0.110, 0.110, 0.149, 1.0);       // rgba(28, 28, 38, 255)
+const PANEL_BG_DARK: Color = Color::new(0.071, 0.071, 0.094, 0.961); // rgba(18, 18, 24, 245)
+const PANEL_BG_MID: Color = Color::new(0.110, 0.110, 0.149, 1.0); // rgba(28, 28, 38, 255)
 
 // Frame/Border colors (bronze/gold medieval theme)
-const FRAME_OUTER: Color = Color::new(0.322, 0.243, 0.165, 1.0);        // rgba(82, 62, 42, 255)
-const FRAME_MID: Color = Color::new(0.557, 0.424, 0.267, 1.0);          // rgba(142, 108, 68, 255)
-const FRAME_INNER: Color = Color::new(0.729, 0.580, 0.361, 1.0);        // rgba(186, 148, 92, 255)
-const FRAME_ACCENT: Color = Color::new(0.855, 0.698, 0.424, 1.0);       // rgba(218, 178, 108, 255)
+const FRAME_OUTER: Color = Color::new(0.322, 0.243, 0.165, 1.0); // rgba(82, 62, 42, 255)
+const FRAME_MID: Color = Color::new(0.557, 0.424, 0.267, 1.0); // rgba(142, 108, 68, 255)
+const FRAME_INNER: Color = Color::new(0.729, 0.580, 0.361, 1.0); // rgba(186, 148, 92, 255)
+const FRAME_ACCENT: Color = Color::new(0.855, 0.698, 0.424, 1.0); // rgba(218, 178, 108, 255)
 
 // Slot colors
-const SLOT_BG_EMPTY: Color = Color::new(0.086, 0.086, 0.118, 1.0);      // rgba(22, 22, 30, 255)
-const SLOT_BG_FILLED: Color = Color::new(0.125, 0.125, 0.173, 1.0);     // rgba(32, 32, 44, 255)
-const SLOT_INNER_SHADOW: Color = Color::new(0.047, 0.047, 0.063, 1.0);  // rgba(12, 12, 16, 255)
-const SLOT_HIGHLIGHT: Color = Color::new(0.188, 0.188, 0.251, 1.0);     // rgba(48, 48, 64, 255)
-const SLOT_BORDER: Color = Color::new(0.227, 0.212, 0.188, 1.0);        // rgba(58, 54, 48, 255)
+const SLOT_BG_EMPTY: Color = Color::new(0.086, 0.086, 0.118, 1.0); // rgba(22, 22, 30, 255)
+const SLOT_BG_FILLED: Color = Color::new(0.125, 0.125, 0.173, 1.0); // rgba(32, 32, 44, 255)
+const SLOT_INNER_SHADOW: Color = Color::new(0.047, 0.047, 0.063, 1.0); // rgba(12, 12, 16, 255)
+const SLOT_HIGHLIGHT: Color = Color::new(0.188, 0.188, 0.251, 1.0); // rgba(48, 48, 64, 255)
+const SLOT_BORDER: Color = Color::new(0.227, 0.212, 0.188, 1.0); // rgba(58, 54, 48, 255)
 
 // Hover/Selection states
-const SLOT_HOVER_BG: Color = Color::new(0.188, 0.188, 0.282, 1.0);      // rgba(48, 48, 72, 255)
-const SLOT_HOVER_BORDER: Color = Color::new(0.659, 0.580, 0.424, 1.0);  // rgba(168, 148, 108, 255)
+const SLOT_HOVER_BG: Color = Color::new(0.188, 0.188, 0.282, 1.0); // rgba(48, 48, 72, 255)
+const SLOT_HOVER_BORDER: Color = Color::new(0.659, 0.580, 0.424, 1.0); // rgba(168, 148, 108, 255)
 const SLOT_SELECTED_BORDER: Color = Color::new(0.855, 0.737, 0.502, 1.0); // rgba(218, 188, 128, 255)
 const SLOT_DRAG_SOURCE: Color = Color::new(0.314, 0.392, 0.627, 0.706); // rgba(80, 100, 160, 180)
 
 // Text colors (used by stats panel)
-const TEXT_TITLE: Color = Color::new(0.855, 0.737, 0.502, 1.0);         // rgba(218, 188, 128, 255)
-const TEXT_NORMAL: Color = Color::new(0.824, 0.824, 0.855, 1.0);        // rgba(210, 210, 218, 255)
-const TEXT_DIM: Color = Color::new(0.502, 0.502, 0.541, 1.0);           // rgba(128, 128, 138, 255)
+const TEXT_TITLE: Color = Color::new(0.855, 0.737, 0.502, 1.0); // rgba(218, 188, 128, 255)
+const TEXT_NORMAL: Color = Color::new(0.824, 0.824, 0.855, 1.0); // rgba(210, 210, 218, 255)
+const TEXT_DIM: Color = Color::new(0.502, 0.502, 0.541, 1.0); // rgba(128, 128, 138, 255)
 
 // Layout constant for draw_panel_frame helper
 const FRAME_THICKNESS: f32 = 4.0;
@@ -111,27 +128,27 @@ const FRAME_THICKNESS: f32 = 4.0;
 // ============================================================================
 
 // Health bar frame (bronze-tinted dark metal)
-const HEALTHBAR_FRAME_DARK: Color = Color::new(0.18, 0.14, 0.10, 1.0);   // Dark bronze outline
-const HEALTHBAR_FRAME_MID: Color = Color::new(0.35, 0.27, 0.18, 1.0);    // Mid bronze
-const HEALTHBAR_FRAME_LIGHT: Color = Color::new(0.55, 0.43, 0.28, 1.0);  // Light bronze
+const HEALTHBAR_FRAME_DARK: Color = Color::new(0.18, 0.14, 0.10, 1.0); // Dark bronze outline
+const HEALTHBAR_FRAME_MID: Color = Color::new(0.35, 0.27, 0.18, 1.0); // Mid bronze
+const HEALTHBAR_FRAME_LIGHT: Color = Color::new(0.55, 0.43, 0.28, 1.0); // Light bronze
 const HEALTHBAR_FRAME_ACCENT: Color = Color::new(0.72, 0.58, 0.38, 1.0); // Gold highlight
 
 // Health bar background (recessed dark)
-const HEALTHBAR_BG_OUTER: Color = Color::new(0.04, 0.04, 0.05, 1.0);     // Outer shadow
-const HEALTHBAR_BG_INNER: Color = Color::new(0.08, 0.07, 0.09, 1.0);     // Inner dark
+const HEALTHBAR_BG_OUTER: Color = Color::new(0.04, 0.04, 0.05, 1.0); // Outer shadow
+const HEALTHBAR_BG_INNER: Color = Color::new(0.08, 0.07, 0.09, 1.0); // Inner dark
 
 // Health colors - rich jewel tones (dark/mid/light for gradient effect)
-const HEALTH_GREEN_DARK: Color = Color::new(0.12, 0.45, 0.22, 1.0);      // Emerald base
-const HEALTH_GREEN_MID: Color = Color::new(0.20, 0.62, 0.32, 1.0);       // Emerald bright
-const HEALTH_GREEN_LIGHT: Color = Color::new(0.35, 0.78, 0.48, 1.0);     // Emerald highlight
+const HEALTH_GREEN_DARK: Color = Color::new(0.12, 0.45, 0.22, 1.0); // Emerald base
+const HEALTH_GREEN_MID: Color = Color::new(0.20, 0.62, 0.32, 1.0); // Emerald bright
+const HEALTH_GREEN_LIGHT: Color = Color::new(0.35, 0.78, 0.48, 1.0); // Emerald highlight
 
-const HEALTH_YELLOW_DARK: Color = Color::new(0.65, 0.45, 0.08, 1.0);     // Amber base
-const HEALTH_YELLOW_MID: Color = Color::new(0.85, 0.62, 0.12, 1.0);      // Amber bright
-const HEALTH_YELLOW_LIGHT: Color = Color::new(0.95, 0.78, 0.25, 1.0);    // Amber highlight
+const HEALTH_YELLOW_DARK: Color = Color::new(0.65, 0.45, 0.08, 1.0); // Amber base
+const HEALTH_YELLOW_MID: Color = Color::new(0.85, 0.62, 0.12, 1.0); // Amber bright
+const HEALTH_YELLOW_LIGHT: Color = Color::new(0.95, 0.78, 0.25, 1.0); // Amber highlight
 
-const HEALTH_RED_DARK: Color = Color::new(0.55, 0.12, 0.12, 1.0);        // Ruby base
-const HEALTH_RED_MID: Color = Color::new(0.75, 0.18, 0.18, 1.0);         // Ruby bright
-const HEALTH_RED_LIGHT: Color = Color::new(0.90, 0.35, 0.35, 1.0);       // Ruby highlight
+const HEALTH_RED_DARK: Color = Color::new(0.55, 0.12, 0.12, 1.0); // Ruby base
+const HEALTH_RED_MID: Color = Color::new(0.75, 0.18, 0.18, 1.0); // Ruby bright
+const HEALTH_RED_LIGHT: Color = Color::new(0.90, 0.35, 0.35, 1.0); // Ruby highlight
 
 /// A sprite atlas: one texture containing many sprites, with rect lookups
 pub struct SpriteAtlas {
@@ -157,12 +174,8 @@ impl SpriteStore {
     /// For individual textures, source_rect covers the whole texture.
     pub fn get(&self, key: &str) -> Option<(&Texture2D, Option<Rect>)> {
         match self {
-            SpriteStore::Atlas(atlas) => {
-                atlas.get(key).map(|(tex, rect)| (tex, Some(rect)))
-            }
-            SpriteStore::Individual(map) => {
-                map.get(key).map(|tex| (tex, None))
-            }
+            SpriteStore::Atlas(atlas) => atlas.get(key).map(|(tex, rect)| (tex, Some(rect))),
+            SpriteStore::Individual(map) => map.get(key).map(|tex| (tex, None)),
         }
     }
 
@@ -206,9 +219,7 @@ impl SpritesheetStore {
             SpritesheetStore::Atlas { texture, rects } => {
                 rects.get(key).map(|r| (texture, Some((r.x, r.y))))
             }
-            SpritesheetStore::Individual(map) => {
-                map.get(key).map(|tex| (tex, None))
-            }
+            SpritesheetStore::Individual(map) => map.get(key).map(|tex| (tex, None)),
         }
     }
 
@@ -217,9 +228,7 @@ impl SpritesheetStore {
     /// For atlas, returns the rect dimensions (the spritesheet size within the atlas).
     pub fn get_dimensions(&self, key: &str) -> Option<(f32, f32)> {
         match self {
-            SpritesheetStore::Atlas { rects, .. } => {
-                rects.get(key).map(|r| (r.w, r.h))
-            }
+            SpritesheetStore::Atlas { rects, .. } => rects.get(key).map(|r| (r.w, r.h)),
             SpritesheetStore::Individual(map) => {
                 map.get(key).map(|tex| (tex.width(), tex.height()))
             }
@@ -251,6 +260,8 @@ const MINIMAP_WORLD_TEXT_SIZE: f32 = 16.0;
 const MINIMAP_VISIBLE_CHUNK_RADIUS: f32 = 2.0;
 const MINIMAP_PREVIEW_TILE_BUDGET: usize = 9_000;
 const MINIMAP_PANEL_TILE_BUDGET: usize = 16_000;
+const MINIMAP_PANEL_MIN_ZOOM: f32 = 1.0;
+const MINIMAP_PANEL_MAX_ZOOM: f32 = 6.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MinimapMarkerKind {
@@ -285,6 +296,27 @@ impl MinimapBounds {
     fn height(&self) -> f32 {
         (self.max_y - self.min_y).max(1.0)
     }
+}
+
+#[derive(Clone, Debug)]
+struct MinimapStaticChunk {
+    coord_x: i32,
+    coord_y: i32,
+    ground_tiles: Vec<u32>,
+    tree_markers: Vec<MinimapMarker>,
+    teleport_markers: Vec<MinimapMarker>,
+}
+
+#[derive(Clone, Debug)]
+struct MinimapStaticWorld {
+    bounds: MinimapBounds,
+    chunks: Vec<MinimapStaticChunk>,
+}
+
+enum MinimapStaticWorldState {
+    Uninitialized,
+    Loaded(MinimapStaticWorld),
+    Unavailable,
 }
 
 pub struct Renderer {
@@ -355,6 +387,8 @@ pub struct Renderer {
     tileset_image_cache: RefCell<Option<Image>>,
     /// Cached minimap tint color per tile id.
     minimap_tile_color_cache: RefCell<HashMap<u32, Color>>,
+    /// Desktop-only static minimap chunk cache loaded from rust-server maps.
+    minimap_static_world: RefCell<MinimapStaticWorldState>,
     /// Cached text measurements bucketed by font size.
     text_measure_cache: RefCell<HashMap<i32, HashMap<String, TextDimensions>>>,
     /// Cached wrapped lines bucketed by (max width, font size).
@@ -371,7 +405,11 @@ impl Renderer {
             fn loading_set_label(label: JsObject);
             fn loading_hide();
         }
-        let pct = if total > 0 { (loaded as f64 / total as f64 * 10000.0) as i32 } else { 0 };
+        let pct = if total > 0 {
+            (loaded as f64 / total as f64 * 10000.0) as i32
+        } else {
+            0
+        };
         unsafe {
             loading_set_progress(pct);
             loading_set_label(JsObject::string(label));
@@ -383,7 +421,9 @@ impl Renderer {
         extern "C" {
             fn loading_hide();
         }
-        unsafe { loading_hide(); }
+        unsafe {
+            loading_hide();
+        }
     }
 
     pub async fn new(audio: &mut crate::audio::AudioManager) -> Self {
@@ -431,15 +471,22 @@ impl Renderer {
         // Load player sprites - atlas on WASM/Android, individual on desktop
         set_loading!("Loading player sprites...");
         #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-        let player_sprites: SpritesheetStore = if let Some(ref atlas_info) = manifest.players_atlas {
+        let player_sprites: SpritesheetStore = if let Some(ref atlas_info) = manifest.players_atlas
+        {
             if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                SpritesheetStore::Atlas { texture: tex, rects }
+                SpritesheetStore::Atlas {
+                    texture: tex,
+                    rects,
+                }
             } else {
                 let mut sprites = HashMap::new();
                 for gender in GENDERS {
                     for skin in SKINS {
                         let key = format!("{}_{}", gender, skin);
-                        let path = asset_path(&format!("assets/sprites/players/player_{}_{}.png", gender, skin));
+                        let path = asset_path(&format!(
+                            "assets/sprites/players/player_{}_{}.png",
+                            gender, skin
+                        ));
                         if let Ok(tex) = load_texture(&path).await {
                             tex.set_filter(FilterMode::Nearest);
                             sprites.insert(key, tex);
@@ -453,7 +500,10 @@ impl Renderer {
             for gender in GENDERS {
                 for skin in SKINS {
                     let key = format!("{}_{}", gender, skin);
-                    let path = asset_path(&format!("assets/sprites/players/player_{}_{}.png", gender, skin));
+                    let path = asset_path(&format!(
+                        "assets/sprites/players/player_{}_{}.png",
+                        gender, skin
+                    ));
                     if let Ok(tex) = load_texture(&path).await {
                         tex.set_filter(FilterMode::Nearest);
                         sprites.insert(key, tex);
@@ -485,7 +535,10 @@ impl Renderer {
         #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         let hair_sprites: SpritesheetStore = if let Some(ref atlas_info) = manifest.hair_atlas {
             if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                SpritesheetStore::Atlas { texture: tex, rects }
+                SpritesheetStore::Atlas {
+                    texture: tex,
+                    rects,
+                }
             } else {
                 let mut sprites = HashMap::new();
                 for style in 0..6 {
@@ -494,7 +547,8 @@ impl Renderer {
                         tex.set_filter(FilterMode::Nearest);
                         sprites.insert(format!("male_{}", style), tex);
                     }
-                    let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+                    let path =
+                        asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
                     if let Ok(tex) = load_texture(&path).await {
                         tex.set_filter(FilterMode::Nearest);
                         sprites.insert(format!("female_{}", style), tex);
@@ -544,11 +598,27 @@ impl Renderer {
             match load_texture(&path).await {
                 Ok(tex) => {
                     tex.set_filter(FilterMode::Nearest);
-                    let rects = atlas_info.sprites.iter().map(|(key, sr)| {
-                        (key.clone(), Rect::new(sr.x as f32, sr.y as f32, sr.w as f32, sr.h as f32))
-                    }).collect();
-                    log::info!("Loaded atlas {} ({}x{}, {} sprites)", atlas_info.file, tex.width(), tex.height(), atlas_info.sprites.len());
-                    Some(SpriteAtlas { texture: tex, rects })
+                    let rects = atlas_info
+                        .sprites
+                        .iter()
+                        .map(|(key, sr)| {
+                            (
+                                key.clone(),
+                                Rect::new(sr.x as f32, sr.y as f32, sr.w as f32, sr.h as f32),
+                            )
+                        })
+                        .collect();
+                    log::info!(
+                        "Loaded atlas {} ({}x{}, {} sprites)",
+                        atlas_info.file,
+                        tex.width(),
+                        tex.height(),
+                        atlas_info.sprites.len()
+                    );
+                    Some(SpriteAtlas {
+                        texture: tex,
+                        rects,
+                    })
                 }
                 Err(e) => {
                     log::warn!("Failed to load atlas {}: {}", path, e);
@@ -558,15 +628,30 @@ impl Renderer {
         }
 
         // Helper to load a spritesheet atlas (for animation spritesheets)
-        async fn load_spritesheet_atlas(atlas_info: &SpriteAtlasInfo) -> Option<(Texture2D, HashMap<String, Rect>)> {
+        async fn load_spritesheet_atlas(
+            atlas_info: &SpriteAtlasInfo,
+        ) -> Option<(Texture2D, HashMap<String, Rect>)> {
             let path = asset_path(&format!("assets/{}", atlas_info.file));
             match load_texture(&path).await {
                 Ok(tex) => {
                     tex.set_filter(FilterMode::Nearest);
-                    let rects = atlas_info.sprites.iter().map(|(key, sr)| {
-                        (key.clone(), Rect::new(sr.x as f32, sr.y as f32, sr.w as f32, sr.h as f32))
-                    }).collect();
-                    log::info!("Loaded spritesheet atlas {} ({}x{}, {} sprites)", atlas_info.file, tex.width(), tex.height(), atlas_info.sprites.len());
+                    let rects = atlas_info
+                        .sprites
+                        .iter()
+                        .map(|(key, sr)| {
+                            (
+                                key.clone(),
+                                Rect::new(sr.x as f32, sr.y as f32, sr.w as f32, sr.h as f32),
+                            )
+                        })
+                        .collect();
+                    log::info!(
+                        "Loaded spritesheet atlas {} ({}x{}, {} sprites)",
+                        atlas_info.file,
+                        tex.width(),
+                        tex.height(),
+                        atlas_info.sprites.len()
+                    );
                     Some((tex, rects))
                 }
                 Err(e) => {
@@ -608,20 +693,52 @@ impl Renderer {
         // On WASM/Android, load sprite categories - use atlases when available.
         // On desktop, use the fast directory-scanning loader.
         #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-        let (equipment_sprites, weapon_sprites, weapon_frame_sizes, item_sprites, object_sprites, wall_sprites, npc_sprites, farming_sprites, spell_effect_textures) = {
+        let (
+            equipment_sprites,
+            weapon_sprites,
+            weapon_frame_sizes,
+            item_sprites,
+            object_sprites,
+            wall_sprites,
+            npc_sprites,
+            farming_sprites,
+            spell_effect_textures,
+        ) = {
             // Load equipment - atlas if available
             set_loading!("Loading equipment...");
-            let equipment: SpritesheetStore = if let Some(ref atlas_info) = manifest.equipment_atlas {
+            let equipment: SpritesheetStore = if let Some(ref atlas_info) = manifest.equipment_atlas
+            {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
                     loaded += manifest.equipment.len();
                     #[cfg(target_arch = "wasm32")]
                     Self::update_loading(loaded, total, "Loading equipment...");
-                    SpritesheetStore::Atlas { texture: tex, rects }
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
                 } else {
-                    SpritesheetStore::Individual(load_individual_sprites(&manifest.equipment, "assets/sprites", &mut loaded, total, "Loading equipment...").await)
+                    SpritesheetStore::Individual(
+                        load_individual_sprites(
+                            &manifest.equipment,
+                            "assets/sprites",
+                            &mut loaded,
+                            total,
+                            "Loading equipment...",
+                        )
+                        .await,
+                    )
                 }
             } else {
-                SpritesheetStore::Individual(load_individual_sprites(&manifest.equipment, "assets/sprites", &mut loaded, total, "Loading equipment...").await)
+                SpritesheetStore::Individual(
+                    load_individual_sprites(
+                        &manifest.equipment,
+                        "assets/sprites",
+                        &mut loaded,
+                        total,
+                        "Loading equipment...",
+                    )
+                    .await,
+                )
             };
 
             // Load weapons - atlas if available
@@ -631,15 +748,38 @@ impl Renderer {
                     loaded += manifest.weapons.len();
                     #[cfg(target_arch = "wasm32")]
                     Self::update_loading(loaded, total, "Loading weapons...");
-                    SpritesheetStore::Atlas { texture: tex, rects }
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
                 } else {
-                    SpritesheetStore::Individual(load_individual_sprites(&manifest.weapons, "assets/sprites/weapons", &mut loaded, total, "Loading weapons...").await)
+                    SpritesheetStore::Individual(
+                        load_individual_sprites(
+                            &manifest.weapons,
+                            "assets/sprites/weapons",
+                            &mut loaded,
+                            total,
+                            "Loading weapons...",
+                        )
+                        .await,
+                    )
                 }
             } else {
-                SpritesheetStore::Individual(load_individual_sprites(&manifest.weapons, "assets/sprites/weapons", &mut loaded, total, "Loading weapons...").await)
+                SpritesheetStore::Individual(
+                    load_individual_sprites(
+                        &manifest.weapons,
+                        "assets/sprites/weapons",
+                        &mut loaded,
+                        total,
+                        "Loading weapons...",
+                    )
+                    .await,
+                )
             };
             // Build weapon frame sizes map
-            let wf_sizes: HashMap<String, (f32, f32)> = manifest.weapon_frame_sizes.iter()
+            let wf_sizes: HashMap<String, (f32, f32)> = manifest
+                .weapon_frame_sizes
+                .iter()
                 .map(|(k, v)| (k.clone(), (v[0], v[1])))
                 .collect();
 
@@ -652,10 +792,28 @@ impl Renderer {
                     Self::update_loading(loaded, total, "Loading items...");
                     SpriteStore::Atlas(atlas)
                 } else {
-                    SpriteStore::Individual(load_individual_sprites(&manifest.inventory, "assets/sprites/inventory", &mut loaded, total, "Loading items...").await)
+                    SpriteStore::Individual(
+                        load_individual_sprites(
+                            &manifest.inventory,
+                            "assets/sprites/inventory",
+                            &mut loaded,
+                            total,
+                            "Loading items...",
+                        )
+                        .await,
+                    )
                 }
             } else {
-                SpriteStore::Individual(load_individual_sprites(&manifest.inventory, "assets/sprites/inventory", &mut loaded, total, "Loading items...").await)
+                SpriteStore::Individual(
+                    load_individual_sprites(
+                        &manifest.inventory,
+                        "assets/sprites/inventory",
+                        &mut loaded,
+                        total,
+                        "Loading items...",
+                    )
+                    .await,
+                )
             };
 
             // Load objects - atlas if available
@@ -667,10 +825,28 @@ impl Renderer {
                     Self::update_loading(loaded, total, "Loading objects...");
                     SpriteStore::Atlas(atlas)
                 } else {
-                    SpriteStore::Individual(load_individual_sprites(&manifest.objects, "assets/sprites/objects", &mut loaded, total, "Loading objects...").await)
+                    SpriteStore::Individual(
+                        load_individual_sprites(
+                            &manifest.objects,
+                            "assets/sprites/objects",
+                            &mut loaded,
+                            total,
+                            "Loading objects...",
+                        )
+                        .await,
+                    )
                 }
             } else {
-                SpriteStore::Individual(load_individual_sprites(&manifest.objects, "assets/sprites/objects", &mut loaded, total, "Loading objects...").await)
+                SpriteStore::Individual(
+                    load_individual_sprites(
+                        &manifest.objects,
+                        "assets/sprites/objects",
+                        &mut loaded,
+                        total,
+                        "Loading objects...",
+                    )
+                    .await,
+                )
             };
 
             // Load walls - atlas if available
@@ -682,10 +858,28 @@ impl Renderer {
                     Self::update_loading(loaded, total, "Loading walls...");
                     SpriteStore::Atlas(atlas)
                 } else {
-                    SpriteStore::Individual(load_individual_sprites(&manifest.walls, "assets/sprites/walls", &mut loaded, total, "Loading walls...").await)
+                    SpriteStore::Individual(
+                        load_individual_sprites(
+                            &manifest.walls,
+                            "assets/sprites/walls",
+                            &mut loaded,
+                            total,
+                            "Loading walls...",
+                        )
+                        .await,
+                    )
                 }
             } else {
-                SpriteStore::Individual(load_individual_sprites(&manifest.walls, "assets/sprites/walls", &mut loaded, total, "Loading walls...").await)
+                SpriteStore::Individual(
+                    load_individual_sprites(
+                        &manifest.walls,
+                        "assets/sprites/walls",
+                        &mut loaded,
+                        total,
+                        "Loading walls...",
+                    )
+                    .await,
+                )
             };
 
             // Load NPCs/enemies - atlas if available
@@ -695,24 +889,59 @@ impl Renderer {
                     loaded += manifest.enemies.len();
                     #[cfg(target_arch = "wasm32")]
                     Self::update_loading(loaded, total, "Loading NPCs...");
-                    SpritesheetStore::Atlas { texture: tex, rects }
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
                 } else {
-                    SpritesheetStore::Individual(load_individual_sprites(&manifest.enemies, "assets/sprites/enemies", &mut loaded, total, "Loading NPCs...").await)
+                    SpritesheetStore::Individual(
+                        load_individual_sprites(
+                            &manifest.enemies,
+                            "assets/sprites/enemies",
+                            &mut loaded,
+                            total,
+                            "Loading NPCs...",
+                        )
+                        .await,
+                    )
                 }
             } else {
-                SpritesheetStore::Individual(load_individual_sprites(&manifest.enemies, "assets/sprites/enemies", &mut loaded, total, "Loading NPCs...").await)
+                SpritesheetStore::Individual(
+                    load_individual_sprites(
+                        &manifest.enemies,
+                        "assets/sprites/enemies",
+                        &mut loaded,
+                        total,
+                        "Loading NPCs...",
+                    )
+                    .await,
+                )
             };
 
             // Load farming sprites - atlas if available
             set_loading!("Loading farming...");
             let farming: SpritesheetStore = if let Some(ref atlas_info) = manifest.farming_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    SpritesheetStore::Atlas { texture: tex, rects }
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
                 } else {
-                    let crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
+                    let crop_names = [
+                        "potato",
+                        "onion",
+                        "tomato",
+                        "cabbage",
+                        "strawberry",
+                        "sweetcorn",
+                        "wheat",
+                        "carrot",
+                        "spinach",
+                    ];
                     let mut sprites = HashMap::new();
                     for crop in &crop_names {
-                        let path = asset_path(&format!("assets/sprites/farming/farming_{}.png", crop));
+                        let path =
+                            asset_path(&format!("assets/sprites/farming/farming_{}.png", crop));
                         if let Ok(tex) = load_texture(&path).await {
                             tex.set_filter(FilterMode::Nearest);
                             sprites.insert(crop.to_string(), tex);
@@ -721,7 +950,17 @@ impl Renderer {
                     SpritesheetStore::Individual(sprites)
                 }
             } else {
-                let crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
+                let crop_names = [
+                    "potato",
+                    "onion",
+                    "tomato",
+                    "cabbage",
+                    "strawberry",
+                    "sweetcorn",
+                    "wheat",
+                    "carrot",
+                    "spinach",
+                ];
                 let mut sprites = HashMap::new();
                 for crop in &crop_names {
                     let path = asset_path(&format!("assets/sprites/farming/farming_{}.png", crop));
@@ -737,7 +976,10 @@ impl Renderer {
             set_loading!("Loading effects...");
             let effects: SpritesheetStore = if let Some(ref atlas_info) = manifest.effects_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    SpritesheetStore::Atlas { texture: tex, rects }
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
                 } else {
                     let mut sprites = HashMap::new();
                     for name in &["dark_hand", "dark_eater", "self_heal", "bubbles_warp"] {
@@ -761,25 +1003,91 @@ impl Renderer {
                 SpritesheetStore::Individual(sprites)
             };
 
-            (equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects)
+            (
+                equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects,
+            )
         };
 
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        let (equipment_sprites, weapon_sprites, weapon_frame_sizes, item_sprites, object_sprites, wall_sprites, npc_sprites, farming_sprites, spell_effect_textures) = {
+        let (
+            equipment_sprites,
+            weapon_sprites,
+            weapon_frame_sizes,
+            item_sprites,
+            object_sprites,
+            wall_sprites,
+            npc_sprites,
+            farming_sprites,
+            spell_effect_textures,
+        ) = {
             use crate::util::load_sprites_from_dir_or_manifest;
 
-            let equipment = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/equipment", &manifest.equipment, "assets/sprites").await);
-            let weapons = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/weapons", &manifest.weapons, "assets/sprites/weapons").await);
+            let equipment = SpritesheetStore::Individual(
+                load_sprites_from_dir_or_manifest(
+                    "assets/sprites/equipment",
+                    &manifest.equipment,
+                    "assets/sprites",
+                )
+                .await,
+            );
+            let weapons = SpritesheetStore::Individual(
+                load_sprites_from_dir_or_manifest(
+                    "assets/sprites/weapons",
+                    &manifest.weapons,
+                    "assets/sprites/weapons",
+                )
+                .await,
+            );
             // Build weapon frame sizes map
-            let wf_sizes: HashMap<String, (f32, f32)> = manifest.weapon_frame_sizes.iter()
+            let wf_sizes: HashMap<String, (f32, f32)> = manifest
+                .weapon_frame_sizes
+                .iter()
                 .map(|(k, v)| (k.clone(), (v[0], v[1])))
                 .collect();
-            let items = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/inventory", &manifest.inventory, "assets/sprites/inventory").await);
-            let objects = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/objects", &manifest.objects, "assets/sprites/objects").await);
-            let walls = SpriteStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/walls", &manifest.walls, "assets/sprites/walls").await);
-            let npcs = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/enemies", &manifest.enemies, "assets/sprites/enemies").await);
+            let items = SpriteStore::Individual(
+                load_sprites_from_dir_or_manifest(
+                    "assets/sprites/inventory",
+                    &manifest.inventory,
+                    "assets/sprites/inventory",
+                )
+                .await,
+            );
+            let objects = SpriteStore::Individual(
+                load_sprites_from_dir_or_manifest(
+                    "assets/sprites/objects",
+                    &manifest.objects,
+                    "assets/sprites/objects",
+                )
+                .await,
+            );
+            let walls = SpriteStore::Individual(
+                load_sprites_from_dir_or_manifest(
+                    "assets/sprites/walls",
+                    &manifest.walls,
+                    "assets/sprites/walls",
+                )
+                .await,
+            );
+            let npcs = SpritesheetStore::Individual(
+                load_sprites_from_dir_or_manifest(
+                    "assets/sprites/enemies",
+                    &manifest.enemies,
+                    "assets/sprites/enemies",
+                )
+                .await,
+            );
             let farming = {
-                let crop_names = ["potato", "onion", "tomato", "cabbage", "strawberry", "sweetcorn", "wheat", "carrot", "spinach"];
+                let crop_names = [
+                    "potato",
+                    "onion",
+                    "tomato",
+                    "cabbage",
+                    "strawberry",
+                    "sweetcorn",
+                    "wheat",
+                    "carrot",
+                    "spinach",
+                ];
                 let mut sprites = HashMap::new();
                 for crop in &crop_names {
                     let path = format!("assets/sprites/farming/farming_{}.png", crop);
@@ -790,35 +1098,55 @@ impl Renderer {
                 }
                 SpritesheetStore::Individual(sprites)
             };
-            let effects = SpritesheetStore::Individual(load_sprites_from_dir_or_manifest("assets/sprites/effects", &[], "assets/sprites/effects").await);
-            (equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects)
+            let effects = SpritesheetStore::Individual(
+                load_sprites_from_dir_or_manifest(
+                    "assets/sprites/effects",
+                    &[],
+                    "assets/sprites/effects",
+                )
+                .await,
+            );
+            (
+                equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects,
+            )
         };
 
         set_loading!("Loading fonts...");
 
-        let font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+        let font =
+            BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
         loaded += 1;
 
         set_loading!("Loading UI...");
 
         // Load quest complete banner texture
-        let quest_complete_texture = match load_texture(&asset_path("assets/ui/quest_complete.png")).await {
-            Ok(tex) => {
-                tex.set_filter(FilterMode::Nearest);
-                log::info!("Loaded quest complete texture: {}x{}", tex.width(), tex.height());
-                Some(tex)
-            }
-            Err(e) => {
-                log::warn!("Failed to load quest complete texture: {}", e);
-                None
-            }
-        };
+        let quest_complete_texture =
+            match load_texture(&asset_path("assets/ui/quest_complete.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    log::info!(
+                        "Loaded quest complete texture: {}x{}",
+                        tex.width(),
+                        tex.height()
+                    );
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load quest complete texture: {}", e);
+                    None
+                }
+            };
 
         // Load gold nugget icon for inventory
-        let gold_nugget_texture = match load_texture(&asset_path("assets/ui/gold_nugget.png")).await {
+        let gold_nugget_texture = match load_texture(&asset_path("assets/ui/gold_nugget.png")).await
+        {
             Ok(tex) => {
                 tex.set_filter(FilterMode::Nearest);
-                log::info!("Loaded gold nugget texture: {}x{}", tex.width(), tex.height());
+                log::info!(
+                    "Loaded gold nugget texture: {}x{}",
+                    tex.width(),
+                    tex.height()
+                );
                 Some(tex)
             }
             Err(e) => {
@@ -828,30 +1156,36 @@ impl Renderer {
         };
 
         // Load circular stone backdrop for shop item icons
-        let circular_stone_texture = match load_texture(&asset_path("assets/ui/circular_stone.png")).await {
-            Ok(tex) => {
-                tex.set_filter(FilterMode::Nearest);
-                log::info!("Loaded circular stone texture: {}x{}", tex.width(), tex.height());
-                Some(tex)
-            }
-            Err(e) => {
-                log::warn!("Failed to load circular stone texture: {}", e);
-                None
-            }
-        };
+        let circular_stone_texture =
+            match load_texture(&asset_path("assets/ui/circular_stone.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    log::info!(
+                        "Loaded circular stone texture: {}x{}",
+                        tex.width(),
+                        tex.height()
+                    );
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load circular stone texture: {}", e);
+                    None
+                }
+            };
 
         // Load menu button icons sprite sheet
-        let menu_button_icons = match load_texture(&asset_path("assets/ui/background_icons.png")).await {
-            Ok(tex) => {
-                tex.set_filter(FilterMode::Nearest);
-                log::info!("Loaded menu button icons: {}x{}", tex.width(), tex.height());
-                Some(tex)
-            }
-            Err(e) => {
-                log::warn!("Failed to load menu button icons: {}", e);
-                None
-            }
-        };
+        let menu_button_icons =
+            match load_texture(&asset_path("assets/ui/background_icons.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    log::info!("Loaded menu button icons: {}x{}", tex.width(), tex.height());
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load menu button icons: {}", e);
+                    None
+                }
+            };
 
         // Load UI icons sprite sheet (24x24 icons in 10x10 grid)
         let ui_icons = match load_texture(&asset_path("assets/ui/ui_icons.png")).await {
@@ -878,16 +1212,17 @@ impl Renderer {
             }
         };
 
-        let fishing_skill_icon = match load_texture(&asset_path("assets/ui/fishing_skill.png")).await {
-            Ok(tex) => {
-                tex.set_filter(FilterMode::Nearest);
-                Some(tex)
-            }
-            Err(e) => {
-                log::warn!("Failed to load fishing_skill icon: {}", e);
-                None
-            }
-        };
+        let fishing_skill_icon =
+            match load_texture(&asset_path("assets/ui/fishing_skill.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load fishing_skill icon: {}", e);
+                    None
+                }
+            };
 
         let coin_small_icon = match load_texture(&asset_path("assets/ui/coin_small.png")).await {
             Ok(tex) => {
@@ -959,10 +1294,20 @@ impl Renderer {
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         let prayer_icons: SpriteStore = {
             let prayer_names = [
-                "clarity", "thick_skin", "burst_of_strength", "improved_clarity",
-                "rock_skin", "superhuman_strength", "resourcefulness", "rapid_heal",
-                "steel_skin", "incredible_clarity", "ultimate_strength", "protection",
-                "greater_resourcefulness", "greater_protection",
+                "clarity",
+                "thick_skin",
+                "burst_of_strength",
+                "improved_clarity",
+                "rock_skin",
+                "superhuman_strength",
+                "resourcefulness",
+                "rapid_heal",
+                "steel_skin",
+                "incredible_clarity",
+                "ultimate_strength",
+                "protection",
+                "greater_resourcefulness",
+                "greater_protection",
             ];
             let mut icons = HashMap::new();
             for prayer in &prayer_names {
@@ -996,7 +1341,7 @@ impl Renderer {
             let spell_icon_mappings = [
                 ("dark_hand", "dark_hand"),
                 ("dark_eater", "dark_eater"),
-                ("heal", "self_heal"),
+                ("heal", "heal"),
                 ("return_home", "return_home"),
             ];
             let mut icons = HashMap::new();
@@ -1016,16 +1361,20 @@ impl Renderer {
 
         // Load miscellaneous UI icons atlas (WASM/Android only)
         #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-        let ui_misc_atlas: Option<SpriteAtlas> = if let Some(ref atlas_info) = manifest.ui_misc_atlas {
-            load_atlas(atlas_info).await
-        } else {
-            None
-        };
+        let ui_misc_atlas: Option<SpriteAtlas> =
+            if let Some(ref atlas_info) = manifest.ui_misc_atlas {
+                load_atlas(atlas_info).await
+            } else {
+                None
+            };
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         let ui_misc_atlas: Option<SpriteAtlas> = None;
 
         // spell_effect_textures loaded via atlas/manifest in earlier block
-        log::info!("Spell effect textures loaded: {}", spell_effect_textures.len());
+        log::info!(
+            "Spell effect textures loaded: {}",
+            spell_effect_textures.len()
+        );
 
         set_loading!("Loading shaders...");
 
@@ -1061,9 +1410,7 @@ impl Renderer {
                 fragment: shaders::WATER_FRAGMENT,
             },
             MaterialParams {
-                uniforms: vec![
-                    UniformDesc::new("Time", UniformType::Float1),
-                ],
+                uniforms: vec![UniformDesc::new("Time", UniformType::Float1)],
                 ..Default::default()
             },
         ) {
@@ -1072,7 +1419,10 @@ impl Renderer {
                 Some(mat)
             }
             Err(e) => {
-                log::warn!("Failed to load water shader: {}. Water tiles will render without animation.", e);
+                log::warn!(
+                    "Failed to load water shader: {}. Water tiles will render without animation.",
+                    e
+                );
                 None
             }
         };
@@ -1091,8 +1441,12 @@ impl Renderer {
                 pipeline_params: macroquad::miniquad::PipelineParams {
                     color_blend: Some(macroquad::miniquad::BlendState::new(
                         macroquad::miniquad::Equation::Add,
-                        macroquad::miniquad::BlendFactor::Value(macroquad::miniquad::BlendValue::SourceAlpha),
-                        macroquad::miniquad::BlendFactor::OneMinusValue(macroquad::miniquad::BlendValue::SourceAlpha),
+                        macroquad::miniquad::BlendFactor::Value(
+                            macroquad::miniquad::BlendValue::SourceAlpha,
+                        ),
+                        macroquad::miniquad::BlendFactor::OneMinusValue(
+                            macroquad::miniquad::BlendValue::SourceAlpha,
+                        ),
                     )),
                     ..Default::default()
                 },
@@ -1149,6 +1503,7 @@ impl Renderer {
             chat_lines_cache: RefCell::new(ChatLinesCache::default()),
             tileset_image_cache: RefCell::new(None),
             minimap_tile_color_cache: RefCell::new(HashMap::new()),
+            minimap_static_world: RefCell::new(MinimapStaticWorldState::Uninitialized),
             text_measure_cache: RefCell::new(HashMap::new()),
             text_wrap_cache: RefCell::new(HashMap::new()),
         }
@@ -1156,9 +1511,14 @@ impl Renderer {
 
     /// Get the sprite texture for a given player appearance
     /// Returns (texture, atlas_offset) where atlas_offset is Some((x, y)) if from atlas
-    fn get_player_sprite(&self, gender: &str, skin: &str) -> Option<(&Texture2D, Option<(f32, f32)>)> {
+    fn get_player_sprite(
+        &self,
+        gender: &str,
+        skin: &str,
+    ) -> Option<(&Texture2D, Option<(f32, f32)>)> {
         let key = format!("{}_{}", gender, skin);
-        self.player_sprites.get(&key)
+        self.player_sprites
+            .get(&key)
             // Fallback to male_tan if sprite not found
             .or_else(|| self.player_sprites.get("male_tan"))
     }
@@ -1191,7 +1551,8 @@ impl Renderer {
     /// Uses multi-size bitmap font for crisp text at any size
     pub fn draw_text_sharp(&self, text: &str, x: f32, y: f32, font_size: f32, color: Color) {
         // Round to integer pixels for crisp rendering
-        self.font.draw_text(text, x.floor(), y.floor(), font_size, color);
+        self.font
+            .draw_text(text, x.floor(), y.floor(), font_size, color);
     }
 
     /// Get reference to player sprites for sharing with UI screens
@@ -1236,7 +1597,16 @@ impl Renderer {
 
     /// Draw text with word wrapping to fit within max_width
     /// Returns the total height used
-    pub(crate) fn draw_text_wrapped(&self, text: &str, x: f32, y: f32, font_size: f32, color: Color, max_width: f32, line_height: f32) -> f32 {
+    pub(crate) fn draw_text_wrapped(
+        &self,
+        text: &str,
+        x: f32,
+        y: f32,
+        font_size: f32,
+        color: Color,
+        max_width: f32,
+        line_height: f32,
+    ) -> f32 {
         let words: Vec<&str> = text.split_whitespace().collect();
         let mut current_line = String::new();
         let mut current_y = y;
@@ -1300,7 +1670,15 @@ impl Renderer {
     }
 
     /// Draw a tile sprite from the tileset
-    fn draw_tile_sprite(&self, screen_x: f32, screen_y: f32, tile_id: u32, zoom: f32, world_pos: Option<(f32, f32)>, water_effects: bool) {
+    fn draw_tile_sprite(
+        &self,
+        screen_x: f32,
+        screen_y: f32,
+        tile_id: u32,
+        zoom: f32,
+        world_pos: Option<(f32, f32)>,
+        water_effects: bool,
+    ) {
         let scaled_width = TILE_WIDTH * zoom;
         let scaled_height = TILE_HEIGHT * zoom;
 
@@ -1411,20 +1789,200 @@ impl Renderer {
     fn minimap_stats_stack_position(&self, state: &GameState, bar_width: f32) -> (f32, f32) {
         let _ = bar_width;
         let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
-        (
-            name_tag_x.floor(),
-            (name_tag_y + 22.0 + 4.0).floor(),
-        )
+        (name_tag_x.floor(), (name_tag_y + 22.0 + 4.0).floor())
     }
 
     fn draw_minimap_preview_frame(&self, x: f32, y: f32, w: f32, h: f32) {
         // Low-profile frame: subtle shadow + thin bezel.
-        draw_rectangle(x - 1.0, y - 1.0, w + 2.0, h + 2.0, Color::new(0.0, 0.0, 0.0, 0.25));
+        draw_rectangle(
+            x - 1.0,
+            y - 1.0,
+            w + 2.0,
+            h + 2.0,
+            Color::new(0.0, 0.0, 0.0, 0.25),
+        );
         draw_rectangle(x, y, w, h, Color::new(0.22, 0.18, 0.12, 0.90));
-        draw_rectangle(x + 1.0, y + 1.0, w - 2.0, h - 2.0, Color::new(0.31, 0.25, 0.16, 0.95));
-        draw_rectangle(x + 2.0, y + 2.0, w - 4.0, h - 4.0, Color::new(0.09, 0.11, 0.13, 0.95));
-        draw_line(x + 2.0, y + 2.0, x + w - 2.0, y + 2.0, 1.0, Color::new(0.62, 0.53, 0.37, 0.25));
-        draw_line(x + 2.0, y + 2.0, x + 2.0, y + h - 2.0, 1.0, Color::new(0.62, 0.53, 0.37, 0.20));
+        draw_rectangle(
+            x + 1.0,
+            y + 1.0,
+            w - 2.0,
+            h - 2.0,
+            Color::new(0.31, 0.25, 0.16, 0.95),
+        );
+        draw_rectangle(
+            x + 2.0,
+            y + 2.0,
+            w - 4.0,
+            h - 4.0,
+            Color::new(0.09, 0.11, 0.13, 0.95),
+        );
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + w - 2.0,
+            y + 2.0,
+            1.0,
+            Color::new(0.62, 0.53, 0.37, 0.25),
+        );
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + 2.0,
+            y + h - 2.0,
+            1.0,
+            Color::new(0.62, 0.53, 0.37, 0.20),
+        );
+    }
+
+    fn ensure_minimap_static_world_loaded(&self) {
+        let should_load = {
+            let cache = self.minimap_static_world.borrow();
+            matches!(*cache, MinimapStaticWorldState::Uninitialized)
+        };
+        if !should_load {
+            return;
+        }
+
+        let loaded = Self::load_minimap_static_world();
+        *self.minimap_static_world.borrow_mut() = match loaded {
+            Some(world) => MinimapStaticWorldState::Loaded(world),
+            None => MinimapStaticWorldState::Unavailable,
+        };
+    }
+
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+    fn load_minimap_static_world() -> Option<MinimapStaticWorld> {
+        #[derive(serde::Deserialize)]
+        struct FileCoord {
+            cx: i32,
+            cy: i32,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct FileLayers {
+            #[serde(default)]
+            ground: Vec<u32>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct FileMapObject {
+            gid: u32,
+            x: i32,
+            y: i32,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct FilePortal {
+            x: i32,
+            y: i32,
+            width: Option<i32>,
+            height: Option<i32>,
+            #[serde(rename = "targetMap")]
+            target_map: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct ChunkFile {
+            coord: FileCoord,
+            layers: FileLayers,
+            #[serde(default, rename = "mapObjects")]
+            map_objects: Vec<FileMapObject>,
+            #[serde(default)]
+            portals: Vec<FilePortal>,
+        }
+
+        let mut chunks = Vec::new();
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+        let world_dir = std::path::Path::new("rust-server/maps/world_0");
+        let entries = std::fs::read_dir(world_dir).ok()?;
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if !name.starts_with("chunk_") || !name.ends_with(".json") {
+                continue;
+            }
+
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            let Ok(chunk_file) = serde_json::from_slice::<ChunkFile>(&bytes) else {
+                continue;
+            };
+
+            let coord_x = chunk_file.coord.cx;
+            let coord_y = chunk_file.coord.cy;
+            let base_x = coord_x * CHUNK_SIZE as i32;
+            let base_y = coord_y * CHUNK_SIZE as i32;
+            let chunk_min_x = base_x as f32;
+            let chunk_min_y = base_y as f32;
+            let chunk_max_x = chunk_min_x + CHUNK_SIZE as f32;
+            let chunk_max_y = chunk_min_y + CHUNK_SIZE as f32;
+            min_x = min_x.min(chunk_min_x);
+            min_y = min_y.min(chunk_min_y);
+            max_x = max_x.max(chunk_max_x);
+            max_y = max_y.max(chunk_max_y);
+
+            let mut tree_markers = Vec::new();
+            for obj in chunk_file.map_objects {
+                if let Some(tree_info) = get_tree_info(obj.gid) {
+                    tree_markers.push(MinimapMarker {
+                        kind: MinimapMarkerKind::Tree,
+                        x: base_x as f32 + obj.x as f32 + 0.5,
+                        y: base_y as f32 + obj.y as f32 + 0.5,
+                        label: format!("Tree, {} (Lv.{})", tree_info.name, tree_info.level_required),
+                    });
+                }
+            }
+
+            let mut teleport_markers = Vec::new();
+            for portal in chunk_file.portals {
+                let width = portal.width.unwrap_or(1).max(1);
+                let height = portal.height.unwrap_or(1).max(1);
+                let target = Self::format_map_display_name(portal.target_map.as_deref().unwrap_or(""));
+                teleport_markers.push(MinimapMarker {
+                    kind: MinimapMarkerKind::Teleport,
+                    x: base_x as f32 + portal.x as f32 + width as f32 * 0.5,
+                    y: base_y as f32 + portal.y as f32 + height as f32 * 0.5,
+                    label: format!("Teleport, {}", target),
+                });
+            }
+
+            chunks.push(MinimapStaticChunk {
+                coord_x,
+                coord_y,
+                ground_tiles: chunk_file.layers.ground,
+                tree_markers,
+                teleport_markers,
+            });
+        }
+
+        if chunks.is_empty() {
+            return None;
+        }
+
+        Some(MinimapStaticWorld {
+            bounds: MinimapBounds {
+                min_x,
+                min_y,
+                max_x,
+                max_y,
+            },
+            chunks,
+        })
+    }
+
+    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
+    fn load_minimap_static_world() -> Option<MinimapStaticWorld> {
+        None
     }
 
     fn minimap_bounds(&self, state: &GameState) -> Option<MinimapBounds> {
@@ -1475,6 +2033,17 @@ impl Renderer {
             bounds.max_y = bounds.max_y.max(player.y);
         }
 
+        if state.chunk_manager.get_interior_size().is_none() {
+            self.ensure_minimap_static_world_loaded();
+            let static_world = self.minimap_static_world.borrow();
+            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
+                bounds.min_x = bounds.min_x.min(static_world.bounds.min_x);
+                bounds.min_y = bounds.min_y.min(static_world.bounds.min_y);
+                bounds.max_x = bounds.max_x.max(static_world.bounds.max_x);
+                bounds.max_y = bounds.max_y.max(static_world.bounds.max_y);
+            }
+        }
+
         let padding = 2.0;
         bounds.min_x -= padding;
         bounds.min_y -= padding;
@@ -1499,6 +2068,62 @@ impl Renderer {
             max_x: player.x + half_span,
             max_y: player.y + half_span,
         })
+    }
+
+    fn clamp_minimap_panel_center(
+        world_bounds: MinimapBounds,
+        view_w: f32,
+        view_h: f32,
+        center_x: f32,
+        center_y: f32,
+    ) -> (f32, f32) {
+        let half_w = view_w * 0.5;
+        let half_h = view_h * 0.5;
+        let min_cx = world_bounds.min_x + half_w;
+        let max_cx = world_bounds.max_x - half_w;
+        let min_cy = world_bounds.min_y + half_h;
+        let max_cy = world_bounds.max_y - half_h;
+        (
+            center_x.clamp(min_cx, max_cx),
+            center_y.clamp(min_cy, max_cy),
+        )
+    }
+
+    fn minimap_panel_view_bounds(
+        &self,
+        state: &GameState,
+        world_bounds: MinimapBounds,
+    ) -> MinimapBounds {
+        let zoom = state
+            .ui_state
+            .minimap_panel_zoom
+            .clamp(MINIMAP_PANEL_MIN_ZOOM, MINIMAP_PANEL_MAX_ZOOM);
+        let view_w = (world_bounds.width() / zoom).clamp(1.0, world_bounds.width());
+        let view_h = (world_bounds.height() / zoom).clamp(1.0, world_bounds.height());
+
+        let default_center = state.get_local_player().map(|p| (p.x, p.y)).unwrap_or((
+            (world_bounds.min_x + world_bounds.max_x) * 0.5,
+            (world_bounds.min_y + world_bounds.max_y) * 0.5,
+        ));
+        let center_x = state
+            .ui_state
+            .minimap_panel_center_x
+            .unwrap_or(default_center.0);
+        let center_y = state
+            .ui_state
+            .minimap_panel_center_y
+            .unwrap_or(default_center.1);
+        let (center_x, center_y) =
+            Self::clamp_minimap_panel_center(world_bounds, view_w, view_h, center_x, center_y);
+        let half_w = view_w * 0.5;
+        let half_h = view_h * 0.5;
+
+        MinimapBounds {
+            min_x: center_x - half_w,
+            min_y: center_y - half_h,
+            max_x: center_x + half_w,
+            max_y: center_y + half_h,
+        }
     }
 
     fn minimap_marker_style(kind: MinimapMarkerKind) -> (Color, f32) {
@@ -1529,7 +2154,11 @@ impl Renderer {
         }
 
         let mut out = String::new();
-        for (i, word) in id.split(['_', '-', ' ']).filter(|w| !w.is_empty()).enumerate() {
+        for (i, word) in id
+            .split(['_', '-', ' '])
+            .filter(|w| !w.is_empty())
+            .enumerate()
+        {
             if i > 0 {
                 out.push(' ');
             }
@@ -1611,7 +2240,12 @@ impl Renderer {
     }
 
     fn minimap_tile_color(&self, tile_id: u32) -> Color {
-        if let Some(cached) = self.minimap_tile_color_cache.borrow().get(&tile_id).copied() {
+        if let Some(cached) = self
+            .minimap_tile_color_cache
+            .borrow()
+            .get(&tile_id)
+            .copied()
+        {
             return cached;
         }
 
@@ -1622,7 +2256,8 @@ impl Renderer {
             }
         }
 
-        let sampled = self.tileset_image_cache
+        let sampled = self
+            .tileset_image_cache
             .borrow()
             .as_ref()
             .and_then(|img| Self::sample_tileset_tile_color(img, tile_id));
@@ -1654,20 +2289,33 @@ impl Renderer {
         tuned
     }
 
-    fn minimap_world_to_screen(&self, bounds: &MinimapBounds, map_rect: Rect, world_x: f32, world_y: f32) -> (f32, f32) {
+    fn minimap_world_to_screen(
+        &self,
+        bounds: &MinimapBounds,
+        map_rect: Rect,
+        world_x: f32,
+        world_y: f32,
+    ) -> (f32, f32) {
         let nx = ((world_x - bounds.min_x) / bounds.width()).clamp(0.0, 1.0);
         let ny = ((world_y - bounds.min_y) / bounds.height()).clamp(0.0, 1.0);
-        (
-            map_rect.x + nx * map_rect.w,
-            map_rect.y + ny * map_rect.h,
-        )
+        (map_rect.x + nx * map_rect.w, map_rect.y + ny * map_rect.h)
     }
 
-    fn collect_minimap_markers(&self, state: &GameState, bounds: Option<&MinimapBounds>) -> Vec<MinimapMarker> {
+    fn collect_minimap_markers(
+        &self,
+        state: &GameState,
+        bounds: Option<&MinimapBounds>,
+    ) -> Vec<MinimapMarker> {
         let mut markers: Vec<MinimapMarker> = Vec::new();
         let player_pos = state.get_local_player().map(|p| (p.x, p.y));
         let bounds = bounds.copied();
         let bounds_margin = CHUNK_SIZE as f32 * 0.5;
+        let loaded_chunk_coords: HashSet<(i32, i32)> = state
+            .chunk_manager
+            .chunks()
+            .keys()
+            .map(|coord| (coord.x, coord.y))
+            .collect();
 
         let distance_sq = |x: f32, y: f32| -> f32 {
             if let Some((px, py)) = player_pos {
@@ -1687,6 +2335,11 @@ impl Renderer {
             } else {
                 true
             }
+        };
+        let npc_in_loaded_chunk = |x: f32, y: f32| -> bool {
+            let chunk_x = (x.floor() as i32).div_euclid(CHUNK_SIZE as i32);
+            let chunk_y = (y.floor() as i32).div_euclid(CHUNK_SIZE as i32);
+            loaded_chunk_coords.contains(&(chunk_x, chunk_y))
         };
 
         if let Some(player) = state.get_local_player() {
@@ -1730,8 +2383,38 @@ impl Renderer {
                 });
             }
         }
+        if state.chunk_manager.get_interior_size().is_none() {
+            self.ensure_minimap_static_world_loaded();
+            let static_world = self.minimap_static_world.borrow();
+            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
+                for static_chunk in &static_world.chunks {
+                    if loaded_chunk_coords.contains(&(static_chunk.coord_x, static_chunk.coord_y)) {
+                        continue;
+                    }
+                    if let Some(b) = bounds {
+                        let chunk_min_x = (static_chunk.coord_x * CHUNK_SIZE as i32) as f32;
+                        let chunk_min_y = (static_chunk.coord_y * CHUNK_SIZE as i32) as f32;
+                        let chunk_max_x = chunk_min_x + CHUNK_SIZE as f32;
+                        let chunk_max_y = chunk_min_y + CHUNK_SIZE as f32;
+                        if chunk_max_x < b.min_x - bounds_margin
+                            || chunk_min_x > b.max_x + bounds_margin
+                            || chunk_max_y < b.min_y - bounds_margin
+                            || chunk_min_y > b.max_y + bounds_margin
+                        {
+                            continue;
+                        }
+                    }
+                    for marker in &static_chunk.teleport_markers {
+                        if in_bounds(marker.x, marker.y) {
+                            teleport_markers.push(marker.clone());
+                        }
+                    }
+                }
+            }
+        }
         teleport_markers.sort_by(|a, b| {
-            a.y.partial_cmp(&b.y).unwrap_or(std::cmp::Ordering::Equal)
+            a.y.partial_cmp(&b.y)
+                .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
         });
         markers.extend(teleport_markers);
@@ -1740,6 +2423,9 @@ impl Renderer {
         let mut enemy_markers: Vec<(f32, MinimapMarker)> = Vec::new();
         for npc in state.npcs.values() {
             if !npc.is_alive() {
+                continue;
+            }
+            if !npc_in_loaded_chunk(npc.x, npc.y) {
                 continue;
             }
             if !in_bounds(npc.x, npc.y) {
@@ -1768,7 +2454,8 @@ impl Renderer {
         markers.extend(quest_markers);
 
         enemy_markers.sort_by(|a, b| {
-            a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
+            a.0.partial_cmp(&b.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.1.label.cmp(&b.1.label))
         });
         const MAX_ENEMY_MARKERS: usize = 120;
@@ -1794,14 +2481,35 @@ impl Renderer {
                             kind: MinimapMarkerKind::Tree,
                             x: wx,
                             y: wy,
-                            label: format!("Tree, {} (Lv.{})", tree_info.name, tree_info.level_required),
+                            label: format!(
+                                "Tree, {} (Lv.{})",
+                                tree_info.name, tree_info.level_required
+                            ),
                         },
                     ));
                 }
             }
         }
+        if state.chunk_manager.get_interior_size().is_none() {
+            self.ensure_minimap_static_world_loaded();
+            let static_world = self.minimap_static_world.borrow();
+            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
+                for static_chunk in &static_world.chunks {
+                    if loaded_chunk_coords.contains(&(static_chunk.coord_x, static_chunk.coord_y)) {
+                        continue;
+                    }
+                    for marker in &static_chunk.tree_markers {
+                        if !in_bounds(marker.x, marker.y) {
+                            continue;
+                        }
+                        tree_markers.push((distance_sq(marker.x, marker.y), marker.clone()));
+                    }
+                }
+            }
+        }
         tree_markers.sort_by(|a, b| {
-            a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
+            a.0.partial_cmp(&b.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.1.label.cmp(&b.1.label))
         });
         const MAX_TREE_MARKERS: usize = 180;
@@ -1833,16 +2541,30 @@ impl Renderer {
 
         let base_step_x = (bounds.width() / map_rect.w.max(1.0)).ceil().max(1.0) as usize;
         let base_step_y = (bounds.height() / map_rect.h.max(1.0)).ceil().max(1.0) as usize;
-        let visible_tiles = (bounds.width().ceil().max(1.0) * bounds.height().ceil().max(1.0)) as usize;
-        let budget_step = ((visible_tiles as f32 / tile_budget.max(1) as f32).sqrt().ceil().max(1.0)) as usize;
+        let visible_tiles =
+            (bounds.width().ceil().max(1.0) * bounds.height().ceil().max(1.0)) as usize;
+        let budget_step = ((visible_tiles as f32 / tile_budget.max(1) as f32)
+            .sqrt()
+            .ceil()
+            .max(1.0)) as usize;
         let sample_step_x = base_step_x.max(budget_step);
         let sample_step_y = base_step_y.max(budget_step);
 
         let interior_size = state.chunk_manager.get_interior_size();
+        let loaded_chunk_coords: HashSet<(i32, i32)> = state
+            .chunk_manager
+            .chunks()
+            .keys()
+            .map(|coord| (coord.x, coord.y))
+            .collect();
         // Draw a primitive world raster by sampling the ground tile color per tile.
         if !state.chunk_manager.chunks().is_empty() {
             for (coord, chunk) in state.chunk_manager.chunks().iter() {
-                let Some(ground_layer) = chunk.layers.iter().find(|layer| layer.layer_type == ChunkLayerType::Ground) else {
+                let Some(ground_layer) = chunk
+                    .layers
+                    .iter()
+                    .find(|layer| layer.layer_type == ChunkLayerType::Ground)
+                else {
                     continue;
                 };
 
@@ -1901,13 +2623,10 @@ impl Renderer {
                         {
                             continue;
                         }
-                        let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, tile_min_x, tile_min_y);
-                        let (sx2, sy2) = self.minimap_world_to_screen(
-                            bounds,
-                            map_rect,
-                            tile_max_x,
-                            tile_max_y,
-                        );
+                        let (sx1, sy1) =
+                            self.minimap_world_to_screen(bounds, map_rect, tile_min_x, tile_min_y);
+                        let (sx2, sy2) =
+                            self.minimap_world_to_screen(bounds, map_rect, tile_max_x, tile_max_y);
                         let rect_x = sx1.min(sx2);
                         let rect_y = sy1.min(sy2);
                         let rect_w = (sx2 - sx1).abs().max(1.0);
@@ -1925,7 +2644,12 @@ impl Renderer {
             }
         } else {
             // Fallback to legacy local tilemap if chunk streaming has not initialized yet.
-            if let Some(layer) = state.tilemap.layers.iter().find(|l| l.layer_type == LayerType::Ground) {
+            if let Some(layer) = state
+                .tilemap
+                .layers
+                .iter()
+                .find(|l| l.layer_type == LayerType::Ground)
+            {
                 let width = state.tilemap.width as usize;
                 let height = state.tilemap.height as usize;
                 for y in (0..height).step_by(sample_step_y) {
@@ -1949,13 +2673,10 @@ impl Renderer {
                         {
                             continue;
                         }
-                        let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, tile_min_x, tile_min_y);
-                        let (sx2, sy2) = self.minimap_world_to_screen(
-                            bounds,
-                            map_rect,
-                            tile_max_x,
-                            tile_max_y,
-                        );
+                        let (sx1, sy1) =
+                            self.minimap_world_to_screen(bounds, map_rect, tile_min_x, tile_min_y);
+                        let (sx2, sy2) =
+                            self.minimap_world_to_screen(bounds, map_rect, tile_max_x, tile_max_y);
                         let rect_x = sx1.min(sx2);
                         let rect_y = sy1.min(sy2);
                         let rect_w = (sx2 - sx1).abs().max(1.0);
@@ -1968,6 +2689,86 @@ impl Renderer {
                             rect_h,
                             self.minimap_tile_color(tile_id),
                         );
+                    }
+                }
+            }
+        }
+
+        if interior_size.is_none() {
+            self.ensure_minimap_static_world_loaded();
+            let static_world = self.minimap_static_world.borrow();
+            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
+                for static_chunk in &static_world.chunks {
+                    if loaded_chunk_coords.contains(&(static_chunk.coord_x, static_chunk.coord_y)) {
+                        continue;
+                    }
+
+                    let tile_w = CHUNK_SIZE as usize;
+                    let tile_h = CHUNK_SIZE as usize;
+                    let base_x = static_chunk.coord_x * CHUNK_SIZE as i32;
+                    let base_y = static_chunk.coord_y * CHUNK_SIZE as i32;
+                    let chunk_min_x = base_x as f32;
+                    let chunk_min_y = base_y as f32;
+                    let chunk_max_x = chunk_min_x + tile_w as f32;
+                    let chunk_max_y = chunk_min_y + tile_h as f32;
+                    if chunk_max_x <= bounds.min_x
+                        || chunk_min_x >= bounds.max_x
+                        || chunk_max_y <= bounds.min_y
+                        || chunk_min_y >= bounds.max_y
+                    {
+                        continue;
+                    }
+
+                    for y in (0..tile_h).step_by(sample_step_y) {
+                        let row_start = y * tile_w;
+                        if row_start >= static_chunk.ground_tiles.len() {
+                            break;
+                        }
+                        for x in (0..tile_w).step_by(sample_step_x) {
+                            let idx = row_start + x;
+                            if idx >= static_chunk.ground_tiles.len() {
+                                break;
+                            }
+                            let tile_id = static_chunk.ground_tiles[idx];
+                            if tile_id == 0 {
+                                continue;
+                            }
+
+                            let world_x = base_x + x as i32;
+                            let world_y = base_y + y as i32;
+                            let tile_span_x = sample_step_x.min(tile_w.saturating_sub(x).max(1));
+                            let tile_span_y = sample_step_y.min(tile_h.saturating_sub(y).max(1));
+                            let tile_min_x = world_x as f32;
+                            let tile_min_y = world_y as f32;
+                            let tile_max_x = (world_x + tile_span_x as i32) as f32;
+                            let tile_max_y = (world_y + tile_span_y as i32) as f32;
+                            if tile_max_x <= bounds.min_x
+                                || tile_min_x >= bounds.max_x
+                                || tile_max_y <= bounds.min_y
+                                || tile_min_y >= bounds.max_y
+                            {
+                                continue;
+                            }
+
+                            let (sx1, sy1) = self.minimap_world_to_screen(
+                                bounds, map_rect, tile_min_x, tile_min_y,
+                            );
+                            let (sx2, sy2) = self.minimap_world_to_screen(
+                                bounds, map_rect, tile_max_x, tile_max_y,
+                            );
+                            let rect_x = sx1.min(sx2);
+                            let rect_y = sy1.min(sy2);
+                            let rect_w = (sx2 - sx1).abs().max(1.0);
+                            let rect_h = (sy2 - sy1).abs().max(1.0);
+
+                            draw_rectangle(
+                                rect_x,
+                                rect_y,
+                                rect_w,
+                                rect_h,
+                                self.minimap_tile_color(tile_id),
+                            );
+                        }
                     }
                 }
             }
@@ -1996,7 +2797,12 @@ impl Renderer {
             }
 
             let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, chunk_x, chunk_y);
-            let (sx2, sy2) = self.minimap_world_to_screen(bounds, map_rect, chunk_x + chunk_w, chunk_y + chunk_h);
+            let (sx2, sy2) = self.minimap_world_to_screen(
+                bounds,
+                map_rect,
+                chunk_x + chunk_w,
+                chunk_y + chunk_h,
+            );
             let rect_x = sx1.min(sx2);
             let rect_y = sy1.min(sy2);
             let rect_w = (sx2 - sx1).abs().max(1.0);
@@ -2019,7 +2825,55 @@ impl Renderer {
             );
         }
 
-        let mut hitboxes: Vec<(usize, Rect)> = Vec::with_capacity(if capture_hitboxes { markers.len() } else { 0 });
+        if interior_size.is_none() {
+            self.ensure_minimap_static_world_loaded();
+            let static_world = self.minimap_static_world.borrow();
+            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
+                for static_chunk in &static_world.chunks {
+                    if loaded_chunk_coords.contains(&(static_chunk.coord_x, static_chunk.coord_y)) {
+                        continue;
+                    }
+                    let chunk_x = (static_chunk.coord_x * CHUNK_SIZE as i32) as f32;
+                    let chunk_y = (static_chunk.coord_y * CHUNK_SIZE as i32) as f32;
+                    let chunk_w = CHUNK_SIZE as f32;
+                    let chunk_h = CHUNK_SIZE as f32;
+                    if chunk_x + chunk_w <= bounds.min_x
+                        || chunk_x >= bounds.max_x
+                        || chunk_y + chunk_h <= bounds.min_y
+                        || chunk_y >= bounds.max_y
+                    {
+                        continue;
+                    }
+
+                    let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, chunk_x, chunk_y);
+                    let (sx2, sy2) =
+                        self.minimap_world_to_screen(bounds, map_rect, chunk_x + chunk_w, chunk_y + chunk_h);
+                    let rect_x = sx1.min(sx2);
+                    let rect_y = sy1.min(sy2);
+                    let rect_w = (sx2 - sx1).abs().max(1.0);
+                    let rect_h = (sy2 - sy1).abs().max(1.0);
+
+                    draw_rectangle(
+                        rect_x,
+                        rect_y,
+                        rect_w,
+                        rect_h,
+                        Color::new(0.0, 0.0, 0.0, 0.08),
+                    );
+                    draw_rectangle_lines(
+                        rect_x,
+                        rect_y,
+                        rect_w,
+                        rect_h,
+                        1.0,
+                        Color::new(0.35, 0.50, 0.40, 0.30),
+                    );
+                }
+            }
+        }
+
+        let mut hitboxes: Vec<(usize, Rect)> =
+            Vec::with_capacity(if capture_hitboxes { markers.len() } else { 0 });
         // Draw player markers in a second pass so they always stay above other marker types.
         for draw_player_pass in [false, true] {
             for (idx, marker) in markers.iter().enumerate() {
@@ -2073,7 +2927,12 @@ impl Renderer {
 
     fn render_minimap_preview(&self, state: &GameState) {
         let preview_rect = self.minimap_preview_rect();
-        self.draw_minimap_preview_frame(preview_rect.x, preview_rect.y, preview_rect.w, preview_rect.h);
+        self.draw_minimap_preview_frame(
+            preview_rect.x,
+            preview_rect.y,
+            preview_rect.w,
+            preview_rect.h,
+        );
 
         let title = "Minimap [M]";
         self.draw_text_sharp(
@@ -2111,11 +2970,22 @@ impl Renderer {
                 map_rect.h,
                 Color::new(0.05, 0.05, 0.07, 0.85),
             );
-            self.draw_text_sharp("Loading map...", map_rect.x + 10.0, map_rect.y + 24.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                "Loading map...",
+                map_rect.x + 10.0,
+                map_rect.y + 24.0,
+                16.0,
+                TEXT_DIM,
+            );
         }
     }
 
-    fn render_minimap_overlay(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    fn render_minimap_overlay(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         if state.get_local_player().is_none() {
             return;
         }
@@ -2143,7 +3013,12 @@ impl Renderer {
             TEXT_TITLE,
         );
 
-        let close_rect = Rect::new(panel_rect.x + panel_rect.w - 34.0, panel_rect.y + 10.0, 22.0, 16.0);
+        let close_rect = Rect::new(
+            panel_rect.x + panel_rect.w - 34.0,
+            panel_rect.y + 10.0,
+            22.0,
+            16.0,
+        );
         let close_hovered = matches!(hovered, Some(UiElementId::MinimapClose));
         let close_bg = if close_hovered {
             Color::new(0.36, 0.14, 0.14, 0.96)
@@ -2155,10 +3030,33 @@ impl Renderer {
         } else {
             Color::new(0.62, 0.40, 0.36, 0.82)
         };
-        let close_text = if close_hovered { TEXT_TITLE } else { TEXT_NORMAL };
-        draw_rectangle(close_rect.x, close_rect.y, close_rect.w, close_rect.h, close_bg);
-        draw_rectangle_lines(close_rect.x, close_rect.y, close_rect.w, close_rect.h, 1.0, close_border);
-        self.draw_text_sharp("X", close_rect.x + 7.0, close_rect.y + 13.0, MINIMAP_WORLD_TEXT_SIZE, close_text);
+        let close_text = if close_hovered {
+            TEXT_TITLE
+        } else {
+            TEXT_NORMAL
+        };
+        draw_rectangle(
+            close_rect.x,
+            close_rect.y,
+            close_rect.w,
+            close_rect.h,
+            close_bg,
+        );
+        draw_rectangle_lines(
+            close_rect.x,
+            close_rect.y,
+            close_rect.w,
+            close_rect.h,
+            1.0,
+            close_border,
+        );
+        self.draw_text_sharp(
+            "X",
+            close_rect.x + 7.0,
+            close_rect.y + 13.0,
+            MINIMAP_WORLD_TEXT_SIZE,
+            close_text,
+        );
         layout.add(UiElementId::MinimapClose, close_rect);
 
         let map_rect = Rect::new(
@@ -2173,11 +3071,12 @@ impl Renderer {
             _ => None,
         };
 
-        if let Some(bounds) = self.minimap_bounds(state) {
-            let markers = self.collect_minimap_markers(state, Some(&bounds));
+        if let Some(world_bounds) = self.minimap_bounds(state) {
+            let view_bounds = self.minimap_panel_view_bounds(state, world_bounds);
+            let markers = self.collect_minimap_markers(state, Some(&view_bounds));
             let marker_hitboxes = self.draw_minimap_contents(
                 state,
-                &bounds,
+                &view_bounds,
                 &markers,
                 map_rect,
                 1.0,
@@ -2218,16 +3117,28 @@ impl Renderer {
                 self.draw_text_sharp(label, text_x, legend_y, footer_text_size, TEXT_NORMAL);
             }
 
+            let zoom = state
+                .ui_state
+                .minimap_panel_zoom
+                .clamp(MINIMAP_PANEL_MIN_ZOOM, MINIMAP_PANEL_MAX_ZOOM);
             let (status_text, status_color) = if let Some(idx) = hovered_marker_idx {
                 if let Some(marker) = markers.get(idx) {
                     (format!("Selected: {}", marker.label), TEXT_TITLE)
                 } else {
-                    ("Hover markers for details".to_string(), TEXT_DIM)
+                    (
+                        format!("Zoom {:.1}x | Scroll to zoom | Drag to pan", zoom),
+                        TEXT_DIM,
+                    )
                 }
             } else {
-                ("Hover markers for details".to_string(), TEXT_DIM)
+                (
+                    format!("Zoom {:.1}x | Scroll to zoom | Drag to pan", zoom),
+                    TEXT_DIM,
+                )
             };
-            let status_w = self.measure_text_sharp(&status_text, footer_text_size).width;
+            let status_w = self
+                .measure_text_sharp(&status_text, footer_text_size)
+                .width;
             self.draw_text_sharp(
                 &status_text,
                 panel_rect.x + (panel_rect.w - status_w) * 0.5,
@@ -2337,19 +3248,41 @@ impl Renderer {
             Player(&'a Player, bool),
             Npc(&'a Npc),
             Item(&'a GroundItem),
-            Tile { x: u32, y: u32, tile_id: u32 },
+            Tile {
+                x: u32,
+                y: u32,
+                tile_id: u32,
+            },
             ChunkObject(&'a MapObject),
             ChunkObjectShaking(&'a MapObject, f32), // Object with shake offset
             ChunkWall(&'a Wall),
-            TreeTimer { tile_x: i32, tile_y: i32, progress: f32 },
-            FallingTree { gid: u32, tile_x: i32, tile_y: i32, angle: f32, alpha: f32, y_offset: f32 },
+            TreeTimer {
+                tile_x: i32,
+                tile_y: i32,
+                progress: f32,
+            },
+            FallingTree {
+                gid: u32,
+                tile_x: i32,
+                tile_y: i32,
+                angle: f32,
+                alpha: f32,
+                y_offset: f32,
+            },
         }
 
         // Pre-allocate with estimated capacity to reduce allocations
-        let chunk_object_estimate: usize = state.chunk_manager.chunks().values()
+        let chunk_object_estimate: usize = state
+            .chunk_manager
+            .chunks()
+            .values()
             .map(|c| c.objects.len() + c.walls.len())
             .sum();
-        let estimated_capacity = state.players.len() + state.npcs.len() + state.ground_items.len() + chunk_object_estimate + 100;
+        let estimated_capacity = state.players.len()
+            + state.npcs.len()
+            + state.ground_items.len()
+            + chunk_object_estimate
+            + 100;
         let mut renderables: Vec<(f32, Renderable)> = Vec::with_capacity(estimated_capacity);
 
         // Only collect world entities when world is ready
@@ -2381,10 +3314,14 @@ impl Renderer {
         ];
         // Margin in world tiles for tall objects and edge effects
         let world_cull_margin = 8.0;
-        let vis_min_x = corners_world.iter().map(|c| c.0).fold(f32::MAX, f32::min) - world_cull_margin;
-        let vis_max_x = corners_world.iter().map(|c| c.0).fold(f32::MIN, f32::max) + world_cull_margin;
-        let vis_min_y = corners_world.iter().map(|c| c.1).fold(f32::MAX, f32::min) - world_cull_margin;
-        let vis_max_y = corners_world.iter().map(|c| c.1).fold(f32::MIN, f32::max) + world_cull_margin;
+        let vis_min_x =
+            corners_world.iter().map(|c| c.0).fold(f32::MAX, f32::min) - world_cull_margin;
+        let vis_max_x =
+            corners_world.iter().map(|c| c.0).fold(f32::MIN, f32::max) + world_cull_margin;
+        let vis_min_y =
+            corners_world.iter().map(|c| c.1).fold(f32::MAX, f32::min) - world_cull_margin;
+        let vis_max_y =
+            corners_world.iter().map(|c| c.1).fold(f32::MIN, f32::max) + world_cull_margin;
         let is_visible_world = |wx: f32, wy: f32| {
             wx >= vis_min_x && wx <= vis_max_x && wy >= vis_min_y && wy <= vis_max_y
         };
@@ -2430,7 +3367,8 @@ impl Renderer {
                         for x in 0..state.tilemap.width {
                             let wx = x as f32;
                             let wy = y as f32;
-                            if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
+                            if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y
+                            {
                                 continue;
                             }
                             let idx = (y * state.tilemap.width + x) as usize;
@@ -2462,8 +3400,11 @@ impl Renderer {
             let chunk_min_y = (coord.y * CHUNK_SIZE as i32) as f32;
             let chunk_max_x = chunk_min_x + chunk_size;
             let chunk_max_y = chunk_min_y + chunk_size;
-            if chunk_max_x < vis_min_x || chunk_min_x > vis_max_x
-                || chunk_max_y < vis_min_y || chunk_min_y > vis_max_y {
+            if chunk_max_x < vis_min_x
+                || chunk_min_x > vis_max_x
+                || chunk_max_y < vis_min_y
+                || chunk_min_y > vis_max_y
+            {
                 continue;
             }
 
@@ -2515,7 +3456,14 @@ impl Renderer {
             let elapsed = current_time - info.depleted_at;
             let progress = (elapsed / total_duration).clamp(0.0, 1.0) as f32;
             let depth = calculate_depth(wx, wy, 1);
-            renderables.push((depth, Renderable::TreeTimer { tile_x: *tile_x, tile_y: *tile_y, progress }));
+            renderables.push((
+                depth,
+                Renderable::TreeTimer {
+                    tile_x: *tile_x,
+                    tile_y: *tile_y,
+                    progress,
+                },
+            ));
         }
 
         // Add falling trees (trees that were just chopped down)
@@ -2527,14 +3475,17 @@ impl Renderer {
             }
             let (angle, alpha, y_offset) = ft.get_transform();
             let depth = calculate_depth(wx, wy, 1);
-            renderables.push((depth, Renderable::FallingTree {
-                gid: ft.gid,
-                tile_x: ft.x,
-                tile_y: ft.y,
-                angle,
-                alpha,
-                y_offset,
-            }));
+            renderables.push((
+                depth,
+                Renderable::FallingTree {
+                    gid: ft.gid,
+                    tile_x: ft.x,
+                    tile_y: ft.y,
+                    angle,
+                    alpha,
+                    y_offset,
+                },
+            ));
         }
 
         // Sort by depth (painter's algorithm)
@@ -2578,11 +3529,30 @@ impl Renderer {
                 Renderable::ChunkWall(wall) => {
                     self.render_wall(wall, &state.camera);
                 }
-                Renderable::TreeTimer { tile_x, tile_y, progress } => {
+                Renderable::TreeTimer {
+                    tile_x,
+                    tile_y,
+                    progress,
+                } => {
                     self.render_tree_timer(tile_x, tile_y, progress, &state.camera);
                 }
-                Renderable::FallingTree { gid, tile_x, tile_y, angle, alpha, y_offset } => {
-                    self.render_falling_tree(gid, tile_x, tile_y, angle, alpha, y_offset, &state.camera);
+                Renderable::FallingTree {
+                    gid,
+                    tile_x,
+                    tile_y,
+                    angle,
+                    alpha,
+                    y_offset,
+                } => {
+                    self.render_falling_tree(
+                        gid,
+                        tile_x,
+                        tile_y,
+                        angle,
+                        alpha,
+                        y_offset,
+                        &state.camera,
+                    );
                 }
             }
         }
@@ -2594,13 +3564,19 @@ impl Renderer {
             }
 
             // Convert tile coords to screen coords
-            let (screen_x, base_screen_y) = world_to_screen(leaf.tile_x, leaf.tile_y, &state.camera);
+            let (screen_x, base_screen_y) =
+                world_to_screen(leaf.tile_x, leaf.tile_y, &state.camera);
 
             // Offset upward by height (height is in unscaled pixels, apply zoom)
             let screen_y = base_screen_y - leaf.height * state.camera.zoom;
 
             let alpha = leaf.get_alpha();
-            let color = Color::new(leaf.color.r, leaf.color.g, leaf.color.b, leaf.color.a * alpha);
+            let color = Color::new(
+                leaf.color.r,
+                leaf.color.g,
+                leaf.color.b,
+                leaf.color.a * alpha,
+            );
             let size = leaf.size * state.camera.zoom;
 
             // Draw a simple leaf shape (small rotated diamond)
@@ -2612,10 +3588,22 @@ impl Renderer {
             let hh = size * 0.8;
 
             let points = [
-                (screen_x + cos_r * 0.0 - sin_r * (-hh), screen_y + sin_r * 0.0 + cos_r * (-hh)), // top
-                (screen_x + cos_r * hw - sin_r * 0.0, screen_y + sin_r * hw + cos_r * 0.0),       // right
-                (screen_x + cos_r * 0.0 - sin_r * hh, screen_y + sin_r * 0.0 + cos_r * hh),       // bottom
-                (screen_x + cos_r * (-hw) - sin_r * 0.0, screen_y + sin_r * (-hw) + cos_r * 0.0), // left
+                (
+                    screen_x + cos_r * 0.0 - sin_r * (-hh),
+                    screen_y + sin_r * 0.0 + cos_r * (-hh),
+                ), // top
+                (
+                    screen_x + cos_r * hw - sin_r * 0.0,
+                    screen_y + sin_r * hw + cos_r * 0.0,
+                ), // right
+                (
+                    screen_x + cos_r * 0.0 - sin_r * hh,
+                    screen_y + sin_r * 0.0 + cos_r * hh,
+                ), // bottom
+                (
+                    screen_x + cos_r * (-hw) - sin_r * 0.0,
+                    screen_y + sin_r * (-hw) + cos_r * 0.0,
+                ), // left
             ];
 
             // Draw as two triangles
@@ -2690,11 +3678,8 @@ impl Renderer {
         let zoom = camera.zoom;
 
         // Convert tile position to screen position (center of tile)
-        let (screen_x, mut screen_y) = world_to_screen(
-            tile_x as f32 + 0.5,
-            tile_y as f32 + 0.5,
-            camera,
-        );
+        let (screen_x, mut screen_y) =
+            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
         // Adjust Y to center on tile (world_to_screen gives bottom of tile)
         screen_y -= 16.0 * zoom;
 
@@ -2777,7 +3762,15 @@ impl Renderer {
     }
 
     /// Create a mesh for a chat bubble with tail (no overlapping geometry)
-    fn create_bubble_mesh(x: f32, y: f32, w: f32, h: f32, r: f32, color: Color, tail: Option<(f32, f32, f32)>) -> Mesh {
+    fn create_bubble_mesh(
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        r: f32,
+        color: Color,
+        tail: Option<(f32, f32, f32)>,
+    ) -> Mesh {
         let color_arr = [
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
@@ -2804,7 +3797,7 @@ impl Renderer {
         let segments = 8;
 
         // Center rectangle vertices (4 corners where the rounded corners meet)
-        let c_tl = add_vertex(x + r, y + r);     // top-left inner corner
+        let c_tl = add_vertex(x + r, y + r); // top-left inner corner
         let c_tr = add_vertex(x + w - r, y + r); // top-right inner corner
         let c_bl = add_vertex(x + r, y + h - r); // bottom-left inner corner
         let c_br = add_vertex(x + w - r, y + h - r); // bottom-right inner corner
@@ -2901,11 +3894,21 @@ impl Renderer {
             let zoom = state.camera.zoom;
             let font_size = 16.0 * zoom;
             let scaled_sprite_height = SPRITE_HEIGHT * zoom;
-            let has_sprite = self.get_player_sprite(&player.gender, &player.skin).is_some();
-            let name_y_offset = if has_sprite { scaled_sprite_height - 8.0 * zoom } else { 24.0 * zoom };
+            let has_sprite = self
+                .get_player_sprite(&player.gender, &player.skin)
+                .is_some();
+            let name_y_offset = if has_sprite {
+                scaled_sprite_height - 8.0 * zoom
+            } else {
+                24.0 * zoom
+            };
 
             let name_width = self.measure_text_sharp(&player.name, font_size).width;
-            let gm_width = if player.is_admin { self.measure_text_sharp(" (GM)", font_size).width - 2.0 * zoom } else { 0.0 };
+            let gm_width = if player.is_admin {
+                self.measure_text_sharp(" (GM)", font_size).width - 2.0 * zoom
+            } else {
+                0.0
+            };
             let total_width = name_width + gm_width;
             let name_x = screen_x - total_width / 2.0;
             let name_y = screen_y - name_y_offset + 2.0 * zoom;
@@ -2944,16 +3947,17 @@ impl Renderer {
             let zoom = state.camera.zoom;
 
             // Compute sprite height to find top_y
-            let sprite_height = if let Some((_, h)) = self.npc_sprites.get_dimensions(&npc.entity_type) {
-                (h * zoom).round()
-            } else {
-                // Fallback ellipse sizing
-                let time = macroquad::time::get_time() as f32;
-                let wobble = (time * 2.0 + npc.x + npc.y).sin() * 0.5 + 0.5;
-                let radius = (10.0 + wobble * 1.5) * zoom;
-                let height_offset = (8.0 + wobble * 2.0) * zoom;
-                (height_offset + radius) * 2.0
-            };
+            let sprite_height =
+                if let Some((_, h)) = self.npc_sprites.get_dimensions(&npc.entity_type) {
+                    (h * zoom).round()
+                } else {
+                    // Fallback ellipse sizing
+                    let time = macroquad::time::get_time() as f32;
+                    let wobble = (time * 2.0 + npc.x + npc.y).sin() * 0.5 + 0.5;
+                    let radius = (10.0 + wobble * 1.5) * zoom;
+                    let height_offset = (8.0 + wobble * 2.0) * zoom;
+                    (height_offset + radius) * 2.0
+                };
             let top_y = screen_y - sprite_height + 4.0 * zoom;
 
             let name_color = if npc.is_hostile() {
@@ -2980,11 +3984,7 @@ impl Renderer {
             } else {
                 None
             };
-            let check_icon_width = if show_turn_in_check {
-                16.0 * zoom
-            } else {
-                0.0
-            };
+            let check_icon_width = if show_turn_in_check { 16.0 * zoom } else { 0.0 };
 
             let icon_gap = 4.0 * zoom;
             let (total_width, icon_width) = if let Some(tex) = small_icon {
@@ -3010,23 +4010,41 @@ impl Renderer {
                 let icon_h = tex.height() * zoom;
                 let bar_top = name_y - 14.0 * zoom;
                 let icon_y = bar_top + (bar_height - icon_h) / 2.0;
-                draw_texture_ex(tex, content_x, icon_y, WHITE, DrawTextureParams {
-                    dest_size: Some(Vec2::new(tex.width() * zoom, icon_h)),
-                    ..Default::default()
-                });
+                draw_texture_ex(
+                    tex,
+                    content_x,
+                    icon_y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(tex.width() * zoom, icon_h)),
+                        ..Default::default()
+                    },
+                );
             } else if show_turn_in_check {
                 if let Some(ref texture) = self.ui_icons {
                     let src_rect = Rect::new(24.0, 216.0, 24.0, 24.0); // row 10, col 2 (1-based)
                     let icon_size = 16.0 * zoom;
                     let bar_top = name_y - 14.0 * zoom;
                     let icon_y = bar_top + (bar_height - icon_size) / 2.0;
-                    draw_texture_ex(texture, content_x, icon_y, WHITE, DrawTextureParams {
-                        source: Some(src_rect),
-                        dest_size: Some(Vec2::new(icon_size, icon_size)),
-                        ..Default::default()
-                    });
+                    draw_texture_ex(
+                        texture,
+                        content_x,
+                        icon_y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(src_rect),
+                            dest_size: Some(Vec2::new(icon_size, icon_size)),
+                            ..Default::default()
+                        },
+                    );
                 } else {
-                    self.draw_text_sharp("✓", content_x, name_y, font_size, Color::from_rgba(120, 255, 140, 255));
+                    self.draw_text_sharp(
+                        "✓",
+                        content_x,
+                        name_y,
+                        font_size,
+                        Color::from_rgba(120, 255, 140, 255),
+                    );
                 }
             }
 
@@ -3063,19 +4081,25 @@ impl Renderer {
         };
 
         // Get player's woodcutting level
-        let player_wc_level = state.get_local_player()
+        let player_wc_level = state
+            .get_local_player()
             .map(|p| p.skills.get(crate::game::SkillType::Woodcutting).level)
             .unwrap_or(1);
 
         let can_chop = player_wc_level >= tree_info.level_required;
 
         // Get screen position (center of tile, raised up)
-        let (screen_x, screen_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, &state.camera);
+        let (screen_x, screen_y) =
+            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, &state.camera);
         let zoom = state.camera.zoom;
 
         // Get actual sprite height for this tree
         let sprite_height = if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
-            let tex_height = if let Some(r) = source_rect { r.h } else { texture.height() };
+            let tex_height = if let Some(r) = source_rect {
+                r.h
+            } else {
+                texture.height()
+            };
             tex_height * zoom
         } else {
             80.0 * zoom // Fallback if sprite not found
@@ -3170,7 +4194,11 @@ impl Renderer {
             // Check if name tag is showing (hovered or selected) - need extra space
             let is_hovered = state.hovered_entity_id.as_ref() == Some(&bubble.player_id);
             let is_selected = state.selected_entity_id.as_ref() == Some(&bubble.player_id);
-            let name_offset = if is_hovered || is_selected { 16.0 * zoom } else { 0.0 };
+            let name_offset = if is_hovered || is_selected {
+                16.0 * zoom
+            } else {
+                0.0
+            };
 
             let bubble_x = screen_x - bubble_width / 2.0;
             let bubble_y = screen_y - base_offset - name_offset - bubble_height - tail_height;
@@ -3189,7 +4217,14 @@ impl Renderer {
             let bh = bubble_height.floor();
 
             // Draw border first (slightly larger rounded rect)
-            let border_mesh = Self::create_rounded_rect_mesh(bx - 1.0, by - 1.0, bw + 2.0, bh + 2.0, r + 1.0, border_color);
+            let border_mesh = Self::create_rounded_rect_mesh(
+                bx - 1.0,
+                by - 1.0,
+                bw + 2.0,
+                bh + 2.0,
+                r + 1.0,
+                border_color,
+            );
             draw_mesh(&border_mesh);
 
             // Draw fill on top using mesh (no overlapping = no alpha stacking)
@@ -3219,9 +4254,24 @@ impl Renderer {
             ];
             let tail_mesh = Mesh {
                 vertices: vec![
-                    Vertex { position: Vec3::new(tail_x - tail_half_width, tail_top_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
-                    Vertex { position: Vec3::new(tail_x + tail_half_width, tail_top_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
-                    Vertex { position: Vec3::new(tail_x, tail_bottom_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
+                    Vertex {
+                        position: Vec3::new(tail_x - tail_half_width, tail_top_y, 0.0),
+                        uv: Vec2::ZERO,
+                        color: tail_color_arr,
+                        normal: Vec4::ZERO,
+                    },
+                    Vertex {
+                        position: Vec3::new(tail_x + tail_half_width, tail_top_y, 0.0),
+                        uv: Vec2::ZERO,
+                        color: tail_color_arr,
+                        normal: Vec4::ZERO,
+                    },
+                    Vertex {
+                        position: Vec3::new(tail_x, tail_bottom_y, 0.0),
+                        uv: Vec2::ZERO,
+                        color: tail_color_arr,
+                        normal: Vec4::ZERO,
+                    },
                 ],
                 indices: vec![0, 1, 2],
                 texture: None,
@@ -3229,8 +4279,22 @@ impl Renderer {
             draw_mesh(&tail_mesh);
 
             // Tail border lines
-            draw_line(tail_x - tail_half_width, tail_top_y, tail_x, tail_bottom_y, 1.0, border_color);
-            draw_line(tail_x + tail_half_width, tail_top_y, tail_x, tail_bottom_y, 1.0, border_color);
+            draw_line(
+                tail_x - tail_half_width,
+                tail_top_y,
+                tail_x,
+                tail_bottom_y,
+                1.0,
+                border_color,
+            );
+            draw_line(
+                tail_x + tail_half_width,
+                tail_top_y,
+                tail_x,
+                tail_bottom_y,
+                1.0,
+                border_color,
+            );
 
             // Draw text lines (centered)
             let bubble_center_x = bx + bw / 2.0;
@@ -3296,7 +4360,11 @@ impl Renderer {
 
             let is_hovered = state.hovered_entity_id.as_ref() == Some(&npc.id);
             let is_selected = state.selected_entity_id.as_ref() == Some(&npc.id);
-            let name_offset = if is_hovered || is_selected { 16.0 * zoom } else { 0.0 };
+            let name_offset = if is_hovered || is_selected {
+                16.0 * zoom
+            } else {
+                0.0
+            };
 
             let bubble_x = screen_x - bubble_width / 2.0;
             let bubble_y = screen_y - base_offset - name_offset - bubble_height - tail_height;
@@ -3313,7 +4381,14 @@ impl Renderer {
             let bw = bubble_width.floor();
             let bh = bubble_height.floor();
 
-            let border_mesh = Self::create_rounded_rect_mesh(bx - 1.0, by - 1.0, bw + 2.0, bh + 2.0, r + 1.0, border_color);
+            let border_mesh = Self::create_rounded_rect_mesh(
+                bx - 1.0,
+                by - 1.0,
+                bw + 2.0,
+                bh + 2.0,
+                r + 1.0,
+                border_color,
+            );
             draw_mesh(&border_mesh);
 
             let fill_mesh = Self::create_rounded_rect_mesh(bx, by, bw, bh, r, bg_color);
@@ -3340,17 +4415,46 @@ impl Renderer {
             ];
             let tail_mesh = Mesh {
                 vertices: vec![
-                    Vertex { position: Vec3::new(tail_x - tail_half_width, tail_top_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
-                    Vertex { position: Vec3::new(tail_x + tail_half_width, tail_top_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
-                    Vertex { position: Vec3::new(tail_x, tail_bottom_y, 0.0), uv: Vec2::ZERO, color: tail_color_arr, normal: Vec4::ZERO },
+                    Vertex {
+                        position: Vec3::new(tail_x - tail_half_width, tail_top_y, 0.0),
+                        uv: Vec2::ZERO,
+                        color: tail_color_arr,
+                        normal: Vec4::ZERO,
+                    },
+                    Vertex {
+                        position: Vec3::new(tail_x + tail_half_width, tail_top_y, 0.0),
+                        uv: Vec2::ZERO,
+                        color: tail_color_arr,
+                        normal: Vec4::ZERO,
+                    },
+                    Vertex {
+                        position: Vec3::new(tail_x, tail_bottom_y, 0.0),
+                        uv: Vec2::ZERO,
+                        color: tail_color_arr,
+                        normal: Vec4::ZERO,
+                    },
                 ],
                 indices: vec![0, 1, 2],
                 texture: None,
             };
             draw_mesh(&tail_mesh);
 
-            draw_line(tail_x - tail_half_width, tail_top_y, tail_x, tail_bottom_y, 1.0, border_color);
-            draw_line(tail_x + tail_half_width, tail_top_y, tail_x, tail_bottom_y, 1.0, border_color);
+            draw_line(
+                tail_x - tail_half_width,
+                tail_top_y,
+                tail_x,
+                tail_bottom_y,
+                1.0,
+                border_color,
+            );
+            draw_line(
+                tail_x + tail_half_width,
+                tail_top_y,
+                tail_x,
+                tail_bottom_y,
+                1.0,
+                border_color,
+            );
 
             // Draw text lines (centered)
             let bubble_center_x = bx + bw / 2.0;
@@ -3377,8 +4481,10 @@ impl Renderer {
             let screen_y = screen_y_raw + arrow_y_offset;
 
             // Calculate direction in SCREEN space (accounts for isometric transform)
-            let (start_screen_x, start_screen_y) = world_to_screen(projectile.start_x, projectile.start_y, &state.camera);
-            let (end_screen_x, end_screen_y) = world_to_screen(projectile.end_x, projectile.end_y, &state.camera);
+            let (start_screen_x, start_screen_y) =
+                world_to_screen(projectile.start_x, projectile.start_y, &state.camera);
+            let (end_screen_x, end_screen_y) =
+                world_to_screen(projectile.end_x, projectile.end_y, &state.camera);
             let dx = end_screen_x - start_screen_x;
             let dy = end_screen_y - start_screen_y;
             let angle = dy.atan2(dx);
@@ -3387,14 +4493,14 @@ impl Renderer {
             // 8 isometric directions: 0°, 26.57°, 90°, 153.43°, 180°, -153.43°, -90°, -26.57°
             let iso_angle = (0.5_f32).atan(); // atan(1/2) ≈ 26.57° ≈ 0.4636 rad
             let iso_angles: [f32; 8] = [
-                0.0,                                    // UpRight (east)
-                iso_angle,                              // Right (26.57°)
-                std::f32::consts::FRAC_PI_2,           // DownRight (90°)
-                std::f32::consts::PI - iso_angle,      // Down (153.43°)
-                std::f32::consts::PI,                  // DownLeft (180°)
-                -std::f32::consts::PI + iso_angle,     // Left (-153.43°)
-                -std::f32::consts::FRAC_PI_2,          // UpLeft (-90°)
-                -iso_angle,                            // Up (-26.57°)
+                0.0,                               // UpRight (east)
+                iso_angle,                         // Right (26.57°)
+                std::f32::consts::FRAC_PI_2,       // DownRight (90°)
+                std::f32::consts::PI - iso_angle,  // Down (153.43°)
+                std::f32::consts::PI,              // DownLeft (180°)
+                -std::f32::consts::PI + iso_angle, // Left (-153.43°)
+                -std::f32::consts::FRAC_PI_2,      // UpLeft (-90°)
+                -iso_angle,                        // Up (-26.57°)
             ];
 
             // Find nearest isometric angle
@@ -3430,7 +4536,7 @@ impl Renderer {
 
             // Colors
             let shaft_color = Color::new(0.55, 0.35, 0.15, 1.0); // Wood brown
-            let head_color = Color::new(0.45, 0.45, 0.5, 1.0);   // Metal gray
+            let head_color = Color::new(0.45, 0.45, 0.5, 1.0); // Metal gray
             let fletch_color = Color::new(0.85, 0.85, 0.8, 1.0); // Light feathers
 
             // Arrow positions
@@ -3454,8 +4560,14 @@ impl Renderer {
             let head_base_y = screen_y + dir_y * shaft_length / 2.0;
             draw_triangle(
                 Vec2::new(tip_x, tip_y),
-                Vec2::new(head_base_x + perp_x * head_width / 2.0, head_base_y + perp_y * head_width / 2.0),
-                Vec2::new(head_base_x - perp_x * head_width / 2.0, head_base_y - perp_y * head_width / 2.0),
+                Vec2::new(
+                    head_base_x + perp_x * head_width / 2.0,
+                    head_base_y + perp_y * head_width / 2.0,
+                ),
+                Vec2::new(
+                    head_base_x - perp_x * head_width / 2.0,
+                    head_base_y - perp_y * head_width / 2.0,
+                ),
                 head_color,
             );
 
@@ -3465,17 +4577,35 @@ impl Renderer {
 
             // Left fletch
             draw_triangle(
-                Vec2::new(back_x + perp_x * shaft_width / 2.0, back_y + perp_y * shaft_width / 2.0),
-                Vec2::new(fletch_base_x + perp_x * shaft_width / 2.0, fletch_base_y + perp_y * shaft_width / 2.0),
-                Vec2::new(back_x + perp_x * fletch_width, back_y + perp_y * fletch_width),
+                Vec2::new(
+                    back_x + perp_x * shaft_width / 2.0,
+                    back_y + perp_y * shaft_width / 2.0,
+                ),
+                Vec2::new(
+                    fletch_base_x + perp_x * shaft_width / 2.0,
+                    fletch_base_y + perp_y * shaft_width / 2.0,
+                ),
+                Vec2::new(
+                    back_x + perp_x * fletch_width,
+                    back_y + perp_y * fletch_width,
+                ),
                 fletch_color,
             );
 
             // Right fletch
             draw_triangle(
-                Vec2::new(back_x - perp_x * shaft_width / 2.0, back_y - perp_y * shaft_width / 2.0),
-                Vec2::new(fletch_base_x - perp_x * shaft_width / 2.0, fletch_base_y - perp_y * shaft_width / 2.0),
-                Vec2::new(back_x - perp_x * fletch_width, back_y - perp_y * fletch_width),
+                Vec2::new(
+                    back_x - perp_x * shaft_width / 2.0,
+                    back_y - perp_y * shaft_width / 2.0,
+                ),
+                Vec2::new(
+                    fletch_base_x - perp_x * shaft_width / 2.0,
+                    fletch_base_y - perp_y * shaft_width / 2.0,
+                ),
+                Vec2::new(
+                    back_x - perp_x * fletch_width,
+                    back_y - perp_y * fletch_width,
+                ),
                 fletch_color,
             );
         }
@@ -3502,7 +4632,9 @@ impl Renderer {
             };
 
             // Get sprite dimensions (from atlas rect or texture size)
-            let (tex_w, tex_h) = self.spell_effect_textures.get_dimensions(sprite_name)
+            let (tex_w, tex_h) = self
+                .spell_effect_textures
+                .get_dimensions(sprite_name)
                 .unwrap_or((texture.width(), texture.height()));
             let frame_count = 5usize;
             let frame_w = tex_w / frame_count as f32;
@@ -3589,17 +4721,19 @@ impl Renderer {
             let final_y = (screen_y - height_offset - float_offset).round();
 
             // Fade: visible for first half, then fade out
-            let alpha = if t < 0.5 {
-                1.0
-            } else {
-                1.0 - (t - 0.5) * 2.0
-            };
+            let alpha = if t < 0.5 { 1.0 } else { 1.0 - (t - 0.5) * 2.0 };
 
             // Text and color
             let (text, base_color) = if event.damage > 0 {
-                (format!("-{}", event.damage), Color::new(1.0, 0.3, 0.2, alpha))
+                (
+                    format!("-{}", event.damage),
+                    Color::new(1.0, 0.3, 0.2, alpha),
+                )
             } else if event.damage < 0 {
-                (format!("+{}", -event.damage), Color::new(0.3, 1.0, 0.4, alpha))
+                (
+                    format!("+{}", -event.damage),
+                    Color::new(0.3, 1.0, 0.4, alpha),
+                )
             } else {
                 ("MISS".to_string(), Color::new(0.6, 0.6, 0.6, alpha))
             };
@@ -3611,7 +4745,12 @@ impl Renderer {
             // Simple outline - scale offset with zoom
             let outline_offset = 1.0 * zoom;
             let outline_color = Color::new(0.0, 0.0, 0.0, alpha * 0.9);
-            for &(ox, oy) in &[(-outline_offset, -outline_offset), (outline_offset, -outline_offset), (-outline_offset, outline_offset), (outline_offset, outline_offset)] {
+            for &(ox, oy) in &[
+                (-outline_offset, -outline_offset),
+                (outline_offset, -outline_offset),
+                (-outline_offset, outline_offset),
+                (outline_offset, outline_offset),
+            ] {
                 self.draw_text_sharp(&text, draw_x + ox, final_y + oy, font_size, outline_color);
             }
 
@@ -3655,10 +4794,19 @@ impl Renderer {
                 // CHUNK-LEVEL CULLING: Check if chunk is visible before iterating tiles
                 // In isometric projection, a chunk forms a diamond. Check all 4 corners.
                 let corners = [
-                    (chunk_offset_x as f32, chunk_offset_y as f32),                           // top
-                    (chunk_offset_x as f32 + tile_width as f32, chunk_offset_y as f32),       // right
-                    (chunk_offset_x as f32, chunk_offset_y as f32 + tile_height as f32),       // left
-                    (chunk_offset_x as f32 + tile_width as f32, chunk_offset_y as f32 + tile_height as f32), // bottom
+                    (chunk_offset_x as f32, chunk_offset_y as f32), // top
+                    (
+                        chunk_offset_x as f32 + tile_width as f32,
+                        chunk_offset_y as f32,
+                    ), // right
+                    (
+                        chunk_offset_x as f32,
+                        chunk_offset_y as f32 + tile_height as f32,
+                    ), // left
+                    (
+                        chunk_offset_x as f32 + tile_width as f32,
+                        chunk_offset_y as f32 + tile_height as f32,
+                    ), // bottom
                 ];
 
                 // Get screen bounds of the chunk
@@ -3676,8 +4824,11 @@ impl Renderer {
                 }
 
                 // Skip entire chunk if completely off-screen
-                if max_sx < -margin || min_sx > screen_w + margin ||
-                   max_sy < -margin || min_sy > screen_h + margin {
+                if max_sx < -margin
+                    || min_sx > screen_w + margin
+                    || max_sy < -margin
+                    || min_sy > screen_h + margin
+                {
                     continue;
                 }
 
@@ -3693,7 +4844,11 @@ impl Renderer {
                     let zoom = state.camera.zoom;
                     let dx = (TILE_WIDTH / 2.0) * zoom;
                     let dy = (TILE_HEIGHT / 2.0) * zoom;
-                    let (base_sx, base_sy) = world_to_screen_exact(chunk_offset_x as f32, chunk_offset_y as f32, &state.camera);
+                    let (base_sx, base_sy) = world_to_screen_exact(
+                        chunk_offset_x as f32,
+                        chunk_offset_y as f32,
+                        &state.camera,
+                    );
                     let water_effects = !state.ui_state.graphics_low;
 
                     // Tile-level culling bounds
@@ -3720,8 +4875,11 @@ impl Renderer {
                             let screen_y = (row_sy + local_x as f32 * dy).round();
 
                             // Tile-level culling (still needed for partially visible chunks)
-                            if screen_x < cull_left || screen_x > cull_right
-                                || screen_y < cull_top || screen_y > cull_bottom {
+                            if screen_x < cull_left
+                                || screen_x > cull_right
+                                || screen_y < cull_top
+                                || screen_y > cull_bottom
+                            {
                                 continue;
                             }
 
@@ -3730,7 +4888,9 @@ impl Renderer {
 
                             // Apply ground tile overrides (e.g. farming plot tiles)
                             let tile_id = if chunk_layer_type == ChunkLayerType::Ground {
-                                state.ground_tile_overrides.get(&(world_x, world_y))
+                                state
+                                    .ground_tile_overrides
+                                    .get(&(world_x, world_y))
                                     .copied()
                                     .unwrap_or(tile_id)
                             } else {
@@ -3738,10 +4898,19 @@ impl Renderer {
                             };
 
                             // Draw tile sprite (or fallback to colored tile)
-                            self.draw_tile_sprite(screen_x, screen_y, tile_id, zoom, Some((world_x as f32, world_y as f32)), water_effects);
+                            self.draw_tile_sprite(
+                                screen_x,
+                                screen_y,
+                                tile_id,
+                                zoom,
+                                Some((world_x as f32, world_y as f32)),
+                                water_effects,
+                            );
 
                             // Draw collision indicator in debug mode
-                            if state.debug_mode && chunk.collision.get(idx).copied().unwrap_or(false) {
+                            if state.debug_mode
+                                && chunk.collision.get(idx).copied().unwrap_or(false)
+                            {
                                 self.draw_collision_indicator(screen_x, screen_y, zoom);
                             }
                         }
@@ -3784,13 +4953,23 @@ impl Renderer {
                     let screen_y = (row_sy + x as f32 * dy).round();
 
                     // Culling: skip tiles outside viewport
-                    if screen_x < -margin || screen_x > vw + margin
-                        || screen_y < -margin || screen_y > vh + margin {
+                    if screen_x < -margin
+                        || screen_x > vw + margin
+                        || screen_y < -margin
+                        || screen_y > vh + margin
+                    {
                         continue;
                     }
 
                     // Draw tile sprite (or fallback to colored tile)
-                    self.draw_tile_sprite(screen_x, screen_y, tile_id, zoom, Some((x as f32, y as f32)), water_effects);
+                    self.draw_tile_sprite(
+                        screen_x,
+                        screen_y,
+                        tile_id,
+                        zoom,
+                        Some((x as f32, y as f32)),
+                        water_effects,
+                    );
 
                     // Draw collision indicator in debug mode
                     if state.debug_mode && tilemap.collision.get(idx).copied().unwrap_or(false) {
@@ -3816,7 +4995,14 @@ impl Renderer {
 
     fn draw_isometric_object(&self, screen_x: f32, screen_y: f32, tile_id: u32, zoom: f32) {
         // Draw shadow ellipse for objects
-        draw_ellipse(screen_x, screen_y + 4.0 * zoom, 24.0 * zoom, 16.0 * zoom, 0.0, Color::from_rgba(0, 0, 0, 50));
+        draw_ellipse(
+            screen_x,
+            screen_y + 4.0 * zoom,
+            24.0 * zoom,
+            16.0 * zoom,
+            0.0,
+            Color::from_rgba(0, 0, 0, 50),
+        );
 
         // Draw object tile sprite (slightly elevated)
         let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25;
@@ -3893,7 +5079,8 @@ impl Renderer {
     /// Draw corner indicators for the hovered tile
     pub(crate) fn render_tile_hover(&self, tile_x: i32, tile_y: i32, camera: &Camera) {
         // Get the center of the tile in screen space
-        let (center_x, center_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+        let (center_x, center_y) =
+            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
         let center_y = center_y - TILE_HEIGHT * camera.zoom / 2.0;
 
         // Tile dimensions (half-sizes for diamond corners), scaled by zoom
@@ -3914,26 +5101,89 @@ impl Renderer {
         let line_width = 1.0 * camera.zoom;
 
         // Top corner
-        draw_line(top.0, top.1, top.0 + (left.0 - top.0) * t, top.1 + (left.1 - top.1) * t, line_width, color);
-        draw_line(top.0, top.1, top.0 + (right.0 - top.0) * t, top.1 + (right.1 - top.1) * t, line_width, color);
+        draw_line(
+            top.0,
+            top.1,
+            top.0 + (left.0 - top.0) * t,
+            top.1 + (left.1 - top.1) * t,
+            line_width,
+            color,
+        );
+        draw_line(
+            top.0,
+            top.1,
+            top.0 + (right.0 - top.0) * t,
+            top.1 + (right.1 - top.1) * t,
+            line_width,
+            color,
+        );
 
         // Right corner
-        draw_line(right.0, right.1, right.0 + (top.0 - right.0) * t, right.1 + (top.1 - right.1) * t, line_width, color);
-        draw_line(right.0, right.1, right.0 + (bottom.0 - right.0) * t, right.1 + (bottom.1 - right.1) * t, line_width, color);
+        draw_line(
+            right.0,
+            right.1,
+            right.0 + (top.0 - right.0) * t,
+            right.1 + (top.1 - right.1) * t,
+            line_width,
+            color,
+        );
+        draw_line(
+            right.0,
+            right.1,
+            right.0 + (bottom.0 - right.0) * t,
+            right.1 + (bottom.1 - right.1) * t,
+            line_width,
+            color,
+        );
 
         // Bottom corner
-        draw_line(bottom.0, bottom.1, bottom.0 + (right.0 - bottom.0) * t, bottom.1 + (right.1 - bottom.1) * t, line_width, color);
-        draw_line(bottom.0, bottom.1, bottom.0 + (left.0 - bottom.0) * t, bottom.1 + (left.1 - bottom.1) * t, line_width, color);
+        draw_line(
+            bottom.0,
+            bottom.1,
+            bottom.0 + (right.0 - bottom.0) * t,
+            bottom.1 + (right.1 - bottom.1) * t,
+            line_width,
+            color,
+        );
+        draw_line(
+            bottom.0,
+            bottom.1,
+            bottom.0 + (left.0 - bottom.0) * t,
+            bottom.1 + (left.1 - bottom.1) * t,
+            line_width,
+            color,
+        );
 
         // Left corner
-        draw_line(left.0, left.1, left.0 + (bottom.0 - left.0) * t, left.1 + (bottom.1 - left.1) * t, line_width, color);
-        draw_line(left.0, left.1, left.0 + (top.0 - left.0) * t, left.1 + (top.1 - left.1) * t, line_width, color);
+        draw_line(
+            left.0,
+            left.1,
+            left.0 + (bottom.0 - left.0) * t,
+            left.1 + (bottom.1 - left.1) * t,
+            line_width,
+            color,
+        );
+        draw_line(
+            left.0,
+            left.1,
+            left.0 + (top.0 - left.0) * t,
+            left.1 + (top.1 - left.1) * t,
+            line_width,
+            color,
+        );
     }
 
     /// Draw a green drop zone indicator for a tile (when dragging items)
-    pub(crate) fn render_drop_zone(&self, tile_x: i32, tile_y: i32, camera: &Camera, is_hovered: bool) {
+    pub(crate) fn render_drop_zone(
+        &self,
+        tile_x: i32,
+        tile_y: i32,
+        camera: &Camera,
+        is_hovered: bool,
+    ) {
         // Get the center of the tile in screen space
-        let (center_x, center_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+        let (center_x, center_y) =
+            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
         let center_y = center_y - TILE_HEIGHT * camera.zoom / 2.0;
 
         // Tile dimensions (half-sizes for diamond corners), scaled by zoom
@@ -3972,13 +5222,27 @@ impl Renderer {
             let border_color = Color::from_rgba(150, 255, 150, 200);
             let line_width = 1.0 * camera.zoom;
             draw_line(top.0, top.1, right.0, right.1, line_width, border_color);
-            draw_line(right.0, right.1, bottom.0, bottom.1, line_width, border_color);
+            draw_line(
+                right.0,
+                right.1,
+                bottom.0,
+                bottom.1,
+                line_width,
+                border_color,
+            );
             draw_line(bottom.0, bottom.1, left.0, left.1, line_width, border_color);
             draw_line(left.0, left.1, top.0, top.1, line_width, border_color);
         }
     }
 
-    fn render_player(&self, player: &Player, is_local: bool, is_selected: bool, is_hovered: bool, camera: &Camera) {
+    fn render_player(
+        &self,
+        player: &Player,
+        is_local: bool,
+        is_selected: bool,
+        is_hovered: bool,
+        camera: &Camera,
+    ) {
         let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
         let zoom = camera.zoom;
 
@@ -3995,17 +5259,27 @@ impl Renderer {
         }
 
         // Vertical offset for sitting on chair (shift up to center on tile)
-        let sit_offset_y = if player.animation.state == crate::render::animation::AnimationState::SittingChair {
-            10.0 * zoom
-        } else {
-            0.0
-        };
+        let sit_offset_y =
+            if player.animation.state == crate::render::animation::AnimationState::SittingChair {
+                10.0 * zoom
+            } else {
+                0.0
+            };
 
         // Draw shadow under player
-        draw_ellipse(screen_x, screen_y, 16.0 * zoom, 7.0 * zoom, 0.0, Color::from_rgba(0, 0, 0, 60));
+        draw_ellipse(
+            screen_x,
+            screen_y,
+            16.0 * zoom,
+            7.0 * zoom,
+            0.0,
+            Color::from_rgba(0, 0, 0, 60),
+        );
 
         // Try to render sprite based on player's appearance, fall back to colored circle
-        if let Some((player_texture, player_offset)) = self.get_player_sprite(&player.gender, &player.skin) {
+        if let Some((player_texture, player_offset)) =
+            self.get_player_sprite(&player.gender, &player.skin)
+        {
             let coords = player.animation.get_sprite_coords();
             let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
             let (src_x, src_y, src_w, src_h) = coords.to_source_rect();
@@ -4025,28 +5299,56 @@ impl Renderer {
             let player_gender = Gender::from_str(&player.gender);
 
             // Calculate weapon frame info if weapon is equipped (hidden when sitting)
-            let is_sitting = matches!(player.animation.state,
-                crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
-            let weapon_info = player.equipped_weapon.as_ref().filter(|_| !is_sitting).and_then(|weapon_id| {
-                self.weapon_sprites.get(weapon_id).map(|(tex, atlas_offset)| {
-                    let anim_frame = player.animation.frame as u32;
-                    let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
-                    let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
-                    // Get weapon frame size from manifest, fallback to default
-                    let (fw, fh) = self.weapon_frame_sizes.get(weapon_id)
-                        .copied()
-                        .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
-                    (tex, atlas_offset, weapon_frame, offset_x, offset_y, fw, fh)
-                })
-            });
+            let is_sitting = matches!(
+                player.animation.state,
+                crate::render::animation::AnimationState::SittingChair
+                    | crate::render::animation::AnimationState::SittingGround
+            );
+            let weapon_info = player
+                .equipped_weapon
+                .as_ref()
+                .filter(|_| !is_sitting)
+                .and_then(|weapon_id| {
+                    self.weapon_sprites
+                        .get(weapon_id)
+                        .map(|(tex, atlas_offset)| {
+                            let anim_frame = player.animation.frame as u32;
+                            let weapon_frame = get_weapon_frame(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                            );
+                            let (offset_x, offset_y) = get_weapon_offset(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                                player_gender,
+                            );
+                            // Get weapon frame size from manifest, fallback to default
+                            let (fw, fh) = self
+                                .weapon_frame_sizes
+                                .get(weapon_id)
+                                .copied()
+                                .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                            (tex, atlas_offset, weapon_frame, offset_x, offset_y, fw, fh)
+                        })
+                });
 
             // Scaled weapon dimensions (per-weapon)
-            let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info.as_ref()
+            let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info
+                .as_ref()
                 .map(|(_, _, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
-                .unwrap_or((WEAPON_SPRITE_WIDTH * zoom, WEAPON_SPRITE_HEIGHT * zoom, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                .unwrap_or((
+                    WEAPON_SPRITE_WIDTH * zoom,
+                    WEAPON_SPRITE_HEIGHT * zoom,
+                    WEAPON_SPRITE_WIDTH,
+                    WEAPON_SPRITE_HEIGHT,
+                ));
 
             // Draw weapon under-layer (before player sprite)
-            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) =
+                weapon_info
+            {
                 let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
                 let weapon_src_x = atlas_x + weapon_frame.frame_under as f32 * wf_width;
                 let weapon_draw_x = draw_x + offset_x * zoom;
@@ -4068,18 +5370,28 @@ impl Renderer {
 
             // Draw back static items BEHIND player (for down/right directions - tip peeks out)
             if let Some(ref back_item_id) = player.equipped_back {
-                if let Some((equip_texture, equip_offset)) = self.equipment_sprites.get(back_item_id) {
+                if let Some((equip_texture, equip_offset)) =
+                    self.equipment_sprites.get(back_item_id)
+                {
                     // Check if this is an offhand item based on dimensions
-                    let (equip_w, equip_h) = self.equipment_sprites.get_dimensions(back_item_id)
+                    let (equip_w, equip_h) = self
+                        .equipment_sprites
+                        .get_dimensions(back_item_id)
                         .unwrap_or((equip_texture.width(), equip_texture.height()));
                     let is_offhand = equip_w > equip_h * 8.0;
                     if !is_offhand {
                         let anim_frame = player.animation.frame as u32;
                         let back_frame = get_back_static_frame(player.animation.direction);
                         if back_frame.render_behind {
-                            let (back_offset_x, back_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                            let (back_offset_x, back_offset_y) = get_back_static_offset(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                                player_gender,
+                            );
                             let (atlas_x, atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
-                            let back_src_x = atlas_x + back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
+                            let back_src_x =
+                                atlas_x + back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
                             let scaled_back_width = BACK_STATIC_SPRITE_WIDTH * zoom;
                             let scaled_back_height = BACK_STATIC_SPRITE_HEIGHT * zoom;
                             let back_draw_x = draw_x + back_offset_x * zoom;
@@ -4091,8 +5403,16 @@ impl Renderer {
                                 back_draw_y,
                                 tint,
                                 DrawTextureParams {
-                                    source: Some(Rect::new(back_src_x, atlas_y, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
-                                    dest_size: Some(Vec2::new(scaled_back_width, scaled_back_height)),
+                                    source: Some(Rect::new(
+                                        back_src_x,
+                                        atlas_y,
+                                        BACK_STATIC_SPRITE_WIDTH,
+                                        BACK_STATIC_SPRITE_HEIGHT,
+                                    )),
+                                    dest_size: Some(Vec2::new(
+                                        scaled_back_width,
+                                        scaled_back_height,
+                                    )),
                                     flip_x: back_frame.flip_h,
                                     ..Default::default()
                                 },
@@ -4109,7 +5429,12 @@ impl Renderer {
                 draw_y,
                 tint,
                 DrawTextureParams {
-                    source: Some(Rect::new(player_atlas_x + src_x, player_atlas_y + src_y, src_w, src_h)),
+                    source: Some(Rect::new(
+                        player_atlas_x + src_x,
+                        player_atlas_y + src_y,
+                        src_w,
+                        src_h,
+                    )),
                     dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
                     flip_x: coords.flip_h,
                     ..Default::default()
@@ -4119,21 +5444,23 @@ impl Renderer {
             // Draw hair and head equipment (after base sprite, before body armor)
             // Check if player has head equipment that we can render with shader
             let head_item_id_ref = player.equipped_head.as_ref();
-            let head_sprite_data = head_item_id_ref
-                .and_then(|head_item_id| {
-                    let (tex, offset) = self.equipment_sprites.get(head_item_id)?;
-                    let (w, h) = self.equipment_sprites.get_dimensions(head_item_id)?;
-                    Some((tex, offset, w, h))
-                });
+            let head_sprite_data = head_item_id_ref.and_then(|head_item_id| {
+                let (tex, offset) = self.equipment_sprites.get(head_item_id)?;
+                let (w, h) = self.equipment_sprites.get_dimensions(head_item_id)?;
+                Some((tex, offset, w, h))
+            });
 
             let has_shader = self.head_hair_material.is_some();
 
-            if let Some((head_texture, head_offset, _head_rect_w, _head_rect_h)) = head_sprite_data {
+            if let Some((head_texture, head_offset, _head_rect_w, _head_rect_h)) = head_sprite_data
+            {
                 // Player has head equipment - use shader compositing if available
                 if has_shader {
                     if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                         let hair_key = format!("{}_{}", player.gender, style);
-                        if let Some((hair_texture, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
+                        if let Some((hair_texture, hair_atlas_offset)) =
+                            self.hair_sprites.get(&hair_key)
+                        {
                             // For UV calculations, we need the FULL texture dimensions, not sprite rect dimensions
                             // get_dimensions() returns sprite rect size in atlas mode, but UVs need full texture size
                             let hair_full_tex_w = hair_texture.width();
@@ -4142,11 +5469,15 @@ impl Renderer {
                             let head_full_tex_h = head_texture.height();
 
                             // Get atlas offsets (0,0 if not using atlas)
-                            let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
+                            let (hair_atlas_x, hair_atlas_y) =
+                                hair_atlas_offset.unwrap_or((0.0, 0.0));
                             let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
 
                             // Calculate hair frame info
-                            let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
+                            let is_back = matches!(
+                                player.animation.direction,
+                                Direction::Up | Direction::Left
+                            );
                             let frame_index = color * 2 + if is_back { 1 } else { 0 };
                             let hair_src_x = frame_index as f32 * HAIR_SPRITE_WIDTH;
 
@@ -4162,7 +5493,12 @@ impl Renderer {
 
                             // Calculate head frame info
                             let head_frame = get_head_frame(player.animation.direction);
-                            let (head_pos_x, head_pos_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                            let (head_pos_x, head_pos_y) = get_head_offset(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                                player_gender,
+                            );
                             let head_src_x = head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
 
                             // Calculate pixel offset from head origin to hair origin (in unscaled pixels)
@@ -4202,13 +5538,20 @@ impl Renderer {
 
                             let scale_x = head_full_tex_w * hair_uv_w / HAIR_SPRITE_WIDTH;
                             let scale_y = head_full_tex_h * hair_uv_h / HAIR_SPRITE_HEIGHT;
-                            let offset_x = hair_uv_x - head_uv_x * scale_x - delta_x * hair_uv_w / HAIR_SPRITE_WIDTH;
-                            let offset_y = hair_uv_y - head_uv_y * scale_y - delta_y * hair_uv_h / HAIR_SPRITE_HEIGHT;
+                            let offset_x = hair_uv_x
+                                - head_uv_x * scale_x
+                                - delta_x * hair_uv_w / HAIR_SPRITE_WIDTH;
+                            let offset_y = hair_uv_y
+                                - head_uv_y * scale_y
+                                - delta_y * hair_uv_h / HAIR_SPRITE_HEIGHT;
 
                             // Set up shader
                             let material = self.head_hair_material.as_ref().unwrap();
                             material.set_texture("HairTexture", hair_texture.clone());
-                            material.set_uniform("HairUvTransform", [offset_x, offset_y, scale_x, scale_y]);
+                            material.set_uniform(
+                                "HairUvTransform",
+                                [offset_x, offset_y, scale_x, scale_y],
+                            );
                             material.set_uniform("Tint", [1.0f32, 1.0f32, 1.0f32, 1.0f32]);
                             gl_use_material(material);
 
@@ -4224,8 +5567,16 @@ impl Renderer {
                                 head_draw_y,
                                 tint,
                                 DrawTextureParams {
-                                    source: Some(Rect::new(head_atlas_x + head_src_x, head_atlas_y, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
-                                    dest_size: Some(Vec2::new(scaled_head_width, scaled_head_height)),
+                                    source: Some(Rect::new(
+                                        head_atlas_x + head_src_x,
+                                        head_atlas_y,
+                                        HEAD_SPRITE_WIDTH,
+                                        HEAD_SPRITE_HEIGHT,
+                                    )),
+                                    dest_size: Some(Vec2::new(
+                                        scaled_head_width,
+                                        scaled_head_height,
+                                    )),
                                     flip_x: head_frame.flip_h,
                                     ..Default::default()
                                 },
@@ -4237,7 +5588,12 @@ impl Renderer {
                         // No hair, just draw head normally
                         let anim_frame = player.animation.frame as u32;
                         let head_frame = get_head_frame(player.animation.direction);
-                        let (head_pos_offset_x, head_pos_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                        let (head_pos_offset_x, head_pos_offset_y) = get_head_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                        );
                         let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
                         let head_src_x = head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
                         let scaled_head_width = HEAD_SPRITE_WIDTH * zoom;
@@ -4251,7 +5607,12 @@ impl Renderer {
                             head_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(head_atlas_x + head_src_x, head_atlas_y, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(
+                                    head_atlas_x + head_src_x,
+                                    head_atlas_y,
+                                    HEAD_SPRITE_WIDTH,
+                                    HEAD_SPRITE_HEIGHT,
+                                )),
                                 dest_size: Some(Vec2::new(scaled_head_width, scaled_head_height)),
                                 flip_x: head_frame.flip_h,
                                 ..Default::default()
@@ -4263,10 +5624,16 @@ impl Renderer {
                     // Draw hair first
                     if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                         let hair_key = format!("{}_{}", player.gender, style);
-                        if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
-                            let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
+                        if let Some((hair_tex, hair_atlas_offset)) =
+                            self.hair_sprites.get(&hair_key)
+                        {
+                            let is_back = matches!(
+                                player.animation.direction,
+                                Direction::Up | Direction::Left
+                            );
                             let frame_index = color * 2 + if is_back { 1 } else { 0 };
-                            let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
+                            let (hair_atlas_x, hair_atlas_y) =
+                                hair_atlas_offset.unwrap_or((0.0, 0.0));
                             let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
                             let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
                             let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
@@ -4281,7 +5648,9 @@ impl Renderer {
                                 coords.flip_h,
                             );
 
-                            let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_pos_offset_x * zoom;
+                            let hair_draw_x = draw_x
+                                + (scaled_sprite_width - scaled_hair_width) / 2.0
+                                + hair_pos_offset_x * zoom;
                             let hair_draw_y = draw_y + hair_pos_offset_y * zoom;
 
                             draw_texture_ex(
@@ -4290,8 +5659,16 @@ impl Renderer {
                                 hair_draw_y,
                                 tint,
                                 DrawTextureParams {
-                                    source: Some(Rect::new(hair_src_x, hair_atlas_y, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
-                                    dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
+                                    source: Some(Rect::new(
+                                        hair_src_x,
+                                        hair_atlas_y,
+                                        HAIR_SPRITE_WIDTH,
+                                        HAIR_SPRITE_HEIGHT,
+                                    )),
+                                    dest_size: Some(Vec2::new(
+                                        scaled_hair_width,
+                                        scaled_hair_height,
+                                    )),
                                     flip_x: coords.flip_h,
                                     ..Default::default()
                                 },
@@ -4302,7 +5679,12 @@ impl Renderer {
                     // Then draw head on top
                     let anim_frame = player.animation.frame as u32;
                     let head_frame = get_head_frame(player.animation.direction);
-                    let (head_pos_offset_x, head_pos_offset_y) = get_head_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                    let (head_pos_offset_x, head_pos_offset_y) = get_head_offset(
+                        player.animation.state,
+                        player.animation.direction,
+                        anim_frame,
+                        player_gender,
+                    );
                     let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
                     let head_src_x = head_atlas_x + head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
                     let scaled_head_width = HEAD_SPRITE_WIDTH * zoom;
@@ -4316,7 +5698,12 @@ impl Renderer {
                         head_draw_y,
                         tint,
                         DrawTextureParams {
-                            source: Some(Rect::new(head_src_x, head_atlas_y, HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(
+                                head_src_x,
+                                head_atlas_y,
+                                HEAD_SPRITE_WIDTH,
+                                HEAD_SPRITE_HEIGHT,
+                            )),
                             dest_size: Some(Vec2::new(scaled_head_width, scaled_head_height)),
                             flip_x: head_frame.flip_h,
                             ..Default::default()
@@ -4328,10 +5715,14 @@ impl Renderer {
 
             // Draw equipment overlay (body armor)
             if let Some(ref body_item_id) = player.equipped_body {
-                if let Some((body_texture, body_atlas_offset)) = self.equipment_sprites.get(body_item_id) {
+                if let Some((body_texture, body_atlas_offset)) =
+                    self.equipment_sprites.get(body_item_id)
+                {
                     // Check if this is a new-style single-row body armor sprite (width > height * 2)
                     // Body armor sprites are wider (16 frames) so use a more aggressive ratio check
-                    let (body_w, body_h) = self.equipment_sprites.get_dimensions(body_item_id)
+                    let (body_w, body_h) = self
+                        .equipment_sprites
+                        .get_dimensions(body_item_id)
                         .unwrap_or((body_texture.width(), body_texture.height()));
                     let is_single_row = body_w > body_h * 2.0;
                     let (body_atlas_x, body_atlas_y) = body_atlas_offset.unwrap_or((0.0, 0.0));
@@ -4339,10 +5730,20 @@ impl Renderer {
                     if is_single_row {
                         // New single-row body armor format
                         let anim_frame = player.animation.frame as u32;
-                        let armor_frame = get_body_armor_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (armor_offset_x, armor_offset_y) = get_body_armor_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                        let armor_frame = get_body_armor_frame(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                        );
+                        let (armor_offset_x, armor_offset_y) = get_body_armor_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                        );
 
-                        let armor_src_x = body_atlas_x + armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
+                        let armor_src_x =
+                            body_atlas_x + armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
                         let scaled_armor_width = BODY_ARMOR_SPRITE_WIDTH * zoom;
                         let scaled_armor_height = BODY_ARMOR_SPRITE_HEIGHT * zoom;
 
@@ -4355,7 +5756,12 @@ impl Renderer {
                             armor_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(armor_src_x, body_atlas_y, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(
+                                    armor_src_x,
+                                    body_atlas_y,
+                                    BODY_ARMOR_SPRITE_WIDTH,
+                                    BODY_ARMOR_SPRITE_HEIGHT,
+                                )),
                                 dest_size: Some(Vec2::new(scaled_armor_width, scaled_armor_height)),
                                 flip_x: armor_frame.flip_h,
                                 ..Default::default()
@@ -4369,8 +5775,16 @@ impl Renderer {
                             draw_y,
                             tint, // Same tint as player
                             DrawTextureParams {
-                                source: Some(Rect::new(body_atlas_x + src_x, body_atlas_y + src_y, src_w, src_h)),
-                                dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
+                                source: Some(Rect::new(
+                                    body_atlas_x + src_x,
+                                    body_atlas_y + src_y,
+                                    src_w,
+                                    src_h,
+                                )),
+                                dest_size: Some(Vec2::new(
+                                    scaled_sprite_width,
+                                    scaled_sprite_height,
+                                )),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },
@@ -4384,7 +5798,8 @@ impl Renderer {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
                     if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
-                        let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
+                        let is_back =
+                            matches!(player.animation.direction, Direction::Up | Direction::Left);
                         let frame_index = color * 2 + if is_back { 1 } else { 0 };
                         let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
                         let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
@@ -4401,7 +5816,9 @@ impl Renderer {
                             coords.flip_h,
                         );
 
-                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_pos_offset_x * zoom;
+                        let hair_draw_x = draw_x
+                            + (scaled_sprite_width - scaled_hair_width) / 2.0
+                            + hair_pos_offset_x * zoom;
                         let hair_draw_y = draw_y + hair_pos_offset_y * zoom;
 
                         draw_texture_ex(
@@ -4410,7 +5827,12 @@ impl Renderer {
                             hair_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(hair_src_x, hair_atlas_y, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(
+                                    hair_src_x,
+                                    hair_atlas_y,
+                                    HAIR_SPRITE_WIDTH,
+                                    HAIR_SPRITE_HEIGHT,
+                                )),
                                 dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
@@ -4422,9 +5844,13 @@ impl Renderer {
 
             // Draw equipment overlay (boots)
             if let Some(ref feet_item_id) = player.equipped_feet {
-                if let Some((feet_texture, feet_atlas_offset)) = self.equipment_sprites.get(feet_item_id) {
+                if let Some((feet_texture, feet_atlas_offset)) =
+                    self.equipment_sprites.get(feet_item_id)
+                {
                     // Check if this is a new-style single-row boot sprite (width > height)
-                    let (feet_w, feet_h) = self.equipment_sprites.get_dimensions(feet_item_id)
+                    let (feet_w, feet_h) = self
+                        .equipment_sprites
+                        .get_dimensions(feet_item_id)
                         .unwrap_or((feet_texture.width(), feet_texture.height()));
                     let is_single_row = feet_w > feet_h;
                     let (feet_atlas_x, feet_atlas_y) = feet_atlas_offset.unwrap_or((0.0, 0.0));
@@ -4432,8 +5858,17 @@ impl Renderer {
                     if is_single_row {
                         // New single-row boot format
                         let anim_frame = player.animation.frame as u32;
-                        let boot_frame = get_boot_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (boot_offset_x, boot_offset_y) = get_boot_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                        let boot_frame = get_boot_frame(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                        );
+                        let (boot_offset_x, boot_offset_y) = get_boot_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                        );
 
                         let boot_src_x = feet_atlas_x + boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
                         let scaled_boot_width = BOOT_SPRITE_WIDTH * zoom;
@@ -4448,7 +5883,12 @@ impl Renderer {
                             boot_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(boot_src_x, feet_atlas_y, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(
+                                    boot_src_x,
+                                    feet_atlas_y,
+                                    BOOT_SPRITE_WIDTH,
+                                    BOOT_SPRITE_HEIGHT,
+                                )),
                                 dest_size: Some(Vec2::new(scaled_boot_width, scaled_boot_height)),
                                 flip_x: boot_frame.flip_h,
                                 ..Default::default()
@@ -4462,8 +5902,16 @@ impl Renderer {
                             draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(feet_atlas_x + src_x, feet_atlas_y + src_y, src_w, src_h)),
-                                dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
+                                source: Some(Rect::new(
+                                    feet_atlas_x + src_x,
+                                    feet_atlas_y + src_y,
+                                    src_w,
+                                    src_h,
+                                )),
+                                dest_size: Some(Vec2::new(
+                                    scaled_sprite_width,
+                                    scaled_sprite_height,
+                                )),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },
@@ -4474,11 +5922,15 @@ impl Renderer {
 
             // Draw back slot equipment (quiver, shield, etc.)
             if let Some(ref back_item_id) = player.equipped_back {
-                if let Some((back_texture, back_atlas_offset)) = self.equipment_sprites.get(back_item_id) {
+                if let Some((back_texture, back_atlas_offset)) =
+                    self.equipment_sprites.get(back_item_id)
+                {
                     // Detect sprite type by dimensions:
                     // - 16-frame offhand (shield): width > height * 8 (very wide strip)
                     // - 2-frame static back (quiver): width < height * 4 (narrow strip)
-                    let (back_w, back_h) = self.equipment_sprites.get_dimensions(back_item_id)
+                    let (back_w, back_h) = self
+                        .equipment_sprites
+                        .get_dimensions(back_item_id)
                         .unwrap_or((back_texture.width(), back_texture.height()));
                     let is_offhand = back_w > back_h * 8.0;
                     let (back_atlas_x, back_atlas_y) = back_atlas_offset.unwrap_or((0.0, 0.0));
@@ -4486,10 +5938,20 @@ impl Renderer {
                     if is_offhand {
                         // 16-frame offhand item (shield)
                         let anim_frame = player.animation.frame as u32;
-                        let offhand_frame = get_offhand_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (offhand_offset_x, offhand_offset_y) = get_offhand_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                        let offhand_frame = get_offhand_frame(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                        );
+                        let (offhand_offset_x, offhand_offset_y) = get_offhand_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                        );
 
-                        let offhand_src_x = back_atlas_x + offhand_frame.frame as f32 * OFFHAND_SPRITE_WIDTH;
+                        let offhand_src_x =
+                            back_atlas_x + offhand_frame.frame as f32 * OFFHAND_SPRITE_WIDTH;
                         let scaled_offhand_width = OFFHAND_SPRITE_WIDTH * zoom;
                         let scaled_offhand_height = OFFHAND_SPRITE_HEIGHT * zoom;
 
@@ -4502,8 +5964,16 @@ impl Renderer {
                             offhand_draw_y,
                             tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(offhand_src_x, back_atlas_y, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT)),
-                                dest_size: Some(Vec2::new(scaled_offhand_width, scaled_offhand_height)),
+                                source: Some(Rect::new(
+                                    offhand_src_x,
+                                    back_atlas_y,
+                                    OFFHAND_SPRITE_WIDTH,
+                                    OFFHAND_SPRITE_HEIGHT,
+                                )),
+                                dest_size: Some(Vec2::new(
+                                    scaled_offhand_width,
+                                    scaled_offhand_height,
+                                )),
                                 flip_x: offhand_frame.flip_h,
                                 ..Default::default()
                             },
@@ -4516,9 +5986,15 @@ impl Renderer {
                         // Only render here if visible and NOT rendering behind player
                         // (behind rendering happens before player sprite)
                         if back_frame.visible && !back_frame.render_behind {
-                            let (back_pos_offset_x, back_pos_offset_y) = get_back_static_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                            let (back_pos_offset_x, back_pos_offset_y) = get_back_static_offset(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                                player_gender,
+                            );
 
-                            let back_src_x = back_atlas_x + back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
+                            let back_src_x =
+                                back_atlas_x + back_frame.frame as f32 * BACK_STATIC_SPRITE_WIDTH;
                             let scaled_back_width = BACK_STATIC_SPRITE_WIDTH * zoom;
                             let scaled_back_height = BACK_STATIC_SPRITE_HEIGHT * zoom;
 
@@ -4531,8 +6007,16 @@ impl Renderer {
                                 back_draw_y,
                                 tint,
                                 DrawTextureParams {
-                                    source: Some(Rect::new(back_src_x, back_atlas_y, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
-                                    dest_size: Some(Vec2::new(scaled_back_width, scaled_back_height)),
+                                    source: Some(Rect::new(
+                                        back_src_x,
+                                        back_atlas_y,
+                                        BACK_STATIC_SPRITE_WIDTH,
+                                        BACK_STATIC_SPRITE_HEIGHT,
+                                    )),
+                                    dest_size: Some(Vec2::new(
+                                        scaled_back_width,
+                                        scaled_back_height,
+                                    )),
                                     flip_x: back_frame.flip_h,
                                     ..Default::default()
                                 },
@@ -4543,7 +6027,9 @@ impl Renderer {
             }
 
             // Draw weapon over-layer (after equipment, for attack frame 2 front overlay)
-            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) =
+                weapon_info
+            {
                 if let Some(frame_over) = weapon_frame.frame_over {
                     let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
                     let weapon_src_x = atlas_x + frame_over as f32 * wf_width;
@@ -4595,8 +6081,14 @@ impl Renderer {
         }
 
         // Player name (positioned just above head) - only show when hovered or selected
-        let has_sprite = self.get_player_sprite(&player.gender, &player.skin).is_some();
-        let name_y_offset = if has_sprite { scaled_sprite_height - 8.0 * zoom } else { 24.0 * zoom };
+        let has_sprite = self
+            .get_player_sprite(&player.gender, &player.skin)
+            .is_some();
+        let name_y_offset = if has_sprite {
+            scaled_sprite_height - 8.0 * zoom
+        } else {
+            24.0 * zoom
+        };
 
         let show_name = is_selected || is_hovered;
         // Name tag drawing is deferred to render_name_tags() so it appears above all map elements
@@ -4639,7 +6131,9 @@ impl Renderer {
         // Subtle semi-transparent tint (~20% opacity)
         let silhouette_tint = Color::from_rgba(255, 255, 255, 50);
 
-        if let Some((player_texture, player_offset)) = self.get_player_sprite(&player.gender, &player.skin) {
+        if let Some((player_texture, player_offset)) =
+            self.get_player_sprite(&player.gender, &player.skin)
+        {
             let coords = player.animation.get_sprite_coords();
             let (src_x, src_y, src_w, src_h) = coords.to_source_rect();
             let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
@@ -4651,26 +6145,54 @@ impl Renderer {
             let player_gender = Gender::from_str(&player.gender);
 
             // Calculate weapon frame info if weapon is equipped (hidden when sitting)
-            let is_sitting_sil = matches!(player.animation.state,
-                crate::render::animation::AnimationState::SittingChair | crate::render::animation::AnimationState::SittingGround);
-            let weapon_info = player.equipped_weapon.as_ref().filter(|_| !is_sitting_sil).and_then(|weapon_id| {
-                self.weapon_sprites.get(weapon_id).map(|(tex, atlas_offset)| {
-                    let anim_frame = player.animation.frame as u32;
-                    let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
-                    let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
-                    let (fw, fh) = self.weapon_frame_sizes.get(weapon_id)
-                        .copied()
-                        .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
-                    (tex, atlas_offset, weapon_frame, offset_x, offset_y, fw, fh)
-                })
-            });
+            let is_sitting_sil = matches!(
+                player.animation.state,
+                crate::render::animation::AnimationState::SittingChair
+                    | crate::render::animation::AnimationState::SittingGround
+            );
+            let weapon_info = player
+                .equipped_weapon
+                .as_ref()
+                .filter(|_| !is_sitting_sil)
+                .and_then(|weapon_id| {
+                    self.weapon_sprites
+                        .get(weapon_id)
+                        .map(|(tex, atlas_offset)| {
+                            let anim_frame = player.animation.frame as u32;
+                            let weapon_frame = get_weapon_frame(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                            );
+                            let (offset_x, offset_y) = get_weapon_offset(
+                                player.animation.state,
+                                player.animation.direction,
+                                anim_frame,
+                                player_gender,
+                            );
+                            let (fw, fh) = self
+                                .weapon_frame_sizes
+                                .get(weapon_id)
+                                .copied()
+                                .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                            (tex, atlas_offset, weapon_frame, offset_x, offset_y, fw, fh)
+                        })
+                });
 
-            let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info.as_ref()
+            let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info
+                .as_ref()
                 .map(|(_, _, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
-                .unwrap_or((WEAPON_SPRITE_WIDTH * zoom, WEAPON_SPRITE_HEIGHT * zoom, WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                .unwrap_or((
+                    WEAPON_SPRITE_WIDTH * zoom,
+                    WEAPON_SPRITE_HEIGHT * zoom,
+                    WEAPON_SPRITE_WIDTH,
+                    WEAPON_SPRITE_HEIGHT,
+                ));
 
             // Draw weapon under-layer (before player sprite)
-            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) =
+                weapon_info
+            {
                 let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
                 let weapon_src_x = atlas_x + weapon_frame.frame_under as f32 * wf_width;
                 let weapon_draw_x = draw_x + offset_x * zoom;
@@ -4698,7 +6220,12 @@ impl Renderer {
                     draw_y,
                     silhouette_tint,
                     DrawTextureParams {
-                        source: Some(Rect::new(player_atlas_x + src_x, player_atlas_y + src_y, src_w, src_h)),
+                        source: Some(Rect::new(
+                            player_atlas_x + src_x,
+                            player_atlas_y + src_y,
+                            src_w,
+                            src_h,
+                        )),
                         dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
                         flip_x: coords.flip_h,
                         ..Default::default()
@@ -4710,8 +6237,12 @@ impl Renderer {
 
             // Draw equipment silhouette (body armor)
             if let Some(ref body_item_id) = player.equipped_body {
-                if let Some((body_texture, body_atlas_offset)) = self.equipment_sprites.get(body_item_id) {
-                    let (body_w, body_h) = self.equipment_sprites.get_dimensions(body_item_id)
+                if let Some((body_texture, body_atlas_offset)) =
+                    self.equipment_sprites.get(body_item_id)
+                {
+                    let (body_w, body_h) = self
+                        .equipment_sprites
+                        .get_dimensions(body_item_id)
                         .unwrap_or((body_texture.width(), body_texture.height()));
                     let is_single_row = body_w > body_h * 2.0;
                     let (body_atlas_x, body_atlas_y) = body_atlas_offset.unwrap_or((0.0, 0.0));
@@ -4719,10 +6250,20 @@ impl Renderer {
                     if is_single_row {
                         // New single-row body armor format
                         let anim_frame = player.animation.frame as u32;
-                        let armor_frame = get_body_armor_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (armor_offset_x, armor_offset_y) = get_body_armor_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                        let armor_frame = get_body_armor_frame(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                        );
+                        let (armor_offset_x, armor_offset_y) = get_body_armor_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                        );
 
-                        let armor_src_x = body_atlas_x + armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
+                        let armor_src_x =
+                            body_atlas_x + armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
                         let scaled_armor_width = BODY_ARMOR_SPRITE_WIDTH * zoom;
                         let scaled_armor_height = BODY_ARMOR_SPRITE_HEIGHT * zoom;
 
@@ -4735,7 +6276,12 @@ impl Renderer {
                             armor_draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(armor_src_x, body_atlas_y, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(
+                                    armor_src_x,
+                                    body_atlas_y,
+                                    BODY_ARMOR_SPRITE_WIDTH,
+                                    BODY_ARMOR_SPRITE_HEIGHT,
+                                )),
                                 dest_size: Some(Vec2::new(scaled_armor_width, scaled_armor_height)),
                                 flip_x: armor_frame.flip_h,
                                 ..Default::default()
@@ -4749,8 +6295,16 @@ impl Renderer {
                             draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(body_atlas_x + src_x, body_atlas_y + src_y, src_w, src_h)),
-                                dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
+                                source: Some(Rect::new(
+                                    body_atlas_x + src_x,
+                                    body_atlas_y + src_y,
+                                    src_w,
+                                    src_h,
+                                )),
+                                dest_size: Some(Vec2::new(
+                                    scaled_sprite_width,
+                                    scaled_sprite_height,
+                                )),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },
@@ -4764,7 +6318,8 @@ impl Renderer {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
                     if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
-                        let is_back = matches!(player.animation.direction, Direction::Up | Direction::Left);
+                        let is_back =
+                            matches!(player.animation.direction, Direction::Up | Direction::Left);
                         let frame_index = color * 2 + if is_back { 1 } else { 0 };
                         let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
                         let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
@@ -4781,7 +6336,9 @@ impl Renderer {
                             player_gender,
                             coords.flip_h,
                         );
-                        let hair_draw_x = draw_x + (scaled_sprite_width - scaled_hair_width) / 2.0 + hair_pos_offset_x * zoom;
+                        let hair_draw_x = draw_x
+                            + (scaled_sprite_width - scaled_hair_width) / 2.0
+                            + hair_pos_offset_x * zoom;
                         let hair_draw_y = draw_y + hair_pos_offset_y * zoom;
 
                         draw_texture_ex(
@@ -4790,7 +6347,12 @@ impl Renderer {
                             hair_draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(hair_src_x, hair_atlas_y, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(
+                                    hair_src_x,
+                                    hair_atlas_y,
+                                    HAIR_SPRITE_WIDTH,
+                                    HAIR_SPRITE_HEIGHT,
+                                )),
                                 dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
@@ -4802,8 +6364,12 @@ impl Renderer {
 
             // Draw equipment silhouette (boots)
             if let Some(ref feet_item_id) = player.equipped_feet {
-                if let Some((feet_texture, feet_atlas_offset)) = self.equipment_sprites.get(feet_item_id) {
-                    let (feet_w, feet_h) = self.equipment_sprites.get_dimensions(feet_item_id)
+                if let Some((feet_texture, feet_atlas_offset)) =
+                    self.equipment_sprites.get(feet_item_id)
+                {
+                    let (feet_w, feet_h) = self
+                        .equipment_sprites
+                        .get_dimensions(feet_item_id)
                         .unwrap_or((feet_texture.width(), feet_texture.height()));
                     let is_single_row = feet_w > feet_h;
                     let (feet_atlas_x, feet_atlas_y) = feet_atlas_offset.unwrap_or((0.0, 0.0));
@@ -4811,8 +6377,17 @@ impl Renderer {
                     if is_single_row {
                         // New single-row boot format
                         let anim_frame = player.animation.frame as u32;
-                        let boot_frame = get_boot_frame(player.animation.state, player.animation.direction, anim_frame);
-                        let (boot_offset_x, boot_offset_y) = get_boot_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
+                        let boot_frame = get_boot_frame(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                        );
+                        let (boot_offset_x, boot_offset_y) = get_boot_offset(
+                            player.animation.state,
+                            player.animation.direction,
+                            anim_frame,
+                            player_gender,
+                        );
 
                         let boot_src_x = feet_atlas_x + boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
                         let scaled_boot_width = BOOT_SPRITE_WIDTH * zoom;
@@ -4827,7 +6402,12 @@ impl Renderer {
                             boot_draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(boot_src_x, feet_atlas_y, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
+                                source: Some(Rect::new(
+                                    boot_src_x,
+                                    feet_atlas_y,
+                                    BOOT_SPRITE_WIDTH,
+                                    BOOT_SPRITE_HEIGHT,
+                                )),
                                 dest_size: Some(Vec2::new(scaled_boot_width, scaled_boot_height)),
                                 flip_x: boot_frame.flip_h,
                                 ..Default::default()
@@ -4841,8 +6421,16 @@ impl Renderer {
                             draw_y,
                             silhouette_tint,
                             DrawTextureParams {
-                                source: Some(Rect::new(feet_atlas_x + src_x, feet_atlas_y + src_y, src_w, src_h)),
-                                dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
+                                source: Some(Rect::new(
+                                    feet_atlas_x + src_x,
+                                    feet_atlas_y + src_y,
+                                    src_w,
+                                    src_h,
+                                )),
+                                dest_size: Some(Vec2::new(
+                                    scaled_sprite_width,
+                                    scaled_sprite_height,
+                                )),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },
@@ -4851,9 +6439,10 @@ impl Renderer {
                 }
             }
 
-
             // Draw weapon over-layer (after equipment)
-            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) = weapon_info {
+            if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) =
+                weapon_info
+            {
                 if let Some(frame_over) = weapon_frame.frame_over {
                     let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
                     let weapon_src_x = atlas_x + frame_over as f32 * wf_width;
@@ -4908,101 +6497,126 @@ impl Renderer {
         };
 
         // Try to render with sprite, fall back to ellipse
-        let sprite_height = if let Some((npc_texture, npc_atlas_offset)) = self.npc_sprites.get(&npc.entity_type) {
-            // Auto-detect frame size from texture (16 frames per sheet)
-            let (tex_w, tex_h) = self.npc_sprites.get_dimensions(&npc.entity_type)
-                .unwrap_or((npc_texture.width(), npc_texture.height()));
-            let frame_width = tex_w / 16.0;
-            let frame_height = tex_h;
-            let (npc_atlas_x, npc_atlas_y) = npc_atlas_offset.unwrap_or((0.0, 0.0));
+        let sprite_height =
+            if let Some((npc_texture, npc_atlas_offset)) = self.npc_sprites.get(&npc.entity_type) {
+                // Auto-detect frame size from texture (16 frames per sheet)
+                let (tex_w, tex_h) = self
+                    .npc_sprites
+                    .get_dimensions(&npc.entity_type)
+                    .unwrap_or((npc_texture.width(), npc_texture.height()));
+                let frame_width = tex_w / 16.0;
+                let frame_height = tex_h;
+                let (npc_atlas_x, npc_atlas_y) = npc_atlas_offset.unwrap_or((0.0, 0.0));
 
-            // Get current frame based on animation state and direction
-            let frame_index = npc.animation.get_frame_index(npc.direction);
-            let src_x = npc_atlas_x + frame_index as f32 * frame_width;
+                // Get current frame based on animation state and direction
+                let frame_index = npc.animation.get_frame_index(npc.direction);
+                let src_x = npc_atlas_x + frame_index as f32 * frame_width;
 
-            // Flip horizontally for Right/Left directions
-            let flip_x = NpcAnimation::should_flip(npc.direction);
+                // Flip horizontally for Right/Left directions
+                let flip_x = NpcAnimation::should_flip(npc.direction);
 
-            // Position sprite centered horizontally, feet at world position
-            // Round to whole pixels to avoid blurry rendering from subpixel positioning
-            let scaled_width = (frame_width * zoom).round();
-            let scaled_height = (frame_height * zoom).round();
-            let draw_x = (screen_x - scaled_width / 2.0).round();
-            let draw_y = (screen_y - scaled_height + 4.0 * zoom + npc.render_offset_y * zoom).round();
+                // Position sprite centered horizontally, feet at world position
+                // Round to whole pixels to avoid blurry rendering from subpixel positioning
+                let scaled_width = (frame_width * zoom).round();
+                let scaled_height = (frame_height * zoom).round();
+                let draw_x = (screen_x - scaled_width / 2.0).round();
+                let draw_y =
+                    (screen_y - scaled_height + 4.0 * zoom + npc.render_offset_y * zoom).round();
 
-            // Draw shadow (unless disabled)
-            if !npc.no_shadow {
-                let shadow_scale = (frame_width / 50.0).clamp(0.5, 2.0);
+                // Draw shadow (unless disabled)
+                if !npc.no_shadow {
+                    let shadow_scale = (frame_width / 50.0).clamp(0.5, 2.0);
+                    draw_ellipse(
+                        screen_x,
+                        screen_y,
+                        16.0 * shadow_scale * zoom,
+                        6.0 * shadow_scale * zoom,
+                        0.0,
+                        Color::from_rgba(0, 0, 0, 60),
+                    );
+                }
+
+                draw_texture_ex(
+                    npc_texture,
+                    draw_x,
+                    draw_y,
+                    tint_color,
+                    DrawTextureParams {
+                        source: Some(Rect::new(src_x, npc_atlas_y, frame_width, frame_height)),
+                        dest_size: Some(Vec2::new(scaled_width, scaled_height)),
+                        flip_x,
+                        ..Default::default()
+                    },
+                );
+
+                scaled_height
+            } else {
+                // Fallback: colored ellipse rendering
+                let (mut base_color, mut highlight_color) = if npc.is_hostile() {
+                    (
+                        Color::from_rgba(80, 180, 80, 255),
+                        Color::from_rgba(120, 220, 120, 255),
+                    )
+                } else {
+                    (
+                        Color::from_rgba(100, 120, 200, 255),
+                        Color::from_rgba(140, 160, 240, 255),
+                    )
+                };
+
+                // Apply death tint to ellipse colors
+                base_color.r *= tint_color.r;
+                base_color.g *= tint_color.g;
+                base_color.b *= tint_color.b;
+                base_color.a *= tint_color.a;
+                highlight_color.r *= tint_color.r;
+                highlight_color.g *= tint_color.g;
+                highlight_color.b *= tint_color.b;
+                highlight_color.a *= tint_color.a;
+
+                // Only animate wobble for hostile/moving NPCs; static NPCs (altars etc.) stay still
+                let wobble = if npc.is_hostile() {
+                    (macroquad::time::get_time() * 4.0 + npc.animation.frame as f64).sin() as f32
+                } else {
+                    0.0
+                };
+                let radius = (10.0 + wobble * 1.5) * zoom;
+                let height_offset = (8.0 + wobble * 2.0) * zoom;
+
+                // Draw shadow (unless disabled)
+                if !npc.no_shadow {
+                    draw_ellipse(
+                        screen_x,
+                        screen_y,
+                        16.0 * zoom,
+                        6.0 * zoom,
+                        0.0,
+                        Color::from_rgba(0, 0, 0, 60),
+                    );
+                }
+
+                // Draw NPC body (oval blob)
                 draw_ellipse(
                     screen_x,
-                    screen_y,
-                    16.0 * shadow_scale * zoom,
-                    6.0 * shadow_scale * zoom,
+                    screen_y - height_offset,
+                    radius,
+                    radius * 0.7,
                     0.0,
-                    Color::from_rgba(0, 0, 0, 60),
+                    base_color,
                 );
-            }
 
-            draw_texture_ex(
-                npc_texture,
-                draw_x,
-                draw_y,
-                tint_color,
-                DrawTextureParams {
-                    source: Some(Rect::new(src_x, npc_atlas_y, frame_width, frame_height)),
-                    dest_size: Some(Vec2::new(scaled_width, scaled_height)),
-                    flip_x,
-                    ..Default::default()
-                },
-            );
+                // Highlight
+                draw_ellipse(
+                    screen_x - 3.0 * zoom,
+                    screen_y - height_offset - 2.0 * zoom,
+                    radius * 0.3,
+                    radius * 0.2,
+                    0.0,
+                    highlight_color,
+                );
 
-            scaled_height
-        } else {
-            // Fallback: colored ellipse rendering
-            let (mut base_color, mut highlight_color) = if npc.is_hostile() {
-                (
-                    Color::from_rgba(80, 180, 80, 255),
-                    Color::from_rgba(120, 220, 120, 255),
-                )
-            } else {
-                (
-                    Color::from_rgba(100, 120, 200, 255),
-                    Color::from_rgba(140, 160, 240, 255),
-                )
+                (height_offset + radius) * 2.0
             };
-
-            // Apply death tint to ellipse colors
-            base_color.r *= tint_color.r;
-            base_color.g *= tint_color.g;
-            base_color.b *= tint_color.b;
-            base_color.a *= tint_color.a;
-            highlight_color.r *= tint_color.r;
-            highlight_color.g *= tint_color.g;
-            highlight_color.b *= tint_color.b;
-            highlight_color.a *= tint_color.a;
-
-            // Only animate wobble for hostile/moving NPCs; static NPCs (altars etc.) stay still
-            let wobble = if npc.is_hostile() {
-                (macroquad::time::get_time() * 4.0 + npc.animation.frame as f64).sin() as f32
-            } else {
-                0.0
-            };
-            let radius = (10.0 + wobble * 1.5) * zoom;
-            let height_offset = (8.0 + wobble * 2.0) * zoom;
-
-            // Draw shadow (unless disabled)
-            if !npc.no_shadow {
-                draw_ellipse(screen_x, screen_y, 16.0 * zoom, 6.0 * zoom, 0.0, Color::from_rgba(0, 0, 0, 60));
-            }
-
-            // Draw NPC body (oval blob)
-            draw_ellipse(screen_x, screen_y - height_offset, radius, radius * 0.7, 0.0, base_color);
-
-            // Highlight
-            draw_ellipse(screen_x - 3.0 * zoom, screen_y - height_offset - 2.0 * zoom, radius * 0.3, radius * 0.2, 0.0, highlight_color);
-
-            (height_offset + radius) * 2.0
-        };
 
         // Skip UI elements (name, health bar, icons) while dying
         if npc.death_timer.is_some() {
@@ -5013,11 +6627,12 @@ impl Renderer {
         let top_y = screen_y - sprite_height + 4.0 * zoom;
 
         // Determine icon coords for friendly NPCs (quest givers only)
-        let icon_coords: Option<(u32, u32)> = if !npc.is_hostile() && npc.is_quest_giver && !npc.can_turn_in_quest {
-            Some((8, 3))  // Quest giver icon
-        } else {
-            None
-        };
+        let icon_coords: Option<(u32, u32)> =
+            if !npc.is_hostile() && npc.is_quest_giver && !npc.can_turn_in_quest {
+                Some((8, 3)) // Quest giver icon
+            } else {
+                None
+            };
 
         // Floating icon indicator - only when NOT hovered (when hovered, icon is in name bar)
         if !is_hovered && !is_selected {
@@ -5039,7 +6654,7 @@ impl Renderer {
                     ((1.0 - age / 0.5) * 255.0) as u8
                 } else if age > 4.0 && age <= 5.0 {
                     // Fade back in during last second as bubble fades out
-                    (((age - 4.0)) * 255.0) as u8
+                    ((age - 4.0) * 255.0) as u8
                 } else if age > 5.0 {
                     255 // Fully visible after bubble is gone
                 } else {
@@ -5076,7 +6691,9 @@ impl Renderer {
                         Color::from_rgba(120, 255, 140, alpha),
                     );
                 }
-            } else if let (Some((icon_col, icon_row)), Some(ref texture)) = (icon_coords, &self.ui_icons) {
+            } else if let (Some((icon_col, icon_row)), Some(ref texture)) =
+                (icon_coords, &self.ui_icons)
+            {
                 let src_rect = Rect::new(
                     icon_col as f32 * icon_size,
                     icon_row as f32 * icon_size,
@@ -5178,7 +6795,8 @@ impl Renderer {
 
         let height_normalized = height_offset / ARC_HEIGHT; // Normalize to arc height
         let shadow_scale = 1.0 - height_normalized * 0.2;
-        let shadow_alpha = ((SHADOW_BASE_ALPHA - height_normalized * 15.0) * spawn_progress).clamp(0.0, 255.0) as u8;
+        let shadow_alpha = ((SHADOW_BASE_ALPHA - height_normalized * 15.0) * spawn_progress)
+            .clamp(0.0, 255.0) as u8;
 
         draw_ellipse(
             screen_x,
@@ -5217,15 +6835,30 @@ impl Renderer {
         } else {
             // Fallback to colored rectangle
             let color = item_def.category_color();
-            draw_rectangle(screen_x - 6.0 * zoom, item_y - 6.0 * zoom, 16.0 * zoom, 12.0 * zoom, color);
-            draw_rectangle_lines(screen_x - 6.0 * zoom, item_y - 6.0 * zoom, 16.0 * zoom, 12.0 * zoom, 1.0, WHITE);
+            draw_rectangle(
+                screen_x - 6.0 * zoom,
+                item_y - 6.0 * zoom,
+                16.0 * zoom,
+                12.0 * zoom,
+                color,
+            );
+            draw_rectangle_lines(
+                screen_x - 6.0 * zoom,
+                item_y - 6.0 * zoom,
+                16.0 * zoom,
+                12.0 * zoom,
+                1.0,
+                WHITE,
+            );
         }
     }
 
     /// Render a fishing line from the player's rod tip to a landing point in the water
     fn render_fishing_line(&self, player: &Player, camera: &Camera) {
+        use super::animation::{
+            get_weapon_frame, get_weapon_offset, should_flip_horizontal, Gender,
+        };
         use crate::game::Direction;
-        use super::animation::{get_weapon_offset, get_weapon_frame, should_flip_horizontal, Gender};
 
         let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
         let zoom = camera.zoom;
@@ -5239,8 +6872,17 @@ impl Renderer {
         let player_gender = Gender::from_str(&player.gender);
 
         let anim_frame = player.animation.frame as u32;
-        let (offset_x, offset_y) = get_weapon_offset(player.animation.state, player.animation.direction, anim_frame, player_gender);
-        let weapon_frame = get_weapon_frame(player.animation.state, player.animation.direction, anim_frame);
+        let (offset_x, offset_y) = get_weapon_offset(
+            player.animation.state,
+            player.animation.direction,
+            anim_frame,
+            player_gender,
+        );
+        let weapon_frame = get_weapon_frame(
+            player.animation.state,
+            player.animation.direction,
+            anim_frame,
+        );
         let flip = weapon_frame.flip_h;
 
         // Fishing rod frame size (from manifest: 70x86)
@@ -5253,10 +6895,10 @@ impl Renderer {
         // Rod tip position within the weapon frame (in unscaled pixels)
         // These are the approximate pixel positions of the rod tip in each frame
         let (tip_px, tip_py) = match player.animation.direction {
-            Direction::Down  => (14.0, 61.0),  // frame 0: rod points down, tip is lower (+2x, -2y adjust)
-            Direction::Left  => (16.0, 38.0),  // frame 1: mirrored adjustment (+4x, +8y)
-            Direction::Up    => (16.0, 38.0),  // frame 1 flipped: (-4 screen-left, +8y down)
-            Direction::Right => (10.0, 61.0),  // frame 0 flipped: mirrored down adjust (-2x, -2y)
+            Direction::Down => (14.0, 61.0), // frame 0: rod points down, tip is lower (+2x, -2y adjust)
+            Direction::Left => (16.0, 38.0), // frame 1: mirrored adjustment (+4x, +8y)
+            Direction::Up => (16.0, 38.0),   // frame 1 flipped: (-4 screen-left, +8y down)
+            Direction::Right => (10.0, 61.0), // frame 0 flipped: mirrored down adjust (-2x, -2y)
         };
 
         // Account for horizontal flip
@@ -5270,17 +6912,14 @@ impl Renderer {
         let seed = (player.x * 73.137 + player.y * 37.891) as f32;
         let cast_dist = 2.0 + (seed.sin() * 0.5 + 0.5); // range [2.0, 3.0]
         let (tile_dx, tile_dy): (f32, f32) = match player.animation.direction {
-            Direction::Down  => ( 0.0,  cast_dist),
-            Direction::Up    => ( 0.0, -cast_dist),
-            Direction::Left  => (-cast_dist,  0.0),
-            Direction::Right => ( cast_dist,  0.0),
+            Direction::Down => (0.0, cast_dist),
+            Direction::Up => (0.0, -cast_dist),
+            Direction::Left => (-cast_dist, 0.0),
+            Direction::Right => (cast_dist, 0.0),
         };
 
-        let (land_base_x, land_base_y) = world_to_screen(
-            player.x + tile_dx,
-            player.y + tile_dy,
-            camera,
-        );
+        let (land_base_x, land_base_y) =
+            world_to_screen(player.x + tile_dx, player.y + tile_dy, camera);
 
         // Gentle sway at the landing point
         let sway_x = (time * 0.8).sin() as f32 * 2.0 * zoom;
@@ -5310,13 +6949,30 @@ impl Renderer {
             // Slight wind ripple increasing toward the end
             let wind = (time * 2.5 + t0 as f64 * 3.0).sin() as f32 * 1.5 * zoom * t0;
 
-            draw_line(x0 + wind * 0.5, y0_base + sag0, x1 + wind * 0.5, y1_base + sag1, line_thickness, line_color);
+            draw_line(
+                x0 + wind * 0.5,
+                y0_base + sag0,
+                x1 + wind * 0.5,
+                y1_base + sag1,
+                line_thickness,
+                line_color,
+            );
         }
 
         // Small bobber at the landing point
         let bobber_bob = (time * 1.5).sin() as f32 * 1.5 * zoom;
-        draw_circle(land_x, land_y + bobber_bob, 2.0 * zoom, Color::new(0.8, 0.2, 0.1, 0.8));
-        draw_circle(land_x, land_y + bobber_bob, 1.2 * zoom, Color::new(1.0, 0.4, 0.2, 0.9));
+        draw_circle(
+            land_x,
+            land_y + bobber_bob,
+            2.0 * zoom,
+            Color::new(0.8, 0.2, 0.1, 0.8),
+        );
+        draw_circle(
+            land_x,
+            land_y + bobber_bob,
+            1.2 * zoom,
+            Color::new(1.0, 0.4, 0.2, 0.9),
+        );
     }
 
     /// Render farming patches in two passes: signs first (behind), then crops on top
@@ -5335,8 +6991,11 @@ impl Renderer {
                 continue;
             }
             let sign_name = Self::crop_to_sprite_name(&patch.crop_id);
-            if let Some((farm_texture, farm_atlas_offset)) = self.farming_sprites.get(sign_name.as_str()) {
-                let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+            if let Some((farm_texture, farm_atlas_offset)) =
+                self.farming_sprites.get(sign_name.as_str())
+            {
+                let (screen_x, screen_y) =
+                    world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
                 let sign_frame = 5u32;
                 let (farm_atlas_x, farm_atlas_y) = farm_atlas_offset.unwrap_or((0.0, 0.0));
                 let src_x = farm_atlas_x + sign_frame as f32 * frame_w;
@@ -5361,7 +7020,8 @@ impl Renderer {
 
         // Pass 2: Draw crops and empty patch fallbacks on top
         for patch in state.farming_patches.values() {
-            let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+            let (screen_x, screen_y) =
+                world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
 
             // Determine which sprite frame to show
             let (sprite_name, frame_index) = match patch.state.as_str() {
@@ -5386,7 +7046,9 @@ impl Renderer {
 
             // Try to draw sprite
             let drew_sprite = if let Some(ref name) = sprite_name {
-                if let Some((crop_texture, crop_atlas_offset)) = self.farming_sprites.get(name.as_str()) {
+                if let Some((crop_texture, crop_atlas_offset)) =
+                    self.farming_sprites.get(name.as_str())
+                {
                     let (crop_atlas_x, crop_atlas_y) = crop_atlas_offset.unwrap_or((0.0, 0.0));
                     let src_x = crop_atlas_x + frame_index as f32 * frame_w;
                     let draw_w = frame_w * zoom;
@@ -5432,10 +7094,38 @@ impl Renderer {
                     Vec2::new(screen_x, screen_y + half_h),
                     base_color,
                 );
-                draw_line(screen_x, screen_y - half_h, screen_x - half_w, screen_y, 1.0, border_color);
-                draw_line(screen_x - half_w, screen_y, screen_x, screen_y + half_h, 1.0, border_color);
-                draw_line(screen_x, screen_y + half_h, screen_x + half_w, screen_y, 1.0, border_color);
-                draw_line(screen_x + half_w, screen_y, screen_x, screen_y - half_h, 1.0, border_color);
+                draw_line(
+                    screen_x,
+                    screen_y - half_h,
+                    screen_x - half_w,
+                    screen_y,
+                    1.0,
+                    border_color,
+                );
+                draw_line(
+                    screen_x - half_w,
+                    screen_y,
+                    screen_x,
+                    screen_y + half_h,
+                    1.0,
+                    border_color,
+                );
+                draw_line(
+                    screen_x,
+                    screen_y + half_h,
+                    screen_x + half_w,
+                    screen_y,
+                    1.0,
+                    border_color,
+                );
+                draw_line(
+                    screen_x + half_w,
+                    screen_y,
+                    screen_x,
+                    screen_y - half_h,
+                    1.0,
+                    border_color,
+                );
             }
 
             // Draw soft pulsing green overlay on tile for harvestable crops
@@ -5465,7 +7155,9 @@ impl Renderer {
     fn crop_to_sprite_name(crop_id: &str) -> String {
         match crop_id {
             // Herbs use cabbage sprite as placeholder
-            "greenleaf" | "tangleroots" | "marshbloom" | "ashveil" | "nightthorn" | "bloodcap" => "cabbage".to_string(),
+            "greenleaf" | "tangleroots" | "marshbloom" | "ashveil" | "nightthorn" | "bloodcap" => {
+                "cabbage".to_string()
+            }
             _ => crop_id.to_string(),
         }
     }
@@ -5500,7 +7192,8 @@ impl Renderer {
             ),
             "growing" => {
                 let crop_name = patch.crop_id.replace('_', " ");
-                let crop_name = crop_name.split_whitespace()
+                let crop_name = crop_name
+                    .split_whitespace()
                     .map(|w| {
                         let mut c = w.chars();
                         match c.next() {
@@ -5517,7 +7210,8 @@ impl Renderer {
             }
             "harvestable" => {
                 let crop_name = patch.crop_id.replace('_', " ");
-                let crop_name = crop_name.split_whitespace()
+                let crop_name = crop_name
+                    .split_whitespace()
                     .map(|w| {
                         let mut c = w.chars();
                         match c.next() {
@@ -5532,10 +7226,7 @@ impl Renderer {
                     Color::new(1.0, 0.9, 0.3, 1.0),
                 )
             }
-            _ => (
-                "Allotment".to_string(),
-                Color::new(0.7, 0.7, 0.7, 1.0),
-            ),
+            _ => ("Allotment".to_string(), Color::new(0.7, 0.7, 0.7, 1.0)),
         };
 
         // Scale text with zoom for readability
@@ -5560,7 +7251,9 @@ impl Renderer {
     }
 
     fn render_gathering_markers(&self, state: &GameState) {
-        if !state.debug_mode { return; }
+        if !state.debug_mode {
+            return;
+        }
         let zoom = state.camera.zoom;
         for marker in &state.gathering_markers {
             // Map skill type to sprite name
@@ -5569,7 +7262,8 @@ impl Renderer {
                 _ => continue,
             };
 
-            let (screen_x, screen_y) = world_to_screen(marker.x as f32, marker.y as f32, &state.camera);
+            let (screen_x, screen_y) =
+                world_to_screen(marker.x as f32, marker.y as f32, &state.camera);
 
             if let Some((texture, source_rect)) = self.item_sprites.get(sprite_id) {
                 let (sprite_w, sprite_h) = if let Some(r) = source_rect {
@@ -5774,12 +7468,16 @@ impl Renderer {
 
     /// Render gathering buff timer indicator (top-center HUD)
     fn render_gathering_buff(&self, state: &GameState) {
-        if !state.is_gathering { return; }
+        if !state.is_gathering {
+            return;
+        }
         if let Some(ref buff) = state.gathering_buff {
             let time = macroquad::time::get_time();
             let elapsed = time - buff.start_time;
             let remaining = (buff.duration - elapsed).max(0.0);
-            if remaining <= 0.0 { return; }
+            if remaining <= 0.0 {
+                return;
+            }
             let progress = (remaining / buff.duration) as f32;
 
             let sw = screen_width();
@@ -5789,7 +7487,13 @@ impl Renderer {
             let y = 40.0;
 
             // Background
-            draw_rectangle(x - 1.0, y - 1.0, bar_w + 2.0, bar_h + 2.0, Color::new(0.0, 0.0, 0.0, 0.6));
+            draw_rectangle(
+                x - 1.0,
+                y - 1.0,
+                bar_w + 2.0,
+                bar_h + 2.0,
+                Color::new(0.0, 0.0, 0.0, 0.6),
+            );
             // Fill
             let fill_color = Color::new(1.0, 0.85, 0.2, 0.8);
             draw_rectangle(x, y, bar_w * progress, bar_h, fill_color);
@@ -5797,7 +7501,13 @@ impl Renderer {
             let label = format!("2x Gather {:.0}s", remaining);
             let font_size = 10.0;
             let text_w = self.font.measure_text(&label, font_size).width;
-            self.draw_text_sharp(&label, x + (bar_w - text_w) / 2.0, y + 11.0, font_size, WHITE);
+            self.draw_text_sharp(
+                &label,
+                x + (bar_w - text_w) / 2.0,
+                y + 11.0,
+                font_size,
+                WHITE,
+            );
         }
     }
 
@@ -5820,15 +7530,15 @@ impl Renderer {
         let elapsed = time - pile.spawn_time;
 
         // Animation phase durations
-        const ARC_DURATION: f64 = 0.3;      // Phase 1: arc outward
-        const BOUNCE_DURATION: f64 = 0.2;   // Phase 2: bounce up
-        const SETTLE_DURATION: f64 = 0.1;   // Phase 3: settle down
+        const ARC_DURATION: f64 = 0.3; // Phase 1: arc outward
+        const BOUNCE_DURATION: f64 = 0.2; // Phase 2: bounce up
+        const SETTLE_DURATION: f64 = 0.1; // Phase 3: settle down
         const TOTAL_DURATION: f64 = ARC_DURATION + BOUNCE_DURATION + SETTLE_DURATION;
         const STAGGER_DELAY: f64 = 0.03;
 
         // Animation heights
-        const ARC_HEIGHT: f32 = 10.0;       // Peak height during arc
-        const BOUNCE_HEIGHT: f32 = 4.0;     // Peak height during bounce
+        const ARC_HEIGHT: f32 = 10.0; // Peak height during arc
+        const BOUNCE_HEIGHT: f32 = 4.0; // Peak height during bounce
 
         // Bob animation (post-settle)
         const BOB_SPEED: f64 = 2.5;
@@ -5845,9 +7555,11 @@ impl Renderer {
         // Calculate average bob for shadow pulse (only after nuggets mostly settled)
         let avg_bob = if overall_spawn_t > 0.7 {
             let bob_strength = ((overall_spawn_t - 0.7) / 0.3).min(1.0);
-            let sum: f32 = pile.nuggets.iter().map(|n| {
-                ((time * BOB_SPEED + n.phase_offset).sin() as f32) * BOB_AMPLITUDE * zoom
-            }).sum();
+            let sum: f32 = pile
+                .nuggets
+                .iter()
+                .map(|n| ((time * BOB_SPEED + n.phase_offset).sin() as f32) * BOB_AMPLITUDE * zoom)
+                .sum();
             (sum / pile.nuggets.len() as f32) * bob_strength
         } else {
             0.0
@@ -5856,7 +7568,8 @@ impl Renderer {
         // Shadow size and alpha respond to average bob
         let bob_normalized = avg_bob / (BOB_AMPLITUDE * zoom);
         let shadow_scale = 1.0 - bob_normalized * 0.15;
-        let shadow_alpha = ((SHADOW_BASE_ALPHA - bob_normalized * 10.0) * overall_spawn_t).clamp(0.0, 255.0) as u8;
+        let shadow_alpha =
+            ((SHADOW_BASE_ALPHA - bob_normalized * 10.0) * overall_spawn_t).clamp(0.0, 255.0) as u8;
 
         draw_ellipse(
             screen_x,
@@ -5907,7 +7620,8 @@ impl Renderer {
                 (nugget.target_x, nugget.target_y, bounce)
             } else if nugget_elapsed < TOTAL_DURATION {
                 // Phase 3: Settle down
-                let t = ((nugget_elapsed - ARC_DURATION - BOUNCE_DURATION) / SETTLE_DURATION) as f32;
+                let t =
+                    ((nugget_elapsed - ARC_DURATION - BOUNCE_DURATION) / SETTLE_DURATION) as f32;
                 // Small settling bounce (quarter height of main bounce)
                 let settle = 4.0 * (BOUNCE_HEIGHT * 0.25) * t * (1.0 - t);
 
@@ -5942,7 +7656,8 @@ impl Renderer {
     /// Render a map object (tree, rock, decoration) from chunk data
     fn render_map_object(&self, obj: &MapObject, camera: &Camera) {
         // Get screen position for the tile CENTER (add 0.5 to tile coords)
-        let (screen_x, screen_y) = world_to_screen(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, camera);
+        let (screen_x, screen_y) =
+            world_to_screen(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, camera);
         let zoom = camera.zoom;
 
         // Try to get the sprite for this gid
@@ -6000,7 +7715,8 @@ impl Renderer {
 
     /// Render a map object with a horizontal shake offset (for trees being chopped)
     fn render_map_object_shaking(&self, obj: &MapObject, shake_offset: f32, camera: &Camera) {
-        let (screen_x, screen_y) = world_to_screen(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, camera);
+        let (screen_x, screen_y) =
+            world_to_screen(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, camera);
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
@@ -6032,7 +7748,16 @@ impl Renderer {
     }
 
     /// Render a falling tree (tree that was just chopped down)
-    fn render_falling_tree(&self, gid: u32, tile_x: i32, tile_y: i32, angle: f32, alpha: f32, _y_offset: f32, camera: &Camera) {
+    fn render_falling_tree(
+        &self,
+        gid: u32,
+        tile_x: i32,
+        tile_y: i32,
+        angle: f32,
+        alpha: f32,
+        _y_offset: f32,
+        camera: &Camera,
+    ) {
         // The pivot point (tree base) should stay fixed at pivot_x, pivot_y
         let (pivot_x, pivot_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
         let zoom = camera.zoom;
@@ -6055,7 +7780,7 @@ impl Renderer {
                 Vec3::new(
                     pivot_x + rx * cos_a - ry * sin_a,
                     pivot_y + rx * sin_a + ry * cos_a,
-                    0.0
+                    0.0,
                 )
             };
 
@@ -6081,10 +7806,30 @@ impl Renderer {
             // Build mesh with 4 vertices and 2 triangles
             let mesh = Mesh {
                 vertices: vec![
-                    Vertex { position: tl, uv: Vec2::new(u0, v0), color: color_arr, normal: Vec4::ZERO },
-                    Vertex { position: tr, uv: Vec2::new(u1, v0), color: color_arr, normal: Vec4::ZERO },
-                    Vertex { position: br, uv: Vec2::new(u1, v1), color: color_arr, normal: Vec4::ZERO },
-                    Vertex { position: bl, uv: Vec2::new(u0, v1), color: color_arr, normal: Vec4::ZERO },
+                    Vertex {
+                        position: tl,
+                        uv: Vec2::new(u0, v0),
+                        color: color_arr,
+                        normal: Vec4::ZERO,
+                    },
+                    Vertex {
+                        position: tr,
+                        uv: Vec2::new(u1, v0),
+                        color: color_arr,
+                        normal: Vec4::ZERO,
+                    },
+                    Vertex {
+                        position: br,
+                        uv: Vec2::new(u1, v1),
+                        color: color_arr,
+                        normal: Vec4::ZERO,
+                    },
+                    Vertex {
+                        position: bl,
+                        uv: Vec2::new(u0, v1),
+                        color: color_arr,
+                        normal: Vec4::ZERO,
+                    },
                 ],
                 indices: vec![0, 1, 2, 0, 2, 3],
                 texture: Some(texture.clone()),
@@ -6100,11 +7845,8 @@ impl Renderer {
 
         // Get the tile's top vertex screen position (same as mapper)
         // Use exact coordinates to avoid rounding errors
-        let (screen_x, screen_y) = world_to_screen_exact(
-            wall.tile_x as f32,
-            wall.tile_y as f32,
-            camera
-        );
+        let (screen_x, screen_y) =
+            world_to_screen_exact(wall.tile_x as f32, wall.tile_y as f32, camera);
 
         // Tiles are centered on their world_to_screen position, so
         // bottom vertex is at center + half tile height (not full height)
@@ -6126,7 +7868,10 @@ impl Renderer {
             let (draw_x, draw_y) = match wall.edge {
                 WallEdge::Down => {
                     // Bottom-right corner of sprite at bottom vertex
-                    (bottom_vertex_x - scaled_width, bottom_vertex_y - scaled_height)
+                    (
+                        bottom_vertex_x - scaled_width,
+                        bottom_vertex_y - scaled_height,
+                    )
                 }
                 WallEdge::Right => {
                     // Bottom-left corner of sprite at bottom vertex
@@ -6154,7 +7899,11 @@ impl Renderer {
         for (i, announcement) in state.ui_state.announcements.iter().enumerate() {
             let age = current_time - announcement.time;
             // Fade out after 6 seconds (announcements last 8 seconds total)
-            let alpha = if age > 6.0 { ((8.0 - age) / 2.0 * 255.0) as u8 } else { 255 };
+            let alpha = if age > 6.0 {
+                ((8.0 - age) / 2.0 * 255.0) as u8
+            } else {
+                255
+            };
 
             let font_size = 32.0;
             let text = format!("[ANNOUNCEMENT] {}", announcement.text);
@@ -6179,7 +7928,13 @@ impl Renderer {
             let gold_color = Color::from_rgba(255, 215, 0, alpha);
             for ox in [-1.0, 1.0] {
                 for oy in [-1.0, 1.0] {
-                    self.draw_text_sharp(&text, text_x + ox, text_y + oy, font_size, Color::from_rgba(0, 0, 0, alpha));
+                    self.draw_text_sharp(
+                        &text,
+                        text_x + ox,
+                        text_y + oy,
+                        font_size,
+                        Color::from_rgba(0, 0, 0, alpha),
+                    );
                 }
             }
             self.draw_text_sharp(&text, text_x, text_y, font_size, gold_color);
@@ -6234,13 +7989,18 @@ impl Renderer {
             // Layout: BG bottom aligned with hotkey bar bottom, text inside with padding
             let bg_padding = 6.0 * zoom;
             let line_height = 18.0 * zoom;
-            let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 260.0 } else { 360.0 * zoom };
+            let max_chat_width = if zoom >= 2.0 {
+                400.0 * zoom - 260.0
+            } else {
+                360.0 * zoom
+            };
             let font_size = 16.0 * zoom;
             let max_visible_lines: usize = if zoom >= 2.0 { 6 } else { 7 };
             let chat_area_h = max_visible_lines as f32 * line_height;
 
             // BG rectangle positioned from the hotkey bar bottom edge
-            let chat_input_open = state.ui_state.chat_open && !matches!(state.ui_state.chat_active_tab, ChatChannel::System);
+            let chat_input_open = state.ui_state.chat_open
+                && !matches!(state.ui_state.chat_active_tab, ChatChannel::System);
             let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
             // When input bar is open, shrink visible area so messages don't render behind it
             let effective_bottom = if chat_input_open {
@@ -6270,8 +8030,12 @@ impl Renderer {
             for msg in state.ui_state.chat_messages.iter().rev() {
                 match msg.channel {
                     ChatChannel::Local if latest_local_ts <= 0.0 => latest_local_ts = msg.timestamp,
-                    ChatChannel::Global if latest_global_ts <= 0.0 => latest_global_ts = msg.timestamp,
-                    ChatChannel::System if latest_system_ts <= 0.0 => latest_system_ts = msg.timestamp,
+                    ChatChannel::Global if latest_global_ts <= 0.0 => {
+                        latest_global_ts = msg.timestamp
+                    }
+                    ChatChannel::System if latest_system_ts <= 0.0 => {
+                        latest_system_ts = msg.timestamp
+                    }
                     _ => {}
                 }
                 if latest_local_ts > 0.0 && latest_global_ts > 0.0 && latest_system_ts > 0.0 {
@@ -6281,12 +8045,16 @@ impl Renderer {
 
             for i in 0..3 {
                 let tx = chat_x + i as f32 * tab_w;
-                let is_active = std::mem::discriminant(&state.ui_state.chat_active_tab) == std::mem::discriminant(&tab_channels[i]);
-                let is_hovered = state.ui_state.hovered_element.as_ref() == Some(&[
-                    UiElementId::ChatTabLocal,
-                    UiElementId::ChatTabGlobal,
-                    UiElementId::ChatTabSystem,
-                ][i]);
+                let is_active = std::mem::discriminant(&state.ui_state.chat_active_tab)
+                    == std::mem::discriminant(&tab_channels[i]);
+                let is_hovered = state.ui_state.hovered_element.as_ref()
+                    == Some(
+                        &[
+                            UiElementId::ChatTabLocal,
+                            UiElementId::ChatTabGlobal,
+                            UiElementId::ChatTabSystem,
+                        ][i],
+                    );
                 let has_unread = match tab_channels[i] {
                     ChatChannel::Local => latest_local_ts > state.ui_state.chat_last_seen_local,
                     ChatChannel::Global => latest_global_ts > state.ui_state.chat_last_seen_global,
@@ -6305,7 +8073,13 @@ impl Renderer {
 
                 if is_active {
                     // Gold underline for active tab
-                    draw_rectangle(tx + 2.0, tab_bar_y + tab_h - 2.0, tab_w - 4.0, 2.0, Color::new(0.76, 0.60, 0.23, 1.0));
+                    draw_rectangle(
+                        tx + 2.0,
+                        tab_bar_y + tab_h - 2.0,
+                        tab_w - 4.0,
+                        2.0,
+                        Color::new(0.76, 0.60, 0.23, 1.0),
+                    );
                 }
 
                 let label_size = 16.0 * zoom;
@@ -6326,7 +8100,13 @@ impl Renderer {
             }
 
             if state.ui_state.chat_log_background {
-                draw_rectangle(clip_x, clip_y, clip_w, clip_h, Color::new(0.0, 0.0, 0.0, 0.45));
+                draw_rectangle(
+                    clip_x,
+                    clip_y,
+                    clip_w,
+                    clip_h,
+                    Color::new(0.0, 0.0, 0.0, 0.45),
+                );
             }
 
             // Build wrapped chat lines only when chat content or layout changes.
@@ -6370,12 +8150,17 @@ impl Renderer {
                 rebuilt_lines.reserve(state.ui_state.chat_messages.len() * 2);
 
                 for msg in state.ui_state.chat_messages.iter().filter(|m| {
-                    std::mem::discriminant(&m.channel) == std::mem::discriminant(&state.ui_state.chat_active_tab)
+                    std::mem::discriminant(&m.channel)
+                        == std::mem::discriminant(&state.ui_state.chat_active_tab)
                 }) {
                     let (color, text) = match msg.channel {
                         ChatChannel::Local => (WHITE, format!("{}: {}", msg.sender_name, msg.text)),
-                        ChatChannel::Global => (SKYBLUE, format!("[G] {}: {}", msg.sender_name, msg.text)),
-                        ChatChannel::System => (YELLOW, format!("{} {}", msg.sender_name, msg.text)),
+                        ChatChannel::Global => {
+                            (SKYBLUE, format!("[G] {}: {}", msg.sender_name, msg.text))
+                        }
+                        ChatChannel::System => {
+                            (YELLOW, format!("{} {}", msg.sender_name, msg.text))
+                        }
                     };
                     let wrapped_lines = self.wrap_text(&text, max_chat_width, font_size);
                     for line in wrapped_lines {
@@ -6426,7 +8211,8 @@ impl Renderer {
 
             let mut current_y = chat_bottom_y + fractional_offset;
             for i in (start..end).rev() {
-                if current_y >= chat_top_y - line_height && current_y <= chat_bottom_y + line_height {
+                if current_y >= chat_top_y - line_height && current_y <= chat_bottom_y + line_height
+                {
                     let (ref line, color) = all_lines[i];
                     self.draw_text_sharp(line, chat_x, current_y, font_size, color);
                 }
@@ -6448,7 +8234,13 @@ impl Renderer {
                 let track_h = clip_h;
 
                 // Track (subtle background)
-                draw_rectangle(scrollbar_x, track_y, scrollbar_w, track_h, Color::new(1.0, 1.0, 1.0, 0.08));
+                draw_rectangle(
+                    scrollbar_x,
+                    track_y,
+                    scrollbar_w,
+                    track_h,
+                    Color::new(1.0, 1.0, 1.0, 0.08),
+                );
 
                 // Thumb - size proportional to visible area, position based on scroll
                 let visible_ratio = (chat_area_h / total_content_height).min(1.0);
@@ -6457,7 +8249,13 @@ impl Renderer {
                 let scroll_ratio = scroll_px / max_scroll_px;
                 let thumb_y = track_y + (track_h - thumb_h) * (1.0 - scroll_ratio);
 
-                draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, Color::new(1.0, 1.0, 1.0, 0.35));
+                draw_rectangle(
+                    scrollbar_x,
+                    thumb_y,
+                    scrollbar_w,
+                    thumb_h,
+                    Color::new(1.0, 1.0, 1.0, 0.35),
+                );
             }
         }
 
@@ -6507,7 +8305,13 @@ impl Renderer {
             let hp_ratio = player.hp as f32 / player.max_hp.max(1) as f32;
 
             draw_rectangle(hp_bar_x, hp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
-            draw_rectangle(hp_bar_x + 1.0, hp_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+            draw_rectangle(
+                hp_bar_x + 1.0,
+                hp_bar_y + 1.0,
+                bar_width - 2.0,
+                bar_height - 2.0,
+                Color::new(0.08, 0.08, 0.10, 1.0),
+            );
 
             let hp_fill_w = (bar_width - 4.0) * hp_ratio;
             if hp_fill_w > 0.0 {
@@ -6518,18 +8322,37 @@ impl Renderer {
                 } else {
                     Color::new(0.8, 0.2, 0.2, 1.0)
                 };
-                draw_rectangle(hp_bar_x + 2.0, hp_bar_y + 2.0, hp_fill_w, bar_height - 4.0, hp_color);
-                draw_rectangle(hp_bar_x + 2.0, hp_bar_y + 2.0, hp_fill_w, (bar_height - 4.0) / 2.0, Color::new(1.0, 1.0, 1.0, 0.25));
+                draw_rectangle(
+                    hp_bar_x + 2.0,
+                    hp_bar_y + 2.0,
+                    hp_fill_w,
+                    bar_height - 4.0,
+                    hp_color,
+                );
+                draw_rectangle(
+                    hp_bar_x + 2.0,
+                    hp_bar_y + 2.0,
+                    hp_fill_w,
+                    (bar_height - 4.0) / 2.0,
+                    Color::new(1.0, 1.0, 1.0, 0.25),
+                );
             }
 
             let hp_text = format!("{}/{}", player.hp, player.max_hp);
             let hp_text_w = self.measure_text_sharp(&hp_text, font_size).width;
-            self.draw_text_sharp(&hp_text, (hp_bar_x + (bar_width - hp_text_w) / 2.0).floor(), (hp_bar_y + 14.0).floor(), font_size, TEXT_NORMAL);
+            self.draw_text_sharp(
+                &hp_text,
+                (hp_bar_x + (bar_width - hp_text_w) / 2.0).floor(),
+                (hp_bar_y + 14.0).floor(),
+                font_size,
+                TEXT_NORMAL,
+            );
 
             // ===== MP BAR (below HP bar) =====
             let mp_bar_x = bar_x;
             let mp_bar_y = hp_bar_y + bar_height + 4.0;
-            let (mp, max_mp) = state.get_local_player()
+            let (mp, max_mp) = state
+                .get_local_player()
                 .map(|p| (p.mp, p.max_mp))
                 .unwrap_or((0, 12));
             let mp_ratio = if max_mp > 0 {
@@ -6540,20 +8363,44 @@ impl Renderer {
 
             // Background
             draw_rectangle(mp_bar_x, mp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
-            draw_rectangle(mp_bar_x + 1.0, mp_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+            draw_rectangle(
+                mp_bar_x + 1.0,
+                mp_bar_y + 1.0,
+                bar_width - 2.0,
+                bar_height - 2.0,
+                Color::new(0.08, 0.08, 0.10, 1.0),
+            );
 
             // MP fill (blue/purple color)
             let mp_fill_w = (bar_width - 4.0) * mp_ratio;
             if mp_fill_w > 0.0 {
                 let mp_color = Color::new(0.3, 0.2, 0.8, 1.0);
-                draw_rectangle(mp_bar_x + 2.0, mp_bar_y + 2.0, mp_fill_w, bar_height - 4.0, mp_color);
-                draw_rectangle(mp_bar_x + 2.0, mp_bar_y + 2.0, mp_fill_w, (bar_height - 4.0) / 2.0, Color::new(0.5, 0.4, 0.95, 1.0));
+                draw_rectangle(
+                    mp_bar_x + 2.0,
+                    mp_bar_y + 2.0,
+                    mp_fill_w,
+                    bar_height - 4.0,
+                    mp_color,
+                );
+                draw_rectangle(
+                    mp_bar_x + 2.0,
+                    mp_bar_y + 2.0,
+                    mp_fill_w,
+                    (bar_height - 4.0) / 2.0,
+                    Color::new(0.5, 0.4, 0.95, 1.0),
+                );
             }
 
             // MP text
             let mp_text = format!("{}/{}", mp, max_mp);
             let mp_text_w = self.measure_text_sharp(&mp_text, font_size).width;
-            self.draw_text_sharp(&mp_text, (mp_bar_x + (bar_width - mp_text_w) / 2.0).floor(), (mp_bar_y + 14.0).floor(), font_size, TEXT_NORMAL);
+            self.draw_text_sharp(
+                &mp_text,
+                (mp_bar_x + (bar_width - mp_text_w) / 2.0).floor(),
+                (mp_bar_y + 14.0).floor(),
+                font_size,
+                TEXT_NORMAL,
+            );
 
             // ===== PRAYER POINTS BAR (below MP bar) =====
             let prayer_bar_x = bar_x;
@@ -6573,15 +8420,39 @@ impl Renderer {
             } else {
                 SLOT_INNER_SHADOW
             };
-            draw_rectangle(prayer_bar_x, prayer_bar_y, bar_width, bar_height, border_color);
-            draw_rectangle(prayer_bar_x + 1.0, prayer_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+            draw_rectangle(
+                prayer_bar_x,
+                prayer_bar_y,
+                bar_width,
+                bar_height,
+                border_color,
+            );
+            draw_rectangle(
+                prayer_bar_x + 1.0,
+                prayer_bar_y + 1.0,
+                bar_width - 2.0,
+                bar_height - 2.0,
+                Color::new(0.08, 0.08, 0.10, 1.0),
+            );
 
             // Prayer fill (cyan/turquoise color)
             let prayer_fill_w = (bar_width - 4.0) * prayer_ratio;
             if prayer_fill_w > 0.0 {
                 let prayer_color = Color::new(0.2, 0.7, 0.85, 1.0);
-                draw_rectangle(prayer_bar_x + 2.0, prayer_bar_y + 2.0, prayer_fill_w, bar_height - 4.0, prayer_color);
-                draw_rectangle(prayer_bar_x + 2.0, prayer_bar_y + 2.0, prayer_fill_w, (bar_height - 4.0) / 2.0, Color::new(1.0, 1.0, 1.0, 0.25));
+                draw_rectangle(
+                    prayer_bar_x + 2.0,
+                    prayer_bar_y + 2.0,
+                    prayer_fill_w,
+                    bar_height - 4.0,
+                    prayer_color,
+                );
+                draw_rectangle(
+                    prayer_bar_x + 2.0,
+                    prayer_bar_y + 2.0,
+                    prayer_fill_w,
+                    (bar_height - 4.0) / 2.0,
+                    Color::new(1.0, 1.0, 1.0, 0.25),
+                );
             }
 
             // Prayer text
@@ -6594,7 +8465,13 @@ impl Renderer {
             } else {
                 TEXT_NORMAL
             };
-            self.draw_text_sharp(&prayer_text, (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(), (prayer_bar_y + 14.0).floor(), font_size, prayer_text_color);
+            self.draw_text_sharp(
+                &prayer_text,
+                (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(),
+                (prayer_bar_y + 14.0).floor(),
+                font_size,
+                prayer_text_color,
+            );
 
             // ===== Gathering/Woodcutting status indicator (below prayer bar) =====
             let is_skilling = state.is_gathering || state.is_woodcutting;
@@ -6603,9 +8480,19 @@ impl Renderer {
                 let gather_h = 22.0;
                 // Semi-transparent background (blue for fishing, brown for woodcutting)
                 let (bg_color, border_color, text_color, action_name) = if state.is_woodcutting {
-                    (Color::new(0.15, 0.10, 0.05, 0.7), Color::new(0.5, 0.35, 0.2, 0.5), Color::new(0.9, 0.7, 0.4, 0.9), "Chopping")
+                    (
+                        Color::new(0.15, 0.10, 0.05, 0.7),
+                        Color::new(0.5, 0.35, 0.2, 0.5),
+                        Color::new(0.9, 0.7, 0.4, 0.9),
+                        "Chopping",
+                    )
                 } else {
-                    (Color::new(0.05, 0.15, 0.25, 0.7), Color::new(0.2, 0.5, 0.7, 0.5), Color::new(0.4, 0.8, 0.95, 0.9), "Fishing")
+                    (
+                        Color::new(0.05, 0.15, 0.25, 0.7),
+                        Color::new(0.2, 0.5, 0.7, 0.5),
+                        Color::new(0.4, 0.8, 0.95, 0.9),
+                        "Fishing",
+                    )
                 };
                 draw_rectangle(bar_x, gather_y, bar_width, gather_h, bg_color);
                 draw_rectangle_lines(bar_x, gather_y, bar_width, gather_h, 1.0, border_color);
@@ -6614,7 +8501,13 @@ impl Renderer {
                 let dots = ".".repeat(dot_count);
                 let label = format!("{}{}", action_name, dots);
                 let label_w = self.measure_text_sharp(&label, 16.0).width;
-                self.draw_text_sharp(&label, (bar_x + (bar_width - label_w) / 2.0).floor(), (gather_y + 15.0).floor(), 16.0, text_color);
+                self.draw_text_sharp(
+                    &label,
+                    (bar_x + (bar_width - label_w) / 2.0).floor(),
+                    (gather_y + 15.0).floor(),
+                    16.0,
+                    text_color,
+                );
             }
 
             // ===== Dash cooldown indicator (below gathering status or prayer bar) =====
@@ -6640,14 +8533,26 @@ impl Renderer {
                 let fill_w = (bar_width - 4.0) * progress;
                 if fill_w > 0.0 {
                     let fill_color = Color::new(0.6, 0.3, 0.8, 0.8);
-                    draw_rectangle(bar_x + 2.0, dash_bar_y + 2.0, fill_w, dash_h - 4.0, fill_color);
+                    draw_rectangle(
+                        bar_x + 2.0,
+                        dash_bar_y + 2.0,
+                        fill_w,
+                        dash_h - 4.0,
+                        fill_color,
+                    );
                 }
 
                 // Text
                 let remaining_text = format!("Dash {:.1}s", remaining);
                 let text_w = self.measure_text_sharp(&remaining_text, 16.0).width;
                 let text_color = Color::new(0.8, 0.6, 0.95, 0.9);
-                self.draw_text_sharp(&remaining_text, (bar_x + (bar_width - text_w) / 2.0).floor(), (dash_bar_y + 15.0).floor(), 16.0, text_color);
+                self.draw_text_sharp(
+                    &remaining_text,
+                    (bar_x + (bar_width - text_w) / 2.0).floor(),
+                    (dash_bar_y + 15.0).floor(),
+                    16.0,
+                    text_color,
+                );
             }
 
             // XP Globes (to the left of minimap)
@@ -6659,7 +8564,8 @@ impl Renderer {
 
             // XP Drop Feed (below gathering status or MP bar)
             let has_dash_bar = state.dash_cooldown_end > current_time;
-            let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 } + if has_dash_bar { 22.0 + 4.0 } else { 0.0 };
+            let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 }
+                + if has_dash_bar { 22.0 + 4.0 } else { 0.0 };
             let drop_start_y = mp_bar_y + bar_height + extra_offset + 145.0;
             self.render_xp_drop_feed(&state.xp_drop_feed, 10.0, drop_start_y);
         }
@@ -6674,7 +8580,9 @@ impl Renderer {
 
         // Chat input box (when open) - scale with zoom for readability
         // Hidden on System tab (read-only channel)
-        if state.ui_state.chat_open && !matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
+        if state.ui_state.chat_open
+            && !matches!(state.ui_state.chat_active_tab, ChatChannel::System)
+        {
             let zoom = state.camera.zoom;
             let (_, input_sh) = virtual_screen_size();
             let input_x = 10.0;
@@ -6695,7 +8603,13 @@ impl Renderer {
             let text_area_width = input_width - text_padding * 2.0 - 12.0 * zoom - indicator_w; // Extra margin for scroll indicators + indicator
 
             // Background
-            draw_rectangle(input_x, input_y, input_width, input_height, Color::from_rgba(0, 0, 0, 180));
+            draw_rectangle(
+                input_x,
+                input_y,
+                input_width,
+                input_height,
+                Color::from_rgba(0, 0, 0, 180),
+            );
 
             let input_text = &state.ui_state.chat_input;
             let cursor_pos = state.ui_state.chat_cursor;
@@ -6714,7 +8628,9 @@ impl Renderer {
             };
 
             // Determine scroll offset to keep cursor visible
-            let scroll_offset = if self.measure_text_sharp(input_text, font_size).width <= text_area_width {
+            let scroll_offset = if self.measure_text_sharp(input_text, font_size).width
+                <= text_area_width
+            {
                 // Text fits entirely, no scroll needed
                 0
             } else {
@@ -6744,29 +8660,60 @@ impl Renderer {
             // Get visible portion of text that fits
             let chars_from_offset: String = input_text.chars().skip(scroll_offset).collect();
             let visible_char_count = measure_chars_that_fit(&chars_from_offset, text_area_width);
-            let visible_text: String = input_text.chars().skip(scroll_offset).take(visible_char_count).collect();
+            let visible_text: String = input_text
+                .chars()
+                .skip(scroll_offset)
+                .take(visible_char_count)
+                .collect();
             let visible_end = scroll_offset + visible_char_count;
 
             // Draw channel indicator and visible text
             let text_y_offset = 17.0 * zoom;
             let text_start_x = input_x + text_padding + indicator_w;
-            self.draw_text_sharp(indicator, input_x + text_padding, input_y + text_y_offset, font_size, indicator_color);
-            self.draw_text_sharp(&visible_text, text_start_x, input_y + text_y_offset, font_size, WHITE);
+            self.draw_text_sharp(
+                indicator,
+                input_x + text_padding,
+                input_y + text_y_offset,
+                font_size,
+                indicator_color,
+            );
+            self.draw_text_sharp(
+                &visible_text,
+                text_start_x,
+                input_y + text_y_offset,
+                font_size,
+                WHITE,
+            );
 
             // Draw scroll indicators if text is clipped
             if scroll_offset > 0 {
-                self.draw_text_sharp("<", text_start_x - 8.0 * zoom, input_y + text_y_offset, font_size, GRAY);
+                self.draw_text_sharp(
+                    "<",
+                    text_start_x - 8.0 * zoom,
+                    input_y + text_y_offset,
+                    font_size,
+                    GRAY,
+                );
             }
             if visible_end < char_count {
-                self.draw_text_sharp(">", input_x + input_width - 10.0 * zoom, input_y + text_y_offset, font_size, GRAY);
+                self.draw_text_sharp(
+                    ">",
+                    input_x + input_width - 10.0 * zoom,
+                    input_y + text_y_offset,
+                    font_size,
+                    GRAY,
+                );
             }
 
             // Blinking cursor at correct position within visible text
             let cursor_blink = (macroquad::time::get_time() * 2.0) as i32 % 2 == 0;
             if cursor_blink {
                 let cursor_visible_pos = cursor_pos.saturating_sub(scroll_offset);
-                let text_before_cursor: String = visible_text.chars().take(cursor_visible_pos).collect();
-                let cursor_x = self.measure_text_sharp(&text_before_cursor, font_size).width;
+                let text_before_cursor: String =
+                    visible_text.chars().take(cursor_visible_pos).collect();
+                let cursor_x = self
+                    .measure_text_sharp(&text_before_cursor, font_size)
+                    .width;
                 draw_line(
                     text_start_x + cursor_x + 1.0,
                     input_y + 4.0 * zoom,
@@ -6776,10 +8723,8 @@ impl Renderer {
                     WHITE,
                 );
             }
-
         }
     }
-
 
     /// Render all interactive UI elements and return the layout for hit detection
     fn render_interactive_ui(&self, state: &GameState) -> UiLayout {
@@ -6840,7 +8785,11 @@ impl Renderer {
             let (_, chat_sh) = virtual_screen_size();
             let bg_padding = 6.0 * zoom;
             let line_height = 18.0 * zoom;
-            let max_chat_width = if zoom >= 2.0 { 400.0 * zoom - 260.0 } else { 360.0 * zoom };
+            let max_chat_width = if zoom >= 2.0 {
+                400.0 * zoom - 260.0
+            } else {
+                360.0 * zoom
+            };
             let max_visible_lines: usize = if zoom >= 2.0 { 6 } else { 7 };
             let chat_area_h = max_visible_lines as f32 * line_height;
             let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
@@ -6852,15 +8801,23 @@ impl Renderer {
             let tab_w = (max_chat_width / num_tabs).floor();
             let tab_bar_y = clip_y - tab_h;
 
-            let tab_ids = [UiElementId::ChatTabLocal, UiElementId::ChatTabGlobal, UiElementId::ChatTabSystem];
+            let tab_ids = [
+                UiElementId::ChatTabLocal,
+                UiElementId::ChatTabGlobal,
+                UiElementId::ChatTabSystem,
+            ];
             for i in 0..3 {
                 let tx = chat_x + i as f32 * tab_w;
-                layout.add(tab_ids[i].clone(), macroquad::prelude::Rect::new(tx, tab_bar_y, tab_w, tab_h));
+                layout.add(
+                    tab_ids[i].clone(),
+                    macroquad::prelude::Rect::new(tx, tab_bar_y, tab_w, tab_h),
+                );
             }
         }
 
         // Quick slots and menu buttons - hide on mobile when crafting/shop panel is open
-        let hide_bottom_bar = cfg!(target_os = "android") && (state.ui_state.crafting_open || state.ui_state.bank_open);
+        let hide_bottom_bar = cfg!(target_os = "android")
+            && (state.ui_state.crafting_open || state.ui_state.bank_open);
         if !hide_bottom_bar {
             // Quick slots (always visible at bottom, above exp bar)
             self.render_quick_slots(state, hovered, &mut layout);
@@ -6885,12 +8842,26 @@ impl Renderer {
                 let center_y = btn_y + btn_size / 2.0;
                 let radius = btn_size / 2.0;
                 draw_circle(center_x, center_y, radius, Color::new(0.1, 0.1, 0.13, 0.85));
-                draw_circle_lines(center_x, center_y, radius, 1.0, Color::new(0.557, 0.424, 0.267, 1.0));
+                draw_circle_lines(
+                    center_x,
+                    center_y,
+                    radius,
+                    1.0,
+                    Color::new(0.557, 0.424, 0.267, 1.0),
+                );
 
                 // Icon at original size (no scaling)
-                draw_texture(tex, btn_x + (btn_size - icon_w) / 2.0, btn_y + (btn_size - icon_h) / 2.0, WHITE);
+                draw_texture(
+                    tex,
+                    btn_x + (btn_size - icon_w) / 2.0,
+                    btn_y + (btn_size - icon_h) / 2.0,
+                    WHITE,
+                );
 
-                layout.add(UiElementId::ChatButton, macroquad::prelude::Rect::new(btn_x, btn_y, btn_size, btn_size));
+                layout.add(
+                    UiElementId::ChatButton,
+                    macroquad::prelude::Rect::new(btn_x, btn_y, btn_size, btn_size),
+                );
             }
         }
 
@@ -6914,7 +8885,8 @@ impl Renderer {
                 let py = player.y;
                 if px >= 0.0 && px <= 29.0 && py >= -42.0 && py <= -16.0 {
                     let bar_width_contract = 120.0f32;
-                    let (bar_x, stats_y) = self.minimap_stats_stack_position(state, bar_width_contract);
+                    let (bar_x, stats_y) =
+                        self.minimap_stats_stack_position(state, bar_width_contract);
                     // Below 3 stat bars (HP + MP + Prayer, each 18px + 4px gap) + extra gap
                     let contract_y = stats_y + 3.0 * (18.0 + 4.0) + 14.0;
                     self.render_farming_contract_tracker(state, bar_x, contract_y, 200.0);
@@ -7005,16 +8977,50 @@ impl Renderer {
         draw_rectangle(x + 2.0, y + 2.0, w - 4.0, h - 4.0, FRAME_MID);
 
         // Layer 4: Main panel background (inset 4px)
-        draw_rectangle(x + FRAME_THICKNESS, y + FRAME_THICKNESS, w - FRAME_THICKNESS * 2.0, h - FRAME_THICKNESS * 2.0, PANEL_BG_MID);
+        draw_rectangle(
+            x + FRAME_THICKNESS,
+            y + FRAME_THICKNESS,
+            w - FRAME_THICKNESS * 2.0,
+            h - FRAME_THICKNESS * 2.0,
+            PANEL_BG_MID,
+        );
 
         // Layer 5: Inner highlight line (top and left edges - light source simulation)
-        draw_line(x + FRAME_THICKNESS, y + FRAME_THICKNESS, x + w - FRAME_THICKNESS, y + FRAME_THICKNESS, 1.0, FRAME_INNER);
-        draw_line(x + FRAME_THICKNESS, y + FRAME_THICKNESS, x + FRAME_THICKNESS, y + h - FRAME_THICKNESS, 1.0, FRAME_INNER);
+        draw_line(
+            x + FRAME_THICKNESS,
+            y + FRAME_THICKNESS,
+            x + w - FRAME_THICKNESS,
+            y + FRAME_THICKNESS,
+            1.0,
+            FRAME_INNER,
+        );
+        draw_line(
+            x + FRAME_THICKNESS,
+            y + FRAME_THICKNESS,
+            x + FRAME_THICKNESS,
+            y + h - FRAME_THICKNESS,
+            1.0,
+            FRAME_INNER,
+        );
 
         // Layer 6: Inner shadow line (bottom and right edges)
         let shadow = Color::new(0.0, 0.0, 0.0, 0.235);
-        draw_line(x + FRAME_THICKNESS + 1.0, y + h - FRAME_THICKNESS - 1.0, x + w - FRAME_THICKNESS, y + h - FRAME_THICKNESS - 1.0, 1.0, shadow);
-        draw_line(x + w - FRAME_THICKNESS - 1.0, y + FRAME_THICKNESS + 1.0, x + w - FRAME_THICKNESS - 1.0, y + h - FRAME_THICKNESS, 1.0, shadow);
+        draw_line(
+            x + FRAME_THICKNESS + 1.0,
+            y + h - FRAME_THICKNESS - 1.0,
+            x + w - FRAME_THICKNESS,
+            y + h - FRAME_THICKNESS - 1.0,
+            1.0,
+            shadow,
+        );
+        draw_line(
+            x + w - FRAME_THICKNESS - 1.0,
+            y + FRAME_THICKNESS + 1.0,
+            x + w - FRAME_THICKNESS - 1.0,
+            y + h - FRAME_THICKNESS,
+            1.0,
+            shadow,
+        );
     }
 
     /// Draw decorative corner accents (gold L-shapes at corners)
@@ -7043,7 +9049,15 @@ impl Renderer {
     /// Creates a polished health bar with:
     /// - Thin 1px dark border with rounded corners
     /// - Jewel-toned health fill with gradient effect
-    fn draw_entity_health_bar(&self, x: f32, y: f32, width: f32, height: f32, hp_ratio: f32, _scale: f32) {
+    fn draw_entity_health_bar(
+        &self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        hp_ratio: f32,
+        _scale: f32,
+    ) {
         // Pixel-align coordinates for crisp rendering
         let x = x.floor();
         let y = y.floor();
@@ -7103,7 +9117,14 @@ impl Renderer {
     }
 
     /// Draw an inventory slot with bevel effect
-    pub(crate) fn draw_inventory_slot(&self, x: f32, y: f32, size: f32, has_item: bool, state: SlotState) {
+    pub(crate) fn draw_inventory_slot(
+        &self,
+        x: f32,
+        y: f32,
+        size: f32,
+        has_item: bool,
+        state: SlotState,
+    ) {
         // Outer slot border (bronze)
         draw_rectangle(x, y, size, size, SLOT_BORDER);
 
@@ -7114,33 +9135,65 @@ impl Renderer {
 
         // Background based on state
         let bg = match state {
-            SlotState::Normal => if has_item { SLOT_BG_FILLED } else { SLOT_BG_EMPTY },
+            SlotState::Normal => {
+                if has_item {
+                    SLOT_BG_FILLED
+                } else {
+                    SLOT_BG_EMPTY
+                }
+            }
             SlotState::Hovered => SLOT_HOVER_BG,
             SlotState::Dragging => SLOT_DRAG_SOURCE,
         };
         draw_rectangle(inner_x, inner_y, inner_size, inner_size, bg);
 
         // Inner shadow (top and left - simulates recessed slot)
-        draw_line(inner_x, inner_y, inner_x + inner_size, inner_y, 2.0, SLOT_INNER_SHADOW);
-        draw_line(inner_x, inner_y, inner_x, inner_y + inner_size, 2.0, SLOT_INNER_SHADOW);
+        draw_line(
+            inner_x,
+            inner_y,
+            inner_x + inner_size,
+            inner_y,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
+        draw_line(
+            inner_x,
+            inner_y,
+            inner_x,
+            inner_y + inner_size,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
 
         // Inner highlight (bottom and right - subtle)
-        draw_line(inner_x + 1.0, inner_y + inner_size - 1.0, inner_x + inner_size, inner_y + inner_size - 1.0, 1.0, SLOT_HIGHLIGHT);
-        draw_line(inner_x + inner_size - 1.0, inner_y + 1.0, inner_x + inner_size - 1.0, inner_y + inner_size, 1.0, SLOT_HIGHLIGHT);
+        draw_line(
+            inner_x + 1.0,
+            inner_y + inner_size - 1.0,
+            inner_x + inner_size,
+            inner_y + inner_size - 1.0,
+            1.0,
+            SLOT_HIGHLIGHT,
+        );
+        draw_line(
+            inner_x + inner_size - 1.0,
+            inner_y + 1.0,
+            inner_x + inner_size - 1.0,
+            inner_y + inner_size,
+            1.0,
+            SLOT_HIGHLIGHT,
+        );
 
         // State-specific border overlay
         match state {
             SlotState::Hovered => {
                 draw_rectangle_lines(x, y, size, size, 2.0, SLOT_HOVER_BORDER);
-            },
+            }
             SlotState::Dragging => {
                 draw_rectangle_lines(x, y, size, size, 2.0, SLOT_SELECTED_BORDER);
-            },
+            }
             _ => {}
         }
     }
-
-
 
     /// Draw an item icon using sprite or fallback color
     /// Uses the full texture, centered in the slot
@@ -7184,7 +9237,8 @@ impl Renderer {
         // Helper to break a long word into chunks that fit
         let break_long_word = |word: &str, max_len: usize| -> Vec<String> {
             let chars: Vec<char> = word.chars().collect();
-            chars.chunks(max_len)
+            chars
+                .chunks(max_len)
                 .map(|chunk| chunk.iter().collect())
                 .collect()
         };

@@ -1,14 +1,14 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::cmp::Ordering;
 use super::chunk::ChunkManager;
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 /// State for tracking automated pathfinding movement
 #[derive(Debug, Clone)]
 pub struct PathState {
-    pub path: Vec<(i32, i32)>,      // Waypoints (grid coordinates)
-    pub current_index: usize,        // Current waypoint being targeted
-    pub destination: (i32, i32),     // Final target
-    pub pickup_target: Option<String>, // Item ID to pick up when path completes
+    pub path: Vec<(i32, i32)>,           // Waypoints (grid coordinates)
+    pub current_index: usize,            // Current waypoint being targeted
+    pub destination: (i32, i32),         // Final target
+    pub pickup_target: Option<String>,   // Item ID to pick up when path completes
     pub interact_target: Option<String>, // NPC ID to interact with on path completion
 }
 
@@ -16,14 +16,16 @@ pub struct PathState {
 #[derive(Clone, Eq, PartialEq)]
 struct Node {
     pos: (i32, i32),
-    g_cost: i32,  // Cost from start
-    f_cost: i32,  // g + heuristic
+    g_cost: i32, // Cost from start
+    f_cost: i32, // g + heuristic
 }
 
 impl Ord for Node {
     fn cmp(&self, other: &Self) -> Ordering {
         // Min-heap: lower f_cost = higher priority
-        other.f_cost.cmp(&self.f_cost)
+        other
+            .f_cost
+            .cmp(&self.f_cost)
             .then_with(|| other.g_cost.cmp(&self.g_cost))
     }
 }

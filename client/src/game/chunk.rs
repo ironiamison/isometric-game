@@ -288,7 +288,11 @@ impl ChunkManager {
     ) {
         // Don't load world chunks when in interior mode
         if self.interior_size.is_some() {
-            log::debug!("Ignoring world chunk ({}, {}) while in interior mode", chunk_x, chunk_y);
+            log::debug!(
+                "Ignoring world chunk ({}, {}) while in interior mode",
+                chunk_x,
+                chunk_y
+            );
             return;
         }
 
@@ -326,7 +330,6 @@ impl ChunkManager {
 
         // Store chunk
         self.chunks.insert(coord, chunk);
-
     }
 
     /// Check if a world position is walkable
@@ -392,8 +395,7 @@ impl ChunkManager {
         let current = self.current_chunk;
 
         self.chunks.retain(|coord, _| {
-            (coord.x - current.x).abs() <= keep_radius
-                && (coord.y - current.y).abs() <= keep_radius
+            (coord.x - current.x).abs() <= keep_radius && (coord.y - current.y).abs() <= keep_radius
         });
     }
 
@@ -412,8 +414,10 @@ impl ChunkManager {
         chunk.portals.iter().find(|p| {
             let world_px = chunk_base_x + p.x;
             let world_py = chunk_base_y + p.y;
-            tile_x >= world_px && tile_x < world_px + p.width &&
-            tile_y >= world_py && tile_y < world_py + p.height
+            tile_x >= world_px
+                && tile_x < world_px + p.width
+                && tile_y >= world_py
+                && tile_y < world_py + p.height
         })
     }
 
@@ -425,7 +429,11 @@ impl ChunkManager {
         let chunk = self.chunks.get(&coord)?;
 
         // First try exact match
-        if let Some(obj) = chunk.objects.iter().find(|obj| obj.tile_x == tile_x && obj.tile_y == tile_y) {
+        if let Some(obj) = chunk
+            .objects
+            .iter()
+            .find(|obj| obj.tile_x == tile_x && obj.tile_y == tile_y)
+        {
             return Some(obj);
         }
 
@@ -451,11 +459,23 @@ impl ChunkManager {
     pub fn get_object_at_exact(&self, tile_x: i32, tile_y: i32) -> Option<&MapObject> {
         let coord = ChunkCoord::from_world(tile_x, tile_y);
         let chunk = self.chunks.get(&coord)?;
-        chunk.objects.iter().find(|obj| obj.tile_x == tile_x && obj.tile_y == tile_y)
+        chunk
+            .objects
+            .iter()
+            .find(|obj| obj.tile_x == tile_x && obj.tile_y == tile_y)
     }
 
     /// Load an interior as a single chunk at (0,0)
-    pub fn load_interior(&mut self, width: u32, height: u32, layers: Vec<(u8, Vec<u32>)>, collision: &[u8], portals: Vec<Portal>, objects: Vec<MapObject>, walls: Vec<Wall>) {
+    pub fn load_interior(
+        &mut self,
+        width: u32,
+        height: u32,
+        layers: Vec<(u8, Vec<u32>)>,
+        collision: &[u8],
+        portals: Vec<Portal>,
+        objects: Vec<MapObject>,
+        walls: Vec<Wall>,
+    ) {
         // Clear existing chunks
         self.chunks.clear();
         self.pending_requests.clear();
@@ -466,12 +486,13 @@ impl ChunkManager {
         // Create interior chunk at (0,0)
         let coord = ChunkCoord { x: 0, y: 0 };
 
-        let chunk_layers: Vec<ChunkLayer> = layers.into_iter().map(|(layer_type, tiles)| {
-            ChunkLayer {
+        let chunk_layers: Vec<ChunkLayer> = layers
+            .into_iter()
+            .map(|(layer_type, tiles)| ChunkLayer {
                 layer_type: ChunkLayerType::from_u8(layer_type),
                 tiles,
-            }
-        }).collect();
+            })
+            .collect();
 
         let collision_data = Chunk::unpack_collision_sized(collision, (width * height) as usize);
 

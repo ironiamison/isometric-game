@@ -1,11 +1,11 @@
 //! Top bar UI components: experience bar and menu buttons
 
-use macroquad::prelude::*;
+use super::super::Renderer;
+use super::common::*;
 use crate::game::GameState;
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
-use super::super::Renderer;
-use super::common::*;
+use macroquad::prelude::*;
 
 /// Menu button icon frame indices in background_icons.png
 /// Order: inventory, character, settings, skills, social, prayer, magic
@@ -41,15 +41,16 @@ impl Renderer {
         draw_rectangle(bar_x, bar_y, bar_width, bar_height, bg_color);
 
         // Get player skill data - show total level and combat level
-        let (combat_level, total_level, avg_progress) = if let Some(player) = state.get_local_player() {
-            // Calculate average progress across combat skills (HP + Combat)
-            let hp_prog = player.skills.hitpoints.level_progress();
-            let combat_prog = player.skills.combat.level_progress();
-            let avg = (hp_prog + combat_prog) / 2.0;
-            (player.combat_level(), player.skills.total_level(), avg)
-        } else {
-            (6, 13, 0.0) // Default: HP 10 + Combat 3 = 13, combat level = (10+3)/2 = 6
-        };
+        let (combat_level, total_level, avg_progress) =
+            if let Some(player) = state.get_local_player() {
+                // Calculate average progress across combat skills (HP + Combat)
+                let hp_prog = player.skills.hitpoints.level_progress();
+                let combat_prog = player.skills.combat.level_progress();
+                let avg = (hp_prog + combat_prog) / 2.0;
+                (player.combat_level(), player.skills.total_level(), avg)
+            } else {
+                (6, 13, 0.0) // Default: HP 10 + Combat 3 = 13, combat level = (10+3)/2 = 6
+            };
 
         // Draw fill bar showing average skill progress (matching HP bar style)
         let fill_width = bar_width * avg_progress;
@@ -58,7 +59,13 @@ impl Renderer {
             let exp_green = Color::new(0.2, 0.7, 0.3, 0.65);
             draw_rectangle(bar_x, bar_y + 1.0, fill_width, fill_height, exp_green);
             // Highlight on top half
-            draw_rectangle(bar_x, bar_y + 1.0, fill_width, fill_height / 2.0, Color::new(1.0, 1.0, 1.0, 0.15));
+            draw_rectangle(
+                bar_x,
+                bar_y + 1.0,
+                fill_width,
+                fill_height / 2.0,
+                Color::new(1.0, 1.0, 1.0, 0.15),
+            );
         }
 
         // Show combat level and total level
@@ -68,13 +75,24 @@ impl Renderer {
         let text_y = bar_y + (bar_height + 12.0) / 2.0 - 2.0;
 
         // Text shadow
-        self.draw_text_sharp(&exp_text, text_x + 1.0, text_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+        self.draw_text_sharp(
+            &exp_text,
+            text_x + 1.0,
+            text_y + 1.0,
+            16.0,
+            Color::new(0.0, 0.0, 0.0, 0.8),
+        );
         // Text
         self.draw_text_sharp(&exp_text, text_x, text_y, 16.0, TEXT_NORMAL);
     }
 
     /// Render the menu buttons in the bottom-right corner
-    pub(crate) fn render_menu_buttons(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_menu_buttons(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         let (screen_w, screen_h) = virtual_screen_size();
         let scale = state.ui_state.ui_scale;
 
@@ -89,19 +107,48 @@ impl Renderer {
 
         // 6 buttons: Inventory, Character, Skills, Prayer, Social, Settings
         let num_buttons = 6;
-        let total_width = num_buttons as f32 * button_size + (num_buttons - 1) as f32 * button_spacing;
+        let total_width =
+            num_buttons as f32 * button_size + (num_buttons - 1) as f32 * button_spacing;
 
         // Right-aligned with padding, floor to integer pixels
         let start_x = (screen_w - total_width - 8.0).floor();
 
         // Buttons with their icon frame indices
         let buttons = [
-            (UiElementId::MenuButtonInventory, ICON_INVENTORY, state.ui_state.inventory_open),
-            (UiElementId::MenuButtonCharacter, ICON_CHARACTER, state.ui_state.character_panel_open),
-            (UiElementId::MenuButtonSkills, ICON_SKILLS, state.ui_state.skills_open),
-            (UiElementId::MenuButtonPrayer, if state.ui_state.prayer_spell_tab == 1 { ICON_MAGIC } else { ICON_PRAYER }, state.ui_state.prayer_book_open),
-            (UiElementId::MenuButtonSocial, ICON_SOCIAL, state.ui_state.social_open),
-            (UiElementId::MenuButtonSettings, ICON_SETTINGS, state.ui_state.escape_menu_open),
+            (
+                UiElementId::MenuButtonInventory,
+                ICON_INVENTORY,
+                state.ui_state.inventory_open,
+            ),
+            (
+                UiElementId::MenuButtonCharacter,
+                ICON_CHARACTER,
+                state.ui_state.character_panel_open,
+            ),
+            (
+                UiElementId::MenuButtonSkills,
+                ICON_SKILLS,
+                state.ui_state.skills_open,
+            ),
+            (
+                UiElementId::MenuButtonPrayer,
+                if state.ui_state.prayer_spell_tab == 1 {
+                    ICON_MAGIC
+                } else {
+                    ICON_PRAYER
+                },
+                state.ui_state.prayer_book_open,
+            ),
+            (
+                UiElementId::MenuButtonSocial,
+                ICON_SOCIAL,
+                state.ui_state.social_open,
+            ),
+            (
+                UiElementId::MenuButtonSettings,
+                ICON_SETTINGS,
+                state.ui_state.escape_menu_open,
+            ),
         ];
 
         for (i, (element_id, icon_frame, is_active)) in buttons.iter().enumerate() {
@@ -117,7 +164,15 @@ impl Renderer {
             let is_hovered = hovered.as_ref() == Some(element_id);
 
             // Draw button with icon
-            self.draw_menu_button_icon_scaled(x, y, button_size, *icon_frame, is_hovered, *is_active, scale);
+            self.draw_menu_button_icon_scaled(
+                x,
+                y,
+                button_size,
+                *icon_frame,
+                is_hovered,
+                *is_active,
+                scale,
+            );
 
             // Draw notification badge on social button if there are pending requests
             if *element_id == UiElementId::MenuButtonSocial {
@@ -127,7 +182,16 @@ impl Renderer {
     }
 
     /// Draw a single menu button with an icon from the sprite sheet (scaled)
-    fn draw_menu_button_icon_scaled(&self, x: f32, y: f32, size: f32, icon_frame: usize, is_hovered: bool, is_active: bool, scale: f32) {
+    fn draw_menu_button_icon_scaled(
+        &self,
+        x: f32,
+        y: f32,
+        size: f32,
+        icon_frame: usize,
+        is_hovered: bool,
+        is_active: bool,
+        scale: f32,
+    ) {
         // Frame colors based on state
         let (bg_color, border_color) = if is_active {
             // Active state - brighter
@@ -155,8 +219,22 @@ impl Renderer {
         // Bottom/right highlight
         if is_active {
             let accent = Color::new(FRAME_ACCENT.r, FRAME_ACCENT.g, FRAME_ACCENT.b, 0.5);
-            draw_line(x + 2.0, y + size - 1.0, x + size - 2.0, y + size - 1.0, 1.0, accent);
-            draw_line(x + size - 1.0, y + 2.0, x + size - 1.0, y + size - 2.0, 1.0, accent);
+            draw_line(
+                x + 2.0,
+                y + size - 1.0,
+                x + size - 2.0,
+                y + size - 1.0,
+                1.0,
+                accent,
+            );
+            draw_line(
+                x + size - 1.0,
+                y + 2.0,
+                x + size - 1.0,
+                y + size - 2.0,
+                1.0,
+                accent,
+            );
         }
 
         // Draw icon from sprite sheet if available

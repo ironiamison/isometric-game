@@ -1,5 +1,5 @@
-pub mod messages;
 pub(crate) mod message_handler;
+pub mod messages;
 pub(crate) mod protocol;
 
 #[cfg(not(target_arch = "wasm32"))]

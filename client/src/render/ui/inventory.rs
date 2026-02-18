@@ -1,16 +1,25 @@
 //! Inventory panel rendering
 
-use macroquad::prelude::*;
-use macroquad::window::get_internal_gl;
-use crate::game::{GameState, DragState, DragSource};
-use crate::ui::{UiElementId, UiLayout};
-use crate::util::virtual_screen_size;
 use super::super::Renderer;
 use super::common::*;
+use crate::game::{DragSource, DragState, GameState};
+use crate::ui::{UiElementId, UiLayout};
+use crate::util::virtual_screen_size;
+use macroquad::prelude::*;
+use macroquad::window::get_internal_gl;
 
 impl Renderer {
     /// Draw equipment slot with silhouette icon when empty
-    pub(crate) fn draw_equipment_slot(&self, x: f32, y: f32, size: f32, slot_type: &str, has_item: bool, is_hovered: bool, is_dragging: bool) {
+    pub(crate) fn draw_equipment_slot(
+        &self,
+        x: f32,
+        y: f32,
+        size: f32,
+        slot_type: &str,
+        has_item: bool,
+        is_hovered: bool,
+        is_dragging: bool,
+    ) {
         // Outer border (purple accent for equipment)
         let border_color = if is_dragging {
             SLOT_SELECTED_BORDER
@@ -32,8 +41,22 @@ impl Renderer {
         draw_rectangle(x + 1.0, y + 1.0, size - 2.0, size - 2.0, bg);
 
         // Inner bevel effect
-        draw_line(x + 2.0, y + 2.0, x + size - 2.0, y + 2.0, 2.0, SLOT_INNER_SHADOW);
-        draw_line(x + 2.0, y + 2.0, x + 2.0, y + size - 2.0, 2.0, SLOT_INNER_SHADOW);
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + size - 2.0,
+            y + 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + 2.0,
+            y + size - 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
 
         // Draw silhouette if empty (and not dragging)
         if !has_item && !is_dragging {
@@ -47,32 +70,32 @@ impl Renderer {
                     draw_rectangle(center_x - 8.0, center_y - 8.0, 16.0, 14.0, icon_color);
                     draw_rectangle(center_x - 10.0, center_y - 4.0, 20.0, 8.0, icon_color);
                     draw_rectangle(center_x - 6.0, center_y - 12.0, 12.0, 6.0, icon_color);
-                },
+                }
                 "body" => {
                     // Armor silhouette (torso shape)
                     draw_rectangle(center_x - 8.0, center_y - 10.0, 16.0, 20.0, icon_color);
                     draw_rectangle(center_x - 12.0, center_y - 6.0, 5.0, 12.0, icon_color);
                     draw_rectangle(center_x + 7.0, center_y - 6.0, 5.0, 12.0, icon_color);
-                },
+                }
                 "weapon" => {
                     // Sword silhouette
                     draw_rectangle(center_x - 2.0, center_y - 14.0, 4.0, 24.0, icon_color);
                     draw_rectangle(center_x - 8.0, center_y + 4.0, 16.0, 4.0, icon_color);
                     draw_rectangle(center_x - 3.0, center_y + 8.0, 6.0, 4.0, icon_color);
-                },
+                }
                 "back" => {
                     // Cape/backpack silhouette
                     draw_rectangle(center_x - 10.0, center_y - 10.0, 20.0, 6.0, icon_color);
                     draw_rectangle(center_x - 8.0, center_y - 4.0, 16.0, 16.0, icon_color);
                     draw_rectangle(center_x - 6.0, center_y + 10.0, 12.0, 4.0, icon_color);
-                },
+                }
                 "feet" => {
                     // Boots silhouette
                     draw_rectangle(center_x - 8.0, center_y - 4.0, 6.0, 12.0, icon_color);
                     draw_rectangle(center_x + 2.0, center_y - 4.0, 6.0, 12.0, icon_color);
                     draw_rectangle(center_x - 10.0, center_y + 6.0, 9.0, 4.0, icon_color);
                     draw_rectangle(center_x + 1.0, center_y + 6.0, 9.0, 4.0, icon_color);
-                },
+                }
                 "ring" => {
                     // Ring silhouette (circular band)
                     draw_rectangle(center_x - 6.0, center_y - 8.0, 12.0, 4.0, icon_color);
@@ -81,7 +104,7 @@ impl Renderer {
                     draw_rectangle(center_x - 6.0, center_y + 4.0, 12.0, 4.0, icon_color);
                     // Gem on top
                     draw_rectangle(center_x - 3.0, center_y - 12.0, 6.0, 6.0, icon_color);
-                },
+                }
                 "gloves" => {
                     // Glove silhouette (hand shape)
                     draw_rectangle(center_x - 8.0, center_y - 2.0, 16.0, 12.0, icon_color);
@@ -92,7 +115,7 @@ impl Renderer {
                     draw_rectangle(center_x + 4.0, center_y - 10.0, 3.0, 10.0, icon_color);
                     // Thumb
                     draw_rectangle(center_x + 8.0, center_y - 4.0, 4.0, 8.0, icon_color);
-                },
+                }
                 "necklace" => {
                     // Necklace silhouette (pendant on chain)
                     // Chain part (U shape)
@@ -102,20 +125,25 @@ impl Renderer {
                     // Pendant (diamond shape)
                     draw_rectangle(center_x - 4.0, center_y + 1.0, 8.0, 8.0, icon_color);
                     draw_rectangle(center_x - 2.0, center_y + 9.0, 4.0, 4.0, icon_color);
-                },
+                }
                 "belt" => {
                     // Belt silhouette (horizontal band with buckle)
                     draw_rectangle(center_x - 12.0, center_y - 3.0, 24.0, 6.0, icon_color);
                     // Buckle (square with center)
                     draw_rectangle(center_x - 5.0, center_y - 6.0, 10.0, 12.0, icon_color);
                     draw_rectangle(center_x - 2.0, center_y - 3.0, 4.0, 6.0, EQUIP_SLOT_EMPTY);
-                },
+                }
                 _ => {}
             }
         }
     }
 
-    pub(crate) fn render_inventory(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_inventory(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         let (screen_w, screen_h) = virtual_screen_size();
         let scale = state.ui_state.ui_scale;
 
@@ -152,7 +180,14 @@ impl Renderer {
         draw_rectangle(header_x, header_y, header_w, header_height, HEADER_BG);
 
         // Header bottom separator
-        draw_line(header_x + 10.0 * scale, header_y + header_height, header_x + header_w - 10.0 * scale, header_y + header_height, 2.0, HEADER_BORDER);
+        draw_line(
+            header_x + 10.0 * scale,
+            header_y + header_height,
+            header_x + header_w - 10.0 * scale,
+            header_y + header_height,
+            2.0,
+            HEADER_BORDER,
+        );
 
         // Decorative dots on separator
         let dot_spacing = 50.0 * scale;
@@ -160,11 +195,23 @@ impl Renderer {
         let start_dot_x = header_x + 20.0 * scale;
         for i in 0..num_dots {
             let dot_x = start_dot_x + i as f32 * dot_spacing;
-            draw_rectangle(dot_x - 1.5, header_y + header_height - 1.5, 3.0, 3.0, FRAME_ACCENT);
+            draw_rectangle(
+                dot_x - 1.5,
+                header_y + header_height - 1.5,
+                3.0,
+                3.0,
+                FRAME_ACCENT,
+            );
         }
 
         // Title text (native font size for crisp rendering)
-        self.draw_text_sharp("Inventory", header_x + 8.0, header_y + (header_height + 12.0) / 2.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            "Inventory",
+            header_x + 8.0,
+            header_y + (header_height + 12.0) / 2.0,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Gold display (right side)
         let gold_text = format!("{}g", state.inventory.gold);
@@ -189,10 +236,21 @@ impl Renderer {
             );
         }
 
-        self.draw_text_sharp(&gold_text, coin_x + icon_size + icon_margin, header_y + (header_height + 12.0) / 2.0, 16.0, TEXT_GOLD);
+        self.draw_text_sharp(
+            &gold_text,
+            coin_x + icon_size + icon_margin,
+            header_y + (header_height + 12.0) / 2.0,
+            16.0,
+            TEXT_GOLD,
+        );
 
         // Register gold display bounds for right-click context menu
-        let gold_bounds = Rect::new(coin_x, header_y, icon_size + icon_margin + gold_width + 8.0, header_height);
+        let gold_bounds = Rect::new(
+            coin_x,
+            header_y,
+            icon_size + icon_margin + gold_width + 8.0,
+            header_height,
+        );
         layout.add(UiElementId::GoldDisplay, gold_bounds);
 
         // ===== INVENTORY GRID =====
@@ -214,7 +272,10 @@ impl Renderer {
 
         // Scroll offset (clamped)
         let max_scroll = (total_grid_height - visible_grid_height).max(0.0);
-        let scroll_offset = state.ui_state.inventory_scroll_offset.clamp(0.0, max_scroll);
+        let scroll_offset = state
+            .ui_state
+            .inventory_scroll_offset
+            .clamp(0.0, max_scroll);
 
         // Register grid area for scroll input detection
         if needs_scroll {
@@ -236,7 +297,8 @@ impl Renderer {
             let scissor_y = (grid_y * scale_y) as i32;
             let scissor_w = ((inv_width - grid_padding) * scale_x) as i32;
             let scissor_h = (visible_grid_height * scale_y) as i32;
-            gl.quad_gl.scissor(Some((scissor_x, scissor_y, scissor_w, scissor_h)));
+            gl.quad_gl
+                .scissor(Some((scissor_x, scissor_y, scissor_w, scissor_h)));
         }
 
         for i in 0..20 {
@@ -284,9 +346,21 @@ impl Renderer {
                     if slot.quantity > 1 {
                         let qty_text = slot.quantity.to_string();
                         // Shadow
-                        self.draw_text_sharp(&qty_text, x + 3.0, y + slot_size - 4.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+                        self.draw_text_sharp(
+                            &qty_text,
+                            x + 3.0,
+                            y + slot_size - 4.0,
+                            16.0,
+                            Color::new(0.0, 0.0, 0.0, 0.8),
+                        );
                         // Text
-                        self.draw_text_sharp(&qty_text, x + 2.0, y + slot_size - 5.0, 16.0, TEXT_NORMAL);
+                        self.draw_text_sharp(
+                            &qty_text,
+                            x + 2.0,
+                            y + slot_size - 5.0,
+                            16.0,
+                            TEXT_NORMAL,
+                        );
                     }
                 }
             }
@@ -299,7 +373,13 @@ impl Renderer {
                 let badge_h = 13.0;
                 let num_x = x + slot_size - badge_w - 1.0;
                 let num_y = y + 1.0;
-                draw_rectangle(num_x, num_y, badge_w, badge_h, Color::new(0.0, 0.0, 0.0, 0.5));
+                draw_rectangle(
+                    num_x,
+                    num_y,
+                    badge_w,
+                    badge_h,
+                    Color::new(0.0, 0.0, 0.0, 0.5),
+                );
                 self.draw_text_sharp(&num_text, num_x + 1.0, num_y + 11.0, 16.0, TEXT_DIM);
             }
 
@@ -307,9 +387,22 @@ impl Renderer {
             let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
             if shift_held && state.ui_state.shift_drop_enabled && has_item && is_hovered {
                 // Red-tinted overlay
-                draw_rectangle(x + 2.0, y + 2.0, slot_size - 4.0, slot_size - 4.0, Color::new(0.8, 0.2, 0.2, 0.35));
+                draw_rectangle(
+                    x + 2.0,
+                    y + 2.0,
+                    slot_size - 4.0,
+                    slot_size - 4.0,
+                    Color::new(0.8, 0.2, 0.2, 0.35),
+                );
                 // Red border highlight
-                draw_rectangle_lines(x + 1.0, y + 1.0, slot_size - 2.0, slot_size - 2.0, 2.0, Color::new(0.9, 0.3, 0.3, 0.9));
+                draw_rectangle_lines(
+                    x + 1.0,
+                    y + 1.0,
+                    slot_size - 2.0,
+                    slot_size - 2.0,
+                    2.0,
+                    Color::new(0.9, 0.3, 0.3, 0.9),
+                );
             }
         }
 
@@ -327,8 +420,10 @@ impl Renderer {
                     let t = j as f32 / 4.0;
                     let alpha = t * 0.6;
                     draw_rectangle(
-                        grid_x, fade_y + t * fade_h,
-                        inv_width - grid_padding * 2.0, fade_h / 4.0,
+                        grid_x,
+                        fade_y + t * fade_h,
+                        inv_width - grid_padding * 2.0,
+                        fade_h / 4.0,
                         Color::new(PANEL_BG_DARK.r, PANEL_BG_DARK.g, PANEL_BG_DARK.b, alpha),
                     );
                 }
@@ -341,28 +436,47 @@ impl Renderer {
                     let t = 1.0 - j as f32 / 4.0;
                     let alpha = t * 0.6;
                     draw_rectangle(
-                        grid_x, grid_y + (j as f32) * fade_h / 4.0,
-                        inv_width - grid_padding * 2.0, fade_h / 4.0,
+                        grid_x,
+                        grid_y + (j as f32) * fade_h / 4.0,
+                        inv_width - grid_padding * 2.0,
+                        fade_h / 4.0,
                         Color::new(PANEL_BG_DARK.r, PANEL_BG_DARK.g, PANEL_BG_DARK.b, alpha),
                     );
                 }
             }
 
             // Scrollbar track and thumb
-            let scrollbar_w: f32 = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let scrollbar_w: f32 = if cfg!(target_os = "android") {
+                12.0
+            } else {
+                8.0
+            };
             let track_x = inv_x + inv_width - frame_thickness - scrollbar_w - 2.0;
             let track_y = grid_y;
             let track_h = visible_grid_height;
 
-            layout.add(UiElementId::InventoryScrollbar, Rect::new(track_x, track_y, scrollbar_w, track_h));
+            layout.add(
+                UiElementId::InventoryScrollbar,
+                Rect::new(track_x, track_y, scrollbar_w, track_h),
+            );
 
             // Track background
-            draw_rectangle(track_x, track_y, scrollbar_w, track_h, Color::new(0.1, 0.09, 0.12, 0.6));
+            draw_rectangle(
+                track_x,
+                track_y,
+                scrollbar_w,
+                track_h,
+                Color::new(0.1, 0.09, 0.12, 0.6),
+            );
 
             // Thumb
             let thumb_ratio = visible_grid_height / total_grid_height;
             let thumb_h = (track_h * thumb_ratio).max(16.0);
-            let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+            let scroll_ratio = if max_scroll > 0.0 {
+                scroll_offset / max_scroll
+            } else {
+                0.0
+            };
             let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
 
             let thumb_color = if state.ui_state.inventory_scrollbar_dragging {
@@ -372,12 +486,26 @@ impl Renderer {
             } else {
                 Color::new(0.3, 0.27, 0.35, 0.8)
             };
-            draw_rectangle(track_x + 1.0, thumb_y, scrollbar_w - 2.0, thumb_h, thumb_color);
+            draw_rectangle(
+                track_x + 1.0,
+                thumb_y,
+                scrollbar_w - 2.0,
+                thumb_h,
+                thumb_color,
+            );
         }
-
     }
 
-    pub(crate) fn draw_item_icon(&self, item_id: &str, x: f32, y: f32, slot_width: f32, slot_height: f32, state: &GameState, with_backdrop: bool) {
+    pub(crate) fn draw_item_icon(
+        &self,
+        item_id: &str,
+        x: f32,
+        y: f32,
+        slot_width: f32,
+        slot_height: f32,
+        state: &GameState,
+        with_backdrop: bool,
+    ) {
         // Draw circular stone backdrop if requested
         if with_backdrop {
             if let Some(backdrop) = &self.circular_stone_texture {

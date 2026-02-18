@@ -1,9 +1,9 @@
 use sapp_jsutils::JsObject;
 
-use crate::game::GameState;
-use crate::game::state::ConnectionStatus;
 use super::messages::ClientMessage;
 use super::protocol;
+use crate::game::state::ConnectionStatus;
+use crate::game::GameState;
 
 extern "C" {
     fn ws_connect(url: JsObject);
@@ -120,7 +120,10 @@ impl NetworkClient {
         };
 
         let ws_url = format!("{}/{}?sessionToken={}", self.base_url, room_id, token);
-        log::info!("WASM: Connecting WebSocket: {}...", &ws_url[..ws_url.len().min(80)]);
+        log::info!(
+            "WASM: Connecting WebSocket: {}...",
+            &ws_url[..ws_url.len().min(80)]
+        );
 
         self.connection_state = ConnectionState::Connecting;
 
@@ -134,14 +137,21 @@ impl NetworkClient {
             ConnectionState::Disconnected => {
                 if self.was_connected {
                     if self.reconnect_attempts >= MAX_RECONNECT_ATTEMPTS {
-                        log::error!("Failed to reconnect after {} attempts", MAX_RECONNECT_ATTEMPTS);
+                        log::error!(
+                            "Failed to reconnect after {} attempts",
+                            MAX_RECONNECT_ATTEMPTS
+                        );
                         state.reconnection_failed = true;
                         return;
                     }
                     self.reconnect_timer += 1.0 / 60.0;
                     if self.reconnect_timer > 2.0 {
                         self.reconnect_attempts += 1;
-                        log::info!("Reconnection attempt {}/{}", self.reconnect_attempts, MAX_RECONNECT_ATTEMPTS);
+                        log::info!(
+                            "Reconnection attempt {}/{}",
+                            self.reconnect_attempts,
+                            MAX_RECONNECT_ATTEMPTS
+                        );
                         self.reconnect_timer = 0.0;
                         self.start_matchmaking();
                     }
@@ -218,7 +228,11 @@ impl NetworkClient {
             // Process only the latest stateSync
             if let Some((tick, buf)) = latest_state_sync {
                 if tick > state.server_tick + 1 {
-                    log::debug!("Catching up: jumping from tick {} to {}", state.server_tick, tick);
+                    log::debug!(
+                        "Catching up: jumping from tick {} to {}",
+                        state.server_tick,
+                        tick
+                    );
                 }
                 self.handle_binary_message(&buf, state);
             }
@@ -240,28 +254,28 @@ impl NetworkClient {
             }
         };
         match protocol::decode_message(&decompressed) {
-            Ok(decoded) => {
-                match decoded {
-                    protocol::DecodedMessage::RoomData { msg_type, data } => {
-                        super::message_handler::handle_room_data(&msg_type, data.as_ref(), state);
-                    }
-                    protocol::DecodedMessage::RoomState { .. } => {
-                        log::debug!("Received RoomState (ignored)");
-                    }
-                    protocol::DecodedMessage::RoomStatePatch { .. } => {
-                        log::debug!("Received RoomStatePatch (ignored)");
-                    }
-                    protocol::DecodedMessage::Error { code, message } => {
-                        log::error!("Server error {}: {}", code, message);
-                    }
-                    protocol::DecodedMessage::Handshake => {
-                        log::debug!("Received Handshake");
-                    }
-                    protocol::DecodedMessage::Unknown { protocol: proto, .. } => {
-                        log::debug!("Unknown protocol: {}", proto);
-                    }
+            Ok(decoded) => match decoded {
+                protocol::DecodedMessage::RoomData { msg_type, data } => {
+                    super::message_handler::handle_room_data(&msg_type, data.as_ref(), state);
                 }
-            }
+                protocol::DecodedMessage::RoomState { .. } => {
+                    log::debug!("Received RoomState (ignored)");
+                }
+                protocol::DecodedMessage::RoomStatePatch { .. } => {
+                    log::debug!("Received RoomStatePatch (ignored)");
+                }
+                protocol::DecodedMessage::Error { code, message } => {
+                    log::error!("Server error {}: {}", code, message);
+                }
+                protocol::DecodedMessage::Handshake => {
+                    log::debug!("Received Handshake");
+                }
+                protocol::DecodedMessage::Unknown {
+                    protocol: proto, ..
+                } => {
+                    log::debug!("Unknown protocol: {}", proto);
+                }
+            },
             Err(e) => {
                 log::error!("Failed to decode message: {}", e);
             }
@@ -288,11 +302,9 @@ impl NetworkClient {
         if self.connection_state == ConnectionState::Connected {
             let (msg_type, msg_data) = msg.to_protocol();
             match protocol::encode_message(msg_type, &msg_data) {
-                Ok(bytes) => {
-                    unsafe {
-                        ws_send(JsObject::buffer(&bytes));
-                    }
-                }
+                Ok(bytes) => unsafe {
+                    ws_send(JsObject::buffer(&bytes));
+                },
                 Err(e) => {
                     log::error!("Failed to encode message: {}", e);
                 }

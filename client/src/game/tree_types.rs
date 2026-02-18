@@ -9,13 +9,25 @@ pub struct TreeTypeInfo {
 }
 
 /// Oak tree info
-const OAK: TreeTypeInfo = TreeTypeInfo { name: "Oak Tree", level_required: 1 };
+const OAK: TreeTypeInfo = TreeTypeInfo {
+    name: "Oak Tree",
+    level_required: 1,
+};
 /// Willow tree info
-const WILLOW: TreeTypeInfo = TreeTypeInfo { name: "Willow Tree", level_required: 15 };
+const WILLOW: TreeTypeInfo = TreeTypeInfo {
+    name: "Willow Tree",
+    level_required: 15,
+};
 /// Maple tree info
-const MAPLE: TreeTypeInfo = TreeTypeInfo { name: "Maple Tree", level_required: 45 };
+const MAPLE: TreeTypeInfo = TreeTypeInfo {
+    name: "Maple Tree",
+    level_required: 45,
+};
 /// Yew tree info
-const YEW: TreeTypeInfo = TreeTypeInfo { name: "Yew Tree", level_required: 60 };
+const YEW: TreeTypeInfo = TreeTypeInfo {
+    name: "Yew Tree",
+    level_required: 60,
+};
 
 /// Get tree info for a given GID, if it's a tree
 pub fn get_tree_info(gid: u32) -> Option<&'static TreeTypeInfo> {

@@ -1,15 +1,15 @@
-use std::collections::HashMap;
 use macroquad::prelude::*;
+use std::collections::HashMap;
 
 /// Equipment stats for equippable items
 #[derive(Debug, Clone)]
 pub struct EquipmentStats {
     pub slot_type: String,
-    pub attack_level_required: i32,  // For weapons
-    pub defence_level_required: i32, // For armor
-    pub attack_bonus: i32,           // Accuracy
-    pub strength_bonus: i32,         // Max hit
-    pub defence_bonus: i32,          // Avoid hits
+    pub attack_level_required: i32,      // For weapons
+    pub defence_level_required: i32,     // For armor
+    pub attack_bonus: i32,               // Accuracy
+    pub strength_bonus: i32,             // Max hit
+    pub defence_bonus: i32,              // Avoid hits
     pub woodcutting_level_required: i32, // For axes
     pub chop_speed_multiplier: f32,      // Woodcutting speed (0.0 if not an axe)
 }
@@ -76,25 +76,29 @@ impl ItemRegistry {
 
     /// Get item definition or a placeholder for unknown items
     pub fn get_or_placeholder(&self, id: &str) -> ItemDefinition {
-        self.items.get(id).cloned().unwrap_or_else(|| ItemDefinition {
-            id: id.to_string(),
-            display_name: format!("Unknown ({})", id),
-            sprite: "item_unknown".to_string(),
-            category: "material".to_string(),
-            max_stack: 99,
-            description: "Unknown item".to_string(),
-            base_price: 0,
-            sellable: false,
-            equipment: None,
-            weapon_type: None,
-            range: None,
-            prayer_xp: 0,
-        })
+        self.items
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| ItemDefinition {
+                id: id.to_string(),
+                display_name: format!("Unknown ({})", id),
+                sprite: "item_unknown".to_string(),
+                category: "material".to_string(),
+                max_stack: 99,
+                description: "Unknown item".to_string(),
+                base_price: 0,
+                sellable: false,
+                equipment: None,
+                weapon_type: None,
+                range: None,
+                prayer_xp: 0,
+            })
     }
 
     /// Get the sprite key for an item ID (resolves item_id → sprite field)
     pub fn get_sprite_key<'a>(&'a self, id: &'a str) -> &'a str {
-        self.items.get(id)
+        self.items
+            .get(id)
             .map(|def| def.sprite.as_str())
             .unwrap_or(id)
     }

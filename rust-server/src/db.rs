@@ -936,6 +936,10 @@ impl Database {
             .bind(character_id)
             .execute(&self.pool)
             .await?;
+        sqlx::query("DELETE FROM discovered_recipes WHERE character_id = ?")
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
 
         // Delete the character (only if owned by this account)
         let result = sqlx::query("DELETE FROM characters WHERE id = ? AND account_id = ?")

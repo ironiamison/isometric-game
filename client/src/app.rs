@@ -4,17 +4,17 @@ use macroquad::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant};
 
-use crate::game::GameState;
-use crate::network::NetworkClient;
-use crate::render::Renderer;
-use crate::input::{InputHandler, InputCommand};
-use crate::render::animation::AnimationState;
 use crate::audio::AudioManager;
+use crate::game::GameState;
+use crate::input::{InputCommand, InputHandler};
+use crate::network::NetworkClient;
+use crate::render::animation::AnimationState;
+use crate::render::Renderer;
 
 #[cfg(not(target_arch = "wasm32"))]
-use crate::ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, CharacterCreateScreen};
-#[cfg(not(target_arch = "wasm32"))]
 use crate::auth::AuthSession;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
 pub const SERVER_URL: &str = "https://aeven.xyz";
 pub const WS_URL: &str = "wss://aeven.xyz";
@@ -116,7 +116,10 @@ pub fn run_game_frame(
             x if x < 0.85 => 0.9,
             _ => 0.0,
         };
-        log::info!("Delta smoothing: {}", game_state.frame_timings.delta_smoothing);
+        log::info!(
+            "Delta smoothing: {}",
+            game_state.frame_timings.delta_smoothing
+        );
     }
 
     // Debug controls for appearance cycling (only in debug mode)
@@ -177,7 +180,9 @@ pub fn run_game_frame(
                     if let Some(player) = game_state.players.get(local_id) {
                         let is_attacking = matches!(
                             player.animation.state,
-                            AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
+                            AnimationState::Attacking
+                                | AnimationState::Casting
+                                | AnimationState::ShootingBow
                         );
                         if is_attacking {
                             continue;
@@ -194,15 +199,23 @@ pub fn run_game_frame(
                         player.animation.direction = new_dir;
                         game_state.local_face_lock_dir = Some(new_dir);
                         game_state.local_face_lock_until = get_time() + 0.30;
-                        log::info!("[MAIN] Updated local player direction: {:?} -> {:?}", old_dir, player.direction);
+                        log::info!(
+                            "[MAIN] Updated local player direction: {:?} -> {:?}",
+                            old_dir,
+                            player.direction
+                        );
                     }
                 }
-                ClientMessage::Face { direction: *direction }
-            },
+                ClientMessage::Face {
+                    direction: *direction,
+                }
+            }
             InputCommand::Attack => {
                 // Trigger attack animation and sound on local player
                 if let Some(local_id) = &game_state.local_player_id {
-                    let is_ranged = game_state.players.get(local_id)
+                    let is_ranged = game_state
+                        .players
+                        .get(local_id)
                         .and_then(|p| p.equipped_weapon.as_ref())
                         .and_then(|weapon_id| game_state.item_registry.get(weapon_id))
                         .map(|item_def| item_def.weapon_type.as_deref() == Some("ranged"))
@@ -219,9 +232,13 @@ pub fn run_game_frame(
                     }
                 }
                 ClientMessage::Attack
+            }
+            InputCommand::Target { entity_id } => ClientMessage::Target {
+                entity_id: entity_id.clone(),
             },
-            InputCommand::Target { entity_id } => ClientMessage::Target { entity_id: entity_id.clone() },
-            InputCommand::ClearTarget => ClientMessage::Target { entity_id: String::new() },
+            InputCommand::ClearTarget => ClientMessage::Target {
+                entity_id: String::new(),
+            },
             InputCommand::Chat { text, channel } => {
                 // Handle /ping command
                 if text.trim().eq_ignore_ascii_case("/ping") {
@@ -229,18 +246,32 @@ pub fn run_game_frame(
                     game_state.ping_sent_at = Some(timestamp);
                     ClientMessage::Ping { timestamp }
                 } else {
-                    ClientMessage::Chat { text: text.clone(), channel: channel.clone() }
+                    ClientMessage::Chat {
+                        text: text.clone(),
+                        channel: channel.clone(),
+                    }
                 }
+            }
+            InputCommand::Pickup { item_id } => ClientMessage::Pickup {
+                item_id: item_id.clone(),
             },
-            InputCommand::Pickup { item_id } => ClientMessage::Pickup { item_id: item_id.clone() },
-            InputCommand::UseItem { slot_index } => ClientMessage::UseItem { slot_index: *slot_index as u32 },
-            InputCommand::Interact { npc_id } => ClientMessage::Interact { npc_id: npc_id.clone() },
-            InputCommand::DialogueChoice { quest_id, choice_id } => {
+            InputCommand::UseItem { slot_index } => ClientMessage::UseItem {
+                slot_index: *slot_index as u32,
+            },
+            InputCommand::Interact { npc_id } => ClientMessage::Interact {
+                npc_id: npc_id.clone(),
+            },
+            InputCommand::DialogueChoice {
+                quest_id,
+                choice_id,
+            } => {
                 audio.play_sfx("enter");
                 if quest_id == "__control_scheme__" {
                     let classic = choice_id == "classic";
                     game_state.ui_state.classic_controls = classic;
-                    if classic { game_state.ui_state.chat_open = true; }
+                    if classic {
+                        game_state.ui_state.chat_open = true;
+                    }
                     crate::settings::save_classic_controls(classic);
                     crate::settings::save_control_scheme_chosen();
                     game_state.ui_state.active_dialogue = None;
@@ -250,25 +281,76 @@ pub fn run_game_frame(
                     quest_id: quest_id.clone(),
                     choice_id: choice_id.clone(),
                 }
-            },
+            }
             InputCommand::CloseDialogue => {
                 continue;
+            }
+            InputCommand::Craft { recipe_id } => ClientMessage::StartCraft {
+                recipe_id: recipe_id.clone(),
             },
-            InputCommand::Craft { recipe_id } => ClientMessage::StartCraft { recipe_id: recipe_id.clone() },
             InputCommand::CancelCraft => ClientMessage::CancelCraft,
-            InputCommand::Equip { slot_index } => ClientMessage::Equip { slot_index: *slot_index },
-            InputCommand::Unequip { slot_type, target_slot } => ClientMessage::Unequip { slot_type: slot_type.clone(), target_slot: *target_slot },
-            InputCommand::DropItem { slot_index, quantity, target_x, target_y } => ClientMessage::DropItem { slot_index: *slot_index, quantity: *quantity, target_x: *target_x, target_y: *target_y },
+            InputCommand::Equip { slot_index } => ClientMessage::Equip {
+                slot_index: *slot_index,
+            },
+            InputCommand::Unequip {
+                slot_type,
+                target_slot,
+            } => ClientMessage::Unequip {
+                slot_type: slot_type.clone(),
+                target_slot: *target_slot,
+            },
+            InputCommand::DropItem {
+                slot_index,
+                quantity,
+                target_x,
+                target_y,
+            } => ClientMessage::DropItem {
+                slot_index: *slot_index,
+                quantity: *quantity,
+                target_x: *target_x,
+                target_y: *target_y,
+            },
             InputCommand::DropGold { amount } => ClientMessage::DropGold { amount: *amount },
-            InputCommand::SwapSlots { from_slot, to_slot } => ClientMessage::SwapSlots { from_slot: *from_slot, to_slot: *to_slot },
-            InputCommand::ShopBuy { npc_id, item_id, quantity } => ClientMessage::ShopBuy { npc_id: npc_id.clone(), item_id: item_id.clone(), quantity: *quantity },
-            InputCommand::ShopSell { npc_id, item_id, quantity } => ClientMessage::ShopSell { npc_id: npc_id.clone(), item_id: item_id.clone(), quantity: *quantity },
+            InputCommand::SwapSlots { from_slot, to_slot } => ClientMessage::SwapSlots {
+                from_slot: *from_slot,
+                to_slot: *to_slot,
+            },
+            InputCommand::ShopBuy {
+                npc_id,
+                item_id,
+                quantity,
+            } => ClientMessage::ShopBuy {
+                npc_id: npc_id.clone(),
+                item_id: item_id.clone(),
+                quantity: *quantity,
+            },
+            InputCommand::ShopSell {
+                npc_id,
+                item_id,
+                quantity,
+            } => ClientMessage::ShopSell {
+                npc_id: npc_id.clone(),
+                item_id: item_id.clone(),
+                quantity: *quantity,
+            },
             // Bank commands
-            InputCommand::BankDeposit { item_id, quantity } => ClientMessage::BankDeposit { item_id: item_id.clone(), quantity: *quantity },
-            InputCommand::BankWithdraw { item_id, quantity } => ClientMessage::BankWithdraw { item_id: item_id.clone(), quantity: *quantity },
-            InputCommand::BankDepositGold { amount } => ClientMessage::BankDepositGold { amount: *amount },
-            InputCommand::BankWithdrawGold { amount } => ClientMessage::BankWithdrawGold { amount: *amount },
-            InputCommand::EnterPortal { portal_id } => ClientMessage::EnterPortal { portal_id: portal_id.clone() },
+            InputCommand::BankDeposit { item_id, quantity } => ClientMessage::BankDeposit {
+                item_id: item_id.clone(),
+                quantity: *quantity,
+            },
+            InputCommand::BankWithdraw { item_id, quantity } => ClientMessage::BankWithdraw {
+                item_id: item_id.clone(),
+                quantity: *quantity,
+            },
+            InputCommand::BankDepositGold { amount } => {
+                ClientMessage::BankDepositGold { amount: *amount }
+            }
+            InputCommand::BankWithdrawGold { amount } => {
+                ClientMessage::BankWithdrawGold { amount: *amount }
+            }
+            InputCommand::EnterPortal { portal_id } => ClientMessage::EnterPortal {
+                portal_id: portal_id.clone(),
+            },
             InputCommand::StartGathering { marker_x, marker_y } => {
                 // Play attack animation so it looks like the player is casting/throwing
                 if let Some(local_id) = &game_state.local_player_id {
@@ -276,37 +358,82 @@ pub fn run_game_frame(
                         player.play_attack();
                     }
                 }
-                ClientMessage::StartGathering { marker_x: *marker_x, marker_y: *marker_y }
-            },
+                ClientMessage::StartGathering {
+                    marker_x: *marker_x,
+                    marker_y: *marker_y,
+                }
+            }
             InputCommand::StopGathering => ClientMessage::StopGathering,
-            InputCommand::ChopTree { tree_x, tree_y, tree_gid } => {
+            InputCommand::ChopTree {
+                tree_x,
+                tree_y,
+                tree_gid,
+            } => {
                 // Play attack animation for chopping (server will also broadcast this)
                 if let Some(local_id) = &game_state.local_player_id {
                     if let Some(player) = game_state.players.get_mut(local_id) {
                         player.play_attack();
                     }
                 }
-                ClientMessage::ChopTree { tree_x: *tree_x, tree_y: *tree_y, tree_gid: *tree_gid }
+                ClientMessage::ChopTree {
+                    tree_x: *tree_x,
+                    tree_y: *tree_y,
+                    tree_gid: *tree_gid,
+                }
+            }
+            InputCommand::SitChair { tile_x, tile_y } => ClientMessage::SitChair {
+                tile_x: *tile_x,
+                tile_y: *tile_y,
             },
-            InputCommand::SitChair { tile_x, tile_y } => ClientMessage::SitChair { tile_x: *tile_x, tile_y: *tile_y },
             InputCommand::StandUp => ClientMessage::StandUp,
-            InputCommand::PlantSeed { patch_id, item_id } => ClientMessage::PlantSeed { patch_id: patch_id.clone(), item_id: item_id.clone() },
-            InputCommand::HarvestCrop { patch_id } => ClientMessage::HarvestCrop { patch_id: patch_id.clone() },
+            InputCommand::PlantSeed { patch_id, item_id } => ClientMessage::PlantSeed {
+                patch_id: patch_id.clone(),
+                item_id: item_id.clone(),
+            },
+            InputCommand::HarvestCrop { patch_id } => ClientMessage::HarvestCrop {
+                patch_id: patch_id.clone(),
+            },
             // Friend system commands
-            InputCommand::SendFriendRequest { target_name } => ClientMessage::SendFriendRequest { target_name: target_name.clone() },
-            InputCommand::AcceptFriendRequest { requester_id } => ClientMessage::AcceptFriendRequest { requester_id: *requester_id },
-            InputCommand::DeclineFriendRequest { requester_id } => ClientMessage::DeclineFriendRequest { requester_id: *requester_id },
-            InputCommand::RemoveFriend { friend_id } => ClientMessage::RemoveFriend { friend_id: *friend_id },
+            InputCommand::SendFriendRequest { target_name } => ClientMessage::SendFriendRequest {
+                target_name: target_name.clone(),
+            },
+            InputCommand::AcceptFriendRequest { requester_id } => {
+                ClientMessage::AcceptFriendRequest {
+                    requester_id: *requester_id,
+                }
+            }
+            InputCommand::DeclineFriendRequest { requester_id } => {
+                ClientMessage::DeclineFriendRequest {
+                    requester_id: *requester_id,
+                }
+            }
+            InputCommand::RemoveFriend { friend_id } => ClientMessage::RemoveFriend {
+                friend_id: *friend_id,
+            },
             InputCommand::GetOnlinePlayers => ClientMessage::GetOnlinePlayers,
             // Prayer commands
-            InputCommand::TogglePrayer { prayer_id } => ClientMessage::TogglePrayer { prayer_id: prayer_id.clone() },
-            InputCommand::BuryBones { slot } => ClientMessage::BuryBones { slot: *slot as usize },
+            InputCommand::TogglePrayer { prayer_id } => ClientMessage::TogglePrayer {
+                prayer_id: prayer_id.clone(),
+            },
+            InputCommand::BuryBones { slot } => ClientMessage::BuryBones {
+                slot: *slot as usize,
+            },
             // Altar commands
-            InputCommand::OfferBones { slot, altar_id } => ClientMessage::OfferBones { slot: *slot as usize, altar_id: altar_id.clone() },
-            InputCommand::OfferAllBones { item_id, altar_id } => ClientMessage::OfferAllBones { item_id: item_id.clone(), altar_id: altar_id.clone() },
-            InputCommand::PrayAtAltar { altar_id } => ClientMessage::PrayAtAltar { altar_id: altar_id.clone() },
+            InputCommand::OfferBones { slot, altar_id } => ClientMessage::OfferBones {
+                slot: *slot as usize,
+                altar_id: altar_id.clone(),
+            },
+            InputCommand::OfferAllBones { item_id, altar_id } => ClientMessage::OfferAllBones {
+                item_id: item_id.clone(),
+                altar_id: altar_id.clone(),
+            },
+            InputCommand::PrayAtAltar { altar_id } => ClientMessage::PrayAtAltar {
+                altar_id: altar_id.clone(),
+            },
             // Spell commands
-            InputCommand::CastSpell { spell_id } => ClientMessage::CastSpell { spell_id: spell_id.clone() },
+            InputCommand::CastSpell { spell_id } => ClientMessage::CastSpell {
+                spell_id: spell_id.clone(),
+            },
             InputCommand::Dash => ClientMessage::Dash,
         };
         network.send(&msg);
@@ -338,7 +465,9 @@ pub fn run_game_frame(
 
     // 4b. Request chunks around player position
     if let Some(player) = game_state.get_local_player() {
-        let chunks_to_request = game_state.chunk_manager.update_player_position(player.x, player.y);
+        let chunks_to_request = game_state
+            .chunk_manager
+            .update_player_position(player.x, player.y);
         for coord in chunks_to_request {
             network.send(&crate::network::messages::ClientMessage::RequestChunk {
                 chunk_x: coord.x,
@@ -359,7 +488,8 @@ pub fn run_game_frame(
     game_state.frame_timings.render_ui_ms = render_timings.ui_ms;
     game_state.frame_timings.update_ms = update_ms;
     game_state.frame_timings.total_ms = total_ms;
-    game_state.frame_timings.entity_count = game_state.players.len() + game_state.npcs.len() + game_state.ground_items.len();
+    game_state.frame_timings.entity_count =
+        game_state.players.len() + game_state.npcs.len() + game_state.ground_items.len();
     game_state.frame_timings.chunk_count = game_state.chunk_manager.chunks().len();
 
     // 5. Debug info
@@ -370,71 +500,237 @@ pub fn run_game_frame(
             Some(cap) => format!(" (cap: {})", cap),
             None => " (uncapped)".to_string(),
         };
-        renderer.draw_text_sharp(&format!("FPS: {}{} [F4]", get_fps(), fps_cap_str), 10.0, y(20.0), 16.0, WHITE);
-        renderer.draw_text_sharp(&format!("Players: {}", game_state.players.len()), 10.0, y(40.0), 16.0, WHITE);
+        renderer.draw_text_sharp(
+            &format!("FPS: {}{} [F4]", get_fps(), fps_cap_str),
+            10.0,
+            y(20.0),
+            16.0,
+            WHITE,
+        );
+        renderer.draw_text_sharp(
+            &format!("Players: {}", game_state.players.len()),
+            10.0,
+            y(40.0),
+            16.0,
+            WHITE,
+        );
         let ping_str = if game_state.ping_stats.has_data() {
             let ps = &game_state.ping_stats;
-            format!(" | Ping: {}ms (avg:{} min:{} max:{})",
+            format!(
+                " | Ping: {}ms (avg:{} min:{} max:{})",
                 ps.current_ms.round() as i32,
                 ps.avg_ms.round() as i32,
                 ps.min_ms.round() as i32,
-                ps.max_ms.round() as i32)
+                ps.max_ms.round() as i32
+            )
         } else if game_state.debug_mode {
             " | Ping: waiting...".to_string()
         } else {
             String::new()
         };
-        renderer.draw_text_sharp(&format!("Connected: {}{}", network.is_connected(), ping_str), 10.0, y(60.0), 16.0, WHITE);
+        renderer.draw_text_sharp(
+            &format!("Connected: {}{}", network.is_connected(), ping_str),
+            10.0,
+            y(60.0),
+            16.0,
+            WHITE,
+        );
 
         if let Some(player) = game_state.get_local_player() {
             let chunk_x = (player.x / 32.0).floor() as i32;
             let chunk_y = (player.y / 32.0).floor() as i32;
-            renderer.draw_text_sharp(&format!("Pos: ({:.1}, {:.1})", player.x, player.y), 10.0, y(80.0), 16.0, YELLOW);
-            renderer.draw_text_sharp(&format!("Chunk: ({}, {})", chunk_x, chunk_y), 10.0, y(100.0), 16.0, YELLOW);
-            renderer.draw_text_sharp(&format!("NPCs: {}", game_state.npcs.len()), 10.0, y(120.0), 16.0, WHITE);
-            renderer.draw_text_sharp(&format!("Appearance: {} {} (F5/F6 to cycle)", player.gender, player.skin), 10.0, y(140.0), 16.0, Color::from_rgba(150, 200, 255, 255));
+            renderer.draw_text_sharp(
+                &format!("Pos: ({:.1}, {:.1})", player.x, player.y),
+                10.0,
+                y(80.0),
+                16.0,
+                YELLOW,
+            );
+            renderer.draw_text_sharp(
+                &format!("Chunk: ({}, {})", chunk_x, chunk_y),
+                10.0,
+                y(100.0),
+                16.0,
+                YELLOW,
+            );
+            renderer.draw_text_sharp(
+                &format!("NPCs: {}", game_state.npcs.len()),
+                10.0,
+                y(120.0),
+                16.0,
+                WHITE,
+            );
+            renderer.draw_text_sharp(
+                &format!(
+                    "Appearance: {} {} (F5/F6 to cycle)",
+                    player.gender, player.skin
+                ),
+                10.0,
+                y(140.0),
+                16.0,
+                Color::from_rgba(150, 200, 255, 255),
+            );
         }
 
         let t = &game_state.frame_timings;
         let timing_color = Color::from_rgba(100, 255, 150, 255);
         let spike_color = Color::from_rgba(255, 100, 100, 255);
-        renderer.draw_text_sharp("--- Frame Timing (ms) ---", 10.0, y(170.0), 16.0, timing_color);
-        renderer.draw_text_sharp(&format!("Network:  {:.2}", t.network_ms), 10.0, y(190.0), 16.0, timing_color);
+        renderer.draw_text_sharp(
+            "--- Frame Timing (ms) ---",
+            10.0,
+            y(170.0),
+            16.0,
+            timing_color,
+        );
+        renderer.draw_text_sharp(
+            &format!("Network:  {:.2}", t.network_ms),
+            10.0,
+            y(190.0),
+            16.0,
+            timing_color,
+        );
 
-        let ground_color = if t.render_ground_ms > 0.5 { spike_color } else { timing_color };
-        let entities_color = if t.render_entities_ms > 0.5 { spike_color } else { timing_color };
-        let overhead_color = if t.render_overhead_ms > 0.5 { spike_color } else { timing_color };
-        let effects_color = if t.render_effects_ms > 0.5 { spike_color } else { timing_color };
-        let ui_color = if t.render_ui_ms > 0.5 { spike_color } else { timing_color };
+        let ground_color = if t.render_ground_ms > 0.5 {
+            spike_color
+        } else {
+            timing_color
+        };
+        let entities_color = if t.render_entities_ms > 0.5 {
+            spike_color
+        } else {
+            timing_color
+        };
+        let overhead_color = if t.render_overhead_ms > 0.5 {
+            spike_color
+        } else {
+            timing_color
+        };
+        let effects_color = if t.render_effects_ms > 0.5 {
+            spike_color
+        } else {
+            timing_color
+        };
+        let ui_color = if t.render_ui_ms > 0.5 {
+            spike_color
+        } else {
+            timing_color
+        };
 
-        renderer.draw_text_sharp(&format!("Render:   {:.2} (total)", t.render_total_ms), 10.0, y(210.0), 16.0, timing_color);
-        renderer.draw_text_sharp(&format!("  Ground:   {:.2}", t.render_ground_ms), 10.0, y(230.0), 16.0, ground_color);
-        renderer.draw_text_sharp(&format!("  Entities: {:.2}", t.render_entities_ms), 10.0, y(250.0), 16.0, entities_color);
-        renderer.draw_text_sharp(&format!("  Overhead: {:.2}", t.render_overhead_ms), 10.0, y(270.0), 16.0, overhead_color);
-        renderer.draw_text_sharp(&format!("  Effects:  {:.2}", t.render_effects_ms), 10.0, y(290.0), 16.0, effects_color);
-        renderer.draw_text_sharp(&format!("  UI:       {:.2}", t.render_ui_ms), 10.0, y(310.0), 16.0, ui_color);
+        renderer.draw_text_sharp(
+            &format!("Render:   {:.2} (total)", t.render_total_ms),
+            10.0,
+            y(210.0),
+            16.0,
+            timing_color,
+        );
+        renderer.draw_text_sharp(
+            &format!("  Ground:   {:.2}", t.render_ground_ms),
+            10.0,
+            y(230.0),
+            16.0,
+            ground_color,
+        );
+        renderer.draw_text_sharp(
+            &format!("  Entities: {:.2}", t.render_entities_ms),
+            10.0,
+            y(250.0),
+            16.0,
+            entities_color,
+        );
+        renderer.draw_text_sharp(
+            &format!("  Overhead: {:.2}", t.render_overhead_ms),
+            10.0,
+            y(270.0),
+            16.0,
+            overhead_color,
+        );
+        renderer.draw_text_sharp(
+            &format!("  Effects:  {:.2}", t.render_effects_ms),
+            10.0,
+            y(290.0),
+            16.0,
+            effects_color,
+        );
+        renderer.draw_text_sharp(
+            &format!("  UI:       {:.2}", t.render_ui_ms),
+            10.0,
+            y(310.0),
+            16.0,
+            ui_color,
+        );
 
-        renderer.draw_text_sharp(&format!("Update:   {:.2}", t.update_ms), 10.0, y(330.0), 16.0, timing_color);
-        renderer.draw_text_sharp(&format!("Total:    {:.2}", t.total_ms), 10.0, y(350.0), 16.0, timing_color);
-        renderer.draw_text_sharp(&format!("Entities: {} | Chunks: {}", t.entity_count, t.chunk_count), 10.0, y(370.0), 16.0, timing_color);
+        renderer.draw_text_sharp(
+            &format!("Update:   {:.2}", t.update_ms),
+            10.0,
+            y(330.0),
+            16.0,
+            timing_color,
+        );
+        renderer.draw_text_sharp(
+            &format!("Total:    {:.2}", t.total_ms),
+            10.0,
+            y(350.0),
+            16.0,
+            timing_color,
+        );
+        renderer.draw_text_sharp(
+            &format!("Entities: {} | Chunks: {}", t.entity_count, t.chunk_count),
+            10.0,
+            y(370.0),
+            16.0,
+            timing_color,
+        );
 
         let delta_variance = t.delta_max_ms - t.delta_min_ms;
-        let variance_color = if delta_variance > 5.0 { spike_color } else { timing_color };
-        renderer.draw_text_sharp(&format!("Delta: {:.1}ms (range: {:.1}-{:.1}, var: {:.1})",
-            t.delta_ms, t.delta_min_ms, t.delta_max_ms, delta_variance), 10.0, y(390.0), 16.0, variance_color);
+        let variance_color = if delta_variance > 5.0 {
+            spike_color
+        } else {
+            timing_color
+        };
+        renderer.draw_text_sharp(
+            &format!(
+                "Delta: {:.1}ms (range: {:.1}-{:.1}, var: {:.1})",
+                t.delta_ms, t.delta_min_ms, t.delta_max_ms, delta_variance
+            ),
+            10.0,
+            y(390.0),
+            16.0,
+            variance_color,
+        );
 
         let nf_variance = t.next_frame_max_ms - t.next_frame_min_ms;
-        let nf_color = if nf_variance > 5.0 { spike_color } else { timing_color };
-        renderer.draw_text_sharp(&format!("next_frame(): {:.1}ms (range: {:.1}-{:.1}, var: {:.1})",
-            t.next_frame_ms, t.next_frame_min_ms, t.next_frame_max_ms, nf_variance), 10.0, y(410.0), 16.0, nf_color);
+        let nf_color = if nf_variance > 5.0 {
+            spike_color
+        } else {
+            timing_color
+        };
+        renderer.draw_text_sharp(
+            &format!(
+                "next_frame(): {:.1}ms (range: {:.1}-{:.1}, var: {:.1})",
+                t.next_frame_ms, t.next_frame_min_ms, t.next_frame_max_ms, nf_variance
+            ),
+            10.0,
+            y(410.0),
+            16.0,
+            nf_color,
+        );
 
         let smooth_str = if t.delta_smoothing > 0.0 {
             format!("{:.1}", t.delta_smoothing)
         } else {
             "off".to_string()
         };
-        renderer.draw_text_sharp(&format!("Smoothing: {} [F7] (smoothed: {:.1}ms)",
-            smooth_str, t.smoothed_delta * 1000.0), 10.0, y(430.0), 16.0, timing_color);
+        renderer.draw_text_sharp(
+            &format!(
+                "Smoothing: {} [F7] (smoothed: {:.1}ms)",
+                smooth_str,
+                t.smoothed_delta * 1000.0
+            ),
+            10.0,
+            y(430.0),
+            16.0,
+            timing_color,
+        );
     }
 
     // 6. Render overlays
@@ -443,7 +739,8 @@ pub fn run_game_frame(
 
     // 7. Render touch controls (mobile only)
     // Update attack button icon to show equipped weapon
-    let weapon_sprite_key = game_state.get_local_player()
+    let weapon_sprite_key = game_state
+        .get_local_player()
         .and_then(|p| p.equipped_weapon.as_deref())
         .map(|id| game_state.item_registry.get_sprite_key(id));
     input_handler.update_attack_button_icon(weapon_sprite_key, &renderer.item_sprites);
@@ -467,5 +764,9 @@ pub fn run_game_frame(
         || game_state.ui_state.quest_log_open
         || game_state.ui_state.chat_panel_open
         || in_dialogue;
-    input_handler.render_touch_controls(any_panel_open, hide_direction_controls, game_state.ui_state.use_joystick);
+    input_handler.render_touch_controls(
+        any_panel_open,
+        hide_direction_controls,
+        game_state.ui_state.use_joystick,
+    );
 }

@@ -19,7 +19,10 @@ pub enum Protocol {
 
 /// Encode a message for Colyseus in MessagePack format
 /// Format: [Protocol.ROOM_DATA, message_type, message_data]
-pub fn encode_message<T: Serialize>(message_type: &str, data: &T) -> Result<Vec<u8>, rmp_serde::encode::Error> {
+pub fn encode_message<T: Serialize>(
+    message_type: &str,
+    data: &T,
+) -> Result<Vec<u8>, rmp_serde::encode::Error> {
     // Colyseus expects: [13, "type", data]
     let message: (u8, &str, &T) = (Protocol::RoomData as u8, message_type, data);
     rmp_serde::to_vec(&message)
@@ -38,7 +41,8 @@ pub fn maybe_decompress(data: &[u8]) -> Result<Vec<u8>, String> {
         0x01 => {
             let mut decoder = flate2::read::DeflateDecoder::new(&data[1..]);
             let mut decompressed = Vec::new();
-            decoder.read_to_end(&mut decompressed)
+            decoder
+                .read_to_end(&mut decompressed)
                 .map_err(|e| format!("Deflate decompression failed: {}", e))?;
             Ok(decompressed)
         }
@@ -53,15 +57,17 @@ pub fn decode_message(data: &[u8]) -> Result<DecodedMessage, DecodeError> {
     let value = rmpv::decode::read_value(&mut cursor)
         .map_err(|e| DecodeError::MsgpackError(e.to_string()))?;
 
-    let array = value.as_array()
+    let array = value
+        .as_array()
         .ok_or(DecodeError::InvalidFormat("Expected array".into()))?;
 
     if array.is_empty() {
         return Err(DecodeError::InvalidFormat("Empty array".into()));
     }
 
-    let protocol = array[0].as_u64()
-        .ok_or(DecodeError::InvalidFormat("Protocol code must be integer".into()))? as u8;
+    let protocol = array[0].as_u64().ok_or(DecodeError::InvalidFormat(
+        "Protocol code must be integer".into(),
+    ))? as u8;
 
     match protocol {
         9 => {
@@ -71,7 +77,11 @@ pub fn decode_message(data: &[u8]) -> Result<DecodedMessage, DecodeError> {
         11 => {
             // Error
             let code = array.get(1).and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-            let message = array.get(2).and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string();
+            let message = array
+                .get(2)
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown error")
+                .to_string();
             Ok(DecodedMessage::Error { code, message })
         }
         13 => {
@@ -80,8 +90,11 @@ pub fn decode_message(data: &[u8]) -> Result<DecodedMessage, DecodeError> {
                 return Err(DecodeError::InvalidFormat("RoomData missing type".into()));
             }
 
-            let msg_type = array[1].as_str()
-                .ok_or(DecodeError::InvalidFormat("Message type must be string".into()))?
+            let msg_type = array[1]
+                .as_str()
+                .ok_or(DecodeError::InvalidFormat(
+                    "Message type must be string".into(),
+                ))?
                 .to_string();
 
             let msg_data = if array.len() > 2 {
@@ -90,30 +103,51 @@ pub fn decode_message(data: &[u8]) -> Result<DecodedMessage, DecodeError> {
                 None
             };
 
-            Ok(DecodedMessage::RoomData { msg_type, data: msg_data })
+            Ok(DecodedMessage::RoomData {
+                msg_type,
+                data: msg_data,
+            })
         }
         14 => {
             // RoomState - full state (Colyseus Schema binary)
-            Ok(DecodedMessage::RoomState { data: data.to_vec() })
+            Ok(DecodedMessage::RoomState {
+                data: data.to_vec(),
+            })
         }
         15 => {
             // RoomStatePatch - state delta (Colyseus Schema binary)
-            Ok(DecodedMessage::RoomStatePatch { data: data.to_vec() })
+            Ok(DecodedMessage::RoomStatePatch {
+                data: data.to_vec(),
+            })
         }
-        _ => {
-            Ok(DecodedMessage::Unknown { protocol, data: data.to_vec() })
-        }
+        _ => Ok(DecodedMessage::Unknown {
+            protocol,
+            data: data.to_vec(),
+        }),
     }
 }
 
 #[derive(Debug)]
 pub enum DecodedMessage {
     Handshake,
-    Error { code: u32, message: String },
-    RoomData { msg_type: String, data: Option<rmpv::Value> },
-    RoomState { data: Vec<u8> },
-    RoomStatePatch { data: Vec<u8> },
-    Unknown { protocol: u8, data: Vec<u8> },
+    Error {
+        code: u32,
+        message: String,
+    },
+    RoomData {
+        msg_type: String,
+        data: Option<rmpv::Value>,
+    },
+    RoomState {
+        data: Vec<u8>,
+    },
+    RoomStatePatch {
+        data: Vec<u8>,
+    },
+    Unknown {
+        protocol: u8,
+        data: Vec<u8>,
+    },
 }
 
 #[derive(Debug)]
@@ -133,80 +167,82 @@ impl std::fmt::Display for DecodeError {
 
 /// Helper to extract typed data from a rmpv::Value
 pub fn extract_string(value: &rmpv::Value, key: &str) -> Option<String> {
-    value.as_map()
-        .and_then(|map| {
-            map.iter()
-                .find(|(k, _)| k.as_str() == Some(key))
-                .and_then(|(_, v)| v.as_str().map(|s| s.to_string()))
-        })
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| v.as_str().map(|s| s.to_string()))
+    })
 }
 
 pub fn extract_f32(value: &rmpv::Value, key: &str) -> Option<f32> {
-    value.as_map()
-        .and_then(|map| {
-            map.iter()
-                .find(|(k, _)| k.as_str() == Some(key))
-                .and_then(|(_, v)| {
-                    v.as_f64().map(|f| f as f32)
-                        .or_else(|| v.as_i64().map(|i| i as f32))
-                        .or_else(|| v.as_u64().map(|u| u as f32))
-                })
-        })
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| {
+                v.as_f64()
+                    .map(|f| f as f32)
+                    .or_else(|| v.as_i64().map(|i| i as f32))
+                    .or_else(|| v.as_u64().map(|u| u as f32))
+            })
+    })
 }
 
 pub fn extract_i32(value: &rmpv::Value, key: &str) -> Option<i32> {
-    value.as_map()
-        .and_then(|map| {
-            map.iter()
-                .find(|(k, _)| k.as_str() == Some(key))
-                .and_then(|(_, v)| v.as_i64().map(|i| i as i32)
-                    .or_else(|| v.as_u64().map(|u| u as i32)))
-        })
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| {
+                v.as_i64()
+                    .map(|i| i as i32)
+                    .or_else(|| v.as_u64().map(|u| u as i32))
+            })
+    })
 }
 
 pub fn extract_u32(value: &rmpv::Value, key: &str) -> Option<u32> {
-    value.as_map()
-        .and_then(|map| {
-            map.iter()
-                .find(|(k, _)| k.as_str() == Some(key))
-                .and_then(|(_, v)| v.as_u64().map(|u| u as u32)
-                    .or_else(|| v.as_i64().map(|i| i as u32)))
-        })
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| {
+                v.as_u64()
+                    .map(|u| u as u32)
+                    .or_else(|| v.as_i64().map(|i| i as u32))
+            })
+    })
 }
 
 pub fn extract_u64(value: &rmpv::Value, key: &str) -> Option<u64> {
-    value.as_map()
-        .and_then(|map| {
-            map.iter()
-                .find(|(k, _)| k.as_str() == Some(key))
-                .and_then(|(_, v)| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
-        })
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+    })
 }
 
 pub fn extract_array<'a>(value: &'a rmpv::Value, key: &str) -> Option<&'a Vec<rmpv::Value>> {
-    value.as_map()
-        .and_then(|map| {
-            map.iter()
-                .find(|(k, _)| k.as_str() == Some(key))
-                .and_then(|(_, v)| v.as_array())
-        })
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| v.as_array())
+    })
 }
 
 pub fn extract_u8(value: &rmpv::Value, key: &str) -> Option<u8> {
-    value.as_map()
-        .and_then(|map| {
-            map.iter()
-                .find(|(k, _)| k.as_str() == Some(key))
-                .and_then(|(_, v)| v.as_u64().map(|u| u as u8)
-                    .or_else(|| v.as_i64().map(|i| i as u8)))
-        })
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| {
+                v.as_u64()
+                    .map(|u| u as u8)
+                    .or_else(|| v.as_i64().map(|i| i as u8))
+            })
+    })
 }
 
 pub fn extract_bool(value: &rmpv::Value, key: &str) -> Option<bool> {
-    value.as_map()
-        .and_then(|map| {
-            map.iter()
-                .find(|(k, _)| k.as_str() == Some(key))
-                .and_then(|(_, v)| v.as_bool())
-        })
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| v.as_bool())
+    })
 }

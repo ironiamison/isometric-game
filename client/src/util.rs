@@ -1,10 +1,10 @@
 //! Utility functions shared across the codebase
 
-use macroquad::prelude::*;
-use macroquad::file::load_file;
-use std::collections::HashMap;
-use std::cell::Cell;
 use crate::mobile_scale::VIRTUAL_WIDTH;
+use macroquad::file::load_file;
+use macroquad::prelude::*;
+use std::cell::Cell;
+use std::collections::HashMap;
 
 // Cache for virtual screen size to avoid recalculating hundreds of times per frame
 thread_local! {
@@ -129,9 +129,13 @@ impl SpriteManifest {
     #[cfg(target_arch = "wasm32")]
     fn console_log(msg: &str) {
         use sapp_jsutils::JsObject;
-        extern "C" { fn console_log(msg: JsObject); }
+        extern "C" {
+            fn console_log(msg: JsObject);
+        }
         let js_msg = JsObject::string(msg);
-        unsafe { console_log(js_msg); }
+        unsafe {
+            console_log(js_msg);
+        }
     }
 
     /// Load the sprite manifest from the assets folder
@@ -142,18 +146,29 @@ impl SpriteManifest {
                 #[cfg(target_arch = "wasm32")]
                 {
                     let preview = String::from_utf8_lossy(&data[..200.min(data.len())]);
-                    Self::console_log(&format!("MANIFEST: loaded {} bytes, starts with: {}", data.len(), preview));
+                    Self::console_log(&format!(
+                        "MANIFEST: loaded {} bytes, starts with: {}",
+                        data.len(),
+                        preview
+                    ));
 
                     // Check if raw JSON contains atlas key
                     let raw = String::from_utf8_lossy(&data);
-                    Self::console_log(&format!("MANIFEST: contains objects_atlas: {}", raw.contains("objects_atlas")));
+                    Self::console_log(&format!(
+                        "MANIFEST: contains objects_atlas: {}",
+                        raw.contains("objects_atlas")
+                    ));
                 }
                 match serde_json::from_slice(&data) {
                     Ok(manifest) => {
                         #[cfg(target_arch = "wasm32")]
                         {
                             let m: &SpriteManifest = &manifest;
-                            Self::console_log(&format!("MANIFEST: parsed OK, objects_atlas={}, objects={}", m.objects_atlas.is_some(), m.objects.len()));
+                            Self::console_log(&format!(
+                                "MANIFEST: parsed OK, objects_atlas={}, objects={}",
+                                m.objects_atlas.is_some(),
+                                m.objects.len()
+                            ));
                         }
                         manifest
                     }
@@ -256,5 +271,11 @@ pub async fn load_sprites_from_dir_or_manifest(
     manifest_items: &[String],
     base_path_for_manifest: &str,
 ) -> HashMap<String, Texture2D> {
-    load_sprites_with_progress(dir_path, manifest_items, base_path_for_manifest, &mut |_, _| {}).await
+    load_sprites_with_progress(
+        dir_path,
+        manifest_items,
+        base_path_for_manifest,
+        &mut |_, _| {},
+    )
+    .await
 }

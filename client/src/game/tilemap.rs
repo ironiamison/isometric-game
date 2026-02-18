@@ -101,11 +101,14 @@ pub enum LayerType {
 impl Tilemap {
     /// Load tilemap from embedded Tiled JSON
     pub fn from_json(json: &str) -> Result<Self, String> {
-        let tiled: TiledMap = serde_json::from_str(json)
-            .map_err(|e| format!("Failed to parse tilemap: {}", e))?;
+        let tiled: TiledMap =
+            serde_json::from_str(json).map_err(|e| format!("Failed to parse tilemap: {}", e))?;
 
         if tiled.orientation != "isometric" {
-            log::warn!("Tilemap orientation is '{}', expected 'isometric'", tiled.orientation);
+            log::warn!(
+                "Tilemap orientation is '{}', expected 'isometric'",
+                tiled.orientation
+            );
         }
 
         let mut layers = Vec::new();
@@ -134,8 +137,10 @@ impl Tilemap {
                                 // Mark collision tiles
                                 let start_x = (obj.x / tiled.tilewidth as f32) as u32;
                                 let start_y = (obj.y / tiled.tileheight as f32) as u32;
-                                let end_x = start_x + (obj.width / tiled.tilewidth as f32).ceil() as u32;
-                                let end_y = start_y + (obj.height / tiled.tileheight as f32).ceil() as u32;
+                                let end_x =
+                                    start_x + (obj.width / tiled.tilewidth as f32).ceil() as u32;
+                                let end_y =
+                                    start_y + (obj.height / tiled.tileheight as f32).ceil() as u32;
 
                                 for y in start_y..end_y.min(tiled.height) {
                                     for x in start_x..end_x.min(tiled.width) {
@@ -270,15 +275,15 @@ impl Tilemap {
 /// Tile colors for procedural rendering (before we have sprites)
 pub fn get_tile_color(tile_id: u32) -> Color {
     match tile_id {
-        0 => Color::from_rgba(0, 0, 0, 0),          // Empty/transparent
-        1 => Color::from_rgba(60, 90, 50, 255),     // Grass
-        2 => Color::from_rgba(90, 70, 50, 255),     // Dirt
-        3 => Color::from_rgba(40, 60, 100, 255),    // Water
-        4 => Color::from_rgba(80, 80, 90, 255),     // Rock
-        5 => Color::from_rgba(50, 80, 45, 255),     // Dark grass
-        6 => Color::from_rgba(100, 85, 60, 255),    // Sand
-        7 => Color::from_rgba(70, 70, 75, 255),     // Stone floor
-        8 => Color::from_rgba(60, 50, 40, 255),     // Wood
-        _ => Color::from_rgba(100, 50, 100, 255),   // Unknown (purple for debugging)
+        0 => Color::from_rgba(0, 0, 0, 0),        // Empty/transparent
+        1 => Color::from_rgba(60, 90, 50, 255),   // Grass
+        2 => Color::from_rgba(90, 70, 50, 255),   // Dirt
+        3 => Color::from_rgba(40, 60, 100, 255),  // Water
+        4 => Color::from_rgba(80, 80, 90, 255),   // Rock
+        5 => Color::from_rgba(50, 80, 45, 255),   // Dark grass
+        6 => Color::from_rgba(100, 85, 60, 255),  // Sand
+        7 => Color::from_rgba(70, 70, 75, 255),   // Stone floor
+        8 => Color::from_rgba(60, 50, 40, 255),   // Wood
+        _ => Color::from_rgba(100, 50, 100, 255), // Unknown (purple for debugging)
     }
 }

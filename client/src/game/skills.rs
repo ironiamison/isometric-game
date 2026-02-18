@@ -220,6 +220,14 @@ impl Skills {
 
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
-        self.hitpoints.level + self.combat.level + self.fishing.level + self.farming.level + self.smithing.level + self.prayer.level + self.magic.level + self.woodcutting.level + self.alchemy.level
+        self.hitpoints.level
+            + self.combat.level
+            + self.fishing.level
+            + self.farming.level
+            + self.smithing.level
+            + self.prayer.level
+            + self.magic.level
+            + self.woodcutting.level
+            + self.alchemy.level
     }
 }

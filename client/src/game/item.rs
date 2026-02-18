@@ -26,7 +26,10 @@ impl GoldPileState {
     pub fn new(quantity: i32, spawn_time: f64) -> Self {
         let nugget_count = Self::calculate_nugget_count(quantity);
         let nuggets = Self::generate_nuggets(nugget_count);
-        Self { nuggets, spawn_time }
+        Self {
+            nuggets,
+            spawn_time,
+        }
     }
 
     /// Calculate number of nuggets (1-15) based on gold quantity

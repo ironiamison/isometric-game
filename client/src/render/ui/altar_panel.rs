@@ -1,11 +1,11 @@
 //! Altar bone offering panel
 
-use macroquad::prelude::*;
-use crate::game::{GameState, AltarPanelState};
-use crate::ui::{UiElementId, UiLayout};
-use crate::util::virtual_screen_size;
 use super::super::Renderer;
 use super::common::*;
+use crate::game::{AltarPanelState, GameState};
+use crate::ui::{UiElementId, UiLayout};
+use crate::util::virtual_screen_size;
+use macroquad::prelude::*;
 
 /// Info about a bone type in inventory for display
 struct BoneRow {
@@ -26,7 +26,13 @@ fn altar_xp_for_bone(item_id: &str, prayer_xp: i32) -> i32 {
 }
 
 impl Renderer {
-    pub(crate) fn render_altar_panel(&self, panel: &AltarPanelState, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_altar_panel(
+        &self,
+        panel: &AltarPanelState,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         let (sw, sh) = virtual_screen_size();
 
         // Collect bone types from inventory
@@ -60,7 +66,11 @@ impl Renderer {
         let pray_button_height = 32.0;
         let padding = 8.0;
         let box_width = 320.0;
-        let content_rows_height = if bone_rows.is_empty() { 24.0 } else { bone_rows.len() as f32 * row_height };
+        let content_rows_height = if bone_rows.is_empty() {
+            24.0
+        } else {
+            bone_rows.len() as f32 * row_height
+        };
         let box_height = header_height + content_rows_height + pray_button_height + padding * 3.0;
         let box_x = (sw - box_width) / 2.0;
         let box_y = (sh - box_height) / 2.0;
@@ -76,10 +86,29 @@ impl Renderer {
         let title_y = box_y - 8.0;
         let title_h = 26.0;
 
-        draw_rectangle(title_x - 1.0, title_y - 1.0, title_width + 2.0, title_h + 2.0, FRAME_OUTER);
+        draw_rectangle(
+            title_x - 1.0,
+            title_y - 1.0,
+            title_width + 2.0,
+            title_h + 2.0,
+            FRAME_OUTER,
+        );
         draw_rectangle(title_x, title_y, title_width, title_h, HEADER_BG);
-        draw_rectangle(title_x + 1.0, title_y + 1.0, title_width - 2.0, title_h - 2.0, Color::new(0.165, 0.149, 0.188, 1.0));
-        draw_line(title_x + 2.0, title_y + 2.0, title_x + title_width - 2.0, title_y + 2.0, 1.0, FRAME_INNER);
+        draw_rectangle(
+            title_x + 1.0,
+            title_y + 1.0,
+            title_width - 2.0,
+            title_h - 2.0,
+            Color::new(0.165, 0.149, 0.188, 1.0),
+        );
+        draw_line(
+            title_x + 2.0,
+            title_y + 2.0,
+            title_x + title_width - 2.0,
+            title_y + 2.0,
+            1.0,
+            FRAME_INNER,
+        );
         self.draw_text_sharp(title_text, title_x + 14.0, title_y + 18.0, 16.0, TEXT_TITLE);
 
         // Close button (X) top-right
@@ -90,7 +119,11 @@ impl Renderer {
         layout.add(UiElementId::AltarClose, close_bounds);
 
         let close_hovered = matches!(hovered, Some(UiElementId::AltarClose));
-        let close_color = if close_hovered { Color::new(0.9, 0.3, 0.3, 1.0) } else { TEXT_DIM };
+        let close_color = if close_hovered {
+            Color::new(0.9, 0.3, 0.3, 1.0)
+        } else {
+            TEXT_DIM
+        };
         self.draw_text_sharp("X", close_x + 4.0, close_y + 15.0, 16.0, close_color);
 
         // Content area
@@ -99,14 +132,26 @@ impl Renderer {
         let content_width = box_width - FRAME_THICKNESS * 2.0 - padding * 2.0;
 
         if bone_rows.is_empty() {
-            self.draw_text_sharp("You have no bones to offer.", content_x, content_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                "You have no bones to offer.",
+                content_x,
+                content_y + 20.0,
+                16.0,
+                TEXT_DIM,
+            );
         } else {
             for (i, row) in bone_rows.iter().enumerate() {
                 let row_y = content_y + (i as f32 * row_height);
 
                 // Row background (subtle alternating)
                 if i % 2 == 0 {
-                    draw_rectangle(content_x - 4.0, row_y, content_width + 8.0, row_height, Color::new(0.1, 0.1, 0.12, 0.3));
+                    draw_rectangle(
+                        content_x - 4.0,
+                        row_y,
+                        content_width + 8.0,
+                        row_height,
+                        Color::new(0.1, 0.1, 0.12, 0.3),
+                    );
                 }
 
                 // Bone name and quantity
@@ -126,7 +171,8 @@ impl Renderer {
                 let btn_bounds = Rect::new(btn_x, btn_y, btn_width, btn_height);
                 layout.add(UiElementId::AltarOfferAll(i), btn_bounds);
 
-                let btn_hovered = matches!(hovered, Some(UiElementId::AltarOfferAll(idx)) if *idx == i);
+                let btn_hovered =
+                    matches!(hovered, Some(UiElementId::AltarOfferAll(idx)) if *idx == i);
                 let (btn_bg, btn_border) = if btn_hovered {
                     (Color::new(0.235, 0.204, 0.141, 1.0), FRAME_ACCENT)
                 } else {
@@ -134,12 +180,24 @@ impl Renderer {
                 };
 
                 draw_rectangle(btn_x, btn_y, btn_width, btn_height, btn_border);
-                draw_rectangle(btn_x + 1.0, btn_y + 1.0, btn_width - 2.0, btn_height - 2.0, btn_bg);
+                draw_rectangle(
+                    btn_x + 1.0,
+                    btn_y + 1.0,
+                    btn_width - 2.0,
+                    btn_height - 2.0,
+                    btn_bg,
+                );
 
                 let btn_text_color = if btn_hovered { TEXT_TITLE } else { TEXT_NORMAL };
                 let offer_text = "Offer All";
                 let offer_w = self.measure_text_sharp(offer_text, 16.0).width;
-                self.draw_text_sharp(offer_text, btn_x + (btn_width - offer_w) / 2.0, btn_y + 18.0, 16.0, btn_text_color);
+                self.draw_text_sharp(
+                    offer_text,
+                    btn_x + (btn_width - offer_w) / 2.0,
+                    btn_y + 18.0,
+                    16.0,
+                    btn_text_color,
+                );
             }
         }
 
@@ -151,21 +209,53 @@ impl Renderer {
 
         let pray_hovered = matches!(hovered, Some(UiElementId::AltarPray));
         let (pray_bg, pray_border) = if pray_hovered {
-            (Color::new(0.141, 0.180, 0.235, 1.0), Color::new(0.4, 0.6, 0.9, 1.0))
+            (
+                Color::new(0.141, 0.180, 0.235, 1.0),
+                Color::new(0.4, 0.6, 0.9, 1.0),
+            )
         } else {
             (Color::new(0.110, 0.130, 0.157, 1.0), FRAME_MID)
         };
 
-        draw_rectangle(content_x, pray_y, pray_width, pray_button_height, pray_border);
-        draw_rectangle(content_x + 1.0, pray_y + 1.0, pray_width - 2.0, pray_button_height - 2.0, pray_bg);
+        draw_rectangle(
+            content_x,
+            pray_y,
+            pray_width,
+            pray_button_height,
+            pray_border,
+        );
+        draw_rectangle(
+            content_x + 1.0,
+            pray_y + 1.0,
+            pray_width - 2.0,
+            pray_button_height - 2.0,
+            pray_bg,
+        );
 
         if pray_hovered {
-            draw_line(content_x + 2.0, pray_y + 2.0, content_x + pray_width - 2.0, pray_y + 2.0, 1.0, FRAME_INNER);
+            draw_line(
+                content_x + 2.0,
+                pray_y + 2.0,
+                content_x + pray_width - 2.0,
+                pray_y + 2.0,
+                1.0,
+                FRAME_INNER,
+            );
         }
 
-        let pray_text_color = if pray_hovered { Color::new(0.7, 0.85, 1.0, 1.0) } else { TEXT_NORMAL };
+        let pray_text_color = if pray_hovered {
+            Color::new(0.7, 0.85, 1.0, 1.0)
+        } else {
+            TEXT_NORMAL
+        };
         let pray_text = "Pray (Restore Prayer Points)";
         let pray_text_w = self.measure_text_sharp(pray_text, 16.0).width;
-        self.draw_text_sharp(pray_text, content_x + (pray_width - pray_text_w) / 2.0, pray_y + 21.0, 16.0, pray_text_color);
+        self.draw_text_sharp(
+            pray_text,
+            content_x + (pray_width - pray_text_w) / 2.0,
+            pray_y + 21.0,
+            16.0,
+            pray_text_color,
+        );
     }
 }

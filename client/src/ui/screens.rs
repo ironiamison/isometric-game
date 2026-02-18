@@ -1,11 +1,11 @@
-use macroquad::prelude::*;
 use macroquad::miniquad::window::show_keyboard;
+use macroquad::prelude::*;
 use std::collections::HashMap;
 
-use crate::auth::{AuthClient, AuthSession, CharacterInfo};
+use crate::audio::AudioManager;
 #[cfg(target_arch = "wasm32")]
 use crate::auth::AuthResult;
-use crate::audio::AudioManager;
+use crate::auth::{AuthClient, AuthSession, CharacterInfo};
 use crate::render::{BitmapFont, SpritesheetStore};
 use crate::util::{asset_path, virtual_screen_size, SpriteManifest};
 
@@ -69,7 +69,10 @@ async fn load_player_sprites() -> SpritesheetStore {
 
     for gender in &genders {
         for skin in &SKINS {
-            let path = asset_path(&format!("assets/sprites/players/player_{}_{}.png", gender, skin));
+            let path = asset_path(&format!(
+                "assets/sprites/players/player_{}_{}.png",
+                gender, skin
+            ));
             if let Ok(texture) = load_texture(&path).await {
                 texture.set_filter(FilterMode::Nearest);
                 let key = format!("{}_{}", gender, skin);
@@ -83,15 +86,30 @@ async fn load_player_sprites() -> SpritesheetStore {
 
 /// Load a spritesheet atlas texture and return the texture + rect mappings
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-async fn load_spritesheet_atlas(atlas_info: &crate::util::SpriteAtlasInfo) -> Option<(Texture2D, HashMap<String, Rect>)> {
+async fn load_spritesheet_atlas(
+    atlas_info: &crate::util::SpriteAtlasInfo,
+) -> Option<(Texture2D, HashMap<String, Rect>)> {
     let path = asset_path(&format!("assets/{}", atlas_info.file));
     match load_texture(&path).await {
         Ok(tex) => {
             tex.set_filter(FilterMode::Nearest);
-            let rects = atlas_info.sprites.iter().map(|(key, sr)| {
-                (key.clone(), Rect::new(sr.x as f32, sr.y as f32, sr.w as f32, sr.h as f32))
-            }).collect();
-            log::info!("Loaded spritesheet atlas {} ({}x{}, {} sprites)", atlas_info.file, tex.width(), tex.height(), atlas_info.sprites.len());
+            let rects = atlas_info
+                .sprites
+                .iter()
+                .map(|(key, sr)| {
+                    (
+                        key.clone(),
+                        Rect::new(sr.x as f32, sr.y as f32, sr.w as f32, sr.h as f32),
+                    )
+                })
+                .collect();
+            log::info!(
+                "Loaded spritesheet atlas {} ({}x{}, {} sprites)",
+                atlas_info.file,
+                tex.width(),
+                tex.height(),
+                atlas_info.sprites.len()
+            );
             Some((tex, rects))
         }
         Err(e) => {
@@ -134,7 +152,8 @@ fn draw_character_preview(
         if let Some(back_id) = equipped_back {
             if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(back_id) {
                 let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
-                let (equip_w, _equip_h) = equipment_sprites.get_dimensions(back_id)
+                let (equip_w, _equip_h) = equipment_sprites
+                    .get_dimensions(back_id)
                     .unwrap_or((equip_sprite.width(), equip_sprite.height()));
                 let is_offhand = equip_w > 8.0 * BACK_STATIC_SPRITE_WIDTH;
                 if !is_offhand {
@@ -145,7 +164,12 @@ fn draw_character_preview(
                         y - 15.0,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(back_src_x, equip_atlas_y, BACK_STATIC_SPRITE_WIDTH, BACK_STATIC_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(
+                                back_src_x,
+                                equip_atlas_y,
+                                BACK_STATIC_SPRITE_WIDTH,
+                                BACK_STATIC_SPRITE_HEIGHT,
+                            )),
                             flip_x: true,
                             ..Default::default()
                         },
@@ -161,7 +185,12 @@ fn draw_character_preview(
             y,
             WHITE,
             DrawTextureParams {
-                source: Some(Rect::new(player_atlas_x, player_atlas_y, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                source: Some(Rect::new(
+                    player_atlas_x,
+                    player_atlas_y,
+                    SPRITE_WIDTH,
+                    SPRITE_HEIGHT,
+                )),
                 ..Default::default()
             },
         );
@@ -170,7 +199,8 @@ fn draw_character_preview(
         if let Some(body_id) = equipped_body {
             if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(body_id) {
                 let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
-                let (equip_w, equip_h) = equipment_sprites.get_dimensions(body_id)
+                let (equip_w, equip_h) = equipment_sprites
+                    .get_dimensions(body_id)
                     .unwrap_or((equip_sprite.width(), equip_sprite.height()));
                 let is_single_row = equip_w > equip_h * 2.0;
                 if is_single_row {
@@ -180,7 +210,12 @@ fn draw_character_preview(
                         y - 3.0,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, BODY_ARMOR_SPRITE_WIDTH, BODY_ARMOR_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(
+                                equip_atlas_x,
+                                equip_atlas_y,
+                                BODY_ARMOR_SPRITE_WIDTH,
+                                BODY_ARMOR_SPRITE_HEIGHT,
+                            )),
                             ..Default::default()
                         },
                     );
@@ -192,7 +227,12 @@ fn draw_character_preview(
                         y,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                            source: Some(Rect::new(
+                                equip_atlas_x,
+                                equip_atlas_y,
+                                SPRITE_WIDTH,
+                                SPRITE_HEIGHT,
+                            )),
                             ..Default::default()
                         },
                     );
@@ -217,7 +257,12 @@ fn draw_character_preview(
                     hair_y,
                     WHITE,
                     DrawTextureParams {
-                        source: Some(Rect::new(hair_src_x, hair_atlas_y, HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                        source: Some(Rect::new(
+                            hair_src_x,
+                            hair_atlas_y,
+                            HAIR_SPRITE_WIDTH,
+                            HAIR_SPRITE_HEIGHT,
+                        )),
                         ..Default::default()
                     },
                 );
@@ -228,7 +273,8 @@ fn draw_character_preview(
         if let Some(feet_id) = equipped_feet {
             if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(feet_id) {
                 let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
-                let (equip_w, equip_h) = equipment_sprites.get_dimensions(feet_id)
+                let (equip_w, equip_h) = equipment_sprites
+                    .get_dimensions(feet_id)
                     .unwrap_or((equip_sprite.width(), equip_sprite.height()));
                 let is_single_row = equip_w > equip_h;
                 if is_single_row {
@@ -238,7 +284,12 @@ fn draw_character_preview(
                         y + 46.0,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(
+                                equip_atlas_x,
+                                equip_atlas_y,
+                                BOOT_SPRITE_WIDTH,
+                                BOOT_SPRITE_HEIGHT,
+                            )),
                             ..Default::default()
                         },
                     );
@@ -249,7 +300,12 @@ fn draw_character_preview(
                         y,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, SPRITE_WIDTH, SPRITE_HEIGHT)),
+                            source: Some(Rect::new(
+                                equip_atlas_x,
+                                equip_atlas_y,
+                                SPRITE_WIDTH,
+                                SPRITE_HEIGHT,
+                            )),
                             ..Default::default()
                         },
                     );
@@ -261,7 +317,8 @@ fn draw_character_preview(
         if let Some(back_id) = equipped_back {
             if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(back_id) {
                 let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
-                let (equip_w, _equip_h) = equipment_sprites.get_dimensions(back_id)
+                let (equip_w, _equip_h) = equipment_sprites
+                    .get_dimensions(back_id)
                     .unwrap_or((equip_sprite.width(), equip_sprite.height()));
                 let is_offhand = equip_w > 8.0 * BACK_STATIC_SPRITE_WIDTH;
                 if is_offhand {
@@ -271,7 +328,12 @@ fn draw_character_preview(
                         y + 20.0,
                         WHITE,
                         DrawTextureParams {
-                            source: Some(Rect::new(equip_atlas_x, equip_atlas_y, OFFHAND_SPRITE_WIDTH, OFFHAND_SPRITE_HEIGHT)),
+                            source: Some(Rect::new(
+                                equip_atlas_x,
+                                equip_atlas_y,
+                                OFFHAND_SPRITE_WIDTH,
+                                OFFHAND_SPRITE_HEIGHT,
+                            )),
                             ..Default::default()
                         },
                     );
@@ -279,7 +341,13 @@ fn draw_character_preview(
             }
         }
     } else {
-        draw_rectangle(x, y, SPRITE_WIDTH, SPRITE_HEIGHT, Color::from_rgba(100, 100, 100, 255));
+        draw_rectangle(
+            x,
+            y,
+            SPRITE_WIDTH,
+            SPRITE_HEIGHT,
+            Color::from_rgba(100, 100, 100, 255),
+        );
     }
 }
 
@@ -380,7 +448,11 @@ impl LoginScreen {
         Self {
             username: saved_username,
             password: String::new(),
-            active_field: if remember_me { LoginField::Password } else { LoginField::Username },
+            active_field: if remember_me {
+                LoginField::Password
+            } else {
+                LoginField::Username
+            },
             mode: LoginMode::Login,
             error_message: None,
             auth_client: AuthClient::new(server_url),
@@ -415,7 +487,9 @@ impl LoginScreen {
         let font_already_loaded = false;
 
         if !font_already_loaded {
-            self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+            self.font =
+                BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf")
+                    .await;
         }
 
         // Load logo texture
@@ -594,18 +668,15 @@ impl Screen for LoginScreen {
                 self.active_field = LoginField::Username;
                 show_keyboard(true);
             }
-
             // Password field (clickable box area)
             else if point_in_rect(mx, my, box_x, password_field_y, box_width, box_height) {
                 self.active_field = LoginField::Password;
                 show_keyboard(true);
             }
-
             // Remember me checkbox
             else if point_in_rect(mx, my, box_x, remember_y, box_width, checkbox_row_h) {
                 self.remember_me = !self.remember_me;
             }
-
             // Tapped elsewhere - hide keyboard
             else {
                 show_keyboard(false);
@@ -619,8 +690,12 @@ impl Screen for LoginScreen {
                     #[cfg(not(target_arch = "wasm32"))]
                     {
                         let result = match self.mode {
-                            LoginMode::Login => self.auth_client.login(&self.username, &self.password),
-                            LoginMode::Register => self.auth_client.register(&self.username, &self.password),
+                            LoginMode::Login => {
+                                self.auth_client.login(&self.username, &self.password)
+                            }
+                            LoginMode::Register => {
+                                self.auth_client.register(&self.username, &self.password)
+                            }
                         };
 
                         match result {
@@ -637,8 +712,12 @@ impl Screen for LoginScreen {
                     if !self.auth_client.is_busy() {
                         self.loading = true;
                         match self.mode {
-                            LoginMode::Login => self.auth_client.start_login(&self.username, &self.password),
-                            LoginMode::Register => self.auth_client.start_register(&self.username, &self.password),
+                            LoginMode::Login => {
+                                self.auth_client.start_login(&self.username, &self.password)
+                            }
+                            LoginMode::Register => self
+                                .auth_client
+                                .start_register(&self.username, &self.password),
                         }
                     }
                 } else if self.username.len() < 3 {
@@ -651,7 +730,11 @@ impl Screen for LoginScreen {
             // Toggle mode button (right side, same row)
             let toggle_x = box_x + login_btn_w + spacing;
             if point_in_rect(mx, my, toggle_x, buttons_y, login_btn_w, btn_height) {
-                self.mode = if self.mode == LoginMode::Register { LoginMode::Login } else { LoginMode::Register };
+                self.mode = if self.mode == LoginMode::Register {
+                    LoginMode::Login
+                } else {
+                    LoginMode::Register
+                };
                 self.error_message = None;
             }
         }
@@ -674,7 +757,11 @@ impl Screen for LoginScreen {
 
         // Toggle between login/register
         if is_key_pressed(KeyCode::F1) {
-            self.mode = if self.mode == LoginMode::Register { LoginMode::Login } else { LoginMode::Register };
+            self.mode = if self.mode == LoginMode::Register {
+                LoginMode::Login
+            } else {
+                LoginMode::Register
+            };
             self.error_message = None;
         }
 
@@ -693,7 +780,9 @@ impl Screen for LoginScreen {
             {
                 let result = match self.mode {
                     LoginMode::Login => self.auth_client.login(&self.username, &self.password),
-                    LoginMode::Register => self.auth_client.register(&self.username, &self.password),
+                    LoginMode::Register => {
+                        self.auth_client.register(&self.username, &self.password)
+                    }
                 };
 
                 match result {
@@ -711,8 +800,12 @@ impl Screen for LoginScreen {
             if !self.auth_client.is_busy() {
                 self.loading = true;
                 match self.mode {
-                    LoginMode::Login => self.auth_client.start_login(&self.username, &self.password),
-                    LoginMode::Register => self.auth_client.start_register(&self.username, &self.password),
+                    LoginMode::Login => {
+                        self.auth_client.start_login(&self.username, &self.password)
+                    }
+                    LoginMode::Register => self
+                        .auth_client
+                        .start_register(&self.username, &self.password),
                 }
             }
         }
@@ -746,7 +839,10 @@ impl Screen for LoginScreen {
             let alpha = ((t * 1.5 + phase).sin() * 0.5 + 0.5) * 0.9 + 0.1;
             let size = if alpha > 0.7 { 2.0 } else { 1.0 };
             draw_rectangle(
-                sx * sw, sy * sh, size, size,
+                sx * sw,
+                sy * sh,
+                size,
+                size,
                 Color::new(1.0, 1.0, 0.95, alpha),
             );
         }
@@ -758,11 +854,23 @@ impl Screen for LoginScreen {
             let dx = -s.vx / speed * s.length;
             let dy = -s.vy / speed * s.length;
             // Bright head
-            draw_line(s.x, s.y, s.x + dx * 0.3, s.y + dy * 0.3, 2.0,
-                Color::new(1.0, 1.0, 1.0, alpha));
+            draw_line(
+                s.x,
+                s.y,
+                s.x + dx * 0.3,
+                s.y + dy * 0.3,
+                2.0,
+                Color::new(1.0, 1.0, 1.0, alpha),
+            );
             // Fading tail
-            draw_line(s.x + dx * 0.3, s.y + dy * 0.3, s.x + dx, s.y + dy, 1.0,
-                Color::new(0.8, 0.85, 1.0, alpha * 0.4));
+            draw_line(
+                s.x + dx * 0.3,
+                s.y + dy * 0.3,
+                s.x + dx,
+                s.y + dy,
+                1.0,
+                Color::new(0.8, 0.85, 1.0, alpha * 0.4),
+            );
         }
 
         // === FORM OVERLAY ===
@@ -787,13 +895,21 @@ impl Screen for LoginScreen {
         let checkbox_row_h = 20.0;
         let checkbox_gap = if compact { 4.0 } else { 8.0 };
 
-        let form_content_h = subtitle_h + form_gap
-            + label_h + box_height
-            + field_gap + label_h + box_height
-            + checkbox_gap + checkbox_row_h
-            + spacing + btn_height;
+        let form_content_h = subtitle_h
+            + form_gap
+            + label_h
+            + box_height
+            + field_gap
+            + label_h
+            + box_height
+            + checkbox_gap
+            + checkbox_row_h
+            + spacing
+            + btn_height;
 
-        let form_content_top = ((sh - form_content_h) / 2.0).max(logo_h + logo_margin + 6.0).floor();
+        let form_content_top = ((sh - form_content_h) / 2.0)
+            .max(logo_h + logo_margin + 6.0)
+            .floor();
 
         // Semi-transparent panel behind the form
         let panel_padding = 20.0;
@@ -803,7 +919,13 @@ impl Screen for LoginScreen {
         let panel_h = (form_content_h + panel_padding * 2.0).floor();
 
         // Panel background (no border)
-        draw_rectangle(panel_x, panel_y, panel_w, panel_h, Color::from_rgba(20, 20, 35, 180));
+        draw_rectangle(
+            panel_x,
+            panel_y,
+            panel_w,
+            panel_h,
+            Color::from_rgba(20, 20, 35, 180),
+        );
 
         // Logo (placed above the panel)
         let logo_y = panel_y - logo_margin - logo_h;
@@ -825,7 +947,13 @@ impl Screen for LoginScreen {
         } else {
             let title = "NEW AEVEN";
             let title_width = self.measure_text_sharp(title, 16.0).width;
-            self.draw_text_sharp(title, (sw - title_width) / 2.0, logo_y.max(4.0) + 22.0, 16.0, WHITE);
+            self.draw_text_sharp(
+                title,
+                (sw - title_width) / 2.0,
+                logo_y.max(4.0) + 22.0,
+                16.0,
+                WHITE,
+            );
         }
 
         // Subtitle
@@ -838,55 +966,117 @@ impl Screen for LoginScreen {
         // Username field
         let username_y = (form_content_top + subtitle_h + form_gap).floor();
         let username_active = self.active_field == LoginField::Username;
-        let username_color = if username_active { Color::from_rgba(60, 90, 140, 200) } else { Color::from_rgba(40, 40, 60, 180) };
+        let username_color = if username_active {
+            Color::from_rgba(60, 90, 140, 200)
+        } else {
+            Color::from_rgba(40, 40, 60, 180)
+        };
 
         self.draw_text_sharp("Username", box_x, username_y, font_size, LIGHTGRAY);
         let field_y = (username_y + label_h).floor();
         draw_rectangle(box_x, field_y, box_width, box_height, username_color);
-        draw_rectangle_lines(box_x, field_y, box_width, box_height, 2.0, if username_active { WHITE } else { GRAY });
+        draw_rectangle_lines(
+            box_x,
+            field_y,
+            box_width,
+            box_height,
+            2.0,
+            if username_active { WHITE } else { GRAY },
+        );
 
         let username_display = if self.username.is_empty() && !username_active {
             "Enter username...".to_string()
         } else {
-            let cursor = if username_active && (get_time() * 2.0) as i32 % 2 == 0 { "|" } else { "" };
+            let cursor = if username_active && (get_time() * 2.0) as i32 % 2 == 0 {
+                "|"
+            } else {
+                ""
+            };
             format!("{}{}", self.username, cursor)
         };
-        let text_color = if self.username.is_empty() && !username_active { DARKGRAY } else { WHITE };
-        self.draw_text_sharp(&username_display, box_x + 10.0, field_y + (box_height + font_size) / 2.0, font_size, text_color);
+        let text_color = if self.username.is_empty() && !username_active {
+            DARKGRAY
+        } else {
+            WHITE
+        };
+        self.draw_text_sharp(
+            &username_display,
+            box_x + 10.0,
+            field_y + (box_height + font_size) / 2.0,
+            font_size,
+            text_color,
+        );
 
         // Password field
         let password_y = (field_y + box_height + field_gap).floor();
         let password_active = self.active_field == LoginField::Password;
-        let password_color = if password_active { Color::from_rgba(60, 90, 140, 200) } else { Color::from_rgba(40, 40, 60, 180) };
+        let password_color = if password_active {
+            Color::from_rgba(60, 90, 140, 200)
+        } else {
+            Color::from_rgba(40, 40, 60, 180)
+        };
 
         self.draw_text_sharp("Password", box_x, password_y, font_size, LIGHTGRAY);
         let pass_field_y = (password_y + label_h).floor();
         draw_rectangle(box_x, pass_field_y, box_width, box_height, password_color);
-        draw_rectangle_lines(box_x, pass_field_y, box_width, box_height, 2.0, if password_active { WHITE } else { GRAY });
+        draw_rectangle_lines(
+            box_x,
+            pass_field_y,
+            box_width,
+            box_height,
+            2.0,
+            if password_active { WHITE } else { GRAY },
+        );
 
         let password_display = if self.password.is_empty() && !password_active {
             "Enter password...".to_string()
         } else {
             let masked: String = "*".repeat(self.password.len());
-            let cursor = if password_active && (get_time() * 2.0) as i32 % 2 == 0 { "|" } else { "" };
+            let cursor = if password_active && (get_time() * 2.0) as i32 % 2 == 0 {
+                "|"
+            } else {
+                ""
+            };
             format!("{}{}", masked, cursor)
         };
-        let text_color = if self.password.is_empty() && !password_active { DARKGRAY } else { WHITE };
-        self.draw_text_sharp(&password_display, box_x + 10.0, pass_field_y + (box_height + font_size) / 2.0, font_size, text_color);
+        let text_color = if self.password.is_empty() && !password_active {
+            DARKGRAY
+        } else {
+            WHITE
+        };
+        self.draw_text_sharp(
+            &password_display,
+            box_x + 10.0,
+            pass_field_y + (box_height + font_size) / 2.0,
+            font_size,
+            text_color,
+        );
 
         // Remember me checkbox
         let remember_y = (pass_field_y + box_height + checkbox_gap).floor();
         let cb_size = 16.0;
         let cb_x = box_x;
         let cb_y = remember_y + (checkbox_row_h - cb_size) / 2.0;
-        draw_rectangle(cb_x, cb_y, cb_size, cb_size, Color::from_rgba(40, 40, 60, 180));
+        draw_rectangle(
+            cb_x,
+            cb_y,
+            cb_size,
+            cb_size,
+            Color::from_rgba(40, 40, 60, 180),
+        );
         draw_rectangle_lines(cb_x, cb_y, cb_size, cb_size, 2.0, GRAY);
         if self.remember_me {
             // Draw checkmark as two lines
             draw_line(cb_x + 3.0, cb_y + 8.0, cb_x + 6.0, cb_y + 12.0, 2.0, GREEN);
             draw_line(cb_x + 6.0, cb_y + 12.0, cb_x + 13.0, cb_y + 4.0, 2.0, GREEN);
         }
-        self.draw_text_sharp("Remember me", cb_x + cb_size + 6.0, remember_y + 17.0, font_size, LIGHTGRAY);
+        self.draw_text_sharp(
+            "Remember me",
+            cb_x + cb_size + 6.0,
+            remember_y + 17.0,
+            font_size,
+            LIGHTGRAY,
+        );
 
         // Buttons row
         let buttons_y = (remember_y + checkbox_row_h + spacing).floor();
@@ -911,9 +1101,22 @@ impl Screen for LoginScreen {
         draw_rectangle(box_x, buttons_y, btn_w, btn_height, login_bg);
         draw_rectangle_lines(box_x, buttons_y, btn_w, btn_height, 2.0, login_border);
         // Double-line border trick for rounded look
-        draw_rectangle_lines(box_x + 1.0, buttons_y + 1.0, btn_w - 2.0, btn_height - 2.0, 1.0, Color::new(1.0, 1.0, 1.0, 0.1));
+        draw_rectangle_lines(
+            box_x + 1.0,
+            buttons_y + 1.0,
+            btn_w - 2.0,
+            btn_height - 2.0,
+            1.0,
+            Color::new(1.0, 1.0, 1.0, 0.1),
+        );
         let enter_w = self.measure_text_sharp(enter_text, font_size).width;
-        self.draw_text_sharp(enter_text, (box_x + (btn_w - enter_w) / 2.0).floor(), buttons_y + 24.0, font_size, WHITE);
+        self.draw_text_sharp(
+            enter_text,
+            (box_x + (btn_w - enter_w) / 2.0).floor(),
+            buttons_y + 24.0,
+            font_size,
+            WHITE,
+        );
 
         // Toggle mode button (right)
         let toggle_text = match self.mode {
@@ -934,9 +1137,22 @@ impl Screen for LoginScreen {
         };
         draw_rectangle(toggle_x, buttons_y, btn_w, btn_height, toggle_bg);
         draw_rectangle_lines(toggle_x, buttons_y, btn_w, btn_height, 2.0, toggle_border);
-        draw_rectangle_lines(toggle_x + 1.0, buttons_y + 1.0, btn_w - 2.0, btn_height - 2.0, 1.0, Color::new(1.0, 1.0, 1.0, 0.1));
+        draw_rectangle_lines(
+            toggle_x + 1.0,
+            buttons_y + 1.0,
+            btn_w - 2.0,
+            btn_height - 2.0,
+            1.0,
+            Color::new(1.0, 1.0, 1.0, 0.1),
+        );
         let toggle_w = self.measure_text_sharp(toggle_text, font_size).width;
-        self.draw_text_sharp(toggle_text, (toggle_x + (btn_w - toggle_w) / 2.0).floor(), buttons_y + 24.0, font_size, WHITE);
+        self.draw_text_sharp(
+            toggle_text,
+            (toggle_x + (btn_w - toggle_w) / 2.0).floor(),
+            buttons_y + 24.0,
+            font_size,
+            WHITE,
+        );
 
         // Error message (below buttons)
         if let Some(ref error) = self.error_message {
@@ -946,7 +1162,13 @@ impl Screen for LoginScreen {
         // Version (bottom right)
         let version_text = format!("v{}", env!("CARGO_PKG_VERSION"));
         let version_w = self.measure_text_sharp(&version_text, 16.0).width;
-        self.draw_text_sharp(&version_text, (sw - version_w - 10.0).floor(), sh - 10.0, 16.0, DARKGRAY);
+        self.draw_text_sharp(
+            &version_text,
+            (sw - version_w - 10.0).floor(),
+            sh - 10.0,
+            16.0,
+            DARKGRAY,
+        );
 
         // Server status (bottom left)
         let status_dot_color = if self.server_online {
@@ -954,7 +1176,11 @@ impl Screen for LoginScreen {
         } else {
             Color::from_rgba(200, 60, 60, 255)
         };
-        let status_text = if self.server_online { "Connected" } else { "Disconnected" };
+        let status_text = if self.server_online {
+            "Connected"
+        } else {
+            "Disconnected"
+        };
         let status_y = sh - 10.0;
         draw_rectangle(10.0, status_y - 6.0, 6.0, 6.0, status_dot_color);
         self.draw_text_sharp(status_text, 20.0, status_y, 16.0, DARKGRAY);
@@ -1023,7 +1249,13 @@ impl CharacterSelectScreen {
 
     /// Use pre-loaded assets from the renderer (avoids duplicate loading on WASM/Android)
     #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-    pub fn use_renderer_assets(&mut self, font: BitmapFont, player: SpritesheetStore, hair: SpritesheetStore, equipment: SpritesheetStore) {
+    pub fn use_renderer_assets(
+        &mut self,
+        font: BitmapFont,
+        player: SpritesheetStore,
+        hair: SpritesheetStore,
+        equipment: SpritesheetStore,
+    ) {
         self.font = font;
         self.player_sprites = player;
         self.hair_sprites = hair;
@@ -1041,7 +1273,8 @@ impl CharacterSelectScreen {
             }
         }
 
-        self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+        self.font =
+            BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
 
         // On WASM/Android, sprites should be set via use_renderer_sprites() before this call
         // to avoid duplicate network requests. Skip loading if already set.
@@ -1056,12 +1289,18 @@ impl CharacterSelectScreen {
             let manifest = SpriteManifest::load().await;
             if let Some(ref atlas_info) = manifest.players_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.player_sprites = SpritesheetStore::Atlas { texture: tex, rects };
+                    self.player_sprites = SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    };
                 }
             }
             if let Some(ref atlas_info) = manifest.hair_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.hair_sprites = SpritesheetStore::Atlas { texture: tex, rects };
+                    self.hair_sprites = SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    };
                 }
             }
             self.load_equipment_sprites(&manifest).await;
@@ -1101,7 +1340,10 @@ impl CharacterSelectScreen {
         {
             if let Some(ref atlas_info) = manifest.equipment_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.equipment_sprites = SpritesheetStore::Atlas { texture: tex, rects };
+                    self.equipment_sprites = SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    };
                     return;
                 }
             }
@@ -1112,7 +1354,13 @@ impl CharacterSelectScreen {
         {
             let mut item_ids: Vec<String> = Vec::new();
             for c in &self.characters {
-                for slot in [&c.equipped_head, &c.equipped_body, &c.equipped_weapon, &c.equipped_back, &c.equipped_feet] {
+                for slot in [
+                    &c.equipped_head,
+                    &c.equipped_body,
+                    &c.equipped_weapon,
+                    &c.equipped_back,
+                    &c.equipped_feet,
+                ] {
                     if let Some(id) = slot {
                         if !item_ids.contains(id) && !self.equipment_sprites.contains(id) {
                             item_ids.push(id.clone());
@@ -1206,7 +1454,9 @@ impl Screen for CharacterSelectScreen {
                 match result {
                     AuthResult::Characters(Ok(chars)) => {
                         self.characters = chars;
-                        if self.selected_index >= self.characters.len() && !self.characters.is_empty() {
+                        if self.selected_index >= self.characters.len()
+                            && !self.characters.is_empty()
+                        {
                             self.selected_index = self.characters.len() - 1;
                         }
                         self.needs_equipment_load = true;
@@ -1254,7 +1504,8 @@ impl Screen for CharacterSelectScreen {
                     TouchPhase::Moved | TouchPhase::Stationary => {
                         let (_, vy) = screen_to_virtual(touch.position.x, touch.position.y);
                         let dy = self.touch_scroll_last_y - vy;
-                        self.list_scroll_offset = (self.list_scroll_offset + dy).clamp(0.0, max_scroll);
+                        self.list_scroll_offset =
+                            (self.list_scroll_offset + dy).clamp(0.0, max_scroll);
                         self.touch_scroll_last_y = vy;
                     }
                     TouchPhase::Ended | TouchPhase::Cancelled => {
@@ -1270,7 +1521,11 @@ impl Screen for CharacterSelectScreen {
                 if touch.phase == TouchPhase::Started {
                     let (vx, vy) = screen_to_virtual(touch.position.x, touch.position.y);
                     // Only start scroll if touch is in the list area
-                    if vx >= list_x && vx <= list_x + list_w && vy >= list_y && vy <= list_y + list_visible_height {
+                    if vx >= list_x
+                        && vx <= list_x + list_w
+                        && vy >= list_y
+                        && vy <= list_y + list_visible_height
+                    {
                         self.touch_scroll_id = Some(touch.id);
                         self.touch_scroll_last_y = vy;
                         break;
@@ -1282,7 +1537,8 @@ impl Screen for CharacterSelectScreen {
         // Mouse wheel scrolling
         let (_wheel_x, wheel_y) = mouse_wheel();
         if wheel_y != 0.0 && my >= list_y && my <= list_y + list_visible_height {
-            self.list_scroll_offset = (self.list_scroll_offset - wheel_y * 30.0).clamp(0.0, max_scroll);
+            self.list_scroll_offset =
+                (self.list_scroll_offset - wheel_y * 30.0).clamp(0.0, max_scroll);
         }
 
         // Delete confirmation mode
@@ -1293,14 +1549,19 @@ impl Screen for CharacterSelectScreen {
                     let char_id = self.characters[self.selected_index].id;
                     #[cfg(not(target_arch = "wasm32"))]
                     {
-                        if self.auth_client.delete_character(&self.session.token, char_id).is_ok() {
+                        if self
+                            .auth_client
+                            .delete_character(&self.session.token, char_id)
+                            .is_ok()
+                        {
                             self.refresh_characters();
                         }
                     }
                     #[cfg(target_arch = "wasm32")]
                     if !self.auth_client.is_busy() {
                         self.loading = true;
-                        self.auth_client.start_delete_character(&self.session.token, char_id);
+                        self.auth_client
+                            .start_delete_character(&self.session.token, char_id);
                     }
                 }
                 self.confirm_delete = false;
@@ -1326,14 +1587,19 @@ impl Screen for CharacterSelectScreen {
                         let char_id = self.characters[self.selected_index].id;
                         #[cfg(not(target_arch = "wasm32"))]
                         {
-                            if self.auth_client.delete_character(&self.session.token, char_id).is_ok() {
+                            if self
+                                .auth_client
+                                .delete_character(&self.session.token, char_id)
+                                .is_ok()
+                            {
                                 self.refresh_characters();
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
                         if !self.auth_client.is_busy() {
                             self.loading = true;
-                            self.auth_client.start_delete_character(&self.session.token, char_id);
+                            self.auth_client
+                                .start_delete_character(&self.session.token, char_id);
                         }
                     }
                     self.confirm_delete = false;
@@ -1409,7 +1675,9 @@ impl Screen for CharacterSelectScreen {
             // Logout button
             if point_in_rect(mx, my, list_x + 330.0, inst_y - 10.0, 100.0, 30.0) {
                 #[cfg(not(target_arch = "wasm32"))]
-                { let _ = self.auth_client.logout(&self.session.token); }
+                {
+                    let _ = self.auth_client.logout(&self.session.token);
+                }
                 return ScreenState::ToLogin;
             }
         }
@@ -1441,7 +1709,9 @@ impl Screen for CharacterSelectScreen {
         // Keyboard: Logout
         if is_key_pressed(KeyCode::Escape) {
             #[cfg(not(target_arch = "wasm32"))]
-            { let _ = self.auth_client.logout(&self.session.token); }
+            {
+                let _ = self.auth_client.logout(&self.session.token);
+            }
             return ScreenState::ToLogin;
         }
 
@@ -1500,7 +1770,13 @@ impl Screen for CharacterSelectScreen {
 
         if self.characters.is_empty() {
             self.draw_text_sharp("No characters yet!", list_x, list_y + 30.0, 16.0, GRAY);
-            self.draw_text_sharp("Press [N] to create your first character", list_x, list_y + 55.0, 16.0, LIGHTGRAY);
+            self.draw_text_sharp(
+                "Press [N] to create your first character",
+                list_x,
+                list_y + 55.0,
+                16.0,
+                LIGHTGRAY,
+            );
         } else {
             // Set up scissor clipping for the list area
             if needs_scroll {
@@ -1528,7 +1804,8 @@ impl Screen for CharacterSelectScreen {
 
                 let is_selected = i == self.selected_index;
                 let is_hovered = point_in_rect(mx, my, list_x, y, list_w, item_height - 5.0)
-                    && my >= list_y && my <= list_y + list_visible_height;
+                    && my >= list_y
+                    && my <= list_y + list_visible_height;
 
                 // Background
                 let bg_color = if is_selected {
@@ -1567,7 +1844,10 @@ impl Screen for CharacterSelectScreen {
                 // Character info (shifted right to make room for preview)
                 let text_x = list_x + 50.0;
                 self.draw_text_sharp(&character.name, text_x, y + 26.0, 16.0, WHITE);
-                let class_info = format!("Level {} {} {}", character.level, character.gender, character.skin);
+                let class_info = format!(
+                    "Level {} {} {}",
+                    character.level, character.gender, character.skin
+                );
                 self.draw_text_sharp(&class_info, text_x, y + 48.0, 16.0, LIGHTGRAY);
 
                 // Played time
@@ -1594,19 +1874,41 @@ impl Screen for CharacterSelectScreen {
                 let track_h = list_visible_height;
                 let thumb_ratio = list_visible_height / total_list_height;
                 let thumb_h = (track_h * thumb_ratio).max(20.0);
-                let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+                let scroll_ratio = if max_scroll > 0.0 {
+                    scroll_offset / max_scroll
+                } else {
+                    0.0
+                };
                 let thumb_y = list_y + (track_h - thumb_h) * scroll_ratio;
 
                 // Track
-                draw_rectangle(scrollbar_x, list_y, scrollbar_w, track_h, Color::new(1.0, 1.0, 1.0, 0.08));
+                draw_rectangle(
+                    scrollbar_x,
+                    list_y,
+                    scrollbar_w,
+                    track_h,
+                    Color::new(1.0, 1.0, 1.0, 0.08),
+                );
                 // Thumb
-                draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, Color::new(1.0, 1.0, 1.0, 0.3));
+                draw_rectangle(
+                    scrollbar_x,
+                    thumb_y,
+                    scrollbar_w,
+                    thumb_h,
+                    Color::new(1.0, 1.0, 1.0, 0.3),
+                );
             }
         }
 
         // Solid background below the list to cleanly separate from buttons
         let button_zone_y = list_y + list_visible_height;
-        draw_rectangle(0.0, button_zone_y, sw, sh - button_zone_y, Color::from_rgba(25, 25, 35, 255));
+        draw_rectangle(
+            0.0,
+            button_zone_y,
+            sw,
+            sh - button_zone_y,
+            Color::from_rgba(25, 25, 35, 255),
+        );
 
         // Error message
         if let Some(ref error) = self.error_message {
@@ -1623,14 +1925,26 @@ impl Screen for CharacterSelectScreen {
             let box_x = (sw - box_w) / 2.0;
             let box_y = (sh - box_h) / 2.0;
 
-            draw_rectangle(box_x, box_y, box_w, box_h, Color::from_rgba(60, 40, 40, 255));
+            draw_rectangle(
+                box_x,
+                box_y,
+                box_w,
+                box_h,
+                Color::from_rgba(60, 40, 40, 255),
+            );
             draw_rectangle_lines(box_x, box_y, box_w, box_h, 2.0, RED);
 
             if !self.characters.is_empty() {
                 let char_name = &self.characters[self.selected_index].name;
                 let delete_text = format!("Delete '{}'?", char_name);
                 let delete_width = self.measure_text_sharp(&delete_text, 16.0).width;
-                self.draw_text_sharp(&delete_text, box_x + (box_w - delete_width) / 2.0, box_y + 50.0, 16.0, WHITE);
+                self.draw_text_sharp(
+                    &delete_text,
+                    box_x + (box_w - delete_width) / 2.0,
+                    box_y + 50.0,
+                    16.0,
+                    WHITE,
+                );
             }
 
             // Touch-friendly Yes/No buttons
@@ -1663,11 +1977,7 @@ impl Screen for CharacterSelectScreen {
             } else {
                 Color::from_rgba(60, 60, 80, 255)
             };
-            let no_border = if no_hovered {
-                WHITE
-            } else {
-                LIGHTGRAY
-            };
+            let no_border = if no_hovered { WHITE } else { LIGHTGRAY };
             draw_rectangle(no_x, yes_y, button_w, button_h, no_bg);
             draw_rectangle_lines(no_x, yes_y, button_w, button_h, 2.0, no_border);
             self.draw_text_sharp("No, cancel", no_x + 8.0, yes_y + 20.0, 16.0, WHITE);
@@ -1690,12 +2000,20 @@ impl Screen for CharacterSelectScreen {
             GREEN
         };
         draw_rectangle(list_x, inst_y - 10.0, 100.0, button_height, play_bg);
-        draw_rectangle_lines(list_x, inst_y - 10.0, 100.0, button_height, 2.0, play_border);
+        draw_rectangle_lines(
+            list_x,
+            inst_y - 10.0,
+            100.0,
+            button_height,
+            2.0,
+            play_border,
+        );
         self.draw_text_sharp("Play", list_x + 10.0, inst_y + 10.0, 16.0, WHITE);
 
         // New button
         if self.characters.len() < MAX_CHARACTERS {
-            let new_hovered = point_in_rect(mx, my, list_x + 120.0, inst_y - 10.0, 70.0, button_height);
+            let new_hovered =
+                point_in_rect(mx, my, list_x + 120.0, inst_y - 10.0, 70.0, button_height);
             let new_bg = if new_hovered {
                 Color::from_rgba(120, 120, 60, 255)
             } else {
@@ -1707,12 +2025,20 @@ impl Screen for CharacterSelectScreen {
                 YELLOW
             };
             draw_rectangle(list_x + 120.0, inst_y - 10.0, 70.0, button_height, new_bg);
-            draw_rectangle_lines(list_x + 120.0, inst_y - 10.0, 70.0, button_height, 2.0, new_border);
+            draw_rectangle_lines(
+                list_x + 120.0,
+                inst_y - 10.0,
+                70.0,
+                button_height,
+                2.0,
+                new_border,
+            );
             self.draw_text_sharp("New", list_x + 130.0, inst_y + 10.0, 16.0, WHITE);
         }
 
         // Delete button
-        let delete_hovered = point_in_rect(mx, my, list_x + 210.0, inst_y - 10.0, 90.0, button_height);
+        let delete_hovered =
+            point_in_rect(mx, my, list_x + 210.0, inst_y - 10.0, 90.0, button_height);
         let delete_bg = if delete_hovered {
             Color::from_rgba(140, 60, 60, 255)
         } else {
@@ -1723,24 +2049,47 @@ impl Screen for CharacterSelectScreen {
         } else {
             RED
         };
-        draw_rectangle(list_x + 210.0, inst_y - 10.0, 90.0, button_height, delete_bg);
-        draw_rectangle_lines(list_x + 210.0, inst_y - 10.0, 90.0, button_height, 2.0, delete_border);
+        draw_rectangle(
+            list_x + 210.0,
+            inst_y - 10.0,
+            90.0,
+            button_height,
+            delete_bg,
+        );
+        draw_rectangle_lines(
+            list_x + 210.0,
+            inst_y - 10.0,
+            90.0,
+            button_height,
+            2.0,
+            delete_border,
+        );
         self.draw_text_sharp("Delete", list_x + 220.0, inst_y + 10.0, 16.0, WHITE);
 
         // Logout button
-        let logout_hovered = point_in_rect(mx, my, list_x + 330.0, inst_y - 10.0, 100.0, button_height);
+        let logout_hovered =
+            point_in_rect(mx, my, list_x + 330.0, inst_y - 10.0, 100.0, button_height);
         let logout_bg = if logout_hovered {
             Color::from_rgba(80, 80, 110, 255)
         } else {
             Color::from_rgba(60, 60, 80, 255)
         };
-        let logout_border = if logout_hovered {
-            WHITE
-        } else {
-            LIGHTGRAY
-        };
-        draw_rectangle(list_x + 330.0, inst_y - 10.0, 100.0, button_height, logout_bg);
-        draw_rectangle_lines(list_x + 330.0, inst_y - 10.0, 100.0, button_height, 2.0, logout_border);
+        let logout_border = if logout_hovered { WHITE } else { LIGHTGRAY };
+        draw_rectangle(
+            list_x + 330.0,
+            inst_y - 10.0,
+            100.0,
+            button_height,
+            logout_bg,
+        );
+        draw_rectangle_lines(
+            list_x + 330.0,
+            inst_y - 10.0,
+            100.0,
+            button_height,
+            2.0,
+            logout_border,
+        );
         self.draw_text_sharp("Logout", list_x + 340.0, inst_y + 10.0, 16.0, WHITE);
 
         #[cfg(not(target_os = "android"))]
@@ -1761,8 +2110,8 @@ pub struct CharacterCreateScreen {
     name: String,
     gender_index: usize,
     skin_index: usize,
-    hair_style_index: Option<usize>,  // None = bald, Some(0-2) = style
-    hair_color_index: usize,          // 0-6
+    hair_style_index: Option<usize>, // None = bald, Some(0-2) = style
+    hair_color_index: usize,         // 0-6
     error_message: Option<String>,
     auth_client: AuthClient,
     font: BitmapFont,
@@ -1776,7 +2125,7 @@ pub struct CharacterCreateScreen {
     loading: bool,
 }
 
-const HAIR_STYLES: usize = 6;  // 0-5
+const HAIR_STYLES: usize = 6; // 0-5
 const HAIR_COLORS: usize = 10; // 0-9 (20 frames / 2 front-back pairs)
 
 #[derive(PartialEq, Clone, Copy)]
@@ -1813,7 +2162,12 @@ impl CharacterCreateScreen {
 
     /// Use pre-loaded assets from the renderer (avoids duplicate loading on WASM/Android)
     #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-    pub fn use_renderer_assets(&mut self, font: BitmapFont, player: SpritesheetStore, hair: SpritesheetStore) {
+    pub fn use_renderer_assets(
+        &mut self,
+        font: BitmapFont,
+        player: SpritesheetStore,
+        hair: SpritesheetStore,
+    ) {
         self.font = font;
         self.player_sprites = player;
         self.hair_sprites = hair;
@@ -1832,12 +2186,18 @@ impl CharacterCreateScreen {
             let manifest = SpriteManifest::load().await;
             if let Some(ref atlas_info) = manifest.players_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.player_sprites = SpritesheetStore::Atlas { texture: tex, rects };
+                    self.player_sprites = SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    };
                 }
             }
             if let Some(ref atlas_info) = manifest.hair_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.hair_sprites = SpritesheetStore::Atlas { texture: tex, rects };
+                    self.hair_sprites = SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    };
                 }
             }
         }
@@ -1845,7 +2205,9 @@ impl CharacterCreateScreen {
         // Desktop: always load individually
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         {
-            self.font = BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+            self.font =
+                BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf")
+                    .await;
             self.player_sprites = load_player_sprites().await;
 
             let mut hair_map = HashMap::new();
@@ -2057,7 +2419,9 @@ impl Screen for CharacterCreateScreen {
 
             // Hair color field box (right half of hair row, only if hair style selected)
             let hair_color_x = form_x + half_width + 10.0;
-            if self.hair_style_index.is_some() && point_in_rect(mx, my, hair_color_x, hair_box_y, half_width, 36.0) {
+            if self.hair_style_index.is_some()
+                && point_in_rect(mx, my, hair_color_x, hair_box_y, half_width, 36.0)
+            {
                 self.active_field = CreateField::HairColor;
                 show_keyboard(false);
 
@@ -2070,7 +2434,14 @@ impl Screen for CharacterCreateScreen {
                     };
                 }
                 // Check if clicked on right arrow area
-                if point_in_rect(mx, my, hair_color_x + half_width - 35.0, hair_box_y, 35.0, 36.0) {
+                if point_in_rect(
+                    mx,
+                    my,
+                    hair_color_x + half_width - 35.0,
+                    hair_box_y,
+                    35.0,
+                    36.0,
+                ) {
                     self.hair_color_index = (self.hair_color_index + 1) % HAIR_COLORS;
                 }
             }
@@ -2095,10 +2466,21 @@ impl Screen for CharacterCreateScreen {
                 let gender = GENDERS[self.gender_index];
                 let skin = SKINS[self.skin_index];
                 let hair_style = self.hair_style_index.map(|i| i as i32);
-                let hair_color = if self.hair_style_index.is_some() { Some(self.hair_color_index as i32) } else { None };
+                let hair_color = if self.hair_style_index.is_some() {
+                    Some(self.hair_color_index as i32)
+                } else {
+                    None
+                };
 
                 #[cfg(not(target_arch = "wasm32"))]
-                match self.auth_client.create_character(&self.session.token, name, gender, skin, hair_style, hair_color) {
+                match self.auth_client.create_character(
+                    &self.session.token,
+                    name,
+                    gender,
+                    skin,
+                    hair_style,
+                    hair_color,
+                ) {
                     Ok(char_info) => {
                         self.session.characters.push(char_info);
                         return ScreenState::ToCharacterSelect(self.session.clone());
@@ -2110,7 +2492,14 @@ impl Screen for CharacterCreateScreen {
                 #[cfg(target_arch = "wasm32")]
                 if !self.auth_client.is_busy() {
                     self.loading = true;
-                    self.auth_client.start_create_character(&self.session.token, name, gender, skin, hair_style, hair_color);
+                    self.auth_client.start_create_character(
+                        &self.session.token,
+                        name,
+                        gender,
+                        skin,
+                        hair_style,
+                        hair_color,
+                    );
                 }
             }
 
@@ -2234,10 +2623,21 @@ impl Screen for CharacterCreateScreen {
             let gender = GENDERS[self.gender_index];
             let skin = SKINS[self.skin_index];
             let hair_style = self.hair_style_index.map(|i| i as i32);
-            let hair_color = if self.hair_style_index.is_some() { Some(self.hair_color_index as i32) } else { None };
+            let hair_color = if self.hair_style_index.is_some() {
+                Some(self.hair_color_index as i32)
+            } else {
+                None
+            };
 
             #[cfg(not(target_arch = "wasm32"))]
-            match self.auth_client.create_character(&self.session.token, name, gender, skin, hair_style, hair_color) {
+            match self.auth_client.create_character(
+                &self.session.token,
+                name,
+                gender,
+                skin,
+                hair_style,
+                hair_color,
+            ) {
                 Ok(_) => {
                     return ScreenState::ToCharacterSelect(self.session.clone());
                 }
@@ -2248,7 +2648,14 @@ impl Screen for CharacterCreateScreen {
             #[cfg(target_arch = "wasm32")]
             if !self.auth_client.is_busy() {
                 self.loading = true;
-                self.auth_client.start_create_character(&self.session.token, name, gender, skin, hair_style, hair_color);
+                self.auth_client.start_create_character(
+                    &self.session.token,
+                    name,
+                    gender,
+                    skin,
+                    hair_style,
+                    hair_color,
+                );
             }
         }
 
@@ -2277,12 +2684,12 @@ impl Screen for CharacterCreateScreen {
         self.draw_text_sharp(title, (sw - title_width) / 2.0, 30.0, 16.0, WHITE);
 
         // Layout: Preview on left (fixed), form on right (scrollable)
-        let total_width = 460.0;  // Preview (140) + gap (20) + form (300)
+        let total_width = 460.0; // Preview (140) + gap (20) + form (300)
         let content_x = (sw - total_width) / 2.0;
         let content_height: f32 = 330.0; // 4 fields * 70 + buttons area
         let max_content_height = content_height.min(sh - 80.0); // leave room for title + padding
         let fixed_y = ((sh - max_content_height) / 2.0).max(50.0);
-        let form_y = fixed_y - self.scroll_y;  // Form fields scroll
+        let form_y = fixed_y - self.scroll_y; // Form fields scroll
 
         // === LEFT SIDE: Character Preview (fixed) ===
         let preview_w = 140.0;
@@ -2296,20 +2703,73 @@ impl Screen for CharacterCreateScreen {
         let frame_h = preview_h + frame_padding * 2.0;
 
         // Outer glow
-        draw_rectangle(frame_x - 2.0, frame_y - 2.0, frame_w + 4.0, frame_h + 4.0, Color::from_rgba(60, 80, 120, 100));
+        draw_rectangle(
+            frame_x - 2.0,
+            frame_y - 2.0,
+            frame_w + 4.0,
+            frame_h + 4.0,
+            Color::from_rgba(60, 80, 120, 100),
+        );
         // Frame background
-        draw_rectangle(frame_x, frame_y, frame_w, frame_h, Color::from_rgba(40, 45, 60, 255));
+        draw_rectangle(
+            frame_x,
+            frame_y,
+            frame_w,
+            frame_h,
+            Color::from_rgba(40, 45, 60, 255),
+        );
         // Inner preview area
-        draw_rectangle(content_x, fixed_y, preview_w, preview_h, Color::from_rgba(20, 22, 30, 255));
+        draw_rectangle(
+            content_x,
+            fixed_y,
+            preview_w,
+            preview_h,
+            Color::from_rgba(20, 22, 30, 255),
+        );
         // Frame border
-        draw_rectangle_lines(frame_x, frame_y, frame_w, frame_h, 2.0, Color::from_rgba(80, 100, 140, 255));
+        draw_rectangle_lines(
+            frame_x,
+            frame_y,
+            frame_w,
+            frame_h,
+            2.0,
+            Color::from_rgba(80, 100, 140, 255),
+        );
         // Corner accents
         let accent_size = 8.0;
         let accent_color = Color::from_rgba(100, 140, 200, 255);
-        draw_line(frame_x, frame_y + accent_size, frame_x + accent_size, frame_y, 2.0, accent_color);
-        draw_line(frame_x + frame_w - accent_size, frame_y, frame_x + frame_w, frame_y + accent_size, 2.0, accent_color);
-        draw_line(frame_x, frame_y + frame_h - accent_size, frame_x + accent_size, frame_y + frame_h, 2.0, accent_color);
-        draw_line(frame_x + frame_w - accent_size, frame_y + frame_h, frame_x + frame_w, frame_y + frame_h - accent_size, 2.0, accent_color);
+        draw_line(
+            frame_x,
+            frame_y + accent_size,
+            frame_x + accent_size,
+            frame_y,
+            2.0,
+            accent_color,
+        );
+        draw_line(
+            frame_x + frame_w - accent_size,
+            frame_y,
+            frame_x + frame_w,
+            frame_y + accent_size,
+            2.0,
+            accent_color,
+        );
+        draw_line(
+            frame_x,
+            frame_y + frame_h - accent_size,
+            frame_x + accent_size,
+            frame_y + frame_h,
+            2.0,
+            accent_color,
+        );
+        draw_line(
+            frame_x + frame_w - accent_size,
+            frame_y + frame_h,
+            frame_x + frame_w,
+            frame_y + frame_h - accent_size,
+            2.0,
+            accent_color,
+        );
 
         // Draw character sprite preview (native pixel size, floor to avoid subpixel stretching)
         let sprite_x = (content_x + (preview_w - SPRITE_WIDTH) / 2.0).floor();
@@ -2333,7 +2793,13 @@ impl Screen for CharacterCreateScreen {
         // Preview label below character
         let preview_label = format!("{} {}", GENDERS[self.gender_index], SKINS[self.skin_index]);
         let label_width = self.measure_text_sharp(&preview_label, 16.0).width;
-        self.draw_text_sharp(&preview_label, content_x + (preview_w - label_width) / 2.0, fixed_y + preview_h - 30.0, 16.0, LIGHTGRAY);
+        self.draw_text_sharp(
+            &preview_label,
+            content_x + (preview_w - label_width) / 2.0,
+            fixed_y + preview_h - 30.0,
+            16.0,
+            LIGHTGRAY,
+        );
 
         // === RIGHT SIDE: Form Fields (clipped to preview area) ===
         let form_x = content_x + preview_w + 20.0;
@@ -2352,7 +2818,13 @@ impl Screen for CharacterCreateScreen {
         let name_active = self.active_field == CreateField::Name;
         let name_y = form_y;
         if is_visible(name_y, field_height) {
-            self.draw_text_sharp("Name", form_x, name_y, 16.0, if name_active { WHITE } else { GRAY });
+            self.draw_text_sharp(
+                "Name",
+                form_x,
+                name_y,
+                16.0,
+                if name_active { WHITE } else { GRAY },
+            );
 
             let name_box_color = if name_active {
                 Color::from_rgba(80, 120, 180, 255)
@@ -2360,23 +2832,50 @@ impl Screen for CharacterCreateScreen {
                 Color::from_rgba(60, 60, 80, 255)
             };
             draw_rectangle(form_x, name_y + 20.0, form_w, 36.0, name_box_color);
-            draw_rectangle_lines(form_x, name_y + 20.0, form_w, 36.0, 2.0, if name_active { WHITE } else { GRAY });
+            draw_rectangle_lines(
+                form_x,
+                name_y + 20.0,
+                form_w,
+                36.0,
+                2.0,
+                if name_active { WHITE } else { GRAY },
+            );
 
-            let cursor = if name_active && (get_time() * 2.0) as i32 % 2 == 0 { "|" } else { "" };
+            let cursor = if name_active && (get_time() * 2.0) as i32 % 2 == 0 {
+                "|"
+            } else {
+                ""
+            };
             let name_display = if self.name.is_empty() && !name_active {
                 "Enter name...".to_string()
             } else {
                 format!("{}{}", self.name, cursor)
             };
-            let text_color = if self.name.is_empty() && !name_active { DARKGRAY } else { WHITE };
-            self.draw_text_sharp(&name_display, form_x + 10.0, name_y + 44.0, 16.0, text_color);
+            let text_color = if self.name.is_empty() && !name_active {
+                DARKGRAY
+            } else {
+                WHITE
+            };
+            self.draw_text_sharp(
+                &name_display,
+                form_x + 10.0,
+                name_y + 44.0,
+                16.0,
+                text_color,
+            );
         }
 
         // Gender field
         let gender_active = self.active_field == CreateField::Gender;
         let gender_y = form_y + field_height;
         if is_visible(gender_y, field_height) {
-            self.draw_text_sharp("Gender", form_x, gender_y, 16.0, if gender_active { WHITE } else { GRAY });
+            self.draw_text_sharp(
+                "Gender",
+                form_x,
+                gender_y,
+                16.0,
+                if gender_active { WHITE } else { GRAY },
+            );
 
             let gender_box_color = if gender_active {
                 Color::from_rgba(80, 120, 180, 255)
@@ -2384,20 +2883,51 @@ impl Screen for CharacterCreateScreen {
                 Color::from_rgba(60, 60, 80, 255)
             };
             draw_rectangle(form_x, gender_y + 20.0, form_w, 36.0, gender_box_color);
-            draw_rectangle_lines(form_x, gender_y + 20.0, form_w, 36.0, 2.0, if gender_active { WHITE } else { GRAY });
+            draw_rectangle_lines(
+                form_x,
+                gender_y + 20.0,
+                form_w,
+                36.0,
+                2.0,
+                if gender_active { WHITE } else { GRAY },
+            );
 
-            self.draw_text_sharp("<", form_x + 15.0, gender_y + 44.0, 16.0, if gender_active { YELLOW } else { DARKGRAY });
+            self.draw_text_sharp(
+                "<",
+                form_x + 15.0,
+                gender_y + 44.0,
+                16.0,
+                if gender_active { YELLOW } else { DARKGRAY },
+            );
             let gender_text = GENDERS[self.gender_index];
             let gender_width = self.measure_text_sharp(gender_text, 16.0).width;
-            self.draw_text_sharp(gender_text, form_x + form_w / 2.0 - gender_width / 2.0, gender_y + 44.0, 16.0, WHITE);
-            self.draw_text_sharp(">", form_x + form_w - 25.0, gender_y + 44.0, 16.0, if gender_active { YELLOW } else { DARKGRAY });
+            self.draw_text_sharp(
+                gender_text,
+                form_x + form_w / 2.0 - gender_width / 2.0,
+                gender_y + 44.0,
+                16.0,
+                WHITE,
+            );
+            self.draw_text_sharp(
+                ">",
+                form_x + form_w - 25.0,
+                gender_y + 44.0,
+                16.0,
+                if gender_active { YELLOW } else { DARKGRAY },
+            );
         }
 
         // Skin field
         let skin_active = self.active_field == CreateField::Skin;
         let skin_y = form_y + field_height * 2.0;
         if is_visible(skin_y, field_height) {
-            self.draw_text_sharp("Skin", form_x, skin_y, 16.0, if skin_active { WHITE } else { GRAY });
+            self.draw_text_sharp(
+                "Skin",
+                form_x,
+                skin_y,
+                16.0,
+                if skin_active { WHITE } else { GRAY },
+            );
 
             let skin_box_color = if skin_active {
                 Color::from_rgba(80, 120, 180, 255)
@@ -2405,32 +2935,82 @@ impl Screen for CharacterCreateScreen {
                 Color::from_rgba(60, 60, 80, 255)
             };
             draw_rectangle(form_x, skin_y + 20.0, form_w, 36.0, skin_box_color);
-            draw_rectangle_lines(form_x, skin_y + 20.0, form_w, 36.0, 2.0, if skin_active { WHITE } else { GRAY });
+            draw_rectangle_lines(
+                form_x,
+                skin_y + 20.0,
+                form_w,
+                36.0,
+                2.0,
+                if skin_active { WHITE } else { GRAY },
+            );
 
-            self.draw_text_sharp("<", form_x + 15.0, skin_y + 44.0, 16.0, if skin_active { YELLOW } else { DARKGRAY });
+            self.draw_text_sharp(
+                "<",
+                form_x + 15.0,
+                skin_y + 44.0,
+                16.0,
+                if skin_active { YELLOW } else { DARKGRAY },
+            );
             let skin_text = SKINS[self.skin_index];
             let skin_width = self.measure_text_sharp(skin_text, 16.0).width;
-            self.draw_text_sharp(skin_text, form_x + form_w / 2.0 - skin_width / 2.0, skin_y + 44.0, 16.0, WHITE);
-            self.draw_text_sharp(">", form_x + form_w - 25.0, skin_y + 44.0, 16.0, if skin_active { YELLOW } else { DARKGRAY });
+            self.draw_text_sharp(
+                skin_text,
+                form_x + form_w / 2.0 - skin_width / 2.0,
+                skin_y + 44.0,
+                16.0,
+                WHITE,
+            );
+            self.draw_text_sharp(
+                ">",
+                form_x + form_w - 25.0,
+                skin_y + 44.0,
+                16.0,
+                if skin_active { YELLOW } else { DARKGRAY },
+            );
         }
 
         // Hair row: Style and Color side by side
         let hair_y = form_y + field_height * 3.0;
-        let half_width = (form_w - 10.0) / 2.0;  // 10px gap between
+        let half_width = (form_w - 10.0) / 2.0; // 10px gap between
         if is_visible(hair_y, field_height) {
             // Hair Style (left half)
             let hair_style_active = self.active_field == CreateField::HairStyle;
-            self.draw_text_sharp("Style", form_x, hair_y, 16.0, if hair_style_active { WHITE } else { GRAY });
+            self.draw_text_sharp(
+                "Style",
+                form_x,
+                hair_y,
+                16.0,
+                if hair_style_active { WHITE } else { GRAY },
+            );
 
             let hair_style_box_color = if hair_style_active {
                 Color::from_rgba(80, 120, 180, 255)
             } else {
                 Color::from_rgba(60, 60, 80, 255)
             };
-            draw_rectangle(form_x, hair_y + 20.0, half_width, 36.0, hair_style_box_color);
-            draw_rectangle_lines(form_x, hair_y + 20.0, half_width, 36.0, 2.0, if hair_style_active { WHITE } else { GRAY });
+            draw_rectangle(
+                form_x,
+                hair_y + 20.0,
+                half_width,
+                36.0,
+                hair_style_box_color,
+            );
+            draw_rectangle_lines(
+                form_x,
+                hair_y + 20.0,
+                half_width,
+                36.0,
+                2.0,
+                if hair_style_active { WHITE } else { GRAY },
+            );
 
-            self.draw_text_sharp("<", form_x + 10.0, hair_y + 44.0, 16.0, if hair_style_active { YELLOW } else { DARKGRAY });
+            self.draw_text_sharp(
+                "<",
+                form_x + 10.0,
+                hair_y + 44.0,
+                16.0,
+                if hair_style_active { YELLOW } else { DARKGRAY },
+            );
             let hair_style_string;
             let hair_style_text = match self.hair_style_index {
                 None => "Bald",
@@ -2440,35 +3020,106 @@ impl Screen for CharacterCreateScreen {
                 }
             };
             let hair_style_width = self.measure_text_sharp(hair_style_text, 16.0).width;
-            self.draw_text_sharp(hair_style_text, form_x + half_width / 2.0 - hair_style_width / 2.0, hair_y + 44.0, 16.0, WHITE);
-            self.draw_text_sharp(">", form_x + half_width - 20.0, hair_y + 44.0, 16.0, if hair_style_active { YELLOW } else { DARKGRAY });
+            self.draw_text_sharp(
+                hair_style_text,
+                form_x + half_width / 2.0 - hair_style_width / 2.0,
+                hair_y + 44.0,
+                16.0,
+                WHITE,
+            );
+            self.draw_text_sharp(
+                ">",
+                form_x + half_width - 20.0,
+                hair_y + 44.0,
+                16.0,
+                if hair_style_active { YELLOW } else { DARKGRAY },
+            );
 
             // Hair Color (right half) - only enabled if hair style selected
             let hair_color_x = form_x + half_width + 10.0;
             let hair_color_active = self.active_field == CreateField::HairColor;
             let has_hair = self.hair_style_index.is_some();
 
-            self.draw_text_sharp("Color", hair_color_x, hair_y, 16.0, if has_hair { if hair_color_active { WHITE } else { GRAY } } else { DARKGRAY });
+            self.draw_text_sharp(
+                "Color",
+                hair_color_x,
+                hair_y,
+                16.0,
+                if has_hair {
+                    if hair_color_active {
+                        WHITE
+                    } else {
+                        GRAY
+                    }
+                } else {
+                    DARKGRAY
+                },
+            );
 
             let hair_color_box_color = if !has_hair {
-                Color::from_rgba(40, 40, 50, 255)  // Disabled look
+                Color::from_rgba(40, 40, 50, 255) // Disabled look
             } else if hair_color_active {
                 Color::from_rgba(80, 120, 180, 255)
             } else {
                 Color::from_rgba(60, 60, 80, 255)
             };
-            draw_rectangle(hair_color_x, hair_y + 20.0, half_width, 36.0, hair_color_box_color);
-            draw_rectangle_lines(hair_color_x, hair_y + 20.0, half_width, 36.0, 2.0, if has_hair { if hair_color_active { WHITE } else { GRAY } } else { DARKGRAY });
+            draw_rectangle(
+                hair_color_x,
+                hair_y + 20.0,
+                half_width,
+                36.0,
+                hair_color_box_color,
+            );
+            draw_rectangle_lines(
+                hair_color_x,
+                hair_y + 20.0,
+                half_width,
+                36.0,
+                2.0,
+                if has_hair {
+                    if hair_color_active {
+                        WHITE
+                    } else {
+                        GRAY
+                    }
+                } else {
+                    DARKGRAY
+                },
+            );
 
             if has_hair {
-                self.draw_text_sharp("<", hair_color_x + 10.0, hair_y + 44.0, 16.0, if hair_color_active { YELLOW } else { DARKGRAY });
+                self.draw_text_sharp(
+                    "<",
+                    hair_color_x + 10.0,
+                    hair_y + 44.0,
+                    16.0,
+                    if hair_color_active { YELLOW } else { DARKGRAY },
+                );
                 let hair_color_text = format!("{}", self.hair_color_index + 1);
                 let hair_color_width = self.measure_text_sharp(&hair_color_text, 16.0).width;
-                self.draw_text_sharp(&hair_color_text, hair_color_x + half_width / 2.0 - hair_color_width / 2.0, hair_y + 44.0, 16.0, WHITE);
-                self.draw_text_sharp(">", hair_color_x + half_width - 20.0, hair_y + 44.0, 16.0, if hair_color_active { YELLOW } else { DARKGRAY });
+                self.draw_text_sharp(
+                    &hair_color_text,
+                    hair_color_x + half_width / 2.0 - hair_color_width / 2.0,
+                    hair_y + 44.0,
+                    16.0,
+                    WHITE,
+                );
+                self.draw_text_sharp(
+                    ">",
+                    hair_color_x + half_width - 20.0,
+                    hair_y + 44.0,
+                    16.0,
+                    if hair_color_active { YELLOW } else { DARKGRAY },
+                );
             } else {
                 let dash_width = self.measure_text_sharp("-", 16.0).width;
-                self.draw_text_sharp("-", hair_color_x + half_width / 2.0 - dash_width / 2.0, hair_y + 44.0, 16.0, DARKGRAY);
+                self.draw_text_sharp(
+                    "-",
+                    hair_color_x + half_width / 2.0 - dash_width / 2.0,
+                    hair_y + 44.0,
+                    16.0,
+                    DARKGRAY,
+                );
             }
         }
 
@@ -2492,7 +3143,13 @@ impl Screen for CharacterCreateScreen {
             draw_rectangle_lines(form_x, buttons_y, button_w, 36.0, 2.0, create_border);
             let create_text = "Create";
             let create_width = self.measure_text_sharp(create_text, 16.0).width;
-            self.draw_text_sharp(create_text, form_x + button_w / 2.0 - create_width / 2.0, buttons_y + 24.0, 16.0, WHITE);
+            self.draw_text_sharp(
+                create_text,
+                form_x + button_w / 2.0 - create_width / 2.0,
+                buttons_y + 24.0,
+                16.0,
+                WHITE,
+            );
 
             // Cancel button
             let cancel_x = form_x + button_w + 10.0;
@@ -2511,7 +3168,13 @@ impl Screen for CharacterCreateScreen {
             draw_rectangle_lines(cancel_x, buttons_y, button_w, 36.0, 2.0, cancel_border);
             let cancel_text = "Cancel";
             let cancel_width = self.measure_text_sharp(cancel_text, 16.0).width;
-            self.draw_text_sharp(cancel_text, cancel_x + button_w / 2.0 - cancel_width / 2.0, buttons_y + 24.0, 16.0, WHITE);
+            self.draw_text_sharp(
+                cancel_text,
+                cancel_x + button_w / 2.0 - cancel_width / 2.0,
+                buttons_y + 24.0,
+                16.0,
+                WHITE,
+            );
         }
 
         // Error message
@@ -2519,7 +3182,13 @@ impl Screen for CharacterCreateScreen {
             let error_y = buttons_y + 50.0;
             if error_y < clip_bottom {
                 let error_width = self.measure_text_sharp(error, 16.0).width;
-                self.draw_text_sharp(error, form_x + (form_w - error_width) / 2.0, error_y, 16.0, RED);
+                self.draw_text_sharp(
+                    error,
+                    form_x + (form_w - error_width) / 2.0,
+                    error_y,
+                    16.0,
+                    RED,
+                );
             }
         }
 
@@ -2534,21 +3203,38 @@ impl Screen for CharacterCreateScreen {
             let track_w = 4.0;
 
             // Track
-            draw_rectangle(track_x, track_y, track_w, track_h, Color::from_rgba(50, 50, 70, 150));
+            draw_rectangle(
+                track_x,
+                track_y,
+                track_w,
+                track_h,
+                Color::from_rgba(50, 50, 70, 150),
+            );
 
             // Thumb
             let thumb_ratio = (max_content_height / form_total_h).min(1.0);
             let thumb_h = (track_h * thumb_ratio).max(20.0);
             let scroll_ratio = self.scroll_y / max_scroll;
             let thumb_y = track_y + (track_h - thumb_h) * scroll_ratio;
-            draw_rectangle(track_x, thumb_y, track_w, thumb_h, Color::from_rgba(120, 140, 180, 200));
+            draw_rectangle(
+                track_x,
+                thumb_y,
+                track_w,
+                thumb_h,
+                Color::from_rgba(120, 140, 180, 200),
+            );
         }
 
         // Keyboard hints at bottom (hide on touch devices)
         if !self.touch_detected {
             let hints_y = sh - 30.0;
-            self.draw_text_sharp("[Tab] Next field    [A/D] Change    [Enter] Create    [Esc] Cancel",
-                (sw - 450.0) / 2.0, hints_y, 16.0, DARKGRAY);
+            self.draw_text_sharp(
+                "[Tab] Next field    [A/D] Change    [Enter] Create    [Esc] Cancel",
+                (sw - 450.0) / 2.0,
+                hints_y,
+                16.0,
+                DARKGRAY,
+            );
         }
     }
 }

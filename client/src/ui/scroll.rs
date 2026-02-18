@@ -81,11 +81,7 @@ impl ScrollableListConfig {
 
 /// Handle mouse wheel scrolling for a list
 /// Returns the new scroll offset
-pub fn handle_scroll(
-    current_scroll: f32,
-    max_scroll: f32,
-    scroll_speed: f32,
-) -> f32 {
+pub fn handle_scroll(current_scroll: f32, max_scroll: f32, scroll_speed: f32) -> f32 {
     let (_wheel_x, wheel_y) = mouse_wheel();
     let new_scroll = current_scroll - wheel_y * scroll_speed;
     new_scroll.clamp(0.0, max_scroll)

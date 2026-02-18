@@ -1,15 +1,15 @@
-use std::collections::{HashMap, HashSet};
+use super::chunk::ChunkManager;
 use super::entities::Player;
 use super::item::{GroundItem, Inventory, RecipeDefinition};
 use super::item_registry::ItemRegistry;
 use super::npc::Npc;
-use super::tilemap::Tilemap;
-use super::chunk::ChunkManager;
 use super::pathfinding::PathState;
 use super::shop::{ShopData, ShopSubTab};
+use super::tilemap::Tilemap;
+use crate::render::AreaBanner;
 use crate::render::XpGlobesManager;
 use crate::ui::UiElementId;
-use crate::render::AreaBanner;
+use std::collections::{HashMap, HashSet};
 
 /// State of a map transition (fade effect)
 #[derive(Debug, Clone, PartialEq)]
@@ -106,7 +106,7 @@ impl Default for FrameTimings {
             next_frame_max_ms: 0.0,
             next_frame_samples: [0.0; 60],
             next_frame_idx: 0,
-            delta_smoothing: 0.0, // 0.0 = disabled, try 0.5-0.9 for smoothing
+            delta_smoothing: 0.0,  // 0.0 = disabled, try 0.5-0.9 for smoothing
             smoothed_delta: 0.016, // Start at ~60fps
         }
     }
@@ -252,12 +252,12 @@ impl Default for Camera {
 /// Chat channel types for different message sources
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChatChannel {
-    Local,      // Nearby players only (current default)
-    Global,     // Server-wide player chat
-    System,     // XP gains, quest completions, shop transactions
-    // Future:
-    // Party,
-    // Guild,
+    Local,  // Nearby players only (current default)
+    Global, // Server-wide player chat
+    System, // XP gains, quest completions, shop transactions
+            // Future:
+            // Party,
+            // Guild,
 }
 
 pub struct ChatMessage {
@@ -367,8 +367,8 @@ pub struct SkillXpEvent {
 /// Info about a depleted tree for respawn timer display
 pub struct DepletedTreeInfo {
     pub gid: u32,
-    pub depleted_at: f64,   // Client time when depleted
-    pub respawn_at: f64,    // Client time when it will respawn
+    pub depleted_at: f64, // Client time when depleted
+    pub respawn_at: f64,  // Client time when it will respawn
 }
 
 /// Tree shake effect when being chopped
@@ -410,17 +410,17 @@ impl TreeShakeEffect {
 
 /// A falling leaf particle
 pub struct LeafParticle {
-    pub tile_x: f32,       // World tile X position
-    pub tile_y: f32,       // World tile Y position
-    pub height: f32,       // Height above ground in screen pixels (starts high, falls to 0)
-    pub drift_x: f32,      // Horizontal drift velocity
-    pub fall_speed: f32,   // Fall speed in pixels per second
+    pub tile_x: f32,     // World tile X position
+    pub tile_y: f32,     // World tile Y position
+    pub height: f32,     // Height above ground in screen pixels (starts high, falls to 0)
+    pub drift_x: f32,    // Horizontal drift velocity
+    pub fall_speed: f32, // Fall speed in pixels per second
     pub rotation: f32,
     pub rotation_speed: f32,
     pub size: f32,
     pub color: macroquad::color::Color,
     pub started_at: f64,
-    pub on_ground: bool,   // True when leaf has landed
+    pub on_ground: bool, // True when leaf has landed
 }
 
 impl LeafParticle {
@@ -435,7 +435,7 @@ impl LeafParticle {
         let color = match gen_range(0, 5) {
             0 => macroquad::color::Color::new(0.2, 0.55, 0.2, 0.95), // Dark green
             1 => macroquad::color::Color::new(0.3, 0.65, 0.25, 0.95), // Green
-            2 => macroquad::color::Color::new(0.5, 0.6, 0.2, 0.95), // Yellow-green
+            2 => macroquad::color::Color::new(0.5, 0.6, 0.2, 0.95),  // Yellow-green
             3 => macroquad::color::Color::new(0.6, 0.5, 0.15, 0.95), // Orange-brown
             _ => macroquad::color::Color::new(0.4, 0.55, 0.2, 0.95), // Olive
         };
@@ -515,7 +515,11 @@ impl FallingTreeEffect {
 
     pub fn new(x: i32, y: i32, gid: u32) -> Self {
         // Random fall direction
-        let fall_direction = if macroquad::rand::gen_range(0, 2) == 0 { -1.0 } else { 1.0 };
+        let fall_direction = if macroquad::rand::gen_range(0, 2) == 0 {
+            -1.0
+        } else {
+            1.0
+        };
         Self {
             x,
             y,
@@ -648,7 +652,7 @@ pub struct FarmingPatch {
     pub patch_id: String,
     pub x: i32,
     pub y: i32,
-    pub state: String,       // "empty", "growing", "harvestable"
+    pub state: String, // "empty", "growing", "harvestable"
     pub crop_id: String,
     pub growth_stage: u32,
     pub owner_id: String,
@@ -735,8 +739,8 @@ pub struct BankQuantityDialog {
 /// Source of a drag operation
 #[derive(Debug, Clone, PartialEq)]
 pub enum DragSource {
-    Inventory(usize),          // Inventory slot index
-    Equipment(String),         // Equipment slot type ("body", "feet")
+    Inventory(usize),  // Inventory slot index
+    Equipment(String), // Equipment slot type ("body", "feet")
 }
 
 /// Drag state for inventory/equipment rearrangement
@@ -834,7 +838,7 @@ pub struct AltarPanelState {
 pub struct UiState {
     pub chat_open: bool,
     pub chat_input: String,
-    pub chat_cursor: usize,        // Cursor position in chat_input (character index)
+    pub chat_cursor: usize, // Cursor position in chat_input (character index)
     pub chat_scroll_offset: usize, // Scroll offset for long messages (character index)
     pub chat_message_scroll: f32, // Scroll offset for message list (in pixels from bottom)
     pub chat_key_repeat_time: f64, // Last time a repeated key action fired
@@ -887,7 +891,7 @@ pub struct UiState {
     pub shop_quantity_hold_last_repeat: f64,
     // Bank UI state
     pub bank_open: bool,
-    pub bank_slots: Vec<Option<(String, i32)>>,  // (item_id, quantity) per slot
+    pub bank_slots: Vec<Option<(String, i32)>>, // (item_id, quantity) per slot
     pub bank_gold: i32,
     pub bank_max_slots: u32,
     pub bank_scroll: f32,
@@ -908,6 +912,12 @@ pub struct UiState {
     pub character_panel_open: bool,
     pub prayer_book_open: bool,
     pub minimap_panel_open: bool,
+    pub minimap_panel_zoom: f32,
+    pub minimap_panel_center_x: Option<f32>,
+    pub minimap_panel_center_y: Option<f32>,
+    pub minimap_panel_dragging: bool,
+    pub minimap_panel_drag_last_x: f32,
+    pub minimap_panel_drag_last_y: f32,
     // Mouse hover state for UI elements
     pub hovered_element: Option<UiElementId>,
     // Context menu state
@@ -1041,6 +1051,12 @@ impl Default for UiState {
             character_panel_open: false,
             prayer_book_open: false,
             minimap_panel_open: false,
+            minimap_panel_zoom: 1.0,
+            minimap_panel_center_x: None,
+            minimap_panel_center_y: None,
+            minimap_panel_dragging: false,
+            minimap_panel_drag_last_x: 0.0,
+            minimap_panel_drag_last_y: 0.0,
             hovered_element: None,
             context_menu: None,
             gold_drop_dialog: None,
@@ -1236,7 +1252,7 @@ pub struct GameState {
     /// Active spell effects for rendering
     pub spell_effects: Vec<SpellEffect>,
     /// Spell cooldowns tracked on client for UI feedback
-    pub spell_cooldowns: std::collections::HashMap<String, f64>,  // spell_id -> time when cooldown expires
+    pub spell_cooldowns: std::collections::HashMap<String, f64>, // spell_id -> time when cooldown expires
 
     // Prayer system state
     /// Current prayer points
@@ -1394,10 +1410,12 @@ impl GameState {
         }
 
         // Clean up old damage events (older than 1.2 seconds)
-        self.damage_events.retain(|event| current_time - event.time < 1.2);
+        self.damage_events
+            .retain(|event| current_time - event.time < 1.2);
 
         // Clean up old level up events (older than 2.0 seconds)
-        self.level_up_events.retain(|event| current_time - event.time < 1.2);
+        self.level_up_events
+            .retain(|event| current_time - event.time < 1.2);
 
         // Update tree effects
         self.tree_shake_effects.retain(|e| !e.is_finished());
@@ -1410,14 +1428,18 @@ impl GameState {
         self.leaf_particles.retain(|p| !p.is_finished());
 
         // Clean up old skill XP events (older than 1.5 seconds)
-        self.skill_xp_events.retain(|event| current_time - event.time < 1.5);
+        self.skill_xp_events
+            .retain(|event| current_time - event.time < 1.5);
 
         // Update and clean up XP drops
         self.xp_drop_feed.update(delta);
-        self.xp_drop_feed.drops.retain(|drop| current_time - drop.time < 2.0);
+        self.xp_drop_feed
+            .drops
+            .retain(|drop| current_time - drop.time < 2.0);
 
         // Clean up old chat bubbles (older than 5.0 seconds)
-        self.chat_bubbles.retain(|bubble| current_time - bubble.time < 5.0);
+        self.chat_bubbles
+            .retain(|bubble| current_time - bubble.time < 5.0);
 
         // Clean up expired NPC speech bubbles
         for npc in self.npcs.values_mut() {
@@ -1438,10 +1460,14 @@ impl GameState {
         });
 
         // Clean up old quest completion events (older than 4 seconds)
-        self.ui_state.quest_completed_events.retain(|event| current_time - event.time < 4.0);
+        self.ui_state
+            .quest_completed_events
+            .retain(|event| current_time - event.time < 4.0);
 
         // Clean up old announcements (older than 8 seconds)
-        self.ui_state.announcements.retain(|ann| current_time - ann.time < 8.0);
+        self.ui_state
+            .announcements
+            .retain(|ann| current_time - ann.time < 8.0);
 
         // Update crafting progress (Task 14)
         if self.ui_state.crafting_in_progress {
@@ -1461,7 +1487,12 @@ impl GameState {
                 // Animation done
             }
         }
-        if self.ui_state.crafting_complete_animation.as_ref().map_or(false, |(_, t)| *t >= 1.0) {
+        if self
+            .ui_state
+            .crafting_complete_animation
+            .as_ref()
+            .map_or(false, |(_, t)| *t >= 1.0)
+        {
             self.ui_state.crafting_complete_animation = None;
         }
 
@@ -1481,7 +1512,9 @@ impl GameState {
     }
 
     pub fn get_local_player(&self) -> Option<&Player> {
-        self.local_player_id.as_ref().and_then(|id| self.players.get(id))
+        self.local_player_id
+            .as_ref()
+            .and_then(|id| self.players.get(id))
     }
 
     /// Returns true when the world is ready to render (player exists and their chunk is loaded)
@@ -1519,7 +1552,14 @@ impl GameState {
     }
 
     /// Start a map transition
-    pub fn start_transition(&mut self, map_type: String, map_id: String, spawn_x: f32, spawn_y: f32, instance_id: String) {
+    pub fn start_transition(
+        &mut self,
+        map_type: String,
+        map_id: String,
+        spawn_x: f32,
+        spawn_y: f32,
+        instance_id: String,
+    ) {
         self.map_transition = MapTransition {
             state: TransitionState::FadingOut,
             progress: 0.0,

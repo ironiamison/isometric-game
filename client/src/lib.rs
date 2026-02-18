@@ -10,28 +10,28 @@ pub use util::asset_path;
 pub mod mobile_scale;
 pub use mobile_scale::MobileScaler;
 
-pub mod game;
-pub mod render;
-pub mod network;
-pub mod input;
-pub mod auth;
-pub mod ui;
-pub mod audio;
-pub mod settings;
 mod app;
+pub mod audio;
+pub mod auth;
+pub mod game;
+pub mod input;
+pub mod network;
+pub mod render;
+pub mod settings;
+pub mod ui;
 
 use audio::AudioManager;
 use game::GameState;
+use input::InputHandler;
 use network::NetworkClient;
 use render::Renderer;
-use input::InputHandler;
 
-use ui::{Screen, ScreenState, LoginScreen, CharacterSelectScreen, CharacterCreateScreen};
 use auth::AuthSession;
+use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
 #[cfg(not(target_arch = "wasm32"))]
 use app::AppState;
-use app::{window_conf, SERVER_URL, WS_URL, DEV_MODE, run_game_frame};
+use app::{run_game_frame, window_conf, DEV_MODE, SERVER_URL, WS_URL};
 
 // For Android, we need to export quad_main as the entry point
 // miniquad's JNI code (in MainActivity.java) spawns a thread that calls quad_main
@@ -65,7 +65,12 @@ async fn async_main() {
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("PANIC: {}", panic_info);
         if let Some(location) = panic_info.location() {
-            eprintln!("  at {}:{}:{}", location.file(), location.line(), location.column());
+            eprintln!(
+                "  at {}:{}:{}",
+                location.file(),
+                location.line(),
+                location.column()
+            );
         }
     }));
 
@@ -95,8 +100,12 @@ async fn async_main() {
             scaler.begin_frame();
 
             // Record last frame's next_frame() time into game state
-            if let AppState::Playing { game_state, .. } | AppState::GuestMode { game_state, .. } = &mut app_state {
-                game_state.frame_timings.record_next_frame(last_next_frame_ms);
+            if let AppState::Playing { game_state, .. } | AppState::GuestMode { game_state, .. } =
+                &mut app_state
+            {
+                game_state
+                    .frame_timings
+                    .record_next_frame(last_next_frame_ms);
             }
 
             match &mut app_state {
@@ -116,7 +125,8 @@ async fn async_main() {
                             game_state.ui_state.audio_volume = audio.music_volume();
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
-                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            game_state.ui_state.classic_controls =
+                                settings::load_classic_controls();
                             // Load persisted UI settings
                             let ui_settings = settings::load_ui_settings();
                             game_state.camera.zoom = ui_settings.zoom;
@@ -125,8 +135,11 @@ async fn async_main() {
                             game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                            game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
-                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            game_state.ui_state.chat_log_background =
+                                ui_settings.chat_log_background;
+                            if game_state.ui_state.classic_controls {
+                                game_state.ui_state.chat_open = true;
+                            }
                             #[cfg(not(target_os = "android"))]
                             app::maybe_show_control_scheme_dialogue(&mut game_state);
                             let network = NetworkClient::new_guest(WS_URL);
@@ -150,13 +163,18 @@ async fn async_main() {
                     screen.render();
 
                     match result {
-                        ScreenState::StartGame { session, character_id, character_name } => {
+                        ScreenState::StartGame {
+                            session,
+                            character_id,
+                            character_name,
+                        } => {
                             let mut game_state = GameState::new();
                             game_state.selected_character_name = Some(character_name);
                             game_state.ui_state.audio_volume = audio.music_volume();
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
-                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            game_state.ui_state.classic_controls =
+                                settings::load_classic_controls();
                             // Load persisted UI settings
                             let ui_settings = settings::load_ui_settings();
                             game_state.camera.zoom = ui_settings.zoom;
@@ -165,8 +183,11 @@ async fn async_main() {
                             game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                            game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
-                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            game_state.ui_state.chat_log_background =
+                                ui_settings.chat_log_background;
+                            if game_state.ui_state.classic_controls {
+                                game_state.ui_state.chat_open = true;
+                            }
                             #[cfg(not(target_os = "android"))]
                             app::maybe_show_control_scheme_dialogue(&mut game_state);
 
@@ -215,8 +236,17 @@ async fn async_main() {
                     }
                 }
 
-                AppState::Playing { game_state, network, input_handler, .. } |
-                AppState::GuestMode { game_state, network, input_handler } => {
+                AppState::Playing {
+                    game_state,
+                    network,
+                    input_handler,
+                    ..
+                }
+                | AppState::GuestMode {
+                    game_state,
+                    network,
+                    input_handler,
+                } => {
                     run_game_frame(game_state, network, input_handler, &renderer, &mut audio);
 
                     if game_state.disconnect_requested {
@@ -332,7 +362,8 @@ async fn async_main() {
                             game_state.ui_state.audio_volume = audio.music_volume();
                             game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                             game_state.ui_state.audio_muted = audio.is_muted();
-                            game_state.ui_state.classic_controls = settings::load_classic_controls();
+                            game_state.ui_state.classic_controls =
+                                settings::load_classic_controls();
                             // Load persisted UI settings
                             let ui_settings = settings::load_ui_settings();
                             game_state.camera.zoom = ui_settings.zoom;
@@ -341,8 +372,11 @@ async fn async_main() {
                             game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                             game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                            game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
-                            if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                            game_state.ui_state.chat_log_background =
+                                ui_settings.chat_log_background;
+                            if game_state.ui_state.classic_controls {
+                                game_state.ui_state.chat_open = true;
+                            }
                             app::maybe_show_control_scheme_dialogue(&mut game_state);
                             let network = NetworkClient::new_guest(WS_URL);
                             let mut input_handler = InputHandler::new();
@@ -366,7 +400,11 @@ async fn async_main() {
                     screen.load_equipment_if_needed().await;
 
                     match result {
-                        ScreenState::StartGame { session, character_id, character_name } => {
+                        ScreenState::StartGame {
+                            session,
+                            character_id,
+                            character_name,
+                        } => {
                             // Start matchmaking via auth client
                             let mut auth_client = crate::auth::AuthClient::new(SERVER_URL);
                             auth_client.start_matchmake(&session.token, character_id, "game_room");
@@ -416,7 +454,11 @@ async fn async_main() {
                     }
                 }
 
-                WasmAppState::Matchmaking { auth_client, session, character_name } => {
+                WasmAppState::Matchmaking {
+                    auth_client,
+                    session,
+                    character_name,
+                } => {
                     // Draw a simple "Connecting..." screen
                     clear_background(Color::from_rgba(25, 25, 35, 255));
                     let (sw, sh) = (screen_width(), screen_height());
@@ -437,17 +479,22 @@ async fn async_main() {
                                 game_state.ui_state.audio_volume = audio.music_volume();
                                 game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
                                 game_state.ui_state.audio_muted = audio.is_muted();
-                                game_state.ui_state.classic_controls = settings::load_classic_controls();
+                                game_state.ui_state.classic_controls =
+                                    settings::load_classic_controls();
                                 // Load persisted UI settings
                                 let ui_settings = settings::load_ui_settings();
                                 game_state.camera.zoom = ui_settings.zoom;
                                 game_state.ui_state.ui_scale = ui_settings.ui_scale;
-                                game_state.ui_state.shift_drop_enabled = ui_settings.shift_drop_enabled;
+                                game_state.ui_state.shift_drop_enabled =
+                                    ui_settings.shift_drop_enabled;
                                 game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
                                 game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
                                 game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                                game_state.ui_state.chat_log_background = ui_settings.chat_log_background;
-                                if game_state.ui_state.classic_controls { game_state.ui_state.chat_open = true; }
+                                game_state.ui_state.chat_log_background =
+                                    ui_settings.chat_log_background;
+                                if game_state.ui_state.classic_controls {
+                                    game_state.ui_state.chat_open = true;
+                                }
                                 app::maybe_show_control_scheme_dialogue(&mut game_state);
 
                                 // Store matchmaking results in localStorage for WASM network client
@@ -458,11 +505,8 @@ async fn async_main() {
                                 }
 
                                 // NetworkClient::new_authenticated will read roomId/sessionToken from localStorage
-                                let network = NetworkClient::new_authenticated(
-                                    WS_URL,
-                                    &session.token,
-                                    0,
-                                );
+                                let network =
+                                    NetworkClient::new_authenticated(WS_URL, &session.token, 0);
                                 let mut input_handler = InputHandler::new();
                                 input_handler.load_touch_icons().await;
 
@@ -477,7 +521,8 @@ async fn async_main() {
                             AuthResult::Matchmake(Err(e)) => {
                                 log::error!("Matchmaking failed: {}", e);
                                 // Go back to character select with error message
-                                let mut char_screen = CharacterSelectScreen::new(session.clone(), SERVER_URL);
+                                let mut char_screen =
+                                    CharacterSelectScreen::new(session.clone(), SERVER_URL);
                                 char_screen.use_renderer_assets(
                                     renderer.font().clone(),
                                     renderer.player_sprites().clone(),
@@ -493,8 +538,16 @@ async fn async_main() {
                     }
                 }
 
-                WasmAppState::Playing { game_state, network, input_handler } |
-                WasmAppState::GuestMode { game_state, network, input_handler } => {
+                WasmAppState::Playing {
+                    game_state,
+                    network,
+                    input_handler,
+                }
+                | WasmAppState::GuestMode {
+                    game_state,
+                    network,
+                    input_handler,
+                } => {
                     run_game_frame(game_state, network, input_handler, &renderer, &mut audio);
 
                     if game_state.disconnect_requested || game_state.reconnection_failed {

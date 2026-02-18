@@ -1,10 +1,19 @@
+use super::messages::ClientMessage;
+use super::protocol::{
+    self, extract_array, extract_bool, extract_f32, extract_i32, extract_string, extract_u32,
+    extract_u64, extract_u8, DecodedMessage,
+};
+use crate::game::npc::{Npc, NpcState};
+use crate::game::{
+    ActiveDialogue, ActiveQuest, ChatBubble, ChatChannel, ChatMessage, ConnectionStatus,
+    DamageEvent, DialogueChoice, Direction, EquipmentStats, GameState, GroundItem, InventorySlot,
+    ItemDefinition, LevelUpEvent, MapObject, Player, Portal, QuestCompletedEvent, QuestObjective,
+    RecipeDefinition, RecipeIngredient, RecipeResult, ShopData, ShopStockItem, SkillType,
+    SkillXpEvent, TransitionState, Wall, WallEdge,
+};
+use crate::render::OVERWORLD_NAME;
 use ewebsock::{WsEvent, WsMessage, WsReceiver, WsSender};
 use serde::{Deserialize, Serialize};
-use crate::game::{GameState, ConnectionStatus, Player, Direction, ChatChannel, ChatMessage, ChatBubble, DamageEvent, LevelUpEvent, SkillXpEvent, GroundItem, InventorySlot, ActiveDialogue, DialogueChoice, ActiveQuest, QuestObjective, QuestCompletedEvent, RecipeDefinition, RecipeIngredient, RecipeResult, ItemDefinition, EquipmentStats, MapObject, ShopData, ShopStockItem, SkillType, Wall, WallEdge, Portal, TransitionState};
-use crate::game::npc::{Npc, NpcState};
-use crate::render::OVERWORLD_NAME;
-use super::messages::ClientMessage;
-use super::protocol::{self, DecodedMessage, extract_string, extract_f32, extract_i32, extract_u32, extract_u64, extract_array, extract_u8, extract_bool};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -129,20 +138,24 @@ impl NetworkClient {
     fn start_matchmaking(&mut self) {
         self.connection_state = ConnectionState::Matchmaking;
 
-        let http_url = self.base_url
+        let http_url = self
+            .base_url
             .replace("ws://", "http://")
             .replace("wss://", "https://");
 
         let matchmake_url = format!("{}/matchmake/joinOrCreate/game_room", http_url);
 
         // Build request - auth is required
-        let request = ureq::post(&matchmake_url)
-            .set("Content-Type", "application/json");
+        let request = ureq::post(&matchmake_url).set("Content-Type", "application/json");
 
         let result = if let Some(token) = &self.auth_token {
             // Authenticated matchmaking - must have character_id
             if let Some(char_id) = self.character_id {
-                log::info!("Matchmaking (authenticated): POST {} with character_id={}", matchmake_url, char_id);
+                log::info!(
+                    "Matchmaking (authenticated): POST {} with character_id={}",
+                    matchmake_url,
+                    char_id
+                );
                 let options = AuthenticatedJoinOptions {
                     character_id: char_id,
                 };
@@ -162,20 +175,18 @@ impl NetworkClient {
         };
 
         match result {
-            Ok(response) => {
-                match response.into_json::<MatchmakeResponse>() {
-                    Ok(data) => {
-                        log::info!("Matchmaking success: room={}", data.room.room_id);
-                        self.room_id = Some(data.room.room_id);
-                        self.session_token = Some(data.session_token);
-                        self.connect_websocket();
-                    }
-                    Err(e) => {
-                        log::error!("Failed to parse matchmake response: {}", e);
-                        self.connection_state = ConnectionState::Disconnected;
-                    }
+            Ok(response) => match response.into_json::<MatchmakeResponse>() {
+                Ok(data) => {
+                    log::info!("Matchmaking success: room={}", data.room.room_id);
+                    self.room_id = Some(data.room.room_id);
+                    self.session_token = Some(data.session_token);
+                    self.connect_websocket();
                 }
-            }
+                Err(e) => {
+                    log::error!("Failed to parse matchmake response: {}", e);
+                    self.connection_state = ConnectionState::Disconnected;
+                }
+            },
             Err(e) => {
                 log::error!("Matchmaking failed: {}", e);
                 self.connection_state = ConnectionState::Disconnected;
@@ -215,7 +226,10 @@ impl NetworkClient {
         };
 
         let ws_url = format!("{}/{}?sessionToken={}", self.base_url, room_id, token);
-        log::info!("Connecting WebSocket: {}...", &ws_url[..ws_url.len().min(80)]);
+        log::info!(
+            "Connecting WebSocket: {}...",
+            &ws_url[..ws_url.len().min(80)]
+        );
 
         self.connection_state = ConnectionState::Connecting;
 
@@ -241,7 +255,10 @@ impl NetworkClient {
                 if self.was_connected {
                     // Check if we've exhausted reconnection attempts
                     if self.reconnect_attempts >= MAX_RECONNECT_ATTEMPTS {
-                        log::error!("Failed to reconnect after {} attempts", MAX_RECONNECT_ATTEMPTS);
+                        log::error!(
+                            "Failed to reconnect after {} attempts",
+                            MAX_RECONNECT_ATTEMPTS
+                        );
                         state.reconnection_failed = true;
                         return;
                     }
@@ -249,7 +266,11 @@ impl NetworkClient {
                     self.reconnect_timer += 1.0 / 60.0;
                     if self.reconnect_timer > 2.0 {
                         self.reconnect_attempts += 1;
-                        log::info!("Reconnection attempt {}/{}", self.reconnect_attempts, MAX_RECONNECT_ATTEMPTS);
+                        log::info!(
+                            "Reconnection attempt {}/{}",
+                            self.reconnect_attempts,
+                            MAX_RECONNECT_ATTEMPTS
+                        );
                         self.reconnect_timer = 0.0;
                         self.start_matchmaking();
                     }
@@ -376,7 +397,11 @@ impl NetworkClient {
         if let Some((tick, bytes)) = latest_state_sync {
             // Log if we skipped stale syncs (useful for debugging lag)
             if tick > state.server_tick + 1 {
-                log::debug!("Catching up: jumping from tick {} to {}", state.server_tick, tick);
+                log::debug!(
+                    "Catching up: jumping from tick {} to {}",
+                    state.server_tick,
+                    tick
+                );
             }
             self.handle_binary_message(&bytes, state);
         }
@@ -390,7 +415,11 @@ impl NetworkClient {
     }
 
     fn handle_binary_message(&self, data: &[u8], state: &mut GameState) {
-        log::trace!("Received {} bytes: {:?}", data.len(), &data[..data.len().min(50)]);
+        log::trace!(
+            "Received {} bytes: {:?}",
+            data.len(),
+            &data[..data.len().min(50)]
+        );
         let decompressed = match protocol::maybe_decompress(data) {
             Ok(d) => d,
             Err(e) => {

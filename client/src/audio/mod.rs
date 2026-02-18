@@ -1,7 +1,9 @@
-use macroquad::audio::{load_sound, play_sound, stop_sound, set_sound_volume, PlaySoundParams, Sound};
+use crate::util::asset_path;
+use macroquad::audio::{
+    load_sound, play_sound, set_sound_volume, stop_sound, PlaySoundParams, Sound,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::util::asset_path;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AudioSettings {
@@ -61,10 +63,7 @@ impl AudioManager {
 
     /// Preload music tracks at startup
     pub async fn preload_music(&mut self) {
-        let music_files = [
-            "assets/audio/menu.ogg",
-            "assets/audio/start.ogg",
-        ];
+        let music_files = ["assets/audio/menu.ogg", "assets/audio/start.ogg"];
 
         for path in music_files {
             match load_sound(&asset_path(path)).await {
@@ -124,7 +123,11 @@ impl AudioManager {
             }
         }
 
-        log::info!("Loaded {} SFX, {} sword sounds", self.sfx.len(), self.sword_sounds.len());
+        log::info!(
+            "Loaded {} SFX, {} sword sounds",
+            self.sfx.len(),
+            self.sword_sounds.len()
+        );
     }
 
     /// Play a sound effect by name
@@ -190,7 +193,11 @@ impl AudioManager {
         log::info!("Loading music from: {}", actual_path);
         match load_sound(&actual_path).await {
             Ok(sound) => {
-                log::info!("Playing music with volume: {} (muted: {})", volume, self.settings.muted);
+                log::info!(
+                    "Playing music with volume: {} (muted: {})",
+                    volume,
+                    self.settings.muted
+                );
                 play_sound(
                     &sound,
                     PlaySoundParams {

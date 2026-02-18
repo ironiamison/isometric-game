@@ -1,11 +1,11 @@
 //! Character panel rendering - separate equipment slots panel
 
-use macroquad::prelude::*;
-use crate::game::{GameState, DragSource};
-use crate::ui::{UiElementId, UiLayout};
-use crate::util::virtual_screen_size;
 use super::super::Renderer;
 use super::common::*;
+use crate::game::{DragSource, GameState};
+use crate::ui::{UiElementId, UiLayout};
+use crate::util::virtual_screen_size;
+use macroquad::prelude::*;
 
 /// Character panel dimensions
 const CHARACTER_PANEL_PADDING: f32 = 12.0;
@@ -13,12 +13,21 @@ const CHARACTER_HEADER_HEIGHT: f32 = 24.0;
 const CHARACTER_GRID_WIDTH: f32 = 3.0 * EQUIP_SLOT_SIZE + 2.0 * EQUIP_SLOT_SPACING; // 122
 const CHARACTER_GRID_HEIGHT: f32 = 4.0 * EQUIP_SLOT_SIZE + 3.0 * EQUIP_SLOT_SPACING + 26.0; // 190
 const CHARACTER_PANEL_WIDTH: f32 = 240.0; // Unified width to match inventory and other UI panels
-const CHARACTER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0 + CHARACTER_HEADER_HEIGHT + CHARACTER_PANEL_PADDING + CHARACTER_GRID_HEIGHT + CHARACTER_PANEL_PADDING; // ~262
+const CHARACTER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
+    + CHARACTER_HEADER_HEIGHT
+    + CHARACTER_PANEL_PADDING
+    + CHARACTER_GRID_HEIGHT
+    + CHARACTER_PANEL_PADDING; // ~262
 const STATS_SECTION_GAP: f32 = 8.0; // Gap between equipment grid and stats
 
 impl Renderer {
     /// Render the character panel when open
-    pub(crate) fn render_character_panel(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_character_panel(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         if !state.ui_state.character_panel_open {
             return;
         }
@@ -70,7 +79,13 @@ impl Renderer {
         let header_text = "Character";
         let text_dims = self.measure_text_sharp(header_text, 16.0);
         let text_x = header_x + (header_w - text_dims.width) / 2.0;
-        self.draw_text_sharp(header_text, text_x, header_y + (header_height + 12.0) / 2.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            header_text,
+            text_x,
+            header_y + (header_height + 12.0) / 2.0,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Grid area
         let grid_x = panel_x + frame_thickness + panel_padding;
@@ -99,11 +114,13 @@ impl Renderer {
             let bounds = Rect::new(slot_x, slot_y, slot_size, slot_size);
             layout.add(UiElementId::EquipmentSlot(slot_type.to_string()), bounds);
 
-            let is_hovered = matches!(hovered, Some(UiElementId::EquipmentSlot(s)) if s == *slot_type);
+            let is_hovered =
+                matches!(hovered, Some(UiElementId::EquipmentSlot(s)) if s == *slot_type);
             let is_dragging = matches!(&state.ui_state.drag_state, Some(drag) if matches!(&drag.source, DragSource::Equipment(s) if s == *slot_type));
 
-            let has_item = state.get_local_player().map(|p| {
-                match *slot_type {
+            let has_item = state
+                .get_local_player()
+                .map(|p| match *slot_type {
                     "head" => p.equipped_head.is_some(),
                     "body" => p.equipped_body.is_some(),
                     "weapon" => p.equipped_weapon.is_some(),
@@ -114,10 +131,18 @@ impl Renderer {
                     "necklace" => p.equipped_necklace.is_some(),
                     "belt" => p.equipped_belt.is_some(),
                     _ => false,
-                }
-            }).unwrap_or(false);
+                })
+                .unwrap_or(false);
 
-            self.draw_equipment_slot(slot_x, slot_y, slot_size, slot_type, has_item, is_hovered, is_dragging);
+            self.draw_equipment_slot(
+                slot_x,
+                slot_y,
+                slot_size,
+                slot_type,
+                has_item,
+                is_hovered,
+                is_dragging,
+            );
 
             if !is_dragging {
                 if let Some(local_player) = state.get_local_player() {

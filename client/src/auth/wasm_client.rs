@@ -213,12 +213,24 @@ impl AuthClient {
 
         // status == 1, success (HTTP response received, may still be an error status code)
         Some(match pending.kind {
-            PendingRequestKind::Login => AuthResult::Login(self.parse_auth_response(&body_text, http_status)),
-            PendingRequestKind::Register => AuthResult::Register(self.parse_auth_response(&body_text, http_status)),
-            PendingRequestKind::GetCharacters => AuthResult::Characters(self.parse_characters_response(&body_text, http_status)),
-            PendingRequestKind::CreateCharacter => AuthResult::CharacterCreated(self.parse_create_character_response(&body_text, http_status)),
-            PendingRequestKind::DeleteCharacter => AuthResult::CharacterDeleted(self.parse_delete_response(&body_text, http_status)),
-            PendingRequestKind::Matchmake => AuthResult::Matchmake(self.parse_matchmake_response(&body_text, http_status)),
+            PendingRequestKind::Login => {
+                AuthResult::Login(self.parse_auth_response(&body_text, http_status))
+            }
+            PendingRequestKind::Register => {
+                AuthResult::Register(self.parse_auth_response(&body_text, http_status))
+            }
+            PendingRequestKind::GetCharacters => {
+                AuthResult::Characters(self.parse_characters_response(&body_text, http_status))
+            }
+            PendingRequestKind::CreateCharacter => AuthResult::CharacterCreated(
+                self.parse_create_character_response(&body_text, http_status),
+            ),
+            PendingRequestKind::DeleteCharacter => {
+                AuthResult::CharacterDeleted(self.parse_delete_response(&body_text, http_status))
+            }
+            PendingRequestKind::Matchmake => {
+                AuthResult::Matchmake(self.parse_matchmake_response(&body_text, http_status))
+            }
             PendingRequestKind::HealthCheck => AuthResult::HealthCheck(http_status == 200),
         })
     }

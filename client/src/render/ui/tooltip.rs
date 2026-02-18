@@ -1,11 +1,11 @@
 //! Item tooltip rendering
 
-use macroquad::prelude::*;
+use super::super::Renderer;
+use super::common::*;
 use crate::game::GameState;
 use crate::ui::UiElementId;
 use crate::util::virtual_screen_size;
-use super::super::Renderer;
-use super::common::*;
+use macroquad::prelude::*;
 
 impl Renderer {
     /// Render tooltip for hovered inventory/quick slot items
@@ -22,9 +22,12 @@ impl Renderer {
             Some(UiElementId::QuickSlot(idx)) => {
                 if state.ui_state.spell_bar_active {
                     // Show spell tooltip
-                    let magic_level = state.get_local_player()
-                        .map(|p| p.skills.magic.level).unwrap_or(1);
-                    let unlocked: Vec<_> = crate::game::spell::SPELLS.iter()
+                    let magic_level = state
+                        .get_local_player()
+                        .map(|p| p.skills.magic.level)
+                        .unwrap_or(1);
+                    let unlocked: Vec<_> = crate::game::spell::SPELLS
+                        .iter()
                         .filter(|s| magic_level >= s.magic_level_req)
                         .collect();
                     if let Some(spell_def) = unlocked.get(*idx) {
@@ -40,20 +43,21 @@ impl Renderer {
                 }
             }
             Some(UiElementId::EquipmentSlot(slot_type)) if state.ui_state.inventory_open => {
-                let equipped_item = state.get_local_player().and_then(|p| {
-                    match slot_type.as_str() {
-                        "head" => p.equipped_head.clone(),
-                        "body" => p.equipped_body.clone(),
-                        "weapon" => p.equipped_weapon.clone(),
-                        "back" => p.equipped_back.clone(),
-                        "feet" => p.equipped_feet.clone(),
-                        "ring" => p.equipped_ring.clone(),
-                        "gloves" => p.equipped_gloves.clone(),
-                        "necklace" => p.equipped_necklace.clone(),
-                        "belt" => p.equipped_belt.clone(),
-                        _ => None,
-                    }
-                });
+                let equipped_item =
+                    state
+                        .get_local_player()
+                        .and_then(|p| match slot_type.as_str() {
+                            "head" => p.equipped_head.clone(),
+                            "body" => p.equipped_body.clone(),
+                            "weapon" => p.equipped_weapon.clone(),
+                            "back" => p.equipped_back.clone(),
+                            "feet" => p.equipped_feet.clone(),
+                            "ring" => p.equipped_ring.clone(),
+                            "gloves" => p.equipped_gloves.clone(),
+                            "necklace" => p.equipped_necklace.clone(),
+                            "belt" => p.equipped_belt.clone(),
+                            _ => None,
+                        });
                 if let Some(id) = equipped_item {
                     (id, 1) // Equipment always has quantity 1
                 } else {
@@ -67,7 +71,8 @@ impl Renderer {
         let item_def = state.item_registry.get_or_placeholder(&item_id);
 
         // Get player combat level for requirement checking (single combat skill)
-        let player_combat_level = state.get_local_player()
+        let player_combat_level = state
+            .get_local_player()
             .map(|p| p.skills.combat.level)
             .unwrap_or(1);
 
@@ -78,7 +83,7 @@ impl Renderer {
         let padding = 10.0;
         let line_height = 20.0;
         let font_size = 16.0;
-        let small_font_size = 16.0;  // Use 16pt for all text (native size)
+        let small_font_size = 16.0; // Use 16pt for all text (native size)
         let max_tooltip_width = 200.0;
         let text_width_limit = max_tooltip_width - padding * 2.0;
 
@@ -117,7 +122,10 @@ impl Renderer {
                 } else {
                     format!("{} Strength", equip.strength_bonus)
                 };
-                max_w = max_w.max(self.measure_text_sharp(&strength_text, small_font_size).width);
+                max_w = max_w.max(
+                    self.measure_text_sharp(&strength_text, small_font_size)
+                        .width,
+                );
             }
             if equip.defence_bonus != 0 {
                 let defence_text = if equip.defence_bonus > 0 {
@@ -125,7 +133,10 @@ impl Renderer {
                 } else {
                     format!("{} Defence", equip.defence_bonus)
                 };
-                max_w = max_w.max(self.measure_text_sharp(&defence_text, small_font_size).width);
+                max_w = max_w.max(
+                    self.measure_text_sharp(&defence_text, small_font_size)
+                        .width,
+                );
             }
             // Measure requirement text
             let is_weapon = equip.slot_type == "weapon";
@@ -169,7 +180,9 @@ impl Renderer {
                 }
                 // Level requirement line (only if > 1)
                 let is_weapon = equip.slot_type == "weapon";
-                if (is_weapon && equip.attack_level_required > 1) || (!is_weapon && equip.defence_level_required > 1) {
+                if (is_weapon && equip.attack_level_required > 1)
+                    || (!is_weapon && equip.defence_level_required > 1)
+                {
                     total_h += line_height;
                 }
             }
@@ -192,17 +205,39 @@ impl Renderer {
 
         // Draw tooltip frame (3-layer)
         // Shadow
-        draw_rectangle(tooltip_x + 2.0, tooltip_y + 2.0, tooltip_width, tooltip_height,
-                       Color::new(0.0, 0.0, 0.0, 0.4));
+        draw_rectangle(
+            tooltip_x + 2.0,
+            tooltip_y + 2.0,
+            tooltip_width,
+            tooltip_height,
+            Color::new(0.0, 0.0, 0.0, 0.4),
+        );
         // Frame
-        draw_rectangle(tooltip_x - 1.0, tooltip_y - 1.0, tooltip_width + 2.0, tooltip_height + 2.0,
-                       TOOLTIP_FRAME);
+        draw_rectangle(
+            tooltip_x - 1.0,
+            tooltip_y - 1.0,
+            tooltip_width + 2.0,
+            tooltip_height + 2.0,
+            TOOLTIP_FRAME,
+        );
         // Background
-        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
+        draw_rectangle(
+            tooltip_x,
+            tooltip_y,
+            tooltip_width,
+            tooltip_height,
+            TOOLTIP_BG,
+        );
 
         // Inner highlight (top edge)
-        draw_line(tooltip_x + 1.0, tooltip_y + 1.0, tooltip_x + tooltip_width - 1.0, tooltip_y + 1.0,
-                  1.0, Color::new(0.227, 0.227, 0.267, 1.0));
+        draw_line(
+            tooltip_x + 1.0,
+            tooltip_y + 1.0,
+            tooltip_x + tooltip_width - 1.0,
+            tooltip_y + 1.0,
+            1.0,
+            Color::new(0.227, 0.227, 0.267, 1.0),
+        );
 
         let mut y = tooltip_y + padding + 12.0;
 
@@ -239,8 +274,8 @@ impl Renderer {
         if let Some(ref equip) = item_def.equipment {
             y += 2.0;
             // Stat colors
-            let stat_green = Color::new(0.392, 0.784, 0.392, 1.0);  // rgba(100, 200, 100)
-            let stat_red = Color::new(1.0, 0.392, 0.392, 1.0);      // rgba(255, 100, 100)
+            let stat_green = Color::new(0.392, 0.784, 0.392, 1.0); // rgba(100, 200, 100)
+            let stat_red = Color::new(1.0, 0.392, 0.392, 1.0); // rgba(255, 100, 100)
 
             // Attack bonus
             if equip.attack_bonus != 0 {
@@ -249,8 +284,18 @@ impl Renderer {
                 } else {
                     format!("{} Attack", equip.attack_bonus)
                 };
-                let attack_color = if equip.attack_bonus > 0 { stat_green } else { stat_red };
-                self.draw_text_sharp(&attack_text, tooltip_x + padding, y, small_font_size, attack_color);
+                let attack_color = if equip.attack_bonus > 0 {
+                    stat_green
+                } else {
+                    stat_red
+                };
+                self.draw_text_sharp(
+                    &attack_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    attack_color,
+                );
                 y += line_height;
             }
 
@@ -261,8 +306,18 @@ impl Renderer {
                 } else {
                     format!("{} Strength", equip.strength_bonus)
                 };
-                let strength_color = if equip.strength_bonus > 0 { stat_green } else { stat_red };
-                self.draw_text_sharp(&strength_text, tooltip_x + padding, y, small_font_size, strength_color);
+                let strength_color = if equip.strength_bonus > 0 {
+                    stat_green
+                } else {
+                    stat_red
+                };
+                self.draw_text_sharp(
+                    &strength_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    strength_color,
+                );
                 y += line_height;
             }
 
@@ -273,24 +328,46 @@ impl Renderer {
                 } else {
                     format!("{} Defence", equip.defence_bonus)
                 };
-                let defence_color = if equip.defence_bonus > 0 { stat_green } else { stat_red };
-                self.draw_text_sharp(&defence_text, tooltip_x + padding, y, small_font_size, defence_color);
+                let defence_color = if equip.defence_bonus > 0 {
+                    stat_green
+                } else {
+                    stat_red
+                };
+                self.draw_text_sharp(
+                    &defence_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    defence_color,
+                );
                 y += line_height;
             }
 
             // Level requirements - check highest requirement against combat level
-            let level_required = equip.attack_level_required.max(equip.defence_level_required);
+            let level_required = equip
+                .attack_level_required
+                .max(equip.defence_level_required);
             if level_required > 1 {
                 let meets_req = player_combat_level >= level_required;
                 let req_color = if meets_req { stat_green } else { stat_red };
                 let req_text = format!("Requires {} Combat", level_required);
-                self.draw_text_sharp(&req_text, tooltip_x + padding, y, small_font_size, req_color);
+                self.draw_text_sharp(
+                    &req_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    req_color,
+                );
             }
         }
     }
 
     /// Render a spell tooltip near the mouse cursor (for quick slot spell bar)
-    fn render_quick_slot_spell_tooltip(&self, spell_def: &crate::game::spell::SpellDef, state: &GameState) {
+    fn render_quick_slot_spell_tooltip(
+        &self,
+        spell_def: &crate::game::spell::SpellDef,
+        state: &GameState,
+    ) {
         let (mouse_x, mouse_y) = mouse_position();
         let padding = 10.0;
         let line_height = 20.0;
@@ -344,13 +421,35 @@ impl Renderer {
         }
 
         // Draw tooltip frame
-        draw_rectangle(tooltip_x + 2.0, tooltip_y + 2.0, tooltip_width, tooltip_height,
-                       Color::new(0.0, 0.0, 0.0, 0.4));
-        draw_rectangle(tooltip_x - 1.0, tooltip_y - 1.0, tooltip_width + 2.0, tooltip_height + 2.0,
-                       TOOLTIP_FRAME);
-        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
-        draw_line(tooltip_x + 1.0, tooltip_y + 1.0, tooltip_x + tooltip_width - 1.0, tooltip_y + 1.0,
-                  1.0, Color::new(0.227, 0.227, 0.267, 1.0));
+        draw_rectangle(
+            tooltip_x + 2.0,
+            tooltip_y + 2.0,
+            tooltip_width,
+            tooltip_height,
+            Color::new(0.0, 0.0, 0.0, 0.4),
+        );
+        draw_rectangle(
+            tooltip_x - 1.0,
+            tooltip_y - 1.0,
+            tooltip_width + 2.0,
+            tooltip_height + 2.0,
+            TOOLTIP_FRAME,
+        );
+        draw_rectangle(
+            tooltip_x,
+            tooltip_y,
+            tooltip_width,
+            tooltip_height,
+            TOOLTIP_BG,
+        );
+        draw_line(
+            tooltip_x + 1.0,
+            tooltip_y + 1.0,
+            tooltip_x + tooltip_width - 1.0,
+            tooltip_y + 1.0,
+            1.0,
+            Color::new(0.227, 0.227, 0.267, 1.0),
+        );
 
         let mut y = tooltip_y + padding + 12.0;
 
@@ -389,8 +488,10 @@ impl Renderer {
         y += line_height;
 
         // Requirement
-        let magic_level = state.get_local_player()
-            .map(|p| p.skills.magic.level).unwrap_or(1);
+        let magic_level = state
+            .get_local_player()
+            .map(|p| p.skills.magic.level)
+            .unwrap_or(1);
         let meets_req = magic_level >= spell_def.magic_level_req;
         let req_color = if meets_req {
             Color::new(0.392, 0.784, 0.392, 1.0)

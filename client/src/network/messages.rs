@@ -68,10 +68,18 @@ pub enum ClientMessage {
     Equip { slot_index: u8 },
 
     #[serde(rename = "unequip")]
-    Unequip { slot_type: String, target_slot: Option<u8> },
+    Unequip {
+        slot_type: String,
+        target_slot: Option<u8>,
+    },
 
     #[serde(rename = "dropItem")]
-    DropItem { slot_index: u8, quantity: u32, target_x: Option<i32>, target_y: Option<i32> },
+    DropItem {
+        slot_index: u8,
+        quantity: u32,
+        target_x: Option<i32>,
+        target_y: Option<i32>,
+    },
 
     #[serde(rename = "dropGold")]
     DropGold { amount: i32 },
@@ -80,10 +88,18 @@ pub enum ClientMessage {
     SwapSlots { from_slot: u8, to_slot: u8 },
 
     #[serde(rename = "shopBuy")]
-    ShopBuy { npc_id: String, item_id: String, quantity: u32 },
+    ShopBuy {
+        npc_id: String,
+        item_id: String,
+        quantity: u32,
+    },
 
     #[serde(rename = "shopSell")]
-    ShopSell { npc_id: String, item_id: String, quantity: u32 },
+    ShopSell {
+        npc_id: String,
+        item_id: String,
+        quantity: u32,
+    },
 
     // Bank commands
     #[serde(rename = "bankDeposit")]
@@ -110,7 +126,11 @@ pub enum ClientMessage {
 
     // Woodcutting commands
     #[serde(rename = "chopTree")]
-    ChopTree { tree_x: i32, tree_y: i32, tree_gid: u32 },
+    ChopTree {
+        tree_x: i32,
+        tree_y: i32,
+        tree_gid: u32,
+    },
 
     // Chair commands
     #[serde(rename = "sitChair")]
@@ -191,11 +211,12 @@ impl ClientMessage {
                 data.insert("dy".into(), Value::F64(*dy as f64));
                 "move"
             }
-            ClientMessage::Dash => {
-                "dash"
-            }
+            ClientMessage::Dash => "dash",
             ClientMessage::Face { direction } => {
-                data.insert("direction".into(), Value::Integer((*direction as i64).into()));
+                data.insert(
+                    "direction".into(),
+                    Value::Integer((*direction as i64).into()),
+                );
                 "face"
             }
             ClientMessage::MoveTo { x, y } => {
@@ -218,7 +239,10 @@ impl ClientMessage {
                 "pickup"
             }
             ClientMessage::UseItem { slot_index } => {
-                data.insert("slot_index".into(), Value::Integer((*slot_index as i64).into()));
+                data.insert(
+                    "slot_index".into(),
+                    Value::Integer((*slot_index as i64).into()),
+                );
                 "useItem"
             }
             ClientMessage::RequestChunk { chunk_x, chunk_y } => {
@@ -230,7 +254,10 @@ impl ClientMessage {
                 data.insert("npc_id".into(), Value::String(npc_id.clone().into()));
                 "interact"
             }
-            ClientMessage::DialogueChoice { quest_id, choice_id } => {
+            ClientMessage::DialogueChoice {
+                quest_id,
+                choice_id,
+            } => {
                 data.insert("quest_id".into(), Value::String(quest_id.clone().into()));
                 data.insert("choice_id".into(), Value::String(choice_id.clone().into()));
                 "dialogueChoice"
@@ -253,18 +280,32 @@ impl ClientMessage {
             }
             ClientMessage::CancelCraft => "cancelCraft",
             ClientMessage::Equip { slot_index } => {
-                data.insert("slot_index".into(), Value::Integer((*slot_index as i64).into()));
+                data.insert(
+                    "slot_index".into(),
+                    Value::Integer((*slot_index as i64).into()),
+                );
                 "equip"
             }
-            ClientMessage::Unequip { slot_type, target_slot } => {
+            ClientMessage::Unequip {
+                slot_type,
+                target_slot,
+            } => {
                 data.insert("slot_type".into(), Value::String(slot_type.clone().into()));
                 if let Some(slot) = target_slot {
                     data.insert("target_slot".into(), Value::Integer((*slot as i64).into()));
                 }
                 "unequip"
             }
-            ClientMessage::DropItem { slot_index, quantity, target_x, target_y } => {
-                data.insert("slot_index".into(), Value::Integer((*slot_index as i64).into()));
+            ClientMessage::DropItem {
+                slot_index,
+                quantity,
+                target_x,
+                target_y,
+            } => {
+                data.insert(
+                    "slot_index".into(),
+                    Value::Integer((*slot_index as i64).into()),
+                );
                 data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
                 if let Some(x) = target_x {
                     data.insert("target_x".into(), Value::Integer((*x as i64).into()));
@@ -279,17 +320,28 @@ impl ClientMessage {
                 "dropGold"
             }
             ClientMessage::SwapSlots { from_slot, to_slot } => {
-                data.insert("from_slot".into(), Value::Integer((*from_slot as i64).into()));
+                data.insert(
+                    "from_slot".into(),
+                    Value::Integer((*from_slot as i64).into()),
+                );
                 data.insert("to_slot".into(), Value::Integer((*to_slot as i64).into()));
                 "swapSlots"
             }
-            ClientMessage::ShopBuy { npc_id, item_id, quantity } => {
+            ClientMessage::ShopBuy {
+                npc_id,
+                item_id,
+                quantity,
+            } => {
                 data.insert("npcId".into(), Value::String(npc_id.clone().into()));
                 data.insert("itemId".into(), Value::String(item_id.clone().into()));
                 data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
                 "shopBuy"
             }
-            ClientMessage::ShopSell { npc_id, item_id, quantity } => {
+            ClientMessage::ShopSell {
+                npc_id,
+                item_id,
+                quantity,
+            } => {
                 data.insert("npcId".into(), Value::String(npc_id.clone().into()));
                 data.insert("itemId".into(), Value::String(item_id.clone().into()));
                 data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
@@ -323,7 +375,11 @@ impl ClientMessage {
                 "startGathering"
             }
             ClientMessage::StopGathering => "stopGathering",
-            ClientMessage::ChopTree { tree_x, tree_y, tree_gid } => {
+            ClientMessage::ChopTree {
+                tree_x,
+                tree_y,
+                tree_gid,
+            } => {
                 data.insert("tree_x".into(), Value::Integer((*tree_x as i64).into()));
                 data.insert("tree_y".into(), Value::Integer((*tree_y as i64).into()));
                 data.insert("tree_gid".into(), Value::Integer((*tree_gid as i64).into()));
@@ -345,15 +401,24 @@ impl ClientMessage {
                 "harvestCrop"
             }
             ClientMessage::SendFriendRequest { target_name } => {
-                data.insert("target_name".into(), Value::String(target_name.clone().into()));
+                data.insert(
+                    "target_name".into(),
+                    Value::String(target_name.clone().into()),
+                );
                 "sendFriendRequest"
             }
             ClientMessage::AcceptFriendRequest { requester_id } => {
-                data.insert("requester_id".into(), Value::Integer((*requester_id).into()));
+                data.insert(
+                    "requester_id".into(),
+                    Value::Integer((*requester_id).into()),
+                );
                 "acceptFriendRequest"
             }
             ClientMessage::DeclineFriendRequest { requester_id } => {
-                data.insert("requester_id".into(), Value::Integer((*requester_id).into()));
+                data.insert(
+                    "requester_id".into(),
+                    Value::Integer((*requester_id).into()),
+                );
                 "declineFriendRequest"
             }
             ClientMessage::RemoveFriend { friend_id } => {

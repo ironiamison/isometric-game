@@ -1,19 +1,24 @@
 //! Skills panel rendering - compact 3x3 grid showing skill levels
 //! 3 active skills (Hitpoints, Combat, Fishing), 5 locked placeholder slots
 
-use macroquad::prelude::*;
+use super::super::Renderer;
+use super::common::*;
 use crate::game::{GameState, SkillType};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
-use super::super::Renderer;
-use super::common::*;
+use macroquad::prelude::*;
 
 /// Skills panel dimensions (compact: just fits the 3x3 grid with padding)
 const SKILLS_PANEL_PADDING: f32 = 8.0;
 const SKILLS_GRID_WIDTH: f32 = 3.0 * SKILL_SLOT_SIZE + 2.0 * SKILL_SLOT_SPACING; // 128
-const SKILLS_PANEL_WIDTH: f32 = SKILLS_GRID_WIDTH + SKILLS_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0; // 152
+const SKILLS_PANEL_WIDTH: f32 =
+    SKILLS_GRID_WIDTH + SKILLS_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0; // 152
 const SKILLS_HEADER_HEIGHT: f32 = 24.0;
-const SKILLS_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0 + SKILLS_HEADER_HEIGHT + SKILLS_PANEL_PADDING + SKILLS_GRID_WIDTH + SKILLS_PANEL_PADDING; // 176
+const SKILLS_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
+    + SKILLS_HEADER_HEIGHT
+    + SKILLS_PANEL_PADDING
+    + SKILLS_GRID_WIDTH
+    + SKILLS_PANEL_PADDING; // 176
 
 /// Skill slot dimensions
 const SKILL_SLOT_SIZE: f32 = 40.0;
@@ -41,7 +46,12 @@ const ACTIVE_SKILLS: [SkillType; 9] = [
 
 impl Renderer {
     /// Render the skills panel when open
-    pub(crate) fn render_skills_panel(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+    pub(crate) fn render_skills_panel(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
         if !state.ui_state.skills_open {
             return;
         }
@@ -85,13 +95,20 @@ impl Renderer {
         );
 
         // Header text with combat level (native font size for crisp rendering)
-        let combat_level = state.get_local_player()
+        let combat_level = state
+            .get_local_player()
             .map(|p| p.combat_level())
             .unwrap_or(3);
         let header_text = format!("Skills (Cmb: {})", combat_level);
         let text_dims = self.measure_text_sharp(&header_text, 16.0);
         let text_x = header_x + (header_w - text_dims.width) / 2.0;
-        self.draw_text_sharp(&header_text, text_x, header_y + (header_height + 12.0) / 2.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            &header_text,
+            text_x,
+            header_y + (header_height + 12.0) / 2.0,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Grid area
         let grid_x = panel_x + frame_thickness + panel_padding;
@@ -113,11 +130,20 @@ impl Renderer {
             if slot_index < ACTIVE_SKILLS.len() {
                 // Active skill slot
                 let skill_type = ACTIVE_SKILLS[slot_index];
-                let skill = state.get_local_player()
+                let skill = state
+                    .get_local_player()
                     .map(|p| p.skills.get(skill_type).clone())
                     .unwrap_or_default();
 
-                self.draw_skill_slot_scaled(slot_x, slot_y, slot_size, skill_type, skill.level, is_hovered, scale);
+                self.draw_skill_slot_scaled(
+                    slot_x,
+                    slot_y,
+                    slot_size,
+                    skill_type,
+                    skill.level,
+                    is_hovered,
+                    scale,
+                );
             } else {
                 // Locked placeholder slot
                 self.draw_locked_skill_slot_scaled(slot_x, slot_y, slot_size, scale);
@@ -126,17 +152,48 @@ impl Renderer {
     }
 
     /// Draw an active skill slot with icon and level (scaled)
-    fn draw_skill_slot_scaled(&self, x: f32, y: f32, size: f32, skill_type: SkillType, level: i32, is_hovered: bool, scale: f32) {
+    fn draw_skill_slot_scaled(
+        &self,
+        x: f32,
+        y: f32,
+        size: f32,
+        skill_type: SkillType,
+        level: i32,
+        is_hovered: bool,
+        scale: f32,
+    ) {
         // Background
-        let bg_color = if is_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
-        let border_color = if is_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
+        let bg_color = if is_hovered {
+            SLOT_HOVER_BG
+        } else {
+            SLOT_BG_EMPTY
+        };
+        let border_color = if is_hovered {
+            SLOT_HOVER_BORDER
+        } else {
+            SLOT_BORDER
+        };
 
         draw_rectangle(x, y, size, size, border_color);
         draw_rectangle(x + 1.0, y + 1.0, size - 2.0, size - 2.0, bg_color);
 
         // Inner shadow
-        draw_line(x + 2.0, y + 2.0, x + size - 2.0, y + 2.0, 2.0, SLOT_INNER_SHADOW);
-        draw_line(x + 2.0, y + 2.0, x + 2.0, y + size - 2.0, 2.0, SLOT_INNER_SHADOW);
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + size - 2.0,
+            y + 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
+        draw_line(
+            x + 2.0,
+            y + 2.0,
+            x + 2.0,
+            y + size - 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
 
         // Draw skill icon (scaled)
         let icon_size = UI_ICON_SIZE * scale;
@@ -147,14 +204,19 @@ impl Renderer {
         let drew_icon = if skill_type == SkillType::Fishing {
             if let Some(ref tex) = self.fishing_skill_icon {
                 draw_texture_ex(
-                    tex, icon_x, icon_y, WHITE,
+                    tex,
+                    icon_x,
+                    icon_y,
+                    WHITE,
                     DrawTextureParams {
                         dest_size: Some(Vec2::new(icon_size, icon_size)),
                         ..Default::default()
                     },
                 );
                 true
-            } else { false }
+            } else {
+                false
+            }
         } else if let Some(ref texture) = self.ui_icons {
             let (icon_col, icon_row) = match skill_type {
                 SkillType::Hitpoints => (0, 6),
@@ -172,7 +234,10 @@ impl Renderer {
             let src_rect = Rect::new(src_x, src_y, UI_ICON_SIZE, UI_ICON_SIZE);
 
             draw_texture_ex(
-                texture, icon_x, icon_y, WHITE,
+                texture,
+                icon_x,
+                icon_y,
+                WHITE,
                 DrawTextureParams {
                     source: Some(src_rect),
                     dest_size: Some(Vec2::new(icon_size, icon_size)),
@@ -180,7 +245,9 @@ impl Renderer {
                 },
             );
             true
-        } else { false };
+        } else {
+            false
+        };
 
         if !drew_icon {
             // Fallback to letter if texture not loaded (native font size)
@@ -209,7 +276,13 @@ impl Renderer {
         let level_y = y + size - 4.0;
 
         // Text shadow
-        self.draw_text_sharp(&level_text, level_x + 1.0, level_y + 1.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+        self.draw_text_sharp(
+            &level_text,
+            level_x + 1.0,
+            level_y + 1.0,
+            16.0,
+            Color::new(0.0, 0.0, 0.0, 0.8),
+        );
         // Text
         self.draw_text_sharp(&level_text, level_x, level_y, 16.0, TEXT_NORMAL);
     }
@@ -229,18 +302,42 @@ impl Renderer {
         let lock_color = Color::new(0.3, 0.28, 0.25, 1.0);
 
         // Lock body (rectangle)
-        draw_rectangle(center_x - 6.0 * scale, center_y - 2.0 * scale, 12.0 * scale, 10.0 * scale, lock_color);
+        draw_rectangle(
+            center_x - 6.0 * scale,
+            center_y - 2.0 * scale,
+            12.0 * scale,
+            10.0 * scale,
+            lock_color,
+        );
 
         // Lock shackle (arch)
-        draw_rectangle(center_x - 4.0 * scale, center_y - 8.0 * scale, 2.0 * scale, 8.0 * scale, lock_color);
-        draw_rectangle(center_x + 2.0 * scale, center_y - 8.0 * scale, 2.0 * scale, 8.0 * scale, lock_color);
-        draw_rectangle(center_x - 4.0 * scale, center_y - 10.0 * scale, 8.0 * scale, 3.0 * scale, lock_color);
+        draw_rectangle(
+            center_x - 4.0 * scale,
+            center_y - 8.0 * scale,
+            2.0 * scale,
+            8.0 * scale,
+            lock_color,
+        );
+        draw_rectangle(
+            center_x + 2.0 * scale,
+            center_y - 8.0 * scale,
+            2.0 * scale,
+            8.0 * scale,
+            lock_color,
+        );
+        draw_rectangle(
+            center_x - 4.0 * scale,
+            center_y - 10.0 * scale,
+            8.0 * scale,
+            3.0 * scale,
+            lock_color,
+        );
     }
 
     /// Get the icon color for a skill type
     fn get_skill_icon_color(&self, skill_type: SkillType) -> Color {
         match skill_type {
-            SkillType::Hitpoints => Color::new(0.8, 0.2, 0.2, 1.0),  // Red
+            SkillType::Hitpoints => Color::new(0.8, 0.2, 0.2, 1.0), // Red
             SkillType::Combat => Color::new(0.85, 0.65, 0.15, 1.0), // Gold/orange
             SkillType::Fishing => Color::new(0.2, 0.6, 0.85, 1.0),  // Blue
             SkillType::Farming => Color::new(0.3, 0.75, 0.3, 1.0),  // Green
@@ -248,7 +345,7 @@ impl Renderer {
             SkillType::Prayer => Color::new(0.9, 0.9, 0.5, 1.0),    // Light yellow (holy)
             SkillType::Magic => Color::new(0.4, 0.3, 0.9, 1.0),     // Purple (arcane)
             SkillType::Woodcutting => Color::new(0.55, 0.35, 0.2, 1.0), // Brown (wood)
-            SkillType::Alchemy => Color::new(0.5, 0.8, 0.4, 1.0),      // Potion green
+            SkillType::Alchemy => Color::new(0.5, 0.8, 0.4, 1.0),   // Potion green
         }
     }
 
@@ -271,11 +368,15 @@ impl Renderer {
         // Tooltip content
         let name = skill_type.display_name();
         let level_text = format!("Level: {}", skill.level);
-        let xp_text = format!("XP: {} / {}",
+        let xp_text = format!(
+            "XP: {} / {}",
             Self::format_number(skill.xp),
             Self::format_number(crate::game::skills::total_xp_for_level(skill.level + 1))
         );
-        let remaining_text = format!("To next: {} XP", Self::format_number(skill.xp_to_next_level()));
+        let remaining_text = format!(
+            "To next: {} XP",
+            Self::format_number(skill.xp_to_next_level())
+        );
 
         // Calculate tooltip size
         let padding = 8.0;
@@ -287,7 +388,8 @@ impl Renderer {
         let xp_dims = self.measure_text_sharp(&xp_text, font_size);
         let remaining_dims = self.measure_text_sharp(&remaining_text, font_size);
 
-        let max_width = name_dims.width
+        let max_width = name_dims
+            .width
             .max(level_dims.width)
             .max(xp_dims.width)
             .max(remaining_dims.width);
@@ -301,8 +403,20 @@ impl Renderer {
         let tooltip_y = (mouse_y + 16.0).min(sh - tooltip_height - 8.0);
 
         // Draw tooltip background
-        draw_rectangle(tooltip_x - 1.0, tooltip_y - 1.0, tooltip_width + 2.0, tooltip_height + 2.0, TOOLTIP_FRAME);
-        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
+        draw_rectangle(
+            tooltip_x - 1.0,
+            tooltip_y - 1.0,
+            tooltip_width + 2.0,
+            tooltip_height + 2.0,
+            TOOLTIP_FRAME,
+        );
+        draw_rectangle(
+            tooltip_x,
+            tooltip_y,
+            tooltip_width,
+            tooltip_height,
+            TOOLTIP_BG,
+        );
 
         // Draw text
         let mut text_y = tooltip_y + padding + 14.0;
@@ -312,15 +426,33 @@ impl Renderer {
         text_y += line_height;
 
         // Level
-        self.draw_text_sharp(&level_text, tooltip_x + padding, text_y, font_size, TEXT_NORMAL);
+        self.draw_text_sharp(
+            &level_text,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
         text_y += line_height;
 
         // XP
-        self.draw_text_sharp(&xp_text, tooltip_x + padding, text_y, font_size, TEXT_NORMAL);
+        self.draw_text_sharp(
+            &xp_text,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
         text_y += line_height;
 
         // Remaining
-        self.draw_text_sharp(&remaining_text, tooltip_x + padding, text_y, font_size, TEXT_DIM);
+        self.draw_text_sharp(
+            &remaining_text,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_DIM,
+        );
     }
 
     /// Format a number with commas (e.g., 1234567 -> "1,234,567")

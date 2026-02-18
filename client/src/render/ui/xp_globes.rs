@@ -1,8 +1,8 @@
 //! XP globe notifications - circular progress indicators for skill XP gains
 
-use macroquad::prelude::*;
 use crate::game::SkillType;
 use crate::util::virtual_screen_size;
+use macroquad::prelude::*;
 
 // ============================================================================
 // Constants
@@ -10,10 +10,10 @@ use crate::util::virtual_screen_size;
 
 pub const GLOBE_SIZE: f32 = 40.0;
 pub const GLOBE_SPACING: f32 = 4.0;
-const STATS_PADDING: f32 = 6.0;  // Extra padding from the stats bar
+const STATS_PADDING: f32 = 6.0; // Extra padding from the stats bar
 const ICON_SIZE: f32 = 24.0;
 const RING_THICKNESS: f32 = 5.0;
-const VISIBLE_DURATION: f64 = 6.0;  // Seconds before fade starts
+const VISIBLE_DURATION: f64 = 6.0; // Seconds before fade starts
 const FADE_OUT_DURATION: f64 = 0.5; // Seconds to fully fade
 
 // UI icons sprite sheet: 24x24 icons in 10 columns
@@ -88,11 +88,20 @@ pub struct XpGlobesManager {
 
 impl XpGlobesManager {
     pub fn new() -> Self {
-        Self { globes: Vec::new(), tapped_skill: None }
+        Self {
+            globes: Vec::new(),
+            tapped_skill: None,
+        }
     }
 
     /// Handle an XP gain event
-    pub fn on_xp_gain(&mut self, skill_type: SkillType, current_xp: i64, xp_for_next_level: i64, level: i32) {
+    pub fn on_xp_gain(
+        &mut self,
+        skill_type: SkillType,
+        current_xp: i64,
+        xp_for_next_level: i64,
+        level: i32,
+    ) {
         // Check if globe for this skill already exists
         if let Some(globe) = self.globes.iter_mut().find(|g| g.skill_type == skill_type) {
             // Update existing globe
@@ -102,7 +111,10 @@ impl XpGlobesManager {
             globe.last_updated = macroquad::time::get_time();
         } else {
             // Create new globe (insert at beginning so it appears on the left)
-            self.globes.insert(0, XpGlobe::new(skill_type, current_xp, xp_for_next_level, level));
+            self.globes.insert(
+                0,
+                XpGlobe::new(skill_type, current_xp, xp_for_next_level, level),
+            );
         }
     }
 
@@ -156,7 +168,11 @@ impl XpGlobesManager {
 
         // Clear tapped_skill if that globe no longer exists
         if let Some(skill) = self.tapped_skill {
-            if !self.globes.iter().any(|g| g.skill_type == skill && !g.is_expired(current_time)) {
+            if !self
+                .globes
+                .iter()
+                .any(|g| g.skill_type == skill && !g.is_expired(current_time))
+            {
                 self.tapped_skill = None;
             }
         }
@@ -174,7 +190,12 @@ use super::super::Renderer;
 
 impl Renderer {
     /// Render XP globes to the left of player stats
-    pub fn render_xp_globes(&self, xp_globes: &XpGlobesManager, stats_left_x: f32, stats_center_y: f32) {
+    pub fn render_xp_globes(
+        &self,
+        xp_globes: &XpGlobesManager,
+        stats_left_x: f32,
+        stats_center_y: f32,
+    ) {
         let current_time = macroquad::time::get_time();
 
         // Globes render right-to-left from stats area
@@ -209,7 +230,7 @@ impl Renderer {
             center_x,
             center_y,
             radius,
-            Color::new(0.05, 0.05, 0.07, 0.95 * opacity)
+            Color::new(0.05, 0.05, 0.07, 0.95 * opacity),
         );
 
         // Dark ring border
@@ -218,13 +239,21 @@ impl Renderer {
             center_y,
             radius - 1.0,
             2.0,
-            Color::new(0.2, 0.18, 0.15, opacity)
+            Color::new(0.2, 0.18, 0.15, opacity),
         );
 
         // Progress arc (draw in the ring area between outer border and inner circle)
         let progress = globe.progress();
         if progress > 0.0 {
-            self.draw_progress_arc(center_x, center_y, radius - 1.0, inner_radius + 1.0, progress, skill_color, opacity);
+            self.draw_progress_arc(
+                center_x,
+                center_y,
+                radius - 1.0,
+                inner_radius + 1.0,
+                progress,
+                skill_color,
+                opacity,
+            );
         }
 
         // Inner dark circle (behind icon)
@@ -232,14 +261,23 @@ impl Renderer {
             center_x,
             center_y,
             inner_radius,
-            Color::new(0.08, 0.08, 0.10, opacity)
+            Color::new(0.08, 0.08, 0.10, opacity),
         );
 
         // Skill icon
         self.draw_xp_globe_icon(globe.skill_type, center_x, center_y, opacity);
     }
 
-    fn draw_progress_arc(&self, cx: f32, cy: f32, outer_r: f32, inner_r: f32, progress: f32, color: Color, opacity: f32) {
+    fn draw_progress_arc(
+        &self,
+        cx: f32,
+        cy: f32,
+        outer_r: f32,
+        inner_r: f32,
+        progress: f32,
+        color: Color,
+        opacity: f32,
+    ) {
         // Draw arc as a series of small segments
         let segments = 32;
         let start_angle = -std::f32::consts::FRAC_PI_2; // Start from top
@@ -265,23 +303,44 @@ impl Renderer {
             let x1 = cx + angle1.cos() * mid_r;
             let y1 = cy + angle1.sin() * mid_r;
 
-            draw_line(x0, y0, x1, y1, thickness, Color::new(color.r, color.g, color.b, opacity));
+            draw_line(
+                x0,
+                y0,
+                x1,
+                y1,
+                thickness,
+                Color::new(color.r, color.g, color.b, opacity),
+            );
         }
     }
 
-    fn draw_xp_globe_icon(&self, skill_type: SkillType, center_x: f32, center_y: f32, opacity: f32) {
+    fn draw_xp_globe_icon(
+        &self,
+        skill_type: SkillType,
+        center_x: f32,
+        center_y: f32,
+        opacity: f32,
+    ) {
         let icon_x = center_x - ICON_SIZE / 2.0;
         let icon_y = center_y - ICON_SIZE / 2.0;
         let tint = Color::new(1.0, 1.0, 1.0, opacity);
 
         let drew_icon = if skill_type == SkillType::Fishing {
             if let Some(ref tex) = self.fishing_skill_icon {
-                draw_texture_ex(tex, icon_x, icon_y, tint, DrawTextureParams {
-                    dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
-                    ..Default::default()
-                });
+                draw_texture_ex(
+                    tex,
+                    icon_x,
+                    icon_y,
+                    tint,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
+                        ..Default::default()
+                    },
+                );
                 true
-            } else { false }
+            } else {
+                false
+            }
         } else if let Some(ref texture) = self.ui_icons {
             let (icon_col, icon_row) = match skill_type {
                 SkillType::Hitpoints => (0, 6),
@@ -298,13 +357,21 @@ impl Renderer {
             let src_y = icon_row as f32 * UI_ICON_SIZE;
             let src_rect = Rect::new(src_x, src_y, UI_ICON_SIZE, UI_ICON_SIZE);
 
-            draw_texture_ex(texture, icon_x, icon_y, tint, DrawTextureParams {
-                source: Some(src_rect),
-                dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
-                ..Default::default()
-            });
+            draw_texture_ex(
+                texture,
+                icon_x,
+                icon_y,
+                tint,
+                DrawTextureParams {
+                    source: Some(src_rect),
+                    dest_size: Some(Vec2::new(ICON_SIZE, ICON_SIZE)),
+                    ..Default::default()
+                },
+            );
             true
-        } else { false };
+        } else {
+            false
+        };
 
         if !drew_icon {
             // Fallback to letter
@@ -326,7 +393,7 @@ impl Renderer {
                 center_x - dims.width / 2.0,
                 center_y + 6.0,
                 18.0,
-                Color::new(color.r, color.g, color.b, opacity)
+                Color::new(color.r, color.g, color.b, opacity),
             );
         }
     }
@@ -346,7 +413,12 @@ impl Renderer {
     }
 
     /// Render tooltip for XP globe if mouse is hovering over one or one is tapped
-    pub fn render_xp_globe_tooltip(&self, xp_globes: &XpGlobesManager, stats_left_x: f32, stats_center_y: f32) {
+    pub fn render_xp_globe_tooltip(
+        &self,
+        xp_globes: &XpGlobesManager,
+        stats_left_x: f32,
+        stats_center_y: f32,
+    ) {
         let current_time = macroquad::time::get_time();
         let (raw_mx, raw_my) = mouse_position();
         let (vw, vh) = virtual_screen_size();
@@ -396,7 +468,7 @@ impl Renderer {
     }
 
     fn draw_xp_globe_tooltip(&self, globe: &XpGlobe, mouse_x: f32, mouse_y: f32) {
-        use super::common::{TOOLTIP_BG, TOOLTIP_FRAME, TEXT_GOLD, TEXT_NORMAL, TEXT_DIM};
+        use super::common::{TEXT_DIM, TEXT_GOLD, TEXT_NORMAL, TOOLTIP_BG, TOOLTIP_FRAME};
 
         let skill_name = globe.skill_type.display_name();
         let level_text = format!("Level: {}", globe.level);
@@ -410,7 +482,8 @@ impl Renderer {
             100
         };
 
-        let xp_text = format!("XP: {} / {}",
+        let xp_text = format!(
+            "XP: {} / {}",
             format_number(globe.current_xp),
             format_number(globe.xp_for_next_level)
         );
@@ -429,7 +502,8 @@ impl Renderer {
         let progress_dims = self.measure_text_sharp(&progress_text, font_size);
         let remaining_dims = self.measure_text_sharp(&remaining_text, font_size);
 
-        let max_width = name_dims.width
+        let max_width = name_dims
+            .width
             .max(level_dims.width)
             .max(xp_dims.width)
             .max(progress_dims.width)
@@ -444,32 +518,73 @@ impl Renderer {
         let tooltip_y = (mouse_y + 16.0).min(sh - tooltip_height - 8.0);
 
         // Draw tooltip background
-        draw_rectangle(tooltip_x - 1.0, tooltip_y - 1.0, tooltip_width + 2.0, tooltip_height + 2.0, TOOLTIP_FRAME);
-        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
+        draw_rectangle(
+            tooltip_x - 1.0,
+            tooltip_y - 1.0,
+            tooltip_width + 2.0,
+            tooltip_height + 2.0,
+            TOOLTIP_FRAME,
+        );
+        draw_rectangle(
+            tooltip_x,
+            tooltip_y,
+            tooltip_width,
+            tooltip_height,
+            TOOLTIP_BG,
+        );
 
         // Draw text
         let mut text_y = tooltip_y + padding + 14.0;
 
         // Skill name (gold)
-        self.draw_text_sharp(skill_name, tooltip_x + padding, text_y, font_size, TEXT_GOLD);
+        self.draw_text_sharp(
+            skill_name,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_GOLD,
+        );
         text_y += line_height;
 
         // Level
-        self.draw_text_sharp(&level_text, tooltip_x + padding, text_y, font_size, TEXT_NORMAL);
+        self.draw_text_sharp(
+            &level_text,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
         text_y += line_height;
 
         // XP
-        self.draw_text_sharp(&xp_text, tooltip_x + padding, text_y, font_size, TEXT_NORMAL);
+        self.draw_text_sharp(
+            &xp_text,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
         text_y += line_height;
 
         // Progress percentage
-        self.draw_text_sharp(&progress_text, tooltip_x + padding, text_y, font_size, TEXT_NORMAL);
+        self.draw_text_sharp(
+            &progress_text,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
         text_y += line_height;
 
         // Remaining
-        self.draw_text_sharp(&remaining_text, tooltip_x + padding, text_y, font_size, TEXT_DIM);
+        self.draw_text_sharp(
+            &remaining_text,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_DIM,
+        );
     }
-
 }
 
 /// Format a number with commas (e.g., 1234567 -> "1,234,567")

@@ -84,7 +84,7 @@ pub enum UiElementId {
 
     // Spell Panel (shares with prayer panel)
     SpellSlot(usize),
-    PrayerSpellTab(usize),  // 0 = Prayers tab, 1 = Spells tab
+    PrayerSpellTab(usize), // 0 = Prayers tab, 1 = Spells tab
 
     // Spell/Item bar toggle button
     SpellBarToggle,
