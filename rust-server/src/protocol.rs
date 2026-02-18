@@ -436,6 +436,9 @@ pub enum ServerMessage {
         rewards_exp: i32,
         rewards_gold: i32,
     },
+    QuestStateSync {
+        completed_quest_ids: Vec<String>,
+    },
     ShowDialogue {
         quest_id: String,
         npc_id: String,
@@ -1057,6 +1060,7 @@ impl ServerMessage {
             ServerMessage::QuestAccepted { .. } => "questAccepted",
             ServerMessage::QuestObjectiveProgress { .. } => "questObjectiveProgress",
             ServerMessage::QuestCompleted { .. } => "questCompleted",
+            ServerMessage::QuestStateSync { .. } => "questStateSync",
             ServerMessage::ShowDialogue { .. } => "showDialogue",
             ServerMessage::Error { .. } => "error",
             ServerMessage::ChunkData { .. } => "chunkData",
@@ -2302,6 +2306,19 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("rewards_gold".into()),
                 Value::Integer((*rewards_gold as i64).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::QuestStateSync { completed_quest_ids } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("completed_quest_ids".into()),
+                Value::Array(
+                    completed_quest_ids
+                        .iter()
+                        .map(|id| Value::String(id.clone().into()))
+                        .collect(),
+                ),
             ));
             Value::Map(map)
         }

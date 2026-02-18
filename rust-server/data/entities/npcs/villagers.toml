@@ -767,7 +767,7 @@ quest_complete = "The broom is on its way! Thank you so much, dearie!"
 # ============================================================================
 [swamp_hermit]
 display_name = "Swamp Hermit"
-sprite = "wise_man"
+sprite = "swamp_hermit"
 animation_type = "humanoid"
 description = "A grizzled warrior stranded on a log in the swamp. His equipment is in rough shape."
 
@@ -889,6 +889,8 @@ hostile = false
 quest_giver = true
 wander_enabled = false
 facing = "right"
+ui_anchor_offset_x = -6.0
+ui_icon_offset_x = -6.0
 
 [adventurer_guide.quest_giver]
 available_quests = ["adventurer_tier_1", "adventurer_tier_2", "adventurer_tier_3"]

@@ -39,15 +39,19 @@ const COMBAT_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
     GuideObjectiveTemplate { id: "reach_combat_8", label: "Reach Combat level", target: 8 },
     GuideObjectiveTemplate { id: "gather_gold_150", label: "Accumulate gold", target: 150 },
 ];
-const COMBAT_T2_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
-    GuideObjectiveTemplate { id: "kill_blue_slimes", label: "Defeat blue slimes", target: 12 },
-    GuideObjectiveTemplate { id: "reach_woodcutting_5", label: "Reach Woodcutting level", target: 5 },
-    GuideObjectiveTemplate { id: "gather_gold_400", label: "Accumulate gold", target: 400 },
+const COMBAT_T2_OBJECTIVES: [GuideObjectiveTemplate; 5] = [
+    GuideObjectiveTemplate { id: "kill_blue_slimes", label: "Defeat blue slimes", target: 24 },
+    GuideObjectiveTemplate { id: "kill_crows", label: "Defeat crows", target: 16 },
+    GuideObjectiveTemplate { id: "reach_woodcutting_8", label: "Reach Woodcutting level", target: 8 },
+    GuideObjectiveTemplate { id: "reach_combat_14", label: "Reach Combat level", target: 14 },
+    GuideObjectiveTemplate { id: "gather_gold_1200", label: "Accumulate gold", target: 1200 },
 ];
-const COMBAT_T3_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
-    GuideObjectiveTemplate { id: "kill_pigs", label: "Defeat pigs", target: 15 },
-    GuideObjectiveTemplate { id: "reach_farming_8", label: "Reach Farming level", target: 8 },
-    GuideObjectiveTemplate { id: "gather_gold_900", label: "Accumulate gold", target: 900 },
+const COMBAT_T3_OBJECTIVES: [GuideObjectiveTemplate; 5] = [
+    GuideObjectiveTemplate { id: "kill_pigs", label: "Defeat pigs", target: 30 },
+    GuideObjectiveTemplate { id: "kill_wild_boars", label: "Defeat wild boars", target: 20 },
+    GuideObjectiveTemplate { id: "reach_farming_12", label: "Reach Farming level", target: 12 },
+    GuideObjectiveTemplate { id: "reach_combat_25", label: "Reach Combat level", target: 25 },
+    GuideObjectiveTemplate { id: "gather_gold_2600", label: "Accumulate gold", target: 2600 },
 ];
 
 const SKILLING_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [

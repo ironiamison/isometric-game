@@ -3,6 +3,31 @@ use crate::game::npc::{Npc, NpcState};
 use crate::render::OVERWORLD_NAME;
 use super::protocol::{extract_string, extract_f32, extract_i32, extract_u32, extract_u64, extract_array, extract_u8, extract_bool};
 
+fn reset_adventurer_guide_dialogue(state: &mut GameState) -> bool {
+    let is_guide = state
+        .ui_state
+        .active_dialogue
+        .as_ref()
+        .map(|d| d.speaker.eq_ignore_ascii_case("Adventurer Guide"))
+        .unwrap_or(false);
+
+    if !is_guide {
+        return false;
+    }
+
+    if let Some(dialogue) = state.ui_state.active_dialogue.as_mut() {
+        dialogue.quest_id.clear();
+        dialogue.choices.clear();
+        dialogue.text = "Select a tier to review progress. Talk to the guide to start or complete tiers.".to_string();
+    }
+    state.ui_state.adventurer_selected_tab = 0;
+    state.ui_state.adventurer_selected_tier = 0;
+    state.ui_state.dialogue_scroll_offset = 0.0;
+    state.ui_state.dialogue_touch_scroll_id = None;
+    state.ui_state.dialogue_touch_dragged = false;
+    true
+}
+
 pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut GameState) {
     match msg_type {
         "welcome" => {
@@ -1272,6 +1297,19 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "questStateSync" => {
+            if let Some(value) = data {
+                state.ui_state.completed_quest_ids.clear();
+                if let Some(ids) = extract_array(value, "completed_quest_ids") {
+                    for id_value in ids {
+                        if let Some(id) = id_value.as_str() {
+                            state.ui_state.completed_quest_ids.insert(id.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
         "questObjectiveProgress" => {
             if let Some(value) = data {
                 let quest_id = extract_string(value, "quest_id").unwrap_or_default();
@@ -1323,14 +1361,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 });
                 state.ui_state.completed_quest_ids.insert(completed_id);
 
-                // Close any open dialogue
-                state.ui_state.active_dialogue = None;
+                // Keep Adventurer Guide UI open and reset it after completion.
+                if !reset_adventurer_guide_dialogue(state) {
+                    state.ui_state.active_dialogue = None;
+                }
             }
         }
 
         "dialogueClosed" => {
-            // Server tells us to close dialogue
-            state.ui_state.active_dialogue = None;
+            // Keep Adventurer Guide panel open and reset to its initial state.
+            if !reset_adventurer_guide_dialogue(state) {
+                state.ui_state.active_dialogue = None;
+            }
         }
 
         // ========== Item Definition Messages ==========

@@ -3086,7 +3086,14 @@
     ]
   },
   "collision": "AAAAOAAAACAAAAAgAAAAIAAAACAAAAAgAAAAIAAAACEAAIAiAQCAIgIAwD4EACAAOAAgAEAAJP7AAC6BAAEqgYACKpXw/DuBgAAAgR8AAP8AwD8AEeIAAAAEgY8AAAJIAAAMSAAAEEgAACAIAwhACGAAgPgiAYAACgCAAPADAAE=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "swamp_hermit",
+      "x": 3,
+      "y": 20,
+      "level": 1
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1668,
@@ -3094,13 +3101,6 @@
       "y": 22,
       "width": 59,
       "height": 97
-    },
-    {
-      "gid": 2094,
-      "x": 3,
-      "y": 20,
-      "width": 59,
-      "height": 81
     },
     {
       "gid": 1662,

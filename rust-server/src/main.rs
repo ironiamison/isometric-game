@@ -1608,6 +1608,12 @@ async fn handle_socket(
         }
     }
 
+    // Send completed quest ids so client can show correct tier lock/completion states after relog
+    let quest_state_sync = room.get_completed_quest_sync_message(&player_id).await;
+    if let Ok(bytes) = protocol::encode_server_message(&quest_state_sync) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Send initial inventory to this client
     if let Some(inv_msg) = room.get_player_inventory_update(&player_id).await {
         if let Ok(bytes) = protocol::encode_server_message(&inv_msg) {

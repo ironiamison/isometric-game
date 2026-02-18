@@ -1654,6 +1654,17 @@ impl GameRoom {
         messages
     }
 
+    /// Get a sync message containing completed quest ids for this player (for login UI state)
+    pub async fn get_completed_quest_sync_message(&self, player_id: &str) -> ServerMessage {
+        let quest_states = self.player_quest_states.read().await;
+        let completed_quest_ids = quest_states
+            .get(player_id)
+            .map(|state| state.completed_quests.clone())
+            .unwrap_or_default();
+
+        ServerMessage::QuestStateSync { completed_quest_ids }
+    }
+
     pub async fn player_count(&self) -> usize {
         let players = self.players.read().await;
         players.values().filter(|p| p.active).count()
