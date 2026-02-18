@@ -189,36 +189,7 @@ pub fn run_game_frame(
     for cmd in &commands {
         use crate::network::messages::ClientMessage;
         let msg = match cmd {
-            InputCommand::Move { dx, dy } => {
-                // Predict target ahead for same-direction movement (keeps sprite in sync
-                // with server despite network latency). Skip prediction when direction
-                // changes - tile-commit logic in set_server_state handles that case.
-                if let Some(local_id) = &game_state.local_player_id {
-                    if let Some(player) = game_state.players.get_mut(local_id) {
-                        // Track local intent so set_server_state can distinguish
-                        // stale stop packets from genuine stop/cancel states.
-                        player.local_intent_dx = *dx;
-                        player.local_intent_dy = *dy;
-
-                        if *dx != 0.0 || *dy != 0.0 {
-                            let moving_dir_x = (player.target_x - player.x).signum();
-                            let moving_dir_y = (player.target_y - player.y).signum();
-                            let move_dir_x = (*dx as f32).signum();
-                            let move_dir_y = (*dy as f32).signum();
-                            let same_dir = !player.is_moving
-                                || (move_dir_x == moving_dir_x && move_dir_y == moving_dir_y);
-                            if same_dir {
-                                player.target_x = player.server_x + *dx;
-                                player.target_y = player.server_y + *dy;
-                                player.local_prediction_started_at = get_time();
-                            }
-                        } else {
-                            player.local_prediction_started_at = 0.0;
-                        }
-                    }
-                }
-                ClientMessage::Move { dx: *dx, dy: *dy }
-            },
+            InputCommand::Move { dx, dy } => ClientMessage::Move { dx: *dx, dy: *dy },
             InputCommand::Face { direction } => {
                 log::info!("[MAIN] Processing Face command: direction={}", direction);
                 // Skip direction update if sitting or attacking
@@ -244,9 +215,6 @@ pub fn run_game_frame(
                         let new_dir = crate::game::Direction::from_u8(*direction);
                         player.direction = new_dir;
                         player.animation.direction = new_dir;
-                        player.local_intent_dx = 0.0;
-                        player.local_intent_dy = 0.0;
-                        player.local_prediction_started_at = 0.0;
                         log::info!("[MAIN] Updated local player direction: {:?} -> {:?}", old_dir, player.direction);
                     }
                 }
@@ -385,8 +353,8 @@ pub fn run_game_frame(
 
     // 4. Update game state
     let update_start = get_time();
-    let (facing_dx, facing_dy) = input_handler.get_raw_facing();
-    game_state.update(delta, facing_dx, facing_dy);
+    let (input_dx, input_dy) = input_handler.get_movement();
+    game_state.update(delta, input_dx, input_dy);
     game_state.update_transition(delta);
     let update_ms = (get_time() - update_start) * 1000.0;
 

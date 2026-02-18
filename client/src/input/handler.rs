@@ -177,10 +177,6 @@ pub struct InputHandler {
     move_sent: bool,
     // Touch controls for mobile devices
     pub touch_controls: TouchControls,
-    // Raw intended direction from key/dpad input (before FACE_THRESHOLD delay).
-    // Used by state.rs for immediate facing direction updates.
-    raw_facing_dx: f32,
-    raw_facing_dy: f32,
 }
 
 impl InputHandler {
@@ -197,8 +193,6 @@ impl InputHandler {
             dir_press_time: 0.0,
             move_sent: false,
             touch_controls: TouchControls::new(),
-            raw_facing_dx: 0.0,
-            raw_facing_dy: 0.0,
         }
     }
 
@@ -2269,24 +2263,16 @@ impl InputHandler {
                 return commands;
             }
 
-            // Q switches between Recipes/Shop main tabs (only if merchant has crafting categories)
+            // Q switches between Recipes/Shop main tabs
             if is_key_pressed(KeyCode::Q) {
-                let has_crafting = state.ui_state.shop_data.as_ref()
-                    .map_or(false, |s| !s.crafting_categories.is_empty());
-                if has_crafting {
-                    state.ui_state.shop_main_tab = if state.ui_state.shop_main_tab == 0 { 1 } else { 0 };
-                }
+                state.ui_state.shop_main_tab = if state.ui_state.shop_main_tab == 0 { 1 } else { 0 };
             }
 
             if state.ui_state.shop_main_tab == 0 {
                 // Recipes tab keyboard controls
-                // Get merchant's allowed crafting categories
-                let allowed_cats: Vec<String> = state.ui_state.shop_data.as_ref()
-                    .map_or_else(Vec::new, |s| s.crafting_categories.clone());
                 // Get unique categories from recipes, merging consumables and materials
                 let categories: Vec<String> = {
                     let mut cats: Vec<String> = state.recipe_definitions.iter()
-                        .filter(|r| allowed_cats.is_empty() || allowed_cats.iter().any(|a| a == &r.category))
                         .map(|r| {
                             if r.category == "materials" || r.category == "consumables" {
                                 "supplies".to_string()
@@ -2323,10 +2309,6 @@ impl InputHandler {
                     let current_category = categories.get(selected_idx).map(|s| s.as_str()).unwrap_or("supplies");
                     let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state.recipe_definitions.iter()
                         .filter(|r| {
-                            // Check merchant allows this raw category
-                            if !allowed_cats.is_empty() && !allowed_cats.iter().any(|a| a == &r.category) {
-                                return false;
-                            }
                             let cat_match = if current_category == "supplies" {
                                 r.category == "consumables" || r.category == "materials"
                             } else {
@@ -2418,12 +2400,7 @@ impl InputHandler {
                     let sel_idx = state.ui_state.crafting_selected_category.min(categories.len().saturating_sub(1));
                     let cur_cat = categories.get(sel_idx).map(|s| s.as_str()).unwrap_or("supplies");
                     let total_visible: usize = state.recipe_definitions.iter()
-                        .filter(|r| {
-                            if !allowed_cats.is_empty() && !allowed_cats.iter().any(|a| a == &r.category) {
-                                return false;
-                            }
-                            if cur_cat == "supplies" { r.category == "consumables" || r.category == "materials" } else { r.category == cur_cat }
-                        })
+                        .filter(|r| if cur_cat == "supplies" { r.category == "consumables" || r.category == "materials" } else { r.category == cur_cat })
                         .count();
                     // Match renderer: list_content_height = list_height - 34, list_height = content_height - tab_height - 20
                     // content_height = panel_height - FRAME*2 - HEADER - FOOTER - 12, tab_height = 28
@@ -3047,12 +3024,6 @@ impl InputHandler {
             CardinalDir::None => (0.0, 0.0),
         };
 
-        // Store raw intended direction for immediate facing updates in state.rs.
-        // This is available before the FACE_THRESHOLD delay, preventing the
-        // 150ms flash of the old direction when changing facing.
-        self.raw_facing_dx = dx;
-        self.raw_facing_dy = dy;
-
         // Only send Move commands if held past the threshold
         // Don't move while attacking - check both attack key/touch button and animation state
         let attack_key_down = if classic {
@@ -3159,7 +3130,7 @@ impl InputHandler {
             let is_moving = self.last_dx != 0.0 || self.last_dy != 0.0;
             if is_moving && current_time >= state.dash_cooldown_end {
                 commands.push(InputCommand::Dash);
-                state.dash_cooldown_end = current_time + 5.0; // 5 second cooldown
+                state.dash_cooldown_end = current_time + 3.0; // 3 second cooldown
             }
         }
 
@@ -4119,22 +4090,13 @@ impl InputHandler {
         (self.last_dx, self.last_dy)
     }
 
-    /// Get raw intended direction from key/dpad input (before FACE_THRESHOLD).
-    /// Used for immediate facing direction so the sprite doesn't flash the old
-    /// direction during the 150ms threshold window.
-    pub fn get_raw_facing(&self) -> (f32, f32) {
-        (self.raw_facing_dx, self.raw_facing_dy)
-    }
-
     /// Read immediate direction from current key/dpad state.
-    /// Call BEFORE render to eliminate 1-frame direction lag.
-    /// Returns None if no direction input is active.
+    /// Call before render to eliminate one-frame facing lag.
     pub fn get_immediate_direction(&self, classic: bool) -> Option<crate::game::Direction> {
         use crate::game::Direction;
         use crate::input::touch::DPadDirection;
         use macroquad::prelude::*;
 
-        // D-pad takes priority (touch input)
         let dpad = self.touch_controls.get_direction();
         if dpad != DPadDirection::None {
             return Some(match dpad {
@@ -4146,7 +4108,6 @@ impl InputHandler {
             });
         }
 
-        // Keyboard (respects classic mode: arrows only vs WASD+arrows)
         let down = if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) };
         let up = if classic { is_key_down(KeyCode::Up) } else { is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) };
         let left = if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) };
