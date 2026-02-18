@@ -503,7 +503,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             if let Some(value) = data {
                 let sender_name = extract_string(value, "senderName").unwrap_or_default();
                 let text = extract_string(value, "text").unwrap_or_default();
-                let timestamp = extract_u64(value, "timestamp").unwrap_or(0) as f64;
+                let extracted_ts = extract_u64(value, "timestamp").unwrap_or(0) as f64;
+                let timestamp = if extracted_ts > 0.0 {
+                    extracted_ts
+                } else {
+                    macroquad::time::get_time()
+                };
                 let channel_str = extract_string(value, "channel").unwrap_or_default();
 
                 let channel = match channel_str.as_str() {
@@ -2530,12 +2535,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 } else if let Some(err) = error {
                     log::warn!("Friend action '{}' failed: {}", action, err);
                     // Add error to chat as system message
-                    state.ui_state.chat_messages.push(ChatMessage {
-                        sender_name: "System".to_string(),
-                        text: err,
-                        timestamp: 0.0,
-                        channel: ChatChannel::System,
-                    });
+                    state.ui_state.chat_messages.push(ChatMessage::system(err));
                 }
             }
         }

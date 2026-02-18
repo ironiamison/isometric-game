@@ -66,11 +66,30 @@ impl Renderer {
             (UiElementId::ChatTabGlobal, "Global", ChatChannel::Global),
             (UiElementId::ChatTabSystem, "System", ChatChannel::System),
         ];
+        let mut latest_local_ts = 0.0f64;
+        let mut latest_global_ts = 0.0f64;
+        let mut latest_system_ts = 0.0f64;
+        for msg in state.ui_state.chat_messages.iter().rev() {
+            match msg.channel {
+                ChatChannel::Local if latest_local_ts <= 0.0 => latest_local_ts = msg.timestamp,
+                ChatChannel::Global if latest_global_ts <= 0.0 => latest_global_ts = msg.timestamp,
+                ChatChannel::System if latest_system_ts <= 0.0 => latest_system_ts = msg.timestamp,
+                _ => {}
+            }
+            if latest_local_ts > 0.0 && latest_global_ts > 0.0 && latest_system_ts > 0.0 {
+                break;
+            }
+        }
 
         for (i, (id, label, channel)) in tabs.iter().enumerate() {
             let tx = tab_x_start + i as f32 * tab_w;
             let is_active = std::mem::discriminant(&state.ui_state.chat_active_tab) == std::mem::discriminant(channel);
             let is_hovered = hovered.as_ref() == Some(id);
+            let has_unread = match channel {
+                ChatChannel::Local => latest_local_ts > state.ui_state.chat_last_seen_local,
+                ChatChannel::Global => latest_global_ts > state.ui_state.chat_last_seen_global,
+                ChatChannel::System => latest_system_ts > state.ui_state.chat_last_seen_system,
+            };
 
             let bg = if is_active {
                 HEADER_BG
@@ -91,7 +110,13 @@ impl Renderer {
             let text_w = self.measure_text_sharp(label, TAB_FONT_SIZE).width;
             self.draw_text_sharp(label, (tx + (tab_w - text_w) / 2.0).floor(),
                                (tab_y + tab_h / 2.0 + 5.0).floor(), TAB_FONT_SIZE,
-                               if is_active { TEXT_TITLE } else { TEXT_DIM });
+                               if is_active {
+                                   TEXT_TITLE
+                               } else if has_unread {
+                                   Color::new(0.92, 0.92, 0.92, 1.0)
+                               } else {
+                                   TEXT_DIM
+                               });
 
             layout.add(id.clone(), macroquad::prelude::Rect::new(tx, tab_y, tab_w, tab_h));
         }

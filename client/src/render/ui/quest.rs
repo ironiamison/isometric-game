@@ -17,7 +17,7 @@ impl Renderer {
         let objective_line_height = line_height - 2.0;
         let title_wrap_width = (tracker_width + 58.0).max(140.0);
         let detail_wrap_width = (tracker_width + 42.0).max(132.0);
-        let mut height = line_height + 5.0; // header
+        let mut height = line_height; // header
 
         for quest in state.ui_state.active_quests.iter().take(2) {
             let title_lines = self.wrap_text(&quest.name, title_wrap_width, 16.0);
@@ -269,7 +269,7 @@ impl Renderer {
 
         // Header
         draw_right(self, "QUESTS", y, Color::from_rgba(255, 220, 100, 255));
-        y += line_height + 5.0;
+        y += line_height;
 
         // Only show first 2 active quests
         for quest in state.ui_state.active_quests.iter().take(2) {
@@ -312,8 +312,8 @@ impl Renderer {
         }
     }
 
-    /// Render farming contract tracker (shown when in the farming chunk)
-    pub(crate) fn render_farming_contract_tracker(&self, state: &GameState, tracker_x: f32, tracker_y: f32, tracker_width: f32) {
+    /// Render farming contract tracker (left-aligned, below stat bars)
+    pub(crate) fn render_farming_contract_tracker(&self, state: &GameState, x: f32, y_start: f32, max_width: f32) {
         let contract = match &state.farming_contract {
             Some(c) => c,
             None => return,
@@ -321,28 +321,16 @@ impl Renderer {
 
         let line_height = 18.0;
         let objective_line_height = line_height - 2.0;
-        let title_wrap_width = (tracker_width + 58.0).max(140.0);
-        let detail_wrap_width = (tracker_width + 42.0).max(132.0);
-        let right_edge = tracker_x + tracker_width;
-        let draw_right = |renderer: &Renderer, text: &str, y: f32, color: Color| {
-            let text_width = renderer.measure_text_sharp(text, 16.0).width;
-            renderer.draw_text_sharp(text, (right_edge - text_width).floor(), y, 16.0, color);
-        };
-
-        // Offset past quest tracker content
-        let mut y = tracker_y + self.quest_tracker_height(state, tracker_width);
-        if !state.ui_state.active_quests.is_empty() {
-            y += 6.0; // gap between quest and contract sections
-        }
+        let mut y = y_start;
 
         // Header
-        draw_right(self, "CONTRACT", y, Color::from_rgba(180, 220, 130, 255));
-        y += line_height + 5.0;
+        self.draw_text_sharp("CONTRACT", x, y, 16.0, Color::from_rgba(180, 220, 130, 255));
+        y += line_height;
 
         // Contract info: "Easy: Harvest potatoes"
         let title = format!("{}: Harvest {}", contract.difficulty, contract.crop_name);
-        for line in self.wrap_text(&title, title_wrap_width, 16.0).iter().take(2) {
-            draw_right(self, line, y, WHITE);
+        for line in self.wrap_text(&title, max_width, 16.0).iter().take(2) {
+            self.draw_text_sharp(line, x, y, 16.0, WHITE);
             y += line_height;
         }
 
@@ -353,27 +341,16 @@ impl Renderer {
         } else {
             ("[ ]", Color::from_rgba(200, 200, 200, 255))
         };
-        let progress_text = format!("{}/{} harvested", contract.amount_harvested, contract.amount_required);
-        let wrapped_progress = self.wrap_text(&progress_text, detail_wrap_width, 16.0);
-        for (idx, line) in wrapped_progress.iter().enumerate() {
-            let render_line = if idx == 0 {
-                format!("{} {}", check, line)
-            } else {
-                format!("    {}", line)
-            };
-            draw_right(self, &render_line, y, status_color);
+        let progress_text = format!("{} {}/{} harvested", check, contract.amount_harvested, contract.amount_required);
+        for line in self.wrap_text(&progress_text, max_width, 16.0).iter().take(2) {
+            self.draw_text_sharp(line, x, y, 16.0, status_color);
             y += objective_line_height;
         }
 
         if complete {
-            let wrapped_return = self.wrap_text("Return to Master Farmer", detail_wrap_width, 16.0);
-            for (idx, line) in wrapped_return.iter().enumerate() {
-                let render_line = if idx == 0 {
-                    format!("[ ] {}", line)
-                } else {
-                    format!("    {}", line)
-                };
-                draw_right(self, &render_line, y, Color::from_rgba(200, 200, 200, 255));
+            let return_text = "[ ] Return to Master Farmer";
+            for line in self.wrap_text(return_text, max_width, 16.0).iter().take(2) {
+                self.draw_text_sharp(line, x, y, 16.0, Color::from_rgba(200, 200, 200, 255));
                 y += objective_line_height;
             }
         }

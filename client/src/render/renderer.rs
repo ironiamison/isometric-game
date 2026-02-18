@@ -6220,6 +6220,20 @@ impl Renderer {
             let num_tabs = 3.0f32;
             let tab_w = (max_chat_width / num_tabs).floor();
             let tab_bar_y = clip_y - tab_h;
+            let mut latest_local_ts = 0.0f64;
+            let mut latest_global_ts = 0.0f64;
+            let mut latest_system_ts = 0.0f64;
+            for msg in state.ui_state.chat_messages.iter().rev() {
+                match msg.channel {
+                    ChatChannel::Local if latest_local_ts <= 0.0 => latest_local_ts = msg.timestamp,
+                    ChatChannel::Global if latest_global_ts <= 0.0 => latest_global_ts = msg.timestamp,
+                    ChatChannel::System if latest_system_ts <= 0.0 => latest_system_ts = msg.timestamp,
+                    _ => {}
+                }
+                if latest_local_ts > 0.0 && latest_global_ts > 0.0 && latest_system_ts > 0.0 {
+                    break;
+                }
+            }
 
             for i in 0..3 {
                 let tx = chat_x + i as f32 * tab_w;
@@ -6229,6 +6243,11 @@ impl Renderer {
                     UiElementId::ChatTabGlobal,
                     UiElementId::ChatTabSystem,
                 ][i]);
+                let has_unread = match tab_channels[i] {
+                    ChatChannel::Local => latest_local_ts > state.ui_state.chat_last_seen_local,
+                    ChatChannel::Global => latest_global_ts > state.ui_state.chat_last_seen_global,
+                    ChatChannel::System => latest_system_ts > state.ui_state.chat_last_seen_system,
+                };
 
                 let bg = if is_active {
                     Color::new(0.15, 0.15, 0.2, 0.85)
@@ -6252,7 +6271,13 @@ impl Renderer {
                     (tx + (tab_w - tw) / 2.0).floor(),
                     (tab_bar_y + tab_h / 2.0 + label_size * 0.35).floor(),
                     label_size,
-                    if is_active { WHITE } else { Color::new(0.6, 0.6, 0.6, 1.0) },
+                    if is_active {
+                        WHITE
+                    } else if has_unread {
+                        Color::new(0.92, 0.92, 0.92, 1.0)
+                    } else {
+                        Color::new(0.6, 0.6, 0.6, 1.0)
+                    },
                 );
             }
 
@@ -6838,13 +6863,17 @@ impl Renderer {
         let tracker_x = (tracker_right - tracker_width).floor();
         self.render_quest_tracker(state, tracker_x, tracker_y, tracker_width);
 
-        // Farming contract tracker (shown in farming area)
+        // Farming contract tracker (shown in farming area) - left side below stat bars
         if state.farming_contract.is_some() {
             if let Some(player) = state.get_local_player() {
                 let px = player.x;
                 let py = player.y;
                 if px >= 0.0 && px <= 29.0 && py >= -42.0 && py <= -16.0 {
-                    self.render_farming_contract_tracker(state, tracker_x, tracker_y, tracker_width);
+                    let bar_width_contract = 120.0f32;
+                    let (bar_x, stats_y) = self.minimap_stats_stack_position(state, bar_width_contract);
+                    // Below 3 stat bars (HP + MP + Prayer, each 18px + 4px gap) + extra gap
+                    let contract_y = stats_y + 3.0 * (18.0 + 4.0) + 14.0;
+                    self.render_farming_contract_tracker(state, bar_x, contract_y, 200.0);
                 }
             }
         }

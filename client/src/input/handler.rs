@@ -33,6 +33,32 @@ fn screen_to_virtual_coords(x: f32, y: f32) -> (f32, f32) {
     (x * vw / screen_w, y * vh / screen_h)
 }
 
+fn latest_chat_timestamp_for_channel(state: &GameState, channel: ChatChannel) -> f64 {
+    state
+        .ui_state
+        .chat_messages
+        .iter()
+        .rev()
+        .find(|m| m.channel == channel)
+        .map(|m| m.timestamp)
+        .unwrap_or(0.0)
+}
+
+fn mark_chat_channel_as_read(state: &mut GameState, channel: ChatChannel) {
+    let latest = latest_chat_timestamp_for_channel(state, channel);
+    match channel {
+        ChatChannel::Local => {
+            state.ui_state.chat_last_seen_local = state.ui_state.chat_last_seen_local.max(latest);
+        }
+        ChatChannel::Global => {
+            state.ui_state.chat_last_seen_global = state.ui_state.chat_last_seen_global.max(latest);
+        }
+        ChatChannel::System => {
+            state.ui_state.chat_last_seen_system = state.ui_state.chat_last_seen_system.max(latest);
+        }
+    }
+}
+
 /// Build set of tiles occupied by entities (other players + NPCs) for pathfinding
 fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
     let mut occupied = HashSet::new();
@@ -236,6 +262,8 @@ impl InputHandler {
 
         // Update hover state for visual feedback (used by renderer next frame)
         state.ui_state.hovered_element = layout.hit_test(mx, my).cloned();
+        // Keep the active chat tab marked as read for unread badge highlighting.
+        mark_chat_channel_as_read(state, state.ui_state.chat_active_tab);
 
         // Update hovered tile based on mouse position (only when not hovering UI or using touch controls)
         // Use round() instead of floor() because tile sprites are visually centered
@@ -856,6 +884,7 @@ impl InputHandler {
                         state.ui_state.chat_panel_open = !state.ui_state.chat_panel_open;
                         if state.ui_state.chat_panel_open {
                             state.ui_state.chat_active_tab = ChatChannel::Local;
+                            mark_chat_channel_as_read(state, ChatChannel::Local);
                             state.ui_state.chat_message_scroll = 0.0;
                             // Close other panels
                             state.ui_state.inventory_open = false;
@@ -893,16 +922,19 @@ impl InputHandler {
                     UiElementId::ChatTabLocal => {
                         audio.play_sfx("enter");
                         state.ui_state.chat_active_tab = ChatChannel::Local;
+                        mark_chat_channel_as_read(state, ChatChannel::Local);
                         state.ui_state.chat_message_scroll = 0.0;
                     }
                     UiElementId::ChatTabGlobal => {
                         audio.play_sfx("enter");
                         state.ui_state.chat_active_tab = ChatChannel::Global;
+                        mark_chat_channel_as_read(state, ChatChannel::Global);
                         state.ui_state.chat_message_scroll = 0.0;
                     }
                     UiElementId::ChatTabSystem => {
                         audio.play_sfx("enter");
                         state.ui_state.chat_active_tab = ChatChannel::System;
+                        mark_chat_channel_as_read(state, ChatChannel::System);
                         state.ui_state.chat_message_scroll = 0.0;
                     }
                     UiElementId::ChatSendButton => {

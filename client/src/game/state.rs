@@ -931,6 +931,10 @@ pub struct UiState {
     // Mobile chat panel
     pub chat_panel_open: bool,
     pub chat_active_tab: ChatChannel,
+    // Last read message timestamp per tab (for unread tab highlighting)
+    pub chat_last_seen_local: f64,
+    pub chat_last_seen_global: f64,
+    pub chat_last_seen_system: f64,
     // Tap-to-pathfind (enabled by default on mobile, disabled on desktop)
     pub tap_to_pathfind: bool,
     // Use joystick instead of D-pad for mobile controls
@@ -1051,6 +1055,9 @@ impl Default for UiState {
             chat_log_background: true,
             chat_panel_open: false,
             chat_active_tab: ChatChannel::Local,
+            chat_last_seen_local: 0.0,
+            chat_last_seen_global: 0.0,
+            chat_last_seen_system: 0.0,
             #[cfg(target_os = "android")]
             tap_to_pathfind: false,
             #[cfg(not(target_os = "android"))]
