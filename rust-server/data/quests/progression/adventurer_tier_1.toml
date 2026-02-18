@@ -41,8 +41,8 @@ description = "Return to the Adventurer Guide"
 sequential = true
 
 [quest.rewards]
-exp = 300
-gold = 120
+exp = 600
+gold = 1200
 items = [
     { id = "weak_health_potion", count = 3 },
 ]

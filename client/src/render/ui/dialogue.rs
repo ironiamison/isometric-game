@@ -99,8 +99,8 @@ const COMBAT_TIERS: [GuideTierTemplate; 3] = [
         title: "Getting a Grip on It",
         subtitle: "Tier I",
         description: "Build your baseline with combat, monster clears, and early money control.",
-        reward_exp: 300,
-        reward_gold: 120,
+        reward_exp: 600,
+        reward_gold: 1200,
         reward_items: &COMBAT_T1_REWARDS,
         objectives: &COMBAT_T1_OBJECTIVES,
     },
@@ -109,8 +109,8 @@ const COMBAT_TIERS: [GuideTierTemplate; 3] = [
         title: "Building Consistency",
         subtitle: "Tier II",
         description: "Balance combat and gathering while keeping momentum across objectives.",
-        reward_exp: 450,
-        reward_gold: 220,
+        reward_exp: 900,
+        reward_gold: 2200,
         reward_items: &COMBAT_T2_REWARDS,
         objectives: &COMBAT_T2_OBJECTIVES,
     },
@@ -119,8 +119,8 @@ const COMBAT_TIERS: [GuideTierTemplate; 3] = [
         title: "Early Mastery",
         subtitle: "Tier III",
         description: "Prove discipline across combat, farming growth, and wealth management.",
-        reward_exp: 700,
-        reward_gold: 400,
+        reward_exp: 1400,
+        reward_gold: 4000,
         reward_items: &COMBAT_T3_REWARDS,
         objectives: &COMBAT_T3_OBJECTIVES,
     },
@@ -132,8 +132,8 @@ const SKILLING_TIERS: [GuideTierTemplate; 3] = [
         title: "Skilling Foundations",
         subtitle: "Tier I",
         description: "Focus on gathering loops: woodcutting, fishing, and beginner alchemy output.",
-        reward_exp: 260,
-        reward_gold: 100,
+        reward_exp: 520,
+        reward_gold: 200,
         reward_items: &SKILLING_T1_REWARDS,
         objectives: &SKILLING_T1_OBJECTIVES,
     },
@@ -142,8 +142,8 @@ const SKILLING_TIERS: [GuideTierTemplate; 3] = [
         title: "Skilling Routine",
         subtitle: "Tier II",
         description: "Scale your production rhythm and sustain resources through better efficiency.",
-        reward_exp: 420,
-        reward_gold: 180,
+        reward_exp: 840,
+        reward_gold: 360,
         reward_items: &SKILLING_T2_REWARDS,
         objectives: &SKILLING_T2_OBJECTIVES,
     },
@@ -152,8 +152,8 @@ const SKILLING_TIERS: [GuideTierTemplate; 3] = [
         title: "Skilling Specialist",
         subtitle: "Tier III",
         description: "Commit to a long-term skilling route with high-output gathering and crafting.",
-        reward_exp: 620,
-        reward_gold: 320,
+        reward_exp: 1240,
+        reward_gold: 640,
         reward_items: &SKILLING_T3_REWARDS,
         objectives: &SKILLING_T3_OBJECTIVES,
     },
@@ -231,6 +231,19 @@ fn skilling_missing_unlock_requirements(
     }
 
     skilling_tier_requirements(tiers[idx - 1].id)
+        .iter()
+        .filter_map(|(quest_id, quest_name)| {
+            if state.ui_state.completed_quest_ids.contains(*quest_id) {
+                None
+            } else {
+                Some(*quest_name)
+            }
+        })
+        .collect()
+}
+
+fn skilling_missing_tier_requirements(state: &GameState, tier_id: &str) -> Vec<&'static str> {
+    skilling_tier_requirements(tier_id)
         .iter()
         .filter_map(|(quest_id, quest_name)| {
             if state.ui_state.completed_quest_ids.contains(*quest_id) {
@@ -730,9 +743,33 @@ impl Renderer {
             self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_NORMAL);
             desc_y += 18.0;
         }
-        for line in self.wrap_text(&dialogue.text, right_w - 24.0, 16.0).iter().take(2) {
-            self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_DIM);
-            desc_y += 17.0;
+        if selected_track_idx == 1 {
+            let missing = skilling_missing_tier_requirements(state, tier.id);
+            let req_text = if missing.is_empty() {
+                let names: Vec<&str> = skilling_tier_requirements(tier.id)
+                    .iter()
+                    .map(|(_, name)| *name)
+                    .collect();
+                if names.is_empty() {
+                    None
+                } else {
+                    Some(format!("Requirements met: {}", names.join(", ")))
+                }
+            } else {
+                Some(format!("Missing requirements: {}", missing.join(", ")))
+            };
+
+            if let Some(text) = req_text {
+                for line in self.wrap_text(&text, right_w - 24.0, 16.0).iter().take(2) {
+                    self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_DIM);
+                    desc_y += 17.0;
+                }
+            }
+        } else if dialogue.quest_id == tier.id {
+            for line in self.wrap_text(&dialogue.text, right_w - 24.0, 16.0).iter().take(2) {
+                self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_DIM);
+                desc_y += 17.0;
+            }
         }
 
         draw_line(right_x + 12.0, desc_y + 4.0, right_x + right_w - 12.0, desc_y + 4.0, 1.0, HEADER_BORDER);
