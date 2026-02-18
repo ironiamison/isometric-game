@@ -86,42 +86,9 @@
       403,
       304,
       304,
-      304,
-      304,
-      304,
-      304,
-      304,
-      304,
-      114,
-      114,
-      495,
-      495,
-      495,
-      495,
-      495,
-      495,
-      495,
-      495,
-      495,
-      1,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      403,
-      304,
-      304,
-      304,
-      304,
+      1196,
+      1196,
+      1196,
       304,
       304,
       304,
@@ -135,6 +102,39 @@
       495,
       495,
       495,
+      495,
+      1,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      403,
+      304,
+      304,
+      1196,
+      1196,
+      1196,
+      304,
+      304,
+      114,
+      114,
+      495,
+      495,
+      495,
+      495,
+      495,
+      495,
+      495,
+      495,
       1,
       1,
       403,
@@ -154,9 +154,9 @@
       304,
       304,
       304,
-      304,
-      304,
-      304,
+      1196,
+      1196,
+      1196,
       304,
       114,
       495,
@@ -187,11 +187,11 @@
       304,
       304,
       304,
-      304,
-      304,
-      304,
-      304,
-      114,
+      1196,
+      1196,
+      1196,
+      1196,
+      1196,
       114,
       495,
       495,
@@ -221,10 +221,10 @@
       304,
       304,
       304,
-      304,
-      304,
-      304,
-      114,
+      1196,
+      1196,
+      1196,
+      1196,
       114,
       114,
       114,
@@ -253,7 +253,7 @@
       304,
       304,
       304,
-      304,
+      1196,
       304,
       304,
       304,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAIAAAACAAAAAgAAAAIAAAACAAAAAgAAAAIAAAACAAAAAgAAAP4/AAAQIAAAECMAAJAhAACQIAAAkCAAAHAkAAAQIAAAAOD//wAAAIAAAACAAAAAgAAAAIA=",
+  "collision": "ABMAAAAWAAAAdAAAAIgAAACAAQAAYAEAAIAHAAAACAAAAAMAAwAKAAIAIAACAKADAgCABAIAgPoCAAD4AgAAwAIAAAACAAAAAgAAAP4/AAAQIAAAECMAAJAhAACQIAAAkCAAAHAkAAAQIAAAAOD//wAAAIAAAACAAAAAgAAAAIA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3521,6 +3521,240 @@
       "x": 4,
       "y": 20,
       "edge": "down"
+    },
+    {
+      "gid": 336,
+      "x": 8,
+      "y": 0,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 9,
+      "y": 1,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 10,
+      "y": 2,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 11,
+      "y": 3,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 13,
+      "y": 5,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 15,
+      "y": 6,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 16,
+      "y": 8,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 17,
+      "y": 9,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 19,
+      "y": 9,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 21,
+      "y": 10,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 23,
+      "y": 12,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 17,
+      "y": 8,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 9,
+      "y": 0,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 10,
+      "y": 1,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 12,
+      "y": 2,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 14,
+      "y": 5,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 15,
+      "y": 4,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 16,
+      "y": 4,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 12,
+      "y": 0,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 24,
+      "y": 11,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 26,
+      "y": 12,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 30,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 25,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 23,
+      "y": 11,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 19,
+      "y": 7,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 25,
+      "y": 11,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 28,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 27,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 28,
+      "y": 14,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 27,
+      "y": 14,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 23,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 21,
+      "y": 11,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 30,
+      "y": 14,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 29,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 29,
+      "y": 14,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 30,
+      "y": 15,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 31,
+      "y": 15,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 31,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 31,
+      "y": 14,
+      "edge": "right"
     }
   ],
   "portals": [],

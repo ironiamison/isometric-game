@@ -1006,8 +1006,8 @@
       381,
       381,
       381,
-      381,
-      381,
+      396,
+      396,
       381,
       396,
       396,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "CCAAAQAhgAgAIEAAECMgYIBHEDwAAAAAAAAAAAAAAAAAAAAAAA8APBBDKACAAgBQAAgAAAAACAQAAAgEAAAIBAAgCAQAYCgsAGAeD9AfAACwYSAwMOABeAAAAAAAAAAAAAAAAAAAAAB4wANwRDGhGAMAAAD+////BgDIewYABAA=",
+  "collision": "CCAAAQAhgAgAIEAAECMgYIBHEDwAAAAAAAAAAAAAAAAAAAAAAA8APBBDKACAAgBQAAgAAAAACAQAAAgEAAAIBAAgCAQAYCgsAGAeD9AfAACwYSAwMOABeAAAAAAAAAAAAAAAAAAAAAB4wANwRDGhGAMAAAD+////BoHIe+YQBAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3528,6 +3528,13 @@
       "y": 20,
       "width": 28,
       "height": 36
+    },
+    {
+      "gid": 2125,
+      "x": 15,
+      "y": 30,
+      "width": 34,
+      "height": 79
     }
   ],
   "walls": [
@@ -4172,6 +4179,36 @@
       "x": 29,
       "y": 9,
       "edge": "right"
+    },
+    {
+      "gid": 2039,
+      "x": 5,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 2040,
+      "x": 6,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 2041,
+      "x": 7,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 2042,
+      "x": 8,
+      "y": 30,
+      "edge": "down"
+    },
+    {
+      "gid": 2052,
+      "x": 12,
+      "y": 31,
+      "edge": "down"
     }
   ],
   "portals": [],

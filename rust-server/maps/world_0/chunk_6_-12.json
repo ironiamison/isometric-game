@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAACAAAACAAAAAwAAAAPAAAACAAAAA8AAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAOAAAAGAAAAGwAAACvAAAACAEAAA8DAAAQBQAAwAQAAIAJAAA=",
   "entities": [],
   "mapObjects": [],
   "walls": [
@@ -3144,12 +3144,6 @@
       "edge": "right"
     },
     {
-      "gid": 295,
-      "x": 0,
-      "y": 22,
-      "edge": "right"
-    },
-    {
       "gid": 644,
       "x": 3,
       "y": 28,
@@ -3177,6 +3171,66 @@
       "gid": 641,
       "x": 3,
       "y": 27,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 0,
+      "y": 22,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 2,
+      "y": 23,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 4,
+      "y": 29,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 6,
+      "y": 30,
+      "edge": "right"
+    },
+    {
+      "gid": 336,
+      "x": 7,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 7,
+      "y": 30,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 8,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 8,
+      "y": 29,
+      "edge": "right"
+    },
+    {
+      "gid": 335,
+      "x": 5,
+      "y": 26,
+      "edge": "right"
+    },
+    {
+      "gid": 332,
+      "x": 3,
+      "y": 23,
       "edge": "right"
     }
   ],

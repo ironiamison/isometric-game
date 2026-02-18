@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAD4/wAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AAD4/wAAAgAAAAIAAQADAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3096,7 +3096,50 @@
       "height": 40
     }
   ],
-  "walls": [],
+  "walls": [
+    {
+      "gid": 1884,
+      "x": 17,
+      "y": 3,
+      "edge": "down"
+    },
+    {
+      "gid": 1883,
+      "x": 16,
+      "y": 3,
+      "edge": "right"
+    },
+    {
+      "gid": 1883,
+      "x": 16,
+      "y": 4,
+      "edge": "right"
+    },
+    {
+      "gid": 1885,
+      "x": 17,
+      "y": 3,
+      "edge": "right"
+    },
+    {
+      "gid": 1886,
+      "x": 17,
+      "y": 2,
+      "edge": "right"
+    },
+    {
+      "gid": 1887,
+      "x": 17,
+      "y": 1,
+      "edge": "right"
+    },
+    {
+      "gid": 1883,
+      "x": 31,
+      "y": 19,
+      "edge": "right"
+    }
+  ],
   "portals": [],
   "gatheringZones": []
 }

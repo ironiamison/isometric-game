@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAgCZAggAAABAAAEAABAAAAAEACAIAAAAAIBQEBAIAAAQAAEBAAAAEID//39AAiBAAAIgQAgCIECgAiBACAIAQAACAEAgAiBAAAIgQAACIEAAAiBAAP75eQACAEAIAABAAAAAQAAAAkAAAgBAEAMAQACCB0AIggVAADoEQAA=",
+  "collision": "AAAAAAAAAAACAAAAAAAAAAAAAAAAACAIAAAAIAAMAAAAAAgAAAAAAAAAAAD//38AAiBAIAIgQAACIEAAAiBACAIAQAACAEAAAiBAAAIgQAACIEAAAiBAQP75eQAKkEAAAABAAAAAQAAAAEAAAgBAAAMAQBCCB0AIgg1AALoEQAA=",
   "entities": [
     {
       "entityId": "pig",
@@ -3535,11 +3535,39 @@
       "height": 31
     },
     {
-      "gid": 1826,
-      "x": 9,
-      "y": 26,
-      "width": 44,
-      "height": 91
+      "gid": 2312,
+      "x": 12,
+      "y": 23,
+      "width": 60,
+      "height": 62
+    },
+    {
+      "gid": 2312,
+      "x": 15,
+      "y": 23,
+      "width": 60,
+      "height": 62
+    },
+    {
+      "gid": 2311,
+      "x": 3,
+      "y": 23,
+      "width": 60,
+      "height": 62
+    },
+    {
+      "gid": 1270,
+      "x": 11,
+      "y": 30,
+      "width": 42,
+      "height": 88
+    },
+    {
+      "gid": 2100,
+      "x": 11,
+      "y": 7,
+      "width": 25,
+      "height": 54
     }
   ],
   "walls": [

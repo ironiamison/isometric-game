@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAEAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAIAA/AAAAwYBAAIDAgACQQQAAgEYAEIBIAACAkBiAAKA/wATgKEABAABAAiAGQAIgAlAEIAJACCAGXBAwg9QwOABUAATBRAAFAVQABT/UAAUAHAAFwAAABEAAMBxAP976P8=",
+  "collision": "AEwAAEAEAAAAXgAAAB0AAAAQAAAAAAAAAAAAAAAAAIAA/AAAAwYBcAIDAlACQQQQAgEYUEIBIHACAkBiAwKA/wATgKEABAABAAiAGQAIgAlAEIAJACCAGXBAwg9QwOABUAATBRAAFAVQABT/UAAUAHAAFwAAABEAAMBxAP9/6P8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3728,6 +3728,27 @@
       "y": 16,
       "width": 26,
       "height": 38
+    },
+    {
+      "gid": 2246,
+      "x": 14,
+      "y": 2,
+      "width": 47,
+      "height": 51
+    },
+    {
+      "gid": 2246,
+      "x": 14,
+      "y": 0,
+      "width": 47,
+      "height": 51
+    },
+    {
+      "gid": 2344,
+      "x": 31,
+      "y": 17,
+      "width": 32,
+      "height": 20
     }
   ],
   "walls": [
@@ -4056,12 +4077,6 @@
       "edge": "right"
     },
     {
-      "gid": 590,
-      "x": 1,
-      "y": 12,
-      "edge": "right"
-    },
-    {
       "gid": 573,
       "x": 1,
       "y": 11,
@@ -4324,17 +4339,15 @@
       "x": 30,
       "y": 15,
       "edge": "down"
+    },
+    {
+      "gid": 590,
+      "x": 1,
+      "y": 12,
+      "edge": "right"
     }
   ],
   "portals": [
-    {
-      "x": 9,
-      "y": 3,
-      "width": 1,
-      "height": 1,
-      "targetMap": "old_house",
-      "targetSpawn": "entrance"
-    },
     {
       "x": 6,
       "y": 25,
@@ -4344,20 +4357,36 @@
       "targetSpawn": "entrance"
     },
     {
-      "x": 1,
-      "y": 12,
-      "width": 1,
-      "height": 1,
-      "targetMap": "tailor",
-      "targetSpawn": "entrance"
-    },
-    {
       "x": 30,
       "y": 11,
       "width": 1,
       "height": 1,
       "targetMap": "witch",
       "targetSpawn": "entrance"
+    },
+    {
+      "x": 27,
+      "y": 20,
+      "width": 1,
+      "height": 1,
+      "targetMap": "Oakmere_slayer_house",
+      "targetSpawn": ""
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "width": 1,
+      "height": 1,
+      "targetMap": "tailor",
+      "targetSpawn": ""
+    },
+    {
+      "x": 9,
+      "y": 3,
+      "width": 1,
+      "height": 1,
+      "targetMap": "",
+      "targetSpawn": ""
     }
   ],
   "gatheringZones": [

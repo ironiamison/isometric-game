@@ -27,8 +27,8 @@
       666,
       366,
       366,
-      366,
-      366,
+      681,
+      681,
       366,
       366,
       695,
@@ -59,8 +59,8 @@
       686,
       666,
       666,
-      666,
-      666,
+      681,
+      681,
       366,
       366,
       366,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "jAEAAEQAAABEAAYARAQMAEQMAAB0DAAALAz/B/wP4QTwD2ENIABBHCwAIRwAACEcAAAlDP8BHwzBAAEMMQDxDxEA4A8RACAAEQEgQDEHAIAdAwBAHQcAAAcLAACHBwAA/wMAAPwDAAQIIAAAACAAABlAAAgYAAAIGAAAABAAAAA=",
+  "collision": "jAFMAEQAwABEAAYBRAQMAkQMAAx0DAAQLAz/J/wP4UTwD2GNIABBHCwAIRwAACEcAAAlDPcBHwzBAAEMMQDxDzEA4A8RACAAEQEgQDEHAIAdAwBAHQcAAAcLAACHBwAA/wMAAPwDAAQIIAAAACAAABlAAAgYAAAIGAAAABAAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3556,6 +3556,13 @@
       "y": 7,
       "width": 28,
       "height": 36
+    },
+    {
+      "gid": 2275,
+      "x": 5,
+      "y": 16,
+      "width": 33,
+      "height": 56
     }
   ],
   "walls": [
@@ -4529,6 +4536,18 @@
       "gid": 989,
       "x": 27,
       "y": 8,
+      "edge": "right"
+    },
+    {
+      "gid": 989,
+      "x": 22,
+      "y": 1,
+      "edge": "right"
+    },
+    {
+      "gid": 989,
+      "x": 22,
+      "y": 0,
       "edge": "right"
     }
   ],

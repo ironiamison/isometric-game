@@ -416,7 +416,7 @@
       396,
       396,
       396,
-      396,
+      495,
       495,
       495,
       495,
@@ -516,7 +516,7 @@
       396,
       396,
       396,
-      396,
+      495,
       495,
       495,
       495,
@@ -582,7 +582,7 @@
       396,
       396,
       396,
-      396,
+      495,
       495,
       495,
       495,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwDAACDBgDACAwAIAQ4ADACYAAIgMEACCCAAAgAIAAYAEAAEAGgALBAAQAgAAAAYAIAAEAQAADAGMAAgAFCAAABQAAABwAAAIwAAAAMEAAACIA=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwDAACDBgDACAwAIAQ4ADACYAAIgMEACCCAAAgAIAAYAEAAEAGgALBAAQAgAAAAYAIAAEAQAADAGMAAgAFCAAABQAAABwAAAAwAAAAMEAAACIA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3220,13 +3220,6 @@
       "y": 20,
       "width": 49,
       "height": 33
-    },
-    {
-      "gid": 1874,
-      "x": 23,
-      "y": 29,
-      "width": 47,
-      "height": 41
     },
     {
       "gid": 1445,

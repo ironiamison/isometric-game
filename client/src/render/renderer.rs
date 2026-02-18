@@ -1679,7 +1679,7 @@ impl Renderer {
                     kind: MinimapMarkerKind::Teleport,
                     x: world_x,
                     y: world_y,
-                    label: format!("Teleport {}", target),
+                    label: format!("Teleport, {}", target),
                 });
             }
         }
@@ -1700,7 +1700,7 @@ impl Renderer {
                     kind: MinimapMarkerKind::Quest,
                     x: npc.x,
                     y: npc.y,
-                    label: format!("Quest {}", npc.display_name),
+                    label: format!("Quest, {}", npc.display_name),
                 });
             } else if npc.is_hostile() {
                 enemy_markers.push((
@@ -1709,7 +1709,7 @@ impl Renderer {
                         kind: MinimapMarkerKind::Enemy,
                         x: npc.x,
                         y: npc.y,
-                        label: format!("Enemy {}", npc.display_name),
+                        label: format!("Enemy, {}", npc.display_name),
                     },
                 ));
             }
@@ -1741,7 +1741,7 @@ impl Renderer {
                             kind: MinimapMarkerKind::Tree,
                             x: wx,
                             y: wy,
-                            label: format!("Tree {} (Lv.{})", tree_info.name, tree_info.level_required),
+                            label: format!("Tree, {} (Lv.{})", tree_info.name, tree_info.level_required),
                         },
                     ));
                 }

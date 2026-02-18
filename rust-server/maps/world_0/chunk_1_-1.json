@@ -880,7 +880,7 @@
       381,
       405,
       294,
-      381,
+      294,
       433,
       381,
       381,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAgAAAAAAAAAADAADEAEABAkAAAECAQEAgAICAAQAAAAABAJAAAEQFAAAAAABAAEAIAAKAAAAAgAABAI/38AAQBAAgDARwAQYEYgBKBEAAAgRGgAIEQAAD9EAAB/RIIQwGQgAUpEAiBBRIAAQUQCAkFkAADgRAAAQEQAAMBEAAA=",
+  "collision": "AAAGGAAAGA8AAPAAAAAAAAAEAAAAAAQAAAAAAAAAAAAAAAABAAAEQBAAAAAABAAAAAAAAAAAAAgAAAAI/38AAQBAAgDARwAAYEYAAKBEAAAgRGAAIEQAAD9EAAB/RAIQwGQAAEhEAABARAAAQkQAAEJkAADgRAAAQUQAAMBEAAA=",
   "entities": [
     {
       "entityId": "crow",
@@ -3652,6 +3652,20 @@
       "y": 25,
       "width": 42,
       "height": 27
+    },
+    {
+      "gid": 2367,
+      "x": 1,
+      "y": 28,
+      "width": 23,
+      "height": 39
+    },
+    {
+      "gid": 2244,
+      "x": 0,
+      "y": 30,
+      "width": 41,
+      "height": 29
     }
   ],
   "walls": [

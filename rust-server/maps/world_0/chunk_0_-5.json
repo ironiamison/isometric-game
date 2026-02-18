@@ -20,11 +20,11 @@
       381,
       381,
       381,
+      320,
       403,
       403,
       403,
-      403,
-      403,
+      320,
       381,
       381,
       381,
@@ -134,7 +134,7 @@
       381,
       381,
       381,
-      396,
+      403,
       381,
       381,
       381,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "EAAAABAAQAAQAAAAEAABABAAAQD4////EEACABAAAAAQkAAAEAAAAJAEAAYQAAEAEAICEBAhAgIQAAABEAIAABAABBAQgQAAEBAAEBAgAAIQBAAAEAAAABBAEAYQAIAAkADAABAAAAAQgAAAEAAAABBAEAAQAAIAEAIAAJAAAAA=",
+  "collision": "EAAAQBAAAIAQAACAEAABABAAAQD4////EEACABAAAAAQAAAAEAAAABAEAAIQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQgQAAEAAAABAAAAIQAAAAEAAAABAAAIAQAACAEAAAQBAAAEAQAABAEAAAQBBAAEAQAABAEAAAQBAAAEA=",
   "entities": [
     {
       "entityId": "hedgehog",
@@ -3133,6 +3133,12 @@
       "entityId": "barbarian",
       "x": 27,
       "y": 0,
+      "level": 1
+    },
+    {
+      "entityId": "hedgehog",
+      "x": 26,
+      "y": 16,
       "level": 1
     }
   ],
