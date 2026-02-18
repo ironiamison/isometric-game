@@ -277,12 +277,14 @@ impl Npc {
             self.target_id = None;
             true
         } else {
-            // If we don't have a target and we're attackable, chase the attacker
-            if self.target_id.is_none() && self.is_attackable() {
+            // Being damaged should immediately interrupt current behavior and chase attacker.
+            if self.is_attackable() {
                 if let Some(attacker) = attacker_id {
                     self.target_id = Some(attacker.to_string());
                     self.state = NpcState::Chasing;
                     self.wander_target = None;
+                    self.wander_best_distance = i32::MAX;
+                    self.wander_stuck_count = 0;
                 }
             }
             false

@@ -78,14 +78,14 @@ description = "A menacing black crow with sharp talons."
 [crow.stats]
 level = 2
 max_hp = 5
-damage = 2
-attack_bonus = 2
+damage = 1
+attack_bonus = 1
 defence_bonus = -3
 attack_range = 1
 aggro_range = 7
 chase_range = 10
-move_cooldown_ms = 800
-attack_cooldown_ms = 1200
+move_cooldown_ms = 900
+attack_cooldown_ms = 1400
 respawn_time_ms = 10000
 
 [crow.rewards]
@@ -101,7 +101,7 @@ quantity_max = 3
 
 [[crow.loot]]
 item_id = "recipe_scavenger_bow"
-drop_chance = 0.03
+drop_chance = 0.01
 quantity_min = 1
 quantity_max = 1
 
