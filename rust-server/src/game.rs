@@ -2869,6 +2869,8 @@ impl GameRoom {
                 // Check if attack hits (combat_level used for both attack and strength)
                 if !calculate_hit(combat_level, attack_bonus, npc_defence_level, npc_defence_bonus) {
                     // Miss - deal 0 damage
+                    // Still register aggro so attack attempts interrupt wandering/pathing.
+                    npc.take_damage(0, current_time, Some(player_id));
                     let name = npc.name();
                     tracing::info!(
                         "{} misses {} (atk {} + {} vs def {} + {})",
@@ -10248,6 +10250,8 @@ impl GameRoom {
 
                 if !crate::skills::calculate_hit(effective_level, attack_bonus, npc_defence_level, npc_defence_bonus) {
                     // Miss
+                    // Still register aggro so attack attempts interrupt wandering/pathing.
+                    npc.take_damage(0, current_time, Some(player_id));
                     let name = npc.name();
                     tracing::info!(
                         "{} spell misses {} (eff {} [cmb{}+mag{}] vs def {})",
