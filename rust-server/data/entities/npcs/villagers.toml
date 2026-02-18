@@ -790,7 +790,7 @@ gold_max = 0
 hostile = false
 quest_giver = true
 wander_enabled = false
-facing = "right"
+facing = "down"
 
 [swamp_hermit.quest_giver]
 available_quests = ["shell_repairs", "forging_ahead", "lobster_feast"]
