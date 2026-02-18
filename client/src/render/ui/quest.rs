@@ -8,6 +8,39 @@ use super::super::Renderer;
 use super::common::*;
 
 impl Renderer {
+    fn quest_tracker_height(&self, state: &GameState, tracker_width: f32) -> f32 {
+        if state.ui_state.active_quests.is_empty() {
+            return 0.0;
+        }
+
+        let line_height = 18.0;
+        let objective_line_height = line_height - 2.0;
+        let title_wrap_width = (tracker_width - 2.0).max(80.0);
+        let detail_wrap_width = (tracker_width - 18.0).max(72.0);
+        let mut height = line_height + 5.0; // header
+
+        for quest in state.ui_state.active_quests.iter().take(2) {
+            let title_lines = self.wrap_text(&quest.name, title_wrap_width, 16.0);
+            height += title_lines.len().max(1) as f32 * line_height;
+
+            for obj in &quest.objectives {
+                let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
+                let wrapped = self.wrap_text(&obj_text, detail_wrap_width, 16.0);
+                height += wrapped.len().max(1) as f32 * objective_line_height;
+            }
+
+            height += 8.0;
+        }
+
+        if state.ui_state.active_quests.len() > 2 {
+            let more = format!("...and {} more (Q to view)", state.ui_state.active_quests.len() - 2);
+            let more_lines = self.wrap_text(&more, title_wrap_width, 16.0);
+            height += more_lines.len().max(1) as f32 * line_height;
+        }
+
+        height
+    }
+
     pub(crate) fn render_quest_log(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
         let (sw, sh) = virtual_screen_size();
 
@@ -217,21 +250,15 @@ impl Renderer {
         self.draw_text_sharp(&count_text, footer_x + footer_w - count_width - 10.0, footer_y + 20.0, 16.0, FRAME_MID);
     }
 
-    pub(crate) fn render_quest_tracker(&self, state: &GameState) {
+    pub(crate) fn render_quest_tracker(&self, state: &GameState, tracker_x: f32, tracker_y: f32, tracker_width: f32) {
         if state.ui_state.active_quests.is_empty() {
             return;
         }
 
-        let tracker_x = 10.0;
-        let tracker_y = if state.debug_mode {
-            460.0
-        } else {
-            #[cfg(target_os = "android")]
-            { 46.0 } // Below chat button (10 + 28 + 8)
-            #[cfg(not(target_os = "android"))]
-            { 20.0 }
-        };
         let line_height = 18.0;
+        let objective_line_height = line_height - 2.0;
+        let title_wrap_width = (tracker_width - 2.0).max(80.0);
+        let detail_wrap_width = (tracker_width - 18.0).max(72.0);
 
         let mut y = tracker_y;
 
@@ -241,8 +268,11 @@ impl Renderer {
 
         // Only show first 2 active quests
         for quest in state.ui_state.active_quests.iter().take(2) {
-            self.draw_text_sharp(&quest.name, tracker_x, y, 16.0, WHITE);
-            y += line_height;
+            let title_lines = self.wrap_text(&quest.name, title_wrap_width, 16.0);
+            for line in title_lines.iter().take(2) {
+                self.draw_text_sharp(line, tracker_x, y, 16.0, WHITE);
+                y += line_height;
+            }
 
             for obj in &quest.objectives {
                 let status_color = if obj.completed {
@@ -252,9 +282,17 @@ impl Renderer {
                 };
 
                 let check = if obj.completed { "[x]" } else { "[ ]" };
-                let obj_text = format!("{} {} ({}/{})", check, obj.description, obj.current, obj.target);
-                self.draw_text_sharp(&obj_text, tracker_x + 10.0, y, 16.0, status_color);
-                y += line_height - 2.0;
+                let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
+                let wrapped = self.wrap_text(&obj_text, detail_wrap_width, 16.0);
+                for (idx, line) in wrapped.iter().enumerate() {
+                    let render_line = if idx == 0 {
+                        format!("{} {}", check, line)
+                    } else {
+                        format!("    {}", line)
+                    };
+                    self.draw_text_sharp(&render_line, tracker_x + 10.0, y, 16.0, status_color);
+                    y += objective_line_height;
+                }
             }
 
             y += 8.0;
@@ -262,42 +300,28 @@ impl Renderer {
 
         if state.ui_state.active_quests.len() > 2 {
             let more = format!("...and {} more (Q to view)", state.ui_state.active_quests.len() - 2);
-            self.draw_text_sharp(&more, tracker_x, y, 16.0, LIGHTGRAY);
+            for line in self.wrap_text(&more, title_wrap_width, 16.0).iter().take(2) {
+                self.draw_text_sharp(line, tracker_x, y, 16.0, LIGHTGRAY);
+                y += line_height;
+            }
         }
     }
 
     /// Render farming contract tracker (shown when in the farming chunk)
-    pub(crate) fn render_farming_contract_tracker(&self, state: &GameState) {
+    pub(crate) fn render_farming_contract_tracker(&self, state: &GameState, tracker_x: f32, tracker_y: f32, tracker_width: f32) {
         let contract = match &state.farming_contract {
             Some(c) => c,
             None => return,
         };
 
-        let tracker_x = 10.0;
         let line_height = 18.0;
-
-        // Calculate starting Y below the quest tracker
-        let base_y = if state.debug_mode {
-            460.0
-        } else {
-            #[cfg(target_os = "android")]
-            { 46.0 }
-            #[cfg(not(target_os = "android"))]
-            { 20.0 }
-        };
+        let objective_line_height = line_height - 2.0;
+        let title_wrap_width = (tracker_width - 2.0).max(80.0);
+        let detail_wrap_width = (tracker_width - 18.0).max(72.0);
 
         // Offset past quest tracker content
-        let mut y = base_y;
+        let mut y = tracker_y + self.quest_tracker_height(state, tracker_width);
         if !state.ui_state.active_quests.is_empty() {
-            y += line_height + 5.0; // "QUESTS" header
-            for quest in state.ui_state.active_quests.iter().take(2) {
-                y += line_height; // quest name
-                y += quest.objectives.len() as f32 * (line_height - 2.0); // objectives
-                y += 8.0; // spacing
-            }
-            if state.ui_state.active_quests.len() > 2 {
-                y += line_height; // "...and N more"
-            }
             y += 6.0; // gap between quest and contract sections
         }
 
@@ -307,8 +331,10 @@ impl Renderer {
 
         // Contract info: "Easy: Harvest potatoes"
         let title = format!("{}: Harvest {}", contract.difficulty, contract.crop_name);
-        self.draw_text_sharp(&title, tracker_x, y, 16.0, WHITE);
-        y += line_height;
+        for line in self.wrap_text(&title, title_wrap_width, 16.0).iter().take(2) {
+            self.draw_text_sharp(line, tracker_x, y, 16.0, WHITE);
+            y += line_height;
+        }
 
         // Progress: "[x] 3/5 harvested" or "[x] 5/5 harvested" (complete)
         let complete = contract.amount_harvested >= contract.amount_required;
@@ -317,12 +343,29 @@ impl Renderer {
         } else {
             ("[ ]", Color::from_rgba(200, 200, 200, 255))
         };
-        let progress_text = format!("{} {}/{} harvested", check, contract.amount_harvested, contract.amount_required);
-        self.draw_text_sharp(&progress_text, tracker_x + 10.0, y, 16.0, status_color);
+        let progress_text = format!("{}/{} harvested", contract.amount_harvested, contract.amount_required);
+        let wrapped_progress = self.wrap_text(&progress_text, detail_wrap_width, 16.0);
+        for (idx, line) in wrapped_progress.iter().enumerate() {
+            let render_line = if idx == 0 {
+                format!("{} {}", check, line)
+            } else {
+                format!("    {}", line)
+            };
+            self.draw_text_sharp(&render_line, tracker_x + 10.0, y, 16.0, status_color);
+            y += objective_line_height;
+        }
 
         if complete {
-            y += line_height - 2.0;
-            self.draw_text_sharp("[ ] Return to Master Farmer", tracker_x + 10.0, y, 16.0, Color::from_rgba(200, 200, 200, 255));
+            let wrapped_return = self.wrap_text("Return to Master Farmer", detail_wrap_width, 16.0);
+            for (idx, line) in wrapped_return.iter().enumerate() {
+                let render_line = if idx == 0 {
+                    format!("[ ] {}", line)
+                } else {
+                    format!("    {}", line)
+                };
+                self.draw_text_sharp(&render_line, tracker_x + 10.0, y, 16.0, Color::from_rgba(200, 200, 200, 255));
+                y += objective_line_height;
+            }
         }
     }
 

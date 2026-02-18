@@ -149,6 +149,12 @@ pub enum UiElementId {
     SpellHelpButton,
     PrayerHelpClose,
     SpellHelpClose,
+
+    // Minimap
+    MinimapToggle,
+    MinimapPanel,
+    MinimapClose,
+    MinimapMarker(usize),
 }
 
 /// A single interactive UI element with its bounds

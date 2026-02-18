@@ -243,6 +243,47 @@ impl SpritesheetStore {
     }
 }
 
+const MINIMAP_MARGIN: f32 = 12.0;
+const MINIMAP_PREVIEW_Y: f32 = 8.0;
+const MINIMAP_PREVIEW_WIDTH: f32 = 188.0;
+const MINIMAP_PREVIEW_HEIGHT: f32 = 140.0;
+const MINIMAP_WORLD_TEXT_SIZE: f32 = 16.0;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum MinimapMarkerKind {
+    Player,
+    Teleport,
+    Enemy,
+    Tree,
+    Quest,
+}
+
+#[derive(Clone, Debug)]
+struct MinimapMarker {
+    kind: MinimapMarkerKind,
+    x: f32,
+    y: f32,
+    label: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MinimapBounds {
+    min_x: f32,
+    min_y: f32,
+    max_x: f32,
+    max_y: f32,
+}
+
+impl MinimapBounds {
+    fn width(&self) -> f32 {
+        (self.max_x - self.min_x).max(1.0)
+    }
+
+    fn height(&self) -> f32 {
+        (self.max_y - self.min_y).max(1.0)
+    }
+}
+
 pub struct Renderer {
     player_color: Color,
     local_player_color: Color,
@@ -307,6 +348,10 @@ pub struct Renderer {
     exit_arrow_right: Option<Texture2D>,
     /// Cached wrapped chat lines to avoid rebuilding/wrapping every frame.
     chat_lines_cache: RefCell<ChatLinesCache>,
+    /// CPU copy of the tileset texture for minimap color sampling.
+    tileset_image_cache: RefCell<Option<Image>>,
+    /// Cached minimap tint color per tile id.
+    minimap_tile_color_cache: RefCell<HashMap<u32, Color>>,
     /// Cached text measurements bucketed by font size.
     text_measure_cache: RefCell<HashMap<i32, HashMap<String, TextDimensions>>>,
     /// Cached wrapped lines bucketed by (max width, font size).
@@ -1099,6 +1144,8 @@ impl Renderer {
             exit_arrow_left,
             exit_arrow_right,
             chat_lines_cache: RefCell::new(ChatLinesCache::default()),
+            tileset_image_cache: RefCell::new(None),
+            minimap_tile_color_cache: RefCell::new(HashMap::new()),
             text_measure_cache: RefCell::new(HashMap::new()),
             text_wrap_cache: RefCell::new(HashMap::new()),
         }
@@ -1318,6 +1365,780 @@ impl Renderer {
             if is_water && self.water_material.is_some() {
                 gl_use_default_material();
             }
+        }
+    }
+
+    fn minimap_preview_rect(&self) -> Rect {
+        let (sw, _) = virtual_screen_size();
+        Rect::new(
+            (sw - MINIMAP_PREVIEW_WIDTH - MINIMAP_MARGIN).floor(),
+            MINIMAP_PREVIEW_Y,
+            MINIMAP_PREVIEW_WIDTH,
+            MINIMAP_PREVIEW_HEIGHT,
+        )
+    }
+
+    fn minimap_panel_rect(&self) -> Rect {
+        let (sw, sh) = virtual_screen_size();
+        let panel_w = (sw * 0.72).clamp(420.0, 760.0);
+        let panel_h = (sh * 0.72).clamp(320.0, 620.0);
+        Rect::new(
+            ((sw - panel_w) * 0.5).floor(),
+            ((sh - panel_h) * 0.5).floor(),
+            panel_w,
+            panel_h,
+        )
+    }
+
+    fn local_name_tag_position(&self) -> (f32, f32) {
+        #[cfg(target_os = "android")]
+        {
+            (10.0, 46.0)
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            (10.0, 10.0)
+        }
+    }
+
+    fn minimap_stats_stack_position(&self, bar_width: f32) -> (f32, f32) {
+        let _ = bar_width;
+        let (name_tag_x, name_tag_y) = self.local_name_tag_position();
+        (
+            name_tag_x.floor(),
+            (name_tag_y + 22.0 + 4.0).floor(),
+        )
+    }
+
+    fn draw_minimap_preview_frame(&self, x: f32, y: f32, w: f32, h: f32) {
+        // Low-profile frame: subtle shadow + thin bezel.
+        draw_rectangle(x - 1.0, y - 1.0, w + 2.0, h + 2.0, Color::new(0.0, 0.0, 0.0, 0.25));
+        draw_rectangle(x, y, w, h, Color::new(0.22, 0.18, 0.12, 0.90));
+        draw_rectangle(x + 1.0, y + 1.0, w - 2.0, h - 2.0, Color::new(0.31, 0.25, 0.16, 0.95));
+        draw_rectangle(x + 2.0, y + 2.0, w - 4.0, h - 4.0, Color::new(0.09, 0.11, 0.13, 0.95));
+        draw_line(x + 2.0, y + 2.0, x + w - 2.0, y + 2.0, 1.0, Color::new(0.62, 0.53, 0.37, 0.25));
+        draw_line(x + 2.0, y + 2.0, x + 2.0, y + h - 2.0, 1.0, Color::new(0.62, 0.53, 0.37, 0.20));
+    }
+
+    fn minimap_bounds(&self, state: &GameState) -> Option<MinimapBounds> {
+        let mut bounds = if let Some((width, height)) = state.chunk_manager.get_interior_size() {
+            MinimapBounds {
+                min_x: 0.0,
+                min_y: 0.0,
+                max_x: width as f32,
+                max_y: height as f32,
+            }
+        } else if !state.chunk_manager.chunks().is_empty() {
+            let mut min_x = f32::MAX;
+            let mut min_y = f32::MAX;
+            let mut max_x = f32::MIN;
+            let mut max_y = f32::MIN;
+
+            for coord in state.chunk_manager.chunks().keys() {
+                let chunk_x = (coord.x * CHUNK_SIZE as i32) as f32;
+                let chunk_y = (coord.y * CHUNK_SIZE as i32) as f32;
+                min_x = min_x.min(chunk_x);
+                min_y = min_y.min(chunk_y);
+                max_x = max_x.max(chunk_x + CHUNK_SIZE as f32);
+                max_y = max_y.max(chunk_y + CHUNK_SIZE as f32);
+            }
+
+            MinimapBounds {
+                min_x,
+                min_y,
+                max_x,
+                max_y,
+            }
+        } else if let Some(player) = state.get_local_player() {
+            let radius = 24.0;
+            MinimapBounds {
+                min_x: player.x - radius,
+                min_y: player.y - radius,
+                max_x: player.x + radius,
+                max_y: player.y + radius,
+            }
+        } else {
+            return None;
+        };
+
+        if let Some(player) = state.get_local_player() {
+            bounds.min_x = bounds.min_x.min(player.x);
+            bounds.min_y = bounds.min_y.min(player.y);
+            bounds.max_x = bounds.max_x.max(player.x);
+            bounds.max_y = bounds.max_y.max(player.y);
+        }
+
+        let padding = 2.0;
+        bounds.min_x -= padding;
+        bounds.min_y -= padding;
+        bounds.max_x += padding;
+        bounds.max_y += padding;
+        if bounds.max_x <= bounds.min_x {
+            bounds.max_x = bounds.min_x + 1.0;
+        }
+        if bounds.max_y <= bounds.min_y {
+            bounds.max_y = bounds.min_y + 1.0;
+        }
+        Some(bounds)
+    }
+
+    fn minimap_marker_style(kind: MinimapMarkerKind) -> (Color, f32) {
+        match kind {
+            MinimapMarkerKind::Player => (Color::new(0.95, 0.95, 1.0, 1.0), 3.6),
+            MinimapMarkerKind::Teleport => (Color::new(0.35, 0.85, 1.0, 1.0), 3.0),
+            MinimapMarkerKind::Enemy => (Color::new(0.95, 0.35, 0.35, 1.0), 2.7),
+            MinimapMarkerKind::Tree => (Color::new(0.35, 0.85, 0.45, 1.0), 2.4),
+            MinimapMarkerKind::Quest => (Color::new(1.0, 0.82, 0.35, 1.0), 3.1),
+        }
+    }
+
+    fn format_map_display_name(target_map: &str) -> String {
+        let raw = target_map.trim();
+        if raw.is_empty() {
+            return "Unknown".to_string();
+        }
+
+        // Support encoded forms such as "interior:old_house" or "maps/interiors/old_house".
+        let scoped = raw.rsplit(':').next().unwrap_or(raw);
+        let id = scoped.rsplit('/').next().unwrap_or(scoped).trim();
+        if id.is_empty() {
+            return "Unknown".to_string();
+        }
+
+        if id.eq_ignore_ascii_case("overworld") {
+            return "Overworld".to_string();
+        }
+
+        let mut out = String::new();
+        for (i, word) in id.split(['_', '-', ' ']).filter(|w| !w.is_empty()).enumerate() {
+            if i > 0 {
+                out.push(' ');
+            }
+            let mut chars = word.chars();
+            if let Some(first) = chars.next() {
+                out.push(first.to_ascii_uppercase());
+                for c in chars {
+                    out.push(c.to_ascii_lowercase());
+                }
+            }
+        }
+
+        if out.is_empty() {
+            "Unknown".to_string()
+        } else {
+            out
+        }
+    }
+
+    fn sample_tileset_tile_color(image: &Image, tile_id: u32) -> Option<Color> {
+        if tile_id == 0 {
+            return None;
+        }
+
+        let id = tile_id - 1;
+        let col = id % TILESET_COLUMNS;
+        let row = id / TILESET_COLUMNS;
+        let x0 = col * TILESET_TILE_WIDTH as u32;
+        let y0 = row * TILESET_TILE_HEIGHT as u32;
+
+        let img_w = image.width as u32;
+        let img_h = image.height as u32;
+        if x0 >= img_w || y0 >= img_h {
+            return None;
+        }
+
+        let sample_offsets = [
+            (0.50, 0.50),
+            (0.50, 0.66),
+            (0.36, 0.52),
+            (0.64, 0.52),
+            (0.50, 0.36),
+        ];
+
+        let mut sum_r = 0.0;
+        let mut sum_g = 0.0;
+        let mut sum_b = 0.0;
+        let mut count = 0.0;
+
+        for (fx, fy) in sample_offsets {
+            let sx = (x0 as f32 + TILESET_TILE_WIDTH * fx).floor() as u32;
+            let sy = (y0 as f32 + TILESET_TILE_HEIGHT * fy).floor() as u32;
+            if sx >= img_w || sy >= img_h {
+                continue;
+            }
+            let c = image.get_pixel(sx, sy);
+            if c.a <= 0.05 {
+                continue;
+            }
+            sum_r += c.r;
+            sum_g += c.g;
+            sum_b += c.b;
+            count += 1.0;
+        }
+
+        if count <= 0.0 {
+            return None;
+        }
+
+        Some(Color::new(sum_r / count, sum_g / count, sum_b / count, 1.0))
+    }
+
+    fn is_debug_purple(color: Color) -> bool {
+        // Catch the legacy debug-fallback tone (roughly rgb(100, 50, 100)) and close variants.
+        color.r > color.g + 0.10
+            && color.b > color.g + 0.10
+            && (color.r - color.b).abs() < 0.10
+            && ((color.r + color.g + color.b) / 3.0) < 0.55
+    }
+
+    fn minimap_tile_color(&self, tile_id: u32) -> Color {
+        if let Some(cached) = self.minimap_tile_color_cache.borrow().get(&tile_id).copied() {
+            return cached;
+        }
+
+        if self.tileset_image_cache.borrow().is_none() {
+            if let Some(tileset) = &self.tileset {
+                // One-time GPU->CPU copy used for minimap color sampling.
+                *self.tileset_image_cache.borrow_mut() = Some(tileset.get_texture_data());
+            }
+        }
+
+        let sampled = self.tileset_image_cache
+            .borrow()
+            .as_ref()
+            .and_then(|img| Self::sample_tileset_tile_color(img, tile_id));
+
+        // Keep minimap grounded in world colors. Avoid the debug-purple fallback for unknown ids.
+        let base = sampled.unwrap_or_else(|| {
+            if tile_id <= 8 {
+                get_tile_color(tile_id)
+            } else {
+                Color::from_rgba(58, 92, 64, 255)
+            }
+        });
+        let base = if Self::is_debug_purple(base) {
+            Color::from_rgba(58, 92, 64, 255)
+        } else {
+            base
+        };
+
+        let tuned = Color::new(
+            (base.r * 0.88 + 0.03).clamp(0.0, 1.0),
+            (base.g * 0.88 + 0.03).clamp(0.0, 1.0),
+            (base.b * 0.88 + 0.03).clamp(0.0, 1.0),
+            0.90,
+        );
+
+        self.minimap_tile_color_cache
+            .borrow_mut()
+            .insert(tile_id, tuned);
+        tuned
+    }
+
+    fn minimap_world_to_screen(&self, bounds: &MinimapBounds, map_rect: Rect, world_x: f32, world_y: f32) -> (f32, f32) {
+        let nx = ((world_x - bounds.min_x) / bounds.width()).clamp(0.0, 1.0);
+        let ny = ((world_y - bounds.min_y) / bounds.height()).clamp(0.0, 1.0);
+        (
+            map_rect.x + nx * map_rect.w,
+            map_rect.y + ny * map_rect.h,
+        )
+    }
+
+    fn collect_minimap_markers(&self, state: &GameState) -> Vec<MinimapMarker> {
+        let mut markers: Vec<MinimapMarker> = Vec::new();
+        let player_pos = state.get_local_player().map(|p| (p.x, p.y));
+
+        let distance_sq = |x: f32, y: f32| -> f32 {
+            if let Some((px, py)) = player_pos {
+                let dx = x - px;
+                let dy = y - py;
+                dx * dx + dy * dy
+            } else {
+                0.0
+            }
+        };
+
+        if let Some(player) = state.get_local_player() {
+            markers.push(MinimapMarker {
+                kind: MinimapMarkerKind::Player,
+                x: player.x,
+                y: player.y,
+                label: "You".to_string(),
+            });
+        }
+
+        let mut teleport_markers: Vec<MinimapMarker> = Vec::new();
+        for (coord, chunk) in state.chunk_manager.chunks().iter() {
+            let base_x = coord.x * CHUNK_SIZE as i32;
+            let base_y = coord.y * CHUNK_SIZE as i32;
+            for portal in &chunk.portals {
+                let world_x = base_x as f32 + portal.x as f32 + portal.width.max(1) as f32 * 0.5;
+                let world_y = base_y as f32 + portal.y as f32 + portal.height.max(1) as f32 * 0.5;
+                let target = Self::format_map_display_name(&portal.target_map);
+                teleport_markers.push(MinimapMarker {
+                    kind: MinimapMarkerKind::Teleport,
+                    x: world_x,
+                    y: world_y,
+                    label: format!("Teleport: {}", target),
+                });
+            }
+        }
+        teleport_markers.sort_by(|a, b| {
+            a.y.partial_cmp(&b.y).unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
+        });
+        markers.extend(teleport_markers);
+
+        let mut quest_markers: Vec<MinimapMarker> = Vec::new();
+        let mut enemy_markers: Vec<(f32, MinimapMarker)> = Vec::new();
+        for npc in state.npcs.values() {
+            if !npc.is_alive() {
+                continue;
+            }
+            if npc.is_quest_giver {
+                quest_markers.push(MinimapMarker {
+                    kind: MinimapMarkerKind::Quest,
+                    x: npc.x,
+                    y: npc.y,
+                    label: format!("Quest: {}", npc.display_name),
+                });
+            } else if npc.is_hostile() {
+                enemy_markers.push((
+                    distance_sq(npc.x, npc.y),
+                    MinimapMarker {
+                        kind: MinimapMarkerKind::Enemy,
+                        x: npc.x,
+                        y: npc.y,
+                        label: format!("Enemy: {}", npc.display_name),
+                    },
+                ));
+            }
+        }
+        quest_markers.sort_by(|a, b| a.label.cmp(&b.label));
+        markers.extend(quest_markers);
+
+        enemy_markers.sort_by(|a, b| {
+            a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.1.label.cmp(&b.1.label))
+        });
+        const MAX_ENEMY_MARKERS: usize = 120;
+        for (_, marker) in enemy_markers.into_iter().take(MAX_ENEMY_MARKERS) {
+            markers.push(marker);
+        }
+
+        let mut tree_markers: Vec<(f32, MinimapMarker)> = Vec::new();
+        for chunk in state.chunk_manager.chunks().values() {
+            for obj in &chunk.objects {
+                if state.depleted_trees.contains_key(&(obj.tile_x, obj.tile_y)) {
+                    continue;
+                }
+                if let Some(tree_info) = get_tree_info(obj.gid) {
+                    let wx = obj.tile_x as f32 + 0.5;
+                    let wy = obj.tile_y as f32 + 0.5;
+                    tree_markers.push((
+                        distance_sq(wx, wy),
+                        MinimapMarker {
+                            kind: MinimapMarkerKind::Tree,
+                            x: wx,
+                            y: wy,
+                            label: format!("Tree: {} (Lv.{})", tree_info.name, tree_info.level_required),
+                        },
+                    ));
+                }
+            }
+        }
+        tree_markers.sort_by(|a, b| {
+            a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.1.label.cmp(&b.1.label))
+        });
+        const MAX_TREE_MARKERS: usize = 180;
+        for (_, marker) in tree_markers.into_iter().take(MAX_TREE_MARKERS) {
+            markers.push(marker);
+        }
+
+        markers
+    }
+
+    fn draw_minimap_contents(
+        &self,
+        state: &GameState,
+        bounds: &MinimapBounds,
+        markers: &[MinimapMarker],
+        map_rect: Rect,
+        marker_scale: f32,
+        hovered_marker: Option<usize>,
+        capture_hitboxes: bool,
+    ) -> Vec<Rect> {
+        draw_rectangle(
+            map_rect.x,
+            map_rect.y,
+            map_rect.w,
+            map_rect.h,
+            Color::new(0.045, 0.065, 0.075, 0.95),
+        );
+
+        let sample_step_x = (bounds.width() / map_rect.w).ceil().max(1.0) as usize;
+        let sample_step_y = (bounds.height() / map_rect.h).ceil().max(1.0) as usize;
+
+        let interior_size = state.chunk_manager.get_interior_size();
+        // Draw a primitive world raster by sampling the ground tile color per tile.
+        if !state.chunk_manager.chunks().is_empty() {
+            for (coord, chunk) in state.chunk_manager.chunks().iter() {
+                let Some(ground_layer) = chunk.layers.iter().find(|layer| layer.layer_type == ChunkLayerType::Ground) else {
+                    continue;
+                };
+
+                let (tile_w, tile_h, base_x, base_y) = if let Some((w, h)) = interior_size {
+                    if coord.x != 0 || coord.y != 0 {
+                        continue;
+                    }
+                    (w as usize, h as usize, 0i32, 0i32)
+                } else {
+                    (
+                        CHUNK_SIZE as usize,
+                        CHUNK_SIZE as usize,
+                        coord.x * CHUNK_SIZE as i32,
+                        coord.y * CHUNK_SIZE as i32,
+                    )
+                };
+
+                for y in (0..tile_h).step_by(sample_step_y) {
+                    let row_start = y * tile_w;
+                    if row_start >= ground_layer.tiles.len() {
+                        break;
+                    }
+                    for x in (0..tile_w).step_by(sample_step_x) {
+                        let idx = row_start + x;
+                        if idx >= ground_layer.tiles.len() {
+                            break;
+                        }
+                        let tile_id = ground_layer.tiles[idx];
+                        if tile_id == 0 {
+                            continue;
+                        }
+
+                        let world_x = base_x + x as i32;
+                        let world_y = base_y + y as i32;
+                        let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, world_x as f32, world_y as f32);
+                        let tile_span_x = sample_step_x.min(tile_w.saturating_sub(x).max(1));
+                        let tile_span_y = sample_step_y.min(tile_h.saturating_sub(y).max(1));
+                        let (sx2, sy2) = self.minimap_world_to_screen(
+                            bounds,
+                            map_rect,
+                            (world_x + tile_span_x as i32) as f32,
+                            (world_y + tile_span_y as i32) as f32,
+                        );
+                        let rect_x = sx1.min(sx2);
+                        let rect_y = sy1.min(sy2);
+                        let rect_w = (sx2 - sx1).abs().max(1.0);
+                        let rect_h = (sy2 - sy1).abs().max(1.0);
+
+                        draw_rectangle(
+                            rect_x,
+                            rect_y,
+                            rect_w,
+                            rect_h,
+                            self.minimap_tile_color(tile_id),
+                        );
+                    }
+                }
+            }
+        } else {
+            // Fallback to legacy local tilemap if chunk streaming has not initialized yet.
+            if let Some(layer) = state.tilemap.layers.iter().find(|l| l.layer_type == LayerType::Ground) {
+                let width = state.tilemap.width as usize;
+                let height = state.tilemap.height as usize;
+                for y in (0..height).step_by(sample_step_y) {
+                    for x in (0..width).step_by(sample_step_x) {
+                        let idx = y * width + x;
+                        let tile_id = layer.tiles.get(idx).copied().unwrap_or(0);
+                        if tile_id == 0 {
+                            continue;
+                        }
+
+                        let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, x as f32, y as f32);
+                        let tile_span_x = sample_step_x.min(width.saturating_sub(x).max(1));
+                        let tile_span_y = sample_step_y.min(height.saturating_sub(y).max(1));
+                        let (sx2, sy2) = self.minimap_world_to_screen(
+                            bounds,
+                            map_rect,
+                            (x + tile_span_x) as f32,
+                            (y + tile_span_y) as f32,
+                        );
+                        let rect_x = sx1.min(sx2);
+                        let rect_y = sy1.min(sy2);
+                        let rect_w = (sx2 - sx1).abs().max(1.0);
+                        let rect_h = (sy2 - sy1).abs().max(1.0);
+
+                        draw_rectangle(
+                            rect_x,
+                            rect_y,
+                            rect_w,
+                            rect_h,
+                            self.minimap_tile_color(tile_id),
+                        );
+                    }
+                }
+            }
+        }
+
+        for coord in state.chunk_manager.chunks().keys() {
+            let (chunk_x, chunk_y, chunk_w, chunk_h) = if let Some((w, h)) = interior_size {
+                if coord.x != 0 || coord.y != 0 {
+                    continue;
+                }
+                (0.0, 0.0, w as f32, h as f32)
+            } else {
+                (
+                    (coord.x * CHUNK_SIZE as i32) as f32,
+                    (coord.y * CHUNK_SIZE as i32) as f32,
+                    CHUNK_SIZE as f32,
+                    CHUNK_SIZE as f32,
+                )
+            };
+
+            let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, chunk_x, chunk_y);
+            let (sx2, sy2) = self.minimap_world_to_screen(bounds, map_rect, chunk_x + chunk_w, chunk_y + chunk_h);
+            let rect_x = sx1.min(sx2);
+            let rect_y = sy1.min(sy2);
+            let rect_w = (sx2 - sx1).abs().max(1.0);
+            let rect_h = (sy2 - sy1).abs().max(1.0);
+
+            draw_rectangle(
+                rect_x,
+                rect_y,
+                rect_w,
+                rect_h,
+                Color::new(0.0, 0.0, 0.0, 0.08),
+            );
+            draw_rectangle_lines(
+                rect_x,
+                rect_y,
+                rect_w,
+                rect_h,
+                1.0,
+                Color::new(0.35, 0.50, 0.40, 0.30),
+            );
+        }
+
+        let mut hitboxes: Vec<Rect> = Vec::with_capacity(if capture_hitboxes { markers.len() } else { 0 });
+        for (idx, marker) in markers.iter().enumerate() {
+            let (sx, sy) = self.minimap_world_to_screen(bounds, map_rect, marker.x, marker.y);
+            let (color, base_radius) = Self::minimap_marker_style(marker.kind);
+            let hovered = hovered_marker == Some(idx);
+            let radius = base_radius * marker_scale + if hovered { 1.4 } else { 0.0 };
+
+            draw_circle(sx, sy, radius + 1.2, Color::new(0.0, 0.0, 0.0, 0.65));
+            draw_circle(sx, sy, radius, color);
+            if hovered {
+                draw_circle_lines(sx, sy, radius + 1.6, 1.0, Color::new(1.0, 1.0, 1.0, 0.9));
+            }
+
+            if capture_hitboxes {
+                hitboxes.push(Rect::new(
+                    sx - radius - 3.0,
+                    sy - radius - 3.0,
+                    (radius + 3.0) * 2.0,
+                    (radius + 3.0) * 2.0,
+                ));
+            }
+        }
+
+        draw_rectangle_lines(
+            map_rect.x,
+            map_rect.y,
+            map_rect.w,
+            map_rect.h,
+            1.0,
+            Color::new(0.70, 0.57, 0.36, 0.80),
+        );
+
+        hitboxes
+    }
+
+    fn render_minimap_preview(&self, state: &GameState) {
+        let preview_rect = self.minimap_preview_rect();
+        self.draw_minimap_preview_frame(preview_rect.x, preview_rect.y, preview_rect.w, preview_rect.h);
+
+        let title = "Minimap [M]";
+        self.draw_text_sharp(
+            title,
+            preview_rect.x + 8.0,
+            preview_rect.y + 17.0,
+            MINIMAP_WORLD_TEXT_SIZE,
+            TEXT_TITLE,
+        );
+
+        let map_rect = Rect::new(
+            preview_rect.x + 6.0,
+            preview_rect.y + 24.0,
+            preview_rect.w - 12.0,
+            preview_rect.h - 30.0,
+        );
+
+        if let Some(bounds) = self.minimap_bounds(state) {
+            let markers = self.collect_minimap_markers(state);
+            self.draw_minimap_contents(
+                state,
+                &bounds,
+                &markers,
+                map_rect,
+                0.8,
+                None,
+                false,
+            );
+        } else {
+            draw_rectangle(
+                map_rect.x,
+                map_rect.y,
+                map_rect.w,
+                map_rect.h,
+                Color::new(0.05, 0.05, 0.07, 0.85),
+            );
+            self.draw_text_sharp("Loading map...", map_rect.x + 10.0, map_rect.y + 24.0, 16.0, TEXT_DIM);
+        }
+    }
+
+    fn render_minimap_overlay(&self, state: &GameState, hovered: &Option<UiElementId>, layout: &mut UiLayout) {
+        if state.get_local_player().is_none() {
+            return;
+        }
+
+        layout.add(UiElementId::MinimapToggle, self.minimap_preview_rect());
+
+        if !state.ui_state.minimap_panel_open {
+            return;
+        }
+
+        let (sw, sh) = virtual_screen_size();
+        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
+        layout.add(UiElementId::MinimapPanel, Rect::new(0.0, 0.0, sw, sh));
+
+        let panel_rect = self.minimap_panel_rect();
+        self.draw_panel_frame(panel_rect.x, panel_rect.y, panel_rect.w, panel_rect.h);
+
+        self.draw_text_sharp(
+            "World Map",
+            panel_rect.x + 14.0,
+            panel_rect.y + 22.0,
+            MINIMAP_WORLD_TEXT_SIZE,
+            TEXT_TITLE,
+        );
+
+        let close_rect = Rect::new(panel_rect.x + panel_rect.w - 34.0, panel_rect.y + 10.0, 22.0, 16.0);
+        let close_hovered = matches!(hovered, Some(UiElementId::MinimapClose));
+        let close_bg = if close_hovered {
+            Color::new(0.20, 0.22, 0.26, 0.96)
+        } else {
+            Color::new(0.12, 0.13, 0.16, 0.92)
+        };
+        let close_border = if close_hovered {
+            Color::new(0.74, 0.78, 0.86, 0.90)
+        } else {
+            Color::new(0.48, 0.52, 0.60, 0.75)
+        };
+        let close_text = if close_hovered { TEXT_TITLE } else { TEXT_NORMAL };
+        draw_rectangle(close_rect.x, close_rect.y, close_rect.w, close_rect.h, close_bg);
+        draw_rectangle_lines(close_rect.x, close_rect.y, close_rect.w, close_rect.h, 1.0, close_border);
+        self.draw_text_sharp("X", close_rect.x + 7.0, close_rect.y + 13.0, MINIMAP_WORLD_TEXT_SIZE, close_text);
+        layout.add(UiElementId::MinimapClose, close_rect);
+
+        let map_rect = Rect::new(
+            panel_rect.x + 14.0,
+            panel_rect.y + 34.0,
+            panel_rect.w - 28.0,
+            panel_rect.h - 86.0,
+        );
+
+        let hovered_marker_idx = match hovered {
+            Some(UiElementId::MinimapMarker(idx)) => Some(*idx),
+            _ => None,
+        };
+
+        if let Some(bounds) = self.minimap_bounds(state) {
+            let markers = self.collect_minimap_markers(state);
+            let marker_hitboxes = self.draw_minimap_contents(
+                state,
+                &bounds,
+                &markers,
+                map_rect,
+                1.0,
+                hovered_marker_idx,
+                true,
+            );
+
+            for (idx, hitbox) in marker_hitboxes.into_iter().enumerate() {
+                layout.add(UiElementId::MinimapMarker(idx), hitbox);
+            }
+
+            let footer_left = panel_rect.x + 14.0;
+            let footer_width = panel_rect.w - 28.0;
+            let status_y = panel_rect.y + panel_rect.h - 44.0;
+            let legend_y = panel_rect.y + panel_rect.h - 24.0;
+            let legend_items = [
+                (MinimapMarkerKind::Teleport, "Teleport"),
+                (MinimapMarkerKind::Enemy, "Enemy"),
+                (MinimapMarkerKind::Tree, "Tree"),
+                (MinimapMarkerKind::Quest, "Quest"),
+            ];
+            let slot_width = footer_width / legend_items.len() as f32;
+            let icon_radius = 4.0;
+            let icon_gap = 8.0;
+
+            draw_line(
+                footer_left,
+                status_y - 8.0,
+                footer_left + footer_width,
+                status_y - 8.0,
+                1.0,
+                Color::new(0.35, 0.40, 0.47, 0.35),
+            );
+
+            for (idx, (kind, label)) in legend_items.iter().enumerate() {
+                let (color, _) = Self::minimap_marker_style(*kind);
+                let label_w = self.measure_text_sharp(label, MINIMAP_WORLD_TEXT_SIZE).width;
+                let slot_center_x = footer_left + slot_width * (idx as f32 + 0.5);
+                let group_w = icon_radius * 2.0 + icon_gap + label_w;
+                let group_left = slot_center_x - group_w / 2.0;
+                let icon_x = group_left + icon_radius;
+                let text_x = icon_x + icon_radius + icon_gap;
+
+                draw_circle(icon_x, legend_y - 5.0, icon_radius, color);
+                self.draw_text_sharp(label, text_x, legend_y, MINIMAP_WORLD_TEXT_SIZE, TEXT_NORMAL);
+            }
+
+            let (status_text, status_color) = if let Some(idx) = hovered_marker_idx {
+                if let Some(marker) = markers.get(idx) {
+                    (format!("Selected: {}", marker.label), TEXT_TITLE)
+                } else {
+                    ("Hover markers for details".to_string(), TEXT_DIM)
+                }
+            } else {
+                ("Hover markers for details".to_string(), TEXT_DIM)
+            };
+            let status_w = self.measure_text_sharp(&status_text, MINIMAP_WORLD_TEXT_SIZE).width;
+            self.draw_text_sharp(
+                &status_text,
+                panel_rect.x + (panel_rect.w - status_w) * 0.5,
+                status_y,
+                MINIMAP_WORLD_TEXT_SIZE,
+                status_color,
+            );
+        } else {
+            draw_rectangle(
+                map_rect.x,
+                map_rect.y,
+                map_rect.w,
+                map_rect.h,
+                Color::new(0.05, 0.05, 0.07, 0.85),
+            );
+            self.draw_text_sharp(
+                "Map data not loaded yet.",
+                map_rect.x + 12.0,
+                map_rect.y + 28.0,
+                MINIMAP_WORLD_TEXT_SIZE,
+                TEXT_DIM,
+            );
         }
     }
 
@@ -5459,10 +6280,8 @@ impl Renderer {
             }
         }
 
-        // Local player stats panel (top-right corner) - Name tag + HP bar
+        // Top HUD: minimap on right, local name/stats on left.
         if let Some(player) = state.get_local_player() {
-            let margin = 12.0;
-            let base_y = 8.0;
             let padding = 6.0;
             let font_size = 16.0;
 
@@ -5478,29 +6297,30 @@ impl Renderer {
             let tag_height = 22.0;
             let bar_height = 18.0;
 
-            // Right-align in corner
-            let (ui_sw, _) = virtual_screen_size();
-            let bar_x = (ui_sw - bar_width - margin).floor();
-            let tag_y = base_y;
+            self.render_minimap_preview(state);
 
-            // ===== NAME TAG =====
+            // ===== NAME TAG (top-left) =====
+            let (name_tag_x, name_tag_y) = self.local_name_tag_position();
             draw_rectangle(
-                bar_x,
-                tag_y,
+                name_tag_x,
+                name_tag_y,
                 bar_width,
                 tag_height,
-                Color::from_rgba(0, 0, 0, 180),
+                Color::new(0.0, 0.0, 0.0, 0.45),
             );
 
             // Center text in the bar
-            let text_x = bar_x + (bar_width - total_text_w) / 2.0;
-            let text_y = (tag_y + 16.0).floor();
+            let text_x = name_tag_x + (bar_width - total_text_w) / 2.0;
+            let text_y = (name_tag_y + 16.0).floor();
             self.draw_text_sharp(name, text_x, text_y, font_size, TEXT_TITLE);
             self.draw_text_sharp(&level_text, text_x + name_w, text_y, font_size, TEXT_DIM);
 
+            // Place stat bars directly below the top-left name tag.
+            let (bar_x, stats_y) = self.minimap_stats_stack_position(bar_width);
+
             // ===== HP BAR (below name tag) =====
             let hp_bar_x = bar_x;
-            let hp_bar_y = tag_y + tag_height + 4.0;
+            let hp_bar_y = stats_y;
             let hp_ratio = player.hp as f32 / player.max_hp.max(1) as f32;
 
             draw_rectangle(hp_bar_x, hp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
@@ -5648,7 +6468,7 @@ impl Renderer {
             }
 
             // XP Globes (to the left of player stats)
-            let globe_stats_y = tag_y + tag_height / 2.0 + 8.0; // Slightly below name tag center
+            let globe_stats_y = hp_bar_y + bar_height / 2.0;
             self.render_xp_globes(&state.xp_globes, bar_x, globe_stats_y);
 
             // XP Drop Feed (below gathering status or MP bar)
@@ -5900,8 +6720,13 @@ impl Renderer {
             }
         }
 
-        // Quest objective tracker (top-left)
-        self.render_quest_tracker(state);
+        // Quest objective tracker / contract tracker below minimap on the right side.
+        let preview = self.minimap_preview_rect();
+        let tracker_x = preview.x.floor();
+        let tracker_y = (preview.y + preview.h + 14.0).floor();
+        let (sw, _) = virtual_screen_size();
+        let tracker_width = (sw - tracker_x - 8.0).max(120.0);
+        self.render_quest_tracker(state, tracker_x, tracker_y, tracker_width);
 
         // Farming contract tracker (shown in farming area)
         if state.farming_contract.is_some() {
@@ -5909,7 +6734,7 @@ impl Renderer {
                 let px = player.x;
                 let py = player.y;
                 if px >= 0.0 && px <= 29.0 && py >= -42.0 && py <= -16.0 {
-                    self.render_farming_contract_tracker(state);
+                    self.render_farming_contract_tracker(state, tracker_x, tracker_y, tracker_width);
                 }
             }
         }
@@ -5935,8 +6760,13 @@ impl Renderer {
         // Prayer/Spell help overlay (on top of panels)
         self.render_prayer_help_overlay(state, hovered, &mut layout);
 
-        // Render context menu on top of everything
-        if let Some(ref context_menu) = state.ui_state.context_menu {
+        // Minimap interactions and expanded map overlay
+        self.render_minimap_overlay(state, hovered, &mut layout);
+
+        // Render context menu on top of everything (except modal minimap)
+        if state.ui_state.minimap_panel_open {
+            // Minimap panel is modal; suppress other hover/context overlays.
+        } else if let Some(ref context_menu) = state.ui_state.context_menu {
             self.render_context_menu(context_menu, state, &mut layout);
         } else {
             // Only render tooltips if context menu is not open
@@ -5946,11 +6776,9 @@ impl Renderer {
 
             // XP globe tooltip (calculate position to match render_ui exactly)
             if let Some(player) = state.get_local_player() {
-                let margin = 12.0;
-                let base_y = 25.0;
                 let padding = 6.0;
                 let font_size = 16.0;
-                let tag_height = 22.0;
+                let bar_height = 18.0;
 
                 // Calculate bar_width based on player name (same as render_ui)
                 let name = &player.name;
@@ -5960,9 +6788,8 @@ impl Renderer {
                 let total_text_w = name_w + level_w;
                 let bar_width = (total_text_w + padding * 2.0).max(120.0);
 
-                let (tooltip_sw, _) = virtual_screen_size();
-                let bar_x = (tooltip_sw - bar_width - margin).floor();
-                let globe_stats_y = base_y + tag_height / 2.0 + 8.0;
+                let (bar_x, stats_y) = self.minimap_stats_stack_position(bar_width);
+                let globe_stats_y = stats_y + bar_height / 2.0;
                 self.render_xp_globe_tooltip(&state.xp_globes, bar_x, globe_stats_y);
             }
         }

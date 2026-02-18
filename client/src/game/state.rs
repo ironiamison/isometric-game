@@ -905,6 +905,7 @@ pub struct UiState {
     pub skills_open: bool,
     pub character_panel_open: bool,
     pub prayer_book_open: bool,
+    pub minimap_panel_open: bool,
     // Mouse hover state for UI elements
     pub hovered_element: Option<UiElementId>,
     // Context menu state
@@ -1030,6 +1031,7 @@ impl Default for UiState {
             skills_open: false,
             character_panel_open: false,
             prayer_book_open: false,
+            minimap_panel_open: false,
             hovered_element: None,
             context_menu: None,
             gold_drop_dialog: None,

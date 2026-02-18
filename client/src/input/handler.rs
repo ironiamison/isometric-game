@@ -211,6 +211,7 @@ impl InputHandler {
             || state.ui_state.character_panel_open
             || state.ui_state.skills_open
             || state.ui_state.prayer_book_open
+            || state.ui_state.minimap_panel_open
             || state.ui_state.escape_menu_open
             || state.ui_state.crafting_open
             || state.ui_state.shop_data.is_some()
@@ -224,6 +225,7 @@ impl InputHandler {
             || state.ui_state.crafting_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
+            || state.ui_state.minimap_panel_open
             || state.ui_state.quest_log_open
             || in_dialogue;
         self.touch_controls.update(current_time, hide_action_buttons, hide_direction_controls, state.ui_state.use_joystick);
@@ -776,6 +778,7 @@ impl InputHandler {
                             state.ui_state.social_open = false;
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
+                            state.ui_state.minimap_panel_open = false;
                         }
                         return commands;
                     }
@@ -790,6 +793,7 @@ impl InputHandler {
                             state.ui_state.social_open = false;
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
+                            state.ui_state.minimap_panel_open = false;
                         }
                         return commands;
                     }
@@ -805,6 +809,7 @@ impl InputHandler {
                             state.ui_state.character_panel_open = false;
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
+                            state.ui_state.minimap_panel_open = false;
                             // Request online players list when opening panel
                             commands.push(InputCommand::GetOnlinePlayers);
                         }
@@ -821,6 +826,7 @@ impl InputHandler {
                             state.ui_state.character_panel_open = false;
                             state.ui_state.social_open = false;
                             state.ui_state.prayer_book_open = false;
+                            state.ui_state.minimap_panel_open = false;
                         }
                         return commands;
                     }
@@ -835,6 +841,7 @@ impl InputHandler {
                             state.ui_state.character_panel_open = false;
                             state.ui_state.social_open = false;
                             state.ui_state.skills_open = false;
+                            state.ui_state.minimap_panel_open = false;
                         }
                         return commands;
                     }
@@ -856,7 +863,32 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                             state.ui_state.social_open = false;
                             state.ui_state.prayer_book_open = false;
+                            state.ui_state.minimap_panel_open = false;
                         }
+                    }
+                    UiElementId::MinimapToggle => {
+                        audio.play_sfx("enter");
+                        state.ui_state.minimap_panel_open = !state.ui_state.minimap_panel_open;
+                        if state.ui_state.minimap_panel_open {
+                            state.ui_state.inventory_open = false;
+                            state.ui_state.character_panel_open = false;
+                            state.ui_state.social_open = false;
+                            state.ui_state.skills_open = false;
+                            state.ui_state.prayer_book_open = false;
+                            state.ui_state.quest_log_open = false;
+                            state.ui_state.chat_panel_open = false;
+                            state.ui_state.chat_open = false;
+                        }
+                        return commands;
+                    }
+                    UiElementId::MinimapClose => {
+                        audio.play_sfx("enter");
+                        state.ui_state.minimap_panel_open = false;
+                        return commands;
+                    }
+                    UiElementId::MinimapPanel | UiElementId::MinimapMarker(_) => {
+                        // Consume click while minimap panel is open.
+                        return commands;
                     }
                     UiElementId::ChatTabLocal => {
                         audio.play_sfx("enter");
@@ -2853,6 +2885,15 @@ impl InputHandler {
             return commands;
         }
 
+        // Minimap panel is modal while open (M/Escape closes it)
+        if state.ui_state.minimap_panel_open {
+            if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::M) {
+                audio.play_sfx("enter");
+                state.ui_state.minimap_panel_open = false;
+            }
+            return commands;
+        }
+
         let classic = state.ui_state.classic_controls;
 
         // Enter key opens chat (not in classic mode - chat is always open)
@@ -3764,6 +3805,7 @@ impl InputHandler {
                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
                 state.ui_state.prayer_book_open = false;
+                state.ui_state.minimap_panel_open = false;
             }
         }
 
@@ -3885,6 +3927,7 @@ impl InputHandler {
                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
                 state.ui_state.prayer_book_open = false;
+                state.ui_state.minimap_panel_open = false;
             }
         }
 
@@ -3899,7 +3942,25 @@ impl InputHandler {
                 state.ui_state.character_panel_open = false;
                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
+                state.ui_state.minimap_panel_open = false;
             }
+        }
+
+        // Toggle expanded minimap panel (M key)
+        if !classic && is_key_pressed(KeyCode::M) {
+            audio.play_sfx("enter");
+            state.ui_state.minimap_panel_open = !state.ui_state.minimap_panel_open;
+            if state.ui_state.minimap_panel_open {
+                state.ui_state.inventory_open = false;
+                state.ui_state.character_panel_open = false;
+                state.ui_state.social_open = false;
+                state.ui_state.skills_open = false;
+                state.ui_state.prayer_book_open = false;
+                state.ui_state.quest_log_open = false;
+                state.ui_state.chat_panel_open = false;
+                state.ui_state.chat_open = false;
+            }
+            return commands;
         }
 
         // Use/equip items or cast spells (1-5 keys for quick slots, disabled in classic mode)
