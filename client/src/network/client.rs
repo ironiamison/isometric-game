@@ -329,10 +329,9 @@ impl NetworkClient {
 
         let mut should_disconnect = false;
 
-        // Collect binary messages and find the latest stateSync to avoid processing stale ones
-        // This prevents "teleporting" when catching up after network latency
-        let mut other_messages: Vec<Vec<u8>> = Vec::new();
-        let mut latest_state_sync: Option<(u64, Vec<u8>)> = None; // (tick, data)
+        // Collect decoded messages and keep only the latest stateSync to avoid stale rewinds.
+        let mut other_messages: Vec<DecodedMessage> = Vec::new();
+        let mut latest_state_sync: Option<(u64, DecodedMessage)> = None; // (tick, message)
 
         for event in events {
             match event {
@@ -347,20 +346,20 @@ impl NetworkClient {
                 }
 
                 WsEvent::Message(WsMessage::Binary(bytes)) => {
-                    // Check if this is a stateSync message and extract its tick
-                    if let Some(tick) = self.extract_state_sync_tick(&bytes) {
-                        // Keep only the stateSync with the highest tick
-                        match &latest_state_sync {
-                            Some((existing_tick, _)) if tick <= *existing_tick => {
-                                // Skip older or same tick
+                    if let Some(decoded) = self.decode_binary_message(&bytes) {
+                        if let Some(tick) = Self::extract_state_sync_tick(&decoded) {
+                            // Keep only the stateSync with the highest tick.
+                            match &latest_state_sync {
+                                Some((existing_tick, _)) if tick <= *existing_tick => {
+                                    // Skip older or same tick.
+                                }
+                                _ => {
+                                    latest_state_sync = Some((tick, decoded));
+                                }
                             }
-                            _ => {
-                                latest_state_sync = Some((tick, bytes));
-                            }
+                        } else {
+                            other_messages.push(decoded);
                         }
-                    } else {
-                        // Not a stateSync - process normally
-                        other_messages.push(bytes);
                     }
                 }
 
@@ -389,12 +388,12 @@ impl NetworkClient {
         }
 
         // Process all non-stateSync messages first
-        for bytes in other_messages {
-            self.handle_binary_message(&bytes, state);
+        for decoded in other_messages {
+            self.handle_decoded_message(decoded, state);
         }
 
         // Process only the latest stateSync (if any)
-        if let Some((tick, bytes)) = latest_state_sync {
+        if let Some((tick, decoded)) = latest_state_sync {
             // Log if we skipped stale syncs (useful for debugging lag)
             if tick > state.server_tick + 1 {
                 log::debug!(
@@ -403,7 +402,7 @@ impl NetworkClient {
                     tick
                 );
             }
-            self.handle_binary_message(&bytes, state);
+            self.handle_decoded_message(decoded, state);
         }
 
         if should_disconnect {
@@ -414,7 +413,7 @@ impl NetworkClient {
         }
     }
 
-    fn handle_binary_message(&self, data: &[u8], state: &mut GameState) {
+    fn decode_binary_message(&self, data: &[u8]) -> Option<DecodedMessage> {
         log::trace!(
             "Received {} bytes: {:?}",
             data.len(),
@@ -424,36 +423,39 @@ impl NetworkClient {
             Ok(d) => d,
             Err(e) => {
                 log::error!("Failed to decompress message: {}", e);
-                return;
+                return None;
             }
         };
         match protocol::decode_message(&decompressed) {
-            Ok(decoded) => {
-                match decoded {
-                    DecodedMessage::RoomData { msg_type, data } => {
-                        self.handle_room_data(&msg_type, data.as_ref(), state);
-                    }
-                    DecodedMessage::RoomState { .. } => {
-                        // Colyseus Schema state - we're using custom JSON messages instead
-                        log::debug!("Received RoomState (ignored - using custom messages)");
-                    }
-                    DecodedMessage::RoomStatePatch { .. } => {
-                        // Colyseus Schema patch - ignored
-                        log::debug!("Received RoomStatePatch (ignored)");
-                    }
-                    DecodedMessage::Error { code, message } => {
-                        log::error!("Server error {}: {}", code, message);
-                    }
-                    DecodedMessage::Handshake => {
-                        log::debug!("Received Handshake");
-                    }
-                    DecodedMessage::Unknown { protocol, .. } => {
-                        log::debug!("Unknown protocol: {}", protocol);
-                    }
-                }
-            }
+            Ok(decoded) => Some(decoded),
             Err(e) => {
                 log::error!("Failed to decode message: {}", e);
+                None
+            }
+        }
+    }
+
+    fn handle_decoded_message(&self, decoded: DecodedMessage, state: &mut GameState) {
+        match decoded {
+            DecodedMessage::RoomData { msg_type, data } => {
+                self.handle_room_data(&msg_type, data.as_ref(), state);
+            }
+            DecodedMessage::RoomState { .. } => {
+                // Colyseus Schema state - we're using custom JSON messages instead
+                log::debug!("Received RoomState (ignored - using custom messages)");
+            }
+            DecodedMessage::RoomStatePatch { .. } => {
+                // Colyseus Schema patch - ignored
+                log::debug!("Received RoomStatePatch (ignored)");
+            }
+            DecodedMessage::Error { code, message } => {
+                log::error!("Server error {}: {}", code, message);
+            }
+            DecodedMessage::Handshake => {
+                log::debug!("Received Handshake");
+            }
+            DecodedMessage::Unknown { protocol, .. } => {
+                log::debug!("Unknown protocol: {}", protocol);
             }
         }
     }
@@ -462,17 +464,10 @@ impl NetworkClient {
         super::message_handler::handle_room_data(msg_type, data, state);
     }
 
-    /// Check if message is a stateSync and extract its tick number.
-    /// Returns None if not a stateSync or couldn't parse.
-    fn extract_state_sync_tick(&self, data: &[u8]) -> Option<u64> {
-        let decompressed = protocol::maybe_decompress(data).ok()?;
-        match protocol::decode_message(&decompressed) {
-            Ok(DecodedMessage::RoomData { msg_type, data }) => {
-                if msg_type == "stateSync" {
-                    data.as_ref().and_then(|v| protocol::extract_u64(v, "tick"))
-                } else {
-                    None
-                }
+    fn extract_state_sync_tick(decoded: &DecodedMessage) -> Option<u64> {
+        match decoded {
+            DecodedMessage::RoomData { msg_type, data } if msg_type == "stateSync" => {
+                data.as_ref().and_then(|v| protocol::extract_u64(v, "tick"))
             }
             _ => None,
         }

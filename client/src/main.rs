@@ -449,7 +449,6 @@ fn run_game_frame(
         let msg = match cmd {
             InputCommand::Move { dx, dy } => ClientMessage::Move { dx: *dx, dy: *dy },
             InputCommand::Face { direction } => {
-                log::info!("[MAIN] Processing Face command: direction={}", direction);
                 // Skip direction update if sitting or attacking
                 if game_state.is_sitting {
                     continue;
@@ -471,17 +470,11 @@ fn run_game_frame(
                 // Server state sync remains authoritative.
                 if let Some(local_id) = &game_state.local_player_id {
                     if let Some(player) = game_state.players.get_mut(local_id) {
-                        let old_dir = player.direction;
                         let new_dir = game::Direction::from_u8(*direction);
                         player.direction = new_dir;
                         player.animation.direction = new_dir; // Also update animation direction for rendering
                         game_state.local_face_lock_dir = Some(new_dir);
                         game_state.local_face_lock_until = get_time() + 0.30;
-                        log::info!(
-                            "[MAIN] Updated local player direction: {:?} -> {:?}",
-                            old_dir,
-                            player.direction
-                        );
                     }
                 }
                 ClientMessage::Face {

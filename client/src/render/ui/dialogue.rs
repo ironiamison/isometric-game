@@ -1240,7 +1240,9 @@ impl Renderer {
         let action_base_y = right_y + right_h - 72.0;
         let actions_locked_by_active_task = has_active_guide_task && !tier_is_active;
         if dialogue.quest_id == tier.id && !actions_locked_by_active_task {
-            if tier_is_active {
+            if completed {
+                // Completed tiers intentionally expose no dialogue actions.
+            } else if tier_is_active {
                 if tier_is_completable && dialogue.choices.is_empty() {
                     let btn = Rect::new(right_x + right_w - 170.0, action_base_y, 150.0, 30.0);
                     layout.add(UiElementId::DialogueContinue, btn);

@@ -45,6 +45,8 @@ const PRAYER_DRAIN_INTERVAL_TICKS: u64 = 60;
 
 // View distance for StateSync culling (Chebyshev distance in tiles)
 const VIEW_DISTANCE: i32 = 40;
+// Keep some sender queue headroom so StateSync doesn't starve lower-frequency critical updates.
+const STATE_SYNC_MIN_QUEUE_CAPACITY: usize = 8;
 
 // World spawn point (chunk 0,0) - where players respawn after death
 const WORLD_SPAWN_X: i32 = 15;
@@ -1139,7 +1141,17 @@ impl GameRoom {
         if let Some(sender) = senders.get(player_id) {
             if let Ok(bytes) = encode_server_message(&msg) {
                 if let Err(e) = sender.try_send(bytes) {
-                    tracing::warn!("Failed to send unicast to {}: {}", player_id, e);
+                    match e {
+                        tokio::sync::mpsc::error::TrySendError::Full(_) => {
+                            tracing::debug!("Unicast queue full for {}; dropping message", player_id);
+                        }
+                        tokio::sync::mpsc::error::TrySendError::Closed(_) => {
+                            tracing::warn!(
+                                "Failed to send unicast to {}: channel closed",
+                                player_id
+                            );
+                        }
+                    }
                 }
             }
         } else {
@@ -1260,6 +1272,12 @@ impl GameRoom {
 
         let mut players = self.players.write().await;
         players.insert(player_id.to_string(), player);
+        drop(players);
+
+        // Track player's starting chunk for systems that reference chunk residency.
+        let chunk = ChunkCoord::from_world(x, y);
+        let mut chunks = self.player_chunks.write().await;
+        chunks.insert(player_id.to_string(), chunk);
     }
 
     pub async fn activate_player(&self, player_id: &str) -> String {
@@ -1991,44 +2009,48 @@ impl GameRoom {
 
     /// Handle face command - change direction without moving
     pub async fn handle_face(&self, player_id: &str, direction: u8) {
-        tracing::info!("[SERVER] handle_face called: player_id={}, direction={}", player_id, direction);
-        let should_stop_gathering = {
+        let (player_x, player_y, face_dir) = {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 // Don't allow direction changes while sitting
                 if player.sitting_at.is_some() {
                     return;
                 }
-                let old_dir = player.direction;
-                player.direction = Direction::from_u8(direction);
-                tracing::info!("[SERVER] Updated player direction: {:?} -> {:?}", old_dir, player.direction);
+                let face_dir = Direction::from_u8(direction);
+                player.direction = face_dir;
                 // Ensure player is not moving when just facing
                 player.move_dx = 0;
                 player.move_dy = 0;
-
-                // Check if player is gathering and no longer facing a marker
-                let gathering = self.gathering.read().await;
-                if gathering.is_gathering(player_id) {
-                    let (fdx, fdy): (i32, i32) = match player.direction {
-                        Direction::Down => (0, 1),
-                        Direction::Up => (0, -1),
-                        Direction::Left => (-1, 0),
-                        Direction::Right => (1, 0),
-                        Direction::DownLeft => (-1, 1),
-                        Direction::DownRight => (1, 1),
-                        Direction::UpLeft => (-1, -1),
-                        Direction::UpRight => (1, -1),
-                    };
-                    let face_x = player.x + fdx;
-                    let face_y = player.y + fdy;
-                    let facing_marker = gathering.markers.iter().any(|m| m.x == face_x && m.y == face_y);
-                    !facing_marker
-                } else {
-                    false
-                }
+                (player.x, player.y, face_dir)
             } else {
-                tracing::warn!("[SERVER] handle_face: player not found: {}", player_id);
+                tracing::warn!("handle_face: player not found: {}", player_id);
                 return;
+            }
+        };
+
+        // Determine gathering interruption outside players lock.
+        let should_stop_gathering = {
+            let gathering = self.gathering.read().await;
+            if !gathering.is_gathering(player_id) {
+                false
+            } else {
+                let (fdx, fdy): (i32, i32) = match face_dir {
+                    Direction::Down => (0, 1),
+                    Direction::Up => (0, -1),
+                    Direction::Left => (-1, 0),
+                    Direction::Right => (1, 0),
+                    Direction::DownLeft => (-1, 1),
+                    Direction::DownRight => (1, 1),
+                    Direction::UpLeft => (-1, -1),
+                    Direction::UpRight => (1, -1),
+                };
+                let face_x = player_x + fdx;
+                let face_y = player_y + fdy;
+                let facing_marker = gathering
+                    .markers
+                    .iter()
+                    .any(|m| m.x == face_x && m.y == face_y);
+                !facing_marker
             }
         };
 
@@ -7579,10 +7601,25 @@ impl GameRoom {
         // Periodically unload distant chunks to prevent unbounded memory/CPU growth
         if current_tick % 100 == 0 {
             let unload_start = std::time::Instant::now();
-            let active_coords: Vec<ChunkCoord> = {
-                let chunks = self.player_chunks.read().await;
-                chunks.values().cloned().collect()
+
+            // Use live player positions as the source of truth so stale chunk tracking
+            // cannot unload chunks around actively moving players.
+            let instanced_players: HashSet<String> = {
+                let instances = self.player_instances.read().await;
+                instances.keys().cloned().collect()
             };
+
+            let active_coords: Vec<ChunkCoord> = {
+                let players = self.players.read().await;
+                players
+                    .values()
+                    .filter(|p| p.active && p.is_alive() && !instanced_players.contains(&p.id))
+                    .map(|p| ChunkCoord::from_world(p.x, p.y))
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .collect()
+            };
+
             if !active_coords.is_empty() {
                 self.world.unload_distant_chunks(&active_coords, 5).await;
             }
@@ -8817,10 +8854,11 @@ impl GameRoom {
             let active_receivers: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = group_senders
                 .iter()
                 .copied()
-                .filter(|(_, sender)| sender.capacity() > 0)
+                .filter(|(_, sender)| sender.capacity() >= STATE_SYNC_MIN_QUEUE_CAPACITY)
                 .collect();
+            tick_telemetry.state_sync_capacity_skips +=
+                group_senders.len().saturating_sub(active_receivers.len());
             if active_receivers.is_empty() {
-                tick_telemetry.state_sync_capacity_skips += group_senders.len();
                 continue;
             }
 
@@ -8878,7 +8916,7 @@ impl GameRoom {
         let mut sync_states = self.sync_states.write().await;
 
         for (player_id, sender) in &overworld_senders {
-            if sender.capacity() == 0 {
+            if sender.capacity() < STATE_SYNC_MIN_QUEUE_CAPACITY {
                 tick_telemetry.state_sync_capacity_skips += 1;
                 continue;
             }

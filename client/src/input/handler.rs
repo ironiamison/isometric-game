@@ -130,6 +130,59 @@ fn adventurer_guide_actions_locked(state: &GameState) -> bool {
     has_active_adventurer_guide_task(state) && !is_selected_adventurer_guide_tier_active(state)
 }
 
+fn is_combat_tier_unlocked(state: &GameState, tier_idx: usize) -> bool {
+    let Some(tier_id) = adventurer_guide_tier_id(0, tier_idx) else {
+        return false;
+    };
+
+    if tier_idx == 0 {
+        return true;
+    }
+
+    if state.ui_state.completed_quest_ids.contains(tier_id)
+        || state.ui_state.active_quests.iter().any(|q| q.id == tier_id)
+    {
+        return true;
+    }
+
+    let Some(prev_id) = adventurer_guide_tier_id(0, tier_idx.saturating_sub(1)) else {
+        return false;
+    };
+    state.ui_state.completed_quest_ids.contains(prev_id)
+}
+
+fn should_auto_open_selected_combat_tier_offer(
+    state: &GameState,
+    is_guide_dialogue: bool,
+    dialogue_has_choices: bool,
+) -> bool {
+    if !is_guide_dialogue {
+        return false;
+    }
+    if state.ui_state.adventurer_selected_tab != 0 {
+        return false;
+    }
+    if has_active_adventurer_guide_task(state) {
+        return false;
+    }
+    if dialogue_has_choices {
+        return false;
+    }
+
+    let tier_idx = state.ui_state.adventurer_selected_tier;
+    let Some(tier_id) = adventurer_guide_tier_id(0, tier_idx) else {
+        return false;
+    };
+
+    if state.ui_state.completed_quest_ids.contains(tier_id)
+        || state.ui_state.active_quests.iter().any(|q| q.id == tier_id)
+    {
+        return false;
+    }
+
+    is_combat_tier_unlocked(state, tier_idx)
+}
+
 fn sync_adventurer_guide_dialogue_target(state: &mut GameState) {
     let selected_id = adventurer_guide_tier_id(
         state.ui_state.adventurer_selected_tab,
@@ -2108,6 +2161,7 @@ impl InputHandler {
         // Handle dialogue mode - intercept input when dialogue is open
         if let Some(dialogue) = &state.ui_state.active_dialogue {
             let is_guide_dialogue = is_adventurer_guide_dialogue(&dialogue.speaker);
+            let dialogue_has_choices = !dialogue.choices.is_empty();
             let guide_actions_locked = is_guide_dialogue && adventurer_guide_actions_locked(state);
             let guide_selected_active_tier =
                 is_guide_dialogue && is_selected_adventurer_guide_tier_active(state);
@@ -2211,6 +2265,21 @@ impl InputHandler {
                         UiElementId::AdventurerTier(idx) => {
                             state.ui_state.adventurer_selected_tier = *idx;
                             sync_adventurer_guide_dialogue_target(state);
+                            if should_auto_open_selected_combat_tier_offer(
+                                state,
+                                is_guide_dialogue,
+                                dialogue_has_choices,
+                            ) {
+                                if let Some(quest_id) = adventurer_guide_tier_id(
+                                    state.ui_state.adventurer_selected_tab,
+                                    state.ui_state.adventurer_selected_tier,
+                                ) {
+                                    commands.push(InputCommand::DialogueChoice {
+                                        quest_id: quest_id.to_string(),
+                                        choice_id: "__continue__".to_string(),
+                                    });
+                                }
+                            }
                             return commands;
                         }
                         UiElementId::DialogueChoice(idx) => {
@@ -3969,13 +4038,6 @@ impl InputHandler {
                 self.move_sent = false;
             } else if keyboard_dir == CardinalDir::None && self.prev_dir != CardinalDir::None {
                 // Direction released
-                let hold_duration = current_time - self.dir_press_time;
-                log::info!(
-                    "[INPUT] Key released: hold_duration={:.3}s, threshold={:.3}s, move_sent={}",
-                    hold_duration,
-                    FACE_THRESHOLD,
-                    self.move_sent
-                );
                 if self.move_sent {
                     // Was moving, now stopped - send stop command
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
@@ -3995,11 +4057,6 @@ impl InputHandler {
                     });
                     if !attack_anim && !state.is_sitting {
                         let dir = self.prev_dir.to_direction_u8();
-                        log::info!(
-                            "[INPUT] Sending Face command: direction={} (prev_dir={:?})",
-                            dir,
-                            self.prev_dir
-                        );
                         commands.push(InputCommand::Face { direction: dir });
                         self.last_send_time = current_time;
                     }
@@ -4039,11 +4096,6 @@ impl InputHandler {
                 });
                 if !attack_anim && !state.is_sitting {
                     let dir = dpad_released.to_direction_u8();
-                    log::info!(
-                        "[INPUT] D-pad tap - sending Face command: direction={} (hold={:.0}ms)",
-                        dir,
-                        hold_duration * 1000.0
-                    );
                     commands.push(InputCommand::Face { direction: dir });
                     self.last_send_time = current_time;
                 }
@@ -4350,24 +4402,13 @@ impl InputHandler {
                 let should_woodcut = if should_gather.is_none() {
                     if let Some(player) = state.get_local_player() {
                         // Check if player has an axe equipped (chop_speed_multiplier > 0)
-                        let (has_axe, chop_speed) =
-                            if let Some(ref weapon_id) = player.equipped_weapon {
-                                let speed = state
-                                    .item_registry
-                                    .get(weapon_id)
-                                    .and_then(|item| item.equipment.as_ref())
-                                    .map(|eq| eq.chop_speed_multiplier)
-                                    .unwrap_or(0.0);
-                                log::info!(
-                                    "Woodcutting check: weapon={} chop_speed={}",
-                                    weapon_id,
-                                    speed
-                                );
-                                (speed > 0.0, speed)
-                            } else {
-                                log::info!("Woodcutting check: no weapon equipped");
-                                (false, 0.0)
-                            };
+                        let has_axe = player
+                            .equipped_weapon
+                            .as_ref()
+                            .and_then(|weapon_id| state.item_registry.get(weapon_id))
+                            .and_then(|item| item.equipment.as_ref())
+                            .map(|eq| eq.chop_speed_multiplier > 0.0)
+                            .unwrap_or(false);
 
                         if has_axe {
                             let px = player.x.round() as i32;
@@ -4376,31 +4417,16 @@ impl InputHandler {
                             let face_x = px + fdx as i32;
                             let face_y = py + fdy as i32;
 
-                            log::info!(
-                                "Axe detected (speed={}), checking tile ({}, {})",
-                                chop_speed,
-                                face_x,
-                                face_y
-                            );
-
                             // Check if facing tile has a tree object and is not depleted
                             if !state.depleted_trees.contains_key(&(face_x, face_y)) {
                                 let obj_result =
                                     state.chunk_manager.get_object_at_exact(face_x, face_y);
                                 if let Some(obj) = obj_result {
-                                    log::info!(
-                                        "Found object at ({}, {}): gid={}",
-                                        face_x,
-                                        face_y,
-                                        obj.gid
-                                    );
                                     Some((face_x, face_y, obj.gid))
                                 } else {
-                                    log::info!("No object found at ({}, {})", face_x, face_y);
                                     None
                                 }
                             } else {
-                                log::info!("Tree at ({}, {}) is depleted", face_x, face_y);
                                 None
                             }
                         } else {
@@ -4415,15 +4441,11 @@ impl InputHandler {
 
                 if let Some((marker_x, marker_y)) = should_gather {
                     if !state.is_gathering {
-                        log::info!(
-                            "Fishing rod equipped near fishing spot - sending StartGathering"
-                        );
                         commands.push(InputCommand::StartGathering { marker_x, marker_y });
                         self.last_attack_time = current_time;
                     }
                 } else if let Some((tree_x, tree_y, tree_gid)) = should_woodcut {
                     // Send chop command on each attack press when facing a tree with an axe
-                    log::info!("Axe equipped near tree - sending ChopTree");
                     commands.push(InputCommand::ChopTree {
                         tree_x,
                         tree_y,
@@ -4431,7 +4453,6 @@ impl InputHandler {
                     });
                     self.last_attack_time = current_time;
                 } else {
-                    log::info!("Space held - sending Attack command");
                     commands.push(InputCommand::Attack);
                     self.last_attack_time = current_time;
 
