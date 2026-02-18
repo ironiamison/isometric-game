@@ -4108,21 +4108,54 @@ impl InputHandler {
             });
         }
 
-        let down = if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) };
         let up = if classic { is_key_down(KeyCode::Up) } else { is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) };
+        let down = if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) };
         let left = if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) };
         let right = if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) };
 
-        if up {
-            Some(Direction::Up)
-        } else if down {
-            Some(Direction::Down)
-        } else if left {
-            Some(Direction::Left)
-        } else if right {
-            Some(Direction::Right)
+        let up_just = if classic { is_key_pressed(KeyCode::Up) } else { is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up) };
+        let down_just = if classic { is_key_pressed(KeyCode::Down) } else { is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down) };
+        let left_just = if classic { is_key_pressed(KeyCode::Left) } else { is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left) };
+        let right_just = if classic { is_key_pressed(KeyCode::Right) } else { is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right) };
+
+        // Match movement arbitration so pre-render facing doesn't disagree with
+        // the direction process() will use in the same frame.
+        let keyboard_dir = if up_just {
+            CardinalDir::Up
+        } else if down_just {
+            CardinalDir::Down
+        } else if left_just {
+            CardinalDir::Left
+        } else if right_just {
+            CardinalDir::Right
         } else {
-            None
+            match self.current_dir {
+                CardinalDir::Up if up => CardinalDir::Up,
+                CardinalDir::Down if down => CardinalDir::Down,
+                CardinalDir::Left if left => CardinalDir::Left,
+                CardinalDir::Right if right => CardinalDir::Right,
+                _ => {
+                    if up {
+                        CardinalDir::Up
+                    } else if down {
+                        CardinalDir::Down
+                    } else if left {
+                        CardinalDir::Left
+                    } else if right {
+                        CardinalDir::Right
+                    } else {
+                        CardinalDir::None
+                    }
+                }
+            }
+        };
+
+        match keyboard_dir {
+            CardinalDir::Up => Some(Direction::Up),
+            CardinalDir::Down => Some(Direction::Down),
+            CardinalDir::Left => Some(Direction::Left),
+            CardinalDir::Right => Some(Direction::Right),
+            CardinalDir::None => None,
         }
     }
 

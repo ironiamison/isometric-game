@@ -446,16 +446,15 @@ impl Player {
         }
 
         // Animation direction follows actual movement to prevent moonwalking.
-        // When moving: face the direction the sprite is actually moving (not the
-        // logical player direction, which may update before the sprite turns).
-        // When stationary: face the logical player direction (from Face commands etc).
-        match movement_dir {
-            Some(move_dir) => {
+        // While moving, only update direction when we actually moved this frame.
+        // If a frame has no displacement (tiny delta / jitter), keep the previous
+        // animation direction to avoid one-frame flip-flops.
+        if self.is_moving {
+            if let Some(move_dir) = movement_dir {
                 self.animation.direction = move_dir;
             }
-            None => {
-                self.animation.direction = self.direction;
-            }
+        } else {
+            self.animation.direction = self.direction;
         }
 
         // Handle movement animations
