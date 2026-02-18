@@ -4130,9 +4130,9 @@ impl InputHandler {
     /// Call BEFORE render to eliminate 1-frame direction lag.
     /// Returns None if no direction input is active.
     pub fn get_immediate_direction(&self, classic: bool) -> Option<crate::game::Direction> {
-        use macroquad::prelude::*;
         use crate::game::Direction;
         use crate::input::touch::DPadDirection;
+        use macroquad::prelude::*;
 
         // D-pad takes priority (touch input)
         let dpad = self.touch_controls.get_direction();
@@ -4152,11 +4152,17 @@ impl InputHandler {
         let left = if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) };
         let right = if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) };
 
-        if down { Some(Direction::Down) }
-        else if up { Some(Direction::Up) }
-        else if left { Some(Direction::Left) }
-        else if right { Some(Direction::Right) }
-        else { None }
+        if up {
+            Some(Direction::Up)
+        } else if down {
+            Some(Direction::Down)
+        } else if left {
+            Some(Direction::Left)
+        } else if right {
+            Some(Direction::Right)
+        } else {
+            None
+        }
     }
 
     /// Render touch controls overlay (call after all other rendering)

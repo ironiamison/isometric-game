@@ -399,8 +399,8 @@ fn run_game_frame(
         audio.play_attack_sound(has_weapon);
     }
 
-    // 1.9. Update facing direction from raw input BEFORE render.
-    // Only when at tile center (not mid-transit) - direction is locked during movement.
+    // 1.9. Update local facing from immediate input before render.
+    // Only at tile center (not mid-transit) to avoid moonwalking.
     if let Some(dir) = input_handler.get_immediate_direction(game_state.ui_state.classic_controls) {
         if let Some(local_id) = &game_state.local_player_id {
             if let Some(player) = game_state.players.get_mut(local_id) {
@@ -409,7 +409,9 @@ fn run_game_frame(
                     AnimationState::Attacking | AnimationState::Casting | AnimationState::ShootingBow
                     | AnimationState::SittingChair | AnimationState::SittingGround
                 );
-                if !in_action && !player.is_moving {
+                let in_transit = (player.target_x - player.x).abs() > 0.01
+                    || (player.target_y - player.y).abs() > 0.01;
+                if !in_action && !in_transit {
                     player.direction = dir;
                     player.animation.direction = dir;
                 }
