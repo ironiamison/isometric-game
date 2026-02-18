@@ -1679,7 +1679,7 @@ impl Renderer {
                     kind: MinimapMarkerKind::Teleport,
                     x: world_x,
                     y: world_y,
-                    label: format!("Teleport: {}", target),
+                    label: format!("Teleport {}", target),
                 });
             }
         }
@@ -1700,7 +1700,7 @@ impl Renderer {
                     kind: MinimapMarkerKind::Quest,
                     x: npc.x,
                     y: npc.y,
-                    label: format!("Quest: {}", npc.display_name),
+                    label: format!("Quest {}", npc.display_name),
                 });
             } else if npc.is_hostile() {
                 enemy_markers.push((
@@ -1709,7 +1709,7 @@ impl Renderer {
                         kind: MinimapMarkerKind::Enemy,
                         x: npc.x,
                         y: npc.y,
-                        label: format!("Enemy: {}", npc.display_name),
+                        label: format!("Enemy {}", npc.display_name),
                     },
                 ));
             }
@@ -1741,7 +1741,7 @@ impl Renderer {
                             kind: MinimapMarkerKind::Tree,
                             x: wx,
                             y: wy,
-                            label: format!("Tree: {} (Lv.{})", tree_info.name, tree_info.level_required),
+                            label: format!("Tree {} (Lv.{})", tree_info.name, tree_info.level_required),
                         },
                     ));
                 }
@@ -2028,14 +2028,14 @@ impl Renderer {
         let close_rect = Rect::new(panel_rect.x + panel_rect.w - 34.0, panel_rect.y + 10.0, 22.0, 16.0);
         let close_hovered = matches!(hovered, Some(UiElementId::MinimapClose));
         let close_bg = if close_hovered {
-            Color::new(0.20, 0.22, 0.26, 0.96)
+            Color::new(0.36, 0.14, 0.14, 0.96)
         } else {
-            Color::new(0.12, 0.13, 0.16, 0.92)
+            Color::new(0.28, 0.12, 0.12, 0.92)
         };
         let close_border = if close_hovered {
-            Color::new(0.74, 0.78, 0.86, 0.90)
+            Color::new(0.90, 0.66, 0.60, 0.92)
         } else {
-            Color::new(0.48, 0.52, 0.60, 0.75)
+            Color::new(0.62, 0.40, 0.36, 0.82)
         };
         let close_text = if close_hovered { TEXT_TITLE } else { TEXT_NORMAL };
         draw_rectangle(close_rect.x, close_rect.y, close_rect.w, close_rect.h, close_bg);
@@ -2073,8 +2073,8 @@ impl Renderer {
 
             let footer_left = panel_rect.x + 14.0;
             let footer_width = panel_rect.w - 28.0;
-            let status_y = panel_rect.y + panel_rect.h - 44.0;
-            let legend_y = panel_rect.y + panel_rect.h - 24.0;
+            let status_y = panel_rect.y + panel_rect.h - 38.0;
+            let legend_y = panel_rect.y + panel_rect.h - 16.0;
             let legend_items = [
                 (MinimapMarkerKind::Teleport, "Teleport"),
                 (MinimapMarkerKind::Enemy, "Enemy"),
