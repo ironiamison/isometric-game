@@ -12,8 +12,6 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 use std::collections::HashSet;
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-use std::sync::OnceLock;
 
 /// Save current UI settings to persistent storage
 fn save_current_ui_settings(state: &GameState) {
@@ -392,70 +390,6 @@ fn minimap_map_rect(panel_rect: Rect) -> Rect {
     )
 }
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-fn minimap_static_world_bounds() -> Option<MinimapBounds> {
-    static CACHE: OnceLock<Option<MinimapBounds>> = OnceLock::new();
-    *CACHE.get_or_init(|| {
-        let world_dir = std::path::Path::new("rust-server/maps/world_0");
-        let entries = std::fs::read_dir(world_dir).ok()?;
-        let mut min_x = f32::MAX;
-        let mut min_y = f32::MAX;
-        let mut max_x = f32::MIN;
-        let mut max_y = f32::MIN;
-        let mut found = false;
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if !path.is_file() {
-                continue;
-            }
-            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-                continue;
-            };
-            let Some(raw) = name.strip_prefix("chunk_").and_then(|s| s.strip_suffix(".json")) else {
-                continue;
-            };
-            let mut parts = raw.splitn(2, '_');
-            let Some(cx_raw) = parts.next() else {
-                continue;
-            };
-            let Some(cy_raw) = parts.next() else {
-                continue;
-            };
-            let Ok(cx) = cx_raw.parse::<i32>() else {
-                continue;
-            };
-            let Ok(cy) = cy_raw.parse::<i32>() else {
-                continue;
-            };
-
-            let chunk_x = (cx * CHUNK_SIZE as i32) as f32;
-            let chunk_y = (cy * CHUNK_SIZE as i32) as f32;
-            min_x = min_x.min(chunk_x);
-            min_y = min_y.min(chunk_y);
-            max_x = max_x.max(chunk_x + CHUNK_SIZE as f32);
-            max_y = max_y.max(chunk_y + CHUNK_SIZE as f32);
-            found = true;
-        }
-
-        if !found {
-            None
-        } else {
-            Some(MinimapBounds {
-                min_x,
-                min_y,
-                max_x,
-                max_y,
-            })
-        }
-    })
-}
-
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
-fn minimap_static_world_bounds() -> Option<MinimapBounds> {
-    None
-}
-
 fn minimap_world_bounds(state: &GameState) -> Option<MinimapBounds> {
     let mut bounds = if let Some((width, height)) = state.chunk_manager.get_interior_size() {
         MinimapBounds {
@@ -502,15 +436,6 @@ fn minimap_world_bounds(state: &GameState) -> Option<MinimapBounds> {
         bounds.min_y = bounds.min_y.min(player.y);
         bounds.max_x = bounds.max_x.max(player.x);
         bounds.max_y = bounds.max_y.max(player.y);
-    }
-
-    if state.chunk_manager.get_interior_size().is_none() {
-        if let Some(static_bounds) = minimap_static_world_bounds() {
-            bounds.min_x = bounds.min_x.min(static_bounds.min_x);
-            bounds.min_y = bounds.min_y.min(static_bounds.min_y);
-            bounds.max_x = bounds.max_x.max(static_bounds.max_x);
-            bounds.max_y = bounds.max_y.max(static_bounds.max_y);
-        }
     }
 
     let padding = 2.0;

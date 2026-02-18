@@ -298,27 +298,6 @@ impl MinimapBounds {
     }
 }
 
-#[derive(Clone, Debug)]
-struct MinimapStaticChunk {
-    coord_x: i32,
-    coord_y: i32,
-    ground_tiles: Vec<u32>,
-    tree_markers: Vec<MinimapMarker>,
-    teleport_markers: Vec<MinimapMarker>,
-}
-
-#[derive(Clone, Debug)]
-struct MinimapStaticWorld {
-    bounds: MinimapBounds,
-    chunks: Vec<MinimapStaticChunk>,
-}
-
-enum MinimapStaticWorldState {
-    Uninitialized,
-    Loaded(MinimapStaticWorld),
-    Unavailable,
-}
-
 pub struct Renderer {
     player_color: Color,
     local_player_color: Color,
@@ -387,8 +366,6 @@ pub struct Renderer {
     tileset_image_cache: RefCell<Option<Image>>,
     /// Cached minimap tint color per tile id.
     minimap_tile_color_cache: RefCell<HashMap<u32, Color>>,
-    /// Desktop-only static minimap chunk cache loaded from rust-server maps.
-    minimap_static_world: RefCell<MinimapStaticWorldState>,
     /// Cached text measurements bucketed by font size.
     text_measure_cache: RefCell<HashMap<i32, HashMap<String, TextDimensions>>>,
     /// Cached wrapped lines bucketed by (max width, font size).
@@ -1503,7 +1480,6 @@ impl Renderer {
             chat_lines_cache: RefCell::new(ChatLinesCache::default()),
             tileset_image_cache: RefCell::new(None),
             minimap_tile_color_cache: RefCell::new(HashMap::new()),
-            minimap_static_world: RefCell::new(MinimapStaticWorldState::Uninitialized),
             text_measure_cache: RefCell::new(HashMap::new()),
             text_wrap_cache: RefCell::new(HashMap::new()),
         }
@@ -1834,157 +1810,6 @@ impl Renderer {
         );
     }
 
-    fn ensure_minimap_static_world_loaded(&self) {
-        let should_load = {
-            let cache = self.minimap_static_world.borrow();
-            matches!(*cache, MinimapStaticWorldState::Uninitialized)
-        };
-        if !should_load {
-            return;
-        }
-
-        let loaded = Self::load_minimap_static_world();
-        *self.minimap_static_world.borrow_mut() = match loaded {
-            Some(world) => MinimapStaticWorldState::Loaded(world),
-            None => MinimapStaticWorldState::Unavailable,
-        };
-    }
-
-    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-    fn load_minimap_static_world() -> Option<MinimapStaticWorld> {
-        #[derive(serde::Deserialize)]
-        struct FileCoord {
-            cx: i32,
-            cy: i32,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct FileLayers {
-            #[serde(default)]
-            ground: Vec<u32>,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct FileMapObject {
-            gid: u32,
-            x: i32,
-            y: i32,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct FilePortal {
-            x: i32,
-            y: i32,
-            width: Option<i32>,
-            height: Option<i32>,
-            #[serde(rename = "targetMap")]
-            target_map: Option<String>,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct ChunkFile {
-            coord: FileCoord,
-            layers: FileLayers,
-            #[serde(default, rename = "mapObjects")]
-            map_objects: Vec<FileMapObject>,
-            #[serde(default)]
-            portals: Vec<FilePortal>,
-        }
-
-        let mut chunks = Vec::new();
-        let mut min_x = f32::MAX;
-        let mut min_y = f32::MAX;
-        let mut max_x = f32::MIN;
-        let mut max_y = f32::MIN;
-        let world_dir = std::path::Path::new("rust-server/maps/world_0");
-        let entries = std::fs::read_dir(world_dir).ok()?;
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if !path.is_file() {
-                continue;
-            }
-            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-                continue;
-            };
-            if !name.starts_with("chunk_") || !name.ends_with(".json") {
-                continue;
-            }
-
-            let Ok(bytes) = std::fs::read(&path) else {
-                continue;
-            };
-            let Ok(chunk_file) = serde_json::from_slice::<ChunkFile>(&bytes) else {
-                continue;
-            };
-
-            let coord_x = chunk_file.coord.cx;
-            let coord_y = chunk_file.coord.cy;
-            let base_x = coord_x * CHUNK_SIZE as i32;
-            let base_y = coord_y * CHUNK_SIZE as i32;
-            let chunk_min_x = base_x as f32;
-            let chunk_min_y = base_y as f32;
-            let chunk_max_x = chunk_min_x + CHUNK_SIZE as f32;
-            let chunk_max_y = chunk_min_y + CHUNK_SIZE as f32;
-            min_x = min_x.min(chunk_min_x);
-            min_y = min_y.min(chunk_min_y);
-            max_x = max_x.max(chunk_max_x);
-            max_y = max_y.max(chunk_max_y);
-
-            let mut tree_markers = Vec::new();
-            for obj in chunk_file.map_objects {
-                if let Some(tree_info) = get_tree_info(obj.gid) {
-                    tree_markers.push(MinimapMarker {
-                        kind: MinimapMarkerKind::Tree,
-                        x: base_x as f32 + obj.x as f32 + 0.5,
-                        y: base_y as f32 + obj.y as f32 + 0.5,
-                        label: format!("Tree, {} (Lv.{})", tree_info.name, tree_info.level_required),
-                    });
-                }
-            }
-
-            let mut teleport_markers = Vec::new();
-            for portal in chunk_file.portals {
-                let width = portal.width.unwrap_or(1).max(1);
-                let height = portal.height.unwrap_or(1).max(1);
-                let target = Self::format_map_display_name(portal.target_map.as_deref().unwrap_or(""));
-                teleport_markers.push(MinimapMarker {
-                    kind: MinimapMarkerKind::Teleport,
-                    x: base_x as f32 + portal.x as f32 + width as f32 * 0.5,
-                    y: base_y as f32 + portal.y as f32 + height as f32 * 0.5,
-                    label: format!("Teleport, {}", target),
-                });
-            }
-
-            chunks.push(MinimapStaticChunk {
-                coord_x,
-                coord_y,
-                ground_tiles: chunk_file.layers.ground,
-                tree_markers,
-                teleport_markers,
-            });
-        }
-
-        if chunks.is_empty() {
-            return None;
-        }
-
-        Some(MinimapStaticWorld {
-            bounds: MinimapBounds {
-                min_x,
-                min_y,
-                max_x,
-                max_y,
-            },
-            chunks,
-        })
-    }
-
-    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
-    fn load_minimap_static_world() -> Option<MinimapStaticWorld> {
-        None
-    }
-
     fn minimap_bounds(&self, state: &GameState) -> Option<MinimapBounds> {
         let mut bounds = if let Some((width, height)) = state.chunk_manager.get_interior_size() {
             MinimapBounds {
@@ -2031,17 +1856,6 @@ impl Renderer {
             bounds.min_y = bounds.min_y.min(player.y);
             bounds.max_x = bounds.max_x.max(player.x);
             bounds.max_y = bounds.max_y.max(player.y);
-        }
-
-        if state.chunk_manager.get_interior_size().is_none() {
-            self.ensure_minimap_static_world_loaded();
-            let static_world = self.minimap_static_world.borrow();
-            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
-                bounds.min_x = bounds.min_x.min(static_world.bounds.min_x);
-                bounds.min_y = bounds.min_y.min(static_world.bounds.min_y);
-                bounds.max_x = bounds.max_x.max(static_world.bounds.max_x);
-                bounds.max_y = bounds.max_y.max(static_world.bounds.max_y);
-            }
         }
 
         let padding = 2.0;
@@ -2383,35 +2197,6 @@ impl Renderer {
                 });
             }
         }
-        if state.chunk_manager.get_interior_size().is_none() {
-            self.ensure_minimap_static_world_loaded();
-            let static_world = self.minimap_static_world.borrow();
-            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
-                for static_chunk in &static_world.chunks {
-                    if loaded_chunk_coords.contains(&(static_chunk.coord_x, static_chunk.coord_y)) {
-                        continue;
-                    }
-                    if let Some(b) = bounds {
-                        let chunk_min_x = (static_chunk.coord_x * CHUNK_SIZE as i32) as f32;
-                        let chunk_min_y = (static_chunk.coord_y * CHUNK_SIZE as i32) as f32;
-                        let chunk_max_x = chunk_min_x + CHUNK_SIZE as f32;
-                        let chunk_max_y = chunk_min_y + CHUNK_SIZE as f32;
-                        if chunk_max_x < b.min_x - bounds_margin
-                            || chunk_min_x > b.max_x + bounds_margin
-                            || chunk_max_y < b.min_y - bounds_margin
-                            || chunk_min_y > b.max_y + bounds_margin
-                        {
-                            continue;
-                        }
-                    }
-                    for marker in &static_chunk.teleport_markers {
-                        if in_bounds(marker.x, marker.y) {
-                            teleport_markers.push(marker.clone());
-                        }
-                    }
-                }
-            }
-        }
         teleport_markers.sort_by(|a, b| {
             a.y.partial_cmp(&b.y)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -2490,23 +2275,6 @@ impl Renderer {
                 }
             }
         }
-        if state.chunk_manager.get_interior_size().is_none() {
-            self.ensure_minimap_static_world_loaded();
-            let static_world = self.minimap_static_world.borrow();
-            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
-                for static_chunk in &static_world.chunks {
-                    if loaded_chunk_coords.contains(&(static_chunk.coord_x, static_chunk.coord_y)) {
-                        continue;
-                    }
-                    for marker in &static_chunk.tree_markers {
-                        if !in_bounds(marker.x, marker.y) {
-                            continue;
-                        }
-                        tree_markers.push((distance_sq(marker.x, marker.y), marker.clone()));
-                    }
-                }
-            }
-        }
         tree_markers.sort_by(|a, b| {
             a.0.partial_cmp(&b.0)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -2551,12 +2319,6 @@ impl Renderer {
         let sample_step_y = base_step_y.max(budget_step);
 
         let interior_size = state.chunk_manager.get_interior_size();
-        let loaded_chunk_coords: HashSet<(i32, i32)> = state
-            .chunk_manager
-            .chunks()
-            .keys()
-            .map(|coord| (coord.x, coord.y))
-            .collect();
         // Draw a primitive world raster by sampling the ground tile color per tile.
         if !state.chunk_manager.chunks().is_empty() {
             for (coord, chunk) in state.chunk_manager.chunks().iter() {
@@ -2694,86 +2456,6 @@ impl Renderer {
             }
         }
 
-        if interior_size.is_none() {
-            self.ensure_minimap_static_world_loaded();
-            let static_world = self.minimap_static_world.borrow();
-            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
-                for static_chunk in &static_world.chunks {
-                    if loaded_chunk_coords.contains(&(static_chunk.coord_x, static_chunk.coord_y)) {
-                        continue;
-                    }
-
-                    let tile_w = CHUNK_SIZE as usize;
-                    let tile_h = CHUNK_SIZE as usize;
-                    let base_x = static_chunk.coord_x * CHUNK_SIZE as i32;
-                    let base_y = static_chunk.coord_y * CHUNK_SIZE as i32;
-                    let chunk_min_x = base_x as f32;
-                    let chunk_min_y = base_y as f32;
-                    let chunk_max_x = chunk_min_x + tile_w as f32;
-                    let chunk_max_y = chunk_min_y + tile_h as f32;
-                    if chunk_max_x <= bounds.min_x
-                        || chunk_min_x >= bounds.max_x
-                        || chunk_max_y <= bounds.min_y
-                        || chunk_min_y >= bounds.max_y
-                    {
-                        continue;
-                    }
-
-                    for y in (0..tile_h).step_by(sample_step_y) {
-                        let row_start = y * tile_w;
-                        if row_start >= static_chunk.ground_tiles.len() {
-                            break;
-                        }
-                        for x in (0..tile_w).step_by(sample_step_x) {
-                            let idx = row_start + x;
-                            if idx >= static_chunk.ground_tiles.len() {
-                                break;
-                            }
-                            let tile_id = static_chunk.ground_tiles[idx];
-                            if tile_id == 0 {
-                                continue;
-                            }
-
-                            let world_x = base_x + x as i32;
-                            let world_y = base_y + y as i32;
-                            let tile_span_x = sample_step_x.min(tile_w.saturating_sub(x).max(1));
-                            let tile_span_y = sample_step_y.min(tile_h.saturating_sub(y).max(1));
-                            let tile_min_x = world_x as f32;
-                            let tile_min_y = world_y as f32;
-                            let tile_max_x = (world_x + tile_span_x as i32) as f32;
-                            let tile_max_y = (world_y + tile_span_y as i32) as f32;
-                            if tile_max_x <= bounds.min_x
-                                || tile_min_x >= bounds.max_x
-                                || tile_max_y <= bounds.min_y
-                                || tile_min_y >= bounds.max_y
-                            {
-                                continue;
-                            }
-
-                            let (sx1, sy1) = self.minimap_world_to_screen(
-                                bounds, map_rect, tile_min_x, tile_min_y,
-                            );
-                            let (sx2, sy2) = self.minimap_world_to_screen(
-                                bounds, map_rect, tile_max_x, tile_max_y,
-                            );
-                            let rect_x = sx1.min(sx2);
-                            let rect_y = sy1.min(sy2);
-                            let rect_w = (sx2 - sx1).abs().max(1.0);
-                            let rect_h = (sy2 - sy1).abs().max(1.0);
-
-                            draw_rectangle(
-                                rect_x,
-                                rect_y,
-                                rect_w,
-                                rect_h,
-                                self.minimap_tile_color(tile_id),
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
         for coord in state.chunk_manager.chunks().keys() {
             let (chunk_x, chunk_y, chunk_w, chunk_h) = if let Some((w, h)) = interior_size {
                 if coord.x != 0 || coord.y != 0 {
@@ -2823,53 +2505,6 @@ impl Renderer {
                 1.0,
                 Color::new(0.35, 0.50, 0.40, 0.30),
             );
-        }
-
-        if interior_size.is_none() {
-            self.ensure_minimap_static_world_loaded();
-            let static_world = self.minimap_static_world.borrow();
-            if let MinimapStaticWorldState::Loaded(static_world) = &*static_world {
-                for static_chunk in &static_world.chunks {
-                    if loaded_chunk_coords.contains(&(static_chunk.coord_x, static_chunk.coord_y)) {
-                        continue;
-                    }
-                    let chunk_x = (static_chunk.coord_x * CHUNK_SIZE as i32) as f32;
-                    let chunk_y = (static_chunk.coord_y * CHUNK_SIZE as i32) as f32;
-                    let chunk_w = CHUNK_SIZE as f32;
-                    let chunk_h = CHUNK_SIZE as f32;
-                    if chunk_x + chunk_w <= bounds.min_x
-                        || chunk_x >= bounds.max_x
-                        || chunk_y + chunk_h <= bounds.min_y
-                        || chunk_y >= bounds.max_y
-                    {
-                        continue;
-                    }
-
-                    let (sx1, sy1) = self.minimap_world_to_screen(bounds, map_rect, chunk_x, chunk_y);
-                    let (sx2, sy2) =
-                        self.minimap_world_to_screen(bounds, map_rect, chunk_x + chunk_w, chunk_y + chunk_h);
-                    let rect_x = sx1.min(sx2);
-                    let rect_y = sy1.min(sy2);
-                    let rect_w = (sx2 - sx1).abs().max(1.0);
-                    let rect_h = (sy2 - sy1).abs().max(1.0);
-
-                    draw_rectangle(
-                        rect_x,
-                        rect_y,
-                        rect_w,
-                        rect_h,
-                        Color::new(0.0, 0.0, 0.0, 0.08),
-                    );
-                    draw_rectangle_lines(
-                        rect_x,
-                        rect_y,
-                        rect_w,
-                        rect_h,
-                        1.0,
-                        Color::new(0.35, 0.50, 0.40, 0.30),
-                    );
-                }
-            }
         }
 
         let mut hitboxes: Vec<(usize, Rect)> =
