@@ -132,6 +132,14 @@ pub enum ClientMessage {
         tree_gid: u32,
     },
 
+    // Mining commands
+    #[serde(rename = "mineRock")]
+    MineRock {
+        rock_x: i32,
+        rock_y: i32,
+        rock_gid: u32,
+    },
+
     // Chair commands
     #[serde(rename = "sitChair")]
     SitChair { tile_x: i32, tile_y: i32 },
@@ -384,6 +392,16 @@ impl ClientMessage {
                 data.insert("tree_y".into(), Value::Integer((*tree_y as i64).into()));
                 data.insert("tree_gid".into(), Value::Integer((*tree_gid as i64).into()));
                 "chopTree"
+            }
+            ClientMessage::MineRock {
+                rock_x,
+                rock_y,
+                rock_gid,
+            } => {
+                data.insert("rock_x".into(), Value::Integer((*rock_x as i64).into()));
+                data.insert("rock_y".into(), Value::Integer((*rock_y as i64).into()));
+                data.insert("rock_gid".into(), Value::Integer((*rock_gid as i64).into()));
+                "mineRock"
             }
             ClientMessage::SitChair { tile_x, tile_y } => {
                 data.insert("tile_x".into(), Value::Integer((*tile_x as i64).into()));

@@ -374,6 +374,13 @@ pub struct DepletedTreeInfo {
     pub respawn_at: f64,  // Client time when it will respawn
 }
 
+/// Info about a depleted rock for respawn timer display
+pub struct DepletedRockInfo {
+    pub gid: u32,
+    pub depleted_at: f64, // Client time when depleted
+    pub respawn_at: f64,  // Client time when it will respawn
+}
+
 /// Tree shake effect when being chopped
 pub struct TreeShakeEffect {
     pub x: i32,
@@ -1170,12 +1177,18 @@ pub struct GameState {
 
     /// Depleted trees (position -> info for respawn timer)
     pub depleted_trees: HashMap<(i32, i32), DepletedTreeInfo>,
+    /// Depleted rocks (position -> info for respawn timer)
+    pub depleted_rocks: HashMap<(i32, i32), DepletedRockInfo>,
     /// Local dash cooldown tracking (game time when dash becomes available again)
     pub dash_cooldown_end: f64,
     /// Whether the local player is currently woodcutting
     pub is_woodcutting: bool,
     /// Timestamp when woodcutting started
     pub woodcutting_started_at: f64,
+    /// Whether the local player is currently mining
+    pub is_mining: bool,
+    /// Timestamp when mining started
+    pub mining_started_at: f64,
     /// Tree shake effects (when being chopped)
     pub tree_shake_effects: Vec<TreeShakeEffect>,
     /// Falling leaf particles
@@ -1314,8 +1327,11 @@ impl GameState {
             gathering_buff: None,
             dash_cooldown_end: 0.0,
             depleted_trees: HashMap::new(),
+            depleted_rocks: HashMap::new(),
             is_woodcutting: false,
             woodcutting_started_at: 0.0,
+            is_mining: false,
+            mining_started_at: 0.0,
             tree_shake_effects: Vec::new(),
             leaf_particles: Vec::new(),
             falling_trees: Vec::new(),

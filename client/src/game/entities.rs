@@ -140,6 +140,11 @@ pub struct Player {
     pub woodcutting_started_at: f64,
     pub last_woodcutting_anim: f64,
 
+    // Mining state
+    pub is_mining: bool,
+    pub mining_started_at: f64,
+    pub last_mining_anim: f64,
+
     /// Whether this player is currently in a dash slide
     pub is_dashing: bool,
     /// Short grace window to keep walk loop continuous between step snapshots.
@@ -189,6 +194,9 @@ impl Player {
             is_woodcutting: false,
             woodcutting_started_at: 0.0,
             last_woodcutting_anim: 0.0,
+            is_mining: false,
+            mining_started_at: 0.0,
+            last_mining_anim: 0.0,
             is_dashing: false,
             walk_anim_grace_until: 0.0,
         }

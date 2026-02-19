@@ -1,5 +1,5 @@
-//! Skills panel rendering - compact 3x3 grid showing skill levels
-//! 3 active skills (Hitpoints, Combat, Fishing), 5 locked placeholder slots
+//! Skills panel rendering - compact 4x3 grid showing skill levels
+//! 10 active skills, 2 locked placeholder slots
 
 use super::super::Renderer;
 use super::common::*;
@@ -8,36 +8,38 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
-/// Skills panel dimensions (compact: just fits the 3x3 grid with padding)
+/// Skills panel dimensions (compact: just fits the 4x3 grid with padding)
 const SKILLS_PANEL_PADDING: f32 = 8.0;
 const SKILLS_GRID_WIDTH: f32 = 3.0 * SKILL_SLOT_SIZE + 2.0 * SKILL_SLOT_SPACING; // 128
+const SKILLS_GRID_HEIGHT: f32 = 4.0 * SKILL_SLOT_SIZE + 3.0 * SKILL_SLOT_SPACING; // 172
 const SKILLS_PANEL_WIDTH: f32 =
     SKILLS_GRID_WIDTH + SKILLS_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0; // 152
 const SKILLS_HEADER_HEIGHT: f32 = 24.0;
 const SKILLS_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
     + SKILLS_HEADER_HEIGHT
     + SKILLS_PANEL_PADDING
-    + SKILLS_GRID_WIDTH
-    + SKILLS_PANEL_PADDING; // 176
+    + SKILLS_GRID_HEIGHT
+    + SKILLS_PANEL_PADDING; // ~220
 
 /// Skill slot dimensions
 const SKILL_SLOT_SIZE: f32 = 40.0;
 const SKILL_SLOT_SPACING: f32 = 4.0;
 const SKILL_GRID_COLS: usize = 3;
-const SKILL_GRID_ROWS: usize = 3;
-const TOTAL_SKILL_SLOTS: usize = 9;
+const SKILL_GRID_ROWS: usize = 4;
+const TOTAL_SKILL_SLOTS: usize = 12;
 
 /// UI icons sprite sheet: 24x24 icons in 10 columns
 const UI_ICON_SIZE: f32 = 24.0;
 const UI_ICON_COLS: usize = 10;
 
 /// Active skills in display order
-const ACTIVE_SKILLS: [SkillType; 9] = [
+const ACTIVE_SKILLS: [SkillType; 10] = [
     SkillType::Hitpoints,
     SkillType::Combat,
     SkillType::Fishing,
     SkillType::Woodcutting,
     SkillType::Farming,
+    SkillType::Mining,
     SkillType::Smithing,
     SkillType::Prayer,
     SkillType::Magic,
@@ -223,6 +225,7 @@ impl Renderer {
                 SkillType::Combat => (2, 6),
                 SkillType::Fishing => (4, 6),
                 SkillType::Farming => (4, 6),
+                SkillType::Mining => (5, 6),
                 SkillType::Smithing => (5, 6),
                 SkillType::Prayer => (3, 6),
                 SkillType::Magic => (6, 6),
@@ -256,6 +259,7 @@ impl Renderer {
                 SkillType::Combat => "C",
                 SkillType::Fishing => "F",
                 SkillType::Farming => "Fm",
+                SkillType::Mining => "Mi",
                 SkillType::Smithing => "Sm",
                 SkillType::Prayer => "Pr",
                 SkillType::Magic => "Mg",
@@ -341,6 +345,7 @@ impl Renderer {
             SkillType::Combat => Color::new(0.85, 0.65, 0.15, 1.0), // Gold/orange
             SkillType::Fishing => Color::new(0.2, 0.6, 0.85, 1.0),  // Blue
             SkillType::Farming => Color::new(0.3, 0.75, 0.3, 1.0),  // Green
+            SkillType::Mining => Color::new(0.5, 0.5, 0.6, 1.0),    // Gray/stone
             SkillType::Smithing => Color::new(0.7, 0.5, 0.2, 1.0),  // Bronze/brown
             SkillType::Prayer => Color::new(0.9, 0.9, 0.5, 1.0),    // Light yellow (holy)
             SkillType::Magic => Color::new(0.4, 0.3, 0.9, 1.0),     // Purple (arcane)

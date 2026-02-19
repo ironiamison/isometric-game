@@ -12,6 +12,8 @@ pub struct EquipmentStats {
     pub defence_bonus: i32,              // Avoid hits
     pub woodcutting_level_required: i32, // For axes
     pub chop_speed_multiplier: f32,      // Woodcutting speed (0.0 if not an axe)
+    pub mining_level_required: i32,      // For pickaxes
+    pub mine_speed_multiplier: f32,      // Mining speed (0.0 if not a pickaxe)
 }
 
 /// Item definition received from server

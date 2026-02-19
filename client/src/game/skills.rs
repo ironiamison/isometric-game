@@ -3,7 +3,7 @@
 //! This is a simplified version that tracks skill data received from the server.
 //! All calculations happen server-side.
 //!
-//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting, Alchemy
+//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting, Alchemy, Mining
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Combat: Combined attack/strength/defence skill for all combat
 //! - Fishing: Gathering skill for catching fish
@@ -30,6 +30,7 @@ pub enum SkillType {
     Magic,
     Woodcutting,
     Alchemy,
+    Mining,
 }
 
 impl SkillType {
@@ -44,6 +45,7 @@ impl SkillType {
             SkillType::Magic => "magic",
             SkillType::Woodcutting => "woodcutting",
             SkillType::Alchemy => "alchemy",
+            SkillType::Mining => "mining",
         }
     }
 
@@ -58,6 +60,7 @@ impl SkillType {
             "magic" => Some(SkillType::Magic),
             "woodcutting" => Some(SkillType::Woodcutting),
             "alchemy" => Some(SkillType::Alchemy),
+            "mining" => Some(SkillType::Mining),
             _ => None,
         }
     }
@@ -73,6 +76,7 @@ impl SkillType {
             SkillType::Magic => "Magic",
             SkillType::Woodcutting => "Woodcutting",
             SkillType::Alchemy => "Alchemy",
+            SkillType::Mining => "Mining",
         }
     }
 }
@@ -151,6 +155,8 @@ pub struct Skills {
     pub woodcutting: Skill,
     #[serde(default)]
     pub alchemy: Skill,
+    #[serde(default)]
+    pub mining: Skill,
 }
 
 impl Default for Skills {
@@ -172,6 +178,7 @@ impl Skills {
             magic: Skill::new(1),
             woodcutting: Skill::new(1),
             alchemy: Skill::new(1),
+            mining: Skill::new(1),
         }
     }
 
@@ -193,6 +200,7 @@ impl Skills {
             SkillType::Magic => &self.magic,
             SkillType::Woodcutting => &self.woodcutting,
             SkillType::Alchemy => &self.alchemy,
+            SkillType::Mining => &self.mining,
         }
     }
 
@@ -208,6 +216,7 @@ impl Skills {
             SkillType::Magic => &mut self.magic,
             SkillType::Woodcutting => &mut self.woodcutting,
             SkillType::Alchemy => &mut self.alchemy,
+            SkillType::Mining => &mut self.mining,
         }
     }
 
@@ -229,5 +238,6 @@ impl Skills {
             + self.magic.level
             + self.woodcutting.level
             + self.alchemy.level
+            + self.mining.level
     }
 }

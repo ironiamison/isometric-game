@@ -112,6 +112,14 @@ pub struct EquipmentStats {
     /// Chop speed multiplier for axes (1.0 = base speed, higher = faster)
     #[serde(default)]
     pub chop_speed_multiplier: f32,
+
+    /// Mining level required to equip (for pickaxes)
+    #[serde(default)]
+    pub mining_level_required: i32,
+
+    /// Mine speed multiplier for pickaxes (1.0 = base speed, higher = faster)
+    #[serde(default)]
+    pub mine_speed_multiplier: f32,
 }
 
 // ============================================================================

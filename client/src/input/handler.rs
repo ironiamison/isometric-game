@@ -338,6 +338,12 @@ pub enum InputCommand {
         tree_y: i32,
         tree_gid: u32,
     },
+    // Mining commands
+    MineRock {
+        rock_x: i32,
+        rock_y: i32,
+        rock_gid: u32,
+    },
     // Chair commands
     SitChair {
         tile_x: i32,
@@ -4436,6 +4442,47 @@ impl InputHandler {
                     None
                 };
 
+                // Check if we should mine instead of attack (pickaxe equipped + facing rock)
+                let should_mine = if should_gather.is_none() && should_woodcut.is_none() {
+                    if let Some(player) = state.get_local_player() {
+                        // Check if player has a pickaxe equipped (mine_speed_multiplier > 0)
+                        let has_pickaxe = player
+                            .equipped_weapon
+                            .as_ref()
+                            .and_then(|weapon_id| state.item_registry.get(weapon_id))
+                            .and_then(|item| item.equipment.as_ref())
+                            .map(|eq| eq.mine_speed_multiplier > 0.0)
+                            .unwrap_or(false);
+
+                        if has_pickaxe {
+                            let px = player.x.round() as i32;
+                            let py = player.y.round() as i32;
+                            let (fdx, fdy) = player.direction.to_unit_vector();
+                            let face_x = px + fdx as i32;
+                            let face_y = py + fdy as i32;
+
+                            // Check if facing tile has a rock object and is not depleted
+                            if !state.depleted_rocks.contains_key(&(face_x, face_y)) {
+                                let obj_result =
+                                    state.chunk_manager.get_object_at_exact(face_x, face_y);
+                                if let Some(obj) = obj_result {
+                                    Some((face_x, face_y, obj.gid))
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
                 if let Some((marker_x, marker_y)) = should_gather {
                     if !state.is_gathering {
                         commands.push(InputCommand::StartGathering { marker_x, marker_y });
@@ -4447,6 +4494,14 @@ impl InputHandler {
                         tree_x,
                         tree_y,
                         tree_gid,
+                    });
+                    self.last_attack_time = current_time;
+                } else if let Some((rock_x, rock_y, rock_gid)) = should_mine {
+                    // Send mine command on each attack press when facing a rock with a pickaxe
+                    commands.push(InputCommand::MineRock {
+                        rock_x,
+                        rock_y,
+                        rock_gid,
                     });
                     self.last_attack_time = current_time;
                 } else {

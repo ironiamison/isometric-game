@@ -196,6 +196,15 @@ pub enum ClientMessage {
         tree_gid: u32,
     },
 
+    // ===== Mining System Messages =====
+    /// Mine a rock once (player-initiated, one swing per attack)
+    #[serde(rename = "mineRock")]
+    MineRock {
+        rock_x: i32,
+        rock_y: i32,
+        rock_gid: u32,
+    },
+
     // ===== Bank System Messages =====
     /// Deposit item from inventory into bank
     #[serde(rename = "bankDeposit")]
@@ -266,6 +275,7 @@ impl ClientMessage {
             ClientMessage::PrayAtAltar { .. } => "PrayAtAltar",
             ClientMessage::CastSpell { .. } => "CastSpell",
             ClientMessage::ChopTree { .. } => "ChopTree",
+            ClientMessage::MineRock { .. } => "MineRock",
             ClientMessage::BankDeposit { .. } => "BankDeposit",
             ClientMessage::BankWithdraw { .. } => "BankWithdraw",
             ClientMessage::BankDepositGold { .. } => "BankDepositGold",
@@ -388,6 +398,8 @@ pub enum ServerMessage {
         woodcutting_xp: i64,
         alchemy_level: i32,
         alchemy_xp: i64,
+        mining_level: i32,
+        mining_xp: i64,
     },
     ItemDropped {
         id: String,
@@ -787,6 +799,48 @@ pub enum ServerMessage {
     DepletedTreesSync {
         trees: Vec<DepletedTreeData>,
     },
+    // ===== Mining System Messages =====
+    /// Player started mining a rock
+    MiningStarted {
+        player_id: String,
+        rock_x: i32,
+        rock_y: i32,
+        rock_type: String,
+    },
+    /// Player swung their pickaxe (triggers animation)
+    MiningSwing {
+        player_id: String,
+        rock_x: i32,
+        rock_y: i32,
+    },
+    /// Player mined ore (successful swing)
+    MiningResult {
+        player_id: String,
+        item_id: String,
+        xp_gained: i64,
+    },
+    /// Player stopped mining
+    MiningStopped {
+        player_id: String,
+        reason: String,
+    },
+    /// A rock was mined out (depleted)
+    RockDepleted {
+        x: i32,
+        y: i32,
+        gid: u32,
+        respawn_delay_ms: u64,
+    },
+    /// A rock respawned
+    RockRespawned {
+        x: i32,
+        y: i32,
+        gid: u32,
+    },
+    /// Sync all depleted rocks on chunk load
+    DepletedRocksSync {
+        rocks: Vec<DepletedRockData>,
+    },
     /// Response to ping for latency measurement
     Pong {
         timestamp: f64,
@@ -844,6 +898,14 @@ pub struct FarmingPatchData {
 /// Depleted tree data for client synchronization
 #[derive(Debug, Clone, Serialize)]
 pub struct DepletedTreeData {
+    pub x: i32,
+    pub y: i32,
+    pub gid: u32,
+}
+
+/// Depleted rock data for client synchronization
+#[derive(Debug, Clone, Serialize)]
+pub struct DepletedRockData {
     pub x: i32,
     pub y: i32,
     pub gid: u32,
@@ -955,12 +1017,14 @@ pub struct ClientItemDef {
     pub attack_level_required: Option<i32>,
     pub defence_level_required: Option<i32>,
     pub woodcutting_level_required: Option<i32>,
+    pub mining_level_required: Option<i32>,
     pub attack_bonus: Option<i32>,
     pub strength_bonus: Option<i32>,
     pub defence_bonus: Option<i32>,
     pub weapon_type: Option<String>,
     pub range: Option<i32>,
     pub chop_speed_multiplier: Option<f32>,
+    pub mine_speed_multiplier: Option<f32>,
     pub prayer_xp: i32,
 }
 
@@ -1127,6 +1191,14 @@ impl ServerMessage {
             ServerMessage::TreeDepleted { .. } => "treeDepleted",
             ServerMessage::TreeRespawned { .. } => "treeRespawned",
             ServerMessage::DepletedTreesSync { .. } => "depletedTreesSync",
+            // Mining system messages
+            ServerMessage::MiningStarted { .. } => "miningStarted",
+            ServerMessage::MiningSwing { .. } => "miningSwing",
+            ServerMessage::MiningResult { .. } => "miningResult",
+            ServerMessage::MiningStopped { .. } => "miningStopped",
+            ServerMessage::RockDepleted { .. } => "rockDepleted",
+            ServerMessage::RockRespawned { .. } => "rockRespawned",
+            ServerMessage::DepletedRocksSync { .. } => "depletedRocksSync",
             ServerMessage::Pong { .. } => "pong",
             ServerMessage::BankOpen { .. } => "bankOpen",
             ServerMessage::BankUpdate { .. } => "bankUpdate",
@@ -2020,6 +2092,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             woodcutting_xp,
             alchemy_level,
             alchemy_xp,
+            mining_level,
+            mining_xp,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -2097,6 +2171,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("alchemy_xp".into()),
                 Value::Integer((*alchemy_xp).into()),
+            ));
+            map.push((
+                Value::String("mining_level".into()),
+                Value::Integer((*mining_level as i64).into()),
+            ));
+            map.push((
+                Value::String("mining_xp".into()),
+                Value::Integer((*mining_xp).into()),
             ));
             Value::Map(map)
         }
@@ -2670,6 +2752,19 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     if let Some(speed) = i.chop_speed_multiplier {
                         imap.push((
                             Value::String("chop_speed_multiplier".into()),
+                            Value::F32(speed),
+                        ));
+                    }
+                    // Mining-specific fields
+                    if let Some(level) = i.mining_level_required {
+                        imap.push((
+                            Value::String("mining_level_required".into()),
+                            Value::Integer((level as i64).into()),
+                        ));
+                    }
+                    if let Some(speed) = i.mine_speed_multiplier {
+                        imap.push((
+                            Value::String("mine_speed_multiplier".into()),
                             Value::F32(speed),
                         ));
                     }
@@ -4143,6 +4238,149 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("trees".into()), Value::Array(tree_values)));
             Value::Map(map)
         }
+        // Mining system messages
+        ServerMessage::MiningStarted {
+            player_id,
+            rock_x,
+            rock_y,
+            rock_type,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("rock_x".into()),
+                Value::Integer((*rock_x as i64).into()),
+            ));
+            map.push((
+                Value::String("rock_y".into()),
+                Value::Integer((*rock_y as i64).into()),
+            ));
+            map.push((
+                Value::String("rock_type".into()),
+                Value::String(rock_type.clone().into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::MiningSwing {
+            player_id,
+            rock_x,
+            rock_y,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("rock_x".into()),
+                Value::Integer((*rock_x as i64).into()),
+            ));
+            map.push((
+                Value::String("rock_y".into()),
+                Value::Integer((*rock_y as i64).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::MiningResult {
+            player_id,
+            item_id,
+            xp_gained,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("item_id".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("xp_gained".into()),
+                Value::Integer((*xp_gained).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::MiningStopped { player_id, reason } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("reason".into()),
+                Value::String(reason.clone().into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::RockDepleted {
+            x,
+            y,
+            gid,
+            respawn_delay_ms,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("gid".into()),
+                Value::Integer((*gid as i64).into()),
+            ));
+            map.push((
+                Value::String("respawn_delay_ms".into()),
+                Value::Integer((*respawn_delay_ms as i64).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::RockRespawned { x, y, gid } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("gid".into()),
+                Value::Integer((*gid as i64).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::DepletedRocksSync { rocks } => {
+            let rock_values: Vec<Value> = rocks
+                .iter()
+                .map(|r| {
+                    let mut rock_map = Vec::new();
+                    rock_map.push((
+                        Value::String("x".into()),
+                        Value::Integer((r.x as i64).into()),
+                    ));
+                    rock_map.push((
+                        Value::String("y".into()),
+                        Value::Integer((r.y as i64).into()),
+                    ));
+                    rock_map.push((
+                        Value::String("gid".into()),
+                        Value::Integer((r.gid as i64).into()),
+                    ));
+                    Value::Map(rock_map)
+                })
+                .collect();
+            let mut map = Vec::new();
+            map.push((Value::String("rocks".into()), Value::Array(rock_values)));
+            Value::Map(map)
+        }
         ServerMessage::Pong { timestamp } => {
             let mut map = Vec::new();
             map.push((Value::String("timestamp".into()), Value::F64(*timestamp)));
@@ -4537,6 +4775,17 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
                 tree_x,
                 tree_y,
                 tree_gid,
+            })
+        }
+        // Mining messages
+        "mineRock" => {
+            let rock_x = extract_i64(msg_data, "rock_x").unwrap_or(0) as i32;
+            let rock_y = extract_i64(msg_data, "rock_y").unwrap_or(0) as i32;
+            let rock_gid = extract_i64(msg_data, "rock_gid").unwrap_or(0) as u32;
+            Ok(ClientMessage::MineRock {
+                rock_x,
+                rock_y,
+                rock_gid,
             })
         }
         // Utility messages

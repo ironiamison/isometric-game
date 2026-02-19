@@ -50,6 +50,7 @@ mod spell;
 mod tilemap;
 mod log_buffer;
 mod perf_metrics;
+mod mining;
 mod woodcutting;
 mod world;
 
@@ -2596,6 +2597,9 @@ async fn handle_client_message(
         }
         ClientMessage::ChopTree { tree_x, tree_y, tree_gid } => {
             room.handle_chop_tree(player_id, tree_x, tree_y, tree_gid).await;
+        }
+        ClientMessage::MineRock { rock_x, rock_y, rock_gid } => {
+            room.handle_mine_rock(player_id, rock_x, rock_y, rock_gid).await;
         }
         ClientMessage::SitChair { tile_x, tile_y } => {
             room.handle_sit_chair(player_id, tile_x, tile_y).await;

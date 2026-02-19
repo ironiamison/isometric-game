@@ -431,6 +431,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     new_player.is_woodcutting = true;
                                     new_player.woodcutting_started_at = macroquad::time::get_time();
                                 }
+                                let is_mining =
+                                    extract_bool(player_value, "is_mining").unwrap_or(false);
+                                if is_mining {
+                                    new_player.is_mining = true;
+                                    new_player.mining_started_at = macroquad::time::get_time();
+                                }
                                 let dashing =
                                     extract_bool(player_value, "dashing").unwrap_or(false);
                                 if dashing {
@@ -1063,8 +1069,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(xp) = extract_i32(value, "alchemy_xp") {
                             player.skills.alchemy.xp = xp as i64;
                         }
+                        if let Some(level) = extract_i32(value, "mining_level") {
+                            player.skills.mining.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "mining_xp") {
+                            player.skills.mining.xp = xp as i64;
+                        }
 
-                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}",
+                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}",
                             player_id,
                             player.skills.hitpoints.level,
                             player.skills.combat.level,
@@ -1074,7 +1086,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.skills.prayer.level,
                             player.skills.magic.level,
                             player.skills.woodcutting.level,
-                            player.skills.alchemy.level
+                            player.skills.alchemy.level,
+                            player.skills.mining.level
                         );
                     } else {
                         log::warn!(
@@ -1657,6 +1670,15 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                         chop_speed
                                     );
                                 }
+                                let mine_speed =
+                                    extract_f32(item_value, "mine_speed_multiplier").unwrap_or(0.0);
+                                if mine_speed > 0.0 {
+                                    log::info!(
+                                        "Loaded item {} with mine_speed_multiplier={}",
+                                        id,
+                                        mine_speed
+                                    );
+                                }
                                 EquipmentStats {
                                     slot_type,
                                     attack_level_required: extract_i32(
@@ -1681,6 +1703,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     )
                                     .unwrap_or(1),
                                     chop_speed_multiplier: chop_speed,
+                                    mining_level_required: extract_i32(
+                                        item_value,
+                                        "mining_level_required",
+                                    )
+                                    .unwrap_or(1),
+                                    mine_speed_multiplier: mine_speed,
                                 }
                             });
 
@@ -2780,6 +2808,154 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         );
                     }
                     log::info!("Synced {} depleted trees", state.depleted_trees.len());
+                }
+            }
+        }
+
+        // =====================================================================
+        // Mining Messages
+        // =====================================================================
+        "miningStarted" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                log::info!("Mining started for player {}", player_id);
+                if let Some(player) = state.players.get_mut(&player_id) {
+                    player.is_mining = true;
+                    player.mining_started_at = macroquad::time::get_time();
+                    player.play_attack();
+                }
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    state.is_mining = true;
+                    state.mining_started_at = macroquad::time::get_time();
+                }
+            }
+        }
+
+        "miningStopped" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let reason = extract_string(value, "reason").unwrap_or_default();
+                log::info!("Mining stopped for player {}: {}", player_id, reason);
+                if let Some(player) = state.players.get_mut(&player_id) {
+                    player.is_mining = false;
+                }
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    state.is_mining = false;
+                    if reason == "inventory_full" {
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push(ChatMessage::system("Your inventory is full!".to_string()));
+                    }
+                }
+            }
+        }
+
+        "miningSwing" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let _rock_x = extract_i32(value, "rock_x").unwrap_or(0);
+                let _rock_y = extract_i32(value, "rock_y").unwrap_or(0);
+
+                // Server says player swung - play attack animation and sound
+                let has_weapon = state
+                    .players
+                    .get(&player_id)
+                    .map(|p| p.equipped_weapon.is_some())
+                    .unwrap_or(false);
+                if let Some(player) = state.players.get_mut(&player_id) {
+                    player.play_attack();
+                }
+                state.pending_attack_sounds.push(has_weapon);
+
+                // Play mining sound effect
+                state.pending_sfx.push("mining".to_string());
+            }
+        }
+
+        "miningResult" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "player_id").unwrap_or_default();
+                let item_id = extract_string(value, "item_id").unwrap_or_default();
+                log::info!("Mining result: player {} got {}", player_id, item_id);
+
+                // XP display is handled by the separate skillXp message
+                // This handler just shows the item feedback
+
+                if state.local_player_id.as_deref() == Some(player_id.as_str()) {
+                    let item_name = state
+                        .item_registry
+                        .get(&item_id)
+                        .map(|d| d.display_name.clone())
+                        .unwrap_or(item_id.clone());
+
+                    // Add chat message about the mine
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!(
+                            "You mined some {}!",
+                            item_name
+                        )));
+                }
+            }
+        }
+
+        "rockDepleted" => {
+            if let Some(value) = data {
+                let x = extract_i32(value, "x").unwrap_or(0);
+                let y = extract_i32(value, "y").unwrap_or(0);
+                let gid = extract_u32(value, "gid").unwrap_or(0);
+                let respawn_delay_ms = extract_u64(value, "respawn_delay_ms").unwrap_or(7500);
+                let now = macroquad::time::get_time();
+                log::info!(
+                    "Rock depleted at ({}, {}), respawn in {}ms",
+                    x,
+                    y,
+                    respawn_delay_ms
+                );
+
+                // Mark rock as depleted (hides the static rock, shows respawn timer)
+                state.depleted_rocks.insert(
+                    (x, y),
+                    crate::game::state::DepletedRockInfo {
+                        gid,
+                        depleted_at: now,
+                        respawn_at: now + (respawn_delay_ms as f64 / 1000.0),
+                    },
+                );
+            }
+        }
+
+        "rockRespawned" => {
+            if let Some(value) = data {
+                let x = extract_i32(value, "x").unwrap_or(0);
+                let y = extract_i32(value, "y").unwrap_or(0);
+                log::info!("Rock respawned at ({}, {})", x, y);
+                state.depleted_rocks.remove(&(x, y));
+            }
+        }
+
+        "depletedRocksSync" => {
+            if let Some(value) = data {
+                if let Some(rocks_arr) = extract_array(value, "rocks") {
+                    state.depleted_rocks.clear();
+                    let now = macroquad::time::get_time();
+                    for rock in rocks_arr {
+                        let x = extract_i32(rock, "x").unwrap_or(0);
+                        let y = extract_i32(rock, "y").unwrap_or(0);
+                        let gid = extract_u32(rock, "gid").unwrap_or(0);
+                        // For sync, we don't know exact respawn time, use a short default
+                        state.depleted_rocks.insert(
+                            (x, y),
+                            crate::game::state::DepletedRockInfo {
+                                gid,
+                                depleted_at: now,
+                                respawn_at: now + 5.0, // Default 5 seconds remaining
+                            },
+                        );
+                    }
+                    log::info!("Synced {} depleted rocks", state.depleted_rocks.len());
                 }
             }
         }

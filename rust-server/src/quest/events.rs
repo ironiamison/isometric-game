@@ -52,6 +52,16 @@ pub enum QuestEvent {
         y: i32,
     },
 
+    /// Player depleted (mined out) a rock
+    RockDepleted {
+        player_id: String,
+        /// Rock/ore type ID (e.g., "bronze", "iron")
+        rock_type: String,
+        /// World coordinates where the rock was
+        x: i32,
+        y: i32,
+    },
+
     /// Player reached a specific level in a skill
     SkillLevelChanged {
         player_id: String,
@@ -91,6 +101,7 @@ impl QuestEvent {
             QuestEvent::NpcInteraction { player_id, .. } => player_id,
             QuestEvent::LocationReached { player_id, .. } => player_id,
             QuestEvent::TreeDepleted { player_id, .. } => player_id,
+            QuestEvent::RockDepleted { player_id, .. } => player_id,
             QuestEvent::SkillLevelChanged { player_id, .. } => player_id,
             QuestEvent::GoldAmountChanged { player_id, .. } => player_id,
             QuestEvent::QuestAccepted { player_id, .. } => player_id,
@@ -107,6 +118,7 @@ impl QuestEvent {
             QuestEvent::NpcInteraction { .. } => "npc_interaction",
             QuestEvent::LocationReached { .. } => "location_reached",
             QuestEvent::TreeDepleted { .. } => "tree_depleted",
+            QuestEvent::RockDepleted { .. } => "rock_depleted",
             QuestEvent::SkillLevelChanged { .. } => "skill_level_changed",
             QuestEvent::GoldAmountChanged { .. } => "gold_amount_changed",
             QuestEvent::QuestAccepted { .. } => "quest_accepted",

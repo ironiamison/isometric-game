@@ -283,6 +283,12 @@ impl QuestRegistry {
                         .await,
                 );
             }
+            QuestEvent::RockDepleted { rock_type, .. } => {
+                results.extend(
+                    self.update_deplete_rock_objectives(player_state, rock_type)
+                        .await,
+                );
+            }
             QuestEvent::SkillLevelChanged { skill, level, .. } => {
                 results.extend(
                     self.update_level_objectives(player_state, skill, *level)
@@ -582,6 +588,45 @@ impl QuestRegistry {
                     );
                     if objective.objective_type == ObjectiveType::DepleteTree
                         && objective.target == tree_type
+                    {
+                        info!("Match found! Updating objective '{}'", objective.id);
+                        if let Some(result) =
+                            self.update_single_objective(player_state, &quest_id, &objective.id, 1)
+                        {
+                            results.push(result);
+                        }
+                    }
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Update deplete_rock objectives for active quests
+    async fn update_deplete_rock_objectives(
+        &self,
+        player_state: &mut PlayerQuestState,
+        rock_type: &str,
+    ) -> Vec<QuestEventResult> {
+        let mut results = Vec::new();
+        let quests = self.quests.read().await;
+
+        let quest_ids: Vec<String> = player_state.active_quests.keys().cloned().collect();
+        info!(
+            "Processing rock depletion for rock_type='{}', active quests: {:?}",
+            rock_type, quest_ids
+        );
+
+        for quest_id in quest_ids {
+            if let Some(quest) = quests.get(&quest_id) {
+                for objective in &quest.objectives {
+                    info!(
+                        "Checking quest '{}' objective '{}': type={:?}, target='{}' (looking for DepleteRock with target '{}')",
+                        quest_id, objective.id, objective.objective_type, objective.target, rock_type
+                    );
+                    if objective.objective_type == ObjectiveType::DepleteRock
+                        && objective.target == rock_type
                     {
                         info!("Match found! Updating objective '{}'", objective.id);
                         if let Some(result) =

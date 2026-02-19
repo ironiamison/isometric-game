@@ -1,12 +1,13 @@
 //! Skills system following RuneScape-style mechanics.
 //!
-//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic, Alchemy
+//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic, Alchemy, Mining
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Combat: Combined attack/strength/defence skill for all combat
 //! - Fishing: Gathering skill for catching fish
 //! - Smithing: Crafting skill for forging weapons and armor
 //! - Prayer: Max prayer points (1 point per level, starts at 1)
 //! - Magic: Spell casting skill for damage and healing spells
+//! - Mining: Gathering skill for mining ore from rocks
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,7 @@ pub enum SkillType {
     Magic,
     Woodcutting,
     Alchemy,
+    Mining,
 }
 
 impl SkillType {
@@ -41,6 +43,7 @@ impl SkillType {
             SkillType::Magic => "magic",
             SkillType::Woodcutting => "woodcutting",
             SkillType::Alchemy => "alchemy",
+            SkillType::Mining => "mining",
         }
     }
 
@@ -55,6 +58,7 @@ impl SkillType {
             "magic" => Some(SkillType::Magic),
             "woodcutting" => Some(SkillType::Woodcutting),
             "alchemy" => Some(SkillType::Alchemy),
+            "mining" => Some(SkillType::Mining),
             _ => None,
         }
     }
@@ -70,6 +74,7 @@ impl SkillType {
             SkillType::Magic,
             SkillType::Woodcutting,
             SkillType::Alchemy,
+            SkillType::Mining,
         ]
     }
 }
@@ -183,6 +188,8 @@ pub struct Skills {
     pub woodcutting: Skill,
     #[serde(default)]
     pub alchemy: Skill,
+    #[serde(default)]
+    pub mining: Skill,
 }
 
 impl Default for Skills {
@@ -204,6 +211,7 @@ impl Skills {
             magic: Skill::new(1),
             woodcutting: Skill::new(1),
             alchemy: Skill::new(1),
+            mining: Skill::new(1),
         }
     }
 
@@ -225,6 +233,7 @@ impl Skills {
             SkillType::Magic => &self.magic,
             SkillType::Woodcutting => &self.woodcutting,
             SkillType::Alchemy => &self.alchemy,
+            SkillType::Mining => &self.mining,
         }
     }
 
@@ -240,6 +249,7 @@ impl Skills {
             SkillType::Magic => &mut self.magic,
             SkillType::Woodcutting => &mut self.woodcutting,
             SkillType::Alchemy => &mut self.alchemy,
+            SkillType::Mining => &mut self.mining,
         }
     }
 
@@ -254,6 +264,7 @@ impl Skills {
             + self.magic.level
             + self.woodcutting.level
             + self.alchemy.level
+            + self.mining.level
     }
 }
 
@@ -284,6 +295,7 @@ impl LegacySkills {
             magic: Skill::new(1),
             woodcutting: Skill::new(1),
             alchemy: Skill::new(1),
+            mining: Skill::new(1),
         }
     }
 }
@@ -406,6 +418,7 @@ mod tests {
             magic: Skill::new(1),
             woodcutting: Skill::new(1),
             alchemy: Skill::new(1),
+            mining: Skill::new(1),
         };
         // combat_level = floor((99 + 99) / 2) = 99
         assert_eq!(max_skills.combat_level(), 99);
@@ -414,8 +427,8 @@ mod tests {
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 + Alchemy 1 = 20
-        assert_eq!(skills.total_level(), 20);
+        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 + Alchemy 1 + Mining 1 = 21
+        assert_eq!(skills.total_level(), 21);
     }
 
     #[test]

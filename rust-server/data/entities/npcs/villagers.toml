@@ -561,13 +561,13 @@ messages = [
 greeting = "Peace be with you. Do you need healing or counsel?"
 
 # ============================================================================
-# Miner Mike - Miner / future ore merchant
+# Miner Mike - Mining Merchant & Quest Giver
 # ============================================================================
 [miner_mike]
 display_name = "Miner Mike"
 sprite = "miner_mike"
 animation_type = "humanoid"
-description = "A seasoned miner who knows the tunnels. He may sell ore or mining supplies."
+description = "A seasoned miner who knows the tunnels. He sells pickaxes and buys ore."
 
 [miner_mike.stats]
 max_hp = 120
@@ -586,10 +586,19 @@ gold_max = 0
 
 [miner_mike.behaviors]
 hostile = false
-wander_enabled = true
-wander_radius = 2
-wander_pause_min_ms = 4000
-wander_pause_max_ms = 10000
+merchant = true
+quest_giver = true
+wander_enabled = false
+facing = "left"
+
+[miner_mike.merchant]
+shop_id = "miner"
+buy_multiplier = 0.6
+sell_multiplier = 1.0
+restock_interval_minutes = 5
+
+[miner_mike.quest_giver]
+available_quests = ["rock_bottom"]
 
 [miner_mike.speech]
 radius = 5
@@ -599,10 +608,14 @@ messages = [
     "The earth holds more than stone.",
     "A good pick is a miner's best friend.",
     "Watch your step down in the deep.",
+    "I'll buy ore if you've got some to spare!",
 ]
 
 [miner_mike.dialogue]
 greeting = "Howdy! Miner Mike at your service. Need something from the mines?"
+shop_open = "I've got pickaxes of all kinds, and I'll buy any ore you've mined."
+quest_available = "Say, you look like you could use a pickaxe and some mining lessons."
+quest_complete = "Well struck! You've got the swing of it now. Keep at it and you'll be a master miner in no time."
 
 # ============================================================================
 # Miner - General miner NPC

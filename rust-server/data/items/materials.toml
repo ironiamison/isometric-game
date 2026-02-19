@@ -17,13 +17,72 @@ max_stack = 9999
 base_price = 1
 sellable = false
 
-# [iron_ore]
-# display_name = "Iron Ore"
-# sprite = "item_iron_ore"
-# description = "Raw iron ore for smithing."
-# category = "material"
-# max_stack = 99
-# base_price = 10
+# =============================================================================
+# Ores & Bars (Mining / Smithing)
+# =============================================================================
+
+[bronze_ore]
+display_name = "Bronze Ore"
+sprite = "bronze_ore"
+description = "Raw bronze ore. Can be smelted into a bar at an anvil."
+category = "material"
+max_stack = 99
+base_price = 15
+sellable = true
+
+[bronze_bar]
+display_name = "Bronze Bar"
+sprite = "bronze_bar"
+description = "A bar of smelted bronze. Used to smith bronze equipment."
+category = "material"
+max_stack = 99
+base_price = 40
+sellable = true
+
+[iron_ore]
+display_name = "Iron Ore"
+sprite = "iron_ore"
+description = "Raw iron ore. Can be smelted into a bar at an anvil."
+category = "material"
+max_stack = 99
+base_price = 30
+sellable = true
+
+[iron_bar]
+display_name = "Iron Bar"
+sprite = "iron_bar"
+description = "A bar of smelted iron. Used to smith iron equipment."
+category = "material"
+max_stack = 99
+base_price = 80
+sellable = true
+
+[steel_ore]
+display_name = "Steel Ore"
+sprite = "steel_ore"
+description = "Raw steel ore. Can be smelted into a bar at an anvil."
+category = "material"
+max_stack = 99
+base_price = 60
+sellable = true
+
+[steel_bar]
+display_name = "Steel Bar"
+sprite = "steel_bar"
+description = "A bar of smelted steel. Used to smith steel equipment."
+category = "material"
+max_stack = 99
+base_price = 160
+sellable = true
+
+[ancient_fragment]
+display_name = "Ancient Fragment"
+sprite = "ancient_fragment"
+description = "A weathered fragment of ancient armor. Dropped by powerful creatures."
+category = "material"
+max_stack = 99
+base_price = 200
+sellable = true
 
 # =============================================================================
 # Farming Produce

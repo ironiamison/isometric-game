@@ -1,0 +1,22 @@
+id = "miner"
+display_name = "Miner Mac's Pickaxes"
+
+[[stock]]
+item_id = "bronze_pickaxe"
+max_quantity = 10
+restock_rate = 2
+
+[[stock]]
+item_id = "iron_pickaxe"
+max_quantity = 5
+restock_rate = 1
+
+[[stock]]
+item_id = "steel_pickaxe"
+max_quantity = 3
+restock_rate = 1
+
+[[stock]]
+item_id = "rune_pickaxe"
+max_quantity = 1
+restock_rate = 1

@@ -1,0 +1,38 @@
+# Ore Types Configuration
+# Each ore type defines the GIDs (from objects.tsx tileset), level requirements,
+# XP rewards, and respawn behavior.
+#
+# GID CONVERSION: GID = 1162 + mapper_sprite_id
+# Example: mapper id 454 → GID 1616
+
+[rocks.bronze]
+# Bronze ore rocks: mapper id 454
+gids = [1616]
+level_required = 1
+ore_item_id = "bronze_ore"
+xp_per_ore = 17
+success_chance = 0.30
+depletion_chance = 0.15
+respawn_time_min = 4000
+respawn_time_max = 8000
+
+[rocks.iron]
+# Iron ore rocks: mapper id 419
+gids = [1581]
+level_required = 15
+ore_item_id = "iron_ore"
+xp_per_ore = 35
+success_chance = 0.25
+depletion_chance = 0.12
+respawn_time_min = 6000
+respawn_time_max = 12000
+
+[rocks.steel]
+gids = [9997]
+level_required = 30
+ore_item_id = "steel_ore"
+xp_per_ore = 65
+success_chance = 0.20
+depletion_chance = 0.08
+respawn_time_min = 8000
+respawn_time_max = 16000

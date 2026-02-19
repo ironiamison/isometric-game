@@ -669,6 +669,23 @@ fn run_game_frame(
                     tree_gid: *tree_gid,
                 }
             }
+            InputCommand::MineRock {
+                rock_x,
+                rock_y,
+                rock_gid,
+            } => {
+                // Play attack animation for mining (server will also broadcast this)
+                if let Some(local_id) = &game_state.local_player_id {
+                    if let Some(player) = game_state.players.get_mut(local_id) {
+                        player.play_attack();
+                    }
+                }
+                ClientMessage::MineRock {
+                    rock_x: *rock_x,
+                    rock_y: *rock_y,
+                    rock_gid: *rock_gid,
+                }
+            }
             InputCommand::SitChair { tile_x, tile_y } => ClientMessage::SitChair {
                 tile_x: *tile_x,
                 tile_y: *tile_y,

@@ -54,17 +54,17 @@ defence_bonus = 2
 [ancient_boots]
 display_name = "Ancient Boots"
 sprite = "ancient_boots"
-description = "Weathered boots from a forgotten era."
+description = "Boots forged from fragments of a forgotten civilization. Radiates faint power."
 category = "equipment"
 max_stack = 1
-base_price = 120
+base_price = 3500
 sellable = true
 [ancient_boots.equipment]
 slot_type = "feet"
-defence_level_required = 20
+defence_level_required = 40
 attack_bonus = 0
-strength_bonus = 2
-defence_bonus = 6
+strength_bonus = 3
+defence_bonus = 11
 
 [royal_boots]
 display_name = "Royal Boots"
@@ -485,16 +485,16 @@ defence_bonus = 0
 [steel_sword]
 display_name = "Steel Sword"
 sprite = "steel_sword"
-description = "A basic sword made of steel."
+description = "A finely forged steel blade. Sharp and reliable."
 category = "equipment"
 max_stack = 1
-base_price = 150
+base_price = 1800
 sellable = true
 [steel_sword.equipment]
 slot_type = "weapon"
-attack_level_required = 1
-attack_bonus = 3
-strength_bonus = 2
+attack_level_required = 25
+attack_bonus = 10
+strength_bonus = 7
 defence_bonus = 0
 
 [chain]
@@ -980,6 +980,230 @@ strength_bonus = 0
 defence_bonus = 12
 
 # =============================================================================
+# METAL TIER SETS (Bronze / Iron / Steel / Ancient - Craftable at Blacksmith)
+# =============================================================================
+
+# --- Bronze Tier (Level 5) ---
+
+[bronze_body]
+display_name = "Bronze Platebody"
+sprite = "bronze_body"
+description = "A sturdy chestplate hammered from bronze. Reliable protection for new adventurers."
+category = "equipment"
+max_stack = 1
+base_price = 200
+sellable = true
+[bronze_body.equipment]
+slot_type = "body"
+defence_level_required = 5
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 4
+
+[bronze_boots]
+display_name = "Bronze Boots"
+sprite = "bronze_boots"
+description = "Heavy bronze boots. They clank with every step."
+category = "equipment"
+max_stack = 1
+base_price = 120
+sellable = true
+[bronze_boots.equipment]
+slot_type = "feet"
+defence_level_required = 5
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 2
+
+[bronze_gloves]
+display_name = "Bronze Gloves"
+sprite = "bronze_gloves"
+description = "Gauntlets forged from bronze plates. Good for punching and blocking."
+category = "equipment"
+max_stack = 1
+base_price = 100
+sellable = true
+[bronze_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 5
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 1
+
+[bronze_sword]
+display_name = "Bronze Sword"
+sprite = "bronze_sword"
+description = "A simple but dependable bronze blade."
+category = "equipment"
+max_stack = 1
+base_price = 250
+sellable = true
+[bronze_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 5
+attack_bonus = 3
+strength_bonus = 2
+defence_bonus = 0
+
+# --- Iron Tier (Level 15) ---
+
+[iron_body]
+display_name = "Iron Platebody"
+sprite = "iron_body"
+description = "Solid iron armor that can withstand serious punishment."
+category = "equipment"
+max_stack = 1
+base_price = 600
+sellable = true
+[iron_body.equipment]
+slot_type = "body"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 8
+
+[iron_boots]
+display_name = "Iron Boots"
+sprite = "iron_boots"
+description = "Iron-plated boots offering solid protection underfoot."
+category = "equipment"
+max_stack = 1
+base_price = 400
+sellable = true
+[iron_boots.equipment]
+slot_type = "feet"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 4
+
+[iron_gloves]
+display_name = "Iron Gloves"
+sprite = "iron_gloves"
+description = "Iron gauntlets that pack a heavier punch."
+category = "equipment"
+max_stack = 1
+base_price = 350
+sellable = true
+[iron_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 2
+
+[iron_sword]
+display_name = "Iron Sword"
+sprite = "iron_sword"
+description = "A well-forged iron blade. A warrior's reliable companion."
+category = "equipment"
+max_stack = 1
+base_price = 700
+sellable = true
+[iron_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 15
+attack_bonus = 6
+strength_bonus = 4
+defence_bonus = 0
+
+# --- Steel Tier (Level 25) ---
+# Note: steel_sword is defined in the WEAPONS section above (replaced from starter to tier 3)
+
+[steel_body]
+display_name = "Steel Platebody"
+sprite = "steel_body"
+description = "Gleaming steel armor. The standard of any serious fighter."
+category = "equipment"
+max_stack = 1
+base_price = 1500
+sellable = true
+[steel_body.equipment]
+slot_type = "body"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 12
+
+[steel_boots]
+display_name = "Steel Boots"
+sprite = "steel_boots"
+description = "Polished steel boots built for war."
+category = "equipment"
+max_stack = 1
+base_price = 1000
+sellable = true
+[steel_boots.equipment]
+slot_type = "feet"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 7
+
+[steel_gloves]
+display_name = "Steel Gloves"
+sprite = "steel_gloves"
+description = "Steel gauntlets that turn your fists into weapons."
+category = "equipment"
+max_stack = 1
+base_price = 900
+sellable = true
+[steel_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 3
+defence_bonus = 4
+
+# --- Ancient Tier (Level 40) ---
+# Note: ancient_boots is defined in the FEET section above (replaced from level 20 to tier 4)
+
+[ancient_body]
+display_name = "Ancient Platebody"
+sprite = "ancient_body"
+description = "Armor from a lost age, reforged from fragments of immense power."
+category = "equipment"
+max_stack = 1
+base_price = 5000
+sellable = true
+[ancient_body.equipment]
+slot_type = "body"
+defence_level_required = 40
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 17
+
+[ancient_gloves]
+display_name = "Ancient Gloves"
+sprite = "ancient_gloves"
+description = "Gauntlets humming with ancient energy. They feel alive."
+category = "equipment"
+max_stack = 1
+base_price = 3000
+sellable = true
+[ancient_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 40
+attack_bonus = 0
+strength_bonus = 5
+defence_bonus = 8
+
+[ancient_sword]
+display_name = "Ancient Sword"
+sprite = "ancient_sword"
+description = "A blade from a forgotten era. Its edge never dulls."
+category = "equipment"
+max_stack = 1
+base_price = 6000
+sellable = true
+[ancient_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 40
+attack_bonus = 16
+strength_bonus = 11
+defence_bonus = 0
+
+# =============================================================================
 # SCAVENGER SET (Craftable early-game gear)
 # =============================================================================
 
@@ -1189,3 +1413,51 @@ attack_bonus = 10
 strength_bonus = 8
 defence_bonus = 0
 chop_speed_multiplier = 2.0
+
+# =============================================================================
+# PICKAXES (Mining requirement)
+# =============================================================================
+
+[bronze_pickaxe]
+display_name = "Bronze Pickaxe"
+sprite = "pickaxe"
+category = "equipment"
+max_stack = 1
+base_price = 50
+[bronze_pickaxe.equipment]
+slot_type = "weapon"
+mining_level_required = 1
+mine_speed_multiplier = 1.0
+
+[iron_pickaxe]
+display_name = "Iron Pickaxe"
+sprite = "pickaxe"
+category = "equipment"
+max_stack = 1
+base_price = 150
+[iron_pickaxe.equipment]
+slot_type = "weapon"
+mining_level_required = 6
+mine_speed_multiplier = 1.3
+
+[steel_pickaxe]
+display_name = "Steel Pickaxe"
+sprite = "pickaxe"
+category = "equipment"
+max_stack = 1
+base_price = 500
+[steel_pickaxe.equipment]
+slot_type = "weapon"
+mining_level_required = 11
+mine_speed_multiplier = 1.6
+
+[rune_pickaxe]
+display_name = "Rune Pickaxe"
+sprite = "pickaxe"
+category = "equipment"
+max_stack = 1
+base_price = 5000
+[rune_pickaxe.equipment]
+slot_type = "weapon"
+mining_level_required = 41
+mine_speed_multiplier = 2.0

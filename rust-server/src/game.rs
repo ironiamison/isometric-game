@@ -714,6 +714,8 @@ pub struct GameRoom {
     gathering: RwLock<crate::gathering::GatheringSystem>,
     /// Woodcutting system
     woodcutting: RwLock<crate::woodcutting::WoodcuttingSystem>,
+    /// Mining system
+    mining: RwLock<crate::mining::MiningSystem>,
     /// Chair GID -> direction mapping (loaded from config)
     chair_gids: HashMap<u32, Direction>,
     /// Chair positions on the map: (tile_x, tile_y) -> ChairState
@@ -873,6 +875,18 @@ impl GameRoom {
             }
         };
 
+        // Load mining system
+        let mining = match crate::mining::MiningSystem::load(std::path::Path::new("data")) {
+            Ok(m) => {
+                tracing::info!("Loaded mining system with {} ore types", m.ore_types.len());
+                m
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load mining system: {} (using empty)", e);
+                crate::mining::MiningSystem::new()
+            }
+        };
+
         // Load farming system
         let mut farming = match crate::farming::FarmingSystem::load(std::path::Path::new("data")) {
             Ok(f) => {
@@ -1008,6 +1022,7 @@ impl GameRoom {
             db,
             gathering: RwLock::new(gathering),
             woodcutting: RwLock::new(woodcutting),
+            mining: RwLock::new(mining),
             chair_gids,
             chairs: RwLock::new(chairs),
             farming: RwLock::new(farming),
@@ -1787,6 +1802,8 @@ impl GameRoom {
             woodcutting_xp: p.skills.woodcutting.xp,
             alchemy_level: p.skills.alchemy.level,
             alchemy_xp: p.skills.alchemy.xp,
+            mining_level: p.skills.mining.level,
+            mining_xp: p.skills.mining.xp,
         })
     }
 
@@ -3438,6 +3455,51 @@ impl GameRoom {
             {
                 tracing::info!(
                     "Player {} depleted tree for quest objective {} in quest {}: {}/{}",
+                    player_id, objective_id, result.quest_id, current, target
+                );
+
+                if let Some(sender) = self.player_senders.read().await.get(player_id) {
+                    let msg = ServerMessage::QuestObjectiveProgress {
+                        quest_id: result.quest_id.clone(),
+                        objective_id: objective_id.clone(),
+                        current,
+                        target,
+                    };
+                    if let Ok(data) = crate::protocol::encode_server_message(&msg) {
+                        let _ = sender.send(data).await;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Process quest rock depletion event
+    async fn process_quest_rock_deplete(&self, player_id: &str, rock_type: &str, rock_x: i32, rock_y: i32) {
+        tracing::info!(
+            "Processing rock depletion quest event: player={}, rock_type={}, pos=({}, {})",
+            player_id, rock_type, rock_x, rock_y
+        );
+
+        let mut quest_states = self.player_quest_states.write().await;
+        let quest_state = quest_states.entry(player_id.to_string())
+            .or_insert_with(PlayerQuestState::new);
+
+        let event = QuestEvent::RockDepleted {
+            player_id: player_id.to_string(),
+            rock_type: rock_type.to_string(),
+            x: rock_x,
+            y: rock_y,
+        };
+
+        let results = self.quest_registry.process_event(&event, quest_state).await;
+        tracing::info!("Rock depletion quest event returned {} results", results.len());
+
+        for result in results {
+            if let (Some(objective_id), Some(current), Some(target)) =
+                (&result.objective_id, result.new_progress, result.target)
+            {
+                tracing::info!(
+                    "Player {} depleted rock for quest objective {} in quest {}: {}/{}",
                     player_id, objective_id, result.quest_id, current, target
                 );
 
@@ -6611,6 +6673,173 @@ impl GameRoom {
     }
 
     // ========================================================================
+    // Mining System
+    // ========================================================================
+
+    pub async fn handle_mine_rock(&self, player_id: &str, rock_x: i32, rock_y: i32, rock_gid: u32) {
+        // Mining is overworld-only; reject if player is in an instance
+        if self.player_instances.read().await.contains_key(player_id) {
+            return;
+        }
+
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let (mining_level, player_x, player_y, _player_dir, equipped_weapon) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => (p.skills.mining.level, p.x, p.y, p.direction, p.equipped_weapon.clone()),
+                None => return,
+            }
+        };
+
+        // Check player is adjacent to the rock (within 1 tile)
+        let dx = (player_x - rock_x).abs();
+        let dy = (player_y - rock_y).abs();
+        if dx > 1 || dy > 1 || (dx == 0 && dy == 0) {
+            self.send_to_player(player_id, ServerMessage::Error {
+                code: 400,
+                message: "You need to be next to the rock".to_string(),
+            }).await;
+            return;
+        }
+
+        // Check if player has a pickaxe equipped with sufficient level
+        let has_valid_pickaxe = if let Some(ref weapon_id) = equipped_weapon {
+            if let Some(item_def) = self.item_registry.get(weapon_id) {
+                if let Some(ref equip) = item_def.equipment {
+                    if equip.mine_speed_multiplier > 0.0 {
+                        if equip.mining_level_required > mining_level {
+                            self.send_to_player(player_id, ServerMessage::Error {
+                                code: 400,
+                                message: format!(
+                                    "You need Mining level {} to use this pickaxe",
+                                    equip.mining_level_required
+                                ),
+                            }).await;
+                            return;
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if !has_valid_pickaxe {
+            self.send_to_player(player_id, ServerMessage::Error {
+                code: 400,
+                message: "You need a pickaxe to mine rocks".to_string(),
+            }).await;
+            return;
+        }
+
+        // Perform the mine
+        let mut mining = self.mining.write().await;
+        let mine_result = mining.mine_once(rock_x, rock_y, rock_gid, mining_level, current_time);
+        drop(mining);
+
+        match mine_result {
+            Ok(result) => {
+                // Broadcast the swing animation to all players
+                self.broadcast(ServerMessage::MiningSwing {
+                    player_id: player_id.to_string(),
+                    rock_x,
+                    rock_y,
+                }).await;
+
+                if result.success {
+                    // Add ore to inventory
+                    let mut players = self.players.write().await;
+                    if let Some(player) = players.get_mut(player_id) {
+                        let leftover = player.inventory.add_item(&result.ore_item_id, 1, &self.item_registry);
+                        if leftover > 0 {
+                            drop(players);
+                            self.send_to_player(player_id, ServerMessage::Error {
+                                code: 400,
+                                message: "Your inventory is full!".to_string(),
+                            }).await;
+                            return;
+                        }
+
+                        // Award XP
+                        let leveled_up = player.skills.mining.add_xp(result.xp_gained);
+                        let new_xp = player.skills.mining.xp;
+                        let new_level = player.skills.mining.level;
+                        let inv_update = player.inventory.to_update();
+                        let gold = player.inventory.gold;
+                        drop(players);
+
+                        // Send inventory update
+                        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                            player_id: player_id.to_string(),
+                            slots: inv_update,
+                            gold,
+                        }).await;
+
+                        // Send XP update
+                        self.send_to_player(player_id, ServerMessage::SkillXp {
+                            player_id: player_id.to_string(),
+                            skill: "mining".to_string(),
+                            xp_gained: result.xp_gained,
+                            total_xp: new_xp,
+                            level: new_level,
+                        }).await;
+
+                        // Send mine result
+                        self.send_to_player(player_id, ServerMessage::MiningResult {
+                            player_id: player_id.to_string(),
+                            item_id: result.ore_item_id.clone(),
+                            xp_gained: result.xp_gained,
+                        }).await;
+
+                        // Process quest item collection for mining drops
+                        self.process_quest_item_collect(player_id, &result.ore_item_id, 1).await;
+
+                        // Handle level up
+                        if leveled_up {
+                            self.broadcast(ServerMessage::SkillLevelUp {
+                                player_id: player_id.to_string(),
+                                skill: "mining".to_string(),
+                                new_level,
+                            }).await;
+                        }
+                    }
+                }
+
+                // Handle rock depletion
+                if result.rock_depleted {
+                    let respawn_delay = result.respawn_delay_ms.unwrap_or(7500);
+                    self.broadcast(ServerMessage::RockDepleted {
+                        x: rock_x,
+                        y: rock_y,
+                        gid: rock_gid,
+                        respawn_delay_ms: respawn_delay,
+                    }).await;
+
+                    // Process quest event for rock depletion
+                    self.process_quest_rock_deplete(player_id, &result.ore_type_id, rock_x, rock_y).await;
+                }
+            }
+            Err(msg) => {
+                self.send_to_player(player_id, ServerMessage::Error {
+                    code: 400,
+                    message: msg,
+                }).await;
+            }
+        }
+    }
+
+    // ========================================================================
     // Chair System
     // ========================================================================
 
@@ -8685,6 +8914,19 @@ impl GameRoom {
         };
         for event in tree_respawn_events {
             self.broadcast(ServerMessage::TreeRespawned {
+                x: event.x,
+                y: event.y,
+                gid: event.gid,
+            }).await;
+        }
+
+        // Rock respawn tick: check for rocks that should respawn
+        let rock_respawn_events = {
+            let mut mining = self.mining.write().await;
+            mining.tick_respawns(current_time)
+        };
+        for event in rock_respawn_events {
+            self.broadcast(ServerMessage::RockRespawned {
                 x: event.x,
                 y: event.y,
                 gid: event.gid,
