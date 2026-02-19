@@ -74,6 +74,9 @@ export function Canvas() {
     setSelectedExitPortal,
     setSelectedInteriorEntity,
     setSelectedInteriorMapObject,
+    setSelectedInteriorWall,
+    findWallAtWorld,
+    setSelectedWall,
   } = useEditorStore();
 
   // Setup canvas and renderer
@@ -302,13 +305,14 @@ export function Canvas() {
             break;
           }
           case Tool.Select: {
-            // Select entities or map objects in interior mode
+            // Select entities, map objects, or walls in interior mode
             const entityAtInteriorPos = currentInterior.entities.find(
               (e) => e.x === worldTile.wx && e.y === worldTile.wy
             );
             if (entityAtInteriorPos) {
               setSelectedInteriorEntity(entityAtInteriorPos.id);
               setSelectedInteriorMapObject(null);
+              setSelectedInteriorWall(null);
             } else {
               const objAtInteriorPos = currentInterior.mapObjects.find(
                 (o) => o.x === worldTile.wx && o.y === worldTile.wy
@@ -316,10 +320,21 @@ export function Canvas() {
               if (objAtInteriorPos) {
                 setSelectedInteriorMapObject(objAtInteriorPos.id);
                 setSelectedInteriorEntity(null);
+                setSelectedInteriorWall(null);
               } else {
-                // Nothing at position, clear selection
-                setSelectedInteriorEntity(null);
-                setSelectedInteriorMapObject(null);
+                const wallAtInteriorPos = currentInterior.walls.find(
+                  (w) => w.x === worldTile.wx && w.y === worldTile.wy
+                );
+                if (wallAtInteriorPos) {
+                  setSelectedInteriorWall(wallAtInteriorPos.id);
+                  setSelectedInteriorEntity(null);
+                  setSelectedInteriorMapObject(null);
+                } else {
+                  // Nothing at position, clear selection
+                  setSelectedInteriorEntity(null);
+                  setSelectedInteriorMapObject(null);
+                  setSelectedInteriorWall(null);
+                }
               }
             }
             break;
@@ -464,7 +479,7 @@ export function Canvas() {
           break;
         }
         case Tool.Select: {
-          // Select tool can select entities or objects
+          // Select tool can select entities, objects, or walls
           const entityAtPos = findEntityAtWorld(worldTile);
           if (entityAtPos) {
             setSelectedEntitySpawn({
@@ -472,6 +487,7 @@ export function Canvas() {
               spawnId: entityAtPos.entity.id,
             });
             setSelectedMapObject(null);
+            setSelectedWall(null);
           } else {
             const objectAtPos = findMapObjectAtWorld(worldTile);
             if (objectAtPos) {
@@ -480,10 +496,22 @@ export function Canvas() {
                 objectId: objectAtPos.object.id,
               });
               setSelectedEntitySpawn(null);
+              setSelectedWall(null);
             } else {
-              // Nothing at position, clear selection
-              setSelectedEntitySpawn(null);
-              setSelectedMapObject(null);
+              const wallAtPos = findWallAtWorld(worldTile);
+              if (wallAtPos) {
+                setSelectedWall({
+                  chunkCoord: wallAtPos.chunkCoord,
+                  wallId: wallAtPos.wall.id,
+                });
+                setSelectedEntitySpawn(null);
+                setSelectedMapObject(null);
+              } else {
+                // Nothing at position, clear selection
+                setSelectedEntitySpawn(null);
+                setSelectedMapObject(null);
+                setSelectedWall(null);
+              }
             }
           }
           break;
@@ -613,6 +641,9 @@ export function Canvas() {
       setSelectedExitPortal,
       setSelectedInteriorEntity,
       setSelectedInteriorMapObject,
+      setSelectedInteriorWall,
+      findWallAtWorld,
+      setSelectedWall,
     ]
   );
 

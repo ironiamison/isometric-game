@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useEditorStore } from '@/state/store';
 import { objectLoader } from '@/core/ObjectLoader';
 import { interiorStorage } from '@/core/InteriorStorage';
-import type { EntitySpawn, Portal, ExitPortal } from '@/types';
+import type { EntitySpawn, Portal, ExitPortal, Wall } from '@/types';
 import styles from './PropertiesPanel.module.css';
 
 const GATHERING_ZONE_TYPES = [
@@ -44,10 +44,16 @@ export function PropertiesPanel() {
     editorMode,
     selectedInteriorEntity,
     selectedInteriorMapObject,
+    selectedInteriorWall,
+    selectedWall,
     setSelectedInteriorEntity,
     setSelectedInteriorMapObject,
+    setSelectedInteriorWall,
+    setSelectedWall,
     removeInteriorEntity,
     removeInteriorMapObject,
+    removeInteriorWall,
+    removeWall,
     updateInteriorEntity,
   } = useEditorStore();
 
@@ -119,13 +125,33 @@ export function PropertiesPanel() {
     return currentInterior.mapObjects.find((o) => o.id === selectedInteriorMapObject) || null;
   };
 
+  // Get selected interior wall from currentInterior
+  const getSelectedInteriorWallData = () => {
+    if (!selectedInteriorWall || !currentInterior) return null;
+    return currentInterior.walls.find((w) => w.id === selectedInteriorWall) || null;
+  };
+
+  // Get the actual overworld wall from the selection
+  const getSelectedWallData = () => {
+    if (!selectedWall) return null;
+    const chunk = chunks.get(
+      `${selectedWall.chunkCoord.cx},${selectedWall.chunkCoord.cy}`
+    );
+    if (!chunk) return null;
+    const wall = chunk.walls.find((w) => w.id === selectedWall.wallId);
+    if (!wall) return null;
+    return { wall, chunkCoord: selectedWall.chunkCoord };
+  };
+
   const selectedEntity = getSelectedEntity();
   const selectedObject = getSelectedObject();
+  const selectedWallData = getSelectedWallData();
   const selectedPortalData = getSelectedPortalData();
   const selectedExitPortalData = getSelectedExitPortalData();
   const selectedGatheringZoneData = getSelectedGatheringZoneData();
   const interiorEntityData = getSelectedInteriorEntityData();
   const interiorObjectData = getSelectedInteriorMapObjectData();
+  const interiorWallData = getSelectedInteriorWallData();
 
   // Delete key handler
   useEffect(() => {
@@ -163,13 +189,21 @@ export function PropertiesPanel() {
           e.preventDefault();
           removeInteriorMapObject(interiorObjectData.id);
           setSelectedInteriorMapObject(null);
+        } else if (interiorWallData) {
+          e.preventDefault();
+          removeInteriorWall(interiorWallData.id);
+          setSelectedInteriorWall(null);
+        } else if (selectedWallData) {
+          e.preventDefault();
+          removeWall(selectedWallData.chunkCoord, selectedWallData.wall.id);
+          setSelectedWall(null);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity, selectedObject, selectedPortalData, selectedGatheringZoneData, selectedExitPortalData, interiorEntityData, interiorObjectData, removeEntity, removeMapObject, removePortal, removeGatheringZone, removeExitPortal, removeInteriorEntity, removeInteriorMapObject, setSelectedEntitySpawn, setSelectedMapObject, setSelectedPortal, setSelectedGatheringZone, setSelectedExitPortal, setSelectedInteriorEntity, setSelectedInteriorMapObject]);
+  }, [selectedEntity, selectedObject, selectedWallData, selectedPortalData, selectedGatheringZoneData, selectedExitPortalData, interiorEntityData, interiorObjectData, interiorWallData, removeEntity, removeMapObject, removeWall, removePortal, removeGatheringZone, removeExitPortal, removeInteriorEntity, removeInteriorMapObject, removeInteriorWall, setSelectedEntitySpawn, setSelectedMapObject, setSelectedWall, setSelectedPortal, setSelectedGatheringZone, setSelectedExitPortal, setSelectedInteriorEntity, setSelectedInteriorMapObject, setSelectedInteriorWall]);
 
   // Show portal properties
   if (selectedPortalData) {
@@ -744,6 +778,91 @@ export function PropertiesPanel() {
           <div className={styles.actions}>
             <button className={styles.deleteButton} onClick={handleDelete}>
               Delete Object
+            </button>
+          </div>
+          <div className={styles.hint}>Press Delete to remove</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show interior wall properties
+  if (interiorWallData && editorMode === 'interior') {
+    const wall = interiorWallData;
+    const wallDef = objectLoader.getWallByGid(wall.gid);
+
+    const handleDelete = () => {
+      removeInteriorWall(wall.id);
+      setSelectedInteriorWall(null);
+    };
+
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>Interior Wall Properties</div>
+        <div className={styles.content}>
+          <div className={styles.field}>
+            <label className={styles.label}>Type</label>
+            <div className={styles.value}>{wallDef?.name || `GID: ${wall.gid}`}</div>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Edge</label>
+            <div className={styles.value}>{wall.edge}</div>
+          </div>
+
+          <div className={styles.info}>
+            Position: {wall.x}, {wall.y}
+          </div>
+
+          <div className={styles.actions}>
+            <button className={styles.deleteButton} onClick={handleDelete}>
+              Delete Wall
+            </button>
+          </div>
+          <div className={styles.hint}>Press Delete to remove</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show overworld wall properties
+  if (selectedWallData) {
+    const { wall, chunkCoord } = selectedWallData;
+    const wallDef = objectLoader.getWallByGid(wall.gid);
+
+    const handleDelete = () => {
+      removeWall(chunkCoord, wall.id);
+      setSelectedWall(null);
+    };
+
+    const worldX = chunkCoord.cx * 32 + wall.x;
+    const worldY = chunkCoord.cy * 32 + wall.y;
+
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>Wall Properties</div>
+        <div className={styles.content}>
+          <div className={styles.field}>
+            <label className={styles.label}>Type</label>
+            <div className={styles.value}>{wallDef?.name || `GID: ${wall.gid}`}</div>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Edge</label>
+            <div className={styles.value}>{wall.edge}</div>
+          </div>
+
+          <div className={styles.info}>
+            Position: {worldX}, {worldY}
+            <br />
+            Chunk: {chunkCoord.cx}, {chunkCoord.cy}
+            <br />
+            Local: {wall.x}, {wall.y}
+          </div>
+
+          <div className={styles.actions}>
+            <button className={styles.deleteButton} onClick={handleDelete}>
+              Delete Wall
             </button>
           </div>
           <div className={styles.hint}>Press Delete to remove</div>

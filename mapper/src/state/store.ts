@@ -78,6 +78,7 @@ interface EditorState {
   selectedSpawnPoint: string | null;
   selectedInteriorEntity: string | null;
   selectedInteriorMapObject: string | null;
+  selectedInteriorWall: string | null;
 
   // View state
   viewport: Viewport;
@@ -94,6 +95,7 @@ interface EditorState {
   // Selection state (for placed items on map)
   selectedEntitySpawn: { chunkCoord: ChunkCoord; spawnId: string } | null;
   selectedMapObject: { chunkCoord: ChunkCoord; objectId: string } | null;
+  selectedWall: { chunkCoord: ChunkCoord; wallId: string } | null;
   selectedPortal: { chunkCoord: ChunkCoord; portalId: string } | null;
   selectedGatheringZone: { chunkCoord: ChunkCoord; zoneId: string } | null;
 
@@ -151,10 +153,12 @@ interface EditorActions {
   // Selection actions (for placed items)
   setSelectedEntitySpawn: (selection: { chunkCoord: ChunkCoord; spawnId: string } | null) => void;
   setSelectedMapObject: (selection: { chunkCoord: ChunkCoord; objectId: string } | null) => void;
+  setSelectedWall: (selection: { chunkCoord: ChunkCoord; wallId: string } | null) => void;
   setSelectedPortal: (selection: { chunkCoord: ChunkCoord; portalId: string } | null) => void;
   setSelectedGatheringZone: (selection: { chunkCoord: ChunkCoord; zoneId: string } | null) => void;
   findEntityAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; entity: EntitySpawn } | null;
   findMapObjectAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; object: MapObject } | null;
+  findWallAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; wall: Wall } | null;
   findPortalAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; portal: Portal } | null;
   findGatheringZoneAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; zone: GatheringZone } | null;
 
@@ -180,6 +184,7 @@ interface EditorActions {
 
   // Wall actions
   toggleWall: (world: WorldCoord, edge: WallEdge, gid: number) => void;
+  removeWall: (chunkCoord: ChunkCoord, wallId: string) => void;
 
   // Portal actions
   addPortal: (world: WorldCoord) => Portal;
@@ -254,9 +259,11 @@ interface EditorActions {
   // Interior selection actions
   setSelectedInteriorEntity: (entityId: string | null) => void;
   setSelectedInteriorMapObject: (objectId: string | null) => void;
+  setSelectedInteriorWall: (wallId: string | null) => void;
 
   // Interior wall actions
   toggleInteriorWall: (x: number, y: number, edge: WallEdge, gid: number) => void;
+  removeInteriorWall: (wallId: string) => void;
 
   // Spawn point actions
   addSpawnPoint: (name: string, x: number, y: number) => void;
@@ -295,6 +302,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   selectedSpawnPoint: null,
   selectedInteriorEntity: null,
   selectedInteriorMapObject: null,
+  selectedInteriorWall: null,
 
   viewport: {
     offsetX: 400,
@@ -312,6 +320,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   selectedEntitySpawn: null,
   selectedMapObject: null,
+  selectedWall: null,
   selectedPortal: null,
   selectedGatheringZone: null,
   selectedGatheringZoneId: 'pond',
@@ -410,6 +419,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   // Selection actions (for placed items)
   setSelectedEntitySpawn: (selection) => set({ selectedEntitySpawn: selection }),
   setSelectedMapObject: (selection) => set({ selectedMapObject: selection }),
+  setSelectedWall: (selection) => set({ selectedWall: selection }),
   setSelectedPortal: (selection) => set({ selectedPortal: selection }),
   setSelectedGatheringZone: (selection) => set({ selectedGatheringZone: selection }),
 
@@ -437,6 +447,19 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     const object = chunk.mapObjects.find((o) => o.x === local.lx && o.y === local.ly);
     if (object) {
       return { chunkCoord, object };
+    }
+    return null;
+  },
+
+  findWallAtWorld: (world) => {
+    const chunkCoord = worldToChunk(world);
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk) return null;
+
+    const local = worldToLocal(world);
+    const wall = chunk.walls.find((w) => w.x === local.lx && w.y === local.ly);
+    if (wall) {
+      return { chunkCoord, wall };
     }
     return null;
   },
@@ -1088,6 +1111,29 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     }
   },
 
+  removeWall: (chunkCoord, wallId) => {
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk) return;
+
+    const wall = chunk.walls.find((w) => w.id === wallId);
+    if (!wall) return;
+
+    const otherWallAtTile = chunk.walls.some(
+      (w) => w.id !== wallId && w.x === wall.x && w.y === wall.y
+    );
+    const hasObjectAtTile = chunk.mapObjects.some(
+      (o) => o.x === wall.x && o.y === wall.y && !o.noCollision
+    );
+    const keepCollision = otherWallAtTile || hasObjectAtTile;
+
+    get().updateChunk(chunkCoord, (c) => ({
+      ...c,
+      walls: c.walls.filter((w) => w.id !== wallId),
+      collision: !keepCollision ? setCollisionBit(c, wall.x, wall.y, false) : c.collision,
+      dirty: true,
+    }));
+  },
+
   // Portal actions
   addPortal: (world) => {
     const chunkCoord = worldToChunk(world);
@@ -1384,6 +1430,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       selectedSpawnPoint: null,
       selectedInteriorEntity: null,
       selectedInteriorMapObject: null,
+      selectedInteriorWall: null,
     });
   },
 
@@ -1410,8 +1457,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       selectedGatheringZone: null,
       selectedEntitySpawn: null,
       selectedMapObject: null,
+      selectedWall: null,
       selectedInteriorEntity: null,
       selectedInteriorMapObject: null,
+      selectedInteriorWall: null,
       viewport: {
         ...viewport,
         offsetX: 400 - screenX * viewport.zoom,
@@ -1448,8 +1497,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         selectedPortal: null,
         selectedEntitySpawn: null,
         selectedMapObject: null,
+        selectedWall: null,
         selectedInteriorEntity: null,
         selectedInteriorMapObject: null,
+        selectedInteriorWall: null,
         viewport: {
           ...viewport,
           offsetX: 400 - screenX * viewport.zoom,
@@ -1740,6 +1791,20 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   setSelectedInteriorEntity: (entityId) => set({ selectedInteriorEntity: entityId }),
   setSelectedInteriorMapObject: (objectId) => set({ selectedInteriorMapObject: objectId }),
+  setSelectedInteriorWall: (wallId) => set({ selectedInteriorWall: wallId }),
+
+  removeInteriorWall: (wallId) => {
+    const interior = get().currentInterior;
+    if (!interior) return;
+
+    set({
+      currentInterior: {
+        ...interior,
+        walls: interior.walls.filter((w) => w.id !== wallId),
+        dirty: true,
+      },
+    });
+  },
 
   // Exit portal actions
   addExitPortal: (x, y) => {
