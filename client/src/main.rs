@@ -456,20 +456,7 @@ fn run_game_frame(
     for cmd in &commands {
         use network::messages::ClientMessage;
         let msg = match cmd {
-            InputCommand::Move { dx, dy } => {
-                // Optimistic local facing update to avoid brief direction flashes
-                // while waiting for the next server-confirmed movement step.
-                if !game_state.is_sitting && (*dx != 0.0 || *dy != 0.0) {
-                    if let Some(local_id) = &game_state.local_player_id {
-                        if let Some(player) = game_state.players.get_mut(local_id) {
-                            let new_dir = game::Direction::from_velocity(*dx, *dy);
-                            player.direction = new_dir;
-                            player.animation.direction = new_dir;
-                        }
-                    }
-                }
-                ClientMessage::Move { dx: *dx, dy: *dy }
-            }
+            InputCommand::Move { dx, dy } => ClientMessage::Move { dx: *dx, dy: *dy },
             InputCommand::Face { direction } => {
                 // Skip direction update if sitting or attacking
                 if game_state.is_sitting {
@@ -495,8 +482,6 @@ fn run_game_frame(
                         let new_dir = game::Direction::from_u8(*direction);
                         player.direction = new_dir;
                         player.animation.direction = new_dir; // Also update animation direction for rendering
-                        game_state.local_face_lock_dir = Some(new_dir);
-                        game_state.local_face_lock_until = get_time() + 0.30;
                     }
                 }
                 ClientMessage::Face {

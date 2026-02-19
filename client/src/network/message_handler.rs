@@ -212,14 +212,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let is_admin = extract_bool(player_value, "is_admin").unwrap_or(false);
 
                         let is_local_player = state.local_player_id.as_ref() == Some(&id);
-                        let now = macroquad::time::get_time();
-                        if is_local_player
-                            && state.local_face_lock_dir.is_some()
-                            && now >= state.local_face_lock_until
-                        {
-                            state.local_face_lock_dir = None;
-                            state.local_face_lock_until = 0.0;
-                        }
 
                         if let Some(player) = state.players.get_mut(&id) {
                             // Read velocity (movement intent) from server
@@ -237,49 +229,19 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             }
 
                             if let (Some(x), Some(y)) = (x, y) {
-                                let mut effective_dir = dir;
-                                if is_local_player {
-                                    let server_moved = (x as f32 - player.server_x).abs() > 0.01
-                                        || (y as f32 - player.server_y).abs() > 0.01;
-                                    if server_moved {
-                                        state.local_face_lock_dir = None;
-                                        state.local_face_lock_until = 0.0;
-                                    } else if let Some(locked_dir) = state.local_face_lock_dir {
-                                        if now < state.local_face_lock_until && dir != locked_dir {
-                                            // Stale pre-face snapshot: keep local facing until fresh sync arrives.
-                                            effective_dir = player.direction;
-                                        } else if dir == locked_dir {
-                                            state.local_face_lock_dir = None;
-                                            state.local_face_lock_until = 0.0;
-                                        }
-                                    }
-                                }
+                                // Set server state - local player direction only updates when moving
                                 player.set_server_state(
                                     x as f32,
                                     y as f32,
                                     vel_x,
                                     vel_y,
-                                    effective_dir,
+                                    dir,
+                                    is_local_player,
                                 );
-                            } else if direction.is_some() {
-                                // Direction-only update when no position fields are present.
-                                if is_local_player {
-                                    if let Some(locked_dir) = state.local_face_lock_dir {
-                                        if now < state.local_face_lock_until && dir != locked_dir {
-                                            // Ignore stale direction-only update during local face lock.
-                                        } else {
-                                            player.direction = dir;
-                                            if dir == locked_dir {
-                                                state.local_face_lock_dir = None;
-                                                state.local_face_lock_until = 0.0;
-                                            }
-                                        }
-                                    } else {
-                                        player.direction = dir;
-                                    }
-                                } else {
-                                    player.direction = dir;
-                                }
+                            } else if direction.is_some() && !is_local_player {
+                                // Direction-only update for remote players
+                                // Local player direction is controlled locally when stationary
+                                player.direction = dir;
                             }
                             if let Some(hp) = hp {
                                 // Update last_damage_time if HP decreased (ensures HP bar shows)
@@ -1745,6 +1707,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             extract_string(recipe_value, "description").unwrap_or_default();
                         let category = extract_string(recipe_value, "category")
                             .unwrap_or_else(|| "consumables".to_string());
+                        let section = extract_string(recipe_value, "section");
                         let level_required =
                             extract_i32(recipe_value, "level_required").unwrap_or(1);
                         let station = extract_string(recipe_value, "station");
@@ -1792,6 +1755,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             display_name,
                             description,
                             category,
+                            section,
                             level_required,
                             ingredients,
                             results,

@@ -7,6 +7,41 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
+/// Height of a section header row in the blueprint list
+pub const SECTION_HEADER_HEIGHT: f32 = 22.0;
+
+/// Sort key for section ordering within a category.
+/// Values overlap across categories (e.g. "materials"=0, "restoration"=0) because
+/// sections from different categories never appear in the same list.
+pub fn section_sort_key(section: &str) -> usize {
+    match section {
+        "materials" => 0,
+        "equipment" => 1,
+        "accessories" => 2,
+        "ammunition" => 3,
+        "restoration" => 0,
+        "stat_buffs" => 1,
+        "utility" => 2,
+        "cooking" => 0,
+        _ => 99,
+    }
+}
+
+/// Display name for a section
+fn section_display_name(section: &str) -> &str {
+    match section {
+        "materials" => "Materials",
+        "equipment" => "Equipment",
+        "accessories" => "Accessories",
+        "ammunition" => "Ammunition",
+        "restoration" => "Restoration",
+        "stat_buffs" => "Stat Buffs",
+        "utility" => "Utility",
+        "cooking" => "Cooking",
+        _ => section,
+    }
+}
+
 /// Helper to build the category list from recipes, grouping materials/consumables into "supplies"
 fn build_categories(recipes: &[RecipeDefinition]) -> Vec<String> {
     let mut cats: Vec<String> = recipes
@@ -380,6 +415,33 @@ impl Renderer {
                 16.0,
                 TEXT_DIM,
             );
+
+            // Gold display - right-aligned in footer
+            let gold_text = format!("{}g", state.inventory.gold);
+            let gold_text_w = self.measure_text_sharp(&gold_text, 16.0).width;
+            let icon_size = 12.0;
+            let icon_margin = 4.0;
+            let total_gold_w = icon_size + icon_margin + gold_text_w;
+            let gold_x = footer_x + footer_w - total_gold_w - 10.0;
+            if let Some(texture) = &self.gold_nugget_texture {
+                draw_texture_ex(
+                    texture,
+                    gold_x,
+                    footer_y + 10.0,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(vec2(icon_size, icon_size)),
+                        ..Default::default()
+                    },
+                );
+            }
+            self.draw_text_sharp(
+                &gold_text,
+                gold_x + icon_size + icon_margin,
+                footer_y + 20.0,
+                16.0,
+                TEXT_GOLD,
+            );
         }
     }
 
@@ -492,10 +554,8 @@ impl Renderer {
         // Get all recipes for this category
         let all_recipes = recipes_for_category(&filtered_recipes, current_category);
 
-        // Task 15: Filter recipes by discovery status
-        // - requires_discovery = false: always show
-        // - requires_discovery = true: show only if discovered, otherwise show as "????"
-        let visible_recipes: Vec<(usize, &RecipeDefinition, bool)> = all_recipes
+        // Filter recipes by discovery status and sort by section then level
+        let mut visible_recipes: Vec<(usize, &RecipeDefinition, bool)> = all_recipes
             .iter()
             .enumerate()
             .map(|(i, r)| {
@@ -504,6 +564,16 @@ impl Renderer {
                 (i, *r, is_discovered)
             })
             .collect();
+
+        // Sort by section order, then level, then name
+        visible_recipes.sort_by(|a, b| {
+            let a_sec = a.1.section.as_deref().unwrap_or("");
+            let b_sec = b.1.section.as_deref().unwrap_or("");
+            section_sort_key(a_sec)
+                .cmp(&section_sort_key(b_sec))
+                .then(a.1.level_required.cmp(&b.1.level_required))
+                .then(a.1.display_name.cmp(&b.1.display_name))
+        });
 
         // ===== RECIPE LIST (left side) =====
         let list_width = (220.0_f32).min((content_width - 32.0) * 0.38);
@@ -559,8 +629,21 @@ impl Renderer {
         let list_content_y = list_y + 30.0;
         let list_content_height = list_height - 34.0;
 
+        // Count distinct non-empty sections for header height
+        let num_sections = {
+            let mut seen = std::collections::HashSet::new();
+            for (_, r, _) in &visible_recipes {
+                if let Some(ref s) = r.section {
+                    if !s.is_empty() {
+                        seen.insert(s.as_str());
+                    }
+                }
+            }
+            seen.len()
+        };
         // Calculate total content height and clamp scroll offset
-        let total_content = visible_recipes.len() as f32 * line_height;
+        let total_content = visible_recipes.len() as f32 * line_height
+            + num_sections as f32 * SECTION_HEADER_HEIGHT;
         let max_scroll = (total_content - list_content_height).max(0.0);
         let scroll_offset = state.ui_state.crafting_scroll_offset.clamp(0.0, max_scroll);
 
@@ -585,7 +668,39 @@ impl Renderer {
 
         // Track the index of selectable recipes (discovered only)
         let mut selectable_index = 0usize;
+        let mut current_section: Option<&str> = None;
+
         for (_orig_idx, recipe, is_discovered) in &visible_recipes {
+            // Check if we need a section header
+            let recipe_section = recipe.section.as_deref().unwrap_or("");
+            if !recipe_section.is_empty() && current_section != Some(recipe_section) {
+                current_section = Some(recipe_section);
+
+                // Render section header if visible
+                let header_bottom = y + SECTION_HEADER_HEIGHT;
+                if header_bottom >= list_content_y
+                    && y <= list_content_y + list_content_height
+                {
+                    let display = section_display_name(recipe_section);
+                    self.draw_text_sharp(
+                        display,
+                        list_x + 8.0,
+                        y + 15.0,
+                        14.0,
+                        FRAME_ACCENT,
+                    );
+                    draw_line(
+                        list_x + 8.0,
+                        y + SECTION_HEADER_HEIGHT - 2.0,
+                        list_x + list_width - 8.0,
+                        y + SECTION_HEADER_HEIGHT - 2.0,
+                        1.0,
+                        Color::new(0.25, 0.22, 0.15, 1.0),
+                    );
+                }
+                y += SECTION_HEADER_HEIGHT;
+            }
+
             let item_bottom = y + line_height;
             let item_top = y;
 

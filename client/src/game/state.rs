@@ -1332,11 +1332,6 @@ pub struct GameState {
     // Connection
     pub connection_status: ConnectionStatus,
     pub local_player_id: Option<String>,
-    /// Short lock to prevent stale server snapshots from briefly reverting
-    /// a just-issued local face direction.
-    pub local_face_lock_dir: Option<super::entities::Direction>,
-    /// Client time when local_face_lock_dir expires.
-    pub local_face_lock_until: f64,
     pub selected_character_name: Option<String>,
     pub disconnect_requested: bool,
     pub reconnection_failed: bool,
@@ -1508,8 +1503,6 @@ impl GameState {
         Self {
             connection_status: ConnectionStatus::Disconnected,
             local_player_id: None,
-            local_face_lock_dir: None,
-            local_face_lock_until: 0.0,
             selected_character_name: None,
             disconnect_requested: false,
             reconnection_failed: false,

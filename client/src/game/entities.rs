@@ -67,8 +67,6 @@ pub const TILES_PER_SECOND: f32 = 4.0;
 // Linear interpolation speed - must match server movement rate
 // Server: 250ms per tile = 4 tiles per second
 const VISUAL_SPEED: f32 = 4.0;
-// Keep walking loop alive briefly between step confirmations to avoid frame restarts.
-const WALK_ANIM_GRACE_SECS: f64 = 0.28;
 
 #[derive(Debug, Clone)]
 pub struct Player {
@@ -147,8 +145,6 @@ pub struct Player {
 
     /// Whether this player is currently in a dash slide
     pub is_dashing: bool,
-    /// Short grace window to keep walk loop continuous between step snapshots.
-    walk_anim_grace_until: f64,
 }
 
 impl Player {
@@ -198,7 +194,6 @@ impl Player {
             mining_started_at: 0.0,
             last_mining_anim: 0.0,
             is_dashing: false,
-            walk_anim_grace_until: 0.0,
         }
     }
 
@@ -287,19 +282,41 @@ impl Player {
 
     /// Set server-authoritative position (convenience method for stopped state)
     pub fn set_server_position(&mut self, new_x: f32, new_y: f32) {
-        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction);
+        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction, false);
     }
 
-    /// Set server state in a strict step-confirmed model.
-    /// Facing only changes on confirmed movement, or explicit face updates while idle.
-    pub fn set_server_state(&mut self, x: f32, y: f32, vel_x: f32, vel_y: f32, dir: Direction) {
+    /// Set server state - simple server-authoritative model
+    /// Server is single source of truth, client just animates smoothly
+    /// is_local_player: local direction is controlled from input while moving/idle.
+    pub fn set_server_state(
+        &mut self,
+        x: f32,
+        y: f32,
+        vel_x: f32,
+        vel_y: f32,
+        dir: Direction,
+        is_local_player: bool,
+    ) {
         let old_server_x = self.server_x;
         let old_server_y = self.server_y;
+        let old_vel_x = self.vel_x;
+        let old_vel_y = self.vel_y;
 
         self.server_x = x;
         self.server_y = y;
         self.vel_x = vel_x;
         self.vel_y = vel_y;
+
+        // Remote players always follow server facing.
+        // Local player keeps input-facing unless sitting (chair controlled).
+        let is_sitting = matches!(
+            self.animation.state,
+            crate::render::animation::AnimationState::SittingChair
+                | crate::render::animation::AnimationState::SittingGround
+        );
+        if !is_local_player || is_sitting {
+            self.direction = dir;
+        }
 
         // If dashing, set target to new position for fast slide interpolation (don't snap)
         if self.is_dashing {
@@ -319,97 +336,75 @@ impl Player {
             self.y = y;
             self.target_x = x;
             self.target_y = y;
-            self.direction = dir;
-            self.animation.direction = dir;
-            self.is_moving = false;
             return;
         }
 
-        // Server position changed = server confirmed a tile step.
-        let step_dx = x - old_server_x;
-        let step_dy = y - old_server_y;
-        let server_moved = step_dx.abs() > 0.01 || step_dy.abs() > 0.01;
+        // Server position changed = server confirmed a move
+        let server_moved = (x - old_server_x).abs() > 0.01 || (y - old_server_y).abs() > 0.01;
+        let stopped = vel_x == 0.0 && vel_y == 0.0;
+        let at_tile_center =
+            (self.x - self.x.round()).abs() < 0.1 && (self.y - self.y.round()).abs() < 0.1;
+        let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
 
-        if server_moved {
-            self.target_x = x;
-            self.target_y = y;
-            self.direction = Direction::from_velocity(step_dx, step_dy);
-            return;
-        }
-
-        // No confirmed step: keep current movement target to avoid pre-turns.
-        // Allow explicit face updates only when idle.
-        let idle_intent = vel_x == 0.0 && vel_y == 0.0;
-        if idle_intent {
-            self.target_x = x;
-            self.target_y = y;
-            let visually_idle = (self.x - self.target_x).abs() < 0.01
-                && (self.y - self.target_y).abs() < 0.01;
-            if visually_idle {
-                self.direction = dir;
+        if vel_changed && !server_moved && !stopped {
+            // Direction changed during cooldown: finish current step before retargeting.
+            let near_target =
+                (self.x - self.target_x).abs() < 0.15 && (self.y - self.target_y).abs() < 0.15;
+            if near_target && (vel_x != 0.0 || vel_y != 0.0) {
+                self.target_x = x + vel_x;
+                self.target_y = y + vel_y;
+            }
+        } else if server_moved || stopped || at_tile_center {
+            if vel_x != 0.0 || vel_y != 0.0 {
+                self.target_x = x + vel_x;
+                self.target_y = y + vel_y;
+            } else {
+                self.target_x = x;
+                self.target_y = y;
             }
         }
     }
 
     /// Smooth visual interpolation toward target position
-    /// Axis-locked interpolation keeps movement aligned to grid turns.
+    /// Uses axis-aligned movement to stay grid-true and avoid diagonal artifacts.
     pub fn interpolate_visual(&mut self, delta: f32) {
-        let old_x = self.x;
-        let old_y = self.y;
-        // Use fast speed during dash (normal movement remains 4 tiles/sec).
-        let speed = if self.is_dashing { 16.0 } else { VISUAL_SPEED };
-        let mut remaining = speed * delta;
-
-        while remaining > 0.0001 {
-            let dx = self.target_x - self.x;
-            let dy = self.target_y - self.y;
-            if dx.abs() < 0.0001 && dy.abs() < 0.0001 {
-                self.x = self.target_x;
-                self.y = self.target_y;
-                break;
-            }
-
-            // Resolve one axis at a time so rapid orthogonal turns stay on-grid.
-            let move_x = if dx.abs() > dy.abs() + 0.0001 {
-                true
-            } else if dy.abs() > dx.abs() + 0.0001 {
-                false
-            } else {
-                matches!(self.direction, Direction::Left | Direction::Right)
-            };
-
-            let consumed = if move_x && dx.abs() > 0.0001 {
-                let step = dx.clamp(-remaining, remaining);
-                self.x += step;
-                if (self.target_x - self.x).abs() < 0.0001 {
-                    self.x = self.target_x;
-                }
-                step.abs()
-            } else if dy.abs() > 0.0001 {
-                let step = dy.clamp(-remaining, remaining);
-                self.y += step;
-                if (self.target_y - self.y).abs() < 0.0001 {
-                    self.y = self.target_y;
-                }
-                step.abs()
-            } else {
-                0.0
-            };
-
-            if consumed <= 0.0001 {
-                break;
-            }
-            remaining -= consumed;
-        }
-
         let dx = self.target_x - self.x;
         let dy = self.target_y - self.y;
+        let old_x = self.x;
+        let old_y = self.y;
+
         if dx.abs() < 0.01 && dy.abs() < 0.01 {
             self.x = self.target_x;
             self.y = self.target_y;
             self.is_moving = false;
             self.is_dashing = false; // Dash slide complete
         } else {
+            // Use fast speed during dash (normal movement remains 4 tiles/sec).
+            let speed = if self.is_dashing { 16.0 } else { VISUAL_SPEED };
+            let mut budget = speed * delta;
+
+            // Resolve smaller displacement axis first, then the larger axis.
+            if dx.abs() <= dy.abs() {
+                if dx.abs() > 0.01 {
+                    let step = budget.min(dx.abs());
+                    self.x += dx.signum() * step;
+                    budget -= step;
+                }
+                if budget > 0.01 && dy.abs() > 0.01 {
+                    let step = budget.min(dy.abs());
+                    self.y += dy.signum() * step;
+                }
+            } else {
+                if dy.abs() > 0.01 {
+                    let step = budget.min(dy.abs());
+                    self.y += dy.signum() * step;
+                    budget -= step;
+                }
+                if budget > 0.01 && dx.abs() > 0.01 {
+                    let step = budget.min(dx.abs());
+                    self.x += dx.signum() * step;
+                }
+            }
             self.is_moving = true;
         }
 
@@ -436,12 +431,6 @@ impl Player {
             return;
         }
 
-        let now = macroquad::time::get_time();
-        if self.is_moving {
-            self.walk_anim_grace_until = now + WALK_ANIM_GRACE_SECS;
-        }
-        let should_walk_loop = self.is_moving || now < self.walk_anim_grace_until;
-
         // Handle action animations (attack, cast, etc) - they take priority
         let in_action = self.animation.state == AnimationState::Attacking
             || self.animation.state == AnimationState::Casting
@@ -450,7 +439,7 @@ impl Player {
         if in_action {
             self.animation.update(delta);
             if self.animation.is_finished() {
-                if should_walk_loop {
+                if self.is_moving {
                     self.animation.set_state(AnimationState::Walking);
                 } else {
                     self.animation.set_state(AnimationState::Idle);
@@ -459,18 +448,13 @@ impl Player {
             return;
         }
 
-        // Sitting state is controlled by explicit sit/stand events.
-        if self.animation.state == AnimationState::SittingGround
-            || self.animation.state == AnimationState::SittingChair
-        {
-            return;
-        }
-
         // Animation direction follows actual movement to prevent moonwalking.
-        // While moving, only update direction when we actually moved this frame.
-        // During grace-only frames, keep previous animation direction to avoid flips.
-        if should_walk_loop {
+        // While moving, only update direction when displacement happened this frame.
+        if self.is_moving {
             if let Some(move_dir) = movement_dir {
+                // Keep logical facing in sync with actual movement so idle/attack
+                // frames don't snap back to a stale pre-turn direction.
+                self.direction = move_dir;
                 self.animation.direction = move_dir;
             }
         } else {
@@ -478,11 +462,16 @@ impl Player {
         }
 
         // Handle movement animations
-        if should_walk_loop {
+        if self.is_moving {
             self.animation.set_state(AnimationState::Walking);
             self.animation.update(delta);
         } else {
-            self.animation.set_state(AnimationState::Idle);
+            // Only go to idle if not in a sitting state
+            if self.animation.state != AnimationState::SittingGround
+                && self.animation.state != AnimationState::SittingChair
+            {
+                self.animation.set_state(AnimationState::Idle);
+            }
         }
     }
 

@@ -45,37 +45,9 @@ impl Renderer {
         let left_x = panel_x + FRAME_THICKNESS + 10.0;
         let right_x = left_x + column_width + COLUMN_GAP;
 
-        // Gold display at top of shop
-        let gold_y = content_y + 2.0;
-        let gold_text = format!("{}g", state.inventory.gold);
-        let gold_text_w = self.measure_text_sharp(&gold_text, 16.0).width;
-        let icon_size = 12.0;
-        let icon_margin = 4.0;
-        let total_gold_w = icon_size + icon_margin + gold_text_w;
-        let gold_x = panel_x + FRAME_THICKNESS + (content_width - total_gold_w) / 2.0;
-        if let Some(texture) = &self.gold_nugget_texture {
-            draw_texture_ex(
-                texture,
-                gold_x,
-                gold_y + 2.0,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(vec2(icon_size, icon_size)),
-                    ..Default::default()
-                },
-            );
-        }
-        self.draw_text_sharp(
-            &gold_text,
-            gold_x + icon_size + icon_margin,
-            gold_y + 13.0,
-            16.0,
-            TEXT_GOLD,
-        );
-
-        let header_y = content_y + 20.0;
-        let list_y = content_y + 20.0 + HEADER_HEIGHT + 10.0;
-        let list_height = content_height - HEADER_HEIGHT - TRANSACTION_HEIGHT - 26.0;
+        let header_y = content_y;
+        let list_y = content_y + HEADER_HEIGHT + 10.0;
+        let list_height = content_height - HEADER_HEIGHT - TRANSACTION_HEIGHT - 6.0;
         let bar_y = list_y + list_height + 8.0;
 
         // STEP 1: Render lists FIRST (they may overflow)

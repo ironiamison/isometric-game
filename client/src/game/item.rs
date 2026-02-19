@@ -224,6 +224,7 @@ pub struct RecipeDefinition {
     pub display_name: String,
     pub description: String,
     pub category: String,
+    pub section: Option<String>,
     pub level_required: i32,
     pub ingredients: Vec<RecipeIngredient>,
     pub results: Vec<RecipeResult>,
