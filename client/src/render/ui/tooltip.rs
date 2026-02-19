@@ -65,6 +65,19 @@ impl Renderer {
                 }
             }
             Some(UiElementId::FurnaceRecipeItem(idx)) if state.ui_state.furnace_open => {
+                // Only show tooltip when hovering the left side (icon + recipe info),
+                // not the right side where quantity buttons and smelt button live
+                let (sw, _) = virtual_screen_size();
+                let panel_width = (500.0_f32).min(sw - 16.0);
+                let panel_x = (sw - panel_width) / 2.0;
+                let right_controls_x = panel_x + panel_width - FRAME_THICKNESS - 8.0 - 170.0;
+                let (mouse_x, _) = mouse_position();
+                let scale_x = sw / screen_width();
+                let virtual_mouse_x = mouse_x * scale_x;
+                if virtual_mouse_x >= right_controls_x {
+                    return;
+                }
+
                 let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
                 let mut furnace_recipes: Vec<_> = state
                     .recipe_definitions
