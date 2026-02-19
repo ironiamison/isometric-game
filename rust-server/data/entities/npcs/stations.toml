@@ -47,3 +47,29 @@ gold_max = 0
 [anvil.behaviors]
 hostile = false
 station_type = "anvil"
+
+[bank_vault]
+display_name = "Bank Vault"
+sprite = "bank_vault"
+animation_type = "static"
+description = "A secure vault for storing valuables."
+
+[bank_vault.stats]
+max_hp = 9999
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[bank_vault.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[bank_vault.behaviors]
+hostile = false
+banker = true
+no_shadow = true

@@ -470,9 +470,9 @@
       17,
       17,
       17,
-      0,
       17,
-      1,
+      17,
+      17,
       17,
       17,
       17,
@@ -7520,192 +7520,62 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+  "collision": "AAAAAAAAwD+AAwAAwBCP9wAAAAHAAXwAAAQAIAACAAgAAAAQAEAAAACAAIAAAAAABAACAAAAIAAEAAAAgAAgAAAAAASAAAAAACAAAggAAAABOAAAAIAJIAAAAAAggAAAAAgAAQQAAAAABBAAEAAAIEAAgAAAgAABAAAAAAIEAAAAABAQAAAAAEBAAAAAAAABAwAAAAAECAAAAAAgEAAAAGCAgAAAAAABAQIAAAAABAgAAAAAEEAAAAAAIAABABAA8AAIAGAAOABAAAAAOAAAAgIAHgAAEAgEBAAAgED8DwAAAAQOAAAAACAgAAAAAAABAQAAAAAYBAAAAABAIAAAAAAAAgEAAAAACAQAAAAAQBAAAAAAAIEAAAAAAAQCAAAAACAIAAAAAIAgAAAAAACCAAAAAAAIAgAAAA==",
   "entities": [
     {
-      "entityId": "rock",
+      "entityId": "wolf_spider",
       "x": 6,
-      "y": 9,
+      "y": 6,
       "level": 1
     },
     {
-      "entityId": "rock",
-      "x": 29,
-      "y": 7,
+      "entityId": "wolf_spider",
+      "x": 22,
+      "y": 17,
       "level": 1
     },
     {
-      "entityId": "rock",
-      "x": 29,
-      "y": 7,
-      "level": 1
-    },
-    {
-      "entityId": "rock",
-      "x": 29,
-      "y": 24,
-      "level": 1
-    },
-    {
-      "entityId": "rock",
-      "x": 9,
-      "y": 24,
-      "level": 1
-    },
-    {
-      "entityId": "rock",
-      "x": 20,
-      "y": 15,
-      "level": 1
-    },
-    {
-      "entityId": "rock",
-      "x": 6,
+      "entityId": "wolf_spider",
+      "x": 31,
       "y": 9,
       "level": 1
     },
     {
       "entityId": "wolf_spider",
-      "x": 6,
-      "y": 9,
+      "x": 34,
+      "y": 26,
       "level": 1
     },
     {
       "entityId": "wolf_spider",
-      "x": 6,
-      "y": 9,
+      "x": 7,
+      "y": 28,
       "level": 1
     },
     {
       "entityId": "wolf_spider",
-      "x": 6,
-      "y": 9,
-      "level": 1
-    },
-    {
-      "entityId": "wolf_spider",
-      "x": 6,
-      "y": 9,
-      "level": 1
-    },
-    {
-      "entityId": "wolf_spider",
-      "x": 6,
-      "y": 9,
-      "level": 1
-    },
-    {
-      "entityId": "wolf_spider",
-      "x": 6,
-      "y": 9,
+      "x": 21,
+      "y": 29,
       "level": 1
     },
     {
       "entityId": "wolf_spider",
       "x": 8,
-      "y": 9,
+      "y": 17,
       "level": 1
     },
     {
       "entityId": "wolf_spider",
-      "x": 7,
-      "y": 9,
-      "level": 1
-    },
-    {
-      "entityId": "wolf_spider",
-      "x": 7,
-      "y": 9,
-      "level": 1
-    },
-    {
-      "entityId": "wolf_spider",
-      "x": 7,
-      "y": 9,
-      "level": 1
-    },
-    {
-      "entityId": "wolf_spider",
-      "x": 7,
-      "y": 9,
+      "x": 17,
+      "y": 6,
       "level": 1
     }
   ],
   "mapObjects": [
     {
-      "gid": 1264,
-      "x": 6,
-      "y": 9,
-      "width": 195,
-      "height": 255
-    },
-    {
-      "gid": 1264,
-      "x": 6,
-      "y": 9,
-      "width": 195,
-      "height": 255
-    },
-    {
-      "gid": 1264,
-      "x": 7,
-      "y": 9,
-      "width": 195,
-      "height": 255
-    },
-    {
-      "gid": 1264,
-      "x": 7,
-      "y": 9,
-      "width": 195,
-      "height": 255
-    },
-    {
-      "gid": 1264,
-      "x": 7,
-      "y": 9,
-      "width": 195,
-      "height": 255
-    },
-    {
-      "gid": 1264,
-      "x": 7,
-      "y": 9,
-      "width": 195,
-      "height": 255
-    },
-    {
-      "gid": 1264,
-      "x": 7,
-      "y": 9,
-      "width": 195,
-      "height": 255
-    },
-    {
-      "gid": 1264,
-      "x": 6,
-      "y": 9,
-      "width": 195,
-      "height": 255
-    },
-    {
       "gid": 1279,
       "x": 3,
       "y": 24,
-      "width": 44,
-      "height": 30
-    },
-    {
-      "gid": 1279,
-      "x": 2,
-      "y": 13,
-      "width": 44,
-      "height": 30
-    },
-    {
-      "gid": 1278,
-      "x": 9,
-      "y": 1,
       "width": 44,
       "height": 30
     },
@@ -7722,13 +7592,6 @@
       "y": 13,
       "width": 44,
       "height": 30
-    },
-    {
-      "gid": 1277,
-      "x": 10,
-      "y": 7,
-      "width": 31,
-      "height": 28
     },
     {
       "gid": 1277,
@@ -7757,6 +7620,300 @@
       "y": 31,
       "width": 44,
       "height": 30
+    },
+    {
+      "gid": 1277,
+      "x": 11,
+      "y": 12,
+      "width": 31,
+      "height": 28
+    },
+    {
+      "gid": 2902,
+      "x": 3,
+      "y": 13,
+      "width": 80,
+      "height": 75
+    },
+    {
+      "gid": 2898,
+      "x": 2,
+      "y": 13,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2898,
+      "x": 22,
+      "y": 2,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2901,
+      "x": 21,
+      "y": 4,
+      "width": 51,
+      "height": 62
+    },
+    {
+      "gid": 2904,
+      "x": 14,
+      "y": 7,
+      "width": 29,
+      "height": 220
+    },
+    {
+      "gid": 2693,
+      "x": 4,
+      "y": 14,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "gid": 2694,
+      "x": 21,
+      "y": 5,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "gid": 2690,
+      "x": 37,
+      "y": 12,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "gid": 2694,
+      "x": 23,
+      "y": 30,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "gid": 2697,
+      "x": 18,
+      "y": 18,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "gid": 2700,
+      "x": 30,
+      "y": 15,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "gid": 2898,
+      "x": 29,
+      "y": 15,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2897,
+      "x": 17,
+      "y": 18,
+      "width": 28,
+      "height": 21
+    },
+    {
+      "gid": 2899,
+      "x": 18,
+      "y": 17,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2901,
+      "x": 14,
+      "y": 39,
+      "width": 51,
+      "height": 62
+    },
+    {
+      "gid": 2900,
+      "x": 13,
+      "y": 38,
+      "width": 36,
+      "height": 36
+    },
+    {
+      "gid": 2901,
+      "x": 17,
+      "y": 36,
+      "width": 51,
+      "height": 62
+    },
+    {
+      "gid": 2898,
+      "x": 16,
+      "y": 35,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2895,
+      "x": 17,
+      "y": 35,
+      "width": 45,
+      "height": 25
+    },
+    {
+      "gid": 2895,
+      "x": 16,
+      "y": 34,
+      "width": 45,
+      "height": 25
+    },
+    {
+      "gid": 2899,
+      "x": 15,
+      "y": 33,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2898,
+      "x": 15,
+      "y": 34,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2898,
+      "x": 3,
+      "y": 23,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2898,
+      "x": 36,
+      "y": 26,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2901,
+      "x": 24,
+      "y": 30,
+      "width": 51,
+      "height": 62
+    },
+    {
+      "gid": 2902,
+      "x": 35,
+      "y": 25,
+      "width": 80,
+      "height": 75
+    },
+    {
+      "gid": 2902,
+      "x": 19,
+      "y": 18,
+      "width": 80,
+      "height": 75
+    },
+    {
+      "gid": 2899,
+      "x": 2,
+      "y": 3,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2898,
+      "x": 2,
+      "y": 4,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2898,
+      "x": 1,
+      "y": 8,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2897,
+      "x": 8,
+      "y": 1,
+      "width": 28,
+      "height": 21
+    },
+    {
+      "gid": 2895,
+      "x": 9,
+      "y": 1,
+      "width": 45,
+      "height": 25
+    },
+    {
+      "gid": 2895,
+      "x": 8,
+      "y": 2,
+      "width": 45,
+      "height": 25
+    },
+    {
+      "gid": 2895,
+      "x": 22,
+      "y": 12,
+      "width": 45,
+      "height": 25
+    },
+    {
+      "gid": 2895,
+      "x": 12,
+      "y": 24,
+      "width": 45,
+      "height": 25
+    },
+    {
+      "gid": 2895,
+      "x": 27,
+      "y": 26,
+      "width": 45,
+      "height": 25
+    },
+    {
+      "gid": 2903,
+      "x": 17,
+      "y": 16,
+      "width": 29,
+      "height": 220
+    },
+    {
+      "gid": 2903,
+      "x": 7,
+      "y": 26,
+      "width": 29,
+      "height": 220
+    },
+    {
+      "gid": 2903,
+      "x": 33,
+      "y": 23,
+      "width": 29,
+      "height": 220
+    },
+    {
+      "gid": 2903,
+      "x": 27,
+      "y": 7,
+      "width": 29,
+      "height": 220
+    },
+    {
+      "gid": 2903,
+      "x": 15,
+      "y": 24,
+      "width": 29,
+      "height": 220
     }
   ],
   "walls": [
@@ -9687,5 +9844,46 @@
       "edge": "down"
     }
   ],
-  "portals": []
+  "portals": [
+    {
+      "id": "exit_1771400569788_ny50ff23l",
+      "x": 18,
+      "y": 49,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771400570110_3iw6ub8at",
+      "x": 20,
+      "y": 49,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771400570820_i4hhaj486",
+      "x": 21,
+      "y": 49,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771400571353_dsi0r517k",
+      "x": 19,
+      "y": 49,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    }
+  ]
 }
