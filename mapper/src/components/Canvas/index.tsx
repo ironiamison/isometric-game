@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useEditorStore } from '@/state/store';
 import { isometricRenderer } from '@/core/IsometricRenderer';
-import { screenToWorldTile, worldToChunk, worldToLocal, chunkKey } from '@/core/coords';
+import { screenToWorldTile } from '@/core/coords';
 import { Tool, Layer } from '@/types';
 import { history } from '@/core/History';
 import { objectLoader } from '@/core/ObjectLoader';
