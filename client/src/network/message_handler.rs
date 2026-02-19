@@ -863,6 +863,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     player.die();
                 }
 
+                // Play death sound only for local player
+                if state.local_player_id.as_deref() == Some(&player_id) {
+                    state.pending_sfx.push("death".to_string());
+                }
+
                 // Clear selection if we had this player targeted
                 if state.selected_entity_id.as_ref() == Some(&player_id) {
                     state.selected_entity_id = None;
