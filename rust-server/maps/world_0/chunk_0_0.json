@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAwAwEAEAAAAHgAAAB0AAAAQAAAAAAAAAAAAAAAAAAAA/AAAAwYBcAIDAlACQQQQAAEYUEIBIHACAkBiAwKA/wATgIEABAABAAiAGQAIgAlAEIABACCAGXBAwg9QwOABUAATBRAAFAVQABT/UAAUAHAAFwAAABEAAMBxAP+/7/8=",
+  "collision": "AAwAwEAEAAAAHgAAAB0AAAAQAAAAAAAAAAAAAAAAAAAA/AAAAwYBcAIDAnACQQQwAAEYcEIBIHACAkBiAwKA/wATgIEABAAPAAiAHwAIgA9AEIAHACCAH3BAwg9QwOABUAATBRAAFAVQABT/UAAUAHAAFwAAABEAAMBxAP+/7/8=",
   "entities": [
     {
       "entityId": "crow",
@@ -4363,14 +4363,6 @@
       "targetSpawn": "entrance"
     },
     {
-      "x": 27,
-      "y": 20,
-      "width": 1,
-      "height": 1,
-      "targetMap": "Oakmere_slayer_house",
-      "targetSpawn": ""
-    },
-    {
       "x": 1,
       "y": 12,
       "width": 1,
@@ -4385,6 +4377,14 @@
       "height": 1,
       "targetMap": "",
       "targetSpawn": ""
+    },
+    {
+      "x": 27,
+      "y": 20,
+      "width": 1,
+      "height": 1,
+      "targetMap": "Oakmere_slayer_house",
+      "targetSpawn": "entrance"
     }
   ],
   "gatheringZones": [

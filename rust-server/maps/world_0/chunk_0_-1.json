@@ -4381,7 +4381,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "Oakshore_farm_house",
-      "targetSpawn": ""
+      "targetSpawn": "entrance"
     }
   ],
   "gatheringZones": []

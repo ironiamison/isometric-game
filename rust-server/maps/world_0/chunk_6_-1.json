@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "jAFMAEQAwACEAAYBBAQAAkQMAAx0DAAQLAz8J/wP4kTwD2GNAABhHAgAURwAAAkcAAANDP8BHwzBAAEMMQDxDzEA8A8JADAAGQEgADEHAIAdAwAAHQcAAAcLAACHBwAA/wMEAPwDAAQIIAAAACAAABlAAAgYAAAIGAAAAAAAAAA=",
+  "collision": "jAFMAEQAwACEAAYBBAQAAkQMAAx0DAAQLAz8J/wP4kTwD3GNAABxHAgAURwAAAkcAAAdDP8BHwzBAAEMMQDxDzEA8A8JADAACQEgADEHAIAdAwAAHQcAAAcLAACHBwAA/wMEAPwDAAQIIAAAACAAABlAAAgYAAAIGAAAAAAAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -4574,44 +4574,20 @@
   ],
   "portals": [
     {
-      "x": 4,
-      "y": 18,
-      "width": 1,
-      "height": 1,
-      "targetMap": "swamp_starterzone_bank",
-      "targetSpawn": ""
-    },
-    {
-      "x": 20,
-      "y": 11,
-      "width": 1,
-      "height": 1,
-      "targetMap": "swamp_starter_zone_hair/clothing",
-      "targetSpawn": ""
-    },
-    {
-      "x": 20,
-      "y": 12,
-      "width": 1,
-      "height": 1,
-      "targetMap": "swamp_starter_zone_hair/clothing",
-      "targetSpawn": ""
-    },
-    {
-      "x": 4,
-      "y": 17,
-      "width": 1,
-      "height": 1,
-      "targetMap": "swamp_starterzone_bank",
-      "targetSpawn": ""
-    },
-    {
       "x": 6,
       "y": 3,
       "width": 1,
       "height": 1,
       "targetMap": "swamp_house1",
       "targetSpawn": ""
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "width": 1,
+      "height": 1,
+      "targetMap": "swamp_starterzone_bank",
+      "targetSpawn": "entrance"
     }
   ],
   "gatheringZones": []
