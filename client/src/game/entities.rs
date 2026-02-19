@@ -401,12 +401,10 @@ impl Player {
         }
 
         let now = macroquad::time::get_time();
-        let has_move_intent = self.vel_x.abs() > 0.01 || self.vel_y.abs() > 0.01;
-        if self.is_moving || has_move_intent {
+        if self.is_moving {
             self.walk_anim_grace_until = now + WALK_ANIM_GRACE_SECS;
         }
-        let should_walk_loop =
-            self.is_moving || has_move_intent || now < self.walk_anim_grace_until;
+        let should_walk_loop = self.is_moving || now < self.walk_anim_grace_until;
 
         // Handle action animations (attack, cast, etc) - they take priority
         let in_action = self.animation.state == AnimationState::Attacking
@@ -434,13 +432,10 @@ impl Player {
 
         // Animation direction follows actual movement to prevent moonwalking.
         // While moving, only update direction when we actually moved this frame.
-        // If a frame has no displacement but movement intent exists, use intent.
         // During grace-only frames, keep previous animation direction to avoid flips.
         if should_walk_loop {
             if let Some(move_dir) = movement_dir {
                 self.animation.direction = move_dir;
-            } else if has_move_intent {
-                self.animation.direction = Direction::from_velocity(self.vel_x, self.vel_y);
             }
         } else {
             self.animation.direction = self.direction;
