@@ -642,7 +642,7 @@
       396,
       396,
       396,
-      1,
+      396,
       396,
       396,
       396,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAgAAAAAAAAAAAAAAAAQgAAAAABAAAMD/AABAAAAAQAAAAEAAAAFAAAAAQAAAAEAAAABAAEAAYAAAAkAAAABAAAAAQAAAAEAAAABAAAAAQAAAAGAAAABAAAAAwP8AAkCAAAAAiD8AAIA=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAgAAAAAAAAAAAAAAAAQgAAAAABAAAMD/AABAAAAAQAAAAEAAAAFAAAAAQAAAAEAAAABAAEAAYAAAAkAAAABAAAAAQAAAAEAAAABAAAAAQAAAAGAAAABAAAAAwP8AAgCAAAAAiD8AAIA=",
   "entities": [
     {
       "entityId": "wild_boar",
@@ -3517,12 +3517,6 @@
     {
       "gid": 172,
       "x": 31,
-      "y": 31,
-      "edge": "down"
-    },
-    {
-      "gid": 172,
-      "x": 31,
       "y": 29,
       "edge": "down"
     },
@@ -3753,6 +3747,18 @@
       "x": 31,
       "y": 28,
       "edge": "right"
+    },
+    {
+      "gid": 172,
+      "x": 31,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 172,
+      "x": 31,
+      "y": 30,
+      "edge": "down"
     }
   ],
   "portals": [],

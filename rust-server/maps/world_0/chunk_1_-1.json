@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAGGAAAGA8AAPAAAAAAAAAEAAAAAAQAAAAAAAAAAAAAAAABAAAEQBAAAAAABAAAAAAAAAAAAAgAAAAI/38AAQBAAgDARwAAYEYAAKBEAAAgRGAAIEQAAD9EAAB/RAIQwGQAAEhEAABARAAAQkQAAEJkAADgRAAAQUQAAMBEAAA=",
+  "collision": "AAAGGAAAGA8AAPAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAABAAAEABAAAAAABAAAAAAAAAAAAAAAAAAA/38AAQBAAgDARwAAYEYAACBEAAAgRAAAIEQAAD9EAAB/RAIQwGQAAEhEAABARAAAQkQAAEJkAADgRAAAQUQAAMBEAAA=",
   "entities": [
     {
       "entityId": "crow",
@@ -3124,6 +3124,12 @@
       "level": 1
     },
     {
+      "entityId": "slime",
+      "x": 19,
+      "y": 8,
+      "level": 1
+    },
+    {
       "entityId": "slime_blue",
       "x": 16,
       "y": 18,
@@ -3157,12 +3163,6 @@
       "entityId": "slime_pink",
       "x": 12,
       "y": 13,
-      "level": 1
-    },
-    {
-      "entityId": "altar",
-      "x": 7,
-      "y": 19,
       "level": 1
     },
     {
@@ -3573,13 +3573,6 @@
       "height": 32
     },
     {
-      "gid": 1303,
-      "x": 7,
-      "y": 19,
-      "width": 39,
-      "height": 59
-    },
-    {
       "gid": 1263,
       "x": 3,
       "y": 25,
@@ -3648,6 +3641,13 @@
       "y": 30,
       "width": 41,
       "height": 29
+    },
+    {
+      "gid": 1356,
+      "x": 23,
+      "y": 30,
+      "width": 29,
+      "height": 31
     }
   ],
   "walls": [
@@ -4258,6 +4258,15 @@
       "edge": "right"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 5,
+      "y": 20,
+      "width": 1,
+      "height": 1,
+      "targetMap": "",
+      "targetSpawn": "Oakmere_Church"
+    }
+  ],
   "gatheringZones": []
 }

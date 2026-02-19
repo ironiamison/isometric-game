@@ -619,8 +619,51 @@
       294,
       294,
       294,
+      448,
       381,
-      381,
+      101,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      294,
+      101,
+      101,
       101,
       294,
       294,
@@ -640,52 +683,9 @@
       294,
       294,
       294,
+      440,
       294,
       294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      381,
-      381,
-      101,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      101,
-      101,
-      101,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      294,
-      381,
-      381,
-      101,
       294,
       294,
       294,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAABAhCBIAAAAAAAAAAAAQXgAIACIAAAACBEgAAgCIAAIBAgAGAgIABgQSAAIIAgACEAA/gdAAAECQIAAAEBAAABAYAAAYGAAAAAgAAAAIAABAGAAAABgAABgQAAAQIAAAEAAAQBAAH4AIAAgABAIIQAICCAAhAgkAAI=",
+  "collision": "AAAAAAAAAABAhCBIAAAAAAAAAAAAQXgAIACIAAAACBEgAAgCIAAIBAgAGAgIABAQSAAIIAiACEAAeg9AAAECQIAAAEBAAABAYAAAYGAAAAAAAAAAAAABAGAAAABgAABgQAAAQIAAAEAAAQBAAH4AIAAgABAIIQAICCAAhAgkAAI=",
   "entities": [],
   "mapObjects": [
     {
@@ -3113,20 +3113,6 @@
       "gid": 1624,
       "x": 5,
       "y": 22,
-      "width": 64,
-      "height": 97
-    },
-    {
-      "gid": 1624,
-      "x": 5,
-      "y": 21,
-      "width": 64,
-      "height": 97
-    },
-    {
-      "gid": 1624,
-      "x": 5,
-      "y": 20,
       "width": 64,
       "height": 97
     },
@@ -3665,78 +3651,6 @@
   ],
   "walls": [
     {
-      "gid": 583,
-      "x": 19,
-      "y": 11,
-      "edge": "down"
-    },
-    {
-      "gid": 582,
-      "x": 19,
-      "y": 12,
-      "edge": "down"
-    },
-    {
-      "gid": 581,
-      "x": 19,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 580,
-      "x": 18,
-      "y": 14,
-      "edge": "right"
-    },
-    {
-      "gid": 580,
-      "x": 17,
-      "y": 14,
-      "edge": "right"
-    },
-    {
-      "gid": 580,
-      "x": 16,
-      "y": 14,
-      "edge": "right"
-    },
-    {
-      "gid": 580,
-      "x": 15,
-      "y": 14,
-      "edge": "right"
-    },
-    {
-      "gid": 592,
-      "x": 14,
-      "y": 14,
-      "edge": "right"
-    },
-    {
-      "gid": 580,
-      "x": 13,
-      "y": 14,
-      "edge": "right"
-    },
-    {
-      "gid": 580,
-      "x": 12,
-      "y": 14,
-      "edge": "right"
-    },
-    {
-      "gid": 584,
-      "x": 11,
-      "y": 14,
-      "edge": "right"
-    },
-    {
-      "gid": 568,
-      "x": 10,
-      "y": 14,
-      "edge": "right"
-    },
-    {
       "gid": 172,
       "x": 3,
       "y": 31,
@@ -3777,8 +3691,89 @@
       "x": 3,
       "y": 10,
       "edge": "right"
+    },
+    {
+      "gid": 568,
+      "x": 11,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 584,
+      "x": 12,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 578,
+      "x": 13,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 580,
+      "x": 14,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 592,
+      "x": 15,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 580,
+      "x": 16,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 578,
+      "x": 17,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 581,
+      "x": 19,
+      "y": 14,
+      "edge": "right"
+    },
+    {
+      "gid": 580,
+      "x": 19,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 580,
+      "x": 18,
+      "y": 14,
+      "edge": "down"
+    },
+    {
+      "gid": 583,
+      "x": 19,
+      "y": 12,
+      "edge": "right"
+    },
+    {
+      "gid": 582,
+      "x": 19,
+      "y": 13,
+      "edge": "right"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 15,
+      "y": 14,
+      "width": 1,
+      "height": 1,
+      "targetMap": "",
+      "targetSpawn": ""
+    }
+  ],
   "gatheringZones": []
 }

@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "ACBAAAAAAAAABAAAAAAAAAAEIAAAAAACAAQAAAAkCAAABCAAwAMAAMAcAABAAAACQAAgADgAAAAgAAAAKuAgACAgAAAAwP9/HkBwQABAAEAAQABAAEAQQABAHkAAQBZAIEAOQQBAAkSAUAJAhNAHQKDQAUCkEABAgFAAUABAAEA=",
+  "collision": "ACBAAAAAAAAABAAAAAAAAAAEIAAAAAACAAQAAAAkCAAABCAAwAMAAMAcAABAAAACQAAgADgAAAAgAAAAKuAgACAgAAAAwP9/HkBwQABAAEAAQABAAEAAQABADkAAQAZAIEACQQBAAECAUAJAhNAHQKDQAUCkUABAgFAAUABAAEA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3902,6 +3902,15 @@
       "edge": "down"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 17,
+      "y": 25,
+      "width": 1,
+      "height": 1,
+      "targetMap": "",
+      "targetSpawn": ""
+    }
+  ],
   "gatheringZones": []
 }

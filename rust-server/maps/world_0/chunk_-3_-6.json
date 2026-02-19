@@ -284,8 +284,8 @@
       381,
       381,
       381,
-      381,
-      381,
+      1195,
+      1195,
       381,
       381,
       381,
@@ -317,8 +317,8 @@
       381,
       381,
       381,
-      381,
-      381,
+      1195,
+      1195,
       381,
       381,
       381,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "GARSAFAEAB4QBAAAUAQAABAEAAAQAAAAUPz/fxACAEgQAgJIEAIARhAC6UFQAhFIEAIBQBACAUAQCgFwEOIBQFACAQAQAkEAUAIBABACAQAQAgEAUAIBcBD6AUAQSohIEAIAQBD+/38QAAEAUEDHAxBAAAAQQAAAUEAAABBAAAA=",
+  "collision": "GABQAFAEAB4QBAAAUAQAABAEAAAQAAAAUP7/fxACCEgQAs5IEIJJRxD+eUBQAhFIEAIBQBACAEAQCgFwEOIBQFACAQAQAkEAUAIBABACAQAQAgEAUAIBcBD+AUAQSohIEAIAQBD+/38QAAEAUEDHAxBAAAAQQAAAUEAAABBAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -4290,6 +4290,23 @@
       "edge": "down"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 23,
+      "y": 9,
+      "width": 1,
+      "height": 1,
+      "targetMap": "New_Aeven_blacksmith",
+      "targetSpawn": ""
+    },
+    {
+      "x": 16,
+      "y": 13,
+      "width": 1,
+      "height": 1,
+      "targetMap": "New_Aeven_tailor",
+      "targetSpawn": ""
+    }
+  ],
   "gatheringZones": []
 }

@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "//B/AMAAAAAAEAAAAACAAAAAAAj/AAAAgAAAAICAIACAAAAIgAAAAIAAAACAAAAAgAAAAIAAEBGAYAAAgABAAAAAAAAAAAAAAAAAAAAAAABAQAAAAACAIAEAADwAAAAEAAEAAAAAQAAAAAAAhAAAEAAAAAAAAEAAAAAAAAAAAgA=",
+  "collision": "//B/AMAAAAAAEAAAAACAAAAAAAj/AAAAgAAAAICAIACAAAAIgAAAAIAAAACAAAAAgAAAAIAAEBGAYAAAgABAAAAAACAAAAAAAAAAAAAAAABAQAAAAACAIAEAADwAAAAEAAEAAAAAQAAAAAAAhAAAEAAAAAAAAEAAAAAAAAAAAgA=",
   "entities": [
     {
       "entityId": "crow",
@@ -3144,13 +3144,6 @@
       "y": 4,
       "width": 62,
       "height": 127
-    },
-    {
-      "gid": 1815,
-      "x": 28,
-      "y": 17,
-      "width": 30,
-      "height": 41
     },
     {
       "gid": 1314,
@@ -3816,6 +3809,13 @@
       "y": 23,
       "width": 21,
       "height": 72
+    },
+    {
+      "gid": 1815,
+      "x": 29,
+      "y": 16,
+      "width": 30,
+      "height": 41
     }
   ],
   "walls": [

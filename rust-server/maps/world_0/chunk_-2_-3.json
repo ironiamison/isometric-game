@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "f////4EggIhFAACQAQAAgCEAAIAFfvyDAf74gwEGgIMhFgSDAQYAgwEGAIMBDhKDEQ4AkwAGAINDjgCDPA4Qk2A+4JNgAAAAIAACACAAAABgPuCTfw4Qkz2OAIMhBgCDAQ4gkxEOAoMBFgCDAQYAgwEOgIMh/viDBf74gwEAAIA=",
+  "collision": "/////4EggIhFAACQAQAAgCEAAIAFfvyDAf74gwEGgIMhFgSDAQYAgwEGAIMBDhKDEQ4AkwAGAINDjgCDPA4Qk2A+4JNwAAAACAACADAAAABgPuCTfw4Qkz2OAIMhBgCDAQ4gkxEOAoMBFgCDAQYAgwEOgIMh/viDBf74gwEAAIA=",
   "entities": [
     {
       "entityId": "springs",
@@ -5581,6 +5581,15 @@
       "edge": "down"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 4,
+      "y": 18,
+      "width": 1,
+      "height": 1,
+      "targetMap": "",
+      "targetSpawn": ""
+    }
+  ],
   "gatheringZones": []
 }

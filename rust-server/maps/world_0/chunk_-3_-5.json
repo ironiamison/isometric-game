@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "EDjHA1AkAUAQAADAEAogyRAUAMAQACDJEAAAABAAAAAAACAJMAAAAFAAEABwAAgAEAAIAJAADACwAQgAEAAIANDhBwAQABAA8AEAABAAIAnQwQHAEACIkBAAAMAQAADAEAAAABAAAAAQAAAAEAAAAPD///8AAAAAAAAAAAAABAA=",
+  "collision": "EDjHA1AkAUAQAADAEAogyRAUAMAQACDJEAAAABAAAAAAACAJMAAAAFAAEABwAAgAEAAMAJAAAgCwAQwAEAAIANDhBwAQABAA8AEAABAAIAnQwQHAEACIkBAAAMAQAADAEAAAABAAAAAQAAAAEAAAAPD///8AAAAAAAAAAAAABAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -4025,6 +4025,15 @@
       "edge": "right"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 18,
+      "y": 13,
+      "width": 1,
+      "height": 1,
+      "targetMap": "New_Aeven_Church",
+      "targetSpawn": ""
+    }
+  ],
   "gatheringZones": []
 }

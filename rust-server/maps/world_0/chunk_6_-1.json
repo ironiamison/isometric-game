@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "jAFMAEQAwABEAAYBRAQMAkQMAAx0DAAQLAz/J/wP4UTwD2GNIABBHCwAIRwAACEcAAAlDPcBHwzBAAEMMQDxDzEA4A8RACAAEQEgQDEHAIAdAwBAHQcAAAcLAACHBwAA/wMAAPwDAAQIIAAAACAAABlAAAgYAAAIGAAAABAAAAA=",
+  "collision": "jAFMAEQAwACEAAYBBAQAAkQMAAx0DAAQLAz8J/wP4kTwD2GNAABhHAgAURwAAAkcAAANDP8BHwzBAAEMMQDxDzEA8A8JADAAGQEgADEHAIAdAwAAHQcAAAcLAACHBwAA/wMEAPwDAAQIIAAAACAAABlAAAgYAAAIGAAAAAAAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3563,6 +3563,27 @@
       "y": 16,
       "width": 33,
       "height": 56
+    },
+    {
+      "gid": 1793,
+      "x": 18,
+      "y": 24,
+      "width": 62,
+      "height": 127
+    },
+    {
+      "gid": 1406,
+      "x": 7,
+      "y": 2,
+      "width": 30,
+      "height": 41
+    },
+    {
+      "gid": 1818,
+      "x": 22,
+      "y": 10,
+      "width": 30,
+      "height": 41
     }
   ],
   "walls": [
@@ -4551,6 +4572,47 @@
       "edge": "right"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 4,
+      "y": 18,
+      "width": 1,
+      "height": 1,
+      "targetMap": "swamp_starterzone_bank",
+      "targetSpawn": ""
+    },
+    {
+      "x": 20,
+      "y": 11,
+      "width": 1,
+      "height": 1,
+      "targetMap": "swamp_starter_zone_hair/clothing",
+      "targetSpawn": ""
+    },
+    {
+      "x": 20,
+      "y": 12,
+      "width": 1,
+      "height": 1,
+      "targetMap": "swamp_starter_zone_hair/clothing",
+      "targetSpawn": ""
+    },
+    {
+      "x": 4,
+      "y": 17,
+      "width": 1,
+      "height": 1,
+      "targetMap": "swamp_starterzone_bank",
+      "targetSpawn": ""
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "width": 1,
+      "height": 1,
+      "targetMap": "",
+      "targetSpawn": ""
+    }
+  ],
   "gatheringZones": []
 }
