@@ -860,12 +860,24 @@
       0
     ]
   },
-  "collision": "//8fAAABABAAAAEAEAAAAQAQAAABABAAAAEAEAAAAQAQAAA=",
+  "collision": "//8fAAABABAAAOEHEH4AAQAQAAABABAAAAEAEAAAAQAQAAA=",
   "entities": [
     {
       "entityId": "blacksmith",
       "x": 8,
       "y": 2,
+      "level": 1
+    },
+    {
+      "entityId": "furnace",
+      "x": 12,
+      "y": 1,
+      "level": 1
+    },
+    {
+      "entityId": "anvil",
+      "x": 14,
+      "y": 4,
       "level": 1
     }
   ],
