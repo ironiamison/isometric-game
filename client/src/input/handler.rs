@@ -604,7 +604,7 @@ pub struct InputHandler {
     current_dir: CardinalDir,
     // Track previous direction for detecting key release
     prev_dir: CardinalDir,
-    // Send commands at server tick rate
+    // Periodic movement-intent resend interval
     last_send_time: f64,
     send_interval: f64,
     // Attack cooldown tracking (matches server cooldown)
@@ -626,7 +626,7 @@ impl InputHandler {
             current_dir: CardinalDir::None,
             prev_dir: CardinalDir::None,
             last_send_time: 0.0,
-            send_interval: 0.05, // 50ms = 20Hz (matches server tick rate)
+            send_interval: 0.10, // 100ms keeps intent fresh without excessive resend spam
             last_attack_time: 0.0,
             attack_cooldown: 0.8, // 800 ms (matches server ATTACK_COOLDOWN_MS)
             dir_press_time: 0.0,
@@ -4159,46 +4159,35 @@ impl InputHandler {
             let past_threshold = hold_duration >= FACE_THRESHOLD;
 
             if past_threshold {
-                // Past threshold - check if target tile is walkable before sending movement
-                // When sitting, only allow movement in the chair's facing direction (to stand up)
-                let can_move = if state.is_sitting {
-                    // Allow standing up by moving in the chair's facing direction
-                    // The player's direction matches the chair's direction when sitting
-                    if let Some(player) = state.get_local_player() {
-                        let move_dir = new_dir.to_direction_u8();
-                        let chair_dir = player.direction as u8;
-                        move_dir == chair_dir
-                    } else {
-                        false
-                    }
-                } else if let Some(player) = state.get_local_player() {
-                    // Use authoritative player tile, not interpolated visual position.
-                    let player_x = player.server_x.round() as i32;
-                    let player_y = player.server_y.round() as i32;
-                    let target_x = player_x + dx as i32;
-                    let target_y = player_y + dy as i32;
-
-                    // Check static tile collision
-                    let tile_walkable = state
-                        .chunk_manager
-                        .is_walkable(target_x as f32, target_y as f32);
-
-                    // Check entity collision
-                    let occupied = build_occupied_set(state);
-                    let not_occupied = !occupied.contains(&(target_x, target_y));
-
-                    tile_walkable && not_occupied
-                } else {
-                    false
-                };
-
                 let direction_changed =
                     (dx - self.last_dx).abs() > 0.01 || (dy - self.last_dy).abs() > 0.01;
                 let time_elapsed = current_time - self.last_send_time >= self.send_interval;
                 let should_send = direction_changed || time_elapsed;
 
-                if can_move {
-                    if should_send {
+                if should_send {
+                    // When sitting, only allow movement in the chair's facing direction (to stand up)
+                    // Otherwise only gate by static tile walkability and let server handle dynamic collisions.
+                    let can_move = if state.is_sitting {
+                        if let Some(player) = state.get_local_player() {
+                            let move_dir = new_dir.to_direction_u8();
+                            let chair_dir = player.direction as u8;
+                            move_dir == chair_dir
+                        } else {
+                            false
+                        }
+                    } else if let Some(player) = state.get_local_player() {
+                        let player_x = player.server_x.round() as i32;
+                        let player_y = player.server_y.round() as i32;
+                        let target_x = player_x + dx as i32;
+                        let target_y = player_y + dy as i32;
+                        state
+                            .chunk_manager
+                            .is_walkable(target_x as f32, target_y as f32)
+                    } else {
+                        false
+                    };
+
+                    if can_move {
                         commands.push(InputCommand::Move { dx, dy });
                         self.last_dx = dx;
                         self.last_dy = dy;
@@ -4208,23 +4197,23 @@ impl InputHandler {
                         if has_dpad_input {
                             self.touch_controls.set_dpad_move_sent(true);
                         }
-                    }
-                } else {
-                    // Can't move - face that direction instead
-                    if self.move_sent || self.touch_controls.was_dpad_move_sent() {
-                        // Was moving, send stop
-                        commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
-                        self.move_sent = false;
-                        self.touch_controls.set_dpad_move_sent(false);
-                    }
-                    if should_send && !state.is_sitting {
-                        let face_dir = new_dir.to_direction_u8();
-                        commands.push(InputCommand::Face {
-                            direction: face_dir,
-                        });
-                        self.last_dx = dx;
-                        self.last_dy = dy;
-                        self.last_send_time = current_time;
+                    } else {
+                        // Can't move - face that direction instead
+                        if self.move_sent || self.touch_controls.was_dpad_move_sent() {
+                            // Was moving, send stop
+                            commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                            self.move_sent = false;
+                            self.touch_controls.set_dpad_move_sent(false);
+                        }
+                        if !state.is_sitting {
+                            let face_dir = new_dir.to_direction_u8();
+                            commands.push(InputCommand::Face {
+                                direction: face_dir,
+                            });
+                            self.last_dx = dx;
+                            self.last_dy = dy;
+                            self.last_send_time = current_time;
+                        }
                     }
                 }
             }

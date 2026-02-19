@@ -170,7 +170,20 @@ pub fn run_game_frame(
     for cmd in &commands {
         use crate::network::messages::ClientMessage;
         let msg = match cmd {
-            InputCommand::Move { dx, dy } => ClientMessage::Move { dx: *dx, dy: *dy },
+            InputCommand::Move { dx, dy } => {
+                // Optimistic local facing update to avoid brief direction flashes
+                // while waiting for the next server-confirmed movement step.
+                if !game_state.is_sitting && (*dx != 0.0 || *dy != 0.0) {
+                    if let Some(local_id) = &game_state.local_player_id {
+                        if let Some(player) = game_state.players.get_mut(local_id) {
+                            let new_dir = crate::game::Direction::from_velocity(*dx, *dy);
+                            player.direction = new_dir;
+                            player.animation.direction = new_dir;
+                        }
+                    }
+                }
+                ClientMessage::Move { dx: *dx, dy: *dy }
+            }
             InputCommand::Face { direction } => {
                 // Skip direction update if sitting or attacking
                 if game_state.is_sitting {
@@ -478,7 +491,7 @@ pub fn run_game_frame(
     if let Some(player) = game_state.get_local_player() {
         let chunks_to_request = game_state
             .chunk_manager
-            .update_player_position(player.x, player.y);
+            .update_player_position(player.server_x, player.server_y);
         for coord in chunks_to_request {
             network.send(&crate::network::messages::ClientMessage::RequestChunk {
                 chunk_x: coord.x,

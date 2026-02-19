@@ -1327,12 +1327,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let tile_y = obj_value["tileY"].as_i64().unwrap_or(0) as i32;
                         let width = obj_value["width"].as_u64().unwrap_or(0) as u32;
                         let height = obj_value["height"].as_u64().unwrap_or(0) as u32;
-                        log::info!(
-                            "CLIENT received object gid {} at WORLD tile ({}, {})",
-                            gid,
-                            tile_x,
-                            tile_y
-                        );
                         objects.push(MapObject {
                             gid,
                             tile_x,

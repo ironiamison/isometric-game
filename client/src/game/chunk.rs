@@ -4,6 +4,7 @@ pub const CHUNK_SIZE: u32 = 32;
 const WORLD_VIEW_RADIUS: i32 = 2;
 const MINIMAP_VISIBLE_RADIUS: i32 = 2;
 const MINIMAP_PRELOAD_RING: i32 = 1;
+const MAX_CHUNK_REQUESTS_PER_UPDATE: usize = 6;
 
 /// Chunk coordinates in the world grid
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -247,7 +248,7 @@ impl ChunkManager {
         self.current_chunk = new_chunk;
 
         // Check which chunks need to be loaded
-        let mut to_request = Vec::new();
+        let mut candidates = Vec::new();
         let current_time = macroquad::time::get_time();
 
         for dy in -self.view_radius..=self.view_radius {
@@ -266,10 +267,23 @@ impl ChunkManager {
                     }
                 }
 
-                // Request this chunk
-                self.pending_requests.insert(coord, current_time);
-                to_request.push(coord);
+                candidates.push(coord);
             }
+        }
+
+        // Prioritize nearby chunks first and throttle per-frame requests
+        // to avoid large burst loads that cause frame hitches.
+        candidates.sort_by_key(|coord| {
+            (coord.x - new_chunk.x).abs().max((coord.y - new_chunk.y).abs())
+        });
+
+        let mut to_request = Vec::new();
+        for coord in candidates
+            .into_iter()
+            .take(MAX_CHUNK_REQUESTS_PER_UPDATE)
+        {
+            self.pending_requests.insert(coord, current_time);
+            to_request.push(coord);
         }
 
         to_request

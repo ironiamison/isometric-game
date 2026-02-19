@@ -68,7 +68,7 @@ pub const TILES_PER_SECOND: f32 = 4.0;
 // Server: 250ms per tile = 4 tiles per second
 const VISUAL_SPEED: f32 = 4.0;
 // Keep walking loop alive briefly between step confirmations to avoid frame restarts.
-const WALK_ANIM_GRACE_SECS: f64 = 0.10;
+const WALK_ANIM_GRACE_SECS: f64 = 0.28;
 
 #[derive(Debug, Clone)]
 pub struct Player {
@@ -343,37 +343,73 @@ impl Player {
         if idle_intent {
             self.target_x = x;
             self.target_y = y;
-            self.direction = dir;
+            let visually_idle = (self.x - self.target_x).abs() < 0.01
+                && (self.y - self.target_y).abs() < 0.01;
+            if visually_idle {
+                self.direction = dir;
+            }
         }
     }
 
     /// Smooth visual interpolation toward target position
-    /// Linear constant-speed interpolation keeps stepping smooth without prediction.
+    /// Axis-locked interpolation keeps movement aligned to grid turns.
     pub fn interpolate_visual(&mut self, delta: f32) {
-        let dx = self.target_x - self.x;
-        let dy = self.target_y - self.y;
-        let dist = (dx * dx + dy * dy).sqrt();
-
         let old_x = self.x;
         let old_y = self.y;
+        // Use fast speed during dash (normal movement remains 4 tiles/sec).
+        let speed = if self.is_dashing { 16.0 } else { VISUAL_SPEED };
+        let mut remaining = speed * delta;
 
-        if dist < 0.01 {
+        while remaining > 0.0001 {
+            let dx = self.target_x - self.x;
+            let dy = self.target_y - self.y;
+            if dx.abs() < 0.0001 && dy.abs() < 0.0001 {
+                self.x = self.target_x;
+                self.y = self.target_y;
+                break;
+            }
+
+            // Resolve one axis at a time so rapid orthogonal turns stay on-grid.
+            let move_x = if dx.abs() > dy.abs() + 0.0001 {
+                true
+            } else if dy.abs() > dx.abs() + 0.0001 {
+                false
+            } else {
+                matches!(self.direction, Direction::Left | Direction::Right)
+            };
+
+            let consumed = if move_x && dx.abs() > 0.0001 {
+                let step = dx.clamp(-remaining, remaining);
+                self.x += step;
+                if (self.target_x - self.x).abs() < 0.0001 {
+                    self.x = self.target_x;
+                }
+                step.abs()
+            } else if dy.abs() > 0.0001 {
+                let step = dy.clamp(-remaining, remaining);
+                self.y += step;
+                if (self.target_y - self.y).abs() < 0.0001 {
+                    self.y = self.target_y;
+                }
+                step.abs()
+            } else {
+                0.0
+            };
+
+            if consumed <= 0.0001 {
+                break;
+            }
+            remaining -= consumed;
+        }
+
+        let dx = self.target_x - self.x;
+        let dy = self.target_y - self.y;
+        if dx.abs() < 0.01 && dy.abs() < 0.01 {
             self.x = self.target_x;
             self.y = self.target_y;
             self.is_moving = false;
             self.is_dashing = false; // Dash slide complete
         } else {
-            // Use fast speed during dash (normal movement remains 4 tiles/sec).
-            let speed = if self.is_dashing { 16.0 } else { VISUAL_SPEED };
-            let move_dist = speed * delta;
-
-            if dist <= move_dist {
-                self.x = self.target_x;
-                self.y = self.target_y;
-            } else {
-                self.x += (dx / dist) * move_dist;
-                self.y += (dy / dist) * move_dist;
-            }
             self.is_moving = true;
         }
 
