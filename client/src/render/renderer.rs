@@ -2906,10 +2906,9 @@ impl Renderer {
                 gid: u32,
                 tile_x: i32,
                 tile_y: i32,
-                scale: f32,
+                progress: f32,
                 alpha: f32,
-                y_offset: f32,
-                wobble_x: f32,
+                fragments: Vec<(u8, u8, f32, f32, f32)>, // (grid_x, grid_y, drift_x, drift_y, rotation_speed)
             },
             RockTimer {
                 tile_x: i32,
@@ -3185,7 +3184,12 @@ impl Renderer {
             if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
                 continue;
             }
-            let (scale, alpha, y_offset, wobble_x) = cr.get_transform();
+            let (progress, alpha) = cr.get_progress_alpha();
+            let fragments: Vec<(u8, u8, f32, f32, f32)> = cr
+                .fragments
+                .iter()
+                .map(|f| (f.grid_x, f.grid_y, f.drift_x, f.drift_y, f.rotation_speed))
+                .collect();
             let depth = calculate_depth(wx, wy, 1);
             renderables.push((
                 depth,
@@ -3193,10 +3197,9 @@ impl Renderer {
                     gid: cr.gid,
                     tile_x: cr.x,
                     tile_y: cr.y,
-                    scale,
+                    progress,
                     alpha,
-                    y_offset,
-                    wobble_x,
+                    fragments,
                 },
             ));
         }
@@ -3271,13 +3274,12 @@ impl Renderer {
                     gid,
                     tile_x,
                     tile_y,
-                    scale,
+                    progress,
                     alpha,
-                    y_offset,
-                    wobble_x,
+                    ref fragments,
                 } => {
                     self.render_crumbling_rock(
-                        gid, tile_x, tile_y, scale, alpha, y_offset, wobble_x, &state.camera,
+                        gid, tile_x, tile_y, progress, alpha, fragments, &state.camera,
                     );
                 }
                 Renderable::RockTimer {
@@ -7621,16 +7623,15 @@ impl Renderer {
         }
     }
 
-    /// Render a crumbling rock (rock that was just fully mined — shrink & sink)
+    /// Render a crumbling rock — splits into 2x2 fragments that scatter outward
     fn render_crumbling_rock(
         &self,
         gid: u32,
         tile_x: i32,
         tile_y: i32,
-        scale: f32,
+        progress: f32,
         alpha: f32,
-        y_offset: f32,
-        wobble_x: f32,
+        fragments: &[(u8, u8, f32, f32, f32)], // (grid_x, grid_y, drift_x, drift_y, rotation_speed)
         camera: &Camera,
     ) {
         let (base_x, base_y) =
@@ -7638,32 +7639,87 @@ impl Renderer {
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
-            let (tex_width, tex_height) = if let Some(r) = source_rect {
-                (r.w, r.h)
+            let (tex_x, tex_y, tex_w, tex_h) = if let Some(r) = source_rect {
+                (r.x, r.y, r.w, r.h)
             } else {
-                (texture.width(), texture.height())
+                (0.0, 0.0, texture.width(), texture.height())
             };
 
-            let scaled_width = (tex_width * zoom * scale).round();
-            let scaled_height = (tex_height * zoom * scale).round();
+            let full_w = tex_w * zoom;
+            let full_h = tex_h * zoom;
+            let half_w = tex_w / 2.0;
+            let half_h = tex_h / 2.0;
 
-            // Anchor at base center, apply wobble and sink
-            let draw_x = (base_x - scaled_width / 2.0 + wobble_x * zoom).round();
-            let draw_y = (base_y - scaled_height + y_offset * zoom).round();
+            // Ease-out for smooth deceleration
+            let ease = 1.0 - (1.0 - progress) * (1.0 - progress);
 
-            let color_with_alpha = Color::new(1.0, 1.0, 1.0, alpha);
+            for &(grid_x, grid_y, drift_x, drift_y, rot_speed) in fragments {
+                // Fragment's original position (where it starts before drifting)
+                let frag_w = full_w / 2.0;
+                let frag_h = full_h / 2.0;
+                let orig_x = base_x - full_w / 2.0 + grid_x as f32 * frag_w;
+                let orig_y = base_y - full_h + grid_y as f32 * frag_h;
 
-            draw_texture_ex(
-                texture,
-                draw_x,
-                draw_y,
-                color_with_alpha,
-                DrawTextureParams {
-                    dest_size: Some(Vec2::new(scaled_width, scaled_height)),
-                    source: source_rect,
-                    ..Default::default()
-                },
-            );
+                // Apply drift
+                let dx = drift_x * ease * zoom;
+                let dy = drift_y * ease * zoom;
+
+                // Apply rotation via mesh (like falling trees)
+                let angle = rot_speed * ease;
+                let cos_a = angle.cos();
+                let sin_a = angle.sin();
+
+                // Center of this fragment for rotation pivot
+                let cx = orig_x + frag_w / 2.0 + dx;
+                let cy = orig_y + frag_h / 2.0 + dy;
+
+                let rotate = |rx: f32, ry: f32| -> Vec3 {
+                    Vec3::new(
+                        cx + rx * cos_a - ry * sin_a,
+                        cy + rx * sin_a + ry * cos_a,
+                        0.0,
+                    )
+                };
+
+                let hw = frag_w / 2.0;
+                let hh = frag_h / 2.0;
+                let tl = rotate(-hw, -hh);
+                let tr = rotate(hw, -hh);
+                let br = rotate(hw, hh);
+                let bl = rotate(-hw, hh);
+
+                // UV coordinates for this sub-rect
+                let (u0, v0, u1, v1) = {
+                    let sx = tex_x + grid_x as f32 * half_w;
+                    let sy = tex_y + grid_y as f32 * half_h;
+                    (
+                        sx / texture.width(),
+                        sy / texture.height(),
+                        (sx + half_w) / texture.width(),
+                        (sy + half_h) / texture.height(),
+                    )
+                };
+
+                let color_arr: [u8; 4] = [
+                    255,
+                    255,
+                    255,
+                    (alpha * 255.0) as u8,
+                ];
+
+                let mesh = Mesh {
+                    vertices: vec![
+                        Vertex { position: tl, uv: Vec2::new(u0, v0), color: color_arr, normal: Vec4::ZERO },
+                        Vertex { position: tr, uv: Vec2::new(u1, v0), color: color_arr, normal: Vec4::ZERO },
+                        Vertex { position: br, uv: Vec2::new(u1, v1), color: color_arr, normal: Vec4::ZERO },
+                        Vertex { position: bl, uv: Vec2::new(u0, v1), color: color_arr, normal: Vec4::ZERO },
+                    ],
+                    indices: vec![0, 1, 2, 0, 2, 3],
+                    texture: Some(texture.clone()),
+                };
+
+                draw_mesh(&mesh);
+            }
         }
     }
 

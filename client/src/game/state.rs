@@ -683,43 +683,81 @@ impl FallingTreeEffect {
     }
 }
 
-/// A rock that's crumbling after being fully mined (shrink & sink)
+/// A rock fragment that splits off when a rock is fully mined
+pub struct RockFragment {
+    pub grid_x: u8,           // 0 or 1 (column in 2x2 grid)
+    pub grid_y: u8,           // 0 or 1 (row in 2x2 grid)
+    pub drift_x: f32,         // drift in pixels per second
+    pub drift_y: f32,
+    pub rotation_speed: f32,  // radians per second
+}
+
+/// A rock splitting apart after being fully mined
 pub struct CrumblingRockEffect {
     pub x: i32,
     pub y: i32,
     pub gid: u32,
     pub started_at: f64,
+    pub fragments: Vec<RockFragment>,
 }
 
 impl CrumblingRockEffect {
-    pub const DURATION: f64 = 1.0;
+    pub const DURATION: f64 = 1.2; // slightly longer for scatter to settle
 
     pub fn new(x: i32, y: i32, gid: u32) -> Self {
+        use macroquad::rand::gen_range;
+
+        // Create 4 fragments in a 2x2 grid, each drifting outward
+        let spread = 35.0; // base drift speed in pixels/sec
+        let fragments = vec![
+            RockFragment {
+                grid_x: 0, grid_y: 0, // top-left piece
+                drift_x: gen_range(-spread - 10.0, -spread + 10.0),
+                drift_y: gen_range(-spread - 5.0, -spread + 10.0),
+                rotation_speed: gen_range(-2.0, -0.5),
+            },
+            RockFragment {
+                grid_x: 1, grid_y: 0, // top-right piece
+                drift_x: gen_range(spread - 10.0, spread + 10.0),
+                drift_y: gen_range(-spread - 5.0, -spread + 10.0),
+                rotation_speed: gen_range(0.5, 2.0),
+            },
+            RockFragment {
+                grid_x: 0, grid_y: 1, // bottom-left piece
+                drift_x: gen_range(-spread - 5.0, -spread + 15.0),
+                drift_y: gen_range(5.0, 20.0),
+                rotation_speed: gen_range(-2.0, -0.5),
+            },
+            RockFragment {
+                grid_x: 1, grid_y: 1, // bottom-right piece
+                drift_x: gen_range(spread - 15.0, spread + 5.0),
+                drift_y: gen_range(5.0, 20.0),
+                rotation_speed: gen_range(0.5, 2.0),
+            },
+        ];
+
         Self {
             x,
             y,
             gid,
             started_at: macroquad::time::get_time(),
+            fragments,
         }
     }
 
-    pub fn get_transform(&self) -> (f32, f32, f32, f32) {
+    /// Returns (progress 0-1, alpha 0-1) for the overall effect
+    pub fn get_progress_alpha(&self) -> (f32, f32) {
         let elapsed = macroquad::time::get_time() - self.started_at;
         let progress = (elapsed / Self::DURATION).min(1.0) as f32;
 
-        let ease = progress * progress;
-        let scale = 1.0 - ease * 0.7;
-        let y_offset = ease * 15.0;
-
-        let alpha = if progress > 0.6 {
-            1.0 - ((progress - 0.6) / 0.4)
+        // Fade out in the last 50%
+        let alpha = if progress > 0.5 {
+            1.0 - ((progress - 0.5) / 0.5)
         } else {
             1.0
         };
 
-        let wobble_x = (elapsed * 30.0).sin() as f32 * (1.0 - progress) * 2.0;
-
-        (scale, alpha, y_offset, wobble_x)
+        (progress, alpha)
     }
 
     pub fn is_finished(&self) -> bool {
