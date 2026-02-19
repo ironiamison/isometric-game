@@ -110,6 +110,7 @@ export interface EntityDefinition {
     questGiver?: boolean;
     merchant?: boolean;
     craftsman?: boolean;
+    stationType?: string;
   };
 }
 
@@ -119,6 +120,7 @@ export interface EntityRegistry {
     hostile: EntityDefinition[];
     questGiver: EntityDefinition[];
     merchant: EntityDefinition[];
+    station: EntityDefinition[];
     other: EntityDefinition[];
   };
 }

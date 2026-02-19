@@ -14,6 +14,7 @@ interface TOMLEntityBehaviors {
   quest_giver?: boolean;
   merchant?: boolean;
   craftsman?: boolean;
+  station_type?: string;
   wander_enabled?: boolean;
 }
 
@@ -35,6 +36,7 @@ export class EntityRegistryLoader {
       hostile: [],
       questGiver: [],
       merchant: [],
+      station: [],
       other: [],
     },
   };
@@ -61,6 +63,7 @@ export class EntityRegistryLoader {
       `${basePath}/npcs/arena.toml`,
       `${basePath}/npcs/merchants.toml`,
       `${basePath}/npcs/quest_givers.toml`,
+      `${basePath}/npcs/stations.toml`,
       // Monsters
       `${basePath}/monsters/pig.toml`,
       `${basePath}/monsters/forest_creatures.toml`,
@@ -107,6 +110,7 @@ export class EntityRegistryLoader {
           questGiver: data.behaviors?.quest_giver ?? false,
           merchant: data.behaviors?.merchant ?? false,
           craftsman: data.behaviors?.craftsman ?? false,
+          stationType: data.behaviors?.station_type,
         },
       };
 
@@ -119,6 +123,7 @@ export class EntityRegistryLoader {
       hostile: [],
       questGiver: [],
       merchant: [],
+      station: [],
       other: [],
     };
 
@@ -134,6 +139,10 @@ export class EntityRegistryLoader {
       }
       if (entity.behaviors.merchant) {
         this.registry.byType.merchant.push(entity);
+        categorized = true;
+      }
+      if (entity.behaviors.stationType) {
+        this.registry.byType.station.push(entity);
         categorized = true;
       }
       if (!categorized) {

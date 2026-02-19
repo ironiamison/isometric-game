@@ -6,7 +6,7 @@ export function EntityPanel() {
   const { entityRegistry, selectedEntityId, setSelectedEntityId, setActiveTool } = useEditorStore();
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(['hostile', 'questGiver', 'merchant', 'other'])
+    new Set(['hostile', 'questGiver', 'merchant', 'station', 'other'])
   );
 
   if (!entityRegistry) {
@@ -42,6 +42,7 @@ export function EntityPanel() {
     { key: 'hostile', label: 'Hostile', entities: filterEntities(entityRegistry.byType.hostile) },
     { key: 'questGiver', label: 'Quest Givers', entities: filterEntities(entityRegistry.byType.questGiver) },
     { key: 'merchant', label: 'Merchants', entities: filterEntities(entityRegistry.byType.merchant) },
+    { key: 'station', label: 'Stations', entities: filterEntities(entityRegistry.byType.station) },
     { key: 'other', label: 'Other', entities: filterEntities(entityRegistry.byType.other) },
   ];
 
