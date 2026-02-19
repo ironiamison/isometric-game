@@ -2854,8 +2854,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "miningSwing" => {
             if let Some(value) = data {
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
-                let _rock_x = extract_i32(value, "rock_x").unwrap_or(0);
-                let _rock_y = extract_i32(value, "rock_y").unwrap_or(0);
+                let rock_x = extract_i32(value, "rock_x").unwrap_or(0);
+                let rock_y = extract_i32(value, "rock_y").unwrap_or(0);
 
                 // Server says player swung - play attack animation and sound
                 let has_weapon = state
@@ -2870,6 +2870,23 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Play mining sound effect
                 state.pending_sfx.push("mining".to_string());
+
+                // Add rock shake effect
+                state
+                    .rock_shake_effects
+                    .push(crate::game::state::RockShakeEffect::new(rock_x, rock_y));
+
+                // Spawn rock debris particles
+                let rock_height = 30.0;
+                for _ in 0..4 {
+                    state
+                        .rock_particles
+                        .push(crate::game::state::RockParticle::new_at_rock(
+                            rock_x,
+                            rock_y,
+                            rock_height,
+                        ));
+                }
             }
         }
 
@@ -2914,6 +2931,23 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     y,
                     respawn_delay_ms
                 );
+
+                // Add crumbling rock effect
+                state
+                    .crumbling_rocks
+                    .push(crate::game::state::CrumblingRockEffect::new(x, y, gid));
+
+                // Spawn a burst of rock debris when rock crumbles
+                let rock_height = 30.0;
+                for _ in 0..12 {
+                    state
+                        .rock_particles
+                        .push(crate::game::state::RockParticle::new_at_rock(
+                            x,
+                            y,
+                            rock_height,
+                        ));
+                }
 
                 // Mark rock as depleted (hides the static rock, shows respawn timer)
                 state.depleted_rocks.insert(
