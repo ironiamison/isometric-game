@@ -64,6 +64,7 @@ pub struct PrototypeStats {
     pub no_shadow: bool,
     pub render_offset_y: f32,
     pub hp_regen_percent_per_sec: f32,
+    pub station_type: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -146,6 +147,7 @@ impl Npc {
             hp_regen_percent_per_sec: prototype.stats.hp_regen_percent_per_sec,
             no_shadow: prototype.behaviors.no_shadow,
             render_offset_y: prototype.behaviors.render_offset_y,
+            station_type: prototype.behaviors.station_type.clone(),
         };
 
         Self {
@@ -243,10 +245,14 @@ impl Npc {
         self.stats.is_banker
     }
 
+    pub fn station_type(&self) -> Option<&str> {
+        self.stats.station_type.as_deref()
+    }
+
     /// Returns true if this NPC can be attacked by players.
-    /// Quest givers, merchants, altars, and bankers cannot be attacked.
+    /// Quest givers, merchants, altars, bankers, and stations cannot be attacked.
     pub fn is_attackable(&self) -> bool {
-        !self.stats.is_quest_giver && !self.stats.is_merchant && !self.stats.is_altar && !self.stats.is_banker
+        !self.stats.is_quest_giver && !self.stats.is_merchant && !self.stats.is_altar && !self.stats.is_banker && self.stats.station_type.is_none()
     }
 
     pub fn name(&self) -> String {
@@ -758,6 +764,8 @@ pub struct NpcUpdate {
     pub no_shadow: bool,
     /// Vertical pixel offset for rendering (positive = down)
     pub render_offset_y: f32,
+    /// Station type (e.g. "furnace", "anvil") if this NPC is a crafting station
+    pub station_type: Option<String>,
 }
 
 impl From<&Npc> for NpcUpdate {
@@ -792,6 +800,7 @@ impl From<&Npc> for NpcUpdate {
             just_attacked: npc.just_attacked,
             no_shadow: npc.stats.no_shadow,
             render_offset_y: npc.stats.render_offset_y,
+            station_type: npc.station_type().map(|s| s.to_string()),
         }
     }
 }

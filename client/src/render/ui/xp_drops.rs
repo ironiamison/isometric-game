@@ -92,7 +92,7 @@ impl Renderer {
                 SkillType::Fishing => (4, 6),
                 SkillType::Farming => (4, 6),
                 SkillType::Mining => (0, 5),
-                SkillType::Smithing => (4, 6),
+                SkillType::Smithing => (5, 6),
                 SkillType::Prayer => (3, 6),
                 SkillType::Magic => (6, 6),
                 SkillType::Woodcutting => (7, 6),

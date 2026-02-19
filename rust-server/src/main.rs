@@ -99,7 +99,6 @@ struct AppState {
     prayer_registry: Arc<PrayerRegistry>,
     quest_registry: Arc<QuestRegistry>,
     crafting_registry: Arc<CraftingRegistry>,
-    station_registry: Arc<crate::crafting::StationRegistry>,
     interior_registry: Arc<InteriorRegistry>,
     instance_manager: Arc<InstanceManager>,
     /// Tracks which instance each player is currently in (None = overworld)
@@ -154,12 +153,6 @@ impl AppState {
             error!("Failed to load crafting registry: {}", e);
         }
 
-        // Load station registry from TOML file
-        let mut station_registry = crate::crafting::StationRegistry::new();
-        if let Err(e) = station_registry.load_from_file(&data_dir.join("crafting_stations.toml")) {
-            error!("Failed to load station registry: {}", e);
-        }
-
         // Load interior registry from JSON files
         let interior_registry = Arc::new(
             InteriorRegistry::load_from_directory("maps/interiors")
@@ -211,7 +204,6 @@ impl AppState {
             prayer_registry: Arc::new(prayer_registry),
             quest_registry,
             crafting_registry: Arc::new(crafting_registry),
-            station_registry: Arc::new(station_registry),
             interior_registry,
             instance_manager,
             player_instances: Arc::new(RwLock::new(HashMap::new())),
@@ -1542,22 +1534,6 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
-    // Send station definitions (GID mappings for furnace/anvil/etc.)
-    let station_defs = ServerMessage::StationDefinitions {
-        stations: state.station_registry.all_station_gids()
-            .into_iter()
-            .map(|(id, gids)| {
-                let display_name = state.station_registry.get(&id)
-                    .map(|s| s.display_name.clone())
-                    .unwrap_or_default();
-                protocol::ClientStationDef { id, display_name, gids }
-            })
-            .collect(),
-    };
-    if let Ok(bytes) = protocol::encode_server_message(&station_defs) {
-        let _ = sender.send(Message::Binary(bytes)).await;
-    }
-
     // Send discovered recipes
     let discovered = room.get_player_discovered_recipes(&player_id).await;
     let discovered_msg = ServerMessage::DiscoveredRecipes {
@@ -2846,10 +2822,6 @@ async fn handle_client_message(
         }
 
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
-        // Furnace system messages
-        ClientMessage::OpenFurnace { tile_x, tile_y } => {
-            room.handle_open_furnace(player_id, tile_x, tile_y).await;
-        }
         ClientMessage::StartCraftBatch { recipe_id, quantity } => {
             room.handle_start_craft_batch(player_id, &recipe_id, quantity).await;
         }

@@ -2,17 +2,13 @@
 display_name = "Anvil"
 description = "A sturdy anvil for metalworking and armor crafting."
 interaction_range = 2
-gids = [1951]  # objects firstgid 1162 + mapper id 789
 
 [workbench]
 display_name = "Workbench"
 description = "A wooden workbench for crafting accessories and ammunition."
 interaction_range = 2
-gids = []
 
 [furnace]
 display_name = "Furnace"
 description = "A blazing furnace for smelting ore into bars and crafting jewelry."
 interaction_range = 2
-# Furnace is built from walls (firstgid 1): mapper ids 1896, 1897, 1898
-gids = [1897, 1898, 1899]

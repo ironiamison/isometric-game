@@ -1404,8 +1404,6 @@ pub struct GameState {
     // Crafting
     pub recipe_definitions: Vec<RecipeDefinition>,
     pub discovered_recipes: HashSet<String>,
-    /// Station GID mappings received from server (e.g. "furnace" -> [1234])
-    pub station_gids: HashMap<String, Vec<u32>>,
 
     // Camera and UI
     pub camera: Camera,
@@ -1533,7 +1531,6 @@ impl GameState {
             item_registry: ItemRegistry::new(),
             recipe_definitions: Vec::new(),
             discovered_recipes: HashSet::new(),
-            station_gids: HashMap::new(),
             camera: Camera::default(),
             ui_state: UiState::default(),
             server_tick: 0,

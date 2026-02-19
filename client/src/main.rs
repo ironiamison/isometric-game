@@ -739,10 +739,6 @@ fn run_game_frame(
             },
             InputCommand::Dash => ClientMessage::Dash,
             // Furnace commands
-            InputCommand::OpenFurnace { tile_x, tile_y } => ClientMessage::OpenFurnace {
-                tile_x: *tile_x,
-                tile_y: *tile_y,
-            },
             InputCommand::FurnaceCraft {
                 recipe_id,
                 quantity,

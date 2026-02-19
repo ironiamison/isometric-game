@@ -399,10 +399,6 @@ pub enum InputCommand {
     // Movement abilities
     Dash,
     // Furnace commands
-    OpenFurnace {
-        tile_x: i32,
-        tile_y: i32,
-    },
     FurnaceCraft {
         recipe_id: String,
         quantity: u32,
@@ -4556,13 +4552,19 @@ impl InputHandler {
                     }
                     // Handle interact target (NPC)
                     if let Some(ref npc_id) = path_state.interact_target {
-                        // Check if target is an altar
+                        // Check if target is an altar or station
                         if let Some(npc) = state.npcs.get(npc_id) {
                             if npc.is_altar {
                                 state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
                                     altar_npc_id: npc_id.clone(),
                                     altar_name: npc.display_name.clone(),
                                 });
+                            } else if npc.station_type.as_deref() == Some("furnace") {
+                                state.ui_state.furnace_open = true;
+                                state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                state.ui_state.furnace_selected_recipe = 0;
+                                state.ui_state.furnace_scroll_offset = 0.0;
+                                state.ui_state.furnace_quantity = 1;
                             } else if npc.is_alive() {
                                 commands.push(InputCommand::Interact {
                                     npc_id: npc_id.clone(),
@@ -5034,13 +5036,19 @@ impl InputHandler {
                                 let dist_to_player = (dx * dx + dy * dy).sqrt();
 
                                 if dist_to_player < INTERACT_RANGE {
-                                    // Check if NPC is an altar - open altar panel instead of dialogue
+                                    // Check if NPC is an altar or station
                                     if npc.is_altar {
                                         state.ui_state.altar_panel =
                                             Some(crate::game::AltarPanelState {
                                                 altar_npc_id: npc_id.clone(),
                                                 altar_name: npc.display_name.clone(),
                                             });
+                                    } else if npc.station_type.as_deref() == Some("furnace") {
+                                        state.ui_state.furnace_open = true;
+                                        state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                        state.ui_state.furnace_selected_recipe = 0;
+                                        state.ui_state.furnace_scroll_offset = 0.0;
+                                        state.ui_state.furnace_quantity = 1;
                                     } else {
                                         commands.push(InputCommand::Interact { npc_id });
                                     }
@@ -5540,43 +5548,6 @@ impl InputHandler {
                     }
                 }
                 if !sat_on_chair {
-                    // Check facing tile for station (furnace/anvil) before NPC check
-                    // Stations can be objects or walls, so check both
-                    let mut opened_furnace = false;
-                    if let Some(player) = state.players.get(local_id) {
-                        let px = player.x.round() as i32;
-                        let py = player.y.round() as i32;
-                        let (fdx, fdy) = player.direction.to_unit_vector();
-                        let face_x = px + fdx as i32;
-                        let face_y = py + fdy as i32;
-
-                        // Collect GID from object or wall at facing tile
-                        let facing_gid = state
-                            .chunk_manager
-                            .get_object_at_exact(face_x, face_y)
-                            .map(|obj| obj.gid)
-                            .or_else(|| {
-                                state
-                                    .chunk_manager
-                                    .get_wall_at(face_x, face_y)
-                                    .map(|w| w.gid)
-                            });
-
-                        if let Some(gid) = facing_gid {
-                            let is_furnace = state
-                                .station_gids
-                                .get("furnace")
-                                .map_or(false, |gids| gids.contains(&gid));
-                            if is_furnace {
-                                commands.push(InputCommand::OpenFurnace {
-                                    tile_x: face_x,
-                                    tile_y: face_y,
-                                });
-                                opened_furnace = true;
-                            }
-                        }
-                    }
-                    if !opened_furnace {
                     if let Some(player) = state.players.get(local_id) {
                         // Find nearest NPC within interaction range (2.5 tiles)
                         const INTERACT_RANGE: f32 = 2.5;
@@ -5601,7 +5572,7 @@ impl InputHandler {
 
                         if let Some((npc_id, _)) = nearest_npc {
                             log::info!("Interacting with NPC: {}", npc_id);
-                            // Check if NPC is an altar - open altar panel instead of dialogue
+                            // Check if NPC is an altar or station
                             if let Some(npc) = state.npcs.get(&npc_id) {
                                 if npc.is_altar {
                                     state.ui_state.altar_panel =
@@ -5609,6 +5580,12 @@ impl InputHandler {
                                             altar_npc_id: npc_id.clone(),
                                             altar_name: npc.display_name.clone(),
                                         });
+                                } else if npc.station_type.as_deref() == Some("furnace") {
+                                    state.ui_state.furnace_open = true;
+                                    state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                    state.ui_state.furnace_selected_recipe = 0;
+                                    state.ui_state.furnace_scroll_offset = 0.0;
+                                    state.ui_state.furnace_quantity = 1;
                                 } else {
                                     commands.push(InputCommand::Interact { npc_id });
                                 }
@@ -5636,7 +5613,6 @@ impl InputHandler {
                             }
                         }
                     }
-                    } // if !opened_furnace
                 }
             }
         }

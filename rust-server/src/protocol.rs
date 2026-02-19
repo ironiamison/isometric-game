@@ -222,11 +222,6 @@ pub enum ClientMessage {
     #[serde(rename = "bankWithdrawGold")]
     BankWithdrawGold { amount: i32 },
 
-    // ===== Furnace System Messages =====
-    /// Player requests to open the furnace UI at a tile
-    #[serde(rename = "openFurnace")]
-    OpenFurnace { tile_x: i32, tile_y: i32 },
-
     /// Player starts a batch craft (furnace smelting with quantity)
     #[serde(rename = "startCraftBatch")]
     StartCraftBatch { recipe_id: String, quantity: u32 },
@@ -289,7 +284,6 @@ impl ClientMessage {
             ClientMessage::BankWithdraw { .. } => "BankWithdraw",
             ClientMessage::BankDepositGold { .. } => "BankDepositGold",
             ClientMessage::BankWithdrawGold { .. } => "BankWithdrawGold",
-            ClientMessage::OpenFurnace { .. } => "OpenFurnace",
             ClientMessage::StartCraftBatch { .. } => "StartCraftBatch",
             ClientMessage::Ping { .. } => "Ping",
         }
@@ -744,12 +738,6 @@ pub enum ServerMessage {
         items_gained: Vec<(String, u32)>,
         xp_gained: u32,
     },
-    /// Station definitions sent on connect (GID mappings for furnace/anvil/etc.)
-    StationDefinitions {
-        stations: Vec<ClientStationDef>,
-    },
-    /// Signal to client to open the furnace UI
-    FurnaceOpen,
     /// Batch crafting progress update
     CraftingBatchProgress {
         completed: u32,
@@ -1083,14 +1071,6 @@ pub struct RecipeResult {
     pub count: i32,
 }
 
-/// Station definition for client-side GID lookup
-#[derive(Debug, Clone, Serialize)]
-pub struct ClientStationDef {
-    pub id: String,
-    pub display_name: String,
-    pub gids: Vec<u32>,
-}
-
 /// Recipe definition for client-side registry
 #[derive(Debug, Clone, Serialize)]
 pub struct ClientRecipeDef {
@@ -1209,8 +1189,6 @@ impl ServerMessage {
             ServerMessage::CraftingStarted { .. } => "craftingStarted",
             ServerMessage::CraftingCancelled { .. } => "craftingCancelled",
             ServerMessage::CraftingCompleted { .. } => "craftingCompleted",
-            ServerMessage::StationDefinitions { .. } => "stationDefinitions",
-            ServerMessage::FurnaceOpen => "furnaceOpen",
             ServerMessage::CraftingBatchProgress { .. } => "craftingBatchProgress",
             // Prayer system messages
             ServerMessage::PrayerStateUpdate { .. } => "prayerStateUpdate",
@@ -1468,6 +1446,9 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
     ));
     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
     nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
+    if let Some(ref st) = n.station_type {
+        nmap.push((Value::String("station_type".into()), Value::String(st.clone().into())));
+    }
     nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
     nmap.push((
         Value::String("just_attacked".into()),
@@ -1878,6 +1859,9 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     ));
                     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
                     nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
+                    if let Some(ref st) = n.station_type {
+                        nmap.push((Value::String("station_type".into()), Value::String(st.clone().into())));
+                    }
                     nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
                     nmap.push((
                         Value::String("just_attacked".into()),
@@ -4533,35 +4517,6 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::StationDefinitions { stations } => {
-            let mut map = Vec::new();
-            let station_values: Vec<Value> = stations
-                .iter()
-                .map(|s| {
-                    let mut smap = Vec::new();
-                    smap.push((
-                        Value::String("id".into()),
-                        Value::String(s.id.clone().into()),
-                    ));
-                    smap.push((
-                        Value::String("display_name".into()),
-                        Value::String(s.display_name.clone().into()),
-                    ));
-                    let gid_values: Vec<Value> = s
-                        .gids
-                        .iter()
-                        .map(|g| Value::Integer((*g as i64).into()))
-                        .collect();
-                    smap.push((Value::String("gids".into()), Value::Array(gid_values)));
-                    Value::Map(smap)
-                })
-                .collect();
-            map.push((Value::String("stations".into()), Value::Array(station_values)));
-            Value::Map(map)
-        }
-        ServerMessage::FurnaceOpen => {
-            Value::Map(Vec::new())
-        }
         ServerMessage::CraftingBatchProgress { completed, total } => {
             let mut map = Vec::new();
             map.push((
@@ -4892,12 +4847,6 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "bankWithdrawGold" => {
             let amount = extract_i32(msg_data, "amount").unwrap_or(0);
             Ok(ClientMessage::BankWithdrawGold { amount })
-        }
-        // Furnace messages
-        "openFurnace" => {
-            let tile_x = extract_i32(msg_data, "tile_x").unwrap_or(0);
-            let tile_y = extract_i32(msg_data, "tile_y").unwrap_or(0);
-            Ok(ClientMessage::OpenFurnace { tile_x, tile_y })
         }
         "startCraftBatch" => {
             let recipe_id = extract_string(msg_data, "recipe_id").unwrap_or_default();

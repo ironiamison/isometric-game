@@ -479,16 +479,6 @@ impl ChunkManager {
             .find(|obj| obj.tile_x == tile_x && obj.tile_y == tile_y)
     }
 
-    /// Get wall at exact tile position (returns first matching wall)
-    pub fn get_wall_at(&self, tile_x: i32, tile_y: i32) -> Option<&Wall> {
-        let coord = ChunkCoord::from_world(tile_x, tile_y);
-        let chunk = self.chunks.get(&coord)?;
-        chunk
-            .walls
-            .iter()
-            .find(|w| w.tile_x == tile_x && w.tile_y == tile_y)
-    }
-
     /// Load an interior as a single chunk at (0,0)
     pub fn load_interior(
         &mut self,

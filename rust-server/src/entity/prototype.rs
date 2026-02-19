@@ -101,6 +101,8 @@ pub struct RawEntityBehaviors {
     pub render_offset_y: Option<f32>,
     /// Initial facing direction (e.g. "down", "up", "left", "right")
     pub facing: Option<String>,
+    #[serde(default)]
+    pub station_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -291,6 +293,7 @@ pub struct EntityBehaviors {
     pub render_offset_y: f32,
     /// Initial facing direction (e.g. "down", "up", "left", "right")
     pub facing: Option<String>,
+    pub station_type: Option<String>,
 }
 
 impl Default for EntityBehaviors {
@@ -311,6 +314,7 @@ impl Default for EntityBehaviors {
             no_shadow: false,
             render_offset_y: 0.0,
             facing: None,
+            station_type: None,
         }
     }
 }
@@ -333,6 +337,7 @@ impl From<&RawEntityBehaviors> for EntityBehaviors {
             no_shadow: raw.no_shadow,
             render_offset_y: raw.render_offset_y.unwrap_or(0.0),
             facing: raw.facing.clone(),
+            station_type: raw.station_type.clone(),
         }
     }
 }

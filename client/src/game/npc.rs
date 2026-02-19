@@ -79,6 +79,8 @@ pub struct Npc {
     pub no_shadow: bool,
     /// Vertical pixel offset for rendering (positive = down)
     pub render_offset_y: f32,
+    /// Station type (e.g. "furnace", "anvil") if this NPC is a crafting station
+    pub station_type: Option<String>,
 }
 
 impl Npc {
@@ -112,12 +114,13 @@ impl Npc {
             speech_bubble: None,
             no_shadow: false,
             render_offset_y: 0.0,
+            station_type: None,
         }
     }
 
     pub fn name(&self) -> String {
         // Don't show level for friendly NPCs (quest givers, merchants, altars)
-        if self.is_quest_giver || self.is_merchant || self.is_altar || self.is_banker {
+        if self.is_quest_giver || self.is_merchant || self.is_altar || self.is_banker || self.station_type.is_some() {
             self.display_name.clone()
         } else {
             format!("{} Lv.{}", self.display_name, self.level)
@@ -131,7 +134,7 @@ impl Npc {
     /// Returns true if this NPC can be attacked/targeted by players.
     /// Quest givers, merchants, altars, and bankers cannot be attacked.
     pub fn is_attackable(&self) -> bool {
-        !self.is_quest_giver && !self.is_merchant && !self.is_altar && !self.is_banker
+        !self.is_quest_giver && !self.is_merchant && !self.is_altar && !self.is_banker && self.station_type.is_none()
     }
 
     pub fn is_alive(&self) -> bool {

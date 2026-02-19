@@ -8,8 +8,6 @@ pub struct StationDefinition {
     pub display_name: String,
     pub description: String,
     pub interaction_range: u32,
-    #[serde(default)]
-    pub gids: Vec<u32>,
 }
 
 #[derive(Debug, Default)]
@@ -41,19 +39,4 @@ impl StationRegistry {
         self.stations.contains_key(id)
     }
 
-    /// Find the station that owns a given map object GID
-    pub fn station_for_gid(&self, gid: u32) -> Option<(&str, &StationDefinition)> {
-        self.stations
-            .iter()
-            .find(|(_, def)| def.gids.contains(&gid))
-            .map(|(id, def)| (id.as_str(), def))
-    }
-
-    /// Get all station GIDs as a map (for sending to client)
-    pub fn all_station_gids(&self) -> HashMap<String, Vec<u32>> {
-        self.stations
-            .iter()
-            .map(|(id, def)| (id.clone(), def.gids.clone()))
-            .collect()
-    }
 }

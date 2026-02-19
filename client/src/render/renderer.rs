@@ -3743,6 +3743,8 @@ impl Renderer {
                 Color::from_rgba(255, 215, 0, 255)
             } else if npc.is_merchant {
                 Color::from_rgba(150, 255, 150, 255)
+            } else if npc.station_type.is_some() {
+                Color::from_rgba(255, 180, 100, 255)
             } else {
                 Color::from_rgba(255, 255, 255, 255)
             };
@@ -6353,6 +6355,8 @@ impl Renderer {
             Color::from_rgba(255, 215, 0, 255) // Gold for bankers
         } else if npc.is_merchant {
             Color::from_rgba(150, 255, 150, 255) // Light green for merchants
+        } else if npc.station_type.is_some() {
+            Color::from_rgba(255, 180, 100, 255) // Warm orange for stations
         } else {
             Color::from_rgba(255, 255, 255, 255) // White for other friendly NPCs
         };

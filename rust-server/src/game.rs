@@ -5242,32 +5242,6 @@ impl GameRoom {
         }
     }
 
-    // =========================================================================
-    // Furnace Handlers
-    // =========================================================================
-
-    /// Player requests to open the furnace UI at a given tile
-    pub async fn handle_open_furnace(&self, player_id: &str, tile_x: i32, tile_y: i32) {
-        // Validate player is active/alive and within range
-        {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => p,
-                _ => return,
-            };
-
-            let dx = (player.x as i32 - tile_x).abs();
-            let dy = (player.y as i32 - tile_y).abs();
-            let dist = dx.max(dy);
-            if dist > 2 {
-                return;
-            }
-        }
-
-        // Send furnace open (client filters furnace recipes locally)
-        self.send_to_player(player_id, ServerMessage::FurnaceOpen).await;
-    }
-
     /// Start a batch craft (smelting with quantity)
     pub async fn handle_start_craft_batch(&self, player_id: &str, recipe_id: &str, quantity: u32) {
         use crate::crafting::definition::RecipeCategory;
