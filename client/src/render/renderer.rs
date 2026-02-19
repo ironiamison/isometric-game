@@ -2902,6 +2902,20 @@ impl Renderer {
                 alpha: f32,
                 y_offset: f32,
             },
+            CrumblingRock {
+                gid: u32,
+                tile_x: i32,
+                tile_y: i32,
+                scale: f32,
+                alpha: f32,
+                y_offset: f32,
+                wobble_x: f32,
+            },
+            RockTimer {
+                tile_x: i32,
+                tile_y: i32,
+                progress: f32,
+            },
         }
 
         // Pre-allocate with estimated capacity to reduce allocations
@@ -3025,6 +3039,15 @@ impl Renderer {
             .map(|shake| ((shake.x, shake.y), shake.get_offset()))
             .collect();
 
+        // Build frame-local lookup tables for rock effects
+        let crumbling_rock_positions: HashSet<(i32, i32)> =
+            state.crumbling_rocks.iter().map(|cr| (cr.x, cr.y)).collect();
+        let rock_shake_offsets: HashMap<(i32, i32), f32> = state
+            .rock_shake_effects
+            .iter()
+            .map(|shake| ((shake.x, shake.y), shake.get_offset()))
+            .collect();
+
         // Add map objects and walls from loaded chunks with chunk-level pre-culling
         let chunk_size = CHUNK_SIZE as f32;
         for (coord, chunk) in state.chunk_manager.chunks().iter() {
@@ -3055,9 +3078,19 @@ impl Renderer {
                 if falling_tree_positions.contains(&(obj.tile_x, obj.tile_y)) {
                     continue;
                 }
+                // Skip depleted rocks (they're hidden until respawn)
+                if state.depleted_rocks.contains_key(&(obj.tile_x, obj.tile_y)) {
+                    continue;
+                }
+                // Skip rocks that are currently crumbling
+                if crumbling_rock_positions.contains(&(obj.tile_x, obj.tile_y)) {
+                    continue;
+                }
                 let depth = calculate_depth(wx, wy, 1);
-                // Check if tree is shaking and apply offset
-                if let Some(offset) = tree_shake_offsets.get(&(obj.tile_x, obj.tile_y)).copied() {
+                // Check if object is shaking (tree or rock) and apply offset
+                let tree_shake = tree_shake_offsets.get(&(obj.tile_x, obj.tile_y)).copied();
+                let rock_shake = rock_shake_offsets.get(&(obj.tile_x, obj.tile_y)).copied();
+                if let Some(offset) = tree_shake.or(rock_shake) {
                     renderables.push((depth, Renderable::ChunkObjectShaking(obj, offset)));
                 } else {
                     renderables.push((depth, Renderable::ChunkObject(obj)));
@@ -3099,6 +3132,30 @@ impl Renderer {
             ));
         }
 
+        // Add depleted rock respawn timers
+        for ((tile_x, tile_y), info) in &state.depleted_rocks {
+            let wx = *tile_x as f32;
+            let wy = *tile_y as f32;
+            if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
+                continue;
+            }
+            let total_duration = info.respawn_at - info.depleted_at;
+            if total_duration <= 0.0 {
+                continue;
+            }
+            let elapsed = current_time - info.depleted_at;
+            let progress = (elapsed / total_duration).clamp(0.0, 1.0) as f32;
+            let depth = calculate_depth(wx, wy, 1);
+            renderables.push((
+                depth,
+                Renderable::RockTimer {
+                    tile_x: *tile_x,
+                    tile_y: *tile_y,
+                    progress,
+                },
+            ));
+        }
+
         // Add falling trees (trees that were just chopped down)
         for ft in &state.falling_trees {
             let wx = ft.x as f32;
@@ -3117,6 +3174,29 @@ impl Renderer {
                     angle,
                     alpha,
                     y_offset,
+                },
+            ));
+        }
+
+        // Add crumbling rocks
+        for cr in &state.crumbling_rocks {
+            let wx = cr.x as f32;
+            let wy = cr.y as f32;
+            if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
+                continue;
+            }
+            let (scale, alpha, y_offset, wobble_x) = cr.get_transform();
+            let depth = calculate_depth(wx, wy, 1);
+            renderables.push((
+                depth,
+                Renderable::CrumblingRock {
+                    gid: cr.gid,
+                    tile_x: cr.x,
+                    tile_y: cr.y,
+                    scale,
+                    alpha,
+                    y_offset,
+                    wobble_x,
                 },
             ));
         }
@@ -3187,6 +3267,27 @@ impl Renderer {
                         &state.camera,
                     );
                 }
+                Renderable::CrumblingRock {
+                    gid,
+                    tile_x,
+                    tile_y,
+                    scale,
+                    alpha,
+                    y_offset,
+                    wobble_x,
+                } => {
+                    self.render_crumbling_rock(
+                        gid, tile_x, tile_y, scale, alpha, y_offset, wobble_x, &state.camera,
+                    );
+                }
+                Renderable::RockTimer {
+                    tile_x,
+                    tile_y,
+                    progress,
+                } => {
+                    // Reuse tree timer rendering — same pie chart style
+                    self.render_tree_timer(tile_x, tile_y, progress, &state.camera);
+                }
             }
         }
 
@@ -3240,6 +3341,51 @@ impl Renderer {
             ];
 
             // Draw as two triangles
+            draw_triangle(
+                Vec2::new(points[0].0, points[0].1),
+                Vec2::new(points[1].0, points[1].1),
+                Vec2::new(points[2].0, points[2].1),
+                color,
+            );
+            draw_triangle(
+                Vec2::new(points[0].0, points[0].1),
+                Vec2::new(points[2].0, points[2].1),
+                Vec2::new(points[3].0, points[3].1),
+                color,
+            );
+        }
+
+        // Render rock debris particles (world-space, after depth-sorted objects)
+        for particle in &state.rock_particles {
+            if !is_visible_world(particle.tile_x, particle.tile_y) {
+                continue;
+            }
+
+            let (screen_x, base_screen_y) =
+                world_to_screen(particle.tile_x, particle.tile_y, &state.camera);
+            let screen_y = base_screen_y - particle.height * state.camera.zoom;
+
+            let alpha = particle.get_alpha();
+            let color = Color::new(
+                particle.color.r,
+                particle.color.g,
+                particle.color.b,
+                particle.color.a * alpha,
+            );
+            let size = particle.size * state.camera.zoom;
+
+            // Draw as a small rotated square (chunkier than leaf diamonds)
+            let cos_r = particle.rotation.cos();
+            let sin_r = particle.rotation.sin();
+            let hs = size * 0.5;
+
+            let points = [
+                (screen_x + cos_r * (-hs) - sin_r * (-hs), screen_y + sin_r * (-hs) + cos_r * (-hs)),
+                (screen_x + cos_r * hs - sin_r * (-hs), screen_y + sin_r * hs + cos_r * (-hs)),
+                (screen_x + cos_r * hs - sin_r * hs, screen_y + sin_r * hs + cos_r * hs),
+                (screen_x + cos_r * (-hs) - sin_r * hs, screen_y + sin_r * (-hs) + cos_r * hs),
+            ];
+
             draw_triangle(
                 Vec2::new(points[0].0, points[0].1),
                 Vec2::new(points[1].0, points[1].1),
@@ -7472,6 +7618,52 @@ impl Renderer {
             };
 
             draw_mesh(&mesh);
+        }
+    }
+
+    /// Render a crumbling rock (rock that was just fully mined — shrink & sink)
+    fn render_crumbling_rock(
+        &self,
+        gid: u32,
+        tile_x: i32,
+        tile_y: i32,
+        scale: f32,
+        alpha: f32,
+        y_offset: f32,
+        wobble_x: f32,
+        camera: &Camera,
+    ) {
+        let (base_x, base_y) =
+            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+        let zoom = camera.zoom;
+
+        if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
+            let (tex_width, tex_height) = if let Some(r) = source_rect {
+                (r.w, r.h)
+            } else {
+                (texture.width(), texture.height())
+            };
+
+            let scaled_width = (tex_width * zoom * scale).round();
+            let scaled_height = (tex_height * zoom * scale).round();
+
+            // Anchor at base center, apply wobble and sink
+            let draw_x = (base_x - scaled_width / 2.0 + wobble_x * zoom).round();
+            let draw_y = (base_y - scaled_height + y_offset * zoom).round();
+
+            let color_with_alpha = Color::new(1.0, 1.0, 1.0, alpha);
+
+            draw_texture_ex(
+                texture,
+                draw_x,
+                draw_y,
+                color_with_alpha,
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(scaled_width, scaled_height)),
+                    source: source_rect,
+                    ..Default::default()
+                },
+            );
         }
     }
 
