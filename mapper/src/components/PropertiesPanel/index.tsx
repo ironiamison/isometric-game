@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useEditorStore } from '@/state/store';
 import { objectLoader } from '@/core/ObjectLoader';
 import { interiorStorage } from '@/core/InteriorStorage';
-import type { EntitySpawn, Portal, ExitPortal, Wall } from '@/types';
+import type { EntitySpawn, Portal, ExitPortal } from '@/types';
 import styles from './PropertiesPanel.module.css';
 
 const GATHERING_ZONE_TYPES = [
