@@ -7,6 +7,7 @@ use crate::game::{
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
 use crate::render::isometric::screen_to_world;
+use crate::render::{section_sort_key, SECTION_HEADER_HEIGHT};
 use crate::settings::{save_ui_settings, UiSettings};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
@@ -3225,40 +3226,66 @@ impl InputHandler {
                     if key_navigated {
                         let craft_line_h = 28.0_f32;
                         // Count the actual row position including undiscovered "????" entries
-                        // The renderer shows ALL recipes (discovered + undiscovered) in order,
-                        // but selection index only counts discovered ones
-                        let all_in_category: Vec<&crate::game::RecipeDefinition> = filtered_recipes
-                            .iter()
-                            .filter(|r| {
-                                if current_category == "supplies" {
-                                    r.category == "consumables" || r.category == "materials"
-                                } else {
-                                    r.category == current_category
-                                }
-                            })
-                            .collect();
-                        let mut row = 0usize;
+                        // and section headers (must match renderer layout)
+                        let mut all_in_category: Vec<&crate::game::RecipeDefinition> =
+                            filtered_recipes
+                                .iter()
+                                .filter(|r| {
+                                    if current_category == "supplies" {
+                                        r.category == "consumables" || r.category == "materials"
+                                    } else {
+                                        r.category == current_category
+                                    }
+                                })
+                                .collect();
+                        // Sort by section to match renderer order
+                        all_in_category.sort_by(|a, b| {
+                            let sa = a.section.as_deref().unwrap_or("");
+                            let sb = b.section.as_deref().unwrap_or("");
+                            section_sort_key(sa)
+                                .cmp(&section_sort_key(sb))
+                                .then_with(|| a.level_required.cmp(&b.level_required))
+                                .then_with(|| a.display_name.cmp(&b.display_name))
+                        });
+                        // Walk through items tracking pixel position with section headers
+                        let mut pixel_y = 0.0_f32;
+                        let mut current_section: Option<&str> = None;
                         let mut discovered_idx = 0usize;
+                        let mut item_top = 0.0_f32;
                         for r in &all_in_category {
-                            let is_disc =
-                                !r.requires_discovery || state.discovered_recipes.contains(&r.id);
+                            let recipe_section = r.section.as_deref().unwrap_or("");
+                            if !recipe_section.is_empty()
+                                && current_section != Some(recipe_section)
+                            {
+                                current_section = Some(recipe_section);
+                                pixel_y += SECTION_HEADER_HEIGHT;
+                            }
+                            let is_disc = !r.requires_discovery
+                                || state.discovered_recipes.contains(&r.id);
                             if is_disc {
                                 if discovered_idx == state.ui_state.crafting_selected_recipe {
+                                    item_top = pixel_y;
                                     break;
                                 }
                                 discovered_idx += 1;
                             }
-                            row += 1;
+                            pixel_y += craft_line_h;
                         }
-                        let item_top = row as f32 * craft_line_h;
                         let item_bottom = item_top + craft_line_h;
                         if item_top < state.ui_state.crafting_scroll_offset {
                             state.ui_state.crafting_scroll_offset = item_top;
                         }
-                        // Match renderer: list_content_height = panel_height - 172
+                        // Calculate visible height matching renderer layout
                         let (_, sh) = crate::util::virtual_screen_size();
                         let panel_h = (450.0_f32).min(sh - 16.0);
-                        let visible_h = panel_h - 172.0;
+                        let content_height = panel_h - 8.0 - 40.0 - 30.0 - 12.0;
+                        let has_tabs = categories.len() > 1;
+                        let list_height = if has_tabs {
+                            content_height - 28.0 - 20.0
+                        } else {
+                            content_height - 10.0
+                        };
+                        let visible_h = list_height - 34.0;
                         if item_bottom > state.ui_state.crafting_scroll_offset + visible_h {
                             state.ui_state.crafting_scroll_offset = item_bottom - visible_h;
                         }
@@ -3297,7 +3324,7 @@ impl InputHandler {
                         .get(sel_idx)
                         .map(|s| s.as_str())
                         .unwrap_or("supplies");
-                    let total_visible: usize = filtered_recipes
+                    let recipes_in_cat: Vec<&crate::game::RecipeDefinition> = filtered_recipes
                         .iter()
                         .filter(|r| {
                             if cur_cat == "supplies" {
@@ -3306,15 +3333,33 @@ impl InputHandler {
                                 r.category == cur_cat
                             }
                         })
-                        .count();
-                    // Match renderer: list_content_height = list_height - 34, list_height = content_height - tab_height - 20
-                    // content_height = panel_height - FRAME*2 - HEADER - FOOTER - 12, tab_height = 28
+                        .collect();
+                    let total_visible = recipes_in_cat.len();
+                    // Count distinct sections for header height
+                    let num_scroll_sections = {
+                        let mut seen = std::collections::HashSet::new();
+                        for r in &recipes_in_cat {
+                            if let Some(ref s) = r.section {
+                                if !s.is_empty() {
+                                    seen.insert(s.as_str());
+                                }
+                            }
+                        }
+                        seen.len()
+                    };
+                    // Match renderer layout constants
                     let (_, sh) = crate::util::virtual_screen_size();
                     let panel_height = (450.0_f32).min(sh - 16.0);
-                    let content_height = panel_height - 8.0 - 32.0 - 28.0 - 12.0; // FRAME*2=8, HEADER=32, FOOTER=28
-                    let list_height = content_height - 28.0 - 20.0; // tab_height=28
+                    let content_height = panel_height - 8.0 - 40.0 - 30.0 - 12.0; // FRAME*2=8, HEADER=40, FOOTER=30
+                    let has_tabs = categories.len() > 1;
+                    let list_height = if has_tabs {
+                        content_height - 28.0 - 20.0 // tab_height=28
+                    } else {
+                        content_height - 10.0
+                    };
                     let list_content_height = list_height - 34.0;
-                    let total_content = total_visible as f32 * line_height;
+                    let total_content = total_visible as f32 * line_height
+                        + num_scroll_sections as f32 * SECTION_HEADER_HEIGHT;
                     let max_scroll = (total_content - list_content_height).max(0.0);
                     state.ui_state.crafting_scroll_offset = (state.ui_state.crafting_scroll_offset
                         - wheel_y * SCROLL_SPEED)

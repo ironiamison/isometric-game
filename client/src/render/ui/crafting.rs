@@ -685,8 +685,8 @@ impl Renderer {
                     self.draw_text_sharp(
                         display,
                         list_x + 8.0,
-                        y + 15.0,
-                        14.0,
+                        y + 16.0,
+                        16.0,
                         FRAME_ACCENT,
                     );
                     draw_line(
