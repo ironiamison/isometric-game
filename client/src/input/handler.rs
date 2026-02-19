@@ -627,7 +627,7 @@ impl InputHandler {
             current_dir: CardinalDir::None,
             prev_dir: CardinalDir::None,
             last_send_time: 0.0,
-            send_interval: 0.10, // 100ms keeps intent fresh without excessive resend spam
+            send_interval: 0.05, // 50ms keeps facing/move intent responsive
             last_attack_time: 0.0,
             attack_cooldown: 0.8, // 800 ms (matches server ATTACK_COOLDOWN_MS)
             dir_press_time: 0.0,
@@ -4225,9 +4225,12 @@ impl InputHandler {
                         let player_y = player.server_y.round() as i32;
                         let target_x = player_x + dx as i32;
                         let target_y = player_y + dy as i32;
-                        state
+                        let tile_walkable = state
                             .chunk_manager
-                            .is_walkable(target_x as f32, target_y as f32)
+                            .is_walkable(target_x as f32, target_y as f32);
+                        let occupied = build_occupied_set(state);
+                        let not_occupied = !occupied.contains(&(target_x, target_y));
+                        tile_walkable && not_occupied
                     } else {
                         false
                     };
