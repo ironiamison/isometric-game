@@ -2907,10 +2907,8 @@ impl Renderer {
                 gid: u32,
                 tile_x: i32,
                 tile_y: i32,
-                progress: f32,
-                alpha: f32,
                 scale: f32,
-                fragments: Vec<(u8, u8, f32, f32, f32)>, // (grid_x, grid_y, drift_x, drift_y, rotation_speed)
+                alpha: f32,
             },
             RockTimer {
                 tile_x: i32,
@@ -3186,12 +3184,7 @@ impl Renderer {
             if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
                 continue;
             }
-            let (progress, alpha, scale) = cr.get_progress_alpha();
-            let fragments: Vec<(u8, u8, f32, f32, f32)> = cr
-                .fragments
-                .iter()
-                .map(|f| (f.grid_x, f.grid_y, f.drift_x, f.drift_y, f.rotation_speed))
-                .collect();
+            let (scale, alpha) = cr.get_transform();
             let depth = calculate_depth(wx, wy, 1);
             renderables.push((
                 depth,
@@ -3199,10 +3192,8 @@ impl Renderer {
                     gid: cr.gid,
                     tile_x: cr.x,
                     tile_y: cr.y,
-                    progress,
-                    alpha,
                     scale,
-                    fragments,
+                    alpha,
                 },
             ));
         }
@@ -3277,13 +3268,11 @@ impl Renderer {
                     gid,
                     tile_x,
                     tile_y,
-                    progress,
-                    alpha,
                     scale,
-                    ref fragments,
+                    alpha,
                 } => {
                     self.render_crumbling_rock(
-                        gid, tile_x, tile_y, progress, alpha, scale, fragments, &state.camera,
+                        gid, tile_x, tile_y, scale, alpha, &state.camera,
                     );
                 }
                 Renderable::RockTimer {
@@ -5234,13 +5223,14 @@ impl Renderer {
 
             // Draw back static items BEHIND player (for down/right directions - tip peeks out)
             if let Some(ref back_item_id) = player.equipped_back {
+                let back_sprite_key = item_registry.get_sprite_key(back_item_id);
                 if let Some((equip_texture, equip_offset)) =
-                    self.equipment_sprites.get(back_item_id)
+                    self.equipment_sprites.get(back_sprite_key)
                 {
                     // Check if this is an offhand item based on dimensions
                     let (equip_w, equip_h) = self
                         .equipment_sprites
-                        .get_dimensions(back_item_id)
+                        .get_dimensions(back_sprite_key)
                         .unwrap_or((equip_texture.width(), equip_texture.height()));
                     let is_offhand = equip_w > equip_h * 8.0;
                     if !is_offhand {
@@ -5309,8 +5299,9 @@ impl Renderer {
             // Check if player has head equipment that we can render with shader
             let head_item_id_ref = player.equipped_head.as_ref();
             let head_sprite_data = head_item_id_ref.and_then(|head_item_id| {
-                let (tex, offset) = self.equipment_sprites.get(head_item_id)?;
-                let (w, h) = self.equipment_sprites.get_dimensions(head_item_id)?;
+                let head_sprite_key = item_registry.get_sprite_key(head_item_id);
+                let (tex, offset) = self.equipment_sprites.get(head_sprite_key)?;
+                let (w, h) = self.equipment_sprites.get_dimensions(head_sprite_key)?;
                 Some((tex, offset, w, h))
             });
 
@@ -5579,14 +5570,15 @@ impl Renderer {
 
             // Draw equipment overlay (body armor)
             if let Some(ref body_item_id) = player.equipped_body {
+                let body_sprite_key = item_registry.get_sprite_key(body_item_id);
                 if let Some((body_texture, body_atlas_offset)) =
-                    self.equipment_sprites.get(body_item_id)
+                    self.equipment_sprites.get(body_sprite_key)
                 {
                     // Check if this is a new-style single-row body armor sprite (width > height * 2)
                     // Body armor sprites are wider (16 frames) so use a more aggressive ratio check
                     let (body_w, body_h) = self
                         .equipment_sprites
-                        .get_dimensions(body_item_id)
+                        .get_dimensions(body_sprite_key)
                         .unwrap_or((body_texture.width(), body_texture.height()));
                     let is_single_row = body_w > body_h * 2.0;
                     let (body_atlas_x, body_atlas_y) = body_atlas_offset.unwrap_or((0.0, 0.0));
@@ -5708,13 +5700,14 @@ impl Renderer {
 
             // Draw equipment overlay (boots)
             if let Some(ref feet_item_id) = player.equipped_feet {
+                let feet_sprite_key = item_registry.get_sprite_key(feet_item_id);
                 if let Some((feet_texture, feet_atlas_offset)) =
-                    self.equipment_sprites.get(feet_item_id)
+                    self.equipment_sprites.get(feet_sprite_key)
                 {
                     // Check if this is a new-style single-row boot sprite (width > height)
                     let (feet_w, feet_h) = self
                         .equipment_sprites
-                        .get_dimensions(feet_item_id)
+                        .get_dimensions(feet_sprite_key)
                         .unwrap_or((feet_texture.width(), feet_texture.height()));
                     let is_single_row = feet_w > feet_h;
                     let (feet_atlas_x, feet_atlas_y) = feet_atlas_offset.unwrap_or((0.0, 0.0));
@@ -5786,15 +5779,16 @@ impl Renderer {
 
             // Draw back slot equipment (quiver, shield, etc.)
             if let Some(ref back_item_id) = player.equipped_back {
+                let back_sprite_key = item_registry.get_sprite_key(back_item_id);
                 if let Some((back_texture, back_atlas_offset)) =
-                    self.equipment_sprites.get(back_item_id)
+                    self.equipment_sprites.get(back_sprite_key)
                 {
                     // Detect sprite type by dimensions:
                     // - 16-frame offhand (shield): width > height * 8 (very wide strip)
                     // - 2-frame static back (quiver): width < height * 4 (narrow strip)
                     let (back_w, back_h) = self
                         .equipment_sprites
-                        .get_dimensions(back_item_id)
+                        .get_dimensions(back_sprite_key)
                         .unwrap_or((back_texture.width(), back_texture.height()));
                     let is_offhand = back_w > back_h * 8.0;
                     let (back_atlas_x, back_atlas_y) = back_atlas_offset.unwrap_or((0.0, 0.0));
@@ -6102,12 +6096,13 @@ impl Renderer {
 
             // Draw equipment silhouette (body armor)
             if let Some(ref body_item_id) = player.equipped_body {
+                let body_sprite_key = item_registry.get_sprite_key(body_item_id);
                 if let Some((body_texture, body_atlas_offset)) =
-                    self.equipment_sprites.get(body_item_id)
+                    self.equipment_sprites.get(body_sprite_key)
                 {
                     let (body_w, body_h) = self
                         .equipment_sprites
-                        .get_dimensions(body_item_id)
+                        .get_dimensions(body_sprite_key)
                         .unwrap_or((body_texture.width(), body_texture.height()));
                     let is_single_row = body_w > body_h * 2.0;
                     let (body_atlas_x, body_atlas_y) = body_atlas_offset.unwrap_or((0.0, 0.0));
@@ -6229,12 +6224,13 @@ impl Renderer {
 
             // Draw equipment silhouette (boots)
             if let Some(ref feet_item_id) = player.equipped_feet {
+                let feet_sprite_key = item_registry.get_sprite_key(feet_item_id);
                 if let Some((feet_texture, feet_atlas_offset)) =
-                    self.equipment_sprites.get(feet_item_id)
+                    self.equipment_sprites.get(feet_sprite_key)
                 {
                     let (feet_w, feet_h) = self
                         .equipment_sprites
-                        .get_dimensions(feet_item_id)
+                        .get_dimensions(feet_sprite_key)
                         .unwrap_or((feet_texture.width(), feet_texture.height()));
                     let is_single_row = feet_w > feet_h;
                     let (feet_atlas_x, feet_atlas_y) = feet_atlas_offset.unwrap_or((0.0, 0.0));
@@ -7704,16 +7700,14 @@ impl Renderer {
         }
     }
 
-    /// Render a crumbling rock — splits into 2x2 fragments that scatter outward
+    /// Render a crumbling rock — simple shrink + fade in place
     fn render_crumbling_rock(
         &self,
         gid: u32,
         tile_x: i32,
         tile_y: i32,
-        progress: f32,
-        alpha: f32,
         scale: f32,
-        fragments: &[(u8, u8, f32, f32, f32)], // (grid_x, grid_y, drift_x, drift_y, rotation_speed)
+        alpha: f32,
         camera: &Camera,
     ) {
         let (base_x, base_y) =
@@ -7721,89 +7715,30 @@ impl Renderer {
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
-            let (tex_x, tex_y, tex_w, tex_h) = if let Some(r) = source_rect {
-                (r.x, r.y, r.w, r.h)
+            let (tex_width, tex_height) = if let Some(r) = source_rect {
+                (r.w, r.h)
             } else {
-                (0.0, 0.0, texture.width(), texture.height())
+                (texture.width(), texture.height())
             };
 
-            let full_w = tex_w * zoom;
-            let full_h = tex_h * zoom;
-            let half_w = tex_w / 2.0;
-            let half_h = tex_h / 2.0;
+            let scaled_width = (tex_width * zoom * scale).round();
+            let scaled_height = (tex_height * zoom * scale).round();
 
-            // Ease-out for smooth deceleration
-            let ease = 1.0 - (1.0 - progress) * (1.0 - progress);
+            // Anchor at base center — rock shrinks downward into ground
+            let draw_x = (base_x - scaled_width / 2.0).round();
+            let draw_y = (base_y - scaled_height).round();
 
-            for &(grid_x, grid_y, drift_x, drift_y, rot_speed) in fragments {
-                // Fragment's original position (where it starts before drifting)
-                let frag_w = full_w / 2.0;
-                let frag_h = full_h / 2.0;
-                let orig_x = base_x - full_w / 2.0 + grid_x as f32 * frag_w;
-                let orig_y = base_y - full_h + grid_y as f32 * frag_h;
-
-                // Apply inward drift
-                let dx = drift_x * ease * zoom;
-                let dy = drift_y * ease * zoom;
-
-                // Apply rotation via mesh (like falling trees)
-                let angle = rot_speed * ease;
-                let cos_a = angle.cos();
-                let sin_a = angle.sin();
-
-                // Center of this fragment for rotation pivot
-                let cx = orig_x + frag_w / 2.0 + dx;
-                let cy = orig_y + frag_h / 2.0 + dy;
-
-                // Apply scale: shrink fragments around their center
-                let hw = frag_w / 2.0 * scale;
-                let hh = frag_h / 2.0 * scale;
-
-                let rotate = |rx: f32, ry: f32| -> Vec3 {
-                    Vec3::new(
-                        cx + rx * cos_a - ry * sin_a,
-                        cy + rx * sin_a + ry * cos_a,
-                        0.0,
-                    )
-                };
-
-                let tl = rotate(-hw, -hh);
-                let tr = rotate(hw, -hh);
-                let br = rotate(hw, hh);
-                let bl = rotate(-hw, hh);
-
-                // UV coordinates for this sub-rect
-                let (u0, v0, u1, v1) = {
-                    let sx = tex_x + grid_x as f32 * half_w;
-                    let sy = tex_y + grid_y as f32 * half_h;
-                    (
-                        sx / texture.width(),
-                        sy / texture.height(),
-                        (sx + half_w) / texture.width(),
-                        (sy + half_h) / texture.height(),
-                    )
-                };
-
-                let color_arr: [u8; 4] = [
-                    255,
-                    255,
-                    255,
-                    (alpha * 255.0) as u8,
-                ];
-
-                let mesh = Mesh {
-                    vertices: vec![
-                        Vertex { position: tl, uv: Vec2::new(u0, v0), color: color_arr, normal: Vec4::ZERO },
-                        Vertex { position: tr, uv: Vec2::new(u1, v0), color: color_arr, normal: Vec4::ZERO },
-                        Vertex { position: br, uv: Vec2::new(u1, v1), color: color_arr, normal: Vec4::ZERO },
-                        Vertex { position: bl, uv: Vec2::new(u0, v1), color: color_arr, normal: Vec4::ZERO },
-                    ],
-                    indices: vec![0, 1, 2, 0, 2, 3],
-                    texture: Some(texture.clone()),
-                };
-
-                draw_mesh(&mesh);
-            }
+            draw_texture_ex(
+                texture,
+                draw_x,
+                draw_y,
+                Color::new(1.0, 1.0, 1.0, alpha),
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(scaled_width, scaled_height)),
+                    source: source_rect,
+                    ..Default::default()
+                },
+            );
         }
     }
 

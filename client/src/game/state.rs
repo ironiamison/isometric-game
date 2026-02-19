@@ -684,83 +684,45 @@ impl FallingTreeEffect {
 }
 
 /// A rock fragment that splits off when a rock is fully mined
-pub struct RockFragment {
-    pub grid_x: u8,           // 0 or 1 (column in 2x2 grid)
-    pub grid_y: u8,           // 0 or 1 (row in 2x2 grid)
-    pub drift_x: f32,         // drift in pixels per second
-    pub drift_y: f32,
-    pub rotation_speed: f32,  // radians per second
-}
-
-/// A rock splitting apart after being fully mined
+/// A rock crumbling after being fully mined (simple shrink + fade)
 pub struct CrumblingRockEffect {
     pub x: i32,
     pub y: i32,
     pub gid: u32,
     pub started_at: f64,
-    pub fragments: Vec<RockFragment>,
 }
 
 impl CrumblingRockEffect {
-    pub const DURATION: f64 = 1.2; // slightly longer for scatter to settle
+    pub const DURATION: f64 = 0.6; // quick pop — particles do the heavy lifting
 
     pub fn new(x: i32, y: i32, gid: u32) -> Self {
-        use macroquad::rand::gen_range;
-
-        // Create 4 fragments in a 2x2 grid, each drifting INWARD (collapsing)
-        let drift = 12.0; // gentle inward drift speed in pixels/sec
-        let fragments = vec![
-            RockFragment {
-                grid_x: 0, grid_y: 0, // top-left piece drifts toward center (right & down)
-                drift_x: gen_range(drift - 4.0, drift + 4.0),
-                drift_y: gen_range(drift - 4.0, drift + 4.0),
-                rotation_speed: gen_range(-1.5, -0.3),
-            },
-            RockFragment {
-                grid_x: 1, grid_y: 0, // top-right piece drifts toward center (left & down)
-                drift_x: gen_range(-drift - 4.0, -drift + 4.0),
-                drift_y: gen_range(drift - 4.0, drift + 4.0),
-                rotation_speed: gen_range(0.3, 1.5),
-            },
-            RockFragment {
-                grid_x: 0, grid_y: 1, // bottom-left piece drifts toward center (right & up)
-                drift_x: gen_range(drift - 4.0, drift + 4.0),
-                drift_y: gen_range(-drift - 4.0, -drift + 4.0),
-                rotation_speed: gen_range(-1.5, -0.3),
-            },
-            RockFragment {
-                grid_x: 1, grid_y: 1, // bottom-right piece drifts toward center (left & up)
-                drift_x: gen_range(-drift - 4.0, -drift + 4.0),
-                drift_y: gen_range(-drift - 4.0, -drift + 4.0),
-                rotation_speed: gen_range(0.3, 1.5),
-            },
-        ];
-
         Self {
             x,
             y,
             gid,
             started_at: macroquad::time::get_time(),
-            fragments,
         }
     }
 
-    /// Returns (progress 0-1, alpha 0-1, scale 0-1) for the overall effect
-    pub fn get_progress_alpha(&self) -> (f32, f32, f32) {
+    /// Returns (scale, alpha) for the shrink + fade
+    pub fn get_transform(&self) -> (f32, f32) {
         let elapsed = macroquad::time::get_time() - self.started_at;
         let progress = (elapsed / Self::DURATION).min(1.0) as f32;
 
-        // Fade out in the last 50%
-        let alpha = if progress > 0.5 {
-            1.0 - ((progress - 0.5) / 0.5)
+        // Ease-in: accelerating shrink (starts slow, speeds up)
+        let ease = progress * progress;
+
+        // Shrink: 1.0 → 0.3
+        let scale = 1.0 - ease * 0.7;
+
+        // Fade: starts at 40% progress, fully gone by end
+        let alpha = if progress > 0.4 {
+            1.0 - ((progress - 0.4) / 0.6)
         } else {
             1.0
         };
 
-        // Shrink fragments as they collapse: 1.0 → 0.5
-        let scale = 1.0 - progress * 0.5;
-
-        (progress, alpha, scale)
+        (scale, alpha)
     }
 
     pub fn is_finished(&self) -> bool {
