@@ -96,6 +96,7 @@ impl AudioManager {
             ("message_add", "assets/audio/sfx/message_add.ogg"),
             ("pop", "assets/audio/sfx/misc/pop.ogg"),
             ("quest_complete", "assets/audio/sfx/misc/quest_complete.ogg"),
+            ("furnace", "assets/audio/sfx/misc/furnace.ogg"),
         ];
 
         for (name, path) in sfx_files {

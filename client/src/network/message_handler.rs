@@ -1934,6 +1934,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .push(ChatMessage::system(format!("Crafted: {}", display_name)));
                 }
 
+                // Play furnace sound on successful smelt/craft
+                state.pending_sfx.push("furnace".to_string());
+
                 // Inventory update and XP will come via separate messages
             }
         }
