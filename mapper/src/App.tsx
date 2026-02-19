@@ -144,7 +144,7 @@ function App() {
           console.warn('Could not load entity TOML files, using empty registry');
           setEntityRegistry({
             entities: new Map(),
-            byType: { hostile: [], questGiver: [], merchant: [], other: [] },
+            byType: { hostile: [], questGiver: [], merchant: [], station: [], other: [] },
           });
         }
 
