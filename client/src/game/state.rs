@@ -418,6 +418,42 @@ impl TreeShakeEffect {
     }
 }
 
+/// Rock shake effect when being mined
+pub struct RockShakeEffect {
+    pub x: i32,
+    pub y: i32,
+    pub started_at: f64,
+    pub intensity: f32,
+}
+
+impl RockShakeEffect {
+    pub const DURATION: f64 = 0.20;
+
+    pub fn new(x: i32, y: i32) -> Self {
+        Self {
+            x,
+            y,
+            started_at: macroquad::time::get_time(),
+            intensity: 1.0,
+        }
+    }
+
+    pub fn get_offset(&self) -> f32 {
+        let elapsed = macroquad::time::get_time() - self.started_at;
+        if elapsed > Self::DURATION {
+            return 0.0;
+        }
+        let progress = elapsed / Self::DURATION;
+        let decay = 1.0 - progress as f32;
+        let shake = (elapsed * 50.0).sin() as f32;
+        shake * decay * self.intensity * 2.0
+    }
+
+    pub fn is_finished(&self) -> bool {
+        macroquad::time::get_time() - self.started_at > Self::DURATION
+    }
+}
+
 /// A falling leaf particle
 pub struct LeafParticle {
     pub tile_x: f32,     // World tile X position
@@ -511,6 +547,87 @@ impl LeafParticle {
     }
 }
 
+/// A rock debris particle (flies off when mining)
+pub struct RockParticle {
+    pub tile_x: f32,
+    pub tile_y: f32,
+    pub height: f32,
+    pub drift_x: f32,
+    pub fall_speed: f32,
+    pub rotation: f32,
+    pub rotation_speed: f32,
+    pub size: f32,
+    pub color: macroquad::color::Color,
+    pub started_at: f64,
+    pub on_ground: bool,
+}
+
+impl RockParticle {
+    pub const DURATION: f64 = 2.0;
+    pub const GROUND_LINGER: f64 = 1.0;
+
+    pub fn new_at_rock(tile_x: i32, tile_y: i32, rock_height: f32) -> Self {
+        use macroquad::rand::gen_range;
+
+        let color = match gen_range(0, 5) {
+            0 => macroquad::color::Color::new(0.35, 0.33, 0.30, 0.95),
+            1 => macroquad::color::Color::new(0.55, 0.53, 0.50, 0.95),
+            2 => macroquad::color::Color::new(0.70, 0.68, 0.65, 0.95),
+            3 => macroquad::color::Color::new(0.60, 0.55, 0.40, 0.95),
+            _ => macroquad::color::Color::new(0.55, 0.40, 0.25, 0.95),
+        };
+
+        Self {
+            tile_x: tile_x as f32 + gen_range(-0.2, 0.2),
+            tile_y: tile_y as f32 + gen_range(-0.2, 0.2),
+            height: rock_height + gen_range(-5.0, 5.0),
+            drift_x: gen_range(-20.0, 20.0),
+            fall_speed: gen_range(40.0, 70.0),
+            rotation: gen_range(0.0, std::f32::consts::TAU),
+            rotation_speed: gen_range(-3.0, 3.0),
+            size: gen_range(2.0, 4.0),
+            color,
+            started_at: macroquad::time::get_time(),
+            on_ground: false,
+        }
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        if !self.on_ground {
+            self.drift_x *= 0.97;
+            self.tile_x += self.drift_x * 0.002 * dt;
+            self.height -= self.fall_speed * dt;
+
+            if self.height <= 0.0 {
+                self.height = 0.0;
+                self.on_ground = true;
+            }
+
+            self.rotation += self.rotation_speed * dt;
+        } else {
+            self.rotation_speed *= 0.9;
+            self.rotation += self.rotation_speed * dt;
+        }
+    }
+
+    pub fn get_alpha(&self) -> f32 {
+        let elapsed = macroquad::time::get_time() - self.started_at;
+
+        if self.on_ground {
+            let ground_time = elapsed - (Self::DURATION - Self::GROUND_LINGER);
+            if ground_time > 0.0 {
+                let fade_progress = (ground_time / Self::GROUND_LINGER) as f32;
+                return (1.0 - fade_progress).max(0.0);
+            }
+        }
+        1.0
+    }
+
+    pub fn is_finished(&self) -> bool {
+        macroquad::time::get_time() - self.started_at > Self::DURATION
+    }
+}
+
 /// A tree that's falling down after being chopped
 pub struct FallingTreeEffect {
     pub x: i32,
@@ -559,6 +676,50 @@ impl FallingTreeEffect {
         let y_offset = ease * 10.0;
 
         (angle, alpha, y_offset)
+    }
+
+    pub fn is_finished(&self) -> bool {
+        macroquad::time::get_time() - self.started_at > Self::DURATION
+    }
+}
+
+/// A rock that's crumbling after being fully mined (shrink & sink)
+pub struct CrumblingRockEffect {
+    pub x: i32,
+    pub y: i32,
+    pub gid: u32,
+    pub started_at: f64,
+}
+
+impl CrumblingRockEffect {
+    pub const DURATION: f64 = 1.0;
+
+    pub fn new(x: i32, y: i32, gid: u32) -> Self {
+        Self {
+            x,
+            y,
+            gid,
+            started_at: macroquad::time::get_time(),
+        }
+    }
+
+    pub fn get_transform(&self) -> (f32, f32, f32, f32) {
+        let elapsed = macroquad::time::get_time() - self.started_at;
+        let progress = (elapsed / Self::DURATION).min(1.0) as f32;
+
+        let ease = progress * progress;
+        let scale = 1.0 - ease * 0.7;
+        let y_offset = ease * 15.0;
+
+        let alpha = if progress > 0.6 {
+            1.0 - ((progress - 0.6) / 0.4)
+        } else {
+            1.0
+        };
+
+        let wobble_x = (elapsed * 30.0).sin() as f32 * (1.0 - progress) * 2.0;
+
+        (scale, alpha, y_offset, wobble_x)
     }
 
     pub fn is_finished(&self) -> bool {
@@ -1195,6 +1356,12 @@ pub struct GameState {
     pub leaf_particles: Vec<LeafParticle>,
     /// Trees falling down after being chopped
     pub falling_trees: Vec<FallingTreeEffect>,
+    /// Rock shake effects (when being mined)
+    pub rock_shake_effects: Vec<RockShakeEffect>,
+    /// Rock debris particles
+    pub rock_particles: Vec<RockParticle>,
+    /// Rocks crumbling after being fully mined
+    pub crumbling_rocks: Vec<CrumblingRockEffect>,
 
     // Targeting
     pub selected_entity_id: Option<String>,
@@ -1335,6 +1502,9 @@ impl GameState {
             tree_shake_effects: Vec::new(),
             leaf_particles: Vec::new(),
             falling_trees: Vec::new(),
+            rock_shake_effects: Vec::new(),
+            rock_particles: Vec::new(),
+            crumbling_rocks: Vec::new(),
             selected_entity_id: None,
             damage_events: Vec::new(),
             level_up_events: Vec::new(),
@@ -1460,6 +1630,14 @@ impl GameState {
             leaf.update(delta);
         }
         self.leaf_particles.retain(|p| !p.is_finished());
+
+        // Update rock effects
+        self.rock_shake_effects.retain(|e| !e.is_finished());
+        self.crumbling_rocks.retain(|e| !e.is_finished());
+        for particle in &mut self.rock_particles {
+            particle.update(delta);
+        }
+        self.rock_particles.retain(|p| !p.is_finished());
 
         // Clean up old skill XP events (older than 1.5 seconds)
         self.skill_xp_events
