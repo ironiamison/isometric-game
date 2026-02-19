@@ -21,19 +21,28 @@ sellable = false
 # Ores & Bars (Mining / Smithing)
 # =============================================================================
 
-[bronze_ore]
-display_name = "Bronze Ore"
-sprite = "bronze_ore"
-description = "Raw bronze ore. Can be smelted into a bar at an anvil."
+[copper_ore]
+display_name = "Copper Ore"
+sprite = "copper_ore"
+description = "Raw copper ore. Combine with tin ore to smelt bronze bars."
 category = "material"
 max_stack = 99
-base_price = 15
+base_price = 10
+sellable = true
+
+[tin_ore]
+display_name = "Tin Ore"
+sprite = "tin_ore"
+description = "Raw tin ore. Combine with copper ore to smelt bronze bars."
+category = "material"
+max_stack = 99
+base_price = 10
 sellable = true
 
 [bronze_bar]
 display_name = "Bronze Bar"
 sprite = "bronze_bar"
-description = "A bar of smelted bronze. Used to smith bronze equipment."
+description = "A bar of smelted bronze. Made from copper and tin ore."
 category = "material"
 max_stack = 99
 base_price = 40

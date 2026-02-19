@@ -8,8 +8,12 @@ pub struct OreTypeInfo {
     pub level_required: i32,
 }
 
-const BRONZE: OreTypeInfo = OreTypeInfo {
-    name: "Bronze Rock",
+const COPPER: OreTypeInfo = OreTypeInfo {
+    name: "Copper Rock",
+    level_required: 1,
+};
+const TIN: OreTypeInfo = OreTypeInfo {
+    name: "Tin Rock",
     level_required: 1,
 };
 const IRON: OreTypeInfo = OreTypeInfo {
@@ -24,11 +28,14 @@ const STEEL: OreTypeInfo = OreTypeInfo {
 /// Get ore info for a given GID, if it's a rock
 pub fn get_ore_info(gid: u32) -> Option<&'static OreTypeInfo> {
     match gid {
-        // Bronze rocks: mapper id 454 → GID 1616
-        1616 => Some(&BRONZE),
+        // Copper rocks: mapper id 454 → GID 1616
+        1616 => Some(&COPPER),
+
+        // Tin rocks: mapper id 455 → GID 1617
+        1581 => Some(&TIN),
 
         // Iron rocks: mapper id 419 → GID 1581
-        1581 => Some(&IRON),
+        1582 => Some(&IRON),
 
         // Steel rocks: GID 9997
         9997 => Some(&STEEL),

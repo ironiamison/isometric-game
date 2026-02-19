@@ -6,7 +6,7 @@
 
 [bronze_bar]
 display_name = "Bronze Bar"
-description = "Smelt bronze ore into a usable bar."
+description = "Combine copper and tin ore into a bronze bar."
 category = "smithing"
 section = "materials"
 level_required = 1
@@ -15,7 +15,11 @@ craft_time_ms = 2000
 xp = 10
 
 [[bronze_bar.ingredients]]
-item_id = "bronze_ore"
+item_id = "copper_ore"
+count = 1
+
+[[bronze_bar.ingredients]]
+item_id = "tin_ore"
 count = 1
 
 [[bronze_bar.results]]

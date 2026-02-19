@@ -5,11 +5,22 @@
 # GID CONVERSION: GID = 1162 + mapper_sprite_id
 # Example: mapper id 454 → GID 1616
 
-[rocks.bronze]
-# Bronze ore rocks: mapper id 454
+[rocks.copper]
+# Copper ore rocks: mapper id 454
 gids = [1616]
 level_required = 1
-ore_item_id = "bronze_ore"
+ore_item_id = "copper_ore"
+xp_per_ore = 17
+success_chance = 0.30
+depletion_chance = 0.15
+respawn_time_min = 4000
+respawn_time_max = 8000
+
+[rocks.tin]
+# Tin ore rocks: mapper id 455
+gids = [1617]
+level_required = 1
+ore_item_id = "tin_ore"
 xp_per_ore = 17
 success_chance = 0.30
 depletion_chance = 0.15
