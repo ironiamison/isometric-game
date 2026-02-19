@@ -676,3 +676,183 @@ count = 3
 [[scavenger_bow.results]]
 item_id = "scavenger_bow"
 count = 1
+
+# =============================================================================
+# Jewelry (Furnace - Gems + Bars)
+# =============================================================================
+
+[sapphire_ring]
+display_name = "Sapphire Ring"
+description = "Set a sapphire into a bronze band."
+category = "smithing"
+section = "jewelry"
+level_required = 10
+station = "furnace"
+craft_time_ms = 3000
+xp = 30
+
+[[sapphire_ring.ingredients]]
+item_id = "bronze_bar"
+count = 1
+
+[[sapphire_ring.ingredients]]
+item_id = "uncut_sapphire"
+count = 1
+
+[[sapphire_ring.results]]
+item_id = "sapphire_ring"
+count = 1
+
+[sapphire_pendant]
+display_name = "Sapphire Pendant"
+description = "Set a sapphire into a bronze pendant."
+category = "smithing"
+section = "jewelry"
+level_required = 10
+station = "furnace"
+craft_time_ms = 3000
+xp = 30
+
+[[sapphire_pendant.ingredients]]
+item_id = "bronze_bar"
+count = 1
+
+[[sapphire_pendant.ingredients]]
+item_id = "uncut_sapphire"
+count = 1
+
+[[sapphire_pendant.results]]
+item_id = "sapphire_pendant"
+count = 1
+
+[emerald_ring]
+display_name = "Emerald Ring"
+description = "Set an emerald into an iron band."
+category = "smithing"
+section = "jewelry"
+level_required = 20
+station = "furnace"
+craft_time_ms = 3000
+xp = 50
+
+[[emerald_ring.ingredients]]
+item_id = "iron_bar"
+count = 1
+
+[[emerald_ring.ingredients]]
+item_id = "uncut_emerald"
+count = 1
+
+[[emerald_ring.results]]
+item_id = "emerald_ring"
+count = 1
+
+[emerald_pendant]
+display_name = "Emerald Pendant"
+description = "Set an emerald into an iron pendant."
+category = "smithing"
+section = "jewelry"
+level_required = 20
+station = "furnace"
+craft_time_ms = 3000
+xp = 50
+
+[[emerald_pendant.ingredients]]
+item_id = "iron_bar"
+count = 1
+
+[[emerald_pendant.ingredients]]
+item_id = "uncut_emerald"
+count = 1
+
+[[emerald_pendant.results]]
+item_id = "emerald_pendant"
+count = 1
+
+[ruby_ring]
+display_name = "Ruby Ring"
+description = "Set a ruby into a steel band."
+category = "smithing"
+section = "jewelry"
+level_required = 30
+station = "furnace"
+craft_time_ms = 4000
+xp = 75
+
+[[ruby_ring.ingredients]]
+item_id = "steel_bar"
+count = 1
+
+[[ruby_ring.ingredients]]
+item_id = "uncut_ruby"
+count = 1
+
+[[ruby_ring.results]]
+item_id = "ruby_ring"
+count = 1
+
+[ruby_pendant]
+display_name = "Ruby Pendant"
+description = "Set a ruby into a steel pendant."
+category = "smithing"
+section = "jewelry"
+level_required = 30
+station = "furnace"
+craft_time_ms = 4000
+xp = 75
+
+[[ruby_pendant.ingredients]]
+item_id = "steel_bar"
+count = 1
+
+[[ruby_pendant.ingredients]]
+item_id = "uncut_ruby"
+count = 1
+
+[[ruby_pendant.results]]
+item_id = "ruby_pendant"
+count = 1
+
+[diamond_ring]
+display_name = "Diamond Ring"
+description = "Set a diamond into a steel band."
+category = "smithing"
+section = "jewelry"
+level_required = 40
+station = "furnace"
+craft_time_ms = 5000
+xp = 100
+
+[[diamond_ring.ingredients]]
+item_id = "steel_bar"
+count = 1
+
+[[diamond_ring.ingredients]]
+item_id = "uncut_diamond"
+count = 1
+
+[[diamond_ring.results]]
+item_id = "diamond_ring"
+count = 1
+
+[diamond_pendant]
+display_name = "Diamond Pendant"
+description = "Set a diamond into a steel pendant."
+category = "smithing"
+section = "jewelry"
+level_required = 40
+station = "furnace"
+craft_time_ms = 5000
+xp = 100
+
+[[diamond_pendant.ingredients]]
+item_id = "steel_bar"
+count = 1
+
+[[diamond_pendant.ingredients]]
+item_id = "uncut_diamond"
+count = 1
+
+[[diamond_pendant.results]]
+item_id = "diamond_pendant"
+count = 1

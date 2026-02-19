@@ -560,3 +560,43 @@ category = "material"
 max_stack = 99
 base_price = 100
 sellable = true
+
+# =============================================================================
+# Gems (Mining drops / Jewelry crafting)
+# =============================================================================
+
+[uncut_sapphire]
+display_name = "Uncut Sapphire"
+sprite = "uncut_sapphire"
+description = "A rough blue gemstone. Can be used in jewelry crafting."
+category = "material"
+max_stack = 99
+base_price = 50
+sellable = true
+
+[uncut_emerald]
+display_name = "Uncut Emerald"
+sprite = "uncut_emerald"
+description = "A rough green gemstone. Can be used in jewelry crafting."
+category = "material"
+max_stack = 99
+base_price = 100
+sellable = true
+
+[uncut_ruby]
+display_name = "Uncut Ruby"
+sprite = "uncut_ruby"
+description = "A rough red gemstone. Can be used in jewelry crafting."
+category = "material"
+max_stack = 99
+base_price = 150
+sellable = true
+
+[uncut_diamond]
+display_name = "Uncut Diamond"
+sprite = "uncut_diamond"
+description = "A rough diamond. The finest gem for master jewelers."
+category = "material"
+max_stack = 99
+base_price = 250
+sellable = true

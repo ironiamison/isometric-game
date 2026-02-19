@@ -167,6 +167,8 @@ pub enum UiElementId {
     FurnaceQuantityX,
     FurnaceQuantityAll,
     FurnaceScrollArea,
+    FurnaceTabSmelting,
+    FurnaceTabJewelry,
 }
 
 /// A single interactive UI element with its bounds

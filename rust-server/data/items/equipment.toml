@@ -695,6 +695,66 @@ attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 10
 
+[sapphire_ring]
+display_name = "Sapphire Ring"
+sprite = "sapphire_ring"
+description = "A bronze ring set with a sapphire. Gleams with blue light."
+category = "equipment"
+max_stack = 1
+base_price = 200
+sellable = true
+[sapphire_ring.equipment]
+slot_type = "ring"
+defence_level_required = 10
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 4
+
+[emerald_ring]
+display_name = "Emerald Ring"
+sprite = "emerald_ring"
+description = "An iron ring set with an emerald. Radiates a green glow."
+category = "equipment"
+max_stack = 1
+base_price = 350
+sellable = true
+[emerald_ring.equipment]
+slot_type = "ring"
+defence_level_required = 20
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 6
+
+[ruby_ring]
+display_name = "Ruby Ring"
+sprite = "ruby_ring"
+description = "A steel ring set with a ruby. Burns with inner fire."
+category = "equipment"
+max_stack = 1
+base_price = 500
+sellable = true
+[ruby_ring.equipment]
+slot_type = "ring"
+defence_level_required = 30
+attack_bonus = 0
+strength_bonus = 6
+defence_bonus = 4
+
+[diamond_ring]
+display_name = "Diamond Ring"
+sprite = "diamond_ring"
+description = "A steel ring crowned with a flawless diamond. The finest craftsmanship."
+category = "equipment"
+max_stack = 1
+base_price = 750
+sellable = true
+[diamond_ring.equipment]
+slot_type = "ring"
+defence_level_required = 40
+attack_bonus = 4
+strength_bonus = 0
+defence_bonus = 8
+
 # =============================================================================
 # NECKLACES (Defence requirement - provides bonuses)
 # =============================================================================
@@ -754,6 +814,66 @@ defence_level_required = 20
 attack_bonus = 4
 strength_bonus = 4
 defence_bonus = 0
+
+[sapphire_pendant]
+display_name = "Sapphire Pendant"
+sprite = "sapphire_pendant"
+description = "A bronze pendant with a sapphire stone. Cool to the touch."
+category = "equipment"
+max_stack = 1
+base_price = 200
+sellable = true
+[sapphire_pendant.equipment]
+slot_type = "necklace"
+defence_level_required = 10
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 3
+
+[emerald_pendant]
+display_name = "Emerald Pendant"
+sprite = "emerald_pendant"
+description = "An iron pendant set with an emerald. Hums with natural energy."
+category = "equipment"
+max_stack = 1
+base_price = 350
+sellable = true
+[emerald_pendant.equipment]
+slot_type = "necklace"
+defence_level_required = 20
+attack_bonus = 3
+strength_bonus = 0
+defence_bonus = 5
+
+[ruby_pendant]
+display_name = "Ruby Pendant"
+sprite = "ruby_pendant"
+description = "A steel pendant set with a ruby. Warm against the skin."
+category = "equipment"
+max_stack = 1
+base_price = 500
+sellable = true
+[ruby_pendant.equipment]
+slot_type = "necklace"
+defence_level_required = 30
+attack_bonus = 0
+strength_bonus = 5
+defence_bonus = 7
+
+[diamond_pendant]
+display_name = "Diamond Pendant"
+sprite = "diamond_pendant"
+description = "A steel pendant crowned with a brilliant diamond. Dazzling."
+category = "equipment"
+max_stack = 1
+base_price = 750
+sellable = true
+[diamond_pendant.equipment]
+slot_type = "necklace"
+defence_level_required = 40
+attack_bonus = 5
+strength_bonus = 0
+defence_bonus = 10
 
 # =============================================================================
 # BELTS (Defence requirement)

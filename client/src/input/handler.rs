@@ -3556,10 +3556,12 @@ impl InputHandler {
                         }
                         UiElementId::FurnaceSmeltButton => {
                             if !state.ui_state.crafting_in_progress {
+                                let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
                                 let furnace_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
                                     .filter(|r| r.station.as_deref() == Some("furnace"))
+                                    .filter(|r| r.section.as_deref() == Some(section_filter))
                                     .filter(|r| {
                                         !r.requires_discovery
                                             || state.discovered_recipes.contains(&r.id)
@@ -3599,6 +3601,24 @@ impl InputHandler {
                             state.ui_state.furnace_quantity = u32::MAX;
                             return commands;
                         }
+                        UiElementId::FurnaceTabSmelting => {
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.furnace_tab = 0;
+                                state.ui_state.furnace_selected_recipe = 0;
+                                state.ui_state.furnace_scroll_offset = 0.0;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::FurnaceTabJewelry => {
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.furnace_tab = 1;
+                                state.ui_state.furnace_selected_recipe = 0;
+                                state.ui_state.furnace_scroll_offset = 0.0;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
                         _ => {}
                     }
                 }
@@ -3626,10 +3646,20 @@ impl InputHandler {
             }
 
             if !state.ui_state.crafting_in_progress {
+                // Tab key to cycle tabs
+                if is_key_pressed(KeyCode::Tab) {
+                    state.ui_state.furnace_tab = (state.ui_state.furnace_tab + 1) % 2;
+                    state.ui_state.furnace_selected_recipe = 0;
+                    state.ui_state.furnace_scroll_offset = 0.0;
+                    state.pending_sfx.push("enter".to_string());
+                }
+
+                let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
                 let furnace_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
                     .filter(|r| r.station.as_deref() == Some("furnace"))
+                    .filter(|r| r.section.as_deref() == Some(section_filter))
                     .filter(|r| {
                         !r.requires_discovery || state.discovered_recipes.contains(&r.id)
                     })
@@ -3656,9 +3686,9 @@ impl InputHandler {
                         let item_bottom =
                             (state.ui_state.furnace_selected_recipe + 1) as f32 * row_h;
                         let (_, sh) = crate::util::virtual_screen_size();
-                        let panel_h = (420.0_f32).min(sh - 16.0);
-                        // 8.0 = FRAME*2, 40.0 = HEADER, 30.0 = FOOTER
-                        let content_h = panel_h - 8.0 - 40.0 - 30.0 - 16.0;
+                        let panel_h = (450.0_f32).min(sh - 16.0);
+                        // 8.0 = FRAME*2, 40.0 = HEADER, 28.0 = TABS, 30.0 = FOOTER
+                        let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
                         if item_bottom > state.ui_state.furnace_scroll_offset + content_h {
                             state.ui_state.furnace_scroll_offset = item_bottom - content_h;
                         }
@@ -3699,9 +3729,9 @@ impl InputHandler {
                     let row_h = 72.0_f32;
                     let total_content = recipe_count as f32 * row_h;
                     let (_, sh) = crate::util::virtual_screen_size();
-                    let panel_h = (420.0_f32).min(sh - 16.0);
-                    // 8.0 = FRAME*2, 40.0 = HEADER, 30.0 = FOOTER
-                    let content_h = panel_h - 8.0 - 40.0 - 30.0 - 16.0;
+                    let panel_h = (450.0_f32).min(sh - 16.0);
+                    // 8.0 = FRAME*2, 40.0 = HEADER, 28.0 = TABS, 30.0 = FOOTER
+                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
                     let max_scroll = (total_content - content_h).max(0.0);
                     state.ui_state.furnace_scroll_offset = (state.ui_state.furnace_scroll_offset
                         - wheel_y * SCROLL_SPEED)
@@ -4565,6 +4595,7 @@ impl InputHandler {
                                 state.ui_state.furnace_selected_recipe = 0;
                                 state.ui_state.furnace_scroll_offset = 0.0;
                                 state.ui_state.furnace_quantity = 1;
+                                state.ui_state.furnace_tab = 0;
                             } else if npc.is_alive() {
                                 commands.push(InputCommand::Interact {
                                     npc_id: npc_id.clone(),
@@ -5049,6 +5080,7 @@ impl InputHandler {
                                         state.ui_state.furnace_selected_recipe = 0;
                                         state.ui_state.furnace_scroll_offset = 0.0;
                                         state.ui_state.furnace_quantity = 1;
+                                        state.ui_state.furnace_tab = 0;
                                     } else {
                                         commands.push(InputCommand::Interact { npc_id });
                                     }
@@ -5586,6 +5618,7 @@ impl InputHandler {
                                     state.ui_state.furnace_selected_recipe = 0;
                                     state.ui_state.furnace_scroll_offset = 0.0;
                                     state.ui_state.furnace_quantity = 1;
+                                    state.ui_state.furnace_tab = 0;
                                 } else {
                                     commands.push(InputCommand::Interact { npc_id });
                                 }

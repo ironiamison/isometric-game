@@ -1,4 +1,4 @@
-//! Furnace panel rendering — warm ember-themed smelting UI
+//! Furnace panel rendering — medieval-themed smelting & jewelry UI
 
 use super::super::Renderer;
 use super::common::*;
@@ -7,10 +7,7 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
-// Warm ember accent colors for the furnace theme
-const FURNACE_ACCENT: Color = Color::new(0.85, 0.55, 0.20, 1.0);
-const FURNACE_ACCENT_DIM: Color = Color::new(0.60, 0.38, 0.14, 1.0);
-const FURNACE_HEADER_BG: Color = Color::new(0.16, 0.11, 0.08, 1.0);
+// Progress bar colors (kept for smelting animation)
 const FURNACE_PROGRESS_DARK: Color = Color::new(0.55, 0.30, 0.08, 1.0);
 const FURNACE_PROGRESS_MID: Color = Color::new(0.75, 0.42, 0.12, 1.0);
 const FURNACE_PROGRESS_LIGHT: Color = Color::new(0.90, 0.55, 0.18, 1.0);
@@ -25,7 +22,7 @@ impl Renderer {
         let (sw, sh) = virtual_screen_size();
 
         let panel_width = (500.0_f32).min(sw - 16.0);
-        let panel_height = (420.0_f32).min(sh - 16.0);
+        let panel_height = (450.0_f32).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 
@@ -41,14 +38,14 @@ impl Renderer {
         let header_y = panel_y + FRAME_THICKNESS;
         let header_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(header_x, header_y, header_w, HEADER_HEIGHT, FURNACE_HEADER_BG);
+        draw_rectangle(header_x, header_y, header_w, HEADER_HEIGHT, PANEL_BG_MID);
         draw_line(
             header_x + 10.0,
             header_y + HEADER_HEIGHT,
             header_x + header_w - 10.0,
             header_y + HEADER_HEIGHT,
             2.0,
-            FURNACE_ACCENT_DIM,
+            HEADER_BORDER,
         );
 
         // Decorative dots along header border
@@ -62,7 +59,7 @@ impl Renderer {
                 header_y + HEADER_HEIGHT - 1.5,
                 3.0,
                 3.0,
-                FURNACE_ACCENT,
+                FRAME_ACCENT,
             );
         }
 
@@ -74,7 +71,7 @@ impl Renderer {
             header_x + (header_w - title_dims.width) / 2.0,
             header_y + 26.0,
             16.0,
-            FURNACE_ACCENT,
+            TEXT_TITLE,
         );
 
         // Close button (X)
@@ -109,11 +106,57 @@ impl Renderer {
         draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
         draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
 
+        // ===== TABS =====
+        let tab_y = header_y + HEADER_HEIGHT + 2.0;
+        let tab_h = TAB_HEIGHT;
+        let tab_w = header_w / 2.0;
+        let active_tab = state.ui_state.furnace_tab;
+
+        let tab_labels = ["Smelting", "Jewelry"];
+        let tab_ids = [UiElementId::FurnaceTabSmelting, UiElementId::FurnaceTabJewelry];
+
+        for (idx, (label, id)) in tab_labels.iter().zip(tab_ids.iter()).enumerate() {
+            let tx = header_x + idx as f32 * tab_w;
+            let is_active = idx as u8 == active_tab;
+
+            let bounds = Rect::new(tx, tab_y, tab_w, tab_h);
+            layout.add(id.clone(), bounds);
+
+            let (tab_bg, tab_text_color) = if is_active {
+                (PANEL_BG_MID, TEXT_TITLE)
+            } else {
+                (SLOT_BG_EMPTY, TEXT_DIM)
+            };
+
+            draw_rectangle(tx, tab_y, tab_w, tab_h, tab_bg);
+
+            // Border between tabs
+            if idx > 0 {
+                draw_line(tx, tab_y + 4.0, tx, tab_y + tab_h - 4.0, 1.0, SLOT_BORDER);
+            }
+
+            // Active tab bottom accent
+            if is_active {
+                draw_line(tx + 4.0, tab_y + tab_h - 1.0, tx + tab_w - 4.0, tab_y + tab_h - 1.0, 2.0, SLOT_SELECTED_BORDER);
+            } else {
+                draw_line(tx + 4.0, tab_y + tab_h - 1.0, tx + tab_w - 4.0, tab_y + tab_h - 1.0, 1.0, SLOT_BORDER);
+            }
+
+            let label_dims = self.measure_text_sharp(label, TAB_FONT_SIZE);
+            self.draw_text_sharp(
+                label,
+                tx + (tab_w - label_dims.width) / 2.0,
+                tab_y + 19.0,
+                TAB_FONT_SIZE,
+                tab_text_color,
+            );
+        }
+
         // ===== CONTENT AREA =====
         let content_x = panel_x + FRAME_THICKNESS + 8.0;
-        let content_y = panel_y + FRAME_THICKNESS + HEADER_HEIGHT + 6.0;
+        let content_y = tab_y + tab_h + 4.0;
         let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0;
-        let content_h = panel_height - FRAME_THICKNESS * 2.0 - HEADER_HEIGHT - FOOTER_HEIGHT - 16.0;
+        let content_h = panel_y + panel_height - FRAME_THICKNESS - FOOTER_HEIGHT - 4.0 - content_y;
 
         // If crafting is in progress, show progress overlay
         if state.ui_state.crafting_in_progress {
@@ -134,16 +177,16 @@ impl Renderer {
             footer_x + footer_w - 10.0,
             footer_y,
             1.0,
-            FURNACE_ACCENT_DIM,
+            HEADER_BORDER,
         );
 
         if state.ui_state.crafting_in_progress {
             self.draw_text_sharp("[Esc] Cancel", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
         } else {
-            self.draw_text_sharp("[W/S] Select", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[1/X/A] Qty", footer_x + 130.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[Enter] Smelt", footer_x + 250.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[E] Close", footer_x + 380.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Tab] Tab", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[W/S] Select", footer_x + 105.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[1/X/A] Qty", footer_x + 220.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Enter] Smelt", footer_x + 335.0, footer_y + 20.0, 16.0, TEXT_DIM);
         }
     }
 
@@ -158,17 +201,24 @@ impl Renderer {
         content_w: f32,
         content_h: f32,
     ) {
-        // Filter recipes for furnace station
+        // Filter recipes for furnace station + active tab section
+        let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
         let furnace_recipes: Vec<_> = state
             .recipe_definitions
             .iter()
             .filter(|r| r.station.as_deref() == Some("furnace"))
+            .filter(|r| r.section.as_deref() == Some(section_filter))
             .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
             .collect();
 
         if furnace_recipes.is_empty() {
+            let msg = if state.ui_state.furnace_tab == 0 {
+                "No smelting recipes available"
+            } else {
+                "No jewelry recipes available"
+            };
             self.draw_text_sharp(
-                "No smelting recipes available",
+                msg,
                 content_x + 20.0,
                 content_y + 40.0,
                 16.0,
@@ -220,9 +270,9 @@ impl Renderer {
 
             // Row background
             let row_bg = if is_selected {
-                Color::new(0.20, 0.14, 0.08, 1.0)
+                SLOT_HOVER_BG
             } else if is_hovered {
-                Color::new(0.14, 0.10, 0.06, 1.0)
+                Color::new(0.141, 0.141, 0.188, 1.0)
             } else {
                 Color::new(0.0, 0.0, 0.0, 0.0)
             };
@@ -233,7 +283,7 @@ impl Renderer {
 
             if is_selected {
                 // Left accent bar
-                draw_rectangle(content_x + 2.0, y + 4.0, 3.0, row_height - 8.0, FURNACE_ACCENT);
+                draw_rectangle(content_x + 2.0, y + 4.0, 3.0, row_height - 8.0, SLOT_SELECTED_BORDER);
             }
 
             // Register click area
@@ -259,7 +309,7 @@ impl Renderer {
             // Recipe name
             let text_x = icon_x + icon_size + 10.0;
             let name_color = if is_selected {
-                FURNACE_ACCENT
+                TEXT_TITLE
             } else {
                 TEXT_NORMAL
             };
@@ -326,7 +376,7 @@ impl Renderer {
                     UiElementId::FurnaceQuantityX,
                     UiElementId::FurnaceQuantityAll,
                 ];
-                let qty_values: [u32; 3] = [1, 0, u32::MAX]; // 0 = custom X
+                let _qty_values: [u32; 3] = [1, 0, u32::MAX]; // 0 = custom X
 
                 for (j, (label, id)) in qty_labels.iter().zip(qty_ids.iter()).enumerate() {
                     let bx = right_x + j as f32 * (qty_btn_w + 4.0);
@@ -341,9 +391,9 @@ impl Renderer {
                     let is_qty_hovered = hovered.as_ref() == Some(id);
 
                     let (bg, border) = if is_qty_active {
-                        (Color::new(0.30, 0.18, 0.06, 1.0), FURNACE_ACCENT)
+                        (Color::new(0.188, 0.188, 0.282, 1.0), SLOT_SELECTED_BORDER)
                     } else if is_qty_hovered {
-                        (Color::new(0.18, 0.12, 0.06, 1.0), FURNACE_ACCENT_DIM)
+                        (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
                     } else {
                         (SLOT_BG_EMPTY, SLOT_BORDER)
                     };
@@ -352,7 +402,7 @@ impl Renderer {
                     draw_rectangle(bx + 1.0, qty_y + 1.0, qty_btn_w - 2.0, qty_btn_h - 2.0, bg);
 
                     let label_dims = self.measure_text_sharp(label, 16.0);
-                    let text_color = if is_qty_active { FURNACE_ACCENT } else { TEXT_DIM };
+                    let text_color = if is_qty_active { TEXT_TITLE } else { TEXT_DIM };
                     self.draw_text_sharp(
                         label,
                         bx + (qty_btn_w - label_dims.width) / 2.0,
@@ -371,7 +421,7 @@ impl Renderer {
                 let qty_disp_x = right_x + 3.0 * (qty_btn_w + 4.0) + 4.0;
                 self.draw_text_sharp(&qty_display, qty_disp_x, qty_y + 16.0, 16.0, TEXT_NORMAL);
 
-                // SMELT button
+                // SMELT button (green, like shop Buy)
                 let smelt_btn_w = 100.0;
                 let smelt_btn_h = 26.0;
                 let smelt_btn_x = right_x + 4.0;
@@ -386,9 +436,9 @@ impl Renderer {
                 let (btn_bg, btn_border) = if !can_craft {
                     (Color::new(0.12, 0.08, 0.06, 1.0), SLOT_BORDER)
                 } else if is_smelt_hovered {
-                    (Color::new(0.45, 0.28, 0.08, 1.0), FURNACE_ACCENT)
+                    (Color::new(0.2, 0.5, 0.2, 1.0), Color::new(0.3, 0.7, 0.3, 1.0))
                 } else {
-                    (Color::new(0.35, 0.20, 0.06, 1.0), FURNACE_ACCENT_DIM)
+                    (Color::new(0.15, 0.4, 0.15, 1.0), Color::new(0.25, 0.6, 0.25, 1.0))
                 };
 
                 draw_rectangle(smelt_btn_x, smelt_btn_y, smelt_btn_w, smelt_btn_h, btn_border);
@@ -408,7 +458,7 @@ impl Renderer {
                         smelt_btn_x + smelt_btn_w - 2.0,
                         smelt_btn_y + 2.0,
                         1.0,
-                        FURNACE_ACCENT,
+                        Color::new(0.3, 0.7, 0.3, 1.0),
                     );
                 }
 
@@ -419,7 +469,7 @@ impl Renderer {
                 } else if is_smelt_hovered {
                     WHITE
                 } else {
-                    FURNACE_ACCENT
+                    Color::new(0.3, 0.7, 0.3, 1.0)
                 };
                 self.draw_text_sharp(
                     smelt_text,
@@ -437,7 +487,7 @@ impl Renderer {
                 content_x + content_w - 10.0,
                 y + row_height - 1.0,
                 1.0,
-                Color::new(0.18, 0.14, 0.10, 1.0),
+                Color::new(0.15, 0.15, 0.20, 1.0),
             );
 
             y += row_height;
@@ -468,7 +518,7 @@ impl Renderer {
             let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0);
             let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
-            draw_rectangle(scrollbar_x, thumb_y, 4.0, thumb_h, FURNACE_ACCENT_DIM);
+            draw_rectangle(scrollbar_x, thumb_y, 4.0, thumb_h, SLOT_BORDER);
         }
     }
 
@@ -476,7 +526,7 @@ impl Renderer {
     fn render_furnace_progress(
         &self,
         state: &GameState,
-        hovered: &Option<UiElementId>,
+        _hovered: &Option<UiElementId>,
         layout: &mut UiLayout,
         area_x: f32,
         area_y: f32,
@@ -499,7 +549,7 @@ impl Renderer {
             area_x + (area_w - dots_dims.width) / 2.0,
             area_y + 36.0,
             16.0,
-            FURNACE_ACCENT,
+            TEXT_TITLE,
         );
 
         // Show result item icon + name
@@ -522,9 +572,9 @@ impl Renderer {
                 // Pulsing recipe name
                 let pulse = (time * 3.0).sin() * 0.15 + 0.85;
                 let pulse_color = Color::new(
-                    FURNACE_ACCENT.r * pulse,
-                    FURNACE_ACCENT.g * pulse,
-                    FURNACE_ACCENT.b * pulse,
+                    TEXT_TITLE.r * pulse,
+                    TEXT_TITLE.g * pulse,
+                    TEXT_TITLE.b * pulse,
                     1.0,
                 );
                 let name_dims = self.measure_text_sharp(&recipe.display_name, 16.0);
@@ -555,7 +605,7 @@ impl Renderer {
             );
         }
 
-        // Progress bar (ember themed)
+        // Progress bar
         let bar_width = area_w - 60.0;
         let bar_height = 20.0;
         let bar_x = area_x + 30.0;
@@ -605,7 +655,7 @@ impl Renderer {
         let cancel_bounds = Rect::new(cancel_x, cancel_y, cancel_w, cancel_h);
         layout.add(UiElementId::FurnaceCancelButton, cancel_bounds);
 
-        let is_cancel_hovered = matches!(hovered, Some(UiElementId::FurnaceCancelButton));
+        let is_cancel_hovered = matches!(_hovered, Some(UiElementId::FurnaceCancelButton));
         let (cancel_bg, cancel_border) = if is_cancel_hovered {
             (Color::new(0.45, 0.15, 0.15, 1.0), Color::new(0.6, 0.2, 0.2, 1.0))
         } else {

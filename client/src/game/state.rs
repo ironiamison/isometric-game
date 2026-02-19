@@ -1049,6 +1049,7 @@ pub struct UiState {
     pub furnace_selected_recipe: usize,
     pub furnace_scroll_offset: f32,
     pub furnace_quantity: u32,
+    pub furnace_tab: u8,
     // Batch progress (shared between furnace and regular crafting)
     pub batch_completed: u32,
     pub batch_total: u32,
@@ -1203,6 +1204,7 @@ impl Default for UiState {
             furnace_selected_recipe: 0,
             furnace_scroll_offset: 0.0,
             furnace_quantity: 1,
+            furnace_tab: 0,
             batch_completed: 0,
             batch_total: 0,
             shop_data: None,
