@@ -2801,6 +2801,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::String("category".into()),
                         Value::String(r.category.clone().into()),
                     ));
+                    if let Some(ref s) = r.section {
+                        rmap.push((
+                            Value::String("section".into()),
+                            Value::String(s.clone().into()),
+                        ));
+                    }
                     rmap.push((
                         Value::String("level_required".into()),
                         Value::Integer((r.level_required as i64).into()),
