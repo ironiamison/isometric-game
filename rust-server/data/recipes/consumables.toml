@@ -7,6 +7,7 @@
 display_name = "Baked Potato"
 description = "Bake a potato over the fire for a simple meal."
 category = "consumables"
+section = "cooking"
 level_required = 1
 
 [[baked_potato.ingredients]]
@@ -21,6 +22,7 @@ count = 1
 display_name = "Tomato Soup"
 description = "Simmer tomatoes and onions into a warm soup."
 category = "consumables"
+section = "cooking"
 level_required = 15
 
 [[tomato_soup.ingredients]]
@@ -39,6 +41,7 @@ count = 1
 display_name = "Sweetcorn Bread"
 description = "Grind sweetcorn into flour and bake into bread."
 category = "consumables"
+section = "cooking"
 level_required = 30
 
 [[sweetcorn_bread.ingredients]]
@@ -53,6 +56,7 @@ count = 1
 display_name = "Vegetable Stew"
 description = "A hearty stew from assorted farm vegetables."
 category = "consumables"
+section = "cooking"
 level_required = 20
 
 [[vegetable_stew.ingredients]]

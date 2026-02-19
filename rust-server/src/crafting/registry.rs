@@ -116,6 +116,7 @@ impl CraftingRegistry {
                 display_name: recipe.display_name.clone(),
                 description: recipe.description.clone(),
                 category: recipe.category.as_str().to_string(),
+                section: recipe.section.clone(),
                 level_required: recipe.level_required,
                 ingredients: recipe
                     .ingredients

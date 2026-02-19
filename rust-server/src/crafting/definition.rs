@@ -67,6 +67,7 @@ pub struct RawRecipeDefinition {
     pub description: Option<String>,
     #[serde(default)]
     pub category: RecipeCategory,
+    pub section: Option<String>,
     #[serde(default)]
     pub level_required: i32,
     #[serde(default)]
@@ -104,6 +105,7 @@ pub struct RecipeDefinition {
     pub display_name: String,
     pub description: String,
     pub category: RecipeCategory,
+    pub section: Option<String>,
     pub level_required: i32,
     pub ingredients: Vec<Ingredient>,
     pub results: Vec<CraftResult>,
@@ -124,6 +126,7 @@ impl RecipeDefinition {
                 .unwrap_or_else(|| id.replace('_', " ")),
             description: raw.description.clone().unwrap_or_default(),
             category: raw.category,
+            section: raw.section.clone(),
             level_required: raw.level_required,
             ingredients: raw
                 .ingredients
