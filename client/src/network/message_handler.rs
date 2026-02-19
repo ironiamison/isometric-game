@@ -141,11 +141,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             if let Some(value) = data {
                 let tick = extract_u64(value, "tick").unwrap_or(0);
 
-                // Only process newer ticks
-                if tick >= state.server_tick {
-                    state.server_tick = tick;
-                }
-
                 // Discard stale StateSyncs from a different map context.
                 // This prevents instance NPCs (e.g. Elder Mara) from appearing
                 // in the overworld when a StateSync races with a map transition.
@@ -155,6 +150,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     // Context mismatch — skip this entire StateSync
                     return;
                 }
+
+                // Ignore out-of-order snapshots to prevent positional rewinds/jitter.
+                if tick < state.server_tick {
+                    log::trace!(
+                        "Dropping stale stateSync tick {} (latest {})",
+                        tick,
+                        state.server_tick
+                    );
+                    return;
+                }
+                state.server_tick = tick;
 
                 // Delta sync: "full" field absent or true = full snapshot, false = delta
                 let is_full_sync = extract_bool(value, "full").unwrap_or(true);
@@ -1390,8 +1396,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             if let Some(value) = data {
                 let quest_id = extract_string(value, "quest_id").unwrap_or_default();
                 let npc_id = extract_string(value, "npc_id").unwrap_or_default();
-                let speaker = extract_string(value, "speaker").unwrap_or_default();
+                let mut speaker = extract_string(value, "speaker").unwrap_or_default();
                 let text = extract_string(value, "text").unwrap_or_default();
+
+                // If the NPC is an adventurer guide, always use its canonical
+                // speaker name so the custom guide UI renders instead of the
+                // generic dialogue box.
+                if let Some(npc) = state.npcs.get(&npc_id) {
+                    if npc.entity_type == "adventurer_guide" {
+                        speaker = "Adventurer Guide".to_string();
+                    }
+                }
 
                 // Parse choices array
                 let mut choices = Vec::new();
