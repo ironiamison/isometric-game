@@ -4279,7 +4279,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "Spiderzone_questguy",
-      "targetSpawn": ""
+      "targetSpawn": "entrance"
     }
   ],
   "gatheringZones": []

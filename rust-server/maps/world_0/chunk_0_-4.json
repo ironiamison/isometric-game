@@ -4094,7 +4094,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "underground_spiderzone",
-      "targetSpawn": ""
+      "targetSpawn": "entrance"
     },
     {
       "x": 6,
@@ -4102,7 +4102,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "underground_spiderzone",
-      "targetSpawn": ""
+      "targetSpawn": "entrance"
     }
   ],
   "gatheringZones": []
