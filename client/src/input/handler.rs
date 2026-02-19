@@ -398,6 +398,15 @@ pub enum InputCommand {
     },
     // Movement abilities
     Dash,
+    // Furnace commands
+    OpenFurnace {
+        tile_x: i32,
+        tile_y: i32,
+    },
+    FurnaceCraft {
+        recipe_id: String,
+        quantity: u32,
+    },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -659,6 +668,7 @@ impl InputHandler {
             || state.ui_state.minimap_panel_open
             || state.ui_state.escape_menu_open
             || state.ui_state.crafting_open
+            || state.ui_state.furnace_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
             || state.ui_state.quest_log_open
@@ -668,6 +678,7 @@ impl InputHandler {
         let hide_action_buttons = any_panel_open;
         let hide_direction_controls = state.ui_state.escape_menu_open
             || state.ui_state.crafting_open
+            || state.ui_state.furnace_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
             || state.ui_state.minimap_panel_open
@@ -3525,6 +3536,187 @@ impl InputHandler {
             return commands;
         }
 
+        // Handle furnace mode
+        if state.ui_state.furnace_open {
+            // Handle mouse clicks on furnace elements
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::FurnaceCloseButton => {
+                            state.ui_state.furnace_open = false;
+                            state.ui_state.furnace_tile = None;
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
+                        }
+                        UiElementId::FurnaceRecipeItem(idx) => {
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.furnace_selected_recipe = *idx;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::FurnaceSmeltButton => {
+                            if !state.ui_state.crafting_in_progress {
+                                let furnace_recipes: Vec<_> = state
+                                    .recipe_definitions
+                                    .iter()
+                                    .filter(|r| r.station.as_deref() == Some("furnace"))
+                                    .filter(|r| {
+                                        !r.requires_discovery
+                                            || state.discovered_recipes.contains(&r.id)
+                                    })
+                                    .collect();
+                                if let Some(recipe) =
+                                    furnace_recipes.get(state.ui_state.furnace_selected_recipe)
+                                {
+                                    commands.push(InputCommand::FurnaceCraft {
+                                        recipe_id: recipe.id.clone(),
+                                        quantity: state.ui_state.furnace_quantity,
+                                    });
+                                }
+                            }
+                            return commands;
+                        }
+                        UiElementId::FurnaceCancelButton => {
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            return commands;
+                        }
+                        UiElementId::FurnaceQuantity1 => {
+                            state.ui_state.furnace_quantity = 1;
+                            return commands;
+                        }
+                        UiElementId::FurnaceQuantityX => {
+                            // Toggle to a reasonable default (5) or cycle
+                            state.ui_state.furnace_quantity = if state.ui_state.furnace_quantity == 5 {
+                                10
+                            } else {
+                                5
+                            };
+                            return commands;
+                        }
+                        UiElementId::FurnaceQuantityAll => {
+                            state.ui_state.furnace_quantity = u32::MAX;
+                            return commands;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Escape: cancel if crafting, otherwise close
+            if is_key_pressed(KeyCode::Escape) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                    return commands;
+                }
+                state.ui_state.furnace_open = false;
+                state.ui_state.furnace_tile = None;
+                return commands;
+            }
+
+            // E key closes furnace
+            if is_key_pressed(KeyCode::E) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                }
+                state.ui_state.furnace_open = false;
+                state.ui_state.furnace_tile = None;
+                return commands;
+            }
+
+            if !state.ui_state.crafting_in_progress {
+                let furnace_recipes: Vec<_> = state
+                    .recipe_definitions
+                    .iter()
+                    .filter(|r| r.station.as_deref() == Some("furnace"))
+                    .filter(|r| {
+                        !r.requires_discovery || state.discovered_recipes.contains(&r.id)
+                    })
+                    .collect();
+                let recipe_count = furnace_recipes.len();
+
+                // W/S or Up/Down to navigate recipes
+                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                    if state.ui_state.furnace_selected_recipe > 0 {
+                        state.ui_state.furnace_selected_recipe -= 1;
+                        // Auto-scroll to keep selected in view
+                        let row_h = 72.0_f32;
+                        let item_top = state.ui_state.furnace_selected_recipe as f32 * row_h;
+                        if item_top < state.ui_state.furnace_scroll_offset {
+                            state.ui_state.furnace_scroll_offset = item_top;
+                        }
+                    }
+                }
+                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                    if state.ui_state.furnace_selected_recipe < recipe_count.saturating_sub(1) {
+                        state.ui_state.furnace_selected_recipe += 1;
+                        // Auto-scroll to keep selected in view
+                        let row_h = 72.0_f32;
+                        let item_bottom =
+                            (state.ui_state.furnace_selected_recipe + 1) as f32 * row_h;
+                        let (_, sh) = crate::util::virtual_screen_size();
+                        let panel_h = (420.0_f32).min(sh - 16.0);
+                        // 8.0 = FRAME*2, 40.0 = HEADER, 30.0 = FOOTER
+                        let content_h = panel_h - 8.0 - 40.0 - 30.0 - 16.0;
+                        if item_bottom > state.ui_state.furnace_scroll_offset + content_h {
+                            state.ui_state.furnace_scroll_offset = item_bottom - content_h;
+                        }
+                    }
+                }
+
+                // Quantity keys: 1, X, A
+                if is_key_pressed(KeyCode::Key1) {
+                    state.ui_state.furnace_quantity = 1;
+                }
+                if is_key_pressed(KeyCode::X) {
+                    state.ui_state.furnace_quantity = if state.ui_state.furnace_quantity == 5 {
+                        10
+                    } else {
+                        5
+                    };
+                }
+                if is_key_pressed(KeyCode::A) {
+                    state.ui_state.furnace_quantity = u32::MAX;
+                }
+
+                // Enter or C to smelt
+                if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::C) {
+                    if let Some(recipe) =
+                        furnace_recipes.get(state.ui_state.furnace_selected_recipe)
+                    {
+                        commands.push(InputCommand::FurnaceCraft {
+                            recipe_id: recipe.id.clone(),
+                            quantity: state.ui_state.furnace_quantity,
+                        });
+                    }
+                }
+
+                // Mouse wheel scrolling
+                let (_wheel_x, wheel_y) = mouse_wheel();
+                if wheel_y != 0.0 {
+                    const SCROLL_SPEED: f32 = 30.0;
+                    let row_h = 72.0_f32;
+                    let total_content = recipe_count as f32 * row_h;
+                    let (_, sh) = crate::util::virtual_screen_size();
+                    let panel_h = (420.0_f32).min(sh - 16.0);
+                    // 8.0 = FRAME*2, 40.0 = HEADER, 30.0 = FOOTER
+                    let content_h = panel_h - 8.0 - 40.0 - 30.0 - 16.0;
+                    let max_scroll = (total_content - content_h).max(0.0);
+                    state.ui_state.furnace_scroll_offset = (state.ui_state.furnace_scroll_offset
+                        - wheel_y * SCROLL_SPEED)
+                        .clamp(0.0, max_scroll);
+                }
+            }
+
+            // Don't process other input while furnace is open
+            return commands;
+        }
+
         // Handle social panel touch scrolling
         if state.ui_state.social_open {
             let all_touches: Vec<Touch> = touches();
@@ -5348,6 +5540,43 @@ impl InputHandler {
                     }
                 }
                 if !sat_on_chair {
+                    // Check facing tile for station (furnace/anvil) before NPC check
+                    // Stations can be objects or walls, so check both
+                    let mut opened_furnace = false;
+                    if let Some(player) = state.players.get(local_id) {
+                        let px = player.x.round() as i32;
+                        let py = player.y.round() as i32;
+                        let (fdx, fdy) = player.direction.to_unit_vector();
+                        let face_x = px + fdx as i32;
+                        let face_y = py + fdy as i32;
+
+                        // Collect GID from object or wall at facing tile
+                        let facing_gid = state
+                            .chunk_manager
+                            .get_object_at_exact(face_x, face_y)
+                            .map(|obj| obj.gid)
+                            .or_else(|| {
+                                state
+                                    .chunk_manager
+                                    .get_wall_at(face_x, face_y)
+                                    .map(|w| w.gid)
+                            });
+
+                        if let Some(gid) = facing_gid {
+                            let is_furnace = state
+                                .station_gids
+                                .get("furnace")
+                                .map_or(false, |gids| gids.contains(&gid));
+                            if is_furnace {
+                                commands.push(InputCommand::OpenFurnace {
+                                    tile_x: face_x,
+                                    tile_y: face_y,
+                                });
+                                opened_furnace = true;
+                            }
+                        }
+                    }
+                    if !opened_furnace {
                     if let Some(player) = state.players.get(local_id) {
                         // Find nearest NPC within interaction range (2.5 tiles)
                         const INTERACT_RANGE: f32 = 2.5;
@@ -5407,6 +5636,7 @@ impl InputHandler {
                             }
                         }
                     }
+                    } // if !opened_furnace
                 }
             }
         }

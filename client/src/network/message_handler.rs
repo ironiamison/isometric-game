@@ -1914,12 +1914,69 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .map(|r| r.display_name.clone())
                     .unwrap_or_else(|| recipe_id.clone());
 
-                state
-                    .ui_state
-                    .chat_messages
-                    .push(ChatMessage::system(format!("Crafted: {}", display_name)));
+                if state.ui_state.batch_total > 1 {
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!(
+                            "Smelted: {} ({}/{})",
+                            display_name,
+                            state.ui_state.batch_completed,
+                            state.ui_state.batch_total
+                        )));
+                } else {
+                    state
+                        .ui_state
+                        .chat_messages
+                        .push(ChatMessage::system(format!("Crafted: {}", display_name)));
+                }
 
                 // Inventory update and XP will come via separate messages
+            }
+        }
+
+        // ========== Station/Furnace Messages ==========
+
+        "stationDefinitions" => {
+            if let Some(value) = data {
+                state.station_gids.clear();
+                if let Some(stations_arr) = extract_array(value, "stations") {
+                    for station_value in stations_arr {
+                        let id = extract_string(station_value, "id").unwrap_or_default();
+                        let mut gids = Vec::new();
+                        if let Some(gids_arr) = extract_array(station_value, "gids") {
+                            for gid_value in gids_arr {
+                                if let Some(gid) = gid_value.as_u64() {
+                                    gids.push(gid as u32);
+                                } else if let Some(gid) = gid_value.as_i64() {
+                                    gids.push(gid as u32);
+                                }
+                            }
+                        }
+                        state.station_gids.insert(id, gids);
+                    }
+                }
+                log::info!("Received station definitions: {:?}", state.station_gids.keys().collect::<Vec<_>>());
+            }
+        }
+
+        "furnaceOpen" => {
+            log::info!("Furnace UI opened");
+            state.ui_state.furnace_open = true;
+            state.ui_state.furnace_selected_recipe = 0;
+            state.ui_state.furnace_scroll_offset = 0.0;
+            state.ui_state.furnace_quantity = 1;
+            state.ui_state.batch_completed = 0;
+            state.ui_state.batch_total = 0;
+        }
+
+        "craftingBatchProgress" => {
+            if let Some(value) = data {
+                let completed = extract_u32(value, "completed").unwrap_or(0);
+                let total = extract_u32(value, "total").unwrap_or(0);
+                state.ui_state.batch_completed = completed;
+                state.ui_state.batch_total = total;
+                log::info!("Batch progress: {}/{}", completed, total);
             }
         }
 

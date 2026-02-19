@@ -157,6 +157,16 @@ pub enum UiElementId {
     MinimapPanel,
     MinimapClose,
     MinimapMarker(usize),
+
+    // Furnace
+    FurnaceRecipeItem(usize),
+    FurnaceSmeltButton,
+    FurnaceCancelButton,
+    FurnaceCloseButton,
+    FurnaceQuantity1,
+    FurnaceQuantityX,
+    FurnaceQuantityAll,
+    FurnaceScrollArea,
 }
 
 /// A single interactive UI element with its bounds

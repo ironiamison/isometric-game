@@ -1043,6 +1043,15 @@ pub struct UiState {
     pub crafting_started_at: Option<f64>,
     // Crafting completion animation: (recipe_id, timer_0_to_1)
     pub crafting_complete_animation: Option<(String, f32)>,
+    // Furnace UI state
+    pub furnace_open: bool,
+    pub furnace_tile: Option<(i32, i32)>,
+    pub furnace_selected_recipe: usize,
+    pub furnace_scroll_offset: f32,
+    pub furnace_quantity: u32,
+    // Batch progress (shared between furnace and regular crafting)
+    pub batch_completed: u32,
+    pub batch_total: u32,
     // Shop UI state
     pub shop_data: Option<ShopData>,
     pub shop_npc_id: Option<String>,
@@ -1189,6 +1198,13 @@ impl Default for UiState {
             crafting_duration_ms: 0,
             crafting_started_at: None,
             crafting_complete_animation: None,
+            furnace_open: false,
+            furnace_tile: None,
+            furnace_selected_recipe: 0,
+            furnace_scroll_offset: 0.0,
+            furnace_quantity: 1,
+            batch_completed: 0,
+            batch_total: 0,
             shop_data: None,
             shop_npc_id: None,
             shop_sub_tab: ShopSubTab::Buy,
@@ -1388,6 +1404,8 @@ pub struct GameState {
     // Crafting
     pub recipe_definitions: Vec<RecipeDefinition>,
     pub discovered_recipes: HashSet<String>,
+    /// Station GID mappings received from server (e.g. "furnace" -> [1234])
+    pub station_gids: HashMap<String, Vec<u32>>,
 
     // Camera and UI
     pub camera: Camera,
@@ -1515,6 +1533,7 @@ impl GameState {
             item_registry: ItemRegistry::new(),
             recipe_definitions: Vec::new(),
             discovered_recipes: HashSet::new(),
+            station_gids: HashMap::new(),
             camera: Camera::default(),
             ui_state: UiState::default(),
             server_tick: 0,
@@ -1711,6 +1730,22 @@ impl GameState {
             .map_or(false, |(_, t)| *t >= 1.0)
         {
             self.ui_state.crafting_complete_animation = None;
+        }
+
+        // Auto-close furnace when player moves too far away
+        if self.ui_state.furnace_open {
+            if let Some((fx, fy)) = self.ui_state.furnace_tile {
+                if let Some(player) = self.get_local_player() {
+                    let px = player.x.round() as i32;
+                    let py = player.y.round() as i32;
+                    let dx = (px - fx).abs();
+                    let dy = (py - fy).abs();
+                    if dx > 3 || dy > 3 {
+                        self.ui_state.furnace_open = false;
+                        self.ui_state.furnace_tile = None;
+                    }
+                }
+            }
         }
 
         // Update area banner timer

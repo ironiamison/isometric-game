@@ -120,6 +120,10 @@ pub struct CraftingState {
     pub duration_ms: u64,
     /// Materials consumed at start (for refund on cancel/interrupt)
     pub consumed_materials: Vec<(String, i32)>,
+    /// Remaining crafts after this one completes (0 = single craft)
+    pub batch_remaining: u32,
+    /// Original total for batch progress display (1 = single craft)
+    pub batch_total: u32,
 }
 
 // ============================================================================
@@ -5156,6 +5160,8 @@ impl GameRoom {
                 started_at: std::time::Instant::now(),
                 duration_ms: recipe.craft_time_ms,
                 consumed_materials,
+                batch_remaining: 0,
+                batch_total: 1,
             });
 
             let inventory_update = player.inventory.to_update();
@@ -5234,6 +5240,207 @@ impl GameRoom {
             )
             .await;
         }
+    }
+
+    // =========================================================================
+    // Furnace Handlers
+    // =========================================================================
+
+    /// Player requests to open the furnace UI at a given tile
+    pub async fn handle_open_furnace(&self, player_id: &str, tile_x: i32, tile_y: i32) {
+        // Validate player is active/alive and within range
+        {
+            let players = self.players.read().await;
+            let player = match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => p,
+                _ => return,
+            };
+
+            let dx = (player.x as i32 - tile_x).abs();
+            let dy = (player.y as i32 - tile_y).abs();
+            let dist = dx.max(dy);
+            if dist > 2 {
+                return;
+            }
+        }
+
+        // Send furnace open (client filters furnace recipes locally)
+        self.send_to_player(player_id, ServerMessage::FurnaceOpen).await;
+    }
+
+    /// Start a batch craft (smelting with quantity)
+    pub async fn handle_start_craft_batch(&self, player_id: &str, recipe_id: &str, quantity: u32) {
+        use crate::crafting::definition::RecipeCategory;
+
+        let recipe = match self.crafting_registry.get(recipe_id) {
+            Some(r) => r.clone(),
+            None => {
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftingCancelled {
+                        reason: "Recipe not found".to_string(),
+                    },
+                )
+                .await;
+                return;
+            }
+        };
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        // Check if already crafting
+        if player.crafting_state.is_some() {
+            drop(players);
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: "Already crafting".to_string(),
+                },
+            )
+            .await;
+            return;
+        }
+
+        // Check level requirement
+        let level_check_passed = match recipe.category {
+            RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
+            RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
+            _ => player.combat_level() >= recipe.level_required,
+        };
+
+        if !level_check_passed {
+            let skill_name = match recipe.category {
+                RecipeCategory::Smithing => "Smithing",
+                RecipeCategory::Alchemy => "Alchemy",
+                _ => "Combat",
+            };
+            drop(players);
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: format!("Requires {} level {}", skill_name, recipe.level_required),
+                },
+            )
+            .await;
+            return;
+        }
+
+        // Check recipe discovery requirement
+        if recipe.requires_discovery && !player.discovered_recipes.contains(recipe_id) {
+            drop(players);
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: "Recipe not yet discovered".to_string(),
+                },
+            )
+            .await;
+            return;
+        }
+
+        // For "All" (u32::MAX), calculate max possible from ingredients
+        let actual_quantity = if quantity == u32::MAX {
+            let mut max_possible = u32::MAX;
+            for ingredient in &recipe.ingredients {
+                let have = player.inventory.count_item(&ingredient.item_id) as u32;
+                let can_make = have / ingredient.count as u32;
+                max_possible = max_possible.min(can_make);
+            }
+            max_possible.max(1)
+        } else {
+            quantity.max(1)
+        };
+
+        // Check ingredients for first craft
+        for ingredient in &recipe.ingredients {
+            if !player.inventory.has_item(&ingredient.item_id, ingredient.count) {
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftingCancelled {
+                        reason: "Missing ingredients".to_string(),
+                    },
+                )
+                .await;
+                return;
+            }
+        }
+
+        // Check inventory space for results
+        for result in &recipe.results {
+            if !player.inventory.has_space_for(&result.item_id, result.count, &self.item_registry) {
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftingCancelled {
+                        reason: "Inventory full".to_string(),
+                    },
+                )
+                .await;
+                return;
+            }
+        }
+
+        // Consume materials for first craft only
+        let mut consumed_materials = Vec::new();
+        for ingredient in &recipe.ingredients {
+            player.inventory.remove_item(&ingredient.item_id, ingredient.count);
+            consumed_materials.push((ingredient.item_id.clone(), ingredient.count));
+        }
+
+        // Set crafting state with batch info
+        player.crafting_state = Some(CraftingState {
+            recipe_id: recipe_id.to_string(),
+            started_at: std::time::Instant::now(),
+            duration_ms: recipe.craft_time_ms,
+            consumed_materials,
+            batch_remaining: actual_quantity - 1,
+            batch_total: actual_quantity,
+        });
+
+        let inventory_update = player.inventory.to_update();
+        let gold = player.inventory.gold;
+        drop(players);
+
+        tracing::info!(
+            "Player {} started batch craft {} x{} ({}ms each)",
+            player_id, recipe_id, actual_quantity, recipe.craft_time_ms
+        );
+
+        // Send inventory update (materials consumed)
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold,
+            },
+        )
+        .await;
+
+        // Send crafting started
+        self.send_to_player(
+            player_id,
+            ServerMessage::CraftingStarted {
+                recipe_id: recipe_id.to_string(),
+                duration_ms: recipe.craft_time_ms,
+            },
+        )
+        .await;
+
+        // Send batch progress
+        self.send_to_player(
+            player_id,
+            ServerMessage::CraftingBatchProgress {
+                completed: 0,
+                total: actual_quantity,
+            },
+        )
+        .await;
     }
 
     // =========================================================================
@@ -8337,7 +8544,7 @@ impl GameRoom {
         {
             use crate::crafting::definition::RecipeCategory;
 
-            // Phase 1: Collect completed crafts (read lock)
+            // Phase 1: Collect completed crafts (write lock for batch continuation)
             struct CraftCompletion {
                 pid: String,
                 recipe_id: String,
@@ -8355,6 +8562,10 @@ impl GameRoom {
                 alchemy_total_xp: i64,
                 alchemy_level: i32,
                 alchemy_leveled: bool,
+                // Batch info
+                batch_continued: bool,  // true if next batch craft was started
+                batch_completed: u32,   // how many have completed so far
+                batch_total: u32,       // original total
             }
 
             let completions = {
@@ -8408,6 +8619,42 @@ impl GameRoom {
                             (0, 0, 0, false)
                         };
 
+                    let batch_total = crafting.batch_total;
+                    let completed_count = batch_total - crafting.batch_remaining;
+
+                    // Batch continuation: if more crafts remain, try to start next one
+                    let batch_continued = if crafting.batch_remaining > 0 {
+                        // Check ingredients for next craft
+                        let has_ingredients = recipe.ingredients.iter().all(|i| {
+                            player.inventory.has_item(&i.item_id, i.count)
+                        });
+                        let has_space = recipe.results.iter().all(|r| {
+                            player.inventory.has_space_for(&r.item_id, r.count, &self.item_registry)
+                        });
+
+                        if has_ingredients && has_space {
+                            // Consume materials for next craft
+                            let mut next_consumed = Vec::new();
+                            for ingredient in &recipe.ingredients {
+                                player.inventory.remove_item(&ingredient.item_id, ingredient.count);
+                                next_consumed.push((ingredient.item_id.clone(), ingredient.count));
+                            }
+                            player.crafting_state = Some(CraftingState {
+                                recipe_id: crafting.recipe_id.clone(),
+                                started_at: std::time::Instant::now(),
+                                duration_ms: recipe.craft_time_ms,
+                                consumed_materials: next_consumed,
+                                batch_remaining: crafting.batch_remaining - 1,
+                                batch_total,
+                            });
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
                     completions.push(CraftCompletion {
                         pid: pid.clone(),
                         recipe_id: crafting.recipe_id,
@@ -8425,6 +8672,9 @@ impl GameRoom {
                         alchemy_total_xp,
                         alchemy_level,
                         alchemy_leveled,
+                        batch_continued,
+                        batch_completed: completed_count,
+                        batch_total,
                     });
                 }
                 completions
@@ -8438,7 +8688,7 @@ impl GameRoom {
                 );
 
                 self.send_to_player(&comp.pid, ServerMessage::CraftingCompleted {
-                    recipe_id: comp.recipe_id,
+                    recipe_id: comp.recipe_id.clone(),
                     items_gained: comp.items_gained,
                     xp_gained: comp.xp_gained,
                 }).await;
@@ -8487,6 +8737,28 @@ impl GameRoom {
                             new_level: comp.alchemy_level,
                         }).await;
                     }
+                }
+
+                // Batch continuation: send next crafting started + progress
+                if comp.batch_continued {
+                    // Look up recipe for duration
+                    let duration = self.crafting_registry.get(&comp.recipe_id)
+                        .map(|r| r.craft_time_ms)
+                        .unwrap_or(2000);
+                    self.send_to_player(&comp.pid, ServerMessage::CraftingStarted {
+                        recipe_id: comp.recipe_id,
+                        duration_ms: duration,
+                    }).await;
+                    self.send_to_player(&comp.pid, ServerMessage::CraftingBatchProgress {
+                        completed: comp.batch_completed,
+                        total: comp.batch_total,
+                    }).await;
+                } else if comp.batch_total > 1 {
+                    // Batch ended (ran out of materials/space or completed all)
+                    self.send_to_player(&comp.pid, ServerMessage::CraftingBatchProgress {
+                        completed: comp.batch_completed,
+                        total: comp.batch_total,
+                    }).await;
                 }
             }
         }

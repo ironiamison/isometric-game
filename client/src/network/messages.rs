@@ -191,6 +191,13 @@ pub enum ClientMessage {
     #[serde(rename = "castSpell")]
     CastSpell { spell_id: String },
 
+    // Furnace commands
+    #[serde(rename = "openFurnace")]
+    OpenFurnace { tile_x: i32, tile_y: i32 },
+
+    #[serde(rename = "startCraftBatch")]
+    StartCraftBatch { recipe_id: String, quantity: u32 },
+
     // Ping for latency measurement
     #[serde(rename = "ping")]
     Ping { timestamp: f64 },
@@ -469,6 +476,16 @@ impl ClientMessage {
             ClientMessage::CastSpell { spell_id } => {
                 data.insert("spell_id".into(), Value::String(spell_id.clone().into()));
                 "castSpell"
+            }
+            ClientMessage::OpenFurnace { tile_x, tile_y } => {
+                data.insert("tile_x".into(), Value::from(*tile_x as i64));
+                data.insert("tile_y".into(), Value::from(*tile_y as i64));
+                "openFurnace"
+            }
+            ClientMessage::StartCraftBatch { recipe_id, quantity } => {
+                data.insert("recipe_id".into(), Value::String(recipe_id.clone().into()));
+                data.insert("quantity".into(), Value::from(*quantity as i64));
+                "startCraftBatch"
             }
             ClientMessage::Ping { timestamp } => {
                 data.insert("timestamp".into(), Value::F64(*timestamp));

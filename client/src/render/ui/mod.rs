@@ -10,6 +10,7 @@ pub mod common;
 pub mod context_menu;
 pub mod crafting;
 pub mod dialogue;
+pub mod furnace;
 pub mod gold_drop_dialog;
 pub mod inventory;
 pub mod menu;

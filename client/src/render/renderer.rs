@@ -8662,6 +8662,11 @@ impl Renderer {
             self.render_crafting(state, hovered, &mut layout);
         }
 
+        // Furnace UI (when open)
+        if state.ui_state.furnace_open {
+            self.render_furnace(state, hovered, &mut layout);
+        }
+
         // Bank UI (when open)
         if state.ui_state.bank_open {
             self.render_bank(state, hovered, &mut layout);

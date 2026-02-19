@@ -10,7 +10,7 @@ description = "Combine copper and tin ore into a bronze bar."
 category = "smithing"
 section = "materials"
 level_required = 1
-station = "anvil"
+station = "furnace"
 craft_time_ms = 2000
 xp = 10
 
@@ -32,7 +32,7 @@ description = "Smelt iron ore into a usable bar."
 category = "smithing"
 section = "materials"
 level_required = 10
-station = "anvil"
+station = "furnace"
 craft_time_ms = 2000
 xp = 20
 
@@ -50,7 +50,7 @@ description = "Smelt steel ore into a usable bar."
 category = "smithing"
 section = "materials"
 level_required = 20
-station = "anvil"
+station = "furnace"
 craft_time_ms = 2000
 xp = 35
 
