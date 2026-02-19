@@ -415,11 +415,22 @@ impl ChunkManager {
 
     /// Find a portal at the given world position
     pub fn get_portal_at(&self, x: f32, y: f32) -> Option<&Portal> {
-        let coord = ChunkCoord::from_world_f32(x, y);
-        let chunk = self.chunks.get(&coord)?;
-
         let tile_x = x.floor() as i32;
         let tile_y = y.floor() as i32;
+
+        // In interior mode, all data is in chunk (0,0) and portal coords are absolute
+        if self.interior_size.is_some() {
+            let chunk = self.chunks.get(&ChunkCoord { x: 0, y: 0 })?;
+            return chunk.portals.iter().find(|p| {
+                tile_x >= p.x
+                    && tile_x < p.x + p.width
+                    && tile_y >= p.y
+                    && tile_y < p.y + p.height
+            });
+        }
+
+        let coord = ChunkCoord::from_world_f32(x, y);
+        let chunk = self.chunks.get(&coord)?;
 
         // Portal x/y are LOCAL coords (0-31), need to convert to WORLD coords
         let chunk_base_x = coord.x * CHUNK_SIZE as i32;
