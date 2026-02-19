@@ -1789,9 +1789,14 @@ impl GameState {
     /// Returns true when the world is ready to render (player exists and their chunk is loaded)
     pub fn is_world_ready(&self) -> bool {
         if let Some(player) = self.get_local_player() {
-            // Check if the player's current chunk is loaded
-            let chunk_coord = crate::game::chunk::ChunkCoord::from_world_f32(player.x, player.y);
-            self.chunk_manager.chunks().contains_key(&chunk_coord)
+            if self.current_instance.is_some() {
+                // Interiors are loaded as a single chunk at (0,0) regardless of player position
+                let origin = crate::game::chunk::ChunkCoord { x: 0, y: 0 };
+                self.chunk_manager.chunks().contains_key(&origin)
+            } else {
+                let chunk_coord = crate::game::chunk::ChunkCoord::from_world_f32(player.x, player.y);
+                self.chunk_manager.chunks().contains_key(&chunk_coord)
+            }
         } else {
             false
         }

@@ -2356,16 +2356,23 @@ async fn handle_enter_portal(
         }
     };
 
-    // Get spawn point
+    // Get spawn point - try exact name, then "entrance", then first available
     info!("Looking up spawn point '{}' in interior '{}'", portal.target_spawn, interior.id);
-    let spawn = match interior.get_spawn_point(&portal.target_spawn) {
+    let spawn = if !portal.target_spawn.is_empty() {
+        interior.get_spawn_point(&portal.target_spawn)
+    } else {
+        None
+    };
+    let spawn = match spawn
+        .or_else(|| interior.get_spawn_point("entrance"))
+        .or_else(|| interior.spawn_points.values().next())
+    {
         Some(s) => {
-            info!("Found spawn point '{}' at ({}, {})", portal.target_spawn, s.x, s.y);
+            info!("Using spawn point at ({}, {}) in interior '{}'", s.x, s.y, interior.id);
             s
         }
         None => {
-            error!("Interior '{}' has no spawn point '{}'. Available spawn points: {:?}",
-                interior.id, portal.target_spawn, interior.spawn_points.keys().collect::<Vec<_>>());
+            error!("Interior '{}' has no spawn points at all!", interior.id);
             return;
         }
     };
