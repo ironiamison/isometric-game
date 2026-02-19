@@ -3088,9 +3088,33 @@
   "collision": "AIAJQABACEAAgAkgwAEJIGAGCRCgGAkYoCGJF6Ag8QgwIKEBcCCBAT8gAgEAEBwAARAgAAAgQABAQEEAIECAAMBBAAEAQAADAICAAAAAgQAAAIIAAAB8AAAEDAgAAAwAAAAYAAAgDAAAIA4AABhsAAAgFAAAARQMIAAcBGgADwA=",
   "entities": [
     {
-      "entityId": "reaper",
+      "entityId": "snail",
+      "x": 2,
+      "y": 28,
+      "level": 1
+    },
+    {
+      "entityId": "snail",
+      "x": 10,
+      "y": 30,
+      "level": 1
+    },
+    {
+      "entityId": "snail",
       "x": 6,
-      "y": 20,
+      "y": 19,
+      "level": 1
+    },
+    {
+      "entityId": "snail",
+      "x": 8,
+      "y": 12,
+      "level": 1
+    },
+    {
+      "entityId": "snail",
+      "x": 13,
+      "y": 21,
       "level": 1
     }
   ],

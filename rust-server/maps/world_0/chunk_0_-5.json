@@ -37,8 +37,8 @@
       381,
       381,
       381,
-      495,
-      495,
+      403,
+      403,
       381,
       381,
       381,
@@ -70,7 +70,7 @@
       381,
       381,
       396,
-      495,
+      403,
       381,
       381,
       381,
@@ -102,7 +102,7 @@
       381,
       381,
       396,
-      495,
+      403,
       381,
       381,
       381,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "EAAAQBAAAIAQAACAEAABABAAAQD4////EEACABAAAAAQAAAAEAAAABAEAAIQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQgQAAEAAAABAAAAIQAAAAEAAAABAAAIAQAACAEAAAQBAAAEAQAABAEAAAQBBAAEAQAABAEAAAQBAAAEA=",
+  "collision": "EAAAwBAAAIAQAACAEAAAgBAAAID4H/7/EEACABAAAAAQAAAAEAAAABAEAAIQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQgQAAEAAAABAAAAIQAAAAEAAAABAAAIAQAACAEAAAQBAAAEAQAABAEAAAQBBAAEAQAABAEAAAQBAAAEA=",
   "entities": [
     {
       "entityId": "hedgehog",
@@ -3432,41 +3432,6 @@
       "height": 31
     },
     {
-      "gid": 1541,
-      "x": 13,
-      "y": 5,
-      "width": 72,
-      "height": 95
-    },
-    {
-      "gid": 1541,
-      "x": 14,
-      "y": 5,
-      "width": 72,
-      "height": 95
-    },
-    {
-      "gid": 1541,
-      "x": 15,
-      "y": 5,
-      "width": 72,
-      "height": 95
-    },
-    {
-      "gid": 1541,
-      "x": 16,
-      "y": 5,
-      "width": 72,
-      "height": 95
-    },
-    {
-      "gid": 1541,
-      "x": 17,
-      "y": 5,
-      "width": 72,
-      "height": 95
-    },
-    {
       "gid": 1433,
       "x": 12,
       "y": 1,
@@ -3486,6 +3451,13 @@
       "y": 8,
       "width": 32,
       "height": 32
+    },
+    {
+      "gid": 1441,
+      "x": 13,
+      "y": 1,
+      "width": 52,
+      "height": 52
     }
   ],
   "walls": [

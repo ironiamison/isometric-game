@@ -38,7 +38,7 @@
       320,
       320,
       320,
-      320,
+      403,
       2,
       2,
       2,
@@ -70,7 +70,7 @@
       320,
       320,
       320,
-      320,
+      403,
       2,
       2,
       2,
@@ -102,7 +102,7 @@
       320,
       320,
       320,
-      320,
+      403,
       2,
       2,
       2,
@@ -449,10 +449,10 @@
       2,
       2,
       2,
+      403,
       320,
       320,
       320,
-      320,
       2,
       2,
       2,
@@ -671,11 +671,11 @@
       2,
       2,
       2,
-      320,
       320,
       320,
       320,
       320,
+      403,
       320,
       320,
       320,
@@ -777,9 +777,9 @@
       2,
       320,
       320,
+      403,
       320,
       320,
-      320,
       2,
       2,
       2,
@@ -851,7 +851,6 @@
       2,
       320,
       2,
-      320,
       320,
       320,
       320,
@@ -864,6 +863,7 @@
       320,
       320,
       320,
+      403,
       2,
       2,
       2,
@@ -882,6 +882,7 @@
       320,
       320,
       320,
+      403,
       320,
       320,
       320,
@@ -892,7 +893,6 @@
       320,
       320,
       320,
-      320,
       2,
       320,
       2,
@@ -903,7 +903,7 @@
       2,
       2,
       2,
-      320,
+      403,
       320,
       320,
       320,
@@ -935,6 +935,7 @@
       2,
       2,
       2,
+      403,
       320,
       320,
       320,
@@ -955,7 +956,6 @@
       320,
       320,
       320,
-      320,
       2,
       2,
       2,
@@ -999,7 +999,6 @@
       2,
       2,
       2,
-      320,
       320,
       320,
       320,
@@ -1007,6 +1006,7 @@
       320,
       320,
       320,
+      403,
       320,
       320,
       320,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAQBAAAEAQAABAEAwAcBBAAAAQQAAAEEAAABAwAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAA+AEAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAABgAAAAwAAAAYAAAAEAAAAAAAAAAAAAAIAAAAgAAAAAAAAIAAAAAAAAAAAAA=",
+  "collision": "AAQJAAAEAQAABgEAwAcBBAAAAQYAAMEGAAAJAxAAAQAAAAEAIAQBAQAAAQAAAAEAAAABAAAAgQBA+AEAAAAAAAAAUAAACECAAAAAAAAAAAGCAAAAxgAQAAwAAAAYAAEQEAgAAAAAAAAAAAAIAAAAgAAAAAAAAIAAAAAAAAAAAAA=",
   "entities": [
     {
       "entityId": "barbarian",
@@ -3292,6 +3292,209 @@
       "y": 0,
       "width": 32,
       "height": 32
+    },
+    {
+      "gid": 1442,
+      "x": 15,
+      "y": 28,
+      "width": 52,
+      "height": 52
+    },
+    {
+      "gid": 1442,
+      "x": 30,
+      "y": 1,
+      "width": 52,
+      "height": 52
+    },
+    {
+      "gid": 1438,
+      "x": 28,
+      "y": 23,
+      "width": 32,
+      "height": 74
+    },
+    {
+      "gid": 1438,
+      "x": 24,
+      "y": 19,
+      "width": 32,
+      "height": 74
+    },
+    {
+      "gid": 1264,
+      "x": 11,
+      "y": 24,
+      "width": 195,
+      "height": 255
+    },
+    {
+      "gid": 1264,
+      "x": 20,
+      "y": 21,
+      "width": 195,
+      "height": 255
+    },
+    {
+      "gid": 1265,
+      "x": 16,
+      "y": 23,
+      "width": 72,
+      "height": 116
+    },
+    {
+      "gid": 1264,
+      "x": 4,
+      "y": 7,
+      "width": 195,
+      "height": 255
+    },
+    {
+      "gid": 1264,
+      "x": 10,
+      "y": 9,
+      "width": 195,
+      "height": 255
+    },
+    {
+      "gid": 1263,
+      "x": 5,
+      "y": 9,
+      "width": 108,
+      "height": 161
+    },
+    {
+      "gid": 1265,
+      "x": 6,
+      "y": 14,
+      "width": 72,
+      "height": 116
+    },
+    {
+      "gid": 1263,
+      "x": 11,
+      "y": 17,
+      "width": 108,
+      "height": 161
+    },
+    {
+      "gid": 1263,
+      "x": 19,
+      "y": 0,
+      "width": 108,
+      "height": 161
+    },
+    {
+      "gid": 1263,
+      "x": 23,
+      "y": 13,
+      "width": 108,
+      "height": 161
+    },
+    {
+      "gid": 1265,
+      "x": 19,
+      "y": 6,
+      "width": 72,
+      "height": 116
+    },
+    {
+      "gid": 2924,
+      "x": 31,
+      "y": 17,
+      "width": 20,
+      "height": 40
+    },
+    {
+      "gid": 2924,
+      "x": 24,
+      "y": 9,
+      "width": 20,
+      "height": 40
+    },
+    {
+      "gid": 2924,
+      "x": 20,
+      "y": 16,
+      "width": 20,
+      "height": 40
+    },
+    {
+      "gid": 2334,
+      "x": 26,
+      "y": 4,
+      "width": 61,
+      "height": 69
+    },
+    {
+      "gid": 2333,
+      "x": 25,
+      "y": 4,
+      "width": 39,
+      "height": 52
+    },
+    {
+      "gid": 2339,
+      "x": 22,
+      "y": 17,
+      "width": 61,
+      "height": 69
+    },
+    {
+      "gid": 2340,
+      "x": 22,
+      "y": 16,
+      "width": 39,
+      "height": 52
+    },
+    {
+      "gid": 2326,
+      "x": 22,
+      "y": 5,
+      "width": 66,
+      "height": 68
+    },
+    {
+      "gid": 2327,
+      "x": 23,
+      "y": 5,
+      "width": 56,
+      "height": 82
+    },
+    {
+      "gid": 2328,
+      "x": 25,
+      "y": 5,
+      "width": 50,
+      "height": 52
+    },
+    {
+      "gid": 2329,
+      "x": 25,
+      "y": 6,
+      "width": 38,
+      "height": 48
+    },
+    {
+      "gid": 1280,
+      "x": 9,
+      "y": 2,
+      "width": 31,
+      "height": 106
+    },
+    {
+      "gid": 2697,
+      "x": 0,
+      "y": 29,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "gid": 2702,
+      "x": 10,
+      "y": 31,
+      "width": 64,
+      "height": 64
     }
   ],
   "walls": [
@@ -3551,6 +3754,30 @@
       "gid": 175,
       "x": 4,
       "y": 24,
+      "edge": "right"
+    },
+    {
+      "gid": 344,
+      "x": 6,
+      "y": 21,
+      "edge": "down"
+    },
+    {
+      "gid": 345,
+      "x": 7,
+      "y": 21,
+      "edge": "down"
+    },
+    {
+      "gid": 346,
+      "x": 7,
+      "y": 21,
+      "edge": "right"
+    },
+    {
+      "gid": 347,
+      "x": 7,
+      "y": 20,
       "edge": "right"
     }
   ],

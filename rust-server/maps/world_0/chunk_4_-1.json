@@ -3086,7 +3086,14 @@
     ]
   },
   "collision": "fycAJEAlACTAJQAkgCUARADkAOQABAEkAOQDJAAkACQAJAAkAOT/JwAEAOAABADAAPz3gQAAFAMAABgHAAAQTQAAAIUAAAABAAAAAQAAAAEAAAABAAAACQAAAEEAAADDAAAAIgAAAA4AAAAUAAAAGAAA/0kAwAAfACAAfAAQAPA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "snail",
+      "x": 30,
+      "y": 19,
+      "level": 1
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1747,

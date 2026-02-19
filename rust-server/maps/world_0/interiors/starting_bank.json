@@ -797,51 +797,51 @@
       "level": 1
     },
     {
-      "entityId": "banker",
+      "entityId": "bank_vault",
       "x": 2,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 5,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 9,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 12,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 12,
       "y": 10,
       "level": 1
     },
     {
-      "entityId": "banker",
-      "x": 9,
-      "y": 10,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
+      "entityId": "bank_vault",
       "x": 5,
       "y": 10,
       "level": 1
     },
     {
-      "entityId": "banker",
+      "entityId": "bank_vault",
       "x": 2,
+      "y": 6,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 5,
+      "y": 6,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 9,
       "y": 10,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 12,
+      "y": 10,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 12,
+      "y": 6,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 9,
+      "y": 6,
       "level": 1
     }
   ],
