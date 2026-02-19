@@ -68,7 +68,7 @@ pub const TILES_PER_SECOND: f32 = 4.0;
 // Server: 250ms per tile = 4 tiles per second
 const VISUAL_SPEED: f32 = 4.0;
 // Keep walking loop alive briefly between step confirmations to avoid frame restarts.
-const WALK_ANIM_GRACE_SECS: f64 = 0.18;
+const WALK_ANIM_GRACE_SECS: f64 = 0.10;
 
 #[derive(Debug, Clone)]
 pub struct Player {
