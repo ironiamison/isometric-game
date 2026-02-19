@@ -2909,6 +2909,7 @@ impl Renderer {
                 tile_y: i32,
                 progress: f32,
                 alpha: f32,
+                scale: f32,
                 fragments: Vec<(u8, u8, f32, f32, f32)>, // (grid_x, grid_y, drift_x, drift_y, rotation_speed)
             },
             RockTimer {
@@ -3185,7 +3186,7 @@ impl Renderer {
             if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
                 continue;
             }
-            let (progress, alpha) = cr.get_progress_alpha();
+            let (progress, alpha, scale) = cr.get_progress_alpha();
             let fragments: Vec<(u8, u8, f32, f32, f32)> = cr
                 .fragments
                 .iter()
@@ -3200,6 +3201,7 @@ impl Renderer {
                     tile_y: cr.y,
                     progress,
                     alpha,
+                    scale,
                     fragments,
                 },
             ));
@@ -3277,10 +3279,11 @@ impl Renderer {
                     tile_y,
                     progress,
                     alpha,
+                    scale,
                     ref fragments,
                 } => {
                     self.render_crumbling_rock(
-                        gid, tile_x, tile_y, progress, alpha, fragments, &state.camera,
+                        gid, tile_x, tile_y, progress, alpha, scale, fragments, &state.camera,
                     );
                 }
                 Renderable::RockTimer {
@@ -7709,6 +7712,7 @@ impl Renderer {
         tile_y: i32,
         progress: f32,
         alpha: f32,
+        scale: f32,
         fragments: &[(u8, u8, f32, f32, f32)], // (grid_x, grid_y, drift_x, drift_y, rotation_speed)
         camera: &Camera,
     ) {
@@ -7738,7 +7742,7 @@ impl Renderer {
                 let orig_x = base_x - full_w / 2.0 + grid_x as f32 * frag_w;
                 let orig_y = base_y - full_h + grid_y as f32 * frag_h;
 
-                // Apply drift
+                // Apply inward drift
                 let dx = drift_x * ease * zoom;
                 let dy = drift_y * ease * zoom;
 
@@ -7751,6 +7755,10 @@ impl Renderer {
                 let cx = orig_x + frag_w / 2.0 + dx;
                 let cy = orig_y + frag_h / 2.0 + dy;
 
+                // Apply scale: shrink fragments around their center
+                let hw = frag_w / 2.0 * scale;
+                let hh = frag_h / 2.0 * scale;
+
                 let rotate = |rx: f32, ry: f32| -> Vec3 {
                     Vec3::new(
                         cx + rx * cos_a - ry * sin_a,
@@ -7759,8 +7767,6 @@ impl Renderer {
                     )
                 };
 
-                let hw = frag_w / 2.0;
-                let hh = frag_h / 2.0;
                 let tl = rotate(-hw, -hh);
                 let tr = rotate(hw, -hh);
                 let br = rotate(hw, hh);

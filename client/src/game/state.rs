@@ -707,32 +707,32 @@ impl CrumblingRockEffect {
     pub fn new(x: i32, y: i32, gid: u32) -> Self {
         use macroquad::rand::gen_range;
 
-        // Create 4 fragments in a 2x2 grid, each drifting outward
-        let spread = 35.0; // base drift speed in pixels/sec
+        // Create 4 fragments in a 2x2 grid, each drifting INWARD (collapsing)
+        let drift = 12.0; // gentle inward drift speed in pixels/sec
         let fragments = vec![
             RockFragment {
-                grid_x: 0, grid_y: 0, // top-left piece
-                drift_x: gen_range(-spread - 10.0, -spread + 10.0),
-                drift_y: gen_range(-spread - 5.0, -spread + 10.0),
-                rotation_speed: gen_range(-2.0, -0.5),
+                grid_x: 0, grid_y: 0, // top-left piece drifts toward center (right & down)
+                drift_x: gen_range(drift - 4.0, drift + 4.0),
+                drift_y: gen_range(drift - 4.0, drift + 4.0),
+                rotation_speed: gen_range(-1.5, -0.3),
             },
             RockFragment {
-                grid_x: 1, grid_y: 0, // top-right piece
-                drift_x: gen_range(spread - 10.0, spread + 10.0),
-                drift_y: gen_range(-spread - 5.0, -spread + 10.0),
-                rotation_speed: gen_range(0.5, 2.0),
+                grid_x: 1, grid_y: 0, // top-right piece drifts toward center (left & down)
+                drift_x: gen_range(-drift - 4.0, -drift + 4.0),
+                drift_y: gen_range(drift - 4.0, drift + 4.0),
+                rotation_speed: gen_range(0.3, 1.5),
             },
             RockFragment {
-                grid_x: 0, grid_y: 1, // bottom-left piece
-                drift_x: gen_range(-spread - 5.0, -spread + 15.0),
-                drift_y: gen_range(5.0, 20.0),
-                rotation_speed: gen_range(-2.0, -0.5),
+                grid_x: 0, grid_y: 1, // bottom-left piece drifts toward center (right & up)
+                drift_x: gen_range(drift - 4.0, drift + 4.0),
+                drift_y: gen_range(-drift - 4.0, -drift + 4.0),
+                rotation_speed: gen_range(-1.5, -0.3),
             },
             RockFragment {
-                grid_x: 1, grid_y: 1, // bottom-right piece
-                drift_x: gen_range(spread - 15.0, spread + 5.0),
-                drift_y: gen_range(5.0, 20.0),
-                rotation_speed: gen_range(0.5, 2.0),
+                grid_x: 1, grid_y: 1, // bottom-right piece drifts toward center (left & up)
+                drift_x: gen_range(-drift - 4.0, -drift + 4.0),
+                drift_y: gen_range(-drift - 4.0, -drift + 4.0),
+                rotation_speed: gen_range(0.3, 1.5),
             },
         ];
 
@@ -745,8 +745,8 @@ impl CrumblingRockEffect {
         }
     }
 
-    /// Returns (progress 0-1, alpha 0-1) for the overall effect
-    pub fn get_progress_alpha(&self) -> (f32, f32) {
+    /// Returns (progress 0-1, alpha 0-1, scale 0-1) for the overall effect
+    pub fn get_progress_alpha(&self) -> (f32, f32, f32) {
         let elapsed = macroquad::time::get_time() - self.started_at;
         let progress = (elapsed / Self::DURATION).min(1.0) as f32;
 
@@ -757,7 +757,10 @@ impl CrumblingRockEffect {
             1.0
         };
 
-        (progress, alpha)
+        // Shrink fragments as they collapse: 1.0 → 0.5
+        let scale = 1.0 - progress * 0.5;
+
+        (progress, alpha, scale)
     }
 
     pub fn is_finished(&self) -> bool {
@@ -1618,11 +1621,20 @@ impl GameState {
 
         // Use smoothed delta for visual interpolation (reduces jitter from frame variance)
         let visual_delta = self.frame_timings.smoothed_delta;
+        // Keep local movement tightly synced to real frame time to reduce
+        // drift/corrections during rapid directional changes.
+        let local_visual_delta = delta.clamp(1.0 / 240.0, 1.0 / 30.0);
+        let local_id = self.local_player_id.clone();
 
         // Update all players (smooth interpolation toward server positions)
         // Note: woodcutting animations are now driven by server WoodcuttingSwing messages
-        for player in self.players.values_mut() {
-            player.interpolate_visual(visual_delta);
+        for (player_id, player) in self.players.iter_mut() {
+            let step_delta = if local_id.as_ref() == Some(player_id) {
+                local_visual_delta
+            } else {
+                visual_delta
+            };
+            player.interpolate_visual(step_delta);
         }
 
         // Update camera to follow local player
