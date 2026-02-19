@@ -8858,7 +8858,7 @@ impl GameRoom {
             }).await;
         }
 
-        // Process NPC speech for instance NPCs (interiors)
+        // Process NPC AI updates + speech for instance NPCs (interiors)
         {
             let players = self.players.read().await;
             let mut instance_players: HashMap<String, Vec<(String, i32, i32)>> = HashMap::new();
@@ -8875,19 +8875,66 @@ impl GameRoom {
 
             let mut instance_speech_events: Vec<(String, String, String)> = Vec::new();
 
-            // Check public and private instances using shared helper
+            // Update AI + speech for public and private instance NPCs
             for entry in self.instance_manager.public_instances.iter()
                 .map(|e| e.value().clone())
                 .chain(self.instance_manager.private_instances.iter().map(|e| e.value().clone()))
             {
-                if let Some(inst_players) = instance_players.get(&entry.id) {
-                    let as_refs: Vec<(&str, i32, i32)> = inst_players.iter()
-                        .map(|(pid, x, y)| (pid.as_str(), *x, *y))
-                        .collect();
-                    let mut npcs = entry.npcs.write().await;
-                    for npc in npcs.values_mut() {
-                        check_npc_speech(npc, &as_refs, current_time, &mut instance_speech_events);
+                // Build player positions for this instance (format matches npc.update signature)
+                let inst_player_list: Vec<(String, i32, i32, i32)> = if let Some(inst_players) = instance_players.get(&entry.id) {
+                    let players_guard = self.players.read().await;
+                    inst_players.iter().filter_map(|(pid, x, y)| {
+                        players_guard.get(pid).map(|p| (pid.clone(), *x, *y, p.hp))
+                    }).collect()
+                } else {
+                    continue; // No players in this instance, skip AI updates
+                };
+
+                let collision = entry.collision.read().await;
+                let walkable_check = |wx: i32, wy: i32| -> bool {
+                    entry.is_walkable_sync(&collision, wx, wy)
+                };
+
+                // Build occupied tiles for this instance (NPC + player positions)
+                let mut npcs = entry.npcs.write().await;
+                let mut occupied_tiles: std::collections::HashSet<(i32, i32)> = npcs
+                    .values()
+                    .filter(|n| n.is_alive())
+                    .map(|n| (n.x, n.y))
+                    .collect();
+                for (_, px, py, _) in &inst_player_list {
+                    occupied_tiles.insert((*px, *py));
+                }
+
+                for npc in npcs.values_mut() {
+                    // Respawn check
+                    if npc.ready_to_respawn(current_time) {
+                        npc.respawn();
+                        occupied_tiles.insert((npc.x, npc.y));
                     }
+
+                    // Remove self position to avoid self-collision
+                    let old_pos = (npc.x, npc.y);
+                    occupied_tiles.remove(&old_pos);
+
+                    // Run NPC AI update (wandering, chasing, attacking)
+                    if let Some((target_id, max_hit)) = npc.update(delta_time, &inst_player_list, &occupied_tiles, current_time, &walkable_check) {
+                        npc_attacks.push((npc.id.clone(), target_id, npc.level, max_hit, npc.stats.attack_bonus));
+                    }
+
+                    // Re-insert updated position
+                    if npc.is_alive() {
+                        occupied_tiles.insert((npc.x, npc.y));
+                    }
+
+                    // Apply HP regen
+                    npc.apply_regen(current_time);
+
+                    // Check NPC speech
+                    let as_refs: Vec<(&str, i32, i32)> = inst_player_list.iter()
+                        .map(|(pid, x, y, _)| (pid.as_str(), *x, *y))
+                        .collect();
+                    check_npc_speech(npc, &as_refs, current_time, &mut instance_speech_events);
                 }
             }
 

@@ -1224,44 +1224,44 @@
   "entities": [
     {
       "entityId": "banker",
+      "x": 11,
+      "y": 1,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
       "x": 21,
       "y": 7,
       "level": 1
     },
     {
-      "entityId": "banker",
+      "entityId": "bank_vault",
       "x": 18,
       "y": 7,
       "level": 1
     },
     {
-      "entityId": "banker",
+      "entityId": "bank_vault",
       "x": 15,
       "y": 7,
       "level": 1
     },
     {
-      "entityId": "banker",
+      "entityId": "bank_vault",
       "x": 9,
       "y": 7,
       "level": 1
     },
     {
-      "entityId": "banker",
+      "entityId": "bank_vault",
       "x": 6,
       "y": 7,
       "level": 1
     },
     {
-      "entityId": "banker",
+      "entityId": "bank_vault",
       "x": 3,
       "y": 7,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 11,
-      "y": 1,
       "level": 1
     }
   ],

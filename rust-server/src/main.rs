@@ -1962,14 +1962,20 @@ async fn auto_enter_instance(
     // Get or create instance
     let (instance, is_new) = match interior.instance_type {
         InstanceType::Public => {
-            state.instance_manager.get_or_create_public(&interior.id)
+            state.instance_manager.get_or_create_public(&interior.id, interior.size.width, interior.size.height)
         }
         InstanceType::Private => {
-            state.instance_manager.get_or_create_private(&interior.id, player_id)
+            state.instance_manager.get_or_create_private(&interior.id, player_id, interior.size.width, interior.size.height)
         }
     };
 
     if is_new || !*instance.npcs_spawned.read().await {
+        // Load collision data for NPC walkability
+        if !interior.collision.is_empty() {
+            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision) {
+                instance.set_collision(&bytes).await;
+            }
+        }
         instance.spawn_npcs(&interior.entities, &state.entity_registry).await;
     }
 
@@ -2380,15 +2386,21 @@ async fn handle_enter_portal(
     // Get or create instance based on type
     let (instance, is_new) = match interior.instance_type {
         InstanceType::Public => {
-            state.instance_manager.get_or_create_public(&interior.id)
+            state.instance_manager.get_or_create_public(&interior.id, interior.size.width, interior.size.height)
         }
         InstanceType::Private => {
-            state.instance_manager.get_or_create_private(&interior.id, player_id)
+            state.instance_manager.get_or_create_private(&interior.id, player_id, interior.size.width, interior.size.height)
         }
     };
 
     // Spawn NPCs if this is a new instance
     if is_new || !*instance.npcs_spawned.read().await {
+        // Load collision data for NPC walkability
+        if !interior.collision.is_empty() {
+            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision) {
+                instance.set_collision(&bytes).await;
+            }
+        }
         instance.spawn_npcs(&interior.entities, &state.entity_registry).await;
     }
 

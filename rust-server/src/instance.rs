@@ -19,6 +19,12 @@ pub struct Instance {
     pub npcs: RwLock<HashMap<String, Npc>>,
     /// Whether NPCs have been spawned for this instance
     pub npcs_spawned: RwLock<bool>,
+    /// Collision grid for interior walkability (width * height bools, true = blocked)
+    pub collision: RwLock<Vec<bool>>,
+    /// Interior map width in tiles
+    pub map_width: u32,
+    /// Interior map height in tiles
+    pub map_height: u32,
 }
 
 impl Instance {
@@ -100,6 +106,27 @@ impl Instance {
         info!("Spawned {} NPCs in instance {}", npcs.len(), self.id);
     }
 
+    /// Set collision data for this instance (decoded from base64)
+    pub async fn set_collision(&self, collision_bytes: &[u8]) {
+        let total = (self.map_width * self.map_height) as usize;
+        let mut collision = vec![false; total];
+        for (i, blocked) in collision.iter_mut().enumerate() {
+            if i / 8 < collision_bytes.len() {
+                *blocked = (collision_bytes[i / 8] >> (i % 8)) & 1 == 1;
+            }
+        }
+        *self.collision.write().await = collision;
+    }
+
+    /// Check if a tile is walkable in this instance
+    pub fn is_walkable_sync(&self, collision: &[bool], x: i32, y: i32) -> bool {
+        if x < 0 || y < 0 || x >= self.map_width as i32 || y >= self.map_height as i32 {
+            return false;
+        }
+        let idx = (y as u32 * self.map_width + x as u32) as usize;
+        !collision.get(idx).copied().unwrap_or(true)
+    }
+
     /// Get all NPCs in this instance
     pub async fn get_npcs(&self) -> HashMap<String, Npc> {
         self.npcs.read().await.clone()
@@ -131,7 +158,7 @@ impl InstanceManager {
     }
 
     /// Get or create a public instance for a map
-    pub fn get_or_create_public(&self, map_id: &str) -> (Arc<Instance>, bool) {
+    pub fn get_or_create_public(&self, map_id: &str, width: u32, height: u32) -> (Arc<Instance>, bool) {
         if let Some(instance) = self.public_instances.get(map_id) {
             return (instance.clone(), false);
         }
@@ -145,6 +172,9 @@ impl InstanceManager {
             players: RwLock::new(HashSet::new()),
             npcs: RwLock::new(HashMap::new()),
             npcs_spawned: RwLock::new(false),
+            collision: RwLock::new(Vec::new()),
+            map_width: width,
+            map_height: height,
         });
 
         self.public_instances
@@ -154,7 +184,7 @@ impl InstanceManager {
     }
 
     /// Get or create a private instance for a player
-    pub fn get_or_create_private(&self, map_id: &str, owner_id: &str) -> (Arc<Instance>, bool) {
+    pub fn get_or_create_private(&self, map_id: &str, owner_id: &str, width: u32, height: u32) -> (Arc<Instance>, bool) {
         let key = (owner_id.to_string(), map_id.to_string());
 
         if let Some(instance) = self.private_instances.get(&key) {
@@ -170,6 +200,9 @@ impl InstanceManager {
             players: RwLock::new(HashSet::new()),
             npcs: RwLock::new(HashMap::new()),
             npcs_spawned: RwLock::new(false),
+            collision: RwLock::new(Vec::new()),
+            map_width: width,
+            map_height: height,
         });
 
         self.private_instances.insert(key, instance.clone());
