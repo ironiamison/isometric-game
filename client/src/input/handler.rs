@@ -403,6 +403,11 @@ pub enum InputCommand {
         recipe_id: String,
         quantity: u32,
     },
+    // Anvil commands
+    AnvilCraft {
+        recipe_id: String,
+        quantity: u32,
+    },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -665,6 +670,7 @@ impl InputHandler {
             || state.ui_state.escape_menu_open
             || state.ui_state.crafting_open
             || state.ui_state.furnace_open
+            || state.ui_state.anvil_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
             || state.ui_state.quest_log_open
@@ -675,6 +681,7 @@ impl InputHandler {
         let hide_direction_controls = state.ui_state.escape_menu_open
             || state.ui_state.crafting_open
             || state.ui_state.furnace_open
+            || state.ui_state.anvil_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
             || state.ui_state.minimap_panel_open
@@ -3745,6 +3752,227 @@ impl InputHandler {
             return commands;
         }
 
+        // Handle anvil mode
+        if state.ui_state.anvil_open {
+            // Handle mouse clicks on anvil elements
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::AnvilCloseButton => {
+                            state.ui_state.anvil_open = false;
+                            state.ui_state.anvil_tile = None;
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
+                        }
+                        UiElementId::AnvilRecipeCell(idx) => {
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.anvil_selected_recipe = *idx;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::AnvilSmithButton => {
+                            if !state.ui_state.crafting_in_progress {
+                                let section_filter = if state.ui_state.anvil_tab == 0 { "materials" } else { "equipment" };
+                                let mut anvil_recipes: Vec<_> = state
+                                    .recipe_definitions
+                                    .iter()
+                                    .filter(|r| r.station.as_deref() == Some("anvil"))
+                                    .filter(|r| r.section.as_deref() == Some(section_filter))
+                                    .filter(|r| {
+                                        !r.requires_discovery
+                                            || state.discovered_recipes.contains(&r.id)
+                                    })
+                                    .collect();
+                                anvil_recipes.sort_by_key(|r| r.level_required);
+                                if let Some(recipe) =
+                                    anvil_recipes.get(state.ui_state.anvil_selected_recipe)
+                                {
+                                    commands.push(InputCommand::AnvilCraft {
+                                        recipe_id: recipe.id.clone(),
+                                        quantity: state.ui_state.anvil_quantity,
+                                    });
+                                }
+                            }
+                            return commands;
+                        }
+                        UiElementId::AnvilCancelButton => {
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            return commands;
+                        }
+                        UiElementId::AnvilQuantity1 => {
+                            state.ui_state.anvil_quantity = 1;
+                            return commands;
+                        }
+                        UiElementId::AnvilQuantityX => {
+                            state.ui_state.anvil_quantity = if state.ui_state.anvil_quantity == 5 {
+                                10
+                            } else {
+                                5
+                            };
+                            return commands;
+                        }
+                        UiElementId::AnvilQuantityAll => {
+                            state.ui_state.anvil_quantity = u32::MAX;
+                            return commands;
+                        }
+                        UiElementId::AnvilTabMaterials => {
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.anvil_tab = 0;
+                                state.ui_state.anvil_selected_recipe = 0;
+                                state.ui_state.anvil_scroll_offset = 0.0;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::AnvilTabEquipment => {
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.anvil_tab = 1;
+                                state.ui_state.anvil_selected_recipe = 0;
+                                state.ui_state.anvil_scroll_offset = 0.0;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Escape: cancel if crafting, otherwise close
+            if is_key_pressed(KeyCode::Escape) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                    return commands;
+                }
+                state.ui_state.anvil_open = false;
+                state.ui_state.anvil_tile = None;
+                return commands;
+            }
+
+            // E key closes anvil
+            if is_key_pressed(KeyCode::E) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                }
+                state.ui_state.anvil_open = false;
+                state.ui_state.anvil_tile = None;
+                return commands;
+            }
+
+            if !state.ui_state.crafting_in_progress {
+                // Tab key to cycle tabs
+                if is_key_pressed(KeyCode::Tab) {
+                    state.ui_state.anvil_tab = (state.ui_state.anvil_tab + 1) % 2;
+                    state.ui_state.anvil_selected_recipe = 0;
+                    state.ui_state.anvil_scroll_offset = 0.0;
+                    state.pending_sfx.push("enter".to_string());
+                }
+
+                let section_filter = if state.ui_state.anvil_tab == 0 { "materials" } else { "equipment" };
+                let columns = 4;
+
+                // Get recipe count (drop borrow before navigation)
+                let recipe_count = {
+                    let mut count = 0;
+                    for r in &state.recipe_definitions {
+                        if r.station.as_deref() == Some("anvil")
+                            && r.section.as_deref() == Some(section_filter)
+                            && (!r.requires_discovery || state.discovered_recipes.contains(&r.id))
+                        {
+                            count += 1;
+                        }
+                    }
+                    count
+                };
+
+                // Grid navigation: Up/Down moves by row (±columns), Left/Right moves by ±1
+                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                    if state.ui_state.anvil_selected_recipe >= columns {
+                        state.ui_state.anvil_selected_recipe -= columns;
+                        self.auto_scroll_anvil_grid(state);
+                    }
+                }
+                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                    if state.ui_state.anvil_selected_recipe + columns < recipe_count {
+                        state.ui_state.anvil_selected_recipe += columns;
+                        self.auto_scroll_anvil_grid(state);
+                    }
+                }
+                if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A) {
+                    if state.ui_state.anvil_selected_recipe > 0 {
+                        state.ui_state.anvil_selected_recipe -= 1;
+                        self.auto_scroll_anvil_grid(state);
+                    }
+                }
+                if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
+                    if state.ui_state.anvil_selected_recipe < recipe_count.saturating_sub(1) {
+                        state.ui_state.anvil_selected_recipe += 1;
+                        self.auto_scroll_anvil_grid(state);
+                    }
+                }
+
+                // Quantity keys: 1, X, A (not left/right since those navigate grid)
+                if is_key_pressed(KeyCode::Key1) {
+                    state.ui_state.anvil_quantity = 1;
+                }
+                if is_key_pressed(KeyCode::X) {
+                    state.ui_state.anvil_quantity = if state.ui_state.anvil_quantity == 5 {
+                        10
+                    } else {
+                        5
+                    };
+                }
+
+                // Enter or C to smith
+                if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::C) {
+                    let mut anvil_recipes: Vec<_> = state
+                        .recipe_definitions
+                        .iter()
+                        .filter(|r| r.station.as_deref() == Some("anvil"))
+                        .filter(|r| r.section.as_deref() == Some(section_filter))
+                        .filter(|r| {
+                            !r.requires_discovery || state.discovered_recipes.contains(&r.id)
+                        })
+                        .collect();
+                    anvil_recipes.sort_by_key(|r| r.level_required);
+                    if let Some(recipe) =
+                        anvil_recipes.get(state.ui_state.anvil_selected_recipe)
+                    {
+                        commands.push(InputCommand::AnvilCraft {
+                            recipe_id: recipe.id.clone(),
+                            quantity: state.ui_state.anvil_quantity,
+                        });
+                    }
+                }
+
+                // Mouse wheel scrolling
+                let (_wheel_x, wheel_y) = mouse_wheel();
+                if wheel_y != 0.0 {
+                    const SCROLL_SPEED: f32 = 30.0;
+                    let cell_h = 90.0_f32;
+                    let gap = 6.0_f32;
+                    let rows = (recipe_count + columns - 1) / columns;
+                    let total_content = rows as f32 * (cell_h + gap);
+                    let (_, sh) = crate::util::virtual_screen_size();
+                    let panel_h = (480.0_f32).min(sh - 16.0);
+                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                    let max_scroll = (total_content - content_h).max(0.0);
+                    state.ui_state.anvil_scroll_offset = (state.ui_state.anvil_scroll_offset
+                        - wheel_y * SCROLL_SPEED)
+                        .clamp(0.0, max_scroll);
+                }
+            }
+
+            // Don't process other input while anvil is open
+            return commands;
+        }
+
         // Handle social panel touch scrolling
         if state.ui_state.social_open {
             let all_touches: Vec<Touch> = touches();
@@ -4598,6 +4826,13 @@ impl InputHandler {
                                 state.ui_state.furnace_scroll_offset = 0.0;
                                 state.ui_state.furnace_quantity = 1;
                                 state.ui_state.furnace_tab = 0;
+                            } else if npc.station_type.as_deref() == Some("anvil") {
+                                state.ui_state.anvil_open = true;
+                                state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                state.ui_state.anvil_selected_recipe = 0;
+                                state.ui_state.anvil_scroll_offset = 0.0;
+                                state.ui_state.anvil_quantity = 1;
+                                state.ui_state.anvil_tab = 0;
                             } else if npc.is_alive() {
                                 commands.push(InputCommand::Interact {
                                     npc_id: npc_id.clone(),
@@ -5083,6 +5318,13 @@ impl InputHandler {
                                         state.ui_state.furnace_scroll_offset = 0.0;
                                         state.ui_state.furnace_quantity = 1;
                                         state.ui_state.furnace_tab = 0;
+                                    } else if npc.station_type.as_deref() == Some("anvil") {
+                                        state.ui_state.anvil_open = true;
+                                        state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                        state.ui_state.anvil_selected_recipe = 0;
+                                        state.ui_state.anvil_scroll_offset = 0.0;
+                                        state.ui_state.anvil_quantity = 1;
+                                        state.ui_state.anvil_tab = 0;
                                     } else {
                                         commands.push(InputCommand::Interact { npc_id });
                                     }
@@ -5621,6 +5863,13 @@ impl InputHandler {
                                     state.ui_state.furnace_scroll_offset = 0.0;
                                     state.ui_state.furnace_quantity = 1;
                                     state.ui_state.furnace_tab = 0;
+                                } else if npc.station_type.as_deref() == Some("anvil") {
+                                    state.ui_state.anvil_open = true;
+                                    state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                    state.ui_state.anvil_selected_recipe = 0;
+                                    state.ui_state.anvil_scroll_offset = 0.0;
+                                    state.ui_state.anvil_quantity = 1;
+                                    state.ui_state.anvil_tab = 0;
                                 } else {
                                     commands.push(InputCommand::Interact { npc_id });
                                 }
@@ -5694,5 +5943,26 @@ impl InputHandler {
     ) {
         self.touch_controls
             .update_attack_icon(weapon_id, item_sprites);
+    }
+
+    /// Auto-scroll anvil grid to keep selected recipe in view
+    fn auto_scroll_anvil_grid(&self, state: &mut crate::game::GameState) {
+        let columns = 4;
+        let cell_h = 90.0_f32;
+        let gap = 6.0_f32;
+        let row = state.ui_state.anvil_selected_recipe / columns;
+        let item_top = row as f32 * (cell_h + gap);
+        let item_bottom = item_top + cell_h;
+
+        let (_, sh) = crate::util::virtual_screen_size();
+        let panel_h = (480.0_f32).min(sh - 16.0);
+        let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+
+        if item_top < state.ui_state.anvil_scroll_offset {
+            state.ui_state.anvil_scroll_offset = item_top;
+        }
+        if item_bottom > state.ui_state.anvil_scroll_offset + content_h {
+            state.ui_state.anvil_scroll_offset = item_bottom - content_h;
+        }
     }
 }

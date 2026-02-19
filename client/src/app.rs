@@ -452,6 +452,14 @@ pub fn run_game_frame(
                 recipe_id: recipe_id.clone(),
                 quantity: *quantity,
             },
+            // Anvil commands
+            InputCommand::AnvilCraft {
+                recipe_id,
+                quantity,
+            } => ClientMessage::StartCraftBatch {
+                recipe_id: recipe_id.clone(),
+                quantity: *quantity,
+            },
         };
         network.send(&msg);
     }

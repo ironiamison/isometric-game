@@ -97,6 +97,26 @@ impl Renderer {
                     return;
                 }
             }
+            Some(UiElementId::AnvilRecipeCell(idx)) if state.ui_state.anvil_open => {
+                let section_filter = if state.ui_state.anvil_tab == 0 { "materials" } else { "equipment" };
+                let mut anvil_recipes: Vec<_> = state
+                    .recipe_definitions
+                    .iter()
+                    .filter(|r| r.station.as_deref() == Some("anvil"))
+                    .filter(|r| r.section.as_deref() == Some(section_filter))
+                    .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+                    .collect();
+                anvil_recipes.sort_by_key(|r| r.level_required);
+                if let Some(recipe) = anvil_recipes.get(*idx) {
+                    if let Some(result) = recipe.results.first() {
+                        (result.item_id.clone(), result.count)
+                    } else {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
             _ => return,
         };
 

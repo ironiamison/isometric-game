@@ -1,6 +1,7 @@
 //! UI rendering components split from the main renderer
 
 pub mod altar_panel;
+pub mod anvil;
 pub mod area_banner;
 pub mod bank;
 pub mod bottom_bar;

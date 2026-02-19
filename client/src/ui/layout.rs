@@ -169,6 +169,18 @@ pub enum UiElementId {
     FurnaceScrollArea,
     FurnaceTabSmelting,
     FurnaceTabJewelry,
+
+    // Anvil
+    AnvilRecipeCell(usize),
+    AnvilSmithButton,
+    AnvilCancelButton,
+    AnvilCloseButton,
+    AnvilQuantity1,
+    AnvilQuantityX,
+    AnvilQuantityAll,
+    AnvilScrollArea,
+    AnvilTabMaterials,
+    AnvilTabEquipment,
 }
 
 /// A single interactive UI element with its bounds

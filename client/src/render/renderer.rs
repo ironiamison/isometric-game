@@ -8671,6 +8671,11 @@ impl Renderer {
             self.render_furnace(state, hovered, &mut layout);
         }
 
+        // Anvil UI (when open)
+        if state.ui_state.anvil_open {
+            self.render_anvil(state, hovered, &mut layout);
+        }
+
         // Bank UI (when open)
         if state.ui_state.bank_open {
             self.render_bank(state, hovered, &mut layout);

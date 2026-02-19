@@ -1050,6 +1050,13 @@ pub struct UiState {
     pub furnace_scroll_offset: f32,
     pub furnace_quantity: u32,
     pub furnace_tab: u8,
+    // Anvil UI state
+    pub anvil_open: bool,
+    pub anvil_tile: Option<(i32, i32)>,
+    pub anvil_selected_recipe: usize,
+    pub anvil_scroll_offset: f32,
+    pub anvil_quantity: u32,
+    pub anvil_tab: u8, // 0=Materials, 1=Equipment
     // Batch progress (shared between furnace and regular crafting)
     pub batch_completed: u32,
     pub batch_total: u32,
@@ -1205,6 +1212,12 @@ impl Default for UiState {
             furnace_scroll_offset: 0.0,
             furnace_quantity: 1,
             furnace_tab: 0,
+            anvil_open: false,
+            anvil_tile: None,
+            anvil_selected_recipe: 0,
+            anvil_scroll_offset: 0.0,
+            anvil_quantity: 1,
+            anvil_tab: 0,
             batch_completed: 0,
             batch_total: 0,
             shop_data: None,
@@ -1742,6 +1755,22 @@ impl GameState {
                     if dx > 3 || dy > 3 {
                         self.ui_state.furnace_open = false;
                         self.ui_state.furnace_tile = None;
+                    }
+                }
+            }
+        }
+
+        // Auto-close anvil when player moves too far away
+        if self.ui_state.anvil_open {
+            if let Some((ax, ay)) = self.ui_state.anvil_tile {
+                if let Some(player) = self.get_local_player() {
+                    let px = player.x.round() as i32;
+                    let py = player.y.round() as i32;
+                    let dx = (px - ax).abs();
+                    let dy = (py - ay).abs();
+                    if dx > 3 || dy > 3 {
+                        self.ui_state.anvil_open = false;
+                        self.ui_state.anvil_tile = None;
                     }
                 }
             }
