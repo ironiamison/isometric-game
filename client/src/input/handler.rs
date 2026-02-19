@@ -3557,7 +3557,7 @@ impl InputHandler {
                         UiElementId::FurnaceSmeltButton => {
                             if !state.ui_state.crafting_in_progress {
                                 let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
-                                let furnace_recipes: Vec<_> = state
+                                let mut furnace_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
                                     .filter(|r| r.station.as_deref() == Some("furnace"))
@@ -3567,6 +3567,7 @@ impl InputHandler {
                                             || state.discovered_recipes.contains(&r.id)
                                     })
                                     .collect();
+                                furnace_recipes.sort_by_key(|r| r.level_required);
                                 if let Some(recipe) =
                                     furnace_recipes.get(state.ui_state.furnace_selected_recipe)
                                 {
@@ -3655,7 +3656,7 @@ impl InputHandler {
                 }
 
                 let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
-                let furnace_recipes: Vec<_> = state
+                let mut furnace_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
                     .filter(|r| r.station.as_deref() == Some("furnace"))
@@ -3664,6 +3665,7 @@ impl InputHandler {
                         !r.requires_discovery || state.discovered_recipes.contains(&r.id)
                     })
                     .collect();
+                furnace_recipes.sort_by_key(|r| r.level_required);
                 let recipe_count = furnace_recipes.len();
 
                 // W/S or Up/Down to navigate recipes

@@ -64,6 +64,26 @@ impl Renderer {
                     return;
                 }
             }
+            Some(UiElementId::FurnaceRecipeItem(idx)) if state.ui_state.furnace_open => {
+                let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
+                let mut furnace_recipes: Vec<_> = state
+                    .recipe_definitions
+                    .iter()
+                    .filter(|r| r.station.as_deref() == Some("furnace"))
+                    .filter(|r| r.section.as_deref() == Some(section_filter))
+                    .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+                    .collect();
+                furnace_recipes.sort_by_key(|r| r.level_required);
+                if let Some(recipe) = furnace_recipes.get(*idx) {
+                    if let Some(result) = recipe.results.first() {
+                        (result.item_id.clone(), result.count)
+                    } else {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
             _ => return,
         };
 

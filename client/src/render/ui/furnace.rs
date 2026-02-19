@@ -203,13 +203,14 @@ impl Renderer {
     ) {
         // Filter recipes for furnace station + active tab section
         let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
-        let furnace_recipes: Vec<_> = state
+        let mut furnace_recipes: Vec<_> = state
             .recipe_definitions
             .iter()
             .filter(|r| r.station.as_deref() == Some("furnace"))
             .filter(|r| r.section.as_deref() == Some(section_filter))
             .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
             .collect();
+        furnace_recipes.sort_by_key(|r| r.level_required);
 
         if furnace_recipes.is_empty() {
             let msg = if state.ui_state.furnace_tab == 0 {
