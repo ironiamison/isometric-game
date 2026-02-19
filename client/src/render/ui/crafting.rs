@@ -24,6 +24,7 @@ fn build_categories(recipes: &[RecipeDefinition]) -> Vec<String> {
     cats
 }
 
+
 /// Helper to filter recipes for a given category (matching the supplies grouping)
 fn recipes_for_category<'a>(
     recipes: &'a [RecipeDefinition],
@@ -314,7 +315,7 @@ impl Renderer {
                 // Recipes tab controls
                 self.draw_text_sharp("[Q] Tab", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
 
-                let has_multiple_categories = build_categories(&state.recipe_definitions).len() > 1;
+                let has_multiple_categories = build_categories(&state.shop_filtered_recipes()).len() > 1;
 
                 if has_multiple_categories {
                     self.draw_text_sharp(
@@ -392,7 +393,9 @@ impl Renderer {
         content_width: f32,
         content_height: f32,
     ) {
-        let categories = build_categories(&state.recipe_definitions);
+        // Filter recipes by the shop's crafting categories
+        let filtered_recipes = state.shop_filtered_recipes();
+        let categories = build_categories(&filtered_recipes);
 
         if categories.is_empty() {
             self.draw_text_sharp(
@@ -487,7 +490,7 @@ impl Renderer {
             .unwrap_or("supplies");
 
         // Get all recipes for this category
-        let all_recipes = recipes_for_category(&state.recipe_definitions, current_category);
+        let all_recipes = recipes_for_category(&filtered_recipes, current_category);
 
         // Task 15: Filter recipes by discovery status
         // - requires_discovery = false: always show

@@ -10,6 +10,9 @@ pub struct ShopData {
     pub buy_multiplier: f32,
     pub sell_multiplier: f32,
     pub show_crafting: bool,
+    /// Which recipe categories this shop offers (e.g. ["smithing"], ["alchemy"])
+    /// Empty = no crafting tab
+    pub crafting_categories: Vec<String>,
     pub stock: Vec<ShopStockItem>,
 }
 

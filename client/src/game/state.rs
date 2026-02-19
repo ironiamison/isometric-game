@@ -1517,6 +1517,24 @@ impl GameState {
             .and_then(|id| self.players.get(id))
     }
 
+    /// Get recipes filtered by the current shop's crafting categories.
+    /// Returns all recipes if no shop is open.
+    pub fn shop_filtered_recipes(&self) -> Vec<RecipeDefinition> {
+        if let Some(ref shop) = self.ui_state.shop_data {
+            if shop.crafting_categories.is_empty() {
+                Vec::new()
+            } else {
+                self.recipe_definitions
+                    .iter()
+                    .filter(|r| shop.crafting_categories.contains(&r.category))
+                    .cloned()
+                    .collect()
+            }
+        } else {
+            self.recipe_definitions.clone()
+        }
+    }
+
     /// Returns true when the world is ready to render (player exists and their chunk is loaded)
     pub fn is_world_ready(&self) -> bool {
         if let Some(player) = self.get_local_player() {

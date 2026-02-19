@@ -2909,9 +2909,9 @@ impl InputHandler {
                                 return commands;
                             }
                             // Get unique categories from recipes (matching renderer grouping)
+                            let click_filtered = state.shop_filtered_recipes();
                             let categories: Vec<String> = {
-                                let mut cats: Vec<String> = state
-                                    .recipe_definitions
+                                let mut cats: Vec<String> = click_filtered
                                     .iter()
                                     .map(|r| {
                                         if r.category == "materials" || r.category == "consumables"
@@ -2934,8 +2934,7 @@ impl InputHandler {
                                 .get(selected_idx)
                                 .map(|s| s.as_str())
                                 .unwrap_or("supplies");
-                            let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state
-                                .recipe_definitions
+                            let recipes_in_category: Vec<&crate::game::RecipeDefinition> = click_filtered
                                 .iter()
                                 .filter(|r| {
                                     let cat_match = if current_category == "supplies" {
@@ -3136,10 +3135,11 @@ impl InputHandler {
 
             if state.ui_state.shop_main_tab == 0 {
                 // Recipes tab keyboard controls
+                // Get recipes filtered by this shop's categories
+                let filtered_recipes = state.shop_filtered_recipes();
                 // Get unique categories from recipes, merging consumables and materials
                 let categories: Vec<String> = {
-                    let mut cats: Vec<String> = state
-                        .recipe_definitions
+                    let mut cats: Vec<String> = filtered_recipes
                         .iter()
                         .map(|r| {
                             if r.category == "materials" || r.category == "consumables" {
@@ -3183,8 +3183,7 @@ impl InputHandler {
                         .get(selected_idx)
                         .map(|s| s.as_str())
                         .unwrap_or("supplies");
-                    let recipes_in_category: Vec<&crate::game::RecipeDefinition> = state
-                        .recipe_definitions
+                    let recipes_in_category: Vec<&crate::game::RecipeDefinition> = filtered_recipes
                         .iter()
                         .filter(|r| {
                             let cat_match = if current_category == "supplies" {
@@ -3222,8 +3221,7 @@ impl InputHandler {
                         // Count the actual row position including undiscovered "????" entries
                         // The renderer shows ALL recipes (discovered + undiscovered) in order,
                         // but selection index only counts discovered ones
-                        let all_in_category: Vec<&crate::game::RecipeDefinition> = state
-                            .recipe_definitions
+                        let all_in_category: Vec<&crate::game::RecipeDefinition> = filtered_recipes
                             .iter()
                             .filter(|r| {
                                 if current_category == "supplies" {
@@ -3293,8 +3291,7 @@ impl InputHandler {
                         .get(sel_idx)
                         .map(|s| s.as_str())
                         .unwrap_or("supplies");
-                    let total_visible: usize = state
-                        .recipe_definitions
+                    let total_visible: usize = filtered_recipes
                         .iter()
                         .filter(|r| {
                             if cur_cat == "supplies" {
