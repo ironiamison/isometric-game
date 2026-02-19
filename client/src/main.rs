@@ -325,7 +325,15 @@ async fn main() {
                 let target_frame_time = Duration::from_secs_f64(1.0 / cap as f64);
                 let elapsed = frame_start.elapsed();
                 if elapsed < target_frame_time {
-                    std::thread::sleep(target_frame_time - elapsed);
+                    // Two-phase pacing: coarse sleep, then short spin to reduce oversleep jitter.
+                    // This keeps frame times more consistent than a single sleep() call.
+                    let remaining = target_frame_time - elapsed;
+                    if remaining > Duration::from_millis(2) {
+                        std::thread::sleep(remaining - Duration::from_millis(1));
+                    }
+                    while frame_start.elapsed() < target_frame_time {
+                        std::hint::spin_loop();
+                    }
                 }
             }
 
@@ -375,12 +383,13 @@ fn run_game_frame(
         game_state.debug_mode = !game_state.debug_mode;
     }
 
-    // Cycle FPS cap with F4: Uncapped -> 60 -> 144 -> 240 -> Uncapped
+    // Cycle FPS cap with F4: Uncapped -> 60 -> 144 -> 240 -> 300 -> Uncapped
     if is_key_pressed(KeyCode::F4) {
         game_state.frame_timings.fps_cap = match game_state.frame_timings.fps_cap {
             None => Some(60),
             Some(60) => Some(144),
             Some(144) => Some(240),
+            Some(240) => Some(300),
             _ => None,
         };
         log::info!("FPS cap: {:?}", game_state.frame_timings.fps_cap);

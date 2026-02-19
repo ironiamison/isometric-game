@@ -97,12 +97,13 @@ pub fn run_game_frame(
         game_state.debug_mode = !game_state.debug_mode;
     }
 
-    // Cycle FPS cap with F4: Uncapped -> 60 -> 144 -> 240 -> Uncapped
+    // Cycle FPS cap with F4: Uncapped -> 60 -> 144 -> 240 -> 300 -> Uncapped
     if is_key_pressed(KeyCode::F4) {
         game_state.frame_timings.fps_cap = match game_state.frame_timings.fps_cap {
             None => Some(60),
             Some(60) => Some(144),
             Some(144) => Some(240),
+            Some(240) => Some(300),
             _ => None,
         };
         log::info!("FPS cap: {:?}", game_state.frame_timings.fps_cap);

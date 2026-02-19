@@ -57,8 +57,7 @@ pub struct RenderTimings {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ChatLinesCacheKey {
-    message_count: usize,
-    content_checksum: u64,
+    chat_revision: u64,
     max_chat_width_x100: i32,
     font_size_x100: i32,
     active_tab: u8,
@@ -1564,10 +1563,9 @@ impl Renderer {
         let measured = self.font.measure_text(text, font_size);
         let mut cache = self.text_measure_cache.borrow_mut();
         let bucket = cache.entry(font_key).or_default();
-        if bucket.len() >= TEXT_MEASURE_CACHE_BUCKET_LIMIT {
-            bucket.clear();
+        if bucket.len() < TEXT_MEASURE_CACHE_BUCKET_LIMIT {
+            bucket.insert(text.to_string(), measured);
         }
-        bucket.insert(text.to_string(), measured);
         measured
     }
 
@@ -7745,27 +7743,8 @@ impl Renderer {
             }
 
             // Build wrapped chat lines only when chat content or layout changes.
-            let message_count = state.ui_state.chat_messages.len();
-            // Lightweight checksum to detect rolling-window content changes.
-            let mut content_checksum = 1469598103934665603u64;
-            for msg in state.ui_state.chat_messages.iter() {
-                content_checksum ^= msg.timestamp.to_bits();
-                content_checksum = content_checksum.wrapping_mul(1099511628211);
-                content_checksum ^= msg.sender_name.len() as u64;
-                content_checksum = content_checksum.wrapping_mul(1099511628211);
-                content_checksum ^= msg.text.len() as u64;
-                content_checksum = content_checksum.wrapping_mul(1099511628211);
-                let channel_tag = match msg.channel {
-                    ChatChannel::Local => 1u64,
-                    ChatChannel::Global => 2u64,
-                    ChatChannel::System => 3u64,
-                };
-                content_checksum ^= channel_tag;
-                content_checksum = content_checksum.wrapping_mul(1099511628211);
-            }
             let cache_key = ChatLinesCacheKey {
-                message_count,
-                content_checksum,
+                chat_revision: state.ui_state.chat_revision,
                 max_chat_width_x100: (max_chat_width * 100.0).round() as i32,
                 font_size_x100: (font_size * 100.0).round() as i32,
                 active_tab: match state.ui_state.chat_active_tab {
@@ -8248,60 +8227,6 @@ impl Renderer {
 
             let input_text = &state.ui_state.chat_input;
             let cursor_pos = state.ui_state.chat_cursor;
-            let char_count = input_text.chars().count();
-
-            // Calculate how many chars fit by measuring actual text width
-            let measure_chars_that_fit = |text: &str, max_width: f32| -> usize {
-                let chars: Vec<char> = text.chars().collect();
-                for i in (1..=chars.len()).rev() {
-                    let substr: String = chars[..i].iter().collect();
-                    if self.measure_text_sharp(&substr, font_size).width <= max_width {
-                        return i;
-                    }
-                }
-                0
-            };
-
-            // Determine scroll offset to keep cursor visible
-            let scroll_offset = if self.measure_text_sharp(input_text, font_size).width
-                <= text_area_width
-            {
-                // Text fits entirely, no scroll needed
-                0
-            } else {
-                // Find offset that keeps cursor visible
-                // Start by trying to show text ending at cursor
-                let text_to_cursor: String = input_text.chars().take(cursor_pos).collect();
-                let cursor_text_width = self.measure_text_sharp(&text_to_cursor, font_size).width;
-
-                if cursor_text_width <= text_area_width {
-                    // Cursor is visible from start
-                    0
-                } else {
-                    // Need to scroll - find how many chars to skip to show cursor
-                    let chars: Vec<char> = input_text.chars().collect();
-                    let mut offset = 0;
-                    for i in 0..cursor_pos {
-                        let visible: String = chars[i..cursor_pos].iter().collect();
-                        if self.measure_text_sharp(&visible, font_size).width <= text_area_width {
-                            offset = i;
-                            break;
-                        }
-                    }
-                    offset
-                }
-            };
-
-            // Get visible portion of text that fits
-            let chars_from_offset: String = input_text.chars().skip(scroll_offset).collect();
-            let visible_char_count = measure_chars_that_fit(&chars_from_offset, text_area_width);
-            let visible_text: String = input_text
-                .chars()
-                .skip(scroll_offset)
-                .take(visible_char_count)
-                .collect();
-            let visible_end = scroll_offset + visible_char_count;
-
             // Draw channel indicator and visible text
             let text_y_offset = 17.0 * zoom;
             let text_start_x = input_x + text_padding + indicator_w;
@@ -8312,51 +8237,121 @@ impl Renderer {
                 font_size,
                 indicator_color,
             );
-            self.draw_text_sharp(
-                &visible_text,
-                text_start_x,
-                input_y + text_y_offset,
-                font_size,
-                WHITE,
-            );
 
-            // Draw scroll indicators if text is clipped
-            if scroll_offset > 0 {
+            if input_text.is_empty() {
+                // Fast path for idle chat input (common case in classic mode).
+                let cursor_blink = (macroquad::time::get_time() * 2.0) as i32 % 2 == 0;
+                if cursor_blink {
+                    draw_line(
+                        text_start_x + 1.0,
+                        input_y + 4.0 * zoom,
+                        text_start_x + 1.0,
+                        input_y + input_height - 4.0 * zoom,
+                        1.0,
+                        WHITE,
+                    );
+                }
+            } else {
+                let char_count = input_text.chars().count();
+
+                // Calculate how many chars fit by measuring actual text width
+                let measure_chars_that_fit = |text: &str, max_width: f32| -> usize {
+                    let chars: Vec<char> = text.chars().collect();
+                    for i in (1..=chars.len()).rev() {
+                        let substr: String = chars[..i].iter().collect();
+                        if self.measure_text_sharp(&substr, font_size).width <= max_width {
+                            return i;
+                        }
+                    }
+                    0
+                };
+
+                // Determine scroll offset to keep cursor visible
+                let scroll_offset = if self.measure_text_sharp(input_text, font_size).width
+                    <= text_area_width
+                {
+                    // Text fits entirely, no scroll needed
+                    0
+                } else {
+                    // Find offset that keeps cursor visible
+                    // Start by trying to show text ending at cursor
+                    let text_to_cursor: String = input_text.chars().take(cursor_pos).collect();
+                    let cursor_text_width =
+                        self.measure_text_sharp(&text_to_cursor, font_size).width;
+
+                    if cursor_text_width <= text_area_width {
+                        // Cursor is visible from start
+                        0
+                    } else {
+                        // Need to scroll - find how many chars to skip to show cursor
+                        let chars: Vec<char> = input_text.chars().collect();
+                        let mut offset = 0;
+                        for i in 0..cursor_pos {
+                            let visible: String = chars[i..cursor_pos].iter().collect();
+                            if self.measure_text_sharp(&visible, font_size).width <= text_area_width
+                            {
+                                offset = i;
+                                break;
+                            }
+                        }
+                        offset
+                    }
+                };
+
+                // Get visible portion of text that fits
+                let chars_from_offset: String = input_text.chars().skip(scroll_offset).collect();
+                let visible_char_count = measure_chars_that_fit(&chars_from_offset, text_area_width);
+                let visible_text: String = input_text
+                    .chars()
+                    .skip(scroll_offset)
+                    .take(visible_char_count)
+                    .collect();
+                let visible_end = scroll_offset + visible_char_count;
+
                 self.draw_text_sharp(
-                    "<",
-                    text_start_x - 8.0 * zoom,
+                    &visible_text,
+                    text_start_x,
                     input_y + text_y_offset,
                     font_size,
-                    GRAY,
-                );
-            }
-            if visible_end < char_count {
-                self.draw_text_sharp(
-                    ">",
-                    input_x + input_width - 10.0 * zoom,
-                    input_y + text_y_offset,
-                    font_size,
-                    GRAY,
-                );
-            }
-
-            // Blinking cursor at correct position within visible text
-            let cursor_blink = (macroquad::time::get_time() * 2.0) as i32 % 2 == 0;
-            if cursor_blink {
-                let cursor_visible_pos = cursor_pos.saturating_sub(scroll_offset);
-                let text_before_cursor: String =
-                    visible_text.chars().take(cursor_visible_pos).collect();
-                let cursor_x = self
-                    .measure_text_sharp(&text_before_cursor, font_size)
-                    .width;
-                draw_line(
-                    text_start_x + cursor_x + 1.0,
-                    input_y + 4.0 * zoom,
-                    text_start_x + cursor_x + 1.0,
-                    input_y + input_height - 4.0 * zoom,
-                    1.0,
                     WHITE,
                 );
+
+                // Draw scroll indicators if text is clipped
+                if scroll_offset > 0 {
+                    self.draw_text_sharp(
+                        "<",
+                        text_start_x - 8.0 * zoom,
+                        input_y + text_y_offset,
+                        font_size,
+                        GRAY,
+                    );
+                }
+                if visible_end < char_count {
+                    self.draw_text_sharp(
+                        ">",
+                        input_x + input_width - 10.0 * zoom,
+                        input_y + text_y_offset,
+                        font_size,
+                        GRAY,
+                    );
+                }
+
+                // Blinking cursor at correct position within visible text
+                let cursor_blink = (macroquad::time::get_time() * 2.0) as i32 % 2 == 0;
+                if cursor_blink {
+                    let cursor_visible_pos = cursor_pos.saturating_sub(scroll_offset);
+                    let text_before_cursor: String =
+                        visible_text.chars().take(cursor_visible_pos).collect();
+                    let cursor_x = self.measure_text_sharp(&text_before_cursor, font_size).width;
+                    draw_line(
+                        text_start_x + cursor_x + 1.0,
+                        input_y + 4.0 * zoom,
+                        text_start_x + cursor_x + 1.0,
+                        input_y + input_height - 4.0 * zoom,
+                        1.0,
+                        WHITE,
+                    );
+                }
             }
         }
     }
@@ -8851,10 +8846,9 @@ impl Renderer {
         let wrapped = Self::wrap_text_uncached(text, max_width, font_size);
         let mut cache = self.text_wrap_cache.borrow_mut();
         let bucket = cache.entry(bucket_key).or_default();
-        if bucket.len() >= TEXT_WRAP_CACHE_BUCKET_LIMIT {
-            bucket.clear();
+        if bucket.len() < TEXT_WRAP_CACHE_BUCKET_LIMIT {
+            bucket.insert(text.to_string(), wrapped.clone());
         }
-        bucket.insert(text.to_string(), wrapped.clone());
         wrapped
     }
 

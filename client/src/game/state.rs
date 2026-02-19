@@ -11,6 +11,8 @@ use crate::render::XpGlobesManager;
 use crate::ui::UiElementId;
 use std::collections::{HashMap, HashSet};
 
+const MAX_CHAT_LOG_MESSAGES: usize = 120;
+
 /// State of a map transition (fade effect)
 #[derive(Debug, Clone, PartialEq)]
 pub enum TransitionState {
@@ -100,14 +102,14 @@ impl Default for FrameTimings {
             delta_max_ms: 0.0,
             delta_samples: [0.0; 60],
             delta_idx: 0,
-            fps_cap: None, // Uncapped by default
+            fps_cap: Some(144), // High-but-stable default pacing on most displays
             next_frame_ms: 0.0,
             next_frame_min_ms: 0.0,
             next_frame_max_ms: 0.0,
             next_frame_samples: [0.0; 60],
             next_frame_idx: 0,
-            delta_smoothing: 0.0,  // 0.0 = disabled, try 0.5-0.9 for smoothing
-            smoothed_delta: 0.016, // Start at ~60fps
+            delta_smoothing: 0.8,  // Default smoothing to reduce visible pacing jitter
+            smoothed_delta: 1.0 / 120.0, // Start near high-refresh frame pacing
         }
     }
 }
@@ -158,8 +160,9 @@ impl FrameTimings {
             self.delta_max_ms = delta_ms;
         }
 
-        // Update smoothed delta for visual interpolation
-        let delta_secs = (delta_ms / 1000.0) as f32;
+        // Update smoothed delta for visual interpolation.
+        // Clamp extreme outliers so one hitch doesn't create a large visual jump.
+        let delta_secs = ((delta_ms / 1000.0) as f32).clamp(1.0 / 240.0, 1.0 / 30.0);
         if self.delta_smoothing > 0.0 {
             self.smoothed_delta = self.smoothed_delta * self.delta_smoothing
                 + delta_secs * (1.0 - self.delta_smoothing);
@@ -844,6 +847,7 @@ pub struct UiState {
     pub chat_key_repeat_time: f64, // Last time a repeated key action fired
     pub chat_key_initial_delay: bool, // Whether we're still in initial delay
     pub chat_messages: Vec<ChatMessage>,
+    pub chat_revision: u64, // Increments whenever chat content changes (for render cache invalidation)
     pub inventory_open: bool,
     // Quest UI state
     pub active_dialogue: Option<ActiveDialogue>,
@@ -993,6 +997,7 @@ impl Default for UiState {
             chat_key_repeat_time: 0.0,
             chat_key_initial_delay: true,
             chat_messages: Vec::new(),
+            chat_revision: 0,
             inventory_open: false,
             active_dialogue: None,
             active_quests: Vec::new(),
@@ -1361,6 +1366,12 @@ impl GameState {
         self.auto_path = None;
     }
 
+    /// Append a chat message and bump revision so renderer cache invalidates once.
+    pub fn push_chat_message(&mut self, message: ChatMessage) {
+        self.ui_state.chat_messages.push(message);
+        self.ui_state.chat_revision = self.ui_state.chat_revision.wrapping_add(1);
+    }
+
     /// Update all players in a server-authoritative step model.
     pub fn update(&mut self, delta: f32) {
         // Trigger fade-in when world first becomes ready
@@ -1372,6 +1383,13 @@ impl GameState {
         // Tick down fade-in overlay
         if self.world_fade_in > 0.0 {
             self.world_fade_in = (self.world_fade_in - delta * 3.0).max(0.0); // ~0.33s fade
+        }
+
+        // Keep chat history bounded regardless of source channel.
+        if self.ui_state.chat_messages.len() > MAX_CHAT_LOG_MESSAGES {
+            let to_remove = self.ui_state.chat_messages.len() - MAX_CHAT_LOG_MESSAGES;
+            self.ui_state.chat_messages.drain(0..to_remove);
+            self.ui_state.chat_revision = self.ui_state.chat_revision.wrapping_add(1);
         }
 
         // Use smoothed delta for visual interpolation (reduces jitter from frame variance)

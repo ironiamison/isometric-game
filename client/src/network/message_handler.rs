@@ -679,17 +679,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 };
 
                 // Add to chat log
-                state.ui_state.chat_messages.push(ChatMessage {
+                state.push_chat_message(ChatMessage {
                     sender_name: sender_name.clone(),
                     text: text.clone(),
                     timestamp,
                     channel,
                 });
                 state.pending_sfx.push("message_add".to_string());
-
-                if state.ui_state.chat_messages.len() > 75 {
-                    state.ui_state.chat_messages.remove(0);
-                }
 
                 // Chat bubbles only for public/nearby messages
                 if matches!(channel, ChatChannel::Local) {
@@ -2578,7 +2574,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // Remove the bonus tile
                 state.bonus_tiles.retain(|t| t.x != x || t.y != y);
                 if state.local_player_id.as_deref() == Some(&player_id) {
-                    state.ui_state.chat_messages.push(ChatMessage::system(
+                    state.push_chat_message(ChatMessage::system(
                         "You claimed the bonus spot! 2x gathering speed for 30s!".to_string(),
                     ));
                 }
@@ -3067,7 +3063,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 } else if let Some(err) = error {
                     log::warn!("Friend action '{}' failed: {}", action, err);
                     // Add error to chat as system message
-                    state.ui_state.chat_messages.push(ChatMessage::system(err));
+                    state.push_chat_message(ChatMessage::system(err));
                 }
             }
         }
