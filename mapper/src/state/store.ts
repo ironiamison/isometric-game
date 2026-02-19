@@ -887,28 +887,32 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       type: 'addMapObject',
       description: `Add map object ${objectId}`,
       undo: () => {
-        // Remove object and clear collision
-        get().updateChunk(chunkCoord, (c) => ({
-          ...c,
-          mapObjects: c.mapObjects.filter((o) => o.id !== newObject.id),
-          collision: setCollisionBit(c, local.lx, local.ly, false),
-          dirty: true,
-        }));
+        // Remove object and clear collision only if no wall at this tile
+        get().updateChunk(chunkCoord, (c) => {
+          const hasWall = c.walls.some((w) => w.x === local.lx && w.y === local.ly);
+          return {
+            ...c,
+            mapObjects: c.mapObjects.filter((o) => o.id !== newObject.id),
+            collision: hasWall ? c.collision : setCollisionBit(c, local.lx, local.ly, false),
+            dirty: true,
+          };
+        });
       },
       redo: () => {
         get().updateChunk(chunkCoord, (c) => ({
           ...c,
-          mapObjects: [...c.mapObjects, newObject],
+          // Max 1 object per tile
+          mapObjects: [...c.mapObjects.filter((o) => !(o.x === local.lx && o.y === local.ly)), newObject],
           collision: setCollisionBit(c, local.lx, local.ly, true),
           dirty: true,
         }));
       },
     });
 
-    // Add object and auto-set collision
+    // Add object (max 1 per tile) and auto-set collision
     get().updateChunk(chunkCoord, (c) => ({
       ...c,
-      mapObjects: [...c.mapObjects, newObject],
+      mapObjects: [...c.mapObjects.filter((o) => !(o.x === local.lx && o.y === local.ly)), newObject],
       collision: setCollisionBit(c, local.lx, local.ly, true),
       dirty: true,
     }));
@@ -924,6 +928,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     if (!obj) return;
 
     const shouldClearCollision = !obj.noCollision;
+    // Don't clear collision if a wall still exists at this tile
+    const hasWall = chunk.walls.some((w) => w.x === obj.x && w.y === obj.y);
 
     history.push({
       type: 'removeMapObject',
@@ -942,7 +948,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     get().updateChunk(chunkCoord, (c) => ({
       ...c,
       mapObjects: c.mapObjects.filter((o) => o.id !== objectSpawnId),
-      collision: shouldClearCollision ? setCollisionBit(c, obj.x, obj.y, false) : c.collision,
+      collision: (shouldClearCollision && !hasWall) ? setCollisionBit(c, obj.x, obj.y, false) : c.collision,
       dirty: true,
     }));
   },
@@ -992,10 +998,14 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       // Remove existing wall (toggle off)
       const removedWall = chunk.walls[existingIdx];
 
-      // Only clear collision if no other wall remains at this tile
+      // Only clear collision if no other wall or object remains at this tile
       const otherWallAtTile = chunk.walls.some(
         (w, i) => i !== existingIdx && w.x === local.lx && w.y === local.ly
       );
+      const hasObjectAtTile = chunk.mapObjects.some(
+        (o) => o.x === local.lx && o.y === local.ly && !o.noCollision
+      );
+      const keepCollision = otherWallAtTile || hasObjectAtTile;
 
       history.push({
         type: 'removeWall',
@@ -1013,10 +1023,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
           const stillHasWall = c?.walls.some(
             (w) => w.id !== removedWall.id && w.x === local.lx && w.y === local.ly
           );
+          const stillHasObj = c?.mapObjects.some(
+            (o) => o.x === local.lx && o.y === local.ly && !o.noCollision
+          );
           get().updateChunk(chunkCoord, (c) => ({
             ...c,
             walls: c.walls.filter((w) => w.id !== removedWall.id),
-            collision: !stillHasWall ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
+            collision: (!stillHasWall && !stillHasObj) ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
             dirty: true,
           }));
         },
@@ -1025,7 +1038,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       get().updateChunk(chunkCoord, (c) => ({
         ...c,
         walls: c.walls.filter((_, i) => i !== existingIdx),
-        collision: !otherWallAtTile ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
+        collision: !keepCollision ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
         dirty: true,
       }));
     } else {
@@ -1046,10 +1059,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
           const stillHasWall = c?.walls.some(
             (w) => w.id !== newWall.id && w.x === local.lx && w.y === local.ly
           );
+          const stillHasObj = c?.mapObjects.some(
+            (o) => o.x === local.lx && o.y === local.ly && !o.noCollision
+          );
           get().updateChunk(chunkCoord, (c) => ({
             ...c,
             walls: c.walls.filter((w) => w.id !== newWall.id),
-            collision: !stillHasWall ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
+            collision: (!stillHasWall && !stillHasObj) ? setCollisionBit(c, local.lx, local.ly, false) : c.collision,
             dirty: true,
           }));
         },
@@ -1597,6 +1613,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     const interior = get().currentInterior;
     if (!interior) throw new Error('No interior loaded');
 
+    // Max 1 object per tile - replace existing if present
+    const filtered = interior.mapObjects.filter((o) => !(o.x === x && o.y === y));
+
     const gid = objectLoader.idToGid(objectId);
     const newObject: MapObject = {
       id: `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1610,7 +1629,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     set({
       currentInterior: {
         ...interior,
-        mapObjects: [...interior.mapObjects, newObject],
+        mapObjects: [...filtered, newObject],
         dirty: true,
       },
     });
