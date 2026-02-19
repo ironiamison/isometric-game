@@ -194,7 +194,7 @@ description = "A giant worm that burrows through the earth."
 
 [worm.stats]
 level = 3
-max_hp = 30
+max_hp = 18
 damage = 2
 attack_bonus = 2
 defence_bonus = 0

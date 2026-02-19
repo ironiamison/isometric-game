@@ -832,8 +832,8 @@ impl Renderer {
             ("Bank Controls", TEXT_TITLE),
             ("", TEXT_NORMAL),
             ("Items & Gold", TEXT_GOLD),
-            ("Click - Enter custom amount", TEXT_NORMAL),
-            ("Ctrl+Click - Deposit/Withdraw 1", TEXT_NORMAL),
+            ("Click - Deposit/Withdraw 1", TEXT_NORMAL),
+            ("Ctrl+Click - Enter custom amount", TEXT_NORMAL),
             ("Shift+Click - Deposit/Withdraw all", TEXT_NORMAL),
         ];
 

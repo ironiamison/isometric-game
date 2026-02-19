@@ -8364,6 +8364,19 @@ impl Renderer {
         // Ground item clickable areas and hover labels (world-space, registered first)
         self.render_ground_item_overlays(state, hovered, &mut layout);
 
+        // Quest objective tracker / contract tracker below minimap on the right side.
+        // Rendered early so interactive panels (inventory, quest log, etc.) draw on top.
+        let preview = self.minimap_preview_rect();
+        let tracker_right = (preview.x + preview.w).floor();
+        let tracker_y = if self.minimap_preview_enabled(state) {
+            (preview.y + preview.h + 16.0).floor()
+        } else {
+            (MINIMAP_PREVIEW_Y + 14.0).floor()
+        };
+        let tracker_width = (preview.w + 88.0).max(120.0).min(tracker_right - 10.0);
+        let tracker_x = (tracker_right - tracker_width).floor();
+        self.render_quest_tracker(state, tracker_x, tracker_y, tracker_width);
+
         // Inventory UI (when open)
         if state.ui_state.inventory_open {
             self.render_inventory(state, hovered, &mut layout);
@@ -8494,19 +8507,6 @@ impl Renderer {
                 );
             }
         }
-
-        // Quest objective tracker / contract tracker below minimap on the right side.
-        let preview = self.minimap_preview_rect();
-        let tracker_right = (preview.x + preview.w).floor();
-        let tracker_y = if self.minimap_preview_enabled(state) {
-            (preview.y + preview.h + 16.0).floor()
-        } else {
-            (MINIMAP_PREVIEW_Y + 14.0).floor()
-        };
-        // Keep the tracker right edge flush with the minimap right edge, but allow extra room by expanding left.
-        let tracker_width = (preview.w + 88.0).max(120.0).min(tracker_right - 10.0);
-        let tracker_x = (tracker_right - tracker_width).floor();
-        self.render_quest_tracker(state, tracker_x, tracker_y, tracker_width);
 
         // Farming contract tracker (shown in farming area) - left side below stat bars
         if state.farming_contract.is_some() {

@@ -181,6 +181,20 @@ impl PlayerAnimation {
         self.finished
     }
 
+    /// Advance the animation toward the end of the current cycle without looping.
+    /// Returns true once the cycle completes (frame wraps past frame_count),
+    /// snapping the frame back to 0 so the transition to Idle looks clean.
+    pub fn finish_cycle(&mut self, delta: f32) -> bool {
+        let config = get_animation_config(self.state);
+        self.frame += delta * config.fps;
+        if self.frame >= config.frame_count as f32 {
+            self.frame = 0.0;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Get the current sprite sheet coordinates
     pub fn get_sprite_coords(&self) -> SpriteCoords {
         let config = get_animation_config(self.state);

@@ -2647,15 +2647,8 @@ impl InputHandler {
                                         quantity: inv_slot.quantity,
                                     });
                                     state.pending_sfx.push("enter".to_string());
-                                } else if ctrl_held {
-                                    // Ctrl+Click = deposit 1
-                                    commands.push(InputCommand::BankDeposit {
-                                        item_id: inv_slot.item_id.clone(),
-                                        quantity: 1,
-                                    });
-                                    state.pending_sfx.push("enter".to_string());
-                                } else {
-                                    // Click = open quantity dialog
+                                } else if ctrl_held && inv_slot.quantity > 1 {
+                                    // Ctrl+Click = open quantity dialog (only if stack > 1)
                                     state.ui_state.bank_quantity_dialog =
                                         Some(BankQuantityDialog {
                                             input: String::new(),
@@ -2664,6 +2657,13 @@ impl InputHandler {
                                             item_id: Some(inv_slot.item_id.clone()),
                                             max_quantity: inv_slot.quantity,
                                         });
+                                } else {
+                                    // Click = deposit 1
+                                    commands.push(InputCommand::BankDeposit {
+                                        item_id: inv_slot.item_id.clone(),
+                                        quantity: 1,
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
                                 }
                             }
                             return commands;
@@ -2683,15 +2683,8 @@ impl InputHandler {
                                         quantity: *qty,
                                     });
                                     state.pending_sfx.push("enter".to_string());
-                                } else if ctrl_held {
-                                    // Ctrl+Click = withdraw 1
-                                    commands.push(InputCommand::BankWithdraw {
-                                        item_id: item_id.clone(),
-                                        quantity: 1,
-                                    });
-                                    state.pending_sfx.push("enter".to_string());
-                                } else {
-                                    // Click = open quantity dialog
+                                } else if ctrl_held && *qty > 1 {
+                                    // Ctrl+Click = open quantity dialog (only if stack > 1)
                                     state.ui_state.bank_quantity_dialog =
                                         Some(BankQuantityDialog {
                                             input: String::new(),
@@ -2700,6 +2693,13 @@ impl InputHandler {
                                             item_id: Some(item_id.clone()),
                                             max_quantity: *qty,
                                         });
+                                } else {
+                                    // Click = withdraw 1
+                                    commands.push(InputCommand::BankWithdraw {
+                                        item_id: item_id.clone(),
+                                        quantity: 1,
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
                                 }
                             }
                             return commands;
@@ -2716,9 +2716,6 @@ impl InputHandler {
                                     });
                                     state.pending_sfx.push("enter".to_string());
                                 } else if ctrl_held {
-                                    commands.push(InputCommand::BankDepositGold { amount: 1 });
-                                    state.pending_sfx.push("enter".to_string());
-                                } else {
                                     state.ui_state.bank_quantity_dialog =
                                         Some(BankQuantityDialog {
                                             input: String::new(),
@@ -2727,6 +2724,9 @@ impl InputHandler {
                                             item_id: None,
                                             max_quantity: state.inventory.gold,
                                         });
+                                } else {
+                                    commands.push(InputCommand::BankDepositGold { amount: 1 });
+                                    state.pending_sfx.push("enter".to_string());
                                 }
                             }
                             return commands;
@@ -2743,9 +2743,6 @@ impl InputHandler {
                                     });
                                     state.pending_sfx.push("enter".to_string());
                                 } else if ctrl_held {
-                                    commands.push(InputCommand::BankWithdrawGold { amount: 1 });
-                                    state.pending_sfx.push("enter".to_string());
-                                } else {
                                     state.ui_state.bank_quantity_dialog =
                                         Some(BankQuantityDialog {
                                             input: String::new(),
@@ -2754,6 +2751,9 @@ impl InputHandler {
                                             item_id: None,
                                             max_quantity: state.ui_state.bank_gold,
                                         });
+                                } else {
+                                    commands.push(InputCommand::BankWithdrawGold { amount: 1 });
+                                    state.pending_sfx.push("enter".to_string());
                                 }
                             }
                             return commands;
