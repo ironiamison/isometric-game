@@ -445,11 +445,6 @@ impl Player {
         if should_walk_loop {
             self.animation.set_state(AnimationState::Walking);
             self.animation.update(delta);
-        } else if self.animation.state == AnimationState::Walking {
-            // Let the walk cycle finish cleanly before going idle
-            if self.animation.finish_cycle(delta) {
-                self.animation.set_state(AnimationState::Idle);
-            }
         } else {
             self.animation.set_state(AnimationState::Idle);
         }

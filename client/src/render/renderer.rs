@@ -3135,7 +3135,7 @@ impl Renderer {
                 Renderable::Player(player, is_local) => {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&player.id);
                     let is_hovered = state.hovered_entity_id.as_ref() == Some(&player.id);
-                    self.render_player(player, is_local, is_selected, is_hovered, &state.camera);
+                    self.render_player(player, is_local, is_selected, is_hovered, &state.camera, &state.item_registry);
                     if player.is_gathering {
                         // Delay the line until the cast animation finishes
                         let elapsed = macroquad::time::get_time() - player.gathering_started_at;
@@ -3257,7 +3257,7 @@ impl Renderer {
         // Render subtle local player silhouette (high z-index, visible through trees)
         if let Some(ref local_id) = state.local_player_id {
             if let Some(local_player) = state.players.get(local_id) {
-                self.render_player_silhouette(local_player, &state.camera);
+                self.render_player_silhouette(local_player, &state.camera, &state.item_registry);
             }
         }
 
@@ -4875,6 +4875,7 @@ impl Renderer {
         is_selected: bool,
         is_hovered: bool,
         camera: &Camera,
+        item_registry: &crate::game::item_registry::ItemRegistry,
     ) {
         let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
         let zoom = camera.zoom;
@@ -4942,8 +4943,9 @@ impl Renderer {
                 .as_ref()
                 .filter(|_| !is_sitting)
                 .and_then(|weapon_id| {
+                    let sprite_key = item_registry.get_sprite_key(weapon_id);
                     self.weapon_sprites
-                        .get(weapon_id)
+                        .get(sprite_key)
                         .map(|(tex, atlas_offset)| {
                             let anim_frame = player.animation.frame as u32;
                             let weapon_frame = get_weapon_frame(
@@ -4960,7 +4962,7 @@ impl Renderer {
                             // Get weapon frame size from manifest, fallback to default
                             let (fw, fh) = self
                                 .weapon_frame_sizes
-                                .get(weapon_id)
+                                .get(sprite_key)
                                 .copied()
                                 .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
                             (tex, atlas_offset, weapon_frame, offset_x, offset_y, fw, fh)
@@ -5749,7 +5751,7 @@ impl Renderer {
 
     /// Renders a semi-transparent silhouette of the player that's always visible
     /// This provides visual feedback when the player is behind tall objects like trees
-    fn render_player_silhouette(&self, player: &Player, camera: &Camera) {
+    fn render_player_silhouette(&self, player: &Player, camera: &Camera, item_registry: &crate::game::item_registry::ItemRegistry) {
         // Don't show silhouette for dead players
         if player.is_dead {
             return;
@@ -5788,8 +5790,9 @@ impl Renderer {
                 .as_ref()
                 .filter(|_| !is_sitting_sil)
                 .and_then(|weapon_id| {
+                    let sprite_key = item_registry.get_sprite_key(weapon_id);
                     self.weapon_sprites
-                        .get(weapon_id)
+                        .get(sprite_key)
                         .map(|(tex, atlas_offset)| {
                             let anim_frame = player.animation.frame as u32;
                             let weapon_frame = get_weapon_frame(
@@ -5805,7 +5808,7 @@ impl Renderer {
                             );
                             let (fw, fh) = self
                                 .weapon_frame_sizes
-                                .get(weapon_id)
+                                .get(sprite_key)
                                 .copied()
                                 .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
                             (tex, atlas_offset, weapon_frame, offset_x, offset_y, fw, fh)
