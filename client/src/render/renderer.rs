@@ -17,6 +17,7 @@ use super::shaders;
 use super::ui::common::{SlotState, CORNER_ACCENT_SIZE, EXP_BAR_GAP};
 use crate::game::npc::{Npc, NpcState};
 use crate::game::tilemap::get_tile_color;
+use crate::game::ore_types::get_ore_info;
 use crate::game::tree_types::get_tree_info;
 use crate::game::{
     Camera, ChatChannel, ChunkLayerType, ConnectionStatus, Direction, DragSource, GameState,
@@ -3423,6 +3424,7 @@ impl Renderer {
         // 4.5. Render name tags above all map elements (overhead, walls, objects, etc.)
         self.render_name_tags(state);
         self.render_tree_name_tag(state);
+        self.render_ore_name_tag(state);
         self.render_farming_patch_labels(state);
 
         // 5. Render floating damage numbers
@@ -3916,6 +3918,82 @@ impl Renderer {
         );
 
         // Draw text
+        let text_x = screen_x - text_dims.width / 2.0;
+        self.draw_text_sharp(&text, text_x, tag_y, font_size, level_color);
+    }
+
+    /// Render name tag for hovered rock/ore showing name and level requirement
+    fn render_ore_name_tag(&self, state: &GameState) {
+        let Some((tile_x, tile_y)) = state.hovered_tile else {
+            return;
+        };
+
+        // Don't show for depleted rocks
+        if state.depleted_rocks.contains_key(&(tile_x, tile_y)) {
+            return;
+        }
+
+        // Check if there's an object at this tile
+        let Some(obj) = state.chunk_manager.get_object_at_exact(tile_x, tile_y) else {
+            return;
+        };
+
+        // Check if this object is an ore rock (by GID)
+        let Some(ore_info) = get_ore_info(obj.gid) else {
+            return;
+        };
+
+        // Get player's mining level
+        let player_mining_level = state
+            .get_local_player()
+            .map(|p| p.skills.get(crate::game::SkillType::Mining).level)
+            .unwrap_or(1);
+
+        let can_mine = player_mining_level >= ore_info.level_required;
+
+        // Get screen position
+        let (screen_x, screen_y) =
+            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, &state.camera);
+        let zoom = state.camera.zoom;
+
+        // Get actual sprite height for this rock
+        let sprite_height = if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
+            let tex_height = if let Some(r) = source_rect {
+                r.h
+            } else {
+                texture.height()
+            };
+            tex_height * zoom
+        } else {
+            40.0 * zoom
+        };
+
+        // Position the tag above the rock sprite
+        let tag_y = screen_y - sprite_height - 5.0 * zoom;
+
+        let text = format!("{} (Lvl {})", ore_info.name, ore_info.level_required);
+        let font_size = 16.0 * zoom;
+        let text_dims = self.measure_text_sharp(&text, font_size);
+
+        let level_color = if can_mine {
+            Color::from_rgba(100, 255, 100, 255)
+        } else {
+            Color::from_rgba(255, 100, 100, 255)
+        };
+
+        let padding = 4.0 * zoom;
+        let bar_height = 18.0 * zoom;
+        let bar_x = screen_x - text_dims.width / 2.0 - padding;
+        let bar_y = tag_y - 14.0 * zoom;
+
+        draw_rectangle(
+            bar_x,
+            bar_y,
+            text_dims.width + padding * 2.0,
+            bar_height,
+            Color::from_rgba(0, 0, 0, 180),
+        );
+
         let text_x = screen_x - text_dims.width / 2.0;
         self.draw_text_sharp(&text, text_x, tag_y, font_size, level_color);
     }

@@ -10,6 +10,7 @@ pub mod skills;
 pub mod spell;
 pub mod state;
 pub mod tilemap;
+pub mod ore_types;
 pub mod tree_types;
 
 pub use chunk::{
