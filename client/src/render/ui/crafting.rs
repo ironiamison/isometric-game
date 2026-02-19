@@ -615,19 +615,9 @@ impl Renderer {
             SLOT_INNER_SHADOW,
         );
 
-        self.draw_text_sharp("Blueprints", list_x + 8.0, list_y + 18.0, 16.0, TEXT_TITLE);
-        draw_line(
-            list_x + 6.0,
-            list_y + 24.0,
-            list_x + list_width - 6.0,
-            list_y + 24.0,
-            1.0,
-            HEADER_BORDER,
-        );
-
         let line_height = 28.0;
-        let list_content_y = list_y + 30.0;
-        let list_content_height = list_height - 34.0;
+        let list_content_y = list_y + 4.0;
+        let list_content_height = list_height - 8.0;
 
         // Count distinct non-empty sections for header height
         let num_sections = {

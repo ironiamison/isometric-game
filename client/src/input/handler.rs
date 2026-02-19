@@ -3285,7 +3285,7 @@ impl InputHandler {
                         } else {
                             content_height - 10.0
                         };
-                        let visible_h = list_height - 34.0;
+                        let visible_h = list_height - 8.0;
                         if item_bottom > state.ui_state.crafting_scroll_offset + visible_h {
                             state.ui_state.crafting_scroll_offset = item_bottom - visible_h;
                         }
@@ -3357,7 +3357,7 @@ impl InputHandler {
                     } else {
                         content_height - 10.0
                     };
-                    let list_content_height = list_height - 34.0;
+                    let list_content_height = list_height - 8.0;
                     let total_content = total_visible as f32 * line_height
                         + num_scroll_sections as f32 * SECTION_HEADER_HEIGHT;
                     let max_scroll = (total_content - list_content_height).max(0.0);

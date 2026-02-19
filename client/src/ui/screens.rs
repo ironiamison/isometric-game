@@ -138,9 +138,9 @@ fn draw_character_preview(
     skin: &str,
     hair_style: Option<i32>,
     hair_color: i32,
-    equipped_body: Option<&str>,
-    equipped_back: Option<&str>,
-    equipped_feet: Option<&str>,
+    sprite_body: Option<&str>,
+    sprite_back: Option<&str>,
+    sprite_feet: Option<&str>,
     x: f32,
     y: f32,
 ) {
@@ -149,7 +149,7 @@ fn draw_character_preview(
         let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
 
         // 1. Draw back items behind player (quiver/cape - frame 1 for "down" direction)
-        if let Some(back_id) = equipped_back {
+        if let Some(back_id) = sprite_back {
             if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(back_id) {
                 let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
                 let (equip_w, _equip_h) = equipment_sprites
@@ -196,7 +196,7 @@ fn draw_character_preview(
         );
 
         // 3. Draw body armor (frame 0 for idle/down, offset y=-3)
-        if let Some(body_id) = equipped_body {
+        if let Some(body_id) = sprite_body {
             if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(body_id) {
                 let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
                 let (equip_w, equip_h) = equipment_sprites
@@ -270,7 +270,7 @@ fn draw_character_preview(
         }
 
         // 5. Draw boots (frame 0 for idle/down)
-        if let Some(feet_id) = equipped_feet {
+        if let Some(feet_id) = sprite_feet {
             if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(feet_id) {
                 let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
                 let (equip_w, equip_h) = equipment_sprites
@@ -314,7 +314,7 @@ fn draw_character_preview(
         }
 
         // 6. Draw back items in front of player (offhand/shield - frame 0 for idle/down)
-        if let Some(back_id) = equipped_back {
+        if let Some(back_id) = sprite_back {
             if let Some((equip_sprite, equip_offset)) = equipment_sprites.get(back_id) {
                 let (equip_atlas_x, equip_atlas_y) = equip_offset.unwrap_or((0.0, 0.0));
                 let (equip_w, _equip_h) = equipment_sprites
@@ -1352,37 +1352,37 @@ impl CharacterSelectScreen {
         // Desktop fallback: load individual equipment sprites
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         {
-            let mut item_ids: Vec<String> = Vec::new();
+            let mut sprite_keys: Vec<String> = Vec::new();
             for c in &self.characters {
                 for slot in [
-                    &c.equipped_head,
-                    &c.equipped_body,
-                    &c.equipped_weapon,
-                    &c.equipped_back,
-                    &c.equipped_feet,
+                    &c.sprite_head,
+                    &c.sprite_body,
+                    &c.sprite_weapon,
+                    &c.sprite_back,
+                    &c.sprite_feet,
                 ] {
-                    if let Some(id) = slot {
-                        if !item_ids.contains(id) && !self.equipment_sprites.contains(id) {
-                            item_ids.push(id.clone());
+                    if let Some(key) = slot {
+                        if !sprite_keys.contains(key) && !self.equipment_sprites.contains(key) {
+                            sprite_keys.push(key.clone());
                         }
                     }
                 }
             }
 
-            if item_ids.is_empty() {
+            if sprite_keys.is_empty() {
                 return;
             }
 
             let mut equip_map = HashMap::new();
-            for item_id in &item_ids {
+            for sprite_key in &sprite_keys {
                 // Find the matching manifest entry (e.g. "equipment/head/iron_helm")
                 for entry in &manifest.equipment {
                     let key = entry.rsplit('/').next().unwrap_or(entry);
-                    if key == item_id {
+                    if key == sprite_key {
                         let path = asset_path(&format!("assets/sprites/{}.png", entry));
                         if let Ok(tex) = load_texture(&path).await {
                             tex.set_filter(FilterMode::Nearest);
-                            equip_map.insert(item_id.clone(), tex);
+                            equip_map.insert(sprite_key.clone(), tex);
                         }
                         break;
                     }
@@ -1834,9 +1834,9 @@ impl Screen for CharacterSelectScreen {
                     &character.skin,
                     character.hair_style,
                     character.hair_color.unwrap_or(0),
-                    character.equipped_body.as_deref(),
-                    character.equipped_back.as_deref(),
-                    character.equipped_feet.as_deref(),
+                    character.sprite_body.as_deref(),
+                    character.sprite_back.as_deref(),
+                    character.sprite_feet.as_deref(),
                     preview_x,
                     preview_y,
                 );

@@ -510,20 +510,32 @@ async fn login_account(
 
             // Fetch characters for this account to include in response
             let characters = match state.db.get_characters_for_account(account.id).await {
-                Ok(chars) => Some(chars.into_iter().map(|c| CharacterInfo {
-                    id: c.id,
-                    name: c.name.clone(),
-                    level: c.skills.combat_level(),
-                    gender: c.gender,
-                    skin: c.skin,
-                    hair_style: c.hair_style,
-                    hair_color: c.hair_color,
-                    played_time: c.played_time,
-                    equipped_head: c.equipped_head,
-                    equipped_body: c.equipped_body,
-                    equipped_weapon: c.equipped_weapon,
-                    equipped_back: c.equipped_back,
-                    equipped_feet: c.equipped_feet,
+                Ok(chars) => Some(chars.into_iter().map(|c| {
+                    let sprite_head = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_head);
+                    let sprite_body = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_body);
+                    let sprite_weapon = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_weapon);
+                    let sprite_back = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_back);
+                    let sprite_feet = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_feet);
+                    CharacterInfo {
+                        id: c.id,
+                        name: c.name.clone(),
+                        level: c.skills.combat_level(),
+                        gender: c.gender,
+                        skin: c.skin,
+                        hair_style: c.hair_style,
+                        hair_color: c.hair_color,
+                        played_time: c.played_time,
+                        equipped_head: c.equipped_head,
+                        equipped_body: c.equipped_body,
+                        equipped_weapon: c.equipped_weapon,
+                        equipped_back: c.equipped_back,
+                        equipped_feet: c.equipped_feet,
+                        sprite_head,
+                        sprite_body,
+                        sprite_weapon,
+                        sprite_back,
+                        sprite_feet,
+                    }
                 }).collect()),
                 Err(e) => {
                     warn!("Failed to fetch characters for account {}: {}", account.id, e);
@@ -605,6 +617,24 @@ struct CharacterInfo {
     equipped_back: Option<String>,
     #[serde(rename = "equippedFeet")]
     equipped_feet: Option<String>,
+    #[serde(rename = "spriteHead")]
+    sprite_head: Option<String>,
+    #[serde(rename = "spriteBody")]
+    sprite_body: Option<String>,
+    #[serde(rename = "spriteWeapon")]
+    sprite_weapon: Option<String>,
+    #[serde(rename = "spriteBack")]
+    sprite_back: Option<String>,
+    #[serde(rename = "spriteFeet")]
+    sprite_feet: Option<String>,
+}
+
+impl CharacterInfo {
+    fn resolve_sprite(item_registry: &crate::data::item_registry::ItemRegistry, item_id: &Option<String>) -> Option<String> {
+        item_id.as_ref().and_then(|id| {
+            item_registry.get(id).map(|def| def.sprite.clone())
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -660,20 +690,32 @@ async fn list_characters(
 
     match state.db.get_characters_for_account(account_id).await {
         Ok(chars) => {
-            let char_infos: Vec<CharacterInfo> = chars.into_iter().map(|c| CharacterInfo {
-                id: c.id,
-                name: c.name.clone(),
-                level: c.skills.combat_level(),
-                gender: c.gender,
-                skin: c.skin,
-                hair_style: c.hair_style,
-                hair_color: c.hair_color,
-                played_time: c.played_time,
-                equipped_head: c.equipped_head,
-                equipped_body: c.equipped_body,
-                equipped_weapon: c.equipped_weapon,
-                equipped_back: c.equipped_back,
-                equipped_feet: c.equipped_feet,
+            let char_infos: Vec<CharacterInfo> = chars.into_iter().map(|c| {
+                let sprite_head = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_head);
+                let sprite_body = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_body);
+                let sprite_weapon = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_weapon);
+                let sprite_back = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_back);
+                let sprite_feet = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_feet);
+                CharacterInfo {
+                    id: c.id,
+                    name: c.name.clone(),
+                    level: c.skills.combat_level(),
+                    gender: c.gender,
+                    skin: c.skin,
+                    hair_style: c.hair_style,
+                    hair_color: c.hair_color,
+                    played_time: c.played_time,
+                    equipped_head: c.equipped_head,
+                    equipped_body: c.equipped_body,
+                    equipped_weapon: c.equipped_weapon,
+                    equipped_back: c.equipped_back,
+                    equipped_feet: c.equipped_feet,
+                    sprite_head,
+                    sprite_body,
+                    sprite_weapon,
+                    sprite_back,
+                    sprite_feet,
+                }
             }).collect();
 
             (
@@ -787,20 +829,32 @@ async fn create_character(
                 StatusCode::CREATED,
                 Json(CreateCharacterResponse {
                     success: true,
-                    character: Some(CharacterInfo {
-                        id: char_data.id,
-                        name: char_data.name,
-                        level: char_data.skills.combat_level(),
-                        gender: char_data.gender,
-                        skin: char_data.skin,
-                        hair_style: char_data.hair_style,
-                        hair_color: char_data.hair_color,
-                        played_time: char_data.played_time,
-                        equipped_head: char_data.equipped_head,
-                        equipped_body: char_data.equipped_body,
-                        equipped_weapon: char_data.equipped_weapon,
-                        equipped_back: char_data.equipped_back,
-                        equipped_feet: char_data.equipped_feet,
+                    character: Some({
+                        let sprite_head = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_head);
+                        let sprite_body = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_body);
+                        let sprite_weapon = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_weapon);
+                        let sprite_back = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_back);
+                        let sprite_feet = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_feet);
+                        CharacterInfo {
+                            id: char_data.id,
+                            name: char_data.name,
+                            level: char_data.skills.combat_level(),
+                            gender: char_data.gender,
+                            skin: char_data.skin,
+                            hair_style: char_data.hair_style,
+                            hair_color: char_data.hair_color,
+                            played_time: char_data.played_time,
+                            equipped_head: char_data.equipped_head,
+                            equipped_body: char_data.equipped_body,
+                            equipped_weapon: char_data.equipped_weapon,
+                            equipped_back: char_data.equipped_back,
+                            equipped_feet: char_data.equipped_feet,
+                            sprite_head,
+                            sprite_body,
+                            sprite_weapon,
+                            sprite_back,
+                            sprite_feet,
+                        }
                     }),
                     error: None,
                 }),

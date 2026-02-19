@@ -57,6 +57,16 @@ pub struct CharacterInfo {
     pub equipped_back: Option<String>,
     #[serde(rename = "equippedFeet", default)]
     pub equipped_feet: Option<String>,
+    #[serde(rename = "spriteHead", default)]
+    pub sprite_head: Option<String>,
+    #[serde(rename = "spriteBody", default)]
+    pub sprite_body: Option<String>,
+    #[serde(rename = "spriteWeapon", default)]
+    pub sprite_weapon: Option<String>,
+    #[serde(rename = "spriteBack", default)]
+    pub sprite_back: Option<String>,
+    #[serde(rename = "spriteFeet", default)]
+    pub sprite_feet: Option<String>,
 }
 
 #[derive(Deserialize)]
