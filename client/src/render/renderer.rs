@@ -5121,7 +5121,7 @@ impl Renderer {
         // Draw shadow under player
         draw_ellipse(
             screen_x,
-            screen_y,
+            screen_y + 4.0 * zoom,
             16.0 * zoom,
             7.0 * zoom,
             0.0,
@@ -5145,7 +5145,7 @@ impl Renderer {
 
             // Position sprite so feet are at screen_y
             let draw_x = screen_x - scaled_sprite_width / 2.0;
-            let draw_y = screen_y - scaled_sprite_height + 8.0 * zoom + sit_offset_y; // Offset to align feet with tile
+            let draw_y = screen_y - scaled_sprite_height + 16.0 * zoom + sit_offset_y; // Offset to align feet with tile (8px base + 8px centering adjustment)
 
             // Get player gender for gender-specific offsets
             let player_gender = Gender::from_str(&player.gender);
@@ -5997,7 +5997,7 @@ impl Renderer {
             let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
 
             let draw_x = screen_x - scaled_sprite_width / 2.0;
-            let draw_y = screen_y - scaled_sprite_height + 8.0 * zoom;
+            let draw_y = screen_y - scaled_sprite_height + 16.0 * zoom;
 
             // Get player gender for gender-specific offsets
             let player_gender = Gender::from_str(&player.gender);

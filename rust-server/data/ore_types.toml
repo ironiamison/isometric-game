@@ -17,9 +17,9 @@ respawn_time_min = 4000
 respawn_time_max = 8000
 
 [rocks.tin]
-# Tin ore rocks: mapper id 455
-gids = [1617]
-level_required = 1
+# Tin ore rocks (reuses old iron rock sprite)
+gids = [1581]
+level_required = 5
 ore_item_id = "tin_ore"
 xp_per_ore = 17
 success_chance = 0.30
@@ -28,8 +28,8 @@ respawn_time_min = 4000
 respawn_time_max = 8000
 
 [rocks.iron]
-# Iron ore rocks: mapper id 419
-gids = [1581]
+# Iron ore rocks: mapper id 455 → GID 1617
+gids = [1617]
 level_required = 15
 ore_item_id = "iron_ore"
 xp_per_ore = 35
