@@ -102,7 +102,7 @@ impl Default for FrameTimings {
             delta_max_ms: 0.0,
             delta_samples: [0.0; 60],
             delta_idx: 0,
-            fps_cap: Some(144), // High-but-stable default pacing on most displays
+            fps_cap: None, // Uncapped by default, cycle with F4
             next_frame_ms: 0.0,
             next_frame_min_ms: 0.0,
             next_frame_max_ms: 0.0,
