@@ -406,6 +406,9 @@ pub struct LoginScreen {
     frame_counter: f32,
     stars: Vec<(f32, f32, f32)>, // (x, y, phase)
     shooting_stars: Vec<ShootingStar>,
+    // Backspace key-repeat
+    backspace_held_time: f32,
+    backspace_repeat_timer: f32,
     // Server status
     server_url: String,
     server_online: bool,
@@ -465,6 +468,8 @@ impl LoginScreen {
             frame_counter: 0.0,
             stars,
             shooting_stars: Vec::with_capacity(4),
+            backspace_held_time: 0.0,
+            backspace_repeat_timer: 0.0,
             server_url: server_url.to_string(),
             server_online: false,
             last_ping_time: -10.0, // trigger immediate ping
@@ -536,13 +541,38 @@ impl LoginScreen {
             }
         }
 
-        // Handle backspace
-        if is_key_pressed(KeyCode::Backspace) {
-            let field = match self.active_field {
-                LoginField::Username => &mut self.username,
-                LoginField::Password => &mut self.password,
-            };
-            field.pop();
+        // Handle backspace with key-repeat
+        if is_key_down(KeyCode::Backspace) {
+            let dt = get_frame_time();
+            let mut delete = false;
+
+            if is_key_pressed(KeyCode::Backspace) {
+                // First press: delete immediately and reset timers
+                delete = true;
+                self.backspace_held_time = 0.0;
+                self.backspace_repeat_timer = 0.0;
+            } else {
+                self.backspace_held_time += dt;
+                // After 0.4s initial delay, repeat every 0.05s
+                if self.backspace_held_time > 0.4 {
+                    self.backspace_repeat_timer += dt;
+                    if self.backspace_repeat_timer >= 0.05 {
+                        self.backspace_repeat_timer -= 0.05;
+                        delete = true;
+                    }
+                }
+            }
+
+            if delete {
+                let field = match self.active_field {
+                    LoginField::Username => &mut self.username,
+                    LoginField::Password => &mut self.password,
+                };
+                field.pop();
+            }
+        } else {
+            self.backspace_held_time = 0.0;
+            self.backspace_repeat_timer = 0.0;
         }
     }
 }
