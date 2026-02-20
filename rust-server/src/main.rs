@@ -2587,8 +2587,8 @@ async fn handle_client_message(
     let msg_name = msg.name();
 
     match msg {
-        ClientMessage::Move { dx, dy } => {
-            room.handle_move(player_id, dx, dy).await;
+        ClientMessage::Move { dx, dy, seq } => {
+            room.handle_move(player_id, dx, dy, seq).await;
         }
         ClientMessage::Dash => {
             room.handle_dash(player_id).await;

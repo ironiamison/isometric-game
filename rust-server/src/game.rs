@@ -241,6 +241,9 @@ pub struct Player {
     // Queued movement direction (-1, 0, or 1)
     pub move_dx: i32,
     pub move_dy: i32,
+    pub pending_move_seq: Option<u32>,
+    pub last_received_move_seq: u32,
+    pub last_processed_move_seq: u32,
     pub last_move_tick: u64, // Tick-based movement cooldown
     pub direction: Direction,
     pub hp: i32,
@@ -316,6 +319,9 @@ impl Player {
             spawn_y,
             move_dx: 0,
             move_dy: 0,
+            pending_move_seq: None,
+            last_received_move_seq: 0,
+            last_processed_move_seq: 0,
             last_move_tick: 0,
             direction: Direction::Down,
             hp: skills.hitpoints.level, // HP = Hitpoints level
@@ -480,11 +486,29 @@ impl Player {
         self.is_dead = true;
         self.death_time = current_time;
         self.hp = 0;
-        self.move_dx = 0;
-        self.move_dy = 0;
+        self.reject_pending_move();
         self.target_id = None;
         // Deactivate all prayers on death
         self.active_prayers.clear();
+    }
+
+    fn mark_move_seq_processed(&mut self, seq: u32) {
+        if seq > self.last_processed_move_seq {
+            self.last_processed_move_seq = seq;
+        }
+    }
+
+    fn clear_move_intent(&mut self) {
+        self.move_dx = 0;
+        self.move_dy = 0;
+        self.pending_move_seq = None;
+    }
+
+    fn reject_pending_move(&mut self) {
+        if let Some(seq) = self.pending_move_seq {
+            self.mark_move_seq_processed(seq);
+        }
+        self.clear_move_intent();
     }
 
     pub fn ready_to_respawn(&self, current_time: u64) -> bool {
@@ -567,6 +591,7 @@ pub struct PlayerUpdate {
     // Velocity for client-side prediction (-1, 0, or 1)
     pub vel_x: i32,
     pub vel_y: i32,
+    pub move_ack_seq: Option<u32>,
     pub hp: i32,
     pub max_hp: i32,
     pub combat_level: i32,
@@ -1854,11 +1879,17 @@ impl GameRoom {
         Some(npc_id)
     }
 
-    pub async fn handle_move(&self, player_id: &str, dx: f32, dy: f32) {
+    pub async fn handle_move(&self, player_id: &str, dx: f32, dy: f32, seq: Option<u32>) {
         let mut chair_to_free: Option<(i32, i32)> = None;
         {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
+                let move_seq = seq.unwrap_or_else(|| player.last_received_move_seq.saturating_add(1));
+                if move_seq <= player.last_received_move_seq {
+                    return;
+                }
+                player.last_received_move_seq = move_seq;
+
                 // Auto-stand when trying to move while sitting (only in chair facing direction)
                 if let Some(pos) = player.sitting_at {
                     // Determine intended movement direction
@@ -1885,8 +1916,8 @@ impl GameRoom {
                         chair_to_free = Some(pos);
                     }
                     // Either way, don't process actual movement while sitting
-                    player.move_dx = 0;
-                    player.move_dy = 0;
+                    player.mark_move_seq_processed(move_seq);
+                    player.clear_move_intent();
                 } else {
                     // Convert to grid movement (-1, 0, or 1)
                     // No diagonal movement in grid-based system
@@ -1908,8 +1939,15 @@ impl GameRoom {
 
                     // Queue movement intent only. Facing updates when a move is
                     // actually applied in the tick loop.
-                    player.move_dx = move_dx;
-                    player.move_dy = move_dy;
+                    if move_dx == 0 && move_dy == 0 {
+                        // Stop intent is processed immediately.
+                        player.mark_move_seq_processed(move_seq);
+                        player.clear_move_intent();
+                    } else {
+                        player.move_dx = move_dx;
+                        player.move_dy = move_dy;
+                        player.pending_move_seq = Some(move_seq);
+                    }
                 }
             }
         }
@@ -2027,8 +2065,7 @@ impl GameRoom {
                 player.last_dash_tick = current_tick;
                 player.last_move_tick = current_tick;
                 player.is_dashing = true;
-                player.move_dx = 0;
-                player.move_dy = 0;
+                player.reject_pending_move();
             }
         }
     }
@@ -2045,8 +2082,7 @@ impl GameRoom {
                 let face_dir = Direction::from_u8(direction);
                 player.direction = face_dir;
                 // Ensure player is not moving when just facing
-                player.move_dx = 0;
-                player.move_dy = 0;
+                player.reject_pending_move();
                 (player.x, player.y, face_dir)
             } else {
                 tracing::warn!("handle_face: player not found: {}", player_id);
@@ -2898,8 +2934,7 @@ impl GameRoom {
             if let Some(player) = players.get_mut(player_id) {
                 player.last_attack_time = current_time;
                 // Stop movement when attacking (player must stand still to attack)
-                player.move_dx = 0;
-                player.move_dy = 0;
+                player.reject_pending_move();
             }
         }
 
@@ -7180,8 +7215,7 @@ impl GameRoom {
                 player.x = tile_x;
                 player.y = tile_y;
                 player.direction = direction;
-                player.move_dx = 0;
-                player.move_dy = 0;
+                player.reject_pending_move();
             }
         }
 
@@ -8153,26 +8187,40 @@ impl GameRoom {
         }
 
         // Collect pending moves from a snapshot.
-        // Include the sampled move vector so we can later avoid clearing newer
+        // Include sampled sequence IDs so we can later avoid clearing newer
         // input that may arrive mid-tick after this snapshot is taken.
         // Use tick-based cooldown for deterministic timing (5 ticks = 250ms)
-        let pending_moves: Vec<(String, i32, i32, i32, i32)> = {
+        let pending_moves: Vec<(String, i32, i32, i32, i32, u32)> = {
             let players = self.players.read().await;
             players.values()
                 .filter(|p| p.active && !p.is_dead)
                 .filter(|p| p.move_dx != 0 || p.move_dy != 0)
                 .filter(|p| current_tick - p.last_move_tick >= MOVE_COOLDOWN_TICKS)
-                .map(|p| (p.id.clone(), p.x + p.move_dx, p.y + p.move_dy, p.move_dx, p.move_dy))
+                .filter_map(|p| {
+                    p.pending_move_seq.map(|seq| {
+                        (
+                            p.id.clone(),
+                            p.x + p.move_dx,
+                            p.y + p.move_dy,
+                            p.move_dx,
+                            p.move_dy,
+                            seq,
+                        )
+                    })
+                })
                 .collect()
         };
         tick_telemetry.pending_moves = pending_moves.len();
         // Track all players with pending moves so we can clear rejected ones.
-        let pending_player_ids: Vec<String> = pending_moves.iter().map(|(id, _, _, _, _)| id.clone()).collect();
-        // Snapshot vectors used for stale-intent clearing without clobbering
-        // movement messages that arrive after the pending-move snapshot.
-        let pending_move_vectors: HashMap<String, (i32, i32)> = pending_moves
+        let pending_player_ids: Vec<String> = pending_moves
             .iter()
-            .map(|(id, _, _, dx, dy)| (id.clone(), (*dx, *dy)))
+            .map(|(id, _, _, _, _, _)| id.clone())
+            .collect();
+        // Snapshot sequences used for stale-intent clearing without clobbering
+        // movement messages that arrive after the pending-move snapshot.
+        let pending_move_sequences: HashMap<String, u32> = pending_moves
+            .iter()
+            .map(|(id, _, _, _, _, seq)| (id.clone(), *seq))
             .collect();
 
         // Snapshot which instance each player is in (None = overworld)
@@ -8216,9 +8264,9 @@ impl GameRoom {
         // Check walkability and entity collision for each pending move
         // Grab chunks lock once for all walkability checks (avoids per-move lock acquisition)
         let chunks_guard = self.world.chunks_read().await;
-        let mut valid_moves: Vec<(String, i32, i32, i32, i32)> = Vec::new();
+        let mut valid_moves: Vec<(String, i32, i32, i32, i32, u32)> = Vec::new();
         let mut auto_sit_requests: Vec<(String, i32, i32)> = Vec::new();
-        for (id, target_x, target_y, sampled_dx, sampled_dy) in pending_moves {
+        for (id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq) in pending_moves {
             let player_inst = player_instance_map.get(&id);
             let is_overworld = player_inst.is_none();
             let move_dir = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
@@ -8289,7 +8337,7 @@ impl GameRoom {
                     }
                 }
             }
-            valid_moves.push((id, target_x, target_y, sampled_dx, sampled_dy));
+            valid_moves.push((id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq));
         }
         drop(chunks_guard); // Release before NPC AI section acquires its own
 
@@ -8299,7 +8347,10 @@ impl GameRoom {
         }
 
         // Track which players moved this tick
-        let moved_players: std::collections::HashSet<String> = valid_moves.iter().map(|(id, _, _, _, _)| id.clone()).collect();
+        let moved_players: std::collections::HashSet<String> = valid_moves
+            .iter()
+            .map(|(id, _, _, _, _, _)| id.clone())
+            .collect();
         tick_telemetry.rejected_moves = pending_player_ids.len().saturating_sub(moved_players.len());
 
         // Get set of gathering player IDs for state sync
@@ -8327,7 +8378,7 @@ impl GameRoom {
         let moved_positions: Vec<(String, i32, i32)> = if !self.quest_locations.is_empty() {
             valid_moves
                 .iter()
-                .map(|(id, x, y, _, _)| (id.clone(), *x, *y))
+                .map(|(id, x, y, _, _, _)| (id.clone(), *x, *y))
                 .collect()
         } else {
             Vec::new()
@@ -8337,7 +8388,7 @@ impl GameRoom {
             let mut players = self.players.write().await;
 
             // Apply valid moves
-            for (id, target_x, target_y, sampled_dx, sampled_dy) in valid_moves {
+            for (id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq) in valid_moves {
                 if let Some(player) = players.get_mut(&id) {
                     if sampled_dx != 0 || sampled_dy != 0 {
                         // Facing changes only when movement is actually applied.
@@ -8346,15 +8397,13 @@ impl GameRoom {
                     player.x = target_x;
                     player.y = target_y;
                     player.last_move_tick = current_tick;
+                    player.mark_move_seq_processed(sampled_seq);
 
                     // Clear only if this is still the same sampled intent.
                     // If a new Move message arrived after we built pending_moves,
                     // preserve it so rapid direction changes are not lost.
-                    if let Some((sample_dx, sample_dy)) = pending_move_vectors.get(&id) {
-                        if player.move_dx == *sample_dx && player.move_dy == *sample_dy {
-                            player.move_dx = 0;
-                            player.move_dy = 0;
-                        }
+                    if player.pending_move_seq == Some(sampled_seq) {
+                        player.clear_move_intent();
                     }
                 }
             }
@@ -8365,8 +8414,12 @@ impl GameRoom {
             for player_id in &pending_player_ids {
                 if !moved_players.contains(player_id) {
                     if let Some(player) = players.get_mut(player_id) {
-                        player.move_dx = 0;
-                        player.move_dy = 0;
+                        if let Some(sampled_seq) = pending_move_sequences.get(player_id) {
+                            player.mark_move_seq_processed(*sampled_seq);
+                            if player.pending_move_seq == Some(*sampled_seq) {
+                                player.clear_move_intent();
+                            }
+                        }
                     }
                 }
             }
@@ -8492,6 +8545,11 @@ impl GameRoom {
                     // Send movement intent directly (what player wants to do)
                     vel_x: player.move_dx,
                     vel_y: player.move_dy,
+                    move_ack_seq: if player.last_processed_move_seq > 0 {
+                        Some(player.last_processed_move_seq)
+                    } else {
+                        None
+                    },
                     hp: player.hp,
                     max_hp: player.max_hp(),
                     combat_level: player.combat_level(),
@@ -10962,8 +11020,7 @@ impl GameRoom {
                 player.mp -= spell_def.mana_cost;
                 player.spell_cooldowns.insert(spell_def.id.to_string(), current_time);
                 // Stop movement when casting
-                player.move_dx = 0;
-                player.move_dy = 0;
+                player.reject_pending_move();
             }
         }
 

@@ -11,7 +11,12 @@ use crate::npc::NpcUpdate;
 #[serde(tag = "type")]
 pub enum ClientMessage {
     #[serde(rename = "move")]
-    Move { dx: f32, dy: f32 },
+    Move {
+        dx: f32,
+        dy: f32,
+        #[serde(default)]
+        seq: Option<u32>,
+    },
 
     #[serde(rename = "dash")]
     Dash,
@@ -1256,6 +1261,12 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
         Value::String("velY".into()),
         Value::Integer((p.vel_y as i64).into()),
     ));
+    if let Some(seq) = p.move_ack_seq {
+        pmap.push((
+            Value::String("moveAckSeq".into()),
+            Value::Integer((seq as i64).into()),
+        ));
+    }
     pmap.push((
         Value::String("hp".into()),
         Value::Integer((p.hp as i64).into()),
@@ -4579,7 +4590,8 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "move" => {
             let dx = extract_f32(msg_data, "dx").unwrap_or(0.0);
             let dy = extract_f32(msg_data, "dy").unwrap_or(0.0);
-            Ok(ClientMessage::Move { dx, dy })
+            let seq = extract_u32(msg_data, "seq");
+            Ok(ClientMessage::Move { dx, dy, seq })
         }
         "dash" => Ok(ClientMessage::Dash),
         "face" => {
