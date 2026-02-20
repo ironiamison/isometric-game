@@ -13,7 +13,7 @@ pub enum ClientMessage {
     Register { username: String, password: String },
 
     #[serde(rename = "move")]
-    Move { dx: f32, dy: f32 },
+    Move { dx: f32, dy: f32, seq: u32 },
 
     #[serde(rename = "dash")]
     Dash,
@@ -217,9 +217,10 @@ impl ClientMessage {
                 data.insert("password".into(), Value::String(password.clone().into()));
                 "register"
             }
-            ClientMessage::Move { dx, dy } => {
+            ClientMessage::Move { dx, dy, seq } => {
                 data.insert("dx".into(), Value::F64(*dx as f64));
                 data.insert("dy".into(), Value::F64(*dy as f64));
+                data.insert("seq".into(), Value::Integer((*seq as i64).into()));
                 "move"
             }
             ClientMessage::Dash => "dash",

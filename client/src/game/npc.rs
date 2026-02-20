@@ -187,7 +187,7 @@ impl Npc {
         let dy = self.y - new_y;
         let dist = (dx * dx + dy * dy).sqrt();
 
-        if dist > 2.0 {
+        if dist > 4.0 {
             // Too far - hard snap
             self.x = new_x;
             self.y = new_y;
@@ -237,8 +237,10 @@ impl Npc {
             }
         } else {
             // Linear interpolation - constant speed movement
-            // Move slightly faster than server speed to ensure we arrive before next update
-            let speed = (self.move_speed * 1.25).max(2.0);
+            // Move faster when far behind to avoid visible teleport snaps
+            // while still converging quickly to authoritative state.
+            let catchup = (dist * 0.5).clamp(1.0, 3.0);
+            let speed = (self.move_speed * 1.2 * catchup).max(2.0);
             let move_dist = speed * delta;
 
             if dist <= move_dist {

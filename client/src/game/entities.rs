@@ -70,11 +70,13 @@ const VISUAL_SPEED: f32 = 4.0;
 // Local player prediction lead: enough to prevent per-step micro-pauses
 // between server-confirmed grid moves, while still avoiding long overshoot.
 const LOCAL_PREDICTION_LOOKAHEAD: f32 = 0.9;
-// During rapid direction changes, aggressively reduce lookahead so we don't
-// carry momentum from the previous direction and overstep.
-const LOCAL_TURN_LOOKAHEAD: f32 = 0.25;
 // Hard cap on visual lead versus server-authoritative position.
 const LOCAL_MAX_LEAD_TILES: f32 = 1.1;
+// Allow direction changes near the end of a segment (fractional tiles).
+const LOCAL_TURN_ACCEPT_WINDOW_TILES: f32 = 0.35;
+// Ignore tiny/ambiguous per-frame displacement for facing updates.
+const DIRECTION_FRAME_DELTA_EPS: f32 = 0.01;
+const DIRECTION_AMBIGUITY_EPS: f32 = 0.01;
 
 #[derive(Debug, Clone)]
 pub struct Player {
@@ -153,6 +155,8 @@ pub struct Player {
 
     /// Whether this player is currently in a dash slide
     pub is_dashing: bool,
+    /// True for the local player (set from state sync calls)
+    is_local_player: bool,
 }
 
 impl Player {
@@ -202,6 +206,7 @@ impl Player {
             mining_started_at: 0.0,
             last_mining_anim: 0.0,
             is_dashing: false,
+            is_local_player: false,
         }
     }
 
@@ -290,7 +295,7 @@ impl Player {
 
     /// Set server-authoritative position (convenience method for stopped state)
     pub fn set_server_position(&mut self, new_x: f32, new_y: f32) {
-        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction, false);
+        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction, false, false);
     }
 
     /// Set server state - simple server-authoritative model
@@ -304,16 +309,23 @@ impl Player {
         vel_y: f32,
         dir: Direction,
         is_local_player: bool,
+        has_pending_local_moves: bool,
     ) {
         let old_server_x = self.server_x;
         let old_server_y = self.server_y;
         let old_vel_x = self.vel_x;
         let old_vel_y = self.vel_y;
+        self.is_local_player = is_local_player;
 
         self.server_x = x;
         self.server_y = y;
         self.vel_x = vel_x;
         self.vel_y = vel_y;
+
+        let step_dx = x - old_server_x;
+        let step_dy = y - old_server_y;
+        // Server position changed = server confirmed a tile step.
+        let server_moved = step_dx.abs() > 0.01 || step_dy.abs() > 0.01;
 
         // Remote players always follow server facing.
         // Local player keeps input-facing unless sitting (chair controlled).
@@ -324,6 +336,14 @@ impl Player {
         );
         if !is_local_player || is_sitting {
             self.direction = dir;
+        } else if server_moved {
+            // Local facing is committed from authoritative server tile steps,
+            // not from speculative/correction interpolation.
+            let adx = step_dx.abs();
+            let ady = step_dy.abs();
+            if (adx - ady).abs() > DIRECTION_AMBIGUITY_EPS {
+                self.direction = Direction::from_velocity(step_dx, step_dy);
+            }
         }
 
         // If dashing, set target to new position for fast slide interpolation (don't snap)
@@ -347,17 +367,16 @@ impl Player {
             return;
         }
 
-        // Server position changed = server confirmed a move
-        let server_moved = (x - old_server_x).abs() > 0.01 || (y - old_server_y).abs() > 0.01;
         let stopped = vel_x == 0.0 && vel_y == 0.0;
         let at_tile_center =
             (self.x - self.x.round()).abs() < 0.1 && (self.y - self.y.round()).abs() < 0.1;
-        let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
-        let local_turning_without_server_step =
-            is_local_player && vel_changed && !server_moved && !stopped;
+        let rem_x = self.target_x - self.x;
+        let rem_y = self.target_y - self.y;
+        let near_target = rem_x.abs() < LOCAL_TURN_ACCEPT_WINDOW_TILES
+            && rem_y.abs() < LOCAL_TURN_ACCEPT_WINDOW_TILES;
         let lookahead = if is_local_player {
-            if local_turning_without_server_step {
-                LOCAL_TURN_LOOKAHEAD
+            if !has_pending_local_moves {
+                0.0
             } else {
                 LOCAL_PREDICTION_LOOKAHEAD
             }
@@ -374,21 +393,21 @@ impl Player {
             }
         }
 
-        if local_turning_without_server_step {
-            // Local intent flipped but server hasn't confirmed a new tile yet.
-            // Re-anchor target near authoritative position in the NEW direction
-            // to prevent an extra "carry-over" tile in the old direction.
-            self.target_x = x + vel_x * lookahead;
-            self.target_y = y + vel_y * lookahead;
-        } else if !is_local_player && vel_changed && !server_moved && !stopped {
-            // Direction changed during cooldown: finish current step before retargeting.
-            let near_target =
-                (self.x - self.target_x).abs() < 0.15 && (self.y - self.target_y).abs() < 0.15;
-            if near_target && (vel_x != 0.0 || vel_y != 0.0) {
-                self.target_x = x + vel_x * lookahead;
-                self.target_y = y + vel_y * lookahead;
-            }
-        } else if server_moved || stopped || at_tile_center {
+        // Local player: only defer true reversals mid-segment.
+        // This removes left-right flip-flop while still allowing clean
+        // perpendicular turns without feeling blocked.
+        let reversing_mid_segment = is_local_player
+            && has_pending_local_moves
+            && !server_moved
+            && !stopped
+            && !near_target
+            && ((rem_x.abs() > 0.01 && vel_x != 0.0 && vel_x.signum() != rem_x.signum())
+                || (rem_y.abs() > 0.01 && vel_y != 0.0 && vel_y.signum() != rem_y.signum()));
+        if reversing_mid_segment {
+            return;
+        }
+
+        if server_moved || stopped || at_tile_center || near_target {
             if vel_x != 0.0 || vel_y != 0.0 {
                 self.target_x = x + vel_x * lookahead;
                 self.target_y = y + vel_y * lookahead;
@@ -445,7 +464,11 @@ impl Player {
         // Compute movement direction from actual frame displacement
         let moved_dx = self.x - old_x;
         let moved_dy = self.y - old_y;
-        let movement_dir = if moved_dx.abs() > 0.001 || moved_dy.abs() > 0.001 {
+        let abs_dx = moved_dx.abs();
+        let abs_dy = moved_dy.abs();
+        let movement_dir = if abs_dx.max(abs_dy) > DIRECTION_FRAME_DELTA_EPS
+            && (abs_dx - abs_dy).abs() > DIRECTION_AMBIGUITY_EPS
+        {
             Some(Direction::from_velocity(moved_dx, moved_dy))
         } else {
             None
@@ -482,14 +505,19 @@ impl Player {
             return;
         }
 
-        // Animation direction follows actual movement to prevent moonwalking.
-        // While moving, only update direction when displacement happened this frame.
+        // Local animation facing follows actual rendered movement to avoid
+        // moonwalk during prediction; logical facing still commits from
+        // authoritative server tile steps in set_server_state().
         if self.is_moving {
-            if let Some(move_dir) = movement_dir {
+            if self.is_local_player {
+                self.animation.direction = movement_dir.unwrap_or(self.direction);
+            } else if let Some(move_dir) = movement_dir {
                 // Keep logical facing in sync with actual movement so idle/attack
                 // frames don't snap back to a stale pre-turn direction.
                 self.direction = move_dir;
                 self.animation.direction = move_dir;
+            } else {
+                self.animation.direction = self.direction;
             }
         } else {
             self.animation.direction = self.direction;

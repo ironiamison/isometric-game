@@ -9,7 +9,7 @@ use super::tilemap::Tilemap;
 use crate::render::AreaBanner;
 use crate::render::XpGlobesManager;
 use crate::ui::UiElementId;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 const MAX_CHAT_LOG_MESSAGES: usize = 120;
 
@@ -1426,6 +1426,12 @@ pub struct GameState {
 
     // Server tick (for ordering)
     pub server_tick: u64,
+    /// Next client move sequence number (monotonic per session).
+    pub next_move_seq: u32,
+    /// Highest move sequence acknowledged by the server.
+    pub last_acked_move_seq: u32,
+    /// Unacked directional move commands awaiting server processing.
+    pending_move_seqs: VecDeque<u32>,
 
     // Debug
     pub debug_mode: bool,
@@ -1549,6 +1555,9 @@ impl GameState {
             camera: Camera::default(),
             ui_state: UiState::default(),
             server_tick: 0,
+            next_move_seq: 0,
+            last_acked_move_seq: 0,
+            pending_move_seqs: VecDeque::new(),
             debug_mode: false,
             hovered_tile: None,
             hovered_entity_id: None,
@@ -1577,6 +1586,45 @@ impl GameState {
     /// Clear the current auto-path (e.g., when player presses movement keys)
     pub fn clear_auto_path(&mut self) {
         self.auto_path = None;
+    }
+
+    pub fn next_move_sequence(&mut self, dx: f32, dy: f32) -> u32 {
+        self.next_move_seq = self.next_move_seq.wrapping_add(1);
+        let seq = self.next_move_seq;
+
+        // Track only directional intents; stop packets (0,0) are not predictive.
+        if dx.abs() > 0.1 || dy.abs() > 0.1 {
+            self.pending_move_seqs.push_back(seq);
+            while self.pending_move_seqs.len() > 128 {
+                self.pending_move_seqs.pop_front();
+            }
+        }
+
+        seq
+    }
+
+    pub fn acknowledge_move_sequence(&mut self, ack_seq: u32) {
+        if ack_seq <= self.last_acked_move_seq {
+            return;
+        }
+        self.last_acked_move_seq = ack_seq;
+        while let Some(front) = self.pending_move_seqs.front().copied() {
+            if front <= ack_seq {
+                self.pending_move_seqs.pop_front();
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn has_pending_move_sequences(&self) -> bool {
+        !self.pending_move_seqs.is_empty()
+    }
+
+    pub fn reset_move_sequence_state(&mut self) {
+        self.next_move_seq = 0;
+        self.last_acked_move_seq = 0;
+        self.pending_move_seqs.clear();
     }
 
     /// Append a chat message and bump revision so renderer cache invalidates once.

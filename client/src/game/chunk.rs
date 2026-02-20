@@ -4,7 +4,7 @@ pub const CHUNK_SIZE: u32 = 32;
 const WORLD_VIEW_RADIUS: i32 = 2;
 const MINIMAP_VISIBLE_RADIUS: i32 = 2;
 const MINIMAP_PRELOAD_RING: i32 = 1;
-const MAX_CHUNK_REQUESTS_PER_UPDATE: usize = 6;
+const MAX_CHUNK_REQUESTS_PER_UPDATE: usize = 2;
 
 /// Chunk coordinates in the world grid
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

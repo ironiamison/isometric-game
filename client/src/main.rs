@@ -456,7 +456,14 @@ fn run_game_frame(
     for cmd in &commands {
         use network::messages::ClientMessage;
         let msg = match cmd {
-            InputCommand::Move { dx, dy } => ClientMessage::Move { dx: *dx, dy: *dy },
+            InputCommand::Move { dx, dy } => {
+                let seq = game_state.next_move_sequence(*dx, *dy);
+                ClientMessage::Move {
+                    dx: *dx,
+                    dy: *dy,
+                    seq,
+                }
+            }
             InputCommand::Face { direction } => {
                 // Skip direction update if sitting or attacking
                 if game_state.is_sitting {

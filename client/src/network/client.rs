@@ -347,6 +347,13 @@ impl NetworkClient {
 
                 WsEvent::Message(WsMessage::Binary(bytes)) => {
                     if let Some(decoded) = self.decode_binary_message(&bytes) {
+                        // Handle pong immediately so latency measurement isn't
+                        // inflated by backlog processing in the same frame.
+                        if Self::is_pong_message(&decoded) {
+                            self.handle_decoded_message(decoded, state);
+                            continue;
+                        }
+
                         if let Some(tick) = Self::extract_state_sync_tick(&decoded) {
                             // Keep only the stateSync with the highest tick.
                             match &latest_state_sync {
@@ -471,6 +478,13 @@ impl NetworkClient {
             }
             _ => None,
         }
+    }
+
+    fn is_pong_message(decoded: &DecodedMessage) -> bool {
+        matches!(
+            decoded,
+            DecodedMessage::RoomData { msg_type, .. } if msg_type == "pong"
+        )
     }
 
     pub fn send(&mut self, msg: &ClientMessage) {

@@ -68,6 +68,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if let Some(player_id) = extract_string(value, "player_id") {
                     log::info!("Welcome! Player ID: {}", player_id);
                     state.local_player_id = Some(player_id);
+                    state.reset_move_sequence_state();
                     state.connection_status = ConnectionStatus::Connected;
                 }
             }
@@ -214,8 +215,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let equipped_belt =
                             extract_string(player_value, "equipped_belt").filter(|s| !s.is_empty());
                         let is_admin = extract_bool(player_value, "is_admin").unwrap_or(false);
+                        let move_ack_seq = extract_u32(player_value, "moveAckSeq");
 
                         let is_local_player = state.local_player_id.as_ref() == Some(&id);
+                        if is_local_player {
+                            if let Some(ack_seq) = move_ack_seq {
+                                state.acknowledge_move_sequence(ack_seq);
+                            }
+                        }
+                        let has_pending_local_moves =
+                            is_local_player && state.has_pending_move_sequences();
 
                         if let Some(player) = state.players.get_mut(&id) {
                             // Read velocity (movement intent) from server
@@ -241,6 +250,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     vel_y,
                                     dir,
                                     is_local_player,
+                                    has_pending_local_moves,
                                 );
                             } else if direction.is_some() && !is_local_player {
                                 // Direction-only update for remote players
