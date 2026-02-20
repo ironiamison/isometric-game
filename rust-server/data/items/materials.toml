@@ -26,7 +26,7 @@ display_name = "Copper Ore"
 sprite = "copper_ore"
 description = "Raw copper ore. Combine with tin ore to smelt bronze bars."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 10
 sellable = true
 
@@ -35,7 +35,7 @@ display_name = "Tin Ore"
 sprite = "tin_ore"
 description = "Raw tin ore. Combine with copper ore to smelt bronze bars."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 10
 sellable = true
 
@@ -53,7 +53,7 @@ display_name = "Iron Ore"
 sprite = "iron_ore"
 description = "Raw iron ore. Can be smelted into a bar at an anvil."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 30
 sellable = true
 
@@ -71,7 +71,7 @@ display_name = "Steel Ore"
 sprite = "steel_ore"
 description = "Raw steel ore. Can be smelted into a bar at an anvil."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 60
 sellable = true
 

@@ -578,10 +578,10 @@ impl RockParticle {
         };
 
         Self {
-            tile_x: tile_x as f32 + gen_range(-0.2, 0.2),
-            tile_y: tile_y as f32 + gen_range(-0.2, 0.2),
-            height: rock_height + gen_range(-5.0, 5.0),
-            drift_x: gen_range(-20.0, 20.0),
+            tile_x: tile_x as f32 + gen_range(-0.35, 0.35),
+            tile_y: tile_y as f32 + gen_range(-0.15, 0.25),
+            height: rock_height * gen_range(0.25, 0.55),
+            drift_x: gen_range(-40.0, 40.0),
             fall_speed: gen_range(40.0, 70.0),
             rotation: gen_range(0.0, std::f32::consts::TAU),
             rotation_speed: gen_range(-3.0, 3.0),
