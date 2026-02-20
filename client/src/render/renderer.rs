@@ -6096,26 +6096,24 @@ impl Renderer {
                 );
             }
 
-            // Draw player base sprite (skip if body armor or head slot equipped to avoid transparency stacking)
-            if player.equipped_body.is_none() && player.equipped_head.is_none() {
-                draw_texture_ex(
-                    player_texture,
-                    draw_x,
-                    draw_y,
-                    silhouette_tint,
-                    DrawTextureParams {
-                        source: Some(Rect::new(
-                            player_atlas_x + src_x,
-                            player_atlas_y + src_y,
-                            src_w,
-                            src_h,
-                        )),
-                        dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
-                        flip_x: coords.flip_h,
-                        ..Default::default()
-                    },
-                );
-            }
+            // Always draw player base sprite in silhouette
+            draw_texture_ex(
+                player_texture,
+                draw_x,
+                draw_y,
+                silhouette_tint,
+                DrawTextureParams {
+                    source: Some(Rect::new(
+                        player_atlas_x + src_x,
+                        player_atlas_y + src_y,
+                        src_w,
+                        src_h,
+                    )),
+                    dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
+                    flip_x: coords.flip_h,
+                    ..Default::default()
+                },
+            );
 
             // Hair silhouette is drawn after body armor silhouette (see below)
 
