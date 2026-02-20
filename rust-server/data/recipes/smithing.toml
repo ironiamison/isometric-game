@@ -376,7 +376,7 @@ description = "Tan piglet hides with slime core into crude leather."
 category = "smithing"
 section = "materials"
 level_required = 1
-station = "anvil"
+station = "tanning_rack"
 craft_time_ms = 1500
 xp = 10
 
@@ -420,7 +420,7 @@ description = "Weave worm segments and spider silk into binding material."
 category = "smithing"
 section = "materials"
 level_required = 1
-station = "anvil"
+station = "tanning_rack"
 craft_time_ms = 1500
 xp = 10
 
@@ -534,7 +534,7 @@ description = "Assemble leather and shell into a crude tunic."
 category = "smithing"
 section = "equipment"
 level_required = 1
-station = "anvil"
+station = "tanning_rack"
 craft_time_ms = 5000
 xp = 35
 
@@ -560,7 +560,7 @@ description = "Assemble leather and shell into a crude tunic."
 category = "smithing"
 section = "equipment"
 level_required = 1
-station = "anvil"
+station = "tanning_rack"
 craft_time_ms = 5000
 xp = 35
 
@@ -586,7 +586,7 @@ description = "Stitch leather scraps into sturdy boots."
 category = "smithing"
 section = "equipment"
 level_required = 1
-station = "anvil"
+station = "tanning_rack"
 craft_time_ms = 3000
 xp = 20
 

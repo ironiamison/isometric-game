@@ -154,11 +154,13 @@ impl Renderer {
         let content_x = panel_x + FRAME_THICKNESS + 8.0;
         let content_y = tab_y + tab_h + 4.0;
         let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0;
-        let content_h = panel_y + panel_height - FRAME_THICKNESS - FOOTER_HEIGHT - 4.0 - content_y;
+        let controls_strip_h = 44.0; // space reserved for controls strip above footer
+        let full_content_h = panel_y + panel_height - FRAME_THICKNESS - FOOTER_HEIGHT - 4.0 - content_y;
 
         if state.ui_state.crafting_in_progress {
-            self.render_anvil_progress(state, hovered, layout, content_x, content_y, content_w, content_h);
+            self.render_anvil_progress(state, hovered, layout, content_x, content_y, content_w, full_content_h);
         } else {
+            let content_h = full_content_h - controls_strip_h;
             self.render_anvil_recipe_grid(state, hovered, layout, content_x, content_y, content_w, content_h);
         }
 
@@ -300,6 +302,42 @@ impl Renderer {
             let cell_bounds = Rect::new(cell_x, cell_y, cell_w, cell_h);
             layout.add(UiElementId::AnvilRecipeCell(i), cell_bounds);
 
+            // Smithing level badge (top-left corner)
+            if recipe.level_required > 0 {
+                let badge_icon_size = 14.0;
+                let badge_x = cell_x + 3.0;
+                let badge_y = cell_y + 3.0;
+
+                // Draw small smithing icon from spritesheet
+                let drew_icon = if let Some(ref texture) = self.ui_icons {
+                    let src_x = 5.0 * 24.0; // Smithing = col 5
+                    let src_y = 6.0 * 24.0; // row 6
+                    draw_texture_ex(
+                        texture,
+                        badge_x,
+                        badge_y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(src_x, src_y, 24.0, 24.0)),
+                            dest_size: Some(Vec2::new(badge_icon_size, badge_icon_size)),
+                            ..Default::default()
+                        },
+                    );
+                    true
+                } else {
+                    false
+                };
+
+                if !drew_icon {
+                    // Fallback: colored "Sm" letter
+                    self.draw_text_sharp("Sm", badge_x, badge_y + 11.0, 16.0, Color::new(0.7, 0.5, 0.2, 1.0));
+                }
+
+                // Level number next to icon
+                let lvl_text = format!("{}", recipe.level_required);
+                self.draw_text_sharp(&lvl_text, badge_x + badge_icon_size + 1.0, badge_y + 12.0, 16.0, TEXT_DIM);
+            }
+
             // Icon (centered horizontally, near top)
             let icon_size = 40.0;
             let icon_x = cell_x + (cell_w - icon_size) / 2.0;
@@ -428,10 +466,12 @@ impl Renderer {
         // Actually let's place them inside the content area at the bottom
         // The footer already has keybind hints. Put controls just above footer.
 
-        // We render these inline — the footer handles keybind hints
-        // So just render the quantity buttons + SMITH button in a row
+        let controls_h = 34.0;
+        let controls_y = area_y - controls_h - 2.0;
 
-        let controls_y = area_y - 36.0;
+        // Background strip behind controls
+        draw_rectangle(area_x, controls_y - 4.0, _area_w, controls_h + 8.0, PANEL_BG_DARK);
+        draw_line(area_x + 8.0, controls_y - 4.0, area_x + _area_w - 8.0, controls_y - 4.0, 1.0, SLOT_BORDER);
 
         // Quantity buttons: [1] [X] [All]
         let qty_btn_w = 32.0;

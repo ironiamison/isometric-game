@@ -3961,7 +3961,7 @@ impl InputHandler {
                     let total_content = rows as f32 * (cell_h + gap);
                     let (_, sh) = crate::util::virtual_screen_size();
                     let panel_h = (480.0_f32).min(sh - 16.0);
-                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0 - 44.0;
                     let max_scroll = (total_content - content_h).max(0.0);
                     state.ui_state.anvil_scroll_offset = (state.ui_state.anvil_scroll_offset
                         - wheel_y * SCROLL_SPEED)
@@ -5956,7 +5956,7 @@ impl InputHandler {
 
         let (_, sh) = crate::util::virtual_screen_size();
         let panel_h = (480.0_f32).min(sh - 16.0);
-        let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+        let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0 - 44.0;
 
         if item_top < state.ui_state.anvil_scroll_offset {
             state.ui_state.anvil_scroll_offset = item_top;
