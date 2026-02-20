@@ -611,6 +611,11 @@ pub struct TickTelemetry {
     pub state_sync_send_attempts: usize,
     pub state_sync_capacity_skips: usize,
     pub state_sync_try_send_drops: usize,
+    pub state_sync_full_sends: usize,
+    pub state_sync_delta_sends: usize,
+    pub state_sync_fallback_self_only_sends: usize,
+    pub state_sync_raw_bytes: usize,
+    pub state_sync_bytes_sent: usize,
 }
 
 // ============================================================================
@@ -9439,23 +9444,31 @@ impl GameRoom {
 
         // Instance groups: per-player encode because quest turn-in indicators are player-specific.
         for (inst_id, group_senders) in &instance_groups {
-            let active_receivers: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = group_senders
-                .iter()
-                .copied()
-                .filter(|(_, sender)| sender.capacity() >= STATE_SYNC_MIN_QUEUE_CAPACITY)
-                .collect();
-            tick_telemetry.state_sync_capacity_skips +=
-                group_senders.len().saturating_sub(active_receivers.len());
-            if active_receivers.is_empty() {
-                continue;
+            let mut active_receivers: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = Vec::new();
+            let mut low_capacity_receivers: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = Vec::new();
+            for (pid, sender) in group_senders.iter().copied() {
+                if sender.capacity() >= STATE_SYNC_MIN_QUEUE_CAPACITY {
+                    active_receivers.push((pid, sender));
+                } else {
+                    low_capacity_receivers.push((pid, sender));
+                }
             }
+            tick_telemetry.state_sync_capacity_skips += low_capacity_receivers.len();
 
-            let player_values: Vec<rmpv::Value> = players_by_instance
-                .get(inst_id)
-                .map(|ps| ps.iter().map(|p| crate::protocol::player_update_to_value(p)).collect())
-                .unwrap_or_default();
+            let players_in_instance: Vec<&PlayerUpdate> =
+                players_by_instance.get(inst_id).cloned().unwrap_or_default();
+            let player_values: Vec<rmpv::Value> = players_in_instance
+                .iter()
+                .map(|p| crate::protocol::player_update_to_value(p))
+                .collect();
+            let player_map_in_instance: HashMap<&str, &PlayerUpdate> = players_in_instance
+                .iter()
+                .map(|p| (p.id.as_str(), *p))
+                .collect();
 
-            let instance_npcs: Vec<NpcUpdate> = if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+            let instance_npcs: Vec<NpcUpdate> = if let Some(instance) =
+                self.instance_manager.get_by_instance_id(inst_id)
+            {
                 instance.get_npc_updates().await
             } else {
                 Vec::new()
@@ -9481,11 +9494,50 @@ impl GameRoom {
                     npc_values,
                     inst_id,
                 ) {
+                    let raw_len = raw.len();
                     let bytes = crate::protocol::maybe_compress(raw);
+                    let bytes_len = bytes.len();
                     tick_telemetry.state_sync_send_attempts += 1;
+                    tick_telemetry.state_sync_full_sends += 1;
+                    tick_telemetry.state_sync_raw_bytes += raw_len;
+                    tick_telemetry.state_sync_bytes_sent += bytes_len;
                     if let Err(e) = sender.try_send(bytes) {
                         tick_telemetry.state_sync_try_send_drops += 1;
                         tracing::debug!("StateSync drop for {}: {}", pid, e);
+                    }
+                }
+            }
+
+            // If a client is under queue pressure, still try to send a tiny self-only delta
+            // so local correction/facing remains responsive during transient congestion.
+            for (pid, sender) in low_capacity_receivers {
+                if sender.capacity() == 0 {
+                    continue;
+                }
+                let Some(self_update) = player_map_in_instance.get(pid.as_str()) else {
+                    continue;
+                };
+                let self_values = vec![crate::protocol::player_update_to_value(self_update)];
+                if let Ok(raw) = crate::protocol::encode_delta_state_sync(
+                    tick,
+                    self_values,
+                    Vec::new(),
+                    inst_id,
+                    false,
+                    &[],
+                    &[],
+                ) {
+                    let raw_len = raw.len();
+                    let bytes = crate::protocol::maybe_compress(raw);
+                    let bytes_len = bytes.len();
+                    tick_telemetry.state_sync_send_attempts += 1;
+                    tick_telemetry.state_sync_delta_sends += 1;
+                    tick_telemetry.state_sync_fallback_self_only_sends += 1;
+                    tick_telemetry.state_sync_raw_bytes += raw_len;
+                    tick_telemetry.state_sync_bytes_sent += bytes_len;
+                    if let Err(e) = sender.try_send(bytes) {
+                        tick_telemetry.state_sync_try_send_drops += 1;
+                        tracing::debug!("StateSync fallback drop for {}: {}", pid, e);
                     }
                 }
             }
@@ -9506,6 +9558,37 @@ impl GameRoom {
         for (player_id, sender) in &overworld_senders {
             if sender.capacity() < STATE_SYNC_MIN_QUEUE_CAPACITY {
                 tick_telemetry.state_sync_capacity_skips += 1;
+                if sender.capacity() > 0 {
+                    if let Some(self_update) = overworld_player_map.get(player_id.as_str()) {
+                        let self_values = vec![crate::protocol::player_update_to_value(self_update)];
+                        if let Ok(raw) = crate::protocol::encode_delta_state_sync(
+                            tick,
+                            self_values,
+                            Vec::new(),
+                            "",
+                            false,
+                            &[],
+                            &[],
+                        ) {
+                            let raw_len = raw.len();
+                            let bytes = crate::protocol::maybe_compress(raw);
+                            let bytes_len = bytes.len();
+                            tick_telemetry.state_sync_send_attempts += 1;
+                            tick_telemetry.state_sync_delta_sends += 1;
+                            tick_telemetry.state_sync_fallback_self_only_sends += 1;
+                            tick_telemetry.state_sync_raw_bytes += raw_len;
+                            tick_telemetry.state_sync_bytes_sent += bytes_len;
+                            if let Err(e) = sender.try_send(bytes) {
+                                tick_telemetry.state_sync_try_send_drops += 1;
+                                tracing::debug!(
+                                    "StateSync fallback drop for {}: {}",
+                                    player_id,
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -9546,8 +9629,13 @@ impl GameRoom {
                     .collect();
 
                 if let Ok(raw) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, "") {
+                    let raw_len = raw.len();
                     let bytes = crate::protocol::maybe_compress(raw);
+                    let bytes_len = bytes.len();
                     tick_telemetry.state_sync_send_attempts += 1;
+                    tick_telemetry.state_sync_full_sends += 1;
+                    tick_telemetry.state_sync_raw_bytes += raw_len;
+                    tick_telemetry.state_sync_bytes_sent += bytes_len;
                     if let Err(e) = sender.try_send(bytes) {
                         tick_telemetry.state_sync_try_send_drops += 1;
                         tracing::debug!("StateSync drop for {}: {}", player_id, e);
@@ -9598,17 +9686,25 @@ impl GameRoom {
                 if let Ok(raw) = crate::protocol::encode_delta_state_sync(
                     tick, changed_players, changed_npcs, "", false, &removed_players, &removed_npcs,
                 ) {
+                    let raw_len = raw.len();
                     let bytes = crate::protocol::maybe_compress(raw);
+                    let bytes_len = bytes.len();
                     tick_telemetry.state_sync_send_attempts += 1;
+                    tick_telemetry.state_sync_delta_sends += 1;
+                    tick_telemetry.state_sync_raw_bytes += raw_len;
+                    tick_telemetry.state_sync_bytes_sent += bytes_len;
                     if let Err(e) = sender.try_send(bytes) {
                         tick_telemetry.state_sync_try_send_drops += 1;
                         tracing::debug!("StateSync drop for {}: {}", player_id, e);
+                    } else {
+                        // Keep a rolling baseline on successful deltas to avoid resending
+                        // the same changed entities on every tick.
+                        sync_state.last_players = nearby_players
+                            .iter()
+                            .map(|(id, p)| (id.clone(), (*p).clone()))
+                            .collect();
+                        sync_state.last_npcs = nearby_npcs.clone();
                     }
-                    // NOTE: Do NOT update sync state on delta sends.
-                    // Deltas are always computed against the last full sync baseline.
-                    // This ensures client-side stateSync dedup (which drops all but the
-                    // latest tick) can't cause missed updates — if a delta is dropped,
-                    // the next delta still includes those changes.
                 }
             }
         }
@@ -9625,7 +9721,7 @@ impl GameRoom {
         let tick_duration = tick_start.elapsed();
         if tick_duration.as_millis() > 50 {
             tracing::warn!(
-                "Slow tick {}: {}ms (pre_npc={}ms npc_world={}ms sync={}ms arena={}ms players={} npcs={} overworld_senders={} instance_groups={} chunk_unload={}ms prayer_drain={}ms farming_growth={}ms restock={}ms moves={}/{} reject_reasons(tile={} player={} npc={} chair={} arena={}) sync_attempts={} sync_capacity_skips={} sync_drops={})",
+                "Slow tick {}: {}ms (pre_npc={}ms npc_world={}ms sync={}ms arena={}ms players={} npcs={} overworld_senders={} instance_groups={} chunk_unload={}ms prayer_drain={}ms farming_growth={}ms restock={}ms moves={}/{} reject_reasons(tile={} player={} npc={} chair={} arena={}) sync_attempts={} sync_capacity_skips={} sync_drops={} sync_full={} sync_delta={} sync_fallback={} sync_raw_bytes={} sync_wire_bytes={})",
                 current_tick,
                 tick_duration.as_millis(),
                 pre_npc_ms,
@@ -9650,6 +9746,11 @@ impl GameRoom {
                 tick_telemetry.state_sync_send_attempts,
                 tick_telemetry.state_sync_capacity_skips,
                 tick_telemetry.state_sync_try_send_drops,
+                tick_telemetry.state_sync_full_sends,
+                tick_telemetry.state_sync_delta_sends,
+                tick_telemetry.state_sync_fallback_self_only_sends,
+                tick_telemetry.state_sync_raw_bytes,
+                tick_telemetry.state_sync_bytes_sent,
             );
         }
 

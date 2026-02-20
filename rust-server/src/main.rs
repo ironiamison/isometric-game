@@ -2913,6 +2913,11 @@ async fn main() {
                     tick_telemetry.state_sync_send_attempts,
                     tick_telemetry.state_sync_capacity_skips,
                     tick_telemetry.state_sync_try_send_drops,
+                    tick_telemetry.state_sync_full_sends,
+                    tick_telemetry.state_sync_delta_sends,
+                    tick_telemetry.state_sync_fallback_self_only_sends,
+                    tick_telemetry.state_sync_raw_bytes,
+                    tick_telemetry.state_sync_bytes_sent,
                 );
             }
             let loop_ms = loop_start.elapsed().as_secs_f64() * 1000.0;
@@ -3076,7 +3081,7 @@ async fn main() {
             interval.tick().await;
             let perf = perf_state.perf_metrics.snapshot(3, 0);
             info!(
-                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%)) state_sync(drop_rate={}%, attempts={}, capacity_skips={}, drops={}) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
+                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%)) state_sync(drop_rate={}%, skip_rate={}%, attempts={}, capacity_skips={}, drops={}, full={}({}%), delta={}({}%), fallback_self={}, raw_bytes={}, wire_bytes={}, wire_vs_raw={}%) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
                 perf.uptime_seconds,
                 perf.tick_loop_ms.p95_ms,
                 perf.tick_loop_ms.p99_ms,
@@ -3104,9 +3109,18 @@ async fn main() {
                 perf.counters.movement_rejections_arena_blocked,
                 perf.derived_rates.movement_reject_arena_share_pct,
                 perf.derived_rates.state_sync_drop_rate_pct,
+                perf.derived_rates.state_sync_capacity_skip_rate_pct,
                 perf.counters.state_sync_send_attempts,
                 perf.counters.state_sync_capacity_skips,
                 perf.counters.state_sync_try_send_drops,
+                perf.counters.state_sync_full_sends,
+                perf.derived_rates.state_sync_full_share_pct,
+                perf.counters.state_sync_delta_sends,
+                perf.derived_rates.state_sync_delta_share_pct,
+                perf.counters.state_sync_fallback_self_only_sends,
+                perf.counters.state_sync_raw_bytes,
+                perf.counters.state_sync_wire_bytes,
+                perf.derived_rates.state_sync_wire_vs_raw_pct,
                 perf.counters.tick_loop_overruns,
                 perf.counters.slow_room_ticks,
                 perf.counters.slow_autosaves,

@@ -59,6 +59,11 @@ pub struct PerfCounters {
     pub state_sync_send_attempts: u64,
     pub state_sync_capacity_skips: u64,
     pub state_sync_try_send_drops: u64,
+    pub state_sync_full_sends: u64,
+    pub state_sync_delta_sends: u64,
+    pub state_sync_fallback_self_only_sends: u64,
+    pub state_sync_raw_bytes: u64,
+    pub state_sync_wire_bytes: u64,
 }
 
 #[derive(Clone, Serialize)]
@@ -125,6 +130,10 @@ pub struct PerfDerivedRates {
     pub movement_reject_chair_share_pct: f64,
     pub movement_reject_arena_share_pct: f64,
     pub state_sync_drop_rate_pct: f64,
+    pub state_sync_capacity_skip_rate_pct: f64,
+    pub state_sync_full_share_pct: f64,
+    pub state_sync_delta_share_pct: f64,
+    pub state_sync_wire_vs_raw_pct: f64,
 }
 
 impl PerfMetrics {
@@ -300,8 +309,21 @@ impl PerfMetrics {
         send_attempts: usize,
         capacity_skips: usize,
         try_send_drops: usize,
+        full_sends: usize,
+        delta_sends: usize,
+        fallback_self_only_sends: usize,
+        raw_bytes: usize,
+        wire_bytes: usize,
     ) {
-        if send_attempts == 0 && capacity_skips == 0 && try_send_drops == 0 {
+        if send_attempts == 0
+            && capacity_skips == 0
+            && try_send_drops == 0
+            && full_sends == 0
+            && delta_sends == 0
+            && fallback_self_only_sends == 0
+            && raw_bytes == 0
+            && wire_bytes == 0
+        {
             return;
         }
 
@@ -309,6 +331,11 @@ impl PerfMetrics {
         inner.counters.state_sync_send_attempts += send_attempts as u64;
         inner.counters.state_sync_capacity_skips += capacity_skips as u64;
         inner.counters.state_sync_try_send_drops += try_send_drops as u64;
+        inner.counters.state_sync_full_sends += full_sends as u64;
+        inner.counters.state_sync_delta_sends += delta_sends as u64;
+        inner.counters.state_sync_fallback_self_only_sends += fallback_self_only_sends as u64;
+        inner.counters.state_sync_raw_bytes += raw_bytes as u64;
+        inner.counters.state_sync_wire_bytes += wire_bytes as u64;
     }
 
     pub fn snapshot(&self, top_rooms: usize, spikes: usize) -> PerfSnapshot {
@@ -391,6 +418,22 @@ impl PerfMetrics {
                 state_sync_drop_rate_pct: percent(
                     inner.counters.state_sync_try_send_drops,
                     inner.counters.state_sync_send_attempts,
+                ),
+                state_sync_capacity_skip_rate_pct: percent(
+                    inner.counters.state_sync_capacity_skips,
+                    inner.counters.state_sync_send_attempts + inner.counters.state_sync_capacity_skips,
+                ),
+                state_sync_full_share_pct: percent(
+                    inner.counters.state_sync_full_sends,
+                    inner.counters.state_sync_send_attempts,
+                ),
+                state_sync_delta_share_pct: percent(
+                    inner.counters.state_sync_delta_sends,
+                    inner.counters.state_sync_send_attempts,
+                ),
+                state_sync_wire_vs_raw_pct: percent(
+                    inner.counters.state_sync_wire_bytes,
+                    inner.counters.state_sync_raw_bytes,
                 ),
             },
             tick_loop_ms: summarize(&inner.tick_loop_ms),
