@@ -8834,7 +8834,7 @@ impl Renderer {
                         self.minimap_stats_stack_position(state, bar_width_contract);
                     // Below 3 stat bars (HP + MP + Prayer, each 18px + 4px gap) + extra gap
                     let contract_y = stats_y + 3.0 * (18.0 + 4.0) + 14.0;
-                    self.render_farming_contract_tracker(state, bar_x, contract_y, 200.0);
+                    self.render_farming_contract_tracker(state, bar_x, contract_y, 240.0);
                 }
             }
         }

@@ -443,8 +443,8 @@ fn run_game_frame(
     for sfx_name in game_state.pending_sfx.drain(..) {
         audio.play_sfx(&sfx_name);
     }
-    for has_weapon in game_state.pending_attack_sounds.drain(..) {
-        audio.play_attack_sound(has_weapon);
+    for attack_type in game_state.pending_attack_sounds.drain(..) {
+        audio.play_attack_sound(attack_type);
     }
 
     // 2. Render and get UI layout for hit detection
@@ -513,8 +513,14 @@ fn run_game_frame(
                         } else {
                             player.play_attack();
                         }
-                        let has_weapon = player.equipped_weapon.is_some();
-                        audio.play_attack_sound(has_weapon);
+                        let sound_type = if is_ranged {
+                            crate::game::state::AttackSoundType::Ranged
+                        } else if player.equipped_weapon.is_some() {
+                            crate::game::state::AttackSoundType::Melee
+                        } else {
+                            crate::game::state::AttackSoundType::Unarmed
+                        };
+                        audio.play_attack_sound(sound_type);
                     }
                 }
                 ClientMessage::Attack

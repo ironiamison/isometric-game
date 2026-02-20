@@ -6797,6 +6797,25 @@ impl GameRoom {
             return;
         }
 
+        // Check inventory space before chopping (so we don't waste the tree)
+        {
+            let woodcutting = self.woodcutting.read().await;
+            if let Some(tree_config) = woodcutting.get_tree_type(tree_gid) {
+                let players = self.players.read().await;
+                if let Some(player) = players.get(player_id) {
+                    if !player.inventory.has_space_for(&tree_config.log_item_id, 1, &self.item_registry) {
+                        drop(players);
+                        drop(woodcutting);
+                        self.send_to_player(player_id, ServerMessage::Error {
+                            code: 400,
+                            message: "Your inventory is full!".to_string(),
+                        }).await;
+                        return;
+                    }
+                }
+            }
+        }
+
         // Perform the chop
         let mut woodcutting = self.woodcutting.write().await;
         let chop_result = woodcutting.chop_once(tree_x, tree_y, tree_gid, woodcutting_level, current_time);
@@ -6962,6 +6981,25 @@ impl GameRoom {
                 message: "You need a pickaxe to mine rocks".to_string(),
             }).await;
             return;
+        }
+
+        // Check inventory space before mining (so we don't waste the rock)
+        {
+            let mining = self.mining.read().await;
+            if let Some(ore_config) = mining.get_ore_type(rock_gid) {
+                let players = self.players.read().await;
+                if let Some(player) = players.get(player_id) {
+                    if !player.inventory.has_space_for(&ore_config.ore_item_id, 1, &self.item_registry) {
+                        drop(players);
+                        drop(mining);
+                        self.send_to_player(player_id, ServerMessage::Error {
+                            code: 400,
+                            message: "Your inventory is full!".to_string(),
+                        }).await;
+                        return;
+                    }
+                }
+            }
         }
 
         // Perform the mine

@@ -11,6 +11,13 @@ use crate::render::XpGlobesManager;
 use crate::ui::UiElementId;
 use std::collections::{HashMap, HashSet, VecDeque};
 
+#[derive(Debug, Clone, Copy)]
+pub enum AttackSoundType {
+    Unarmed,
+    Melee,
+    Ranged,
+}
+
 const MAX_CHAT_LOG_MESSAGES: usize = 120;
 const HIGH_PING_ENABLE_MS: f64 = 120.0;
 const HIGH_PING_DISABLE_MS: f64 = 95.0;
@@ -1402,8 +1409,8 @@ pub struct GameState {
     pub level_up_events: Vec<LevelUpEvent>,
     /// Pending sound effects to play (queued by message handler, played by main loop)
     pub pending_sfx: Vec<String>,
-    /// Pending attack sounds (bool = has_weapon) queued by message handler
-    pub pending_attack_sounds: Vec<bool>,
+    /// Pending attack sounds queued by message handler
+    pub pending_attack_sounds: Vec<AttackSoundType>,
     pub skill_xp_events: Vec<SkillXpEvent>,
     pub xp_globes: XpGlobesManager,
     pub xp_drop_feed: XpDropFeed,

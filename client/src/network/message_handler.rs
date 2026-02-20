@@ -2602,6 +2602,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             .ui_state
                             .chat_messages
                             .push(ChatMessage::system("Your inventory is full!".to_string()));
+                        state.pending_sfx.push("error".to_string());
                     }
                 }
             }
@@ -2706,12 +2707,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     player.play_attack();
                 }
                 if in_audio_range {
-                    let has_weapon = state
-                        .players
-                        .get(&player_id)
-                        .map(|p| p.equipped_weapon.is_some())
-                        .unwrap_or(false);
-                    state.pending_attack_sounds.push(has_weapon);
+                    state.pending_attack_sounds.push(crate::game::state::AttackSoundType::Melee);
 
                     // Play woodcutting sound effect
                     state.pending_sfx.push("woodcut".to_string());
@@ -2875,6 +2871,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             .ui_state
                             .chat_messages
                             .push(ChatMessage::system("Your inventory is full!".to_string()));
+                        state.pending_sfx.push("error".to_string());
                     }
                 }
             }
@@ -2901,12 +2898,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     player.play_attack();
                 }
                 if in_audio_range {
-                    let has_weapon = state
-                        .players
-                        .get(&player_id)
-                        .map(|p| p.equipped_weapon.is_some())
-                        .unwrap_or(false);
-                    state.pending_attack_sounds.push(has_weapon);
+                    state.pending_attack_sounds.push(crate::game::state::AttackSoundType::Melee);
 
                     // Play mining sound effect
                     state.pending_sfx.push("mining".to_string());

@@ -1,3 +1,4 @@
+use crate::game::state::AttackSoundType;
 use crate::util::asset_path;
 use macroquad::audio::{
     load_sound, play_sound, set_sound_volume, stop_sound, PlaySoundParams, Sound,
@@ -30,6 +31,8 @@ pub struct AudioManager {
     sfx: HashMap<String, Sound>,
     /// Sword attack sounds for random selection
     sword_sounds: Vec<Sound>,
+    /// Bow attack sound
+    bow_sound: Option<Sound>,
     /// Preloaded music tracks by path
     music: HashMap<String, Sound>,
 }
@@ -44,6 +47,7 @@ impl AudioManager {
             settings,
             sfx: HashMap::new(),
             sword_sounds: Vec::new(),
+            bow_sound: None,
             music: HashMap::new(),
         }
     }
@@ -98,6 +102,7 @@ impl AudioManager {
             ("quest_complete", "assets/audio/sfx/misc/quest_complete.ogg"),
             ("furnace", "assets/audio/sfx/misc/furnace.ogg"),
             ("death", "assets/audio/sfx/misc/death.ogg"),
+            ("error", "assets/audio/sfx/error.wav"),
         ];
 
         for (name, path) in sfx_files {
@@ -126,6 +131,18 @@ impl AudioManager {
             }
         }
 
+        // Load bow attack sound
+        let bow_path = asset_path("assets/audio/sfx/attack/bow.wav");
+        match load_sound(&bow_path).await {
+            Ok(sound) => {
+                self.bow_sound = Some(sound);
+                log::debug!("Loaded bow sound");
+            }
+            Err(e) => {
+                log::warn!("Failed to load bow sound '{}': {:?}", bow_path, e);
+            }
+        }
+
         log::info!(
             "Loaded {} SFX, {} sword sounds",
             self.sfx.len(),
@@ -148,20 +165,35 @@ impl AudioManager {
         }
     }
 
-    /// Play attack sound - random sword sound if armed, unarmed sound if not
-    pub fn play_attack_sound(&self, has_weapon: bool) {
-        if has_weapon && !self.sword_sounds.is_empty() {
-            // Pick a random sword sound
-            let idx = macroquad::rand::gen_range(0, self.sword_sounds.len());
-            play_sound(
-                &self.sword_sounds[idx],
-                PlaySoundParams {
-                    looped: false,
-                    volume: self.effective_sfx_volume(),
-                },
-            );
-        } else {
-            self.play_sfx("unarmed");
+    /// Play attack sound based on weapon type
+    pub fn play_attack_sound(&self, attack_type: AttackSoundType) {
+        match attack_type {
+            AttackSoundType::Ranged => {
+                if let Some(sound) = &self.bow_sound {
+                    play_sound(
+                        sound,
+                        PlaySoundParams {
+                            looped: false,
+                            volume: self.effective_sfx_volume(),
+                        },
+                    );
+                }
+            }
+            AttackSoundType::Melee => {
+                if !self.sword_sounds.is_empty() {
+                    let idx = macroquad::rand::gen_range(0, self.sword_sounds.len());
+                    play_sound(
+                        &self.sword_sounds[idx],
+                        PlaySoundParams {
+                            looped: false,
+                            volume: self.effective_sfx_volume(),
+                        },
+                    );
+                }
+            }
+            AttackSoundType::Unarmed => {
+                self.play_sfx("unarmed");
+            }
         }
     }
 
