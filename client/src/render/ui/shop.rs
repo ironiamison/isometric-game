@@ -25,13 +25,15 @@ impl Renderer {
         content_width: f32,
         content_height: f32,
     ) {
+        let s = self.font_scale.get();
+
         let shop_data = match &state.ui_state.shop_data {
             Some(data) => data,
             None => {
                 self.draw_text_sharp(
                     "Loading shop...",
-                    panel_x + 20.0,
-                    content_y + 40.0,
+                    panel_x + 20.0 * s,
+                    content_y + 40.0 * s,
                     16.0,
                     TEXT_DIM,
                 );
@@ -39,16 +41,21 @@ impl Renderer {
             }
         };
 
+        // Scaled layout constants
+        let header_h = HEADER_HEIGHT * s;
+        let transaction_h = TRANSACTION_HEIGHT * s;
+        let col_gap = COLUMN_GAP * s;
+
         // Calculate column dimensions
-        let usable_width = content_width - 20.0; // Account for padding
-        let column_width = (usable_width - COLUMN_GAP) / 2.0;
-        let left_x = panel_x + FRAME_THICKNESS + 10.0;
-        let right_x = left_x + column_width + COLUMN_GAP;
+        let usable_width = content_width - 20.0 * s; // Account for padding
+        let column_width = (usable_width - col_gap) / 2.0;
+        let left_x = panel_x + FRAME_THICKNESS + 10.0 * s;
+        let right_x = left_x + column_width + col_gap;
 
         let header_y = content_y;
-        let list_y = content_y + HEADER_HEIGHT + 10.0;
-        let list_height = content_height - HEADER_HEIGHT - TRANSACTION_HEIGHT - 6.0;
-        let bar_y = list_y + list_height + 8.0;
+        let list_y = content_y + header_h + 10.0 * s;
+        let list_height = content_height - header_h - transaction_h - 6.0 * s;
+        let bar_y = list_y + list_height + 8.0 * s;
 
         // STEP 1: Render lists FIRST (they may overflow)
         self.render_buy_column(
@@ -78,48 +85,48 @@ impl Renderer {
             left_x,
             header_y,
             column_width,
-            HEADER_HEIGHT + 8.0,
+            header_h + 8.0 * s,
             PANEL_BG_MID,
         ); // Cover gap too
-        draw_rectangle(left_x, header_y, column_width, HEADER_HEIGHT, SLOT_BORDER);
+        draw_rectangle(left_x, header_y, column_width, header_h, SLOT_BORDER);
         draw_rectangle(
             left_x + 1.0,
             header_y + 1.0,
             column_width - 2.0,
-            HEADER_HEIGHT - 2.0,
+            header_h - 2.0,
             PANEL_BG_MID,
         );
         let buy_header_dims = self.measure_text_sharp("BUY", 16.0);
         let buy_header_x = left_x + (column_width - buy_header_dims.width) / 2.0;
-        self.draw_text_sharp("BUY", buy_header_x, header_y + 17.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp("BUY", buy_header_x, header_y + header_h * 0.71, 16.0, TEXT_TITLE);
 
         // SELL header
         draw_rectangle(
             right_x,
             header_y,
             column_width,
-            HEADER_HEIGHT + 8.0,
+            header_h + 8.0 * s,
             PANEL_BG_MID,
         ); // Cover gap too
-        draw_rectangle(right_x, header_y, column_width, HEADER_HEIGHT, SLOT_BORDER);
+        draw_rectangle(right_x, header_y, column_width, header_h, SLOT_BORDER);
         draw_rectangle(
             right_x + 1.0,
             header_y + 1.0,
             column_width - 2.0,
-            HEADER_HEIGHT - 2.0,
+            header_h - 2.0,
             PANEL_BG_MID,
         );
         let sell_header_dims = self.measure_text_sharp("SELL", 16.0);
         let sell_header_x = right_x + (column_width - sell_header_dims.width) / 2.0;
-        self.draw_text_sharp("SELL", sell_header_x, header_y + 17.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp("SELL", sell_header_x, header_y + header_h * 0.71, 16.0, TEXT_TITLE);
 
         // Divider line between buy and sell columns
-        let divider_x = left_x + column_width + COLUMN_GAP / 2.0;
+        let divider_x = left_x + column_width + col_gap / 2.0;
         draw_line(
             divider_x,
             header_y,
             divider_x,
-            bar_y + TRANSACTION_HEIGHT,
+            bar_y + transaction_h,
             1.0,
             HEADER_BORDER,
         );
@@ -156,11 +163,16 @@ impl Renderer {
         list_height: f32,
         shop_data: &crate::game::ShopData,
     ) {
+        let s = self.font_scale.get();
+        let item_h = SHOP_ITEM_HEIGHT * s;
+        let item_sp = SHOP_ITEM_SPACING * s;
+        let scrollbar_w = SCROLLBAR_WIDTH * s;
+
         // Calculate scroll state first to know if scrollbar is needed
         let scroll_config = ScrollableListConfig {
             visible_height: list_height,
-            item_height: SHOP_ITEM_HEIGHT,
-            item_spacing: SHOP_ITEM_SPACING,
+            item_height: item_h,
+            item_spacing: item_sp,
             total_items: shop_data.stock.len(),
             scroll_offset: state.ui_state.shop_buy_scroll,
         };
@@ -168,7 +180,7 @@ impl Renderer {
 
         // Only reserve scrollbar space if scrolling is needed
         let item_width = if scroll_state.show_scrollbar {
-            width - SCROLLBAR_WIDTH - 2.0
+            width - scrollbar_w - 2.0
         } else {
             width
         };
@@ -183,15 +195,15 @@ impl Renderer {
                 let relative_idx = i - scroll_state.first_visible;
                 let item_y = list_y
                     + scroll_state.first_item_offset
-                    + (relative_idx as f32) * (SHOP_ITEM_HEIGHT + SHOP_ITEM_SPACING);
+                    + (relative_idx as f32) * (item_h + item_sp);
 
                 // Skip items completely outside visible area
-                if item_y + SHOP_ITEM_HEIGHT < list_y || item_y > list_y + list_height {
+                if item_y + item_h < list_y || item_y > list_y + list_height {
                     continue;
                 }
 
                 let is_selected = i == state.ui_state.shop_selected_buy_index;
-                let bounds = Rect::new(x, item_y, item_width, SHOP_ITEM_HEIGHT);
+                let bounds = Rect::new(x, item_y, item_width, item_h);
                 layout.add(UiElementId::ShopBuyItem(i), bounds);
 
                 let is_hovered =
@@ -205,29 +217,30 @@ impl Renderer {
                     (SLOT_BG_EMPTY, SLOT_BORDER)
                 };
 
-                draw_rectangle(x, item_y, item_width, SHOP_ITEM_HEIGHT, border_color);
+                draw_rectangle(x, item_y, item_width, item_h, border_color);
                 draw_rectangle(
                     x + 1.0,
                     item_y + 1.0,
                     item_width - 2.0,
-                    SHOP_ITEM_HEIGHT - 2.0,
+                    item_h - 2.0,
                     bg_color,
                 );
 
                 // Item sprite
-                let sprite_x = x + 13.0;
-                let sprite_y = item_y + 8.0;
+                let sprite_x = x + 13.0 * s;
+                let sprite_y = item_y + 8.0 * s;
                 self.draw_item_icon(
                     &stock_item.item_id,
                     sprite_x,
                     sprite_y,
-                    32.0,
-                    32.0,
+                    32.0 * s,
+                    32.0 * s,
                     state,
                     true,
                 );
 
                 // Item name
+                let text_offset = ITEM_TEXT_OFFSET * s;
                 let name = state
                     .item_registry
                     .get(&stock_item.item_id)
@@ -235,25 +248,25 @@ impl Renderer {
                     .unwrap_or(&stock_item.item_id);
                 self.draw_text_sharp(
                     name,
-                    sprite_x + ITEM_TEXT_OFFSET,
-                    item_y + 18.0,
+                    sprite_x + text_offset,
+                    item_y + item_h * 0.375,
                     16.0,
                     TEXT_NORMAL,
                 );
 
                 // Price
                 let price_text = format!("{}g", stock_item.price);
-                let text_x = sprite_x + ITEM_TEXT_OFFSET;
-                let text_y = item_y + 32.0;
+                let text_x = sprite_x + text_offset;
+                let text_y = item_y + item_h * 0.667;
 
                 // Nugget icon
-                let icon_size = 12.0;
-                let icon_margin = 4.0;
+                let icon_size = 12.0 * s;
+                let icon_margin = 4.0 * s;
                 if let Some(texture) = &self.gold_nugget_texture {
                     draw_texture_ex(
                         texture,
                         text_x,
-                        text_y - 11.0,
+                        text_y - 11.0 * s,
                         WHITE,
                         DrawTextureParams {
                             dest_size: Some(vec2(icon_size, icon_size)),
@@ -279,8 +292,8 @@ impl Renderer {
                 };
                 self.draw_text_sharp(
                     &stock_text,
-                    x + item_width - 40.0,
-                    item_y + 26.0,
+                    x + item_width - 40.0 * s,
+                    item_y + item_h * 0.54,
                     16.0,
                     stock_color,
                 );
@@ -293,7 +306,7 @@ impl Renderer {
             draw_scrollbar(
                 scrollbar_x,
                 list_y,
-                SCROLLBAR_WIDTH - 4.0,
+                scrollbar_w - 4.0,
                 list_height,
                 scroll_state.scrollbar_position,
                 scroll_state.scrollbar_size,
@@ -314,6 +327,11 @@ impl Renderer {
         list_height: f32,
         shop_data: &crate::game::ShopData,
     ) {
+        let s = self.font_scale.get();
+        let item_h = SHOP_ITEM_HEIGHT * s;
+        let item_sp = SHOP_ITEM_SPACING * s;
+        let scrollbar_w = SCROLLBAR_WIDTH * s;
+
         // Collect inventory items
         let inventory_items: Vec<(usize, &crate::game::InventorySlot)> = state
             .inventory
@@ -324,15 +342,15 @@ impl Renderer {
             .collect();
 
         if inventory_items.is_empty() {
-            self.draw_text_sharp("No items", x + 10.0, list_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("No items", x + 10.0 * s, list_y + 20.0 * s, 16.0, TEXT_DIM);
             return;
         }
 
         // Calculate scroll state first to know if scrollbar is needed
         let scroll_config = ScrollableListConfig {
             visible_height: list_height,
-            item_height: SHOP_ITEM_HEIGHT,
-            item_spacing: SHOP_ITEM_SPACING,
+            item_height: item_h,
+            item_spacing: item_sp,
             total_items: inventory_items.len(),
             scroll_offset: state.ui_state.shop_sell_scroll,
         };
@@ -340,7 +358,7 @@ impl Renderer {
 
         // Only reserve scrollbar space if scrolling is needed
         let item_width = if scroll_state.show_scrollbar {
-            width - SCROLLBAR_WIDTH - 4.0
+            width - scrollbar_w - 4.0
         } else {
             width - 1.0
         };
@@ -355,15 +373,15 @@ impl Renderer {
                 let relative_idx = i - scroll_state.first_visible;
                 let item_y = list_y
                     + scroll_state.first_item_offset
-                    + (relative_idx as f32) * (SHOP_ITEM_HEIGHT + SHOP_ITEM_SPACING);
+                    + (relative_idx as f32) * (item_h + item_sp);
 
                 // Skip items completely outside visible area
-                if item_y + SHOP_ITEM_HEIGHT < list_y || item_y > list_y + list_height {
+                if item_y + item_h < list_y || item_y > list_y + list_height {
                     continue;
                 }
 
                 let is_selected = i == state.ui_state.shop_selected_sell_index;
-                let bounds = Rect::new(x, item_y, item_width, SHOP_ITEM_HEIGHT);
+                let bounds = Rect::new(x, item_y, item_width, item_h);
                 layout.add(UiElementId::ShopSellItem(i), bounds);
 
                 let is_hovered =
@@ -377,29 +395,30 @@ impl Renderer {
                     (SLOT_BG_EMPTY, SLOT_BORDER)
                 };
 
-                draw_rectangle(x, item_y, item_width, SHOP_ITEM_HEIGHT, border_color);
+                draw_rectangle(x, item_y, item_width, item_h, border_color);
                 draw_rectangle(
                     x + 1.0,
                     item_y + 1.0,
                     item_width - 2.0,
-                    SHOP_ITEM_HEIGHT - 2.0,
+                    item_h - 2.0,
                     bg_color,
                 );
 
                 // Item sprite
-                let sprite_x = x + 13.0;
-                let sprite_y = item_y + 8.0;
+                let sprite_x = x + 13.0 * s;
+                let sprite_y = item_y + 8.0 * s;
                 self.draw_item_icon(
                     &inv_slot.item_id,
                     sprite_x,
                     sprite_y,
-                    32.0,
-                    32.0,
+                    32.0 * s,
+                    32.0 * s,
                     state,
                     true,
                 );
 
                 // Item name
+                let text_offset = ITEM_TEXT_OFFSET * s;
                 let name = state
                     .item_registry
                     .get(&inv_slot.item_id)
@@ -407,8 +426,8 @@ impl Renderer {
                     .unwrap_or(&inv_slot.item_id);
                 self.draw_text_sharp(
                     name,
-                    sprite_x + ITEM_TEXT_OFFSET,
-                    item_y + 18.0,
+                    sprite_x + text_offset,
+                    item_y + item_h * 0.375,
                     16.0,
                     TEXT_NORMAL,
                 );
@@ -417,8 +436,8 @@ impl Renderer {
                 let qty_text = format!("x{}", inv_slot.quantity);
                 self.draw_text_sharp(
                     &qty_text,
-                    sprite_x + ITEM_TEXT_OFFSET,
-                    item_y + 34.0,
+                    sprite_x + text_offset,
+                    item_y + item_h * 0.708,
                     16.0,
                     TEXT_DIM,
                 );
@@ -431,17 +450,17 @@ impl Renderer {
                         let price_text = format!("{}g", sell_price);
                         let price_width = self.measure_text_sharp(&price_text, 16.0).width;
 
-                        let icon_size = 12.0;
-                        let icon_margin = 4.0;
+                        let icon_size = 12.0 * s;
+                        let icon_margin = 4.0 * s;
                         let total_width = icon_size + icon_margin + price_width;
-                        let price_x = x + item_width - total_width - 8.0;
-                        let price_y = item_y + 24.0;
+                        let price_x = x + item_width - total_width - 8.0 * s;
+                        let price_y = item_y + item_h * 0.5;
 
                         if let Some(texture) = &self.gold_nugget_texture {
                             draw_texture_ex(
                                 texture,
                                 price_x,
-                                price_y - 11.0,
+                                price_y - 11.0 * s,
                                 WHITE,
                                 DrawTextureParams {
                                     dest_size: Some(vec2(icon_size, icon_size)),
@@ -459,8 +478,8 @@ impl Renderer {
                     } else {
                         self.draw_text_sharp(
                             "---",
-                            x + item_width - 40.0,
-                            item_y + 24.0,
+                            x + item_width - 40.0 * s,
+                            item_y + item_h * 0.5,
                             16.0,
                             Color::new(0.5, 0.5, 0.5, 1.0),
                         );
@@ -475,7 +494,7 @@ impl Renderer {
             draw_scrollbar(
                 scrollbar_x,
                 list_y,
-                SCROLLBAR_WIDTH - 4.0,
+                scrollbar_w - 4.0,
                 list_height,
                 scroll_state.scrollbar_position,
                 scroll_state.scrollbar_size,
@@ -495,13 +514,16 @@ impl Renderer {
         width: f32,
         shop_data: &crate::game::ShopData,
     ) {
+        let s = self.font_scale.get();
+        let transaction_h = TRANSACTION_HEIGHT * s;
+
         // Background
-        draw_rectangle(x, bar_y, width, TRANSACTION_HEIGHT, SLOT_BORDER);
+        draw_rectangle(x, bar_y, width, transaction_h, SLOT_BORDER);
         draw_rectangle(
             x + 1.0,
             bar_y + 1.0,
             width - 2.0,
-            TRANSACTION_HEIGHT - 2.0,
+            transaction_h - 2.0,
             PANEL_BG_MID,
         );
 
@@ -517,10 +539,10 @@ impl Renderer {
             };
 
         // Single compact row: [-] qty [+]  price  [Buy]
-        let row_y = bar_y + (TRANSACTION_HEIGHT) / 2.0;
-        let btn_size = 18.0;
+        let row_y = bar_y + transaction_h / 2.0;
+        let btn_size = 18.0 * s;
         let btn_y = row_y - btn_size / 2.0;
-        let mut cx = x + 6.0;
+        let mut cx = x + 6.0 * s;
 
         // Minus button
         let minus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
@@ -543,17 +565,17 @@ impl Renderer {
         self.draw_text_sharp(
             "-",
             cx + (btn_size - minus_dims.width) / 2.0,
-            row_y + 5.0,
+            row_y + 5.0 * s,
             16.0,
             TEXT_NORMAL,
         );
-        cx += btn_size + 10.0;
+        cx += btn_size + 10.0 * s;
 
         // Quantity
         let qty_text = format!("{}", state.ui_state.shop_buy_quantity);
         let qty_dims = self.measure_text_sharp(&qty_text, 16.0);
-        self.draw_text_sharp(&qty_text, cx, row_y + 5.0, 16.0, TEXT_TITLE);
-        cx += qty_dims.width + 10.0;
+        self.draw_text_sharp(&qty_text, cx, row_y + 5.0 * s, 16.0, TEXT_TITLE);
+        cx += qty_dims.width + 10.0 * s;
 
         // Plus button
         let plus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
@@ -576,15 +598,15 @@ impl Renderer {
         self.draw_text_sharp(
             "+",
             cx + (btn_size - plus_dims.width) / 2.0,
-            row_y + 5.0,
+            row_y + 5.0 * s,
             16.0,
             TEXT_NORMAL,
         );
-        cx += btn_size + 8.0;
+        cx += btn_size + 8.0 * s;
 
         // Price with nugget icon
-        let icon_size = 12.0;
-        let icon_margin = 4.0;
+        let icon_size = 12.0 * s;
+        let icon_margin = 4.0 * s;
         let price_text = format!("{}g", total_price);
         let price_color = if can_buy {
             TEXT_GOLD
@@ -595,7 +617,7 @@ impl Renderer {
             draw_texture_ex(
                 texture,
                 cx,
-                row_y - 4.0,
+                row_y - 4.0 * s,
                 WHITE,
                 DrawTextureParams {
                     dest_size: Some(vec2(icon_size, icon_size)),
@@ -606,15 +628,15 @@ impl Renderer {
         self.draw_text_sharp(
             &price_text,
             cx + icon_size + icon_margin,
-            row_y + 5.0,
+            row_y + 5.0 * s,
             16.0,
             price_color,
         );
 
         // Buy button (right-aligned)
-        let button_w = 50.0;
-        let button_h = 24.0;
-        let button_x = x + width - button_w - 4.0;
+        let button_w = 50.0 * s;
+        let button_h = 24.0 * s;
+        let button_x = x + width - button_w - 4.0 * s;
         let button_y = row_y - button_h / 2.0;
         let button_bounds = Rect::new(button_x, button_y, button_w, button_h);
         layout.add(UiElementId::ShopBuyConfirmButton, button_bounds);
@@ -651,7 +673,7 @@ impl Renderer {
         self.draw_text_sharp(
             "Buy",
             button_x + (button_w - btn_dims.width) / 2.0,
-            button_y + 17.0,
+            button_y + button_h * 0.71,
             16.0,
             button_text_color,
         );
@@ -667,13 +689,16 @@ impl Renderer {
         width: f32,
         shop_data: &crate::game::ShopData,
     ) {
+        let s = self.font_scale.get();
+        let transaction_h = TRANSACTION_HEIGHT * s;
+
         // Background
-        draw_rectangle(x, bar_y, width, TRANSACTION_HEIGHT, SLOT_BORDER);
+        draw_rectangle(x, bar_y, width, transaction_h, SLOT_BORDER);
         draw_rectangle(
             x + 1.0,
             bar_y + 1.0,
             width - 2.0,
-            TRANSACTION_HEIGHT - 2.0,
+            transaction_h - 2.0,
             PANEL_BG_MID,
         );
 
@@ -705,10 +730,10 @@ impl Renderer {
         };
 
         // Single compact row: [-] qty [+]  price  [Sell]
-        let row_y = bar_y + (TRANSACTION_HEIGHT) / 2.0;
-        let btn_size = 18.0;
+        let row_y = bar_y + transaction_h / 2.0;
+        let btn_size = 18.0 * s;
         let btn_y = row_y - btn_size / 2.0;
-        let mut cx = x + 6.0;
+        let mut cx = x + 6.0 * s;
 
         // Minus button
         let minus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
@@ -731,17 +756,17 @@ impl Renderer {
         self.draw_text_sharp(
             "-",
             cx + (btn_size - minus_dims.width) / 2.0,
-            row_y + 5.0,
+            row_y + 5.0 * s,
             16.0,
             TEXT_NORMAL,
         );
-        cx += btn_size + 10.0;
+        cx += btn_size + 10.0 * s;
 
         // Quantity
         let qty_text = format!("{}", state.ui_state.shop_sell_quantity);
         let qty_dims = self.measure_text_sharp(&qty_text, 16.0);
-        self.draw_text_sharp(&qty_text, cx, row_y + 5.0, 16.0, TEXT_TITLE);
-        cx += qty_dims.width + 10.0;
+        self.draw_text_sharp(&qty_text, cx, row_y + 5.0 * s, 16.0, TEXT_TITLE);
+        cx += qty_dims.width + 10.0 * s;
 
         // Plus button
         let plus_bounds = Rect::new(cx, btn_y, btn_size, btn_size);
@@ -764,14 +789,14 @@ impl Renderer {
         self.draw_text_sharp(
             "+",
             cx + (btn_size - plus_dims.width) / 2.0,
-            row_y + 5.0,
+            row_y + 5.0 * s,
             16.0,
             TEXT_NORMAL,
         );
-        cx += btn_size + 4.0;
+        cx += btn_size + 4.0 * s;
 
         // Max button
-        let max_w = 30.0;
+        let max_w = 30.0 * s;
         let max_bounds = Rect::new(cx, btn_y, max_w, btn_size);
         layout.add(UiElementId::ShopSellQuantityMax, max_bounds);
         let max_hovered = matches!(hovered, Some(UiElementId::ShopSellQuantityMax));
@@ -786,15 +811,15 @@ impl Renderer {
         self.draw_text_sharp(
             "Max",
             cx + (max_w - max_dims.width) / 2.0,
-            row_y + 2.0,
+            row_y + 2.0 * s,
             16.0,
             TEXT_NORMAL,
         );
-        cx += max_w + 8.0;
+        cx += max_w + 8.0 * s;
 
         // Price with nugget icon
-        let icon_size = 12.0;
-        let icon_margin = 4.0;
+        let icon_size = 12.0 * s;
+        let icon_margin = 4.0 * s;
         let price_text = format!("{}g", total_price);
         let price_color = if can_sell {
             TEXT_GOLD
@@ -805,7 +830,7 @@ impl Renderer {
             draw_texture_ex(
                 texture,
                 cx,
-                row_y - 4.0,
+                row_y - 4.0 * s,
                 WHITE,
                 DrawTextureParams {
                     dest_size: Some(vec2(icon_size, icon_size)),
@@ -816,15 +841,15 @@ impl Renderer {
         self.draw_text_sharp(
             &price_text,
             cx + icon_size + icon_margin,
-            row_y + 5.0,
+            row_y + 5.0 * s,
             16.0,
             price_color,
         );
 
         // Sell button (right-aligned)
-        let button_w = 50.0;
-        let button_h = 24.0;
-        let button_x = x + width - button_w - 4.0;
+        let button_w = 50.0 * s;
+        let button_h = 24.0 * s;
+        let button_x = x + width - button_w - 4.0 * s;
         let button_y = row_y - button_h / 2.0;
         let button_bounds = Rect::new(button_x, button_y, button_w, button_h);
         layout.add(UiElementId::ShopSellConfirmButton, button_bounds);
@@ -861,7 +886,7 @@ impl Renderer {
         self.draw_text_sharp(
             "Sell",
             button_x + (button_w - btn_dims.width) / 2.0,
-            button_y + 17.0,
+            button_y + button_h * 0.71,
             16.0,
             button_text_color,
         );

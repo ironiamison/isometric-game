@@ -20,9 +20,10 @@ impl Renderer {
         layout: &mut UiLayout,
     ) {
         let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
 
-        let panel_width = (500.0_f32).min(sw - 16.0);
-        let panel_height = (450.0_f32).min(sh - 16.0);
+        let panel_width = (500.0 * s).min(sw - 16.0);
+        let panel_height = (450.0 * s).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 
@@ -33,30 +34,34 @@ impl Renderer {
         self.draw_panel_frame(panel_x, panel_y, panel_width, panel_height);
         self.draw_corner_accents(panel_x, panel_y, panel_width, panel_height);
 
+        let header_h = HEADER_HEIGHT * s;
+        let footer_h = FOOTER_HEIGHT * s;
+        let tab_h_scaled = TAB_HEIGHT * s;
+
         // ===== HEADER =====
         let header_x = panel_x + FRAME_THICKNESS;
         let header_y = panel_y + FRAME_THICKNESS;
         let header_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(header_x, header_y, header_w, HEADER_HEIGHT, PANEL_BG_MID);
+        draw_rectangle(header_x, header_y, header_w, header_h, PANEL_BG_MID);
         draw_line(
-            header_x + 10.0,
-            header_y + HEADER_HEIGHT,
-            header_x + header_w - 10.0,
-            header_y + HEADER_HEIGHT,
+            header_x + 10.0 * s,
+            header_y + header_h,
+            header_x + header_w - 10.0 * s,
+            header_y + header_h,
             2.0,
             HEADER_BORDER,
         );
 
         // Decorative dots along header border
-        let dot_spacing = 60.0;
-        let num_dots = ((header_w - 40.0) / dot_spacing) as i32;
-        let start_dot_x = header_x + 20.0;
+        let dot_spacing = 60.0 * s;
+        let num_dots = ((header_w - 40.0 * s) / dot_spacing) as i32;
+        let start_dot_x = header_x + 20.0 * s;
         for i in 0..num_dots {
             let dot_x = start_dot_x + i as f32 * dot_spacing;
             draw_rectangle(
                 dot_x - 1.5,
-                header_y + HEADER_HEIGHT - 1.5,
+                header_y + header_h - 1.5,
                 3.0,
                 3.0,
                 FRAME_ACCENT,
@@ -69,16 +74,16 @@ impl Renderer {
         self.draw_text_sharp(
             title,
             header_x + (header_w - title_dims.width) / 2.0,
-            header_y + 26.0,
+            header_y + header_h * 0.65,
             16.0,
             TEXT_TITLE,
         );
 
         // Close button (X)
         let is_mobile = cfg!(target_os = "android");
-        let close_btn_size = if is_mobile { 32.0 } else { 28.0 };
-        let close_btn_x = header_x + header_w - close_btn_size - 6.0;
-        let close_btn_y = header_y + (HEADER_HEIGHT - close_btn_size) / 2.0;
+        let close_btn_size = if is_mobile { 32.0 * s } else { 28.0 * s };
+        let close_btn_x = header_x + header_w - close_btn_size - 6.0 * s;
+        let close_btn_y = header_y + (header_h - close_btn_size) / 2.0;
         let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
         layout.add(UiElementId::FurnaceCloseButton, close_bounds);
 
@@ -107,8 +112,8 @@ impl Renderer {
         draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
 
         // ===== TABS =====
-        let tab_y = header_y + HEADER_HEIGHT + 2.0;
-        let tab_h = TAB_HEIGHT;
+        let tab_y = header_y + header_h + 2.0;
+        let tab_h = tab_h_scaled;
         let tab_w = header_w / 2.0;
         let active_tab = state.ui_state.furnace_tab;
 
@@ -132,31 +137,31 @@ impl Renderer {
 
             // Border between tabs
             if idx > 0 {
-                draw_line(tx, tab_y + 4.0, tx, tab_y + tab_h - 4.0, 1.0, SLOT_BORDER);
+                draw_line(tx, tab_y + 4.0 * s, tx, tab_y + tab_h - 4.0 * s, 1.0, SLOT_BORDER);
             }
 
             // Active tab bottom accent
             if is_active {
-                draw_line(tx + 4.0, tab_y + tab_h - 1.0, tx + tab_w - 4.0, tab_y + tab_h - 1.0, 2.0, SLOT_SELECTED_BORDER);
+                draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 2.0, SLOT_SELECTED_BORDER);
             } else {
-                draw_line(tx + 4.0, tab_y + tab_h - 1.0, tx + tab_w - 4.0, tab_y + tab_h - 1.0, 1.0, SLOT_BORDER);
+                draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 1.0, SLOT_BORDER);
             }
 
             let label_dims = self.measure_text_sharp(label, TAB_FONT_SIZE);
             self.draw_text_sharp(
                 label,
                 tx + (tab_w - label_dims.width) / 2.0,
-                tab_y + 19.0,
+                tab_y + tab_h * 0.68,
                 TAB_FONT_SIZE,
                 tab_text_color,
             );
         }
 
         // ===== CONTENT AREA =====
-        let content_x = panel_x + FRAME_THICKNESS + 8.0;
-        let content_y = tab_y + tab_h + 4.0;
-        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0;
-        let content_h = panel_y + panel_height - FRAME_THICKNESS - FOOTER_HEIGHT - 4.0 - content_y;
+        let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
+        let content_y = tab_y + tab_h + 4.0 * s;
+        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
+        let content_h = panel_y + panel_height - FRAME_THICKNESS - footer_h - 4.0 * s - content_y;
 
         // If crafting is in progress, show progress overlay
         if state.ui_state.crafting_in_progress {
@@ -167,26 +172,26 @@ impl Renderer {
 
         // ===== FOOTER =====
         let footer_x = panel_x + FRAME_THICKNESS;
-        let footer_y = panel_y + panel_height - FRAME_THICKNESS - FOOTER_HEIGHT;
+        let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
         let footer_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(footer_x, footer_y, footer_w, FOOTER_HEIGHT, FOOTER_BG);
+        draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
         draw_line(
-            footer_x + 10.0,
+            footer_x + 10.0 * s,
             footer_y,
-            footer_x + footer_w - 10.0,
+            footer_x + footer_w - 10.0 * s,
             footer_y,
             1.0,
             HEADER_BORDER,
         );
 
         if state.ui_state.crafting_in_progress {
-            self.draw_text_sharp("[Esc] Cancel", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Esc] Cancel", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
         } else {
-            self.draw_text_sharp("[Tab] Tab", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[W/S] Select", footer_x + 105.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[1/X/A] Qty", footer_x + 220.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[Enter] Smelt", footer_x + 335.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Tab] Tab", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[W/S] Select", footer_x + 105.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[1/X/A] Qty", footer_x + 220.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Enter] Smelt", footer_x + 335.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
         }
     }
 
@@ -212,6 +217,8 @@ impl Renderer {
             .collect();
         furnace_recipes.sort_by_key(|r| r.level_required);
 
+        let s = self.font_scale.get();
+
         if furnace_recipes.is_empty() {
             let msg = if state.ui_state.furnace_tab == 0 {
                 "No smelting recipes available"
@@ -220,8 +227,8 @@ impl Renderer {
             };
             self.draw_text_sharp(
                 msg,
-                content_x + 20.0,
-                content_y + 40.0,
+                content_x + 20.0 * s,
+                content_y + 40.0 * s,
                 16.0,
                 TEXT_DIM,
             );
@@ -232,7 +239,7 @@ impl Renderer {
         let scroll_bounds = Rect::new(content_x, content_y, content_w, content_h);
         layout.add(UiElementId::FurnaceScrollArea, scroll_bounds);
 
-        let row_height = 72.0;
+        let row_height = 72.0 * s;
         let total_content = furnace_recipes.len() as f32 * row_height;
         let max_scroll = (total_content - content_h).max(0.0);
         let scroll_offset = state.ui_state.furnace_scroll_offset.clamp(0.0, max_scroll);
@@ -292,8 +299,8 @@ impl Renderer {
             layout.add(UiElementId::FurnaceRecipeItem(i), row_bounds);
 
             // Icon (left side)
-            let icon_size = 40.0;
-            let icon_x = content_x + 12.0;
+            let icon_size = 40.0 * s;
+            let icon_x = content_x + 12.0 * s;
             let icon_y = y + (row_height - icon_size) / 2.0 - 2.0;
             if let Some(result) = recipe.results.first() {
                 self.draw_item_icon(
@@ -308,13 +315,13 @@ impl Renderer {
             }
 
             // Recipe name
-            let text_x = icon_x + icon_size + 10.0;
+            let text_x = icon_x + icon_size + 10.0 * s;
             let name_color = if is_selected {
                 TEXT_TITLE
             } else {
                 TEXT_NORMAL
             };
-            self.draw_text_sharp(&recipe.display_name, text_x, y + 18.0, 16.0, name_color);
+            self.draw_text_sharp(&recipe.display_name, text_x, y + 18.0 * s, 16.0, name_color);
 
             // Ingredients line
             let mut ing_parts: Vec<String> = Vec::new();
@@ -333,7 +340,7 @@ impl Renderer {
             } else {
                 Color::new(0.784, 0.314, 0.314, 1.0)
             };
-            self.draw_text_sharp(&ing_text, text_x, y + 36.0, 16.0, ing_color);
+            self.draw_text_sharp(&ing_text, text_x, y + 36.0 * s, 16.0, ing_color);
 
             // Level, XP, time info
             let mut info_parts: Vec<String> = Vec::new();
@@ -352,7 +359,7 @@ impl Renderer {
                 }
             }
             let info_text = info_parts.join(" · ");
-            self.draw_text_sharp(&info_text, text_x, y + 52.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp(&info_text, text_x, y + 52.0 * s, 16.0, TEXT_DIM);
 
             // Level check - show warning if too low
             if recipe.level_required > 1 {
@@ -365,12 +372,12 @@ impl Renderer {
 
             // Right side: quantity buttons + smelt button (only for selected recipe)
             if is_selected {
-                let right_x = content_x + content_w - 170.0;
+                let right_x = content_x + content_w - 170.0 * s;
 
                 // Quantity buttons: [1] [X] [All]
-                let qty_btn_w = 32.0;
-                let qty_btn_h = 22.0;
-                let qty_y = y + 6.0;
+                let qty_btn_w = 32.0 * s;
+                let qty_btn_h = 22.0 * s;
+                let qty_y = y + 6.0 * s;
                 let qty_labels = ["1", "X", "All"];
                 let qty_ids = [
                     UiElementId::FurnaceQuantity1,
@@ -380,7 +387,7 @@ impl Renderer {
                 let _qty_values: [u32; 3] = [1, 0, u32::MAX]; // 0 = custom X
 
                 for (j, (label, id)) in qty_labels.iter().zip(qty_ids.iter()).enumerate() {
-                    let bx = right_x + j as f32 * (qty_btn_w + 4.0);
+                    let bx = right_x + j as f32 * (qty_btn_w + 4.0 * s);
                     let bounds = Rect::new(bx, qty_y, qty_btn_w, qty_btn_h);
                     layout.add(id.clone(), bounds);
 
@@ -407,7 +414,7 @@ impl Renderer {
                     self.draw_text_sharp(
                         label,
                         bx + (qty_btn_w - label_dims.width) / 2.0,
-                        qty_y + 16.0,
+                        qty_y + qty_btn_h * 0.73,
                         16.0,
                         text_color,
                     );
@@ -419,14 +426,14 @@ impl Renderer {
                 } else {
                     format!("x{}", state.ui_state.furnace_quantity)
                 };
-                let qty_disp_x = right_x + 3.0 * (qty_btn_w + 4.0) + 4.0;
-                self.draw_text_sharp(&qty_display, qty_disp_x, qty_y + 16.0, 16.0, TEXT_NORMAL);
+                let qty_disp_x = right_x + 3.0 * (qty_btn_w + 4.0 * s) + 4.0 * s;
+                self.draw_text_sharp(&qty_display, qty_disp_x, qty_y + qty_btn_h * 0.73, 16.0, TEXT_NORMAL);
 
                 // SMELT button (green, like shop Buy)
-                let smelt_btn_w = 100.0;
-                let smelt_btn_h = 26.0;
-                let smelt_btn_x = right_x + 4.0;
-                let smelt_btn_y = y + row_height - smelt_btn_h - 8.0;
+                let smelt_btn_w = 100.0 * s;
+                let smelt_btn_h = 26.0 * s;
+                let smelt_btn_x = right_x + 4.0 * s;
+                let smelt_btn_y = y + row_height - smelt_btn_h - 8.0 * s;
 
                 if can_craft {
                     let bounds = Rect::new(smelt_btn_x, smelt_btn_y, smelt_btn_w, smelt_btn_h);
@@ -475,7 +482,7 @@ impl Renderer {
                 self.draw_text_sharp(
                     smelt_text,
                     smelt_btn_x + (smelt_btn_w - smelt_text_w) / 2.0,
-                    smelt_btn_y + 18.0,
+                    smelt_btn_y + smelt_btn_h * 0.69,
                     16.0,
                     smelt_text_color,
                 );
@@ -483,9 +490,9 @@ impl Renderer {
 
             // Separator line
             draw_line(
-                content_x + 10.0,
+                content_x + 10.0 * s,
                 y + row_height - 1.0,
-                content_x + content_w - 10.0,
+                content_x + content_w - 10.0 * s,
                 y + row_height - 1.0,
                 1.0,
                 Color::new(0.15, 0.15, 0.20, 1.0),
@@ -503,23 +510,23 @@ impl Renderer {
 
         // Scrollbar
         if max_scroll > 0.0 {
-            let scrollbar_track_h = content_h - 4.0;
-            let scrollbar_x = content_x + content_w - 8.0;
-            let scrollbar_y = content_y + 2.0;
+            let scrollbar_track_h = content_h - 4.0 * s;
+            let scrollbar_x = content_x + content_w - 8.0 * s;
+            let scrollbar_y = content_y + 2.0 * s;
 
             draw_rectangle(
                 scrollbar_x,
                 scrollbar_y,
-                4.0,
+                4.0 * s,
                 scrollbar_track_h,
                 Color::new(0.1, 0.08, 0.06, 1.0),
             );
 
             let visible_ratio = (content_h / total_content).min(1.0);
-            let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0);
+            let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0 * s);
             let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
-            draw_rectangle(scrollbar_x, thumb_y, 4.0, thumb_h, SLOT_BORDER);
+            draw_rectangle(scrollbar_x, thumb_y, 4.0 * s, thumb_h, SLOT_BORDER);
         }
     }
 
@@ -534,6 +541,7 @@ impl Renderer {
         area_w: f32,
         area_h: f32,
     ) {
+        let s = self.font_scale.get();
         let progress = state.ui_state.crafting_progress;
         let time = get_time() as f32;
 
@@ -548,7 +556,7 @@ impl Renderer {
         self.draw_text_sharp(
             dots,
             area_x + (area_w - dots_dims.width) / 2.0,
-            area_y + 36.0,
+            area_y + 36.0 * s,
             16.0,
             TEXT_TITLE,
         );
@@ -556,13 +564,13 @@ impl Renderer {
         // Show result item icon + name
         if let Some(ref recipe_id) = state.ui_state.crafting_recipe_id {
             if let Some(recipe) = state.recipe_definitions.iter().find(|r| &r.id == recipe_id) {
-                let icon_size = 48.0;
+                let icon_size = 48.0 * s;
                 if let Some(result) = recipe.results.first() {
                     let icon_x = area_x + (area_w - icon_size) / 2.0;
                     self.draw_item_icon(
                         &result.item_id,
                         icon_x,
-                        area_y + 46.0,
+                        area_y + 46.0 * s,
                         icon_size,
                         icon_size,
                         state,
@@ -582,7 +590,7 @@ impl Renderer {
                 self.draw_text_sharp(
                     &recipe.display_name,
                     area_x + (area_w - name_dims.width) / 2.0,
-                    area_y + 46.0 + icon_size + 16.0,
+                    area_y + 46.0 * s + icon_size + 16.0 * s,
                     16.0,
                     pulse_color,
                 );
@@ -600,16 +608,16 @@ impl Renderer {
             self.draw_text_sharp(
                 &batch_text,
                 area_x + (area_w - batch_dims.width) / 2.0,
-                area_y + 130.0,
+                area_y + 130.0 * s,
                 16.0,
                 TEXT_NORMAL,
             );
         }
 
         // Progress bar
-        let bar_width = area_w - 60.0;
-        let bar_height = 20.0;
-        let bar_x = area_x + 30.0;
+        let bar_width = area_w - 60.0 * s;
+        let bar_height = 20.0 * s;
+        let bar_x = area_x + 30.0 * s;
         let bar_y = area_y + area_h / 2.0 - bar_height / 2.0 + 10.0;
 
         // Bar background
@@ -642,16 +650,16 @@ impl Renderer {
         self.draw_text_sharp(
             &pct_text,
             area_x + (area_w - pct_dims.width) / 2.0,
-            bar_y + bar_height + 20.0,
+            bar_y + bar_height + 20.0 * s,
             16.0,
             TEXT_NORMAL,
         );
 
         // Cancel button
-        let cancel_w = 120.0;
-        let cancel_h = 28.0;
+        let cancel_w = 120.0 * s;
+        let cancel_h = 28.0 * s;
         let cancel_x = area_x + (area_w - cancel_w) / 2.0;
-        let cancel_y = area_y + area_h - 42.0;
+        let cancel_y = area_y + area_h - 42.0 * s;
 
         let cancel_bounds = Rect::new(cancel_x, cancel_y, cancel_w, cancel_h);
         layout.add(UiElementId::FurnaceCancelButton, cancel_bounds);
@@ -676,7 +684,7 @@ impl Renderer {
         self.draw_text_sharp(
             cancel_text,
             cancel_x + (cancel_w - cancel_text_w) / 2.0,
-            cancel_y + 19.0,
+            cancel_y + cancel_h * 0.68,
             16.0,
             cancel_text_color,
         );

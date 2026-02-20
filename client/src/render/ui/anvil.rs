@@ -20,11 +20,16 @@ impl Renderer {
         layout: &mut UiLayout,
     ) {
         let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
 
-        let panel_width = (560.0_f32).min(sw - 16.0);
-        let panel_height = (480.0_f32).min(sh - 16.0);
+        let panel_width = (560.0 * s).min(sw - 16.0);
+        let panel_height = (480.0 * s).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
+
+        let header_h = HEADER_HEIGHT * s;
+        let footer_h = FOOTER_HEIGHT * s;
+        let tab_h = TAB_HEIGHT * s;
 
         // Semi-transparent overlay
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
@@ -38,25 +43,25 @@ impl Renderer {
         let header_y = panel_y + FRAME_THICKNESS;
         let header_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(header_x, header_y, header_w, HEADER_HEIGHT, PANEL_BG_MID);
+        draw_rectangle(header_x, header_y, header_w, header_h, PANEL_BG_MID);
         draw_line(
-            header_x + 10.0,
-            header_y + HEADER_HEIGHT,
-            header_x + header_w - 10.0,
-            header_y + HEADER_HEIGHT,
+            header_x + 10.0 * s,
+            header_y + header_h,
+            header_x + header_w - 10.0 * s,
+            header_y + header_h,
             2.0,
             HEADER_BORDER,
         );
 
         // Decorative dots along header border
-        let dot_spacing = 60.0;
-        let num_dots = ((header_w - 40.0) / dot_spacing) as i32;
-        let start_dot_x = header_x + 20.0;
+        let dot_spacing = 60.0 * s;
+        let num_dots = ((header_w - 40.0 * s) / dot_spacing) as i32;
+        let start_dot_x = header_x + 20.0 * s;
         for i in 0..num_dots {
             let dot_x = start_dot_x + i as f32 * dot_spacing;
             draw_rectangle(
                 dot_x - 1.5,
-                header_y + HEADER_HEIGHT - 1.5,
+                header_y + header_h - 1.5,
                 3.0,
                 3.0,
                 FRAME_ACCENT,
@@ -69,16 +74,16 @@ impl Renderer {
         self.draw_text_sharp(
             title,
             header_x + (header_w - title_dims.width) / 2.0,
-            header_y + 26.0,
+            header_y + header_h * 0.65,
             16.0,
             TEXT_TITLE,
         );
 
         // Close button (X)
         let is_mobile = cfg!(target_os = "android");
-        let close_btn_size = if is_mobile { 32.0 } else { 28.0 };
-        let close_btn_x = header_x + header_w - close_btn_size - 6.0;
-        let close_btn_y = header_y + (HEADER_HEIGHT - close_btn_size) / 2.0;
+        let close_btn_size = if is_mobile { 32.0 * s } else { 28.0 * s };
+        let close_btn_x = header_x + header_w - close_btn_size - 6.0 * s;
+        let close_btn_y = header_y + (header_h - close_btn_size) / 2.0;
         let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
         layout.add(UiElementId::AnvilCloseButton, close_bounds);
 
@@ -107,8 +112,7 @@ impl Renderer {
         draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
 
         // ===== TABS =====
-        let tab_y = header_y + HEADER_HEIGHT + 2.0;
-        let tab_h = TAB_HEIGHT;
+        let tab_y = header_y + header_h + 2.0;
         let tab_w = header_w / 2.0;
         let active_tab = state.ui_state.anvil_tab;
 
@@ -131,31 +135,31 @@ impl Renderer {
             draw_rectangle(tx, tab_y, tab_w, tab_h, tab_bg);
 
             if idx > 0 {
-                draw_line(tx, tab_y + 4.0, tx, tab_y + tab_h - 4.0, 1.0, SLOT_BORDER);
+                draw_line(tx, tab_y + 4.0 * s, tx, tab_y + tab_h - 4.0 * s, 1.0, SLOT_BORDER);
             }
 
             if is_active {
-                draw_line(tx + 4.0, tab_y + tab_h - 1.0, tx + tab_w - 4.0, tab_y + tab_h - 1.0, 2.0, SLOT_SELECTED_BORDER);
+                draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 2.0, SLOT_SELECTED_BORDER);
             } else {
-                draw_line(tx + 4.0, tab_y + tab_h - 1.0, tx + tab_w - 4.0, tab_y + tab_h - 1.0, 1.0, SLOT_BORDER);
+                draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 1.0, SLOT_BORDER);
             }
 
             let label_dims = self.measure_text_sharp(label, TAB_FONT_SIZE);
             self.draw_text_sharp(
                 label,
                 tx + (tab_w - label_dims.width) / 2.0,
-                tab_y + 19.0,
+                tab_y + tab_h * 0.68,
                 TAB_FONT_SIZE,
                 tab_text_color,
             );
         }
 
         // ===== CONTENT AREA =====
-        let content_x = panel_x + FRAME_THICKNESS + 8.0;
-        let content_y = tab_y + tab_h + 4.0;
-        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0;
-        let controls_strip_h = 44.0; // space reserved for controls strip above footer
-        let full_content_h = panel_y + panel_height - FRAME_THICKNESS - FOOTER_HEIGHT - 4.0 - content_y;
+        let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
+        let content_y = tab_y + tab_h + 4.0 * s;
+        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
+        let controls_strip_h = 44.0 * s; // space reserved for controls strip above footer
+        let full_content_h = panel_y + panel_height - FRAME_THICKNESS - footer_h - 4.0 * s - content_y;
 
         if state.ui_state.crafting_in_progress {
             self.render_anvil_progress(state, hovered, layout, content_x, content_y, content_w, full_content_h);
@@ -166,26 +170,26 @@ impl Renderer {
 
         // ===== FOOTER =====
         let footer_x = panel_x + FRAME_THICKNESS;
-        let footer_y = panel_y + panel_height - FRAME_THICKNESS - FOOTER_HEIGHT;
+        let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
         let footer_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(footer_x, footer_y, footer_w, FOOTER_HEIGHT, FOOTER_BG);
+        draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
         draw_line(
-            footer_x + 10.0,
+            footer_x + 10.0 * s,
             footer_y,
-            footer_x + footer_w - 10.0,
+            footer_x + footer_w - 10.0 * s,
             footer_y,
             1.0,
             HEADER_BORDER,
         );
 
         if state.ui_state.crafting_in_progress {
-            self.draw_text_sharp("[Esc] Cancel", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Esc] Cancel", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
         } else {
-            self.draw_text_sharp("[Tab] Tab", footer_x + 10.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[Arrows] Select", footer_x + 105.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[1/X/A] Qty", footer_x + 240.0, footer_y + 20.0, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[Enter] Smith", footer_x + 355.0, footer_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Tab] Tab", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Arrows] Select", footer_x + 105.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[1/X/A] Qty", footer_x + 240.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Enter] Smith", footer_x + 355.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
         }
     }
 
@@ -200,6 +204,8 @@ impl Renderer {
         content_w: f32,
         content_h: f32,
     ) {
+        let s = self.font_scale.get();
+
         let section_filter = if state.ui_state.anvil_tab == 0 { "materials" } else { "equipment" };
         let mut anvil_recipes: Vec<_> = state
             .recipe_definitions
@@ -216,15 +222,15 @@ impl Renderer {
             } else {
                 "No equipment recipes available"
             };
-            self.draw_text_sharp(msg, content_x + 20.0, content_y + 40.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp(msg, content_x + 20.0 * s, content_y + 40.0 * s, 16.0, TEXT_DIM);
             return;
         }
 
         // Grid layout: 4 columns
         let columns = 4;
-        let gap = 6.0;
+        let gap = 6.0 * s;
         let cell_w = (content_w - (columns as f32 - 1.0) * gap) / columns as f32;
-        let cell_h = 90.0;
+        let cell_h = 90.0 * s;
 
         let rows = (anvil_recipes.len() + columns - 1) / columns;
         let total_content = rows as f32 * (cell_h + gap);
@@ -304,9 +310,9 @@ impl Renderer {
 
             // Smithing level badge (top-left corner)
             if recipe.level_required > 0 {
-                let badge_icon_size = 14.0;
-                let badge_x = cell_x + 3.0;
-                let badge_y = cell_y + 3.0;
+                let badge_icon_size = 14.0 * s;
+                let badge_x = cell_x + 3.0 * s;
+                let badge_y = cell_y + 3.0 * s;
 
                 // Draw small smithing icon from spritesheet
                 let drew_icon = if let Some(ref texture) = self.ui_icons {
@@ -330,18 +336,18 @@ impl Renderer {
 
                 if !drew_icon {
                     // Fallback: colored "Sm" letter
-                    self.draw_text_sharp("Sm", badge_x, badge_y + 11.0, 16.0, Color::new(0.7, 0.5, 0.2, 1.0));
+                    self.draw_text_sharp("Sm", badge_x, badge_y + 11.0 * s, 16.0, Color::new(0.7, 0.5, 0.2, 1.0));
                 }
 
                 // Level number next to icon
                 let lvl_text = format!("{}", recipe.level_required);
-                self.draw_text_sharp(&lvl_text, badge_x + badge_icon_size + 1.0, badge_y + 12.0, 16.0, TEXT_DIM);
+                self.draw_text_sharp(&lvl_text, badge_x + badge_icon_size + 1.0 * s, badge_y + 12.0 * s, 16.0, TEXT_DIM);
             }
 
             // Icon (centered horizontally, near top)
-            let icon_size = 40.0;
+            let icon_size = 40.0 * s;
             let icon_x = cell_x + (cell_w - icon_size) / 2.0;
-            let icon_y = cell_y + 6.0;
+            let icon_y = cell_y + 6.0 * s;
             if let Some(result) = recipe.results.first() {
                 self.draw_item_icon(
                     &result.item_id,
@@ -373,7 +379,7 @@ impl Renderer {
             self.draw_text_sharp(
                 &display_name,
                 cell_x + (cell_w - display_dims.width) / 2.0,
-                cell_y + icon_size + 18.0,
+                cell_y + icon_size + 18.0 * s,
                 16.0,
                 name_color,
             );
@@ -418,7 +424,7 @@ impl Renderer {
             self.draw_text_sharp(
                 &ing_display,
                 cell_x + (cell_w - ing_dims.width) / 2.0,
-                cell_y + icon_size + 34.0,
+                cell_y + icon_size + 34.0 * s,
                 16.0,
                 ing_color,
             );
@@ -433,22 +439,22 @@ impl Renderer {
 
         // Scrollbar
         if max_scroll > 0.0 {
-            let scrollbar_track_h = content_h - 4.0;
-            let scrollbar_x = content_x + content_w - 8.0;
-            let scrollbar_y = content_y + 2.0;
+            let scrollbar_track_h = content_h - 4.0 * s;
+            let scrollbar_x = content_x + content_w - 8.0 * s;
+            let scrollbar_y = content_y + 2.0 * s;
 
-            draw_rectangle(scrollbar_x, scrollbar_y, 4.0, scrollbar_track_h, Color::new(0.1, 0.08, 0.06, 1.0));
+            draw_rectangle(scrollbar_x, scrollbar_y, 4.0 * s, scrollbar_track_h, Color::new(0.1, 0.08, 0.06, 1.0));
 
             let visible_ratio = (content_h / total_content).min(1.0);
-            let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0);
+            let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0 * s);
             let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
-            draw_rectangle(scrollbar_x, thumb_y, 4.0, thumb_h, SLOT_BORDER);
+            draw_rectangle(scrollbar_x, thumb_y, 4.0 * s, thumb_h, SLOT_BORDER);
         }
 
         // ===== CONTROLS (below grid) =====
         // Only show when not crafting
-        self.render_anvil_controls(state, hovered, layout, &anvil_recipes, content_x, content_y + content_h + 2.0, content_w);
+        self.render_anvil_controls(state, hovered, layout, &anvil_recipes, content_x, content_y + content_h + 2.0 * s, content_w);
     }
 
     /// Render quantity buttons and SMITH button below the grid
@@ -462,20 +468,22 @@ impl Renderer {
         area_y: f32,
         _area_w: f32,
     ) {
+        let s = self.font_scale.get();
+
         // Controls are placed in the footer area, but we need space
         // Actually let's place them inside the content area at the bottom
         // The footer already has keybind hints. Put controls just above footer.
 
-        let controls_h = 34.0;
-        let controls_y = area_y - controls_h - 2.0;
+        let controls_h = 34.0 * s;
+        let controls_y = area_y - controls_h - 2.0 * s;
 
         // Background strip behind controls
-        draw_rectangle(area_x, controls_y - 4.0, _area_w, controls_h + 8.0, PANEL_BG_DARK);
-        draw_line(area_x + 8.0, controls_y - 4.0, area_x + _area_w - 8.0, controls_y - 4.0, 1.0, SLOT_BORDER);
+        draw_rectangle(area_x, controls_y - 4.0 * s, _area_w, controls_h + 8.0 * s, PANEL_BG_DARK);
+        draw_line(area_x + 8.0 * s, controls_y - 4.0 * s, area_x + _area_w - 8.0 * s, controls_y - 4.0 * s, 1.0, SLOT_BORDER);
 
         // Quantity buttons: [1] [X] [All]
-        let qty_btn_w = 32.0;
-        let qty_btn_h = 24.0;
+        let qty_btn_w = 32.0 * s;
+        let qty_btn_h = 24.0 * s;
         let qty_labels = ["1", "X", "All"];
         let qty_ids = [
             UiElementId::AnvilQuantity1,
@@ -483,10 +491,10 @@ impl Renderer {
             UiElementId::AnvilQuantityAll,
         ];
 
-        let controls_start_x = area_x + 8.0;
+        let controls_start_x = area_x + 8.0 * s;
 
         for (j, (label, id)) in qty_labels.iter().zip(qty_ids.iter()).enumerate() {
-            let bx = controls_start_x + j as f32 * (qty_btn_w + 4.0);
+            let bx = controls_start_x + j as f32 * (qty_btn_w + 4.0 * s);
             let bounds = Rect::new(bx, controls_y, qty_btn_w, qty_btn_h);
             layout.add(id.clone(), bounds);
 
@@ -513,7 +521,7 @@ impl Renderer {
             self.draw_text_sharp(
                 label,
                 bx + (qty_btn_w - label_dims.width) / 2.0,
-                controls_y + 17.0,
+                controls_y + qty_btn_h * 0.71,
                 16.0,
                 text_color,
             );
@@ -525,8 +533,8 @@ impl Renderer {
         } else {
             format!("x{}", state.ui_state.anvil_quantity)
         };
-        let qty_disp_x = controls_start_x + 3.0 * (qty_btn_w + 4.0) + 4.0;
-        self.draw_text_sharp(&qty_display, qty_disp_x, controls_y + 17.0, 16.0, TEXT_NORMAL);
+        let qty_disp_x = controls_start_x + 3.0 * (qty_btn_w + 4.0 * s) + 4.0 * s;
+        self.draw_text_sharp(&qty_display, qty_disp_x, controls_y + qty_btn_h * 0.71, 16.0, TEXT_NORMAL);
 
         // Check if selected recipe can be crafted
         let mut can_craft = false;
@@ -549,10 +557,10 @@ impl Renderer {
         }
 
         // SMITH button
-        let smith_btn_w = 110.0;
-        let smith_btn_h = 26.0;
-        let smith_btn_x = qty_disp_x + 50.0;
-        let smith_btn_y = controls_y - 1.0;
+        let smith_btn_w = 110.0 * s;
+        let smith_btn_h = 26.0 * s;
+        let smith_btn_x = qty_disp_x + 50.0 * s;
+        let smith_btn_y = controls_y - 1.0 * s;
 
         if can_craft {
             let bounds = Rect::new(smith_btn_x, smith_btn_y, smith_btn_w, smith_btn_h);
@@ -600,7 +608,7 @@ impl Renderer {
         self.draw_text_sharp(
             smith_text,
             smith_btn_x + (smith_btn_w - smith_text_w) / 2.0,
-            smith_btn_y + 18.0,
+            smith_btn_y + smith_btn_h * 0.69,
             16.0,
             smith_text_color,
         );
@@ -617,6 +625,8 @@ impl Renderer {
         area_w: f32,
         area_h: f32,
     ) {
+        let s = self.font_scale.get();
+
         let progress = state.ui_state.crafting_progress;
         let time = get_time() as f32;
 
@@ -631,7 +641,7 @@ impl Renderer {
         self.draw_text_sharp(
             dots,
             area_x + (area_w - dots_dims.width) / 2.0,
-            area_y + 36.0,
+            area_y + 36.0 * s,
             16.0,
             TEXT_TITLE,
         );
@@ -639,13 +649,13 @@ impl Renderer {
         // Show result item icon + name
         if let Some(ref recipe_id) = state.ui_state.crafting_recipe_id {
             if let Some(recipe) = state.recipe_definitions.iter().find(|r| &r.id == recipe_id) {
-                let icon_size = 48.0;
+                let icon_size = 48.0 * s;
                 if let Some(result) = recipe.results.first() {
                     let icon_x = area_x + (area_w - icon_size) / 2.0;
                     self.draw_item_icon(
                         &result.item_id,
                         icon_x,
-                        area_y + 46.0,
+                        area_y + 46.0 * s,
                         icon_size,
                         icon_size,
                         state,
@@ -664,7 +674,7 @@ impl Renderer {
                 self.draw_text_sharp(
                     &recipe.display_name,
                     area_x + (area_w - name_dims.width) / 2.0,
-                    area_y + 46.0 + icon_size + 16.0,
+                    area_y + 46.0 * s + icon_size + 16.0 * s,
                     16.0,
                     pulse_color,
                 );
@@ -682,17 +692,17 @@ impl Renderer {
             self.draw_text_sharp(
                 &batch_text,
                 area_x + (area_w - batch_dims.width) / 2.0,
-                area_y + 130.0,
+                area_y + 130.0 * s,
                 16.0,
                 TEXT_NORMAL,
             );
         }
 
         // Progress bar (steel-blue theme)
-        let bar_width = area_w - 60.0;
-        let bar_height = 20.0;
-        let bar_x = area_x + 30.0;
-        let bar_y = area_y + area_h / 2.0 - bar_height / 2.0 + 10.0;
+        let bar_width = area_w - 60.0 * s;
+        let bar_height = 20.0 * s;
+        let bar_x = area_x + 30.0 * s;
+        let bar_y = area_y + area_h / 2.0 - bar_height / 2.0 + 10.0 * s;
 
         draw_rectangle(bar_x, bar_y, bar_width, bar_height, SLOT_BORDER);
         draw_rectangle(bar_x + 1.0, bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, SLOT_BG_EMPTY);
@@ -715,16 +725,16 @@ impl Renderer {
         self.draw_text_sharp(
             &pct_text,
             area_x + (area_w - pct_dims.width) / 2.0,
-            bar_y + bar_height + 20.0,
+            bar_y + bar_height + 20.0 * s,
             16.0,
             TEXT_NORMAL,
         );
 
         // Cancel button
-        let cancel_w = 120.0;
-        let cancel_h = 28.0;
+        let cancel_w = 120.0 * s;
+        let cancel_h = 28.0 * s;
         let cancel_x = area_x + (area_w - cancel_w) / 2.0;
-        let cancel_y = area_y + area_h - 42.0;
+        let cancel_y = area_y + area_h - 42.0 * s;
 
         let cancel_bounds = Rect::new(cancel_x, cancel_y, cancel_w, cancel_h);
         layout.add(UiElementId::AnvilCancelButton, cancel_bounds);
@@ -749,7 +759,7 @@ impl Renderer {
         self.draw_text_sharp(
             cancel_text,
             cancel_x + (cancel_w - cancel_text_w) / 2.0,
-            cancel_y + 19.0,
+            cancel_y + cancel_h * 0.68,
             16.0,
             cancel_text_color,
         );
