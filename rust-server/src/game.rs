@@ -8265,7 +8265,7 @@ impl GameRoom {
         // Grab chunks lock once for all walkability checks (avoids per-move lock acquisition)
         let chunks_guard = self.world.chunks_read().await;
         let mut valid_moves: Vec<(String, i32, i32, i32, i32, u32)> = Vec::new();
-        let mut auto_sit_requests: Vec<(String, i32, i32)> = Vec::new();
+        let mut auto_sit_requests: Vec<(String, i32, i32, u32)> = Vec::new();
         for (id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq) in pending_moves {
             let player_inst = player_instance_map.get(&id);
             let is_overworld = player_inst.is_none();
@@ -8318,7 +8318,7 @@ impl GameRoom {
                     };
                     if is_approaching_from_front && occupied_by.is_none() {
                         // Correct direction and unoccupied - auto-sit
-                        auto_sit_requests.push((id, target_x, target_y));
+                        auto_sit_requests.push((id, target_x, target_y, sampled_seq));
                     }
                     // Always block the move (chair is solid from all directions)
                     tick_telemetry.rejected_chair_blocked += 1;
@@ -8341,9 +8341,24 @@ impl GameRoom {
         }
         drop(chunks_guard); // Release before NPC AI section acquires its own
 
+        // If a newer move intent arrived after pending snapshot, drop the stale
+        // sampled move so we don't apply an outdated direction step.
+        let current_pending_seqs: HashMap<String, u32> = {
+            let players = self.players.read().await;
+            players
+                .values()
+                .filter_map(|p| p.pending_move_seq.map(|seq| (p.id.clone(), seq)))
+                .collect()
+        };
+        valid_moves.retain(|(id, _, _, _, _, sampled_seq)| {
+            current_pending_seqs.get(id).copied() == Some(*sampled_seq)
+        });
+
         // Process auto-sit requests (players who walked into unoccupied chairs)
-        for (id, tile_x, tile_y) in auto_sit_requests {
-            self.handle_sit_chair(&id, tile_x, tile_y).await;
+        for (id, tile_x, tile_y, sampled_seq) in auto_sit_requests {
+            if current_pending_seqs.get(&id).copied() == Some(sampled_seq) {
+                self.handle_sit_chair(&id, tile_x, tile_y).await;
+            }
         }
 
         // Track which players moved this tick
