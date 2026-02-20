@@ -32,7 +32,7 @@ use macroquad::miniquad::ShaderSource;
 use macroquad::miniquad::UniformDesc;
 use macroquad::models::{draw_mesh, Mesh, Vertex};
 use macroquad::prelude::*;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 /// Format a u32 into a stack-allocated buffer, returning a &str.
@@ -370,6 +370,10 @@ pub struct Renderer {
     text_measure_cache: RefCell<HashMap<i32, HashMap<String, TextDimensions>>>,
     /// Cached wrapped lines bucketed by (max width, font size).
     text_wrap_cache: RefCell<HashMap<(i32, i32), HashMap<String, Vec<String>>>>,
+    /// Font scale multiplier for UI text. Set to ui_scale before UI rendering,
+    /// reset to 1.0 for world rendering. Snaps to nearest multiple of 8 for
+    /// pixel-perfect monogram font rendering.
+    pub(crate) font_scale: Cell<f32>,
 }
 
 impl Renderer {
@@ -1482,6 +1486,7 @@ impl Renderer {
             minimap_tile_color_cache: RefCell::new(HashMap::new()),
             text_measure_cache: RefCell::new(HashMap::new()),
             text_wrap_cache: RefCell::new(HashMap::new()),
+            font_scale: Cell::new(1.0),
         }
     }
 
@@ -1524,11 +1529,22 @@ impl Renderer {
     }
 
     /// Draw text with pixel font for sharp rendering
-    /// Uses multi-size bitmap font for crisp text at any size
+    /// Uses multi-size bitmap font for crisp text at any size.
+    /// Font size is scaled by `font_scale` (set to ui_scale during UI rendering).
     pub fn draw_text_sharp(&self, text: &str, x: f32, y: f32, font_size: f32, color: Color) {
-        // Round to integer pixels for crisp rendering
+        let scaled_size = self.scaled_font_size(font_size);
         self.font
-            .draw_text(text, x.floor(), y.floor(), font_size, color);
+            .draw_text(text, x.floor(), y.floor(), scaled_size, color);
+    }
+
+    /// Apply font_scale and snap to nearest multiple of 8 for pixel-perfect rendering
+    fn scaled_font_size(&self, font_size: f32) -> f32 {
+        let scale = self.font_scale.get();
+        if (scale - 1.0).abs() < 0.01 {
+            font_size
+        } else {
+            ((font_size * scale) / 8.0).round() * 8.0
+        }
     }
 
     /// Get reference to player sprites for sharing with UI screens
@@ -1551,9 +1567,10 @@ impl Renderer {
         &self.font
     }
 
-    /// Measure text with pixel font
+    /// Measure text with pixel font (scaled by font_scale)
     pub(crate) fn measure_text_sharp(&self, text: &str, font_size: f32) -> TextDimensions {
-        let font_key = (font_size * 100.0).round() as i32;
+        let scaled_size = self.scaled_font_size(font_size);
+        let font_key = (scaled_size * 100.0).round() as i32;
 
         if let Some(bucket) = self.text_measure_cache.borrow().get(&font_key) {
             if let Some(cached) = bucket.get(text) {
@@ -1561,7 +1578,7 @@ impl Renderer {
             }
         }
 
-        let measured = self.font.measure_text(text, font_size);
+        let measured = self.font.measure_text(text, scaled_size);
         let mut cache = self.text_measure_cache.borrow_mut();
         let bucket = cache.entry(font_key).or_default();
         if bucket.len() < TEXT_MEASURE_CACHE_BUCKET_LIMIT {
@@ -2831,6 +2848,9 @@ impl Renderer {
         let render_start = get_time();
         let mut timings = RenderTimings::default();
 
+        // Reset font scale to 1.0 for world rendering (player names, damage, etc.)
+        self.font_scale.set(1.0);
+
         // 1. Render ground layer tiles
         let t0 = get_time();
         self.render_tilemap_layer(state, LayerType::Ground);
@@ -2940,6 +2960,7 @@ impl Renderer {
 
             // 8. Render UI (non-interactive elements)
             let t4 = get_time();
+            self.font_scale.set(state.ui_state.ui_scale);
             self.render_ui(state);
 
             // 9. Render interactive UI elements and return layout for hit detection
@@ -3438,6 +3459,7 @@ impl Renderer {
 
         // 8. Render UI (non-interactive elements)
         let t4 = get_time();
+        self.font_scale.set(state.ui_state.ui_scale);
         self.render_ui(state);
 
         // 9. Render interactive UI elements and return layout for hit detection
@@ -7887,22 +7909,21 @@ impl Renderer {
         }
 
         // Chat messages (bottom-left) with text wrapping - only if visible
-        // Scale with zoom for readability
+        // Scale with UI scale for readability
         if state.ui_state.chat_log_visible {
-            let zoom = state.camera.zoom;
             let scale = state.ui_state.ui_scale;
             let chat_x = 10.0;
             let (_, chat_sh) = virtual_screen_size();
             // Layout: BG bottom aligned with hotkey bar bottom, text inside with padding
-            let bg_padding = 6.0 * zoom;
-            let line_height = 18.0 * zoom;
-            let max_chat_width = if zoom >= 2.0 {
-                400.0 * zoom - 260.0
+            let bg_padding = 6.0 * scale;
+            let line_height = 18.0 * scale;
+            let max_chat_width = if scale >= 2.0 {
+                400.0 * scale - 260.0
             } else {
-                360.0 * zoom
+                360.0 * scale
             };
-            let font_size = 16.0 * zoom;
-            let max_visible_lines: usize = if zoom >= 2.0 { 6 } else { 7 };
+            let font_size: f32 = 16.0;
+            let max_visible_lines: usize = if scale >= 2.0 { 6 } else { 7 };
             let chat_area_h = max_visible_lines as f32 * line_height;
 
             // BG rectangle positioned from the hotkey bar bottom edge
@@ -7911,7 +7932,7 @@ impl Renderer {
             let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
             // When input bar is open, shrink visible area so messages don't render behind it
             let effective_bottom = if chat_input_open {
-                bg_bottom - 28.0 * zoom
+                bg_bottom - 28.0 * scale
             } else {
                 bg_bottom
             };
@@ -7925,7 +7946,7 @@ impl Renderer {
             let chat_top_y = clip_y + bg_padding;
 
             // Tab bar above chat log
-            let tab_h = 18.0 * zoom;
+            let tab_h = 18.0 * scale;
             let tab_names = ["Public", "Global", "System"];
             let tab_channels = [ChatChannel::Local, ChatChannel::Global, ChatChannel::System];
             let num_tabs = 3.0f32;
@@ -7989,7 +8010,7 @@ impl Renderer {
                     );
                 }
 
-                let label_size = 16.0 * zoom;
+                let label_size: f32 = 16.0;
                 let tw = self.measure_text_sharp(tab_names[i], label_size).width;
                 self.draw_text_sharp(
                     tab_names[i],
@@ -8116,8 +8137,8 @@ impl Renderer {
 
             // Draw scroll indicator (thin scrollbar on the right edge)
             if max_scroll_px > 0.0 {
-                let scrollbar_w = 3.0 * zoom;
-                let scrollbar_x = clip_x + clip_w - scrollbar_w - 2.0 * zoom;
+                let scrollbar_w = 3.0 * scale;
+                let scrollbar_x = clip_x + clip_w - scrollbar_w - 2.0 * scale;
                 let track_y = clip_y;
                 let track_h = clip_h;
 
@@ -8132,7 +8153,7 @@ impl Renderer {
 
                 // Thumb - size proportional to visible area, position based on scroll
                 let visible_ratio = (chat_area_h / total_content_height).min(1.0);
-                let thumb_h = (track_h * visible_ratio).max(12.0 * zoom);
+                let thumb_h = (track_h * visible_ratio).max(12.0 * scale);
                 // scroll_px=0 means at bottom (most recent), max_scroll_px means scrolled to top
                 let scroll_ratio = scroll_px / max_scroll_px;
                 let thumb_y = track_y + (track_h - thumb_h) * (1.0 - scroll_ratio);
@@ -8151,6 +8172,7 @@ impl Renderer {
         if let Some(player) = state.get_local_player() {
             let padding = 6.0;
             let font_size = 16.0;
+            let s = self.font_scale.get();
 
             // Measure text first to calculate widths
             let name = &player.name;
@@ -8160,9 +8182,9 @@ impl Renderer {
             let total_text_w = name_w + level_w;
 
             // Both bars use same width (at least 120, or text width + padding)
-            let bar_width = (total_text_w + padding * 2.0).max(120.0);
-            let tag_height = 22.0;
-            let bar_height = 18.0;
+            let bar_width = (total_text_w + padding * 2.0).max(120.0 * s);
+            let tag_height = 22.0 * s;
+            let bar_height = 18.0 * s;
 
             if self.minimap_preview_enabled(state) {
                 self.render_minimap_preview(state);
@@ -8180,7 +8202,7 @@ impl Renderer {
 
             // Center text in the bar
             let text_x = name_tag_x + (bar_width - total_text_w) / 2.0;
-            let text_y = (name_tag_y + 16.0).floor();
+            let text_y = (name_tag_y + tag_height * 0.73).floor();
             self.draw_text_sharp(name, text_x, text_y, font_size, TEXT_TITLE);
             self.draw_text_sharp(&level_text, text_x + name_w, text_y, font_size, TEXT_DIM);
 
@@ -8231,14 +8253,14 @@ impl Renderer {
             self.draw_text_sharp(
                 &hp_text,
                 (hp_bar_x + (bar_width - hp_text_w) / 2.0).floor(),
-                (hp_bar_y + 14.0).floor(),
+                (hp_bar_y + bar_height * 0.78).floor(),
                 font_size,
                 TEXT_NORMAL,
             );
 
             // ===== MP BAR (below HP bar) =====
             let mp_bar_x = bar_x;
-            let mp_bar_y = hp_bar_y + bar_height + 4.0;
+            let mp_bar_y = hp_bar_y + bar_height + 4.0 * s;
             let (mp, max_mp) = state
                 .get_local_player()
                 .map(|p| (p.mp, p.max_mp))
@@ -8285,14 +8307,14 @@ impl Renderer {
             self.draw_text_sharp(
                 &mp_text,
                 (mp_bar_x + (bar_width - mp_text_w) / 2.0).floor(),
-                (mp_bar_y + 14.0).floor(),
+                (mp_bar_y + bar_height * 0.78).floor(),
                 font_size,
                 TEXT_NORMAL,
             );
 
             // ===== PRAYER POINTS BAR (below MP bar) =====
             let prayer_bar_x = bar_x;
-            let prayer_bar_y = mp_bar_y + bar_height + 4.0;
+            let prayer_bar_y = mp_bar_y + bar_height + 4.0 * s;
             let prayer_ratio = if state.max_prayer_points > 0 {
                 state.prayer_points as f32 / state.max_prayer_points as f32
             } else {
@@ -8356,7 +8378,7 @@ impl Renderer {
             self.draw_text_sharp(
                 &prayer_text,
                 (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(),
-                (prayer_bar_y + 14.0).floor(),
+                (prayer_bar_y + bar_height * 0.78).floor(),
                 font_size,
                 prayer_text_color,
             );
@@ -8364,8 +8386,8 @@ impl Renderer {
             // ===== Gathering/Woodcutting status indicator (below prayer bar) =====
             let is_skilling = state.is_gathering || state.is_woodcutting;
             if is_skilling {
-                let gather_y = prayer_bar_y + bar_height + 4.0;
-                let gather_h = 22.0;
+                let gather_y = prayer_bar_y + bar_height + 4.0 * s;
+                let gather_h = 22.0 * s;
                 // Semi-transparent background (blue for fishing, brown for woodcutting)
                 let (bg_color, border_color, text_color, action_name) = if state.is_woodcutting {
                     (
@@ -8392,7 +8414,7 @@ impl Renderer {
                 self.draw_text_sharp(
                     &label,
                     (bar_x + (bar_width - label_w) / 2.0).floor(),
-                    (gather_y + 15.0).floor(),
+                    (gather_y + gather_h * 0.68).floor(),
                     16.0,
                     text_color,
                 );
@@ -8400,16 +8422,16 @@ impl Renderer {
 
             // ===== Dash cooldown indicator (below gathering status or prayer bar) =====
             let dash_bar_y = if is_skilling {
-                prayer_bar_y + bar_height + 4.0 + 22.0 + 4.0 // Below gathering bar
+                prayer_bar_y + bar_height + 4.0 * s + 22.0 * s + 4.0 * s // Below gathering bar
             } else {
-                prayer_bar_y + bar_height + 4.0 // Below prayer bar
+                prayer_bar_y + bar_height + 4.0 * s // Below prayer bar
             };
             let current_time = macroquad::time::get_time();
             if state.dash_cooldown_end > current_time {
                 let remaining = (state.dash_cooldown_end - current_time) as f32;
                 let total_cooldown = 3.0f32;
                 let progress = 1.0 - (remaining / total_cooldown).clamp(0.0, 1.0);
-                let dash_h = 22.0;
+                let dash_h = 22.0 * s;
 
                 // Background
                 let bg_color = Color::new(0.15, 0.08, 0.15, 0.7);
@@ -8437,7 +8459,7 @@ impl Renderer {
                 self.draw_text_sharp(
                     &remaining_text,
                     (bar_x + (bar_width - text_w) / 2.0).floor(),
-                    (dash_bar_y + 15.0).floor(),
+                    (dash_bar_y + dash_h * 0.68).floor(),
                     16.0,
                     text_color,
                 );
@@ -8466,20 +8488,19 @@ impl Renderer {
             self.render_area_banner(&state.area_banner.text, state.area_banner.opacity());
         }
 
-        // Chat input box (when open) - scale with zoom for readability
+        // Chat input box (when open) - scale with UI scale
         // Hidden on System tab (read-only channel)
         if state.ui_state.chat_open
             && !matches!(state.ui_state.chat_active_tab, ChatChannel::System)
         {
-            let zoom = state.camera.zoom;
             let (_, input_sh) = virtual_screen_size();
             let input_x = 10.0;
             let scale = state.ui_state.ui_scale;
-            let input_y = input_sh - EXP_BAR_GAP * scale - 24.0 * zoom - 4.0 * zoom;
-            let input_width = 360.0 * zoom;
-            let input_height = 24.0 * zoom;
-            let text_padding = 5.0 * zoom;
-            let font_size = 16.0 * zoom;
+            let input_y = input_sh - EXP_BAR_GAP * scale - 24.0 * scale - 4.0 * scale;
+            let input_width = 360.0 * scale;
+            let input_height = 24.0 * scale;
+            let text_padding = 5.0 * scale;
+            let font_size: f32 = 16.0;
 
             // Channel indicator
             let (indicator, indicator_color) = match state.ui_state.chat_active_tab {
@@ -8488,7 +8509,7 @@ impl Renderer {
                 ChatChannel::System => ("[System] ", YELLOW),
             };
             let indicator_w = self.measure_text_sharp(indicator, font_size).width;
-            let text_area_width = input_width - text_padding * 2.0 - 12.0 * zoom - indicator_w; // Extra margin for scroll indicators + indicator
+            let text_area_width = input_width - text_padding * 2.0 - 12.0 * scale - indicator_w; // Extra margin for scroll indicators + indicator
 
             // Background
             draw_rectangle(
@@ -8502,7 +8523,7 @@ impl Renderer {
             let input_text = &state.ui_state.chat_input;
             let cursor_pos = state.ui_state.chat_cursor;
             // Draw channel indicator and visible text
-            let text_y_offset = 17.0 * zoom;
+            let text_y_offset = 17.0 * scale;
             let text_start_x = input_x + text_padding + indicator_w;
             self.draw_text_sharp(
                 indicator,
@@ -8518,9 +8539,9 @@ impl Renderer {
                 if cursor_blink {
                     draw_line(
                         text_start_x + 1.0,
-                        input_y + 4.0 * zoom,
+                        input_y + 4.0 * scale,
                         text_start_x + 1.0,
-                        input_y + input_height - 4.0 * zoom,
+                        input_y + input_height - 4.0 * scale,
                         1.0,
                         WHITE,
                     );
@@ -8594,7 +8615,7 @@ impl Renderer {
                 if scroll_offset > 0 {
                     self.draw_text_sharp(
                         "<",
-                        text_start_x - 8.0 * zoom,
+                        text_start_x - 8.0 * scale,
                         input_y + text_y_offset,
                         font_size,
                         GRAY,
@@ -8603,7 +8624,7 @@ impl Renderer {
                 if visible_end < char_count {
                     self.draw_text_sharp(
                         ">",
-                        input_x + input_width - 10.0 * zoom,
+                        input_x + input_width - 10.0 * scale,
                         input_y + text_y_offset,
                         font_size,
                         GRAY,
@@ -8619,9 +8640,9 @@ impl Renderer {
                     let cursor_x = self.measure_text_sharp(&text_before_cursor, font_size).width;
                     draw_line(
                         text_start_x + cursor_x + 1.0,
-                        input_y + 4.0 * zoom,
+                        input_y + 4.0 * scale,
                         text_start_x + cursor_x + 1.0,
-                        input_y + input_height - 4.0 * zoom,
+                        input_y + input_height - 4.0 * scale,
                         1.0,
                         WHITE,
                     );
@@ -8706,24 +8727,23 @@ impl Renderer {
         // so that clicks/hovers pass through to the game world beneath it.
         // However, the tab bar above the chat log IS registered for click handling.
         if state.ui_state.chat_log_visible {
-            let zoom = state.camera.zoom;
             let scale = state.ui_state.ui_scale;
             let chat_x = 10.0;
             let (_, chat_sh) = virtual_screen_size();
-            let bg_padding = 6.0 * zoom;
-            let line_height = 18.0 * zoom;
-            let max_chat_width = if zoom >= 2.0 {
-                400.0 * zoom - 260.0
+            let bg_padding = 6.0 * scale;
+            let line_height = 18.0 * scale;
+            let max_chat_width = if scale >= 2.0 {
+                400.0 * scale - 260.0
             } else {
-                360.0 * zoom
+                360.0 * scale
             };
-            let max_visible_lines: usize = if zoom >= 2.0 { 6 } else { 7 };
+            let max_visible_lines: usize = if scale >= 2.0 { 6 } else { 7 };
             let chat_area_h = max_visible_lines as f32 * line_height;
             let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
             let clip_h = chat_area_h + bg_padding * 2.0;
             let clip_y = bg_bottom - clip_h;
 
-            let tab_h = 18.0 * zoom;
+            let tab_h = 18.0 * scale;
             let num_tabs = 3.0f32;
             let tab_w = (max_chat_width / num_tabs).floor();
             let tab_bar_y = clip_y - tab_h;

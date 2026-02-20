@@ -7,8 +7,8 @@ use macroquad::file::load_file;
 use macroquad::prelude::*;
 use std::collections::HashMap;
 
-/// Available font sizes - these are pre-loaded at native resolution
-pub const FONT_SIZES: &[u16] = &[8, 10, 12, 16, 20, 24, 32];
+/// Available font sizes - multiples of 8 for pixel-perfect monogram font rendering
+pub const FONT_SIZES: &[u16] = &[8, 16, 24, 32, 40, 48];
 
 /// Multi-size bitmap font that provides pixel-perfect rendering
 #[derive(Clone)]

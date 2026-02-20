@@ -20,6 +20,7 @@ impl Renderer {
         }
 
         let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
 
         // Semi-transparent overlay (blocks game interaction)
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.6));
@@ -85,7 +86,7 @@ impl Renderer {
         // === TAB BAR ===
         let tab_y = panel_y + FRAME_THICKNESS;
         let tab_w = (panel_w - FRAME_THICKNESS * 2.0 - close_size - 8.0) / 3.0;
-        let tab_h = TAB_HEIGHT;
+        let tab_h = TAB_HEIGHT * s;
         let tab_x_start = panel_x + FRAME_THICKNESS;
 
         let tabs = [
@@ -145,7 +146,7 @@ impl Renderer {
             self.draw_text_sharp(
                 label,
                 (tx + (tab_w - text_w) / 2.0).floor(),
-                (tab_y + tab_h / 2.0 + 5.0).floor(),
+                (tab_y + tab_h * 0.68).floor(),
                 TAB_FONT_SIZE,
                 if is_active {
                     TEXT_TITLE
@@ -163,13 +164,13 @@ impl Renderer {
         }
 
         // === MESSAGE LIST ===
-        let messages_y = tab_y + tab_h + 4.0;
-        let input_bar_h = 48.0;
+        let messages_y = tab_y + tab_h + 4.0 * s;
+        let input_bar_h = 48.0 * s;
         let is_system_tab = matches!(state.ui_state.chat_active_tab, ChatChannel::System);
         let messages_h = if is_system_tab {
             panel_y + panel_h - FRAME_THICKNESS - messages_y
         } else {
-            panel_y + panel_h - FRAME_THICKNESS - input_bar_h - 4.0 - messages_y
+            panel_y + panel_h - FRAME_THICKNESS - input_bar_h - 4.0 * s - messages_y
         };
         let messages_x = panel_x + FRAME_THICKNESS + 8.0;
         let messages_w = panel_w - FRAME_THICKNESS * 2.0 - 16.0;
@@ -196,7 +197,7 @@ impl Renderer {
 
         // Filter and render messages
         let font_size = 16.0;
-        let line_height = 20.0;
+        let line_height = 20.0 * s;
         let max_lines = (messages_h / line_height) as usize;
 
         let filtered: Vec<_> = state
@@ -268,7 +269,7 @@ impl Renderer {
         // === INPUT BAR (hidden on System tab) ===
         if !is_system_tab {
             let input_y = panel_y + panel_h - FRAME_THICKNESS - input_bar_h;
-            let send_btn_w = 60.0;
+            let send_btn_w = 60.0 * s;
             let input_w = panel_w - FRAME_THICKNESS * 2.0 - send_btn_w - 12.0;
             let input_x = panel_x + FRAME_THICKNESS + 4.0;
 
@@ -277,7 +278,7 @@ impl Renderer {
             draw_rectangle_lines(input_x, input_y, input_w, input_bar_h, 1.0, SLOT_BORDER);
 
             // Input text
-            let text_y = input_y + input_bar_h / 2.0 + 5.0;
+            let text_y = input_y + input_bar_h * 0.6;
             let display_text = if state.ui_state.chat_input.is_empty() {
                 "Tap to chat..."
             } else {

@@ -11,13 +11,14 @@ impl Renderer {
     /// Render the escape menu (settings and disconnect)
     pub(crate) fn render_escape_menu(&self, state: &GameState, layout: &mut UiLayout) {
         let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
 
         // Semi-transparent overlay
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.5));
 
         // Compact menu sizing - fits on mobile
-        let menu_width = 240.0;
-        let menu_height = (sh - 40.0).min(430.0); // Cap height, leave margin
+        let menu_width = 240.0 * s;
+        let menu_height = (sh - 40.0).min(430.0 * s); // Cap height, leave margin
         let menu_x = ((sw - menu_width) / 2.0).floor();
         let menu_y = ((sh - menu_height) / 2.0).floor();
 
@@ -26,7 +27,7 @@ impl Renderer {
         self.draw_corner_accents(menu_x, menu_y, menu_width, menu_height);
 
         // ===== HEADER =====
-        let header_height = 24.0;
+        let header_height = 24.0 * s;
         draw_rectangle(
             menu_x + FRAME_THICKNESS,
             menu_y + FRAME_THICKNESS,
@@ -49,7 +50,7 @@ impl Renderer {
         self.draw_text_sharp(
             title,
             (menu_x + (menu_width - title_width) / 2.0).floor(),
-            (menu_y + FRAME_THICKNESS + 17.0).floor(),
+            (menu_y + FRAME_THICKNESS + 17.0 * s).floor(),
             16.0,
             TEXT_TITLE,
         );
@@ -58,14 +59,14 @@ impl Renderer {
         let (mouse_x, mouse_y) = mouse_position();
 
         // ===== CONTENT AREA =====
-        let content_x = menu_x + FRAME_THICKNESS + 8.0;
-        let mut y = menu_y + FRAME_THICKNESS + header_height + 8.0;
+        let content_x = menu_x + FRAME_THICKNESS + 8.0 * s;
+        let mut y = menu_y + FRAME_THICKNESS + header_height + 8.0 * s;
 
         // Shared dimensions
-        let row_height = 26.0;
-        let btn_height = 24.0;
-        let slider_height = 16.0;
-        let inner_width = menu_width - FRAME_THICKNESS * 2.0 - 16.0;
+        let row_height = 26.0 * s;
+        let btn_height = 24.0 * s;
+        let slider_height = 16.0 * s;
+        let inner_width = menu_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
 
         // Helper to draw themed button
         let draw_button = |btn_x: f32,
@@ -103,7 +104,7 @@ impl Renderer {
             renderer.draw_text_sharp(
                 text,
                 (btn_x + (btn_w - text_width) / 2.0).floor(),
-                (btn_y + 17.0).floor(),
+                (btn_y + btn_h * 0.71).floor(),
                 16.0,
                 text_color,
             );
@@ -118,11 +119,11 @@ impl Renderer {
         };
 
         // ===== ZOOM ROW =====
-        let zoom_btn_w = (inner_width - 12.0) / 3.0;
+        let zoom_btn_w = (inner_width - 12.0 * s) / 3.0;
         let zoom_05x_bounds = Rect::new(content_x, y, zoom_btn_w, btn_height);
-        let zoom_1x_bounds = Rect::new(content_x + zoom_btn_w + 6.0, y, zoom_btn_w, btn_height);
+        let zoom_1x_bounds = Rect::new(content_x + zoom_btn_w + 6.0 * s, y, zoom_btn_w, btn_height);
         let zoom_2x_bounds = Rect::new(
-            content_x + (zoom_btn_w + 6.0) * 2.0,
+            content_x + (zoom_btn_w + 6.0 * s) * 2.0,
             y,
             zoom_btn_w,
             btn_height,
@@ -164,18 +165,18 @@ impl Renderer {
             is_hovered(zoom_2x_bounds),
             self,
         );
-        y += row_height + 4.0;
+        y += row_height + 4.0 * s;
 
         // ===== AUDIO SLIDERS =====
         // On Android: Music + SFX side by side on one row
         // On desktop: separate rows
         #[cfg(target_os = "android")]
         {
-            let half_width = (inner_width - 6.0) / 2.0;
-            let label_offset = 30.0;
+            let half_width = (inner_width - 6.0 * s) / 2.0;
+            let label_offset = 30.0 * s;
             let left_slider_x = content_x + label_offset;
             let left_slider_w = half_width - label_offset;
-            let right_slider_x = content_x + half_width + 6.0 + label_offset;
+            let right_slider_x = content_x + half_width + 6.0 * s + label_offset;
             let right_slider_w = half_width - label_offset;
 
             let music_bounds = Rect::new(left_slider_x, y, left_slider_w, slider_height);
@@ -203,12 +204,12 @@ impl Renderer {
                 state.ui_state.audio_muted,
                 is_hovered(sfx_bounds),
             );
-            y += row_height - 4.0;
+            y += row_height - 4.0 * s;
         }
         #[cfg(not(target_os = "android"))]
         {
-            let slider_width = inner_width - 50.0;
-            let slider_x = content_x + 42.0;
+            let slider_width = inner_width - 50.0 * s;
+            let slider_x = content_x + 42.0 * s;
 
             let music_bounds = Rect::new(slider_x, y, slider_width, slider_height);
             layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
@@ -222,7 +223,7 @@ impl Renderer {
                 state.ui_state.audio_muted,
                 is_hovered(music_bounds),
             );
-            y += row_height - 4.0;
+            y += row_height - 4.0 * s;
 
             let sfx_bounds = Rect::new(slider_x, y, slider_width, slider_height);
             layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
@@ -236,15 +237,15 @@ impl Renderer {
                 state.ui_state.audio_muted,
                 is_hovered(sfx_bounds),
             );
-            y += row_height - 4.0;
+            y += row_height - 4.0 * s;
         }
 
         // UI Scale slider
-        let ui_slider_width = inner_width - 50.0;
-        let ui_slider_x = content_x + 42.0;
+        let ui_slider_width = inner_width - 50.0 * s;
+        let ui_slider_x = content_x + 42.0 * s;
         let scale_bounds = Rect::new(ui_slider_x, y, ui_slider_width, slider_height);
         layout.add(UiElementId::EscapeMenuUiScaleSlider, scale_bounds);
-        let scale_normalized = (state.ui_state.ui_scale - 0.75) / 0.5; // 0.75-1.25 range
+        let scale_normalized = (state.ui_state.ui_scale - 0.75) / 1.25; // 0.75-2.0 range
         self.draw_compact_slider(
             "Scale",
             ui_slider_x,
@@ -258,11 +259,11 @@ impl Renderer {
         y += row_height;
 
         // ===== TOGGLE BUTTONS (2 per row) =====
-        let toggle_w = (inner_width - 6.0) / 2.0;
+        let toggle_w = (inner_width - 6.0 * s) / 2.0;
 
         // Row 1: Mute + Shift-Drop
         let mute_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-        let shift_drop_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+        let shift_drop_bounds = Rect::new(content_x + toggle_w + 6.0 * s, y, toggle_w, btn_height);
         layout.add(UiElementId::EscapeMenuMuteToggle, mute_bounds);
         layout.add(UiElementId::EscapeMenuShiftDropToggle, shift_drop_bounds);
 
@@ -320,7 +321,7 @@ impl Renderer {
 
         #[cfg(not(target_os = "android"))]
         {
-            let chat_bg_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+            let chat_bg_bounds = Rect::new(content_x + toggle_w + 6.0 * s, y, toggle_w, btn_height);
             layout.add(UiElementId::EscapeMenuChatBgToggle, chat_bg_bounds);
             draw_button(
                 chat_bg_bounds.x,
@@ -380,7 +381,7 @@ impl Renderer {
         {
             let ctrl_modern_bounds = Rect::new(content_x, y, toggle_w, btn_height);
             let ctrl_classic_bounds =
-                Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+                Rect::new(content_x + toggle_w + 6.0 * s, y, toggle_w, btn_height);
             layout.add(
                 UiElementId::EscapeMenuControlSchemeToggle,
                 ctrl_modern_bounds,
@@ -417,7 +418,7 @@ impl Renderer {
         #[cfg(not(target_os = "android"))]
         {
             let gfx_high_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-            let gfx_low_bounds = Rect::new(content_x + toggle_w + 6.0, y, toggle_w, btn_height);
+            let gfx_low_bounds = Rect::new(content_x + toggle_w + 6.0 * s, y, toggle_w, btn_height);
             layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_high_bounds);
             layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_low_bounds);
 
@@ -444,11 +445,11 @@ impl Renderer {
             y += row_height;
         }
 
-        y += 8.0;
+        y += 8.0 * s;
 
         // ===== DISCONNECT BUTTON =====
         let disconnect_width = inner_width;
-        let disconnect_height = 28.0;
+        let disconnect_height = 28.0 * s;
         let disconnect_x = content_x;
         let disconnect_y = y;
         let disconnect_bounds = Rect::new(
@@ -503,7 +504,7 @@ impl Renderer {
         self.draw_text_sharp(
             disconnect_text,
             (disconnect_x + (disconnect_width - disconnect_text_width) / 2.0).floor(),
-            (disconnect_y + 19.0).floor(),
+            (disconnect_y + disconnect_height * 0.68).floor(),
             16.0,
             disconnect_text_color,
         );
@@ -516,7 +517,7 @@ impl Renderer {
             self.draw_text_sharp(
                 hint,
                 (menu_x + (menu_width - hint_width) / 2.0).floor(),
-                (menu_y + menu_height - FRAME_THICKNESS - 6.0).floor(),
+                (menu_y + menu_height - FRAME_THICKNESS - 6.0 * s).floor(),
                 16.0,
                 TEXT_DIM,
             );
@@ -535,12 +536,13 @@ impl Renderer {
         muted: bool,
         hovered: bool,
     ) {
+        let s = self.font_scale.get();
         // Label to the left
         let label_width = self.measure_text_sharp(label, 16.0).width;
         self.draw_text_sharp(
             label,
-            (x - label_width - 6.0).floor(),
-            (y + 12.0).floor(),
+            (x - label_width - 6.0 * s).floor(),
+            (y + height * 0.75).floor(),
             16.0,
             TEXT_DIM,
         );

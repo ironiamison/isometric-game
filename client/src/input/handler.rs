@@ -1807,7 +1807,7 @@ impl InputHandler {
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let normalized =
                                     (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
-                                state.ui_state.ui_scale = 0.75 + normalized * 0.5;
+                                state.ui_state.ui_scale = 0.75 + normalized * 1.25;
                             }
                         }
                         _ => {}
@@ -1892,7 +1892,7 @@ impl InputHandler {
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let normalized =
                                     (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
-                                state.ui_state.ui_scale = 0.75 + normalized * 0.5;
+                                state.ui_state.ui_scale = 0.75 + normalized * 1.25;
                             }
                             return commands;
                         }
@@ -5548,16 +5548,20 @@ impl InputHandler {
                 let (vmx, vmy) = screen_to_virtual_coords(mx, my);
                 let (_, chat_sh) = virtual_screen_size();
                 let scale = state.ui_state.ui_scale;
-                let bg_padding = 6.0;
-                let bar_bottom_offset = 8.0 * scale + 6.0; // EXP_BAR_GAP * scale + margin
-                let box_bottom = chat_sh - bar_bottom_offset;
-                let line_height = 18.0;
-                let max_visible_lines: usize = 9;
+                let bg_padding = 6.0 * scale;
+                let box_bottom = chat_sh - 8.0 * scale; // EXP_BAR_GAP * scale
+                let line_height = 18.0 * scale;
+                let max_chat_width = if scale >= 2.0 {
+                    400.0 * scale - 260.0
+                } else {
+                    360.0 * scale
+                };
+                let max_visible_lines: usize = if scale >= 2.0 { 6 } else { 7 };
                 let chat_area_h = max_visible_lines as f32 * line_height;
                 let chat_bottom_y = box_bottom - bg_padding;
                 let chat_top_y = chat_bottom_y - chat_area_h + line_height;
                 let over_chat = vmx >= 10.0 - bg_padding
-                    && vmx <= 10.0 + 400.0 + bg_padding
+                    && vmx <= 10.0 + max_chat_width + bg_padding
                     && vmy >= chat_top_y - bg_padding
                     && vmy <= box_bottom;
                 if over_chat {
