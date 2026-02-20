@@ -81,3 +81,11 @@ direction = "right"
 [[chairs]]
 gid = 2247
 direction = "down"
+
+[[chairs]]
+gid = 2250
+direction = "down"
+
+[[chairs]]
+gid = 2251
+direction = "right"
