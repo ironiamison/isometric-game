@@ -82,6 +82,14 @@ const TILESET_COLUMNS: u32 = 32;
 pub const GENDERS: &[&str] = &["male", "female"];
 pub const SKINS: &[&str] = &["tan", "pale", "brown", "fish", "orc", "panda", "skeleton"];
 
+/// Render target size for silhouette compositing (pixels at 1x scale).
+/// Must be large enough to contain the player sprite plus equipment/weapon overhang.
+const SILHOUETTE_RT_SIZE: u32 = 160;
+/// Anchor X in the render target where the player sprite's draw_x maps to.
+const SILHOUETTE_ANCHOR_X: f32 = 63.0;
+/// Anchor Y in the render target where the player sprite's draw_y maps to.
+const SILHOUETTE_ANCHOR_Y: f32 = 41.0;
+
 /// Objects tileset firstgid (GID = firstGid + spriteFileId, matching mapper-config.json)
 const OBJECTS_FIRSTGID: u32 = 1162;
 
@@ -374,6 +382,8 @@ pub struct Renderer {
     /// reset to 1.0 for world rendering. Snaps to nearest multiple of 8 for
     /// pixel-perfect monogram font rendering.
     pub(crate) font_scale: Cell<f32>,
+    /// Off-screen render target for compositing the player silhouette at full opacity
+    silhouette_rt: RefCell<Option<RenderTarget>>,
 }
 
 impl Renderer {
@@ -1487,6 +1497,7 @@ impl Renderer {
             text_measure_cache: RefCell::new(HashMap::new()),
             text_wrap_cache: RefCell::new(HashMap::new()),
             font_scale: Cell::new(1.0),
+            silhouette_rt: RefCell::new(None),
         }
     }
 
@@ -3417,13 +3428,6 @@ impl Renderer {
             );
         }
 
-        // Render subtle local player silhouette (high z-index, visible through trees)
-        if let Some(ref local_id) = state.local_player_id {
-            if let Some(local_player) = state.players.get(local_id) {
-                self.render_player_silhouette(local_player, &state.camera, &state.item_registry);
-            }
-        }
-
         timings.entities_ms = (get_time() - t1) * 1000.0;
 
         // 4. Render overhead layer (always on top)
@@ -3434,6 +3438,13 @@ impl Renderer {
         self.render_exit_portal_arrows(state);
 
         timings.overhead_ms = (get_time() - t2) * 1000.0;
+
+        // 4.2. Render local player silhouette (on top of overhead, visible through trees)
+        if let Some(ref local_id) = state.local_player_id {
+            if let Some(local_player) = state.players.get(local_id) {
+                self.render_player_silhouette(local_player, &state.camera, &state.item_registry);
+            }
+        }
 
         // 4.5. Render name tags above all map elements (overhead, walls, objects, etc.)
         self.render_name_tags(state);
@@ -5997,22 +6008,35 @@ impl Renderer {
         }
     }
 
-    /// Renders a semi-transparent silhouette of the player that's always visible
-    /// This provides visual feedback when the player is behind tall objects like trees
+    /// Renders a semi-transparent silhouette of the player that's always visible.
+    /// Composites all layers at full opacity onto an off-screen render target first,
+    /// then draws the result with low alpha so equipment properly occludes skin.
     fn render_player_silhouette(&self, player: &Player, camera: &Camera, item_registry: &crate::game::item_registry::ItemRegistry) {
-        // Don't show silhouette for dead players
         if player.is_dead {
             return;
         }
 
-        let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
-        let zoom = camera.zoom;
+        // Lazily create the render target
+        {
+            let mut rt_opt = self.silhouette_rt.borrow_mut();
+            if rt_opt.is_none() {
+                let rt = render_target(SILHOUETTE_RT_SIZE, SILHOUETTE_RT_SIZE);
+                rt.texture.set_filter(FilterMode::Nearest);
+                *rt_opt = Some(rt);
+            }
+        }
+        let rt = self.silhouette_rt.borrow().as_ref().unwrap().clone();
 
-        let scaled_sprite_width = SPRITE_WIDTH * zoom;
-        let scaled_sprite_height = SPRITE_HEIGHT * zoom;
-
-        // Subtle semi-transparent tint (~20% opacity)
-        let silhouette_tint = Color::from_rgba(255, 255, 255, 50);
+        // --- Phase 1: Composite all layers at full opacity onto the render target ---
+        set_camera(&Camera2D {
+            render_target: Some(rt.clone()),
+            ..Camera2D::from_display_rect(Rect::new(
+                0.0, 0.0,
+                SILHOUETTE_RT_SIZE as f32,
+                SILHOUETTE_RT_SIZE as f32,
+            ))
+        });
+        clear_background(Color::new(0.0, 0.0, 0.0, 0.0));
 
         if let Some((player_texture, player_offset)) =
             self.get_player_sprite(&player.gender, &player.skin)
@@ -6021,13 +6045,12 @@ impl Renderer {
             let (src_x, src_y, src_w, src_h) = coords.to_source_rect();
             let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
 
-            let draw_x = screen_x - scaled_sprite_width / 2.0;
-            let draw_y = screen_y - scaled_sprite_height + 16.0 * zoom;
-
-            // Get player gender for gender-specific offsets
+            // Draw at anchor position in the RT (1x scale, no zoom)
+            let draw_x = SILHOUETTE_ANCHOR_X;
+            let draw_y = SILHOUETTE_ANCHOR_Y;
             let player_gender = Gender::from_str(&player.gender);
 
-            // Calculate weapon frame info if weapon is equipped (hidden when sitting)
+            // Calculate weapon frame info (hidden when sitting)
             let is_sitting_sil = matches!(
                 player.animation.state,
                 crate::render::animation::AnimationState::SittingChair
@@ -6063,45 +6086,37 @@ impl Renderer {
                         })
                 });
 
-            let (scaled_weapon_width, scaled_weapon_height, wf_width, wf_height) = weapon_info
+            let (wf_width, wf_height) = weapon_info
                 .as_ref()
-                .map(|(_, _, _, _, _, fw, fh)| (*fw * zoom, *fh * zoom, *fw, *fh))
-                .unwrap_or((
-                    WEAPON_SPRITE_WIDTH * zoom,
-                    WEAPON_SPRITE_HEIGHT * zoom,
-                    WEAPON_SPRITE_WIDTH,
-                    WEAPON_SPRITE_HEIGHT,
-                ));
+                .map(|(_, _, _, _, _, fw, fh)| (*fw, *fh))
+                .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
 
-            // Draw weapon under-layer (before player sprite)
+            // Weapon under-layer
             if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) =
                 weapon_info
             {
                 let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
                 let weapon_src_x = atlas_x + weapon_frame.frame_under as f32 * wf_width;
-                let weapon_draw_x = draw_x + offset_x * zoom;
-                let weapon_draw_y = draw_y + offset_y * zoom;
-
                 draw_texture_ex(
                     weapon_sprite,
-                    weapon_draw_x,
-                    weapon_draw_y,
-                    silhouette_tint,
+                    draw_x + offset_x,
+                    draw_y + offset_y,
+                    WHITE,
                     DrawTextureParams {
                         source: Some(Rect::new(weapon_src_x, atlas_y, wf_width, wf_height)),
-                        dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
+                        dest_size: Some(Vec2::new(wf_width, wf_height)),
                         flip_x: weapon_frame.flip_h,
                         ..Default::default()
                     },
                 );
             }
 
-            // Always draw player base sprite in silhouette
+            // Player base sprite
             draw_texture_ex(
                 player_texture,
                 draw_x,
                 draw_y,
-                silhouette_tint,
+                WHITE,
                 DrawTextureParams {
                     source: Some(Rect::new(
                         player_atlas_x + src_x,
@@ -6109,15 +6124,13 @@ impl Renderer {
                         src_w,
                         src_h,
                     )),
-                    dest_size: Some(Vec2::new(scaled_sprite_width, scaled_sprite_height)),
+                    dest_size: Some(Vec2::new(SPRITE_WIDTH, SPRITE_HEIGHT)),
                     flip_x: coords.flip_h,
                     ..Default::default()
                 },
             );
 
-            // Hair silhouette is drawn after body armor silhouette (see below)
-
-            // Draw equipment silhouette (body armor)
+            // Body armor
             if let Some(ref body_item_id) = player.equipped_body {
                 let body_sprite_key = item_registry.get_sprite_key(body_item_id);
                 if let Some((body_texture, body_atlas_offset)) =
@@ -6131,7 +6144,6 @@ impl Renderer {
                     let (body_atlas_x, body_atlas_y) = body_atlas_offset.unwrap_or((0.0, 0.0));
 
                     if is_single_row {
-                        // New single-row body armor format
                         let anim_frame = player.animation.frame as u32;
                         let armor_frame = get_body_armor_frame(
                             player.animation.state,
@@ -6144,20 +6156,13 @@ impl Renderer {
                             anim_frame,
                             player_gender,
                         );
-
                         let armor_src_x =
                             body_atlas_x + armor_frame.frame as f32 * BODY_ARMOR_SPRITE_WIDTH;
-                        let scaled_armor_width = BODY_ARMOR_SPRITE_WIDTH * zoom;
-                        let scaled_armor_height = BODY_ARMOR_SPRITE_HEIGHT * zoom;
-
-                        let armor_draw_x = draw_x + armor_offset_x * zoom;
-                        let armor_draw_y = draw_y + armor_offset_y * zoom;
-
                         draw_texture_ex(
                             body_texture,
-                            armor_draw_x,
-                            armor_draw_y,
-                            silhouette_tint,
+                            draw_x + armor_offset_x,
+                            draw_y + armor_offset_y,
+                            WHITE,
                             DrawTextureParams {
                                 source: Some(Rect::new(
                                     armor_src_x,
@@ -6165,18 +6170,20 @@ impl Renderer {
                                     BODY_ARMOR_SPRITE_WIDTH,
                                     BODY_ARMOR_SPRITE_HEIGHT,
                                 )),
-                                dest_size: Some(Vec2::new(scaled_armor_width, scaled_armor_height)),
+                                dest_size: Some(Vec2::new(
+                                    BODY_ARMOR_SPRITE_WIDTH,
+                                    BODY_ARMOR_SPRITE_HEIGHT,
+                                )),
                                 flip_x: armor_frame.flip_h,
                                 ..Default::default()
                             },
                         );
                     } else {
-                        // Old grid-style body armor format
                         draw_texture_ex(
                             body_texture,
                             draw_x,
                             draw_y,
-                            silhouette_tint,
+                            WHITE,
                             DrawTextureParams {
                                 source: Some(Rect::new(
                                     body_atlas_x + src_x,
@@ -6184,10 +6191,7 @@ impl Renderer {
                                     src_w,
                                     src_h,
                                 )),
-                                dest_size: Some(Vec2::new(
-                                    scaled_sprite_width,
-                                    scaled_sprite_height,
-                                )),
+                                dest_size: Some(Vec2::new(SPRITE_WIDTH, SPRITE_HEIGHT)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },
@@ -6196,7 +6200,7 @@ impl Renderer {
                 }
             }
 
-            // Draw hair silhouette on top of body armor (when no head equipment)
+            // Hair (when no head equipment)
             if player.equipped_head.is_none() {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
@@ -6207,10 +6211,6 @@ impl Renderer {
                         let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
                         let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
 
-                        let scaled_hair_width = HAIR_SPRITE_WIDTH * zoom;
-                        let scaled_hair_height = HAIR_SPRITE_HEIGHT * zoom;
-
-                        // Calculate hair offsets using gender-aware function
                         let anim_frame = player.animation.frame as u32;
                         let (hair_pos_offset_x, hair_pos_offset_y) = get_hair_offset(
                             player.animation.state,
@@ -6220,15 +6220,15 @@ impl Renderer {
                             coords.flip_h,
                         );
                         let hair_draw_x = draw_x
-                            + (scaled_sprite_width - scaled_hair_width) / 2.0
-                            + hair_pos_offset_x * zoom;
-                        let hair_draw_y = draw_y + hair_pos_offset_y * zoom;
+                            + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0
+                            + hair_pos_offset_x;
+                        let hair_draw_y = draw_y + hair_pos_offset_y;
 
                         draw_texture_ex(
                             hair_tex,
                             hair_draw_x,
                             hair_draw_y,
-                            silhouette_tint,
+                            WHITE,
                             DrawTextureParams {
                                 source: Some(Rect::new(
                                     hair_src_x,
@@ -6236,7 +6236,7 @@ impl Renderer {
                                     HAIR_SPRITE_WIDTH,
                                     HAIR_SPRITE_HEIGHT,
                                 )),
-                                dest_size: Some(Vec2::new(scaled_hair_width, scaled_hair_height)),
+                                dest_size: Some(Vec2::new(HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },
@@ -6245,7 +6245,7 @@ impl Renderer {
                 }
             }
 
-            // Draw equipment silhouette (boots)
+            // Boots
             if let Some(ref feet_item_id) = player.equipped_feet {
                 let feet_sprite_key = item_registry.get_sprite_key(feet_item_id);
                 if let Some((feet_texture, feet_atlas_offset)) =
@@ -6259,7 +6259,6 @@ impl Renderer {
                     let (feet_atlas_x, feet_atlas_y) = feet_atlas_offset.unwrap_or((0.0, 0.0));
 
                     if is_single_row {
-                        // New single-row boot format
                         let anim_frame = player.animation.frame as u32;
                         let boot_frame = get_boot_frame(
                             player.animation.state,
@@ -6272,19 +6271,12 @@ impl Renderer {
                             anim_frame,
                             player_gender,
                         );
-
                         let boot_src_x = feet_atlas_x + boot_frame.frame as f32 * BOOT_SPRITE_WIDTH;
-                        let scaled_boot_width = BOOT_SPRITE_WIDTH * zoom;
-                        let scaled_boot_height = BOOT_SPRITE_HEIGHT * zoom;
-
-                        let boot_draw_x = draw_x + boot_offset_x * zoom;
-                        let boot_draw_y = draw_y + boot_offset_y * zoom;
-
                         draw_texture_ex(
                             feet_texture,
-                            boot_draw_x,
-                            boot_draw_y,
-                            silhouette_tint,
+                            draw_x + boot_offset_x,
+                            draw_y + boot_offset_y,
+                            WHITE,
                             DrawTextureParams {
                                 source: Some(Rect::new(
                                     boot_src_x,
@@ -6292,18 +6284,17 @@ impl Renderer {
                                     BOOT_SPRITE_WIDTH,
                                     BOOT_SPRITE_HEIGHT,
                                 )),
-                                dest_size: Some(Vec2::new(scaled_boot_width, scaled_boot_height)),
+                                dest_size: Some(Vec2::new(BOOT_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT)),
                                 flip_x: boot_frame.flip_h,
                                 ..Default::default()
                             },
                         );
                     } else {
-                        // Old grid-style boot format
                         draw_texture_ex(
                             feet_texture,
                             draw_x,
                             draw_y,
-                            silhouette_tint,
+                            WHITE,
                             DrawTextureParams {
                                 source: Some(Rect::new(
                                     feet_atlas_x + src_x,
@@ -6311,10 +6302,7 @@ impl Renderer {
                                     src_w,
                                     src_h,
                                 )),
-                                dest_size: Some(Vec2::new(
-                                    scaled_sprite_width,
-                                    scaled_sprite_height,
-                                )),
+                                dest_size: Some(Vec2::new(SPRITE_WIDTH, SPRITE_HEIGHT)),
                                 flip_x: coords.flip_h,
                                 ..Default::default()
                             },
@@ -6323,24 +6311,21 @@ impl Renderer {
                 }
             }
 
-            // Draw weapon over-layer (after equipment)
+            // Weapon over-layer
             if let Some((weapon_sprite, atlas_offset, ref weapon_frame, offset_x, offset_y, _, _)) =
                 weapon_info
             {
                 if let Some(frame_over) = weapon_frame.frame_over {
                     let (atlas_x, atlas_y) = atlas_offset.unwrap_or((0.0, 0.0));
                     let weapon_src_x = atlas_x + frame_over as f32 * wf_width;
-                    let weapon_draw_x = draw_x + offset_x * zoom;
-                    let weapon_draw_y = draw_y + offset_y * zoom;
-
                     draw_texture_ex(
                         weapon_sprite,
-                        weapon_draw_x,
-                        weapon_draw_y,
-                        silhouette_tint,
+                        draw_x + offset_x,
+                        draw_y + offset_y,
+                        WHITE,
                         DrawTextureParams {
                             source: Some(Rect::new(weapon_src_x, atlas_y, wf_width, wf_height)),
-                            dest_size: Some(Vec2::new(scaled_weapon_width, scaled_weapon_height)),
+                            dest_size: Some(Vec2::new(wf_width, wf_height)),
                             flip_x: weapon_frame.flip_h,
                             ..Default::default()
                         },
@@ -6348,6 +6333,32 @@ impl Renderer {
                 }
             }
         }
+
+        // --- Phase 2: Draw the composited RT to screen with silhouette tint ---
+        set_default_camera();
+
+        let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
+        let zoom = camera.zoom;
+        let player_draw_x = screen_x - SPRITE_WIDTH * zoom / 2.0;
+        let player_draw_y = screen_y - SPRITE_HEIGHT * zoom + 16.0 * zoom;
+
+        let rt_screen_x = player_draw_x - SILHOUETTE_ANCHOR_X * zoom;
+        let rt_screen_y = player_draw_y - SILHOUETTE_ANCHOR_Y * zoom;
+
+        draw_texture_ex(
+            &rt.texture,
+            rt_screen_x,
+            rt_screen_y,
+            Color::from_rgba(255, 255, 255, 50),
+            DrawTextureParams {
+                dest_size: Some(Vec2::new(
+                    SILHOUETTE_RT_SIZE as f32 * zoom,
+                    SILHOUETTE_RT_SIZE as f32 * zoom,
+                )),
+                flip_y: true,
+                ..Default::default()
+            },
+        );
     }
 
     fn render_npc(&self, npc: &Npc, is_selected: bool, is_hovered: bool, camera: &Camera) {
