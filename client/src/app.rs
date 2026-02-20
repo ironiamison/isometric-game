@@ -473,6 +473,21 @@ pub fn run_game_frame(
                 recipe_id: recipe_id.clone(),
                 quantity: *quantity,
             },
+            // Slayer commands
+            InputCommand::SlayerGetTask { master_id } => ClientMessage::SlayerGetTask {
+                master_id: master_id.clone(),
+            },
+            InputCommand::SlayerCancelTask => ClientMessage::SlayerCancelTask,
+            InputCommand::SlayerBuyReward {
+                reward_id,
+                target_monster_id,
+            } => ClientMessage::SlayerBuyReward {
+                reward_id: reward_id.clone(),
+                target_monster_id: target_monster_id.clone(),
+            },
+            InputCommand::SlayerRemoveBlock { monster_id } => ClientMessage::SlayerRemoveBlock {
+                monster_id: monster_id.clone(),
+            },
         };
         network.send(&msg);
     }

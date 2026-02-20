@@ -1,0 +1,34 @@
+# Slayer Rewards - Purchasable with slayer points
+
+[[rewards]]
+id = "health_potion_bundle"
+display_name = "Health Potion Bundle"
+description = "Receive 5 health potions"
+cost = 10
+category = "potion"
+target_id = "health_potion"
+quantity = 5
+
+[[rewards]]
+id = "prayer_potion_bundle"
+display_name = "Prayer Potion Bundle"
+description = "Receive 5 prayer potions"
+cost = 15
+category = "potion"
+target_id = "prayer_potion"
+quantity = 5
+
+[[rewards]]
+id = "unlock_rock_golem"
+display_name = "Unlock: Rock Golems"
+description = "Unlock Rock Golems as a slayer task"
+cost = 100
+category = "unlock"
+target_id = "rock_golem"
+
+[[rewards]]
+id = "block_slot"
+display_name = "Block Monster"
+description = "Block a monster from being assigned as a task"
+cost = 50
+category = "block"

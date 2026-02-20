@@ -65,6 +65,8 @@ pub struct Npc {
     pub is_altar: bool,
     /// Whether this NPC is a banker
     pub is_banker: bool,
+    /// Whether this NPC is a slayer master
+    pub is_slayer_master: bool,
     /// Movement speed in tiles per second (from server, for interpolation)
     pub move_speed: f32,
     /// Last time this NPC took damage (for health bar visibility)
@@ -107,6 +109,7 @@ impl Npc {
             is_merchant: false,
             is_altar: false,
             is_banker: false,
+            is_slayer_master: false,
             move_speed: 2.0, // Default, will be set by server
             last_damage_time: 0.0,
             death_timer: None,
@@ -120,7 +123,7 @@ impl Npc {
 
     pub fn name(&self) -> String {
         // Don't show level for friendly NPCs (quest givers, merchants, altars)
-        if self.is_quest_giver || self.is_merchant || self.is_altar || self.is_banker || self.station_type.is_some() {
+        if self.is_quest_giver || self.is_merchant || self.is_altar || self.is_banker || self.is_slayer_master || self.station_type.is_some() {
             self.display_name.clone()
         } else {
             format!("{} Lv.{}", self.display_name, self.level)
@@ -134,7 +137,7 @@ impl Npc {
     /// Returns true if this NPC can be attacked/targeted by players.
     /// Quest givers, merchants, altars, and bankers cannot be attacked.
     pub fn is_attackable(&self) -> bool {
-        !self.is_quest_giver && !self.is_merchant && !self.is_altar && !self.is_banker && self.station_type.is_none()
+        !self.is_quest_giver && !self.is_merchant && !self.is_altar && !self.is_banker && !self.is_slayer_master && self.station_type.is_none()
     }
 
     pub fn is_alive(&self) -> bool {

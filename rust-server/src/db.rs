@@ -423,6 +423,18 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Slayer state table - per-character slayer progress
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS character_slayer (
+                character_id INTEGER PRIMARY KEY,
+                slayer_state_json TEXT NOT NULL DEFAULT '{}'
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -937,6 +949,10 @@ impl Database {
             .execute(&self.pool)
             .await?;
         sqlx::query("DELETE FROM discovered_recipes WHERE character_id = ?")
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("DELETE FROM character_slayer WHERE character_id = ?")
             .bind(character_id)
             .execute(&self.pool)
             .await?;
@@ -1455,6 +1471,56 @@ impl Database {
         .bind(recipe_id)
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
+
+    // =========================================================================
+    // Slayer State Functions
+    // =========================================================================
+
+    /// Load slayer state for a character from database
+    pub async fn load_character_slayer_state(
+        &self,
+        character_id: i64,
+    ) -> Result<crate::slayer::PlayerSlayerState, String> {
+        let row = sqlx::query(
+            "SELECT slayer_state_json FROM character_slayer WHERE character_id = ?",
+        )
+        .bind(character_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| format!("Database error loading slayer state: {}", e))?;
+
+        match row {
+            Some(row) => {
+                let json: String = row.get("slayer_state_json");
+                serde_json::from_str(&json).map_err(|e| {
+                    format!("Failed to parse slayer state JSON: {}", e)
+                })
+            }
+            None => Ok(crate::slayer::PlayerSlayerState::default()),
+        }
+    }
+
+    /// Save slayer state for a character to database
+    pub async fn save_character_slayer_state(
+        &self,
+        character_id: i64,
+        state: &crate::slayer::PlayerSlayerState,
+    ) -> Result<(), String> {
+        let json = serde_json::to_string(state)
+            .map_err(|e| format!("Failed to serialize slayer state: {}", e))?;
+
+        sqlx::query(
+            r#"INSERT OR REPLACE INTO character_slayer (character_id, slayer_state_json)
+               VALUES (?, ?)"#,
+        )
+        .bind(character_id)
+        .bind(&json)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Database error saving slayer state: {}", e))?;
+
         Ok(())
     }
 

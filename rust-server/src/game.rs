@@ -760,6 +760,10 @@ pub struct GameRoom {
     portal_tiles: std::collections::HashSet<(i32, i32)>,
     /// Quest locations for reach_location objectives (location_id -> QuestLocation)
     quest_locations: HashMap<String, QuestLocation>,
+    /// Slayer task/reward registry
+    slayer_registry: Arc<crate::slayer::SlayerRegistry>,
+    /// Per-player slayer state
+    player_slayer_states: RwLock<HashMap<String, crate::slayer::PlayerSlayerState>>,
 }
 
 impl GameRoom {
@@ -894,6 +898,15 @@ impl GameRoom {
             Err(_) => {
                 tracing::info!("No quest_locations.toml found, skipping");
                 HashMap::new()
+            }
+        };
+
+        // Load slayer registry
+        let slayer_registry = match crate::slayer::SlayerRegistry::load(std::path::Path::new("data")) {
+            Ok(r) => Arc::new(r),
+            Err(e) => {
+                tracing::warn!("Failed to load slayer registry: {}, using empty registry", e);
+                Arc::new(crate::slayer::SlayerRegistry::empty())
             }
         };
 
@@ -1062,6 +1075,8 @@ impl GameRoom {
             farming: RwLock::new(farming),
             portal_tiles,
             quest_locations,
+            slayer_registry,
+            player_slayer_states: RwLock::new(HashMap::new()),
         }
     }
 
@@ -1501,7 +1516,7 @@ impl GameRoom {
 
     /// Batch-snapshot save data for multiple players in a single lock acquisition.
     /// Returns a map of player_id -> (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)
-    pub async fn get_bulk_save_data(&self, player_ids: &[String]) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)> {
+    pub async fn get_bulk_save_data(&self, player_ids: &[String]) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>, Option<crate::slayer::PlayerSlayerState>)> {
         struct RawPlayerSnapshot {
             x: i32,
             y: i32,
@@ -1629,7 +1644,7 @@ impl GameRoom {
                 bank_json: serde_json::to_string(&raw.bank_slots).unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: raw.bank_gold,
             };
-            result.insert(pid, (save_data, None, raw.recipes));
+            result.insert(pid, (save_data, None, raw.recipes, None));
         }
 
         // Single lock on quest states
@@ -1638,6 +1653,16 @@ impl GameRoom {
             for pid in player_ids {
                 if let Some(entry) = result.get_mut(pid) {
                     entry.1 = quest_states.get(pid).cloned();
+                }
+            }
+        }
+
+        // Single lock on slayer states
+        {
+            let slayer_states = self.player_slayer_states.read().await;
+            for pid in player_ids {
+                if let Some(entry) = result.get_mut(pid) {
+                    entry.3 = slayer_states.get(pid).cloned();
                 }
             }
         }
@@ -1838,6 +1863,8 @@ impl GameRoom {
             alchemy_xp: p.skills.alchemy.xp,
             mining_level: p.skills.mining.level,
             mining_xp: p.skills.mining.xp,
+            slayer_level: p.skills.slayer.level,
+            slayer_xp: p.skills.slayer.xp,
         })
     }
 
@@ -2928,6 +2955,29 @@ impl GameRoom {
             }
         };
 
+        // Slayer level gating: check if the NPC requires a minimum slayer level
+        if is_npc {
+            let npc_prototype_id = {
+                let npcs = self.npcs.read().await;
+                npcs.get(&target_id).map(|n| n.prototype_id.clone())
+            };
+            if let Some(proto_id) = npc_prototype_id {
+                if let Some(required_level) = self.slayer_registry.get_slayer_requirement(&proto_id) {
+                    let player_slayer_level = {
+                        let players = self.players.read().await;
+                        players.get(player_id).map(|p| p.skills.slayer.level).unwrap_or(0)
+                    };
+                    if player_slayer_level < required_level {
+                        self.send_system_message(
+                            player_id,
+                            &format!("You need a Slayer level of {} to attack this creature.", required_level),
+                        ).await;
+                        return;
+                    }
+                }
+            }
+        }
+
         // Update attacker's last attack time and stop movement
         {
             let mut players = self.players.write().await;
@@ -3123,6 +3173,9 @@ impl GameRoom {
 
                 // Process quest kill event
                 self.process_quest_kill(player_id, &prototype_id).await;
+
+                // Process slayer kill event
+                self.process_slayer_kill(player_id, &prototype_id).await;
 
                 // Spawn item drops from prototype loot table
                 let current_time = std::time::SystemTime::now()
@@ -3693,6 +3746,564 @@ impl GameRoom {
         }
     }
 
+    // ===== Slayer System Methods =====
+
+    pub async fn set_player_slayer_state(&self, player_id: &str, state: crate::slayer::PlayerSlayerState) {
+        let mut states = self.player_slayer_states.write().await;
+        states.insert(player_id.to_string(), state);
+    }
+
+    pub async fn get_player_slayer_state(&self, player_id: &str) -> Option<crate::slayer::PlayerSlayerState> {
+        let states = self.player_slayer_states.read().await;
+        states.get(player_id).cloned()
+    }
+
+    pub async fn handle_slayer_master_interact(&self, player_id: &str, npc_id: &str) {
+        // Get NPC prototype_id from the NPC
+        let prototype_id = {
+            let npcs = self.npcs.read().await;
+            match npcs.get(npc_id) {
+                Some(npc) => npc.prototype_id.clone(),
+                None => return,
+            }
+        };
+
+        // Look up the slayer master definition
+        let master = match self.slayer_registry.get_master_by_prototype(&prototype_id) {
+            Some(m) => m,
+            None => {
+                tracing::warn!("NPC {} ({}) is marked as slayer_master but has no registry entry", npc_id, prototype_id);
+                return;
+            }
+        };
+
+        // Get player's slayer state
+        let slayer_state = {
+            let states = self.player_slayer_states.read().await;
+            states.get(player_id).cloned().unwrap_or_default()
+        };
+
+        // Build current task data for protocol
+        let current_task = slayer_state.current_task.as_ref().map(|t| {
+            crate::protocol::SlayerTaskData {
+                monster_id: t.monster_id.clone(),
+                display_name: t.display_name.clone(),
+                kills_current: t.kills_current,
+                kills_required: t.kills_required,
+                xp_per_kill: t.xp_per_kill,
+                master_id: t.master_id.clone(),
+                points_on_complete: t.points_on_complete,
+            }
+        });
+
+        // Build rewards list
+        let rewards: Vec<crate::protocol::SlayerRewardData> = self.slayer_registry.get_rewards().iter().map(|r| {
+            crate::protocol::SlayerRewardData {
+                id: r.id.clone(),
+                display_name: r.display_name.clone(),
+                description: r.description.clone(),
+                cost: r.cost,
+                category: r.category.clone(),
+                target_id: r.target_id.clone(),
+                quantity: r.quantity,
+            }
+        }).collect();
+
+        let msg = ServerMessage::SlayerPanelOpen {
+            master_id: master.id.clone(),
+            master_name: master.display_name.clone(),
+            current_task,
+            points: slayer_state.points,
+            tasks_completed: slayer_state.tasks_completed,
+            rewards,
+            blocked_monsters: slayer_state.blocked_monsters.clone(),
+            unlocked_monsters: slayer_state.unlocked_monsters.clone(),
+        };
+
+        self.send_to_player(player_id, msg).await;
+    }
+
+    pub async fn process_slayer_kill(&self, player_id: &str, prototype_id: &str) {
+        // Check if player has an active slayer task for this monster
+        let mut states = self.player_slayer_states.write().await;
+        let state = match states.get_mut(player_id) {
+            Some(s) => s,
+            None => return,
+        };
+
+        let task_matches = state.current_task.as_ref()
+            .map(|t| t.monster_id == prototype_id)
+            .unwrap_or(false);
+
+        if !task_matches {
+            return;
+        }
+
+        // Increment kills
+        let task = state.current_task.as_mut().unwrap();
+        task.kills_current += 1;
+        let kills_current = task.kills_current;
+        let kills_required = task.kills_required;
+        let xp_per_kill = task.xp_per_kill;
+        let monster_id = task.monster_id.clone();
+        let display_name = task.display_name.clone();
+        let points_on_complete = task.points_on_complete;
+        let completed = kills_current >= kills_required;
+
+        // Drop the slayer state lock before acquiring player lock
+        drop(states);
+
+        // Award XP per kill
+        let (new_xp, new_level, leveled_up) = {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                let leveled = player.skills.slayer.add_xp(xp_per_kill);
+                (player.skills.slayer.xp, player.skills.slayer.level, leveled)
+            } else {
+                return;
+            }
+        };
+
+        // Send XP notification
+        self.send_to_player(player_id, ServerMessage::SkillXp {
+            player_id: player_id.to_string(),
+            skill: "slayer".to_string(),
+            xp_gained: xp_per_kill,
+            total_xp: new_xp,
+            level: new_level,
+        }).await;
+
+        if leveled_up {
+            tracing::info!("Player {} leveled up slayer to {}", player_id, new_level);
+            self.broadcast(ServerMessage::SkillLevelUp {
+                player_id: player_id.to_string(),
+                skill: "slayer".to_string(),
+                new_level,
+            }).await;
+        }
+
+        if completed {
+            // Re-acquire state lock to award points and clear task
+            let mut states = self.player_slayer_states.write().await;
+            if let Some(state) = states.get_mut(player_id) {
+                state.points += points_on_complete;
+                state.tasks_completed += 1;
+                state.current_task = None;
+                let total_points = state.points;
+                drop(states);
+
+                self.send_to_player(player_id, ServerMessage::SlayerTaskComplete {
+                    monster_id: monster_id.clone(),
+                    display_name: display_name.clone(),
+                    points_awarded: points_on_complete,
+                    total_points,
+                }).await;
+
+                tracing::info!(
+                    "Player {} completed slayer task: {} ({}/{}), awarded {} points (total: {})",
+                    player_id, display_name, kills_current, kills_required, points_on_complete, total_points
+                );
+            }
+        } else {
+            // Send progress update
+            self.send_to_player(player_id, ServerMessage::SlayerTaskProgress {
+                monster_id,
+                display_name,
+                kills_current,
+                kills_required,
+            }).await;
+        }
+    }
+
+    pub async fn handle_slayer_get_task(&self, player_id: &str, master_id: &str) {
+        // Validate master exists
+        let master = match self.slayer_registry.get_master(master_id) {
+            Some(m) => m,
+            None => {
+                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                    success: false,
+                    action: "get_task".to_string(),
+                    message: "Unknown slayer master.".to_string(),
+                    task: None,
+                    points: None,
+                }).await;
+                return;
+            }
+        };
+
+        // Get player's combat and slayer levels
+        let (combat_level, slayer_level) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => (p.skills.combat_level(), p.skills.slayer.level),
+                None => return,
+            }
+        };
+
+        // Check combat level requirement
+        if combat_level < master.combat_level_required {
+            self.send_to_player(player_id, ServerMessage::SlayerResult {
+                success: false,
+                action: "get_task".to_string(),
+                message: format!(
+                    "You need a combat level of {} to receive tasks from {}. Your combat level is {}.",
+                    master.combat_level_required, master.display_name, combat_level
+                ),
+                task: None,
+                points: None,
+            }).await;
+            return;
+        }
+
+        // Check slayer level requirement
+        if slayer_level < master.slayer_level_required {
+            self.send_to_player(player_id, ServerMessage::SlayerResult {
+                success: false,
+                action: "get_task".to_string(),
+                message: format!(
+                    "You need a Slayer level of {} to receive tasks from {}. Your Slayer level is {}.",
+                    master.slayer_level_required, master.display_name, slayer_level
+                ),
+                task: None,
+                points: None,
+            }).await;
+            return;
+        }
+
+        // Check if player already has a task
+        {
+            let states = self.player_slayer_states.read().await;
+            if let Some(state) = states.get(player_id) {
+                if state.current_task.is_some() {
+                    self.send_to_player(player_id, ServerMessage::SlayerResult {
+                        success: false,
+                        action: "get_task".to_string(),
+                        message: "You already have a slayer task. Complete or cancel it first.".to_string(),
+                        task: None,
+                        points: None,
+                    }).await;
+                    return;
+                }
+            }
+        }
+
+        // Get player slayer state for task assignment
+        let player_state = {
+            let states = self.player_slayer_states.read().await;
+            states.get(player_id).cloned().unwrap_or_default()
+        };
+
+        // Assign a task
+        match self.slayer_registry.assign_task(master_id, slayer_level, &player_state) {
+            Some(task) => {
+                let task_data = crate::protocol::SlayerTaskData {
+                    monster_id: task.monster_id.clone(),
+                    display_name: task.display_name.clone(),
+                    kills_current: task.kills_current,
+                    kills_required: task.kills_required,
+                    xp_per_kill: task.xp_per_kill,
+                    master_id: task.master_id.clone(),
+                    points_on_complete: task.points_on_complete,
+                };
+
+                // Store the task
+                let mut states = self.player_slayer_states.write().await;
+                let state = states.entry(player_id.to_string()).or_insert_with(Default::default);
+                state.current_task = Some(task);
+
+                tracing::info!(
+                    "Player {} assigned slayer task: {} x{} from {}",
+                    player_id, task_data.display_name, task_data.kills_required, master_id
+                );
+
+                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                    success: true,
+                    action: "get_task".to_string(),
+                    message: format!(
+                        "Your task is to kill {} {}.",
+                        task_data.kills_required, task_data.display_name
+                    ),
+                    task: Some(task_data),
+                    points: None,
+                }).await;
+            }
+            None => {
+                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                    success: false,
+                    action: "get_task".to_string(),
+                    message: "No suitable tasks available for your level.".to_string(),
+                    task: None,
+                    points: None,
+                }).await;
+            }
+        }
+    }
+
+    pub async fn handle_slayer_cancel_task(&self, player_id: &str) {
+        let mut states = self.player_slayer_states.write().await;
+        let state = match states.get_mut(player_id) {
+            Some(s) => s,
+            None => {
+                drop(states);
+                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                    success: false,
+                    action: "cancel_task".to_string(),
+                    message: "You don't have a slayer profile yet.".to_string(),
+                    task: None,
+                    points: None,
+                }).await;
+                return;
+            }
+        };
+
+        if state.current_task.is_none() {
+            drop(states);
+            self.send_to_player(player_id, ServerMessage::SlayerResult {
+                success: false,
+                action: "cancel_task".to_string(),
+                message: "You don't have an active slayer task.".to_string(),
+                task: None,
+                points: None,
+            }).await;
+            return;
+        }
+
+        // Deduct 30 points
+        if state.points < 30 {
+            let points = state.points;
+            drop(states);
+            self.send_to_player(player_id, ServerMessage::SlayerResult {
+                success: false,
+                action: "cancel_task".to_string(),
+                message: format!("You need 30 slayer points to cancel a task. You have {}.", points),
+                task: None,
+                points: None,
+            }).await;
+            return;
+        }
+
+        state.points -= 30;
+        state.current_task = None;
+        let remaining_points = state.points;
+        drop(states);
+
+        tracing::info!("Player {} cancelled slayer task (-30 points, {} remaining)", player_id, remaining_points);
+
+        self.send_to_player(player_id, ServerMessage::SlayerResult {
+            success: true,
+            action: "cancel_task".to_string(),
+            message: "Your slayer task has been cancelled. 30 points have been deducted.".to_string(),
+            task: None,
+            points: Some(remaining_points),
+        }).await;
+    }
+
+    pub async fn handle_slayer_buy_reward(&self, player_id: &str, reward_id: &str, target_monster_id: Option<String>) {
+        // Look up the reward definition
+        let reward = match self.slayer_registry.get_reward(reward_id) {
+            Some(r) => r.clone(),
+            None => {
+                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                    success: false,
+                    action: "buy_reward".to_string(),
+                    message: "Unknown reward.".to_string(),
+                    task: None,
+                    points: None,
+                }).await;
+                return;
+            }
+        };
+
+        // Check if player has enough points
+        let mut states = self.player_slayer_states.write().await;
+        let state = states.entry(player_id.to_string()).or_insert_with(Default::default);
+
+        if state.points < reward.cost {
+            let points = state.points;
+            drop(states);
+            self.send_to_player(player_id, ServerMessage::SlayerResult {
+                success: false,
+                action: "buy_reward".to_string(),
+                message: format!("You need {} slayer points. You have {}.", reward.cost, points),
+                task: None,
+                points: None,
+            }).await;
+            return;
+        }
+
+        match reward.category.as_str() {
+            "unlock" => {
+                let monster_id = reward.target_id.as_ref().or(target_monster_id.as_ref());
+                if let Some(mid) = monster_id {
+                    if state.unlocked_monsters.contains(mid) {
+                        drop(states);
+                        self.send_to_player(player_id, ServerMessage::SlayerResult {
+                            success: false,
+                            action: "buy_reward".to_string(),
+                            message: "You have already unlocked this monster.".to_string(),
+                            task: None,
+                            points: None,
+                        }).await;
+                        return;
+                    }
+                    state.points -= reward.cost;
+                    state.unlocked_monsters.push(mid.clone());
+                    let points = state.points;
+                    drop(states);
+
+                    tracing::info!("Player {} unlocked monster {} for {} points", player_id, mid, reward.cost);
+
+                    self.send_to_player(player_id, ServerMessage::SlayerResult {
+                        success: true,
+                        action: "buy_reward".to_string(),
+                        message: format!("Unlocked {} as a slayer task.", reward.display_name),
+                        task: None,
+                        points: Some(points),
+                    }).await;
+                } else {
+                    drop(states);
+                    self.send_to_player(player_id, ServerMessage::SlayerResult {
+                        success: false,
+                        action: "buy_reward".to_string(),
+                        message: "No target monster specified for unlock.".to_string(),
+                        task: None,
+                        points: None,
+                    }).await;
+                }
+            }
+            "block" => {
+                let monster_id = reward.target_id.as_ref().or(target_monster_id.as_ref());
+                if let Some(mid) = monster_id {
+                    if state.blocked_monsters.contains(mid) {
+                        drop(states);
+                        self.send_to_player(player_id, ServerMessage::SlayerResult {
+                            success: false,
+                            action: "buy_reward".to_string(),
+                            message: "This monster is already blocked.".to_string(),
+                            task: None,
+                            points: None,
+                        }).await;
+                        return;
+                    }
+                    state.points -= reward.cost;
+                    state.blocked_monsters.push(mid.clone());
+                    let points = state.points;
+                    drop(states);
+
+                    tracing::info!("Player {} blocked monster {} for {} points", player_id, mid, reward.cost);
+
+                    self.send_to_player(player_id, ServerMessage::SlayerResult {
+                        success: true,
+                        action: "buy_reward".to_string(),
+                        message: format!("Blocked {}. You will no longer receive this as a task.", reward.display_name),
+                        task: None,
+                        points: Some(points),
+                    }).await;
+                } else {
+                    drop(states);
+                    self.send_to_player(player_id, ServerMessage::SlayerResult {
+                        success: false,
+                        action: "buy_reward".to_string(),
+                        message: "No target monster specified for block.".to_string(),
+                        task: None,
+                        points: None,
+                    }).await;
+                }
+            }
+            "potion" => {
+                let item_id = match &reward.target_id {
+                    Some(id) => id.clone(),
+                    None => {
+                        drop(states);
+                        self.send_to_player(player_id, ServerMessage::SlayerResult {
+                            success: false,
+                            action: "buy_reward".to_string(),
+                            message: "Reward has no associated item.".to_string(),
+                            task: None,
+                            points: None,
+                        }).await;
+                        return;
+                    }
+                };
+
+                state.points -= reward.cost;
+                let points = state.points;
+                drop(states);
+
+                // Add item to player inventory
+                {
+                    let mut players = self.players.write().await;
+                    if let Some(player) = players.get_mut(player_id) {
+                        player.inventory.add_item(&item_id, reward.quantity, &self.item_registry);
+                    }
+                }
+
+                tracing::info!("Player {} bought {}x {} for {} slayer points", player_id, reward.quantity, item_id, reward.cost);
+
+                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                    success: true,
+                    action: "buy_reward".to_string(),
+                    message: format!("Purchased {}x {}.", reward.quantity, reward.display_name),
+                    task: None,
+                    points: Some(points),
+                }).await;
+            }
+            other => {
+                drop(states);
+                tracing::warn!("Unknown reward category '{}' for reward {}", other, reward_id);
+                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                    success: false,
+                    action: "buy_reward".to_string(),
+                    message: "Unknown reward category.".to_string(),
+                    task: None,
+                    points: None,
+                }).await;
+            }
+        }
+    }
+
+    pub async fn handle_slayer_remove_block(&self, player_id: &str, monster_id: &str) {
+        let mut states = self.player_slayer_states.write().await;
+        let state = match states.get_mut(player_id) {
+            Some(s) => s,
+            None => {
+                drop(states);
+                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                    success: false,
+                    action: "remove_block".to_string(),
+                    message: "You don't have a slayer profile yet.".to_string(),
+                    task: None,
+                    points: None,
+                }).await;
+                return;
+            }
+        };
+
+        if let Some(pos) = state.blocked_monsters.iter().position(|m| m == monster_id) {
+            state.blocked_monsters.remove(pos);
+            drop(states);
+
+            tracing::info!("Player {} removed block on monster {}", player_id, monster_id);
+
+            self.send_to_player(player_id, ServerMessage::SlayerResult {
+                success: true,
+                action: "remove_block".to_string(),
+                message: "Monster unblocked. You may receive it as a task again.".to_string(),
+                task: None,
+                points: None,
+            }).await;
+        } else {
+            drop(states);
+            self.send_to_player(player_id, ServerMessage::SlayerResult {
+                success: false,
+                action: "remove_block".to_string(),
+                message: "That monster is not currently blocked.".to_string(),
+                task: None,
+                points: None,
+            }).await;
+        }
+    }
+
     /// Check if two directions are close enough (within 45 degrees)
     fn directions_match(dir1: Direction, dir2: Direction) -> bool {
         // Convert to numeric for comparison
@@ -4016,6 +4627,15 @@ impl GameRoom {
 
         if is_plot_seller {
             self.show_master_farmer_dialogue(player_id, &npc_id).await;
+            return;
+        }
+
+        // Slayer Master interaction
+        let is_slayer_master = self.entity_registry.get(&entity_type)
+            .map(|p| p.behaviors.slayer_master)
+            .unwrap_or(false);
+        if is_slayer_master {
+            self.handle_slayer_master_interact(player_id, &npc_id).await;
             return;
         }
 
@@ -11308,6 +11928,9 @@ impl GameRoom {
 
                 // Process quest kill event
                 self.process_quest_kill(player_id, &prototype_id).await;
+
+                // Process slayer kill event
+                self.process_slayer_kill(player_id, &prototype_id).await;
 
                 // Spawn item drops from prototype loot table
                 let drop_time = std::time::SystemTime::now()

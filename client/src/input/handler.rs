@@ -408,6 +408,18 @@ pub enum InputCommand {
         recipe_id: String,
         quantity: u32,
     },
+    // Slayer commands
+    SlayerGetTask {
+        master_id: String,
+    },
+    SlayerCancelTask,
+    SlayerBuyReward {
+        reward_id: String,
+        target_monster_id: Option<String>,
+    },
+    SlayerRemoveBlock {
+        monster_id: String,
+    },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -676,6 +688,7 @@ impl InputHandler {
             || state.ui_state.quest_log_open
             || state.ui_state.social_open
             || state.ui_state.chat_panel_open
+            || state.ui_state.slayer_panel_open
             || in_dialogue;
         let hide_action_buttons = any_panel_open;
         let hide_direction_controls = state.ui_state.escape_menu_open
@@ -686,6 +699,7 @@ impl InputHandler {
             || state.ui_state.bank_open
             || state.ui_state.minimap_panel_open
             || state.ui_state.quest_log_open
+            || state.ui_state.slayer_panel_open
             || in_dialogue;
         self.touch_controls.update(
             current_time,
@@ -2790,6 +2804,76 @@ impl InputHandler {
                 state.ui_state.bank_slots.clear();
                 state.ui_state.bank_quantity_dialog = None;
                 state.ui_state.bank_help_open = false;
+                return commands;
+            }
+
+            return commands;
+        }
+
+        // Handle slayer panel mode
+        if state.ui_state.slayer_panel_open {
+            // Mouse wheel scroll for reward list
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                if let Some(UiElementId::SlayerScrollArea) = &state.ui_state.hovered_element {
+                    state.ui_state.slayer_reward_scroll =
+                        (state.ui_state.slayer_reward_scroll - wheel_y * 30.0).max(0.0);
+                }
+            }
+
+            if mouse_clicked {
+                if let Some(ref element) = state.ui_state.hovered_element {
+                    match element {
+                        UiElementId::SlayerCloseButton => {
+                            state.ui_state.slayer_panel_open = false;
+                            state.pending_sfx.push("enter".to_string());
+                        }
+                        UiElementId::SlayerGetTaskButton => {
+                            if let Some(ref master_id) = state.ui_state.slayer_master_id.clone() {
+                                commands.push(InputCommand::SlayerGetTask {
+                                    master_id: master_id.clone(),
+                                });
+                            }
+                            state.pending_sfx.push("enter".to_string());
+                        }
+                        UiElementId::SlayerCancelTaskButton => {
+                            commands.push(InputCommand::SlayerCancelTask);
+                            state.pending_sfx.push("enter".to_string());
+                        }
+                        UiElementId::SlayerRewardTab(idx) => {
+                            state.ui_state.slayer_reward_tab = *idx;
+                            state.ui_state.slayer_reward_scroll = 0.0;
+                            state.pending_sfx.push("enter".to_string());
+                        }
+                        UiElementId::SlayerBuyReward(idx) => {
+                            if let Some(reward) = state.ui_state.slayer_rewards.get(*idx) {
+                                if state.ui_state.slayer_points >= reward.cost {
+                                    commands.push(InputCommand::SlayerBuyReward {
+                                        reward_id: reward.id.clone(),
+                                        target_monster_id: reward.target_id.clone(),
+                                    });
+                                    state.pending_sfx.push("enter".to_string());
+                                }
+                            }
+                        }
+                        UiElementId::SlayerRemoveBlock(idx) => {
+                            if let Some(monster_name) =
+                                state.ui_state.slayer_blocked_monsters.get(*idx)
+                            {
+                                commands.push(InputCommand::SlayerRemoveBlock {
+                                    monster_id: monster_name.clone(),
+                                });
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Escape to close
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.slayer_panel_open = false;
                 return commands;
             }
 

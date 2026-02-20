@@ -46,6 +46,7 @@ mod protocol;
 mod quest;
 mod shop;
 mod skills;
+mod slayer;
 mod spell;
 mod tilemap;
 mod log_buffer;
@@ -1147,6 +1148,23 @@ async fn matchmake_join_or_create(
         }
     }
 
+    // Load slayer state from database
+    match state.db.load_character_slayer_state(character_id).await {
+        Ok(slayer_state) => {
+            let has_task = slayer_state.current_task.is_some();
+            let points = slayer_state.points;
+            room.set_player_slayer_state(&player_id, slayer_state).await;
+            if has_task || points > 0 {
+                info!("Loaded slayer state for {}: task={}, points={}",
+                    character_data.name, has_task, points);
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to load slayer state for character {}: {}", character_id, e);
+            // Continue with default slayer state
+        }
+    }
+
     // Load discovered recipes from database
     match state.db.load_discovered_recipes(character_id).await {
         Ok(recipes) => {
@@ -1683,6 +1701,28 @@ async fn handle_socket(
         }
     }
 
+    // Send initial slayer state to this client
+    if let Some(slayer_state) = room.get_player_slayer_state(&player_id).await {
+        let slayer_msg = ServerMessage::SlayerStateSync {
+            current_task: slayer_state.current_task.as_ref().map(|t| protocol::SlayerTaskData {
+                monster_id: t.monster_id.clone(),
+                display_name: t.display_name.clone(),
+                kills_current: t.kills_current,
+                kills_required: t.kills_required,
+                xp_per_kill: t.xp_per_kill,
+                master_id: t.master_id.clone(),
+                points_on_complete: t.points_on_complete,
+            }),
+            points: slayer_state.points,
+            tasks_completed: slayer_state.tasks_completed,
+            blocked_monsters: slayer_state.blocked_monsters.clone(),
+            unlocked_monsters: slayer_state.unlocked_monsters.clone(),
+        };
+        if let Ok(bytes) = protocol::encode_server_message(&slayer_msg) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
     // Create channel for sending messages to this client
     let (tx, mut rx) = mpsc::channel::<Vec<u8>>(512);
 
@@ -1845,6 +1885,18 @@ async fn handle_socket(
                 } else if !quest_state.active_quests.is_empty() || !quest_state.completed_quests.is_empty() {
                     info!("Saved quest state for {}: {} active, {} completed",
                         character_name, quest_state.active_quests.len(), quest_state.completed_quests.len());
+                }
+            }
+        }
+
+        // Save slayer state to database
+        if character_id > 0 {
+            if let Some(slayer_state) = room.get_player_slayer_state(&player_id).await {
+                if let Err(e) = state.db.save_character_slayer_state(character_id, &slayer_state).await {
+                    error!("Failed to save slayer state for {} on disconnect: {}", character_name, e);
+                } else if slayer_state.current_task.is_some() || slayer_state.points > 0 {
+                    info!("Saved slayer state for {}: task={}, points={}",
+                        character_name, slayer_state.current_task.is_some(), slayer_state.points);
                 }
             }
         }
@@ -2840,6 +2892,19 @@ async fn handle_client_message(
             room.handle_bank_withdraw_gold(player_id, amount).await;
         }
 
+        ClientMessage::SlayerGetTask { master_id } => {
+            room.handle_slayer_get_task(player_id, &master_id).await;
+        }
+        ClientMessage::SlayerCancelTask => {
+            room.handle_slayer_cancel_task(player_id).await;
+        }
+        ClientMessage::SlayerBuyReward { reward_id, target_monster_id } => {
+            room.handle_slayer_buy_reward(player_id, &reward_id, target_monster_id).await;
+        }
+        ClientMessage::SlayerRemoveBlock { monster_id } => {
+            room.handle_slayer_remove_block(player_id, &monster_id).await;
+        }
+
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
         ClientMessage::StartCraftBatch { recipe_id, quantity } => {
             room.handle_start_craft_batch(player_id, &recipe_id, quantity).await;
@@ -2962,7 +3027,7 @@ async fn main() {
                     let bulk_data = room.get_bulk_save_data(&player_ids).await;
 
                     for (character_id, character_name, player_id) in players {
-                        if let Some((mut save_data, quest_state, discovered_recipes)) = bulk_data.get(player_id).cloned() {
+                        if let Some((mut save_data, quest_state, discovered_recipes, slayer_state)) = bulk_data.get(player_id).cloned() {
                             let played_time_delta = save_state.play_time_anchors
                                 .get(character_id)
                                 .map(|anchor| anchor.elapsed().as_secs() as i64)
@@ -2977,7 +3042,7 @@ async fn main() {
                                 }
                             }
 
-                            snapshots.push((*character_id, character_name.clone(), save_data, quest_state, played_time_delta, discovered_recipes));
+                            snapshots.push((*character_id, character_name.clone(), save_data, quest_state, played_time_delta, discovered_recipes, slayer_state));
                         }
                     }
                 }
@@ -2992,7 +3057,7 @@ async fn main() {
                 let save_count = snapshots.len();
                 let mut save_tasks = Vec::with_capacity(save_count);
 
-                for (character_id, character_name, save_data, quest_state, played_time_delta, discovered_recipes) in snapshots {
+                for (character_id, character_name, save_data, quest_state, played_time_delta, discovered_recipes, slayer_state) in snapshots {
                     let db = save_state.db.clone();
                     save_tasks.push(tokio::spawn(async move {
                         if let Err(e) = db.save_character(
@@ -3030,6 +3095,11 @@ async fn main() {
                         // Save discovered recipes
                         for recipe_id in &discovered_recipes {
                             let _ = db.save_discovered_recipe(character_id, recipe_id).await;
+                        }
+
+                        // Save slayer state
+                        if let Some(slayer_state) = slayer_state {
+                            let _ = db.save_character_slayer_state(character_id, &slayer_state).await;
                         }
                     }));
                 }
@@ -3200,7 +3270,7 @@ async fn main() {
             let char_id_map: HashMap<&str, i64> = players.iter().map(|(pid, cid)| (pid.as_str(), *cid)).collect();
 
             let bulk_data = room.get_bulk_save_data(&player_ids).await;
-            for (player_id, (save_data, quest_state, discovered_recipes)) in bulk_data {
+            for (player_id, (save_data, quest_state, discovered_recipes, slayer_state)) in bulk_data {
                 let character_id = match char_id_map.get(player_id.as_str()) {
                     Some(id) => *id,
                     None => continue,
@@ -3242,6 +3312,10 @@ async fn main() {
 
                 for recipe_id in &discovered_recipes {
                     let _ = shutdown_state.db.save_discovered_recipe(character_id, recipe_id).await;
+                }
+
+                if let Some(slayer_state) = slayer_state {
+                    let _ = shutdown_state.db.save_character_slayer_state(character_id, &slayer_state).await;
                 }
             }
         }

@@ -8,7 +8,7 @@ use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
 impl Renderer {
-    fn quest_tracker_height(&self, state: &GameState, tracker_width: f32) -> f32 {
+    pub(crate) fn quest_tracker_height(&self, state: &GameState, tracker_width: f32) -> f32 {
         if state.ui_state.active_quests.is_empty() {
             return 0.0;
         }
@@ -512,6 +512,41 @@ impl Renderer {
                 y += objective_line_height;
             }
         }
+    }
+
+    /// Render slayer task tracker (right-aligned, below quest tracker)
+    pub(crate) fn render_slayer_task_tracker(
+        &self,
+        task: &crate::game::slayer::SlayerTaskClientData,
+        tracker_x: f32,
+        tracker_y: f32,
+        tracker_width: f32,
+    ) {
+        let line_height = 18.0;
+        let right_edge = tracker_x + tracker_width;
+        let draw_right = |renderer: &Renderer, text: &str, y: f32, color: Color| {
+            let text_width = renderer.measure_text_sharp(text, 16.0).width;
+            renderer.draw_text_sharp(text, (right_edge - text_width).floor(), y, 16.0, color);
+        };
+
+        let mut y = tracker_y;
+
+        // Header
+        draw_right(self, "SLAYER", y, Color::from_rgba(200, 120, 120, 255));
+        y += line_height;
+
+        // Task info: "Monster 12/25"
+        let progress = format!(
+            "{} {}/{}",
+            task.display_name, task.kills_current, task.kills_required
+        );
+        let complete = task.kills_current >= task.kills_required;
+        let status_color = if complete {
+            Color::from_rgba(100, 255, 100, 255)
+        } else {
+            Color::from_rgba(200, 200, 200, 255)
+        };
+        draw_right(self, &progress, y, status_color);
     }
 
     pub(crate) fn render_quest_completed(&self, state: &GameState) {

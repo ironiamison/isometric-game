@@ -61,6 +61,75 @@ fn reset_adventurer_guide_dialogue(state: &mut GameState) -> bool {
     true
 }
 
+fn extract_slayer_task(
+    value: &rmpv::Value,
+    key: &str,
+) -> Option<crate::game::slayer::SlayerTaskClientData> {
+    let task_val = &value
+        .as_map()?
+        .iter()
+        .find(|(k, _)| k.as_str() == Some(key))?
+        .1;
+    if task_val.is_nil() {
+        return None;
+    }
+    Some(crate::game::slayer::SlayerTaskClientData {
+        monster_id: extract_string(task_val, "monster_id").unwrap_or_default(),
+        display_name: extract_string(task_val, "display_name").unwrap_or_default(),
+        kills_current: extract_i32(task_val, "kills_current").unwrap_or(0),
+        kills_required: extract_i32(task_val, "kills_required").unwrap_or(0),
+        xp_per_kill: extract_i32(task_val, "xp_per_kill").unwrap_or(0) as i64,
+        master_id: extract_string(task_val, "master_id").unwrap_or_default(),
+        points_on_complete: extract_i32(task_val, "points_on_complete").unwrap_or(0),
+    })
+}
+
+fn extract_slayer_rewards(
+    value: &rmpv::Value,
+    key: &str,
+) -> Vec<crate::game::slayer::SlayerRewardClientData> {
+    let arr = match value
+        .as_map()
+        .and_then(|m| m.iter().find(|(k, _)| k.as_str() == Some(key)).map(|(_, v)| v))
+    {
+        Some(v) => v,
+        None => return Vec::new(),
+    };
+    let items = match arr.as_array() {
+        Some(a) => a,
+        None => return Vec::new(),
+    };
+    items
+        .iter()
+        .map(|r| crate::game::slayer::SlayerRewardClientData {
+            id: extract_string(r, "id").unwrap_or_default(),
+            display_name: extract_string(r, "display_name").unwrap_or_default(),
+            description: extract_string(r, "description").unwrap_or_default(),
+            cost: extract_i32(r, "cost").unwrap_or(0),
+            category: extract_string(r, "category").unwrap_or_default(),
+            target_id: extract_string(r, "target_id"),
+            quantity: extract_i32(r, "quantity").unwrap_or(1),
+        })
+        .collect()
+}
+
+fn extract_string_array(value: &rmpv::Value, key: &str) -> Vec<String> {
+    let arr = match value
+        .as_map()
+        .and_then(|m| m.iter().find(|(k, _)| k.as_str() == Some(key)).map(|(_, v)| v))
+    {
+        Some(v) => v,
+        None => return Vec::new(),
+    };
+    match arr.as_array() {
+        Some(a) => a
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect(),
+        None => Vec::new(),
+    }
+}
+
 pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut GameState) {
     match msg_type {
         "welcome" => {
@@ -568,6 +637,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let is_merchant = extract_bool(npc_value, "is_merchant").unwrap_or(false);
                         let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
                         let is_banker = extract_bool(npc_value, "is_banker").unwrap_or(false);
+                        let is_slayer_master =
+                            extract_bool(npc_value, "is_slayer_master").unwrap_or(false);
                         let station_type = extract_string(npc_value, "station_type");
                         let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
                         let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
@@ -609,6 +680,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.is_merchant = is_merchant;
                             npc.is_altar = is_altar;
                             npc.is_banker = is_banker;
+                            npc.is_slayer_master = is_slayer_master;
                             npc.station_type = station_type;
                             npc.move_speed = move_speed;
                             npc.no_shadow = no_shadow;
@@ -628,6 +700,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.is_merchant = is_merchant;
                             npc.is_altar = is_altar;
                             npc.is_banker = is_banker;
+                            npc.is_slayer_master = is_slayer_master;
                             npc.station_type = station_type;
                             npc.move_speed = move_speed;
                             npc.no_shadow = no_shadow;
@@ -1071,8 +1144,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(xp) = extract_i32(value, "mining_xp") {
                             player.skills.mining.xp = xp as i64;
                         }
+                        if let Some(level) = extract_i32(value, "slayer_level") {
+                            player.skills.slayer.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "slayer_xp") {
+                            player.skills.slayer.xp = xp as i64;
+                        }
 
-                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}",
+                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}, Slayer {}",
                             player_id,
                             player.skills.hitpoints.level,
                             player.skills.combat.level,
@@ -1083,7 +1162,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.skills.magic.level,
                             player.skills.woodcutting.level,
                             player.skills.alchemy.level,
-                            player.skills.mining.level
+                            player.skills.mining.level,
+                            player.skills.slayer.level
                         );
                     } else {
                         log::warn!(
@@ -3426,6 +3506,91 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             latency_ms.round() as i32
                         )));
                 }
+            }
+        }
+
+        // ========== Slayer System Messages ==========
+        "slayerPanelOpen" => {
+            if let Some(value) = data {
+                state.ui_state.slayer_master_id = extract_string(value, "master_id");
+                state.ui_state.slayer_master_name = extract_string(value, "master_name");
+                state.ui_state.slayer_current_task = extract_slayer_task(value, "current_task");
+                state.ui_state.slayer_points = extract_i32(value, "points").unwrap_or(0);
+                state.ui_state.slayer_tasks_completed =
+                    extract_i32(value, "tasks_completed").unwrap_or(0);
+                state.ui_state.slayer_rewards = extract_slayer_rewards(value, "rewards");
+                state.ui_state.slayer_blocked_monsters =
+                    extract_string_array(value, "blocked_monsters");
+                state.ui_state.slayer_unlocked_monsters =
+                    extract_string_array(value, "unlocked_monsters");
+                state.ui_state.slayer_panel_open = true;
+                state.ui_state.slayer_reward_tab = 0;
+                state.ui_state.slayer_reward_scroll = 0.0;
+                state.pending_sfx.push("ui_open".to_string());
+            }
+        }
+
+        "slayerTaskProgress" => {
+            if let Some(value) = data {
+                if let Some(ref mut task) = state.ui_state.slayer_current_task {
+                    if let Some(kills) = extract_i32(value, "kills_current") {
+                        task.kills_current = kills;
+                    }
+                    if let Some(kills) = extract_i32(value, "kills_required") {
+                        task.kills_required = kills;
+                    }
+                }
+            }
+        }
+
+        "slayerTaskComplete" => {
+            if let Some(value) = data {
+                state.ui_state.slayer_current_task = None;
+                if let Some(pts) = extract_i32(value, "total_points") {
+                    state.ui_state.slayer_points = pts;
+                }
+                state.ui_state.slayer_tasks_completed += 1;
+                let _display = extract_string(value, "display_name").unwrap_or_default();
+                let pts = extract_i32(value, "points_awarded").unwrap_or(0);
+                state
+                    .ui_state
+                    .chat_messages
+                    .push(ChatMessage::system(format!(
+                        "Slayer task complete! +{} points",
+                        pts
+                    )));
+                state.pending_sfx.push("level_up".to_string());
+            }
+        }
+
+        "slayerResult" => {
+            if let Some(value) = data {
+                let success = extract_bool(value, "success").unwrap_or(false);
+                let message = extract_string(value, "message").unwrap_or_default();
+                if success {
+                    // Update task if provided
+                    state.ui_state.slayer_current_task = extract_slayer_task(value, "task");
+                    if let Some(pts) = extract_i32(value, "points") {
+                        state.ui_state.slayer_points = pts;
+                    }
+                }
+                state
+                    .ui_state
+                    .chat_messages
+                    .push(ChatMessage::system(message));
+            }
+        }
+
+        "slayerStateSync" => {
+            if let Some(value) = data {
+                state.ui_state.slayer_current_task = extract_slayer_task(value, "current_task");
+                state.ui_state.slayer_points = extract_i32(value, "points").unwrap_or(0);
+                state.ui_state.slayer_tasks_completed =
+                    extract_i32(value, "tasks_completed").unwrap_or(0);
+                state.ui_state.slayer_blocked_monsters =
+                    extract_string_array(value, "blocked_monsters");
+                state.ui_state.slayer_unlocked_monsters =
+                    extract_string_array(value, "unlocked_monsters");
             }
         }
 

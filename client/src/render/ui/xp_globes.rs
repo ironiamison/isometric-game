@@ -353,6 +353,7 @@ impl Renderer {
                 SkillType::Magic => (6, 6),
                 SkillType::Woodcutting => (7, 6),
                 SkillType::Alchemy => (1, 6),
+                SkillType::Slayer => (2, 6),
             };
             let src_x = icon_col as f32 * UI_ICON_SIZE;
             let src_y = icon_row as f32 * UI_ICON_SIZE;
@@ -387,6 +388,7 @@ impl Renderer {
                 SkillType::Magic => "Mg",
                 SkillType::Woodcutting => "Wc",
                 SkillType::Alchemy => "Al",
+                SkillType::Slayer => "Sl",
             };
             let color = self.get_xp_globe_skill_color(skill_type);
             let dims = self.measure_text_sharp(letter, 18.0);
@@ -412,6 +414,7 @@ impl Renderer {
             SkillType::Magic => Color::new(0.4, 0.3, 0.9, 1.0),
             SkillType::Woodcutting => Color::new(0.55, 0.35, 0.2, 1.0),
             SkillType::Alchemy => Color::new(0.5, 0.8, 0.4, 1.0),
+            SkillType::Slayer => Color::new(0.7, 0.2, 0.2, 1.0),
         }
     }
 

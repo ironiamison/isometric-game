@@ -3778,6 +3778,8 @@ impl Renderer {
                 Color::from_rgba(255, 215, 0, 255)
             } else if npc.is_merchant {
                 Color::from_rgba(150, 255, 150, 255)
+            } else if npc.is_slayer_master {
+                Color::from_rgba(200, 80, 80, 255)
             } else if npc.station_type.is_some() {
                 Color::from_rgba(255, 180, 100, 255)
             } else {
@@ -6397,6 +6399,8 @@ impl Renderer {
             Color::from_rgba(255, 215, 0, 255) // Gold for bankers
         } else if npc.is_merchant {
             Color::from_rgba(150, 255, 150, 255) // Light green for merchants
+        } else if npc.is_slayer_master {
+            Color::from_rgba(200, 80, 80, 255) // Dark red for slayer masters
         } else if npc.station_type.is_some() {
             Color::from_rgba(255, 180, 100, 255) // Warm orange for stations
         } else {
@@ -8693,6 +8697,15 @@ impl Renderer {
         let tracker_x = (tracker_right - tracker_width).floor();
         self.render_quest_tracker(state, tracker_x, tracker_y, tracker_width);
 
+        // Slayer task tracker below quest tracker (only when panel is closed and task is active)
+        if !state.ui_state.slayer_panel_open {
+            if let Some(ref task) = state.ui_state.slayer_current_task {
+                let quest_h = self.quest_tracker_height(state, tracker_width);
+                let slayer_y = tracker_y + quest_h + if quest_h > 0.0 { 8.0 } else { 0.0 };
+                self.render_slayer_task_tracker(task, tracker_x, slayer_y, tracker_width);
+            }
+        }
+
         // Inventory UI (when open)
         if state.ui_state.inventory_open {
             self.render_inventory(state, hovered, &mut layout);
@@ -8728,6 +8741,9 @@ impl Renderer {
                 self.render_bank_help_overlay(hovered, &mut layout);
             }
         }
+
+        // Slayer panel (when open)
+        self.render_slayer_panel(state, hovered, &mut layout);
 
         // Skills panel (when open)
         self.render_skills_panel(state, hovered, &mut layout);
