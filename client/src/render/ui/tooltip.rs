@@ -123,10 +123,18 @@ impl Renderer {
         // Get item definition from registry
         let item_def = state.item_registry.get_or_placeholder(&item_id);
 
-        // Get player combat level for requirement checking (single combat skill)
+        // Get player skill levels for requirement checking
         let player_combat_level = state
             .get_local_player()
             .map(|p| p.skills.combat.level)
+            .unwrap_or(1);
+        let player_woodcutting_level = state
+            .get_local_player()
+            .map(|p| p.skills.woodcutting.level)
+            .unwrap_or(1);
+        let player_mining_level = state
+            .get_local_player()
+            .map(|p| p.skills.mining.level)
             .unwrap_or(1);
 
         // Get mouse position for tooltip placement
@@ -203,6 +211,14 @@ impl Renderer {
             if !req_text.is_empty() {
                 max_w = max_w.max(self.measure_text_sharp(&req_text, small_font_size).width);
             }
+            if equip.woodcutting_level_required > 1 {
+                let wc_req_text = format!("Requires {} Woodcutting", equip.woodcutting_level_required);
+                max_w = max_w.max(self.measure_text_sharp(&wc_req_text, small_font_size).width);
+            }
+            if equip.mining_level_required > 1 {
+                let mining_req_text = format!("Requires {} Mining", equip.mining_level_required);
+                max_w = max_w.max(self.measure_text_sharp(&mining_req_text, small_font_size).width);
+            }
         }
 
         let tooltip_width = (max_w + padding * 2.0).ceil().min(max_tooltip_width);
@@ -231,11 +247,17 @@ impl Renderer {
                 if equip.defence_bonus != 0 {
                     total_h += line_height;
                 }
-                // Level requirement line (only if > 1)
+                // Level requirement lines (only if > 1)
                 let is_weapon = equip.slot_type == "weapon";
                 if (is_weapon && equip.attack_level_required > 1)
                     || (!is_weapon && equip.defence_level_required > 1)
                 {
+                    total_h += line_height;
+                }
+                if equip.woodcutting_level_required > 1 {
+                    total_h += line_height;
+                }
+                if equip.mining_level_required > 1 {
                     total_h += line_height;
                 }
             }
@@ -411,6 +433,37 @@ impl Renderer {
                     small_font_size,
                     req_color,
                 );
+                y += line_height;
+            }
+
+            // Woodcutting level requirement
+            if equip.woodcutting_level_required > 1 {
+                let meets_req = player_woodcutting_level >= equip.woodcutting_level_required;
+                let req_color = if meets_req { stat_green } else { stat_red };
+                let req_text = format!("Requires {} Woodcutting", equip.woodcutting_level_required);
+                self.draw_text_sharp(
+                    &req_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    req_color,
+                );
+                y += line_height;
+            }
+
+            // Mining level requirement
+            if equip.mining_level_required > 1 {
+                let meets_req = player_mining_level >= equip.mining_level_required;
+                let req_color = if meets_req { stat_green } else { stat_red };
+                let req_text = format!("Requires {} Mining", equip.mining_level_required);
+                self.draw_text_sharp(
+                    &req_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    req_color,
+                );
+                y += line_height;
             }
         }
     }
