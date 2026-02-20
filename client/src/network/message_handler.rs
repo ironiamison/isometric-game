@@ -13,6 +13,10 @@ use crate::game::{
 };
 use crate::render::OVERWORLD_NAME;
 
+/// Max tile distance from local player to play other players' SFX.
+/// Roughly matches the visible screen area so you don't hear off-screen actions.
+const SFX_AUDIBLE_RANGE: f32 = 20.0;
+
 fn adventurer_guide_tier_id(tab_idx: usize, tier_idx: usize) -> Option<&'static str> {
     match (tab_idx, tier_idx) {
         (0, 0) => Some("adventurer_tier_1"),
@@ -2665,19 +2669,31 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let tree_x = extract_i32(value, "tree_x").unwrap_or(0);
                 let tree_y = extract_i32(value, "tree_y").unwrap_or(0);
 
-                // Server says player swung - play attack animation and sound
-                let has_weapon = state
-                    .players
-                    .get(&player_id)
-                    .map(|p| p.equipped_weapon.is_some())
-                    .unwrap_or(false);
+                // Check if the action is close enough to the local player to hear
+                let is_local = state.local_player_id.as_deref() == Some(&player_id);
+                let in_audio_range = is_local || {
+                    state.local_player_id.as_ref().and_then(|id| state.players.get(id)).map(|lp| {
+                        let dx = (lp.x - tree_x as f32).abs();
+                        let dy = (lp.y - tree_y as f32).abs();
+                        dx.max(dy) <= SFX_AUDIBLE_RANGE
+                    }).unwrap_or(false)
+                };
+
+                // Server says player swung - play attack animation (always) and sound (if in range)
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.play_attack();
                 }
-                state.pending_attack_sounds.push(has_weapon);
+                if in_audio_range {
+                    let has_weapon = state
+                        .players
+                        .get(&player_id)
+                        .map(|p| p.equipped_weapon.is_some())
+                        .unwrap_or(false);
+                    state.pending_attack_sounds.push(has_weapon);
 
-                // Play woodcutting sound effect
-                state.pending_sfx.push("woodcut".to_string());
+                    // Play woodcutting sound effect
+                    state.pending_sfx.push("woodcut".to_string());
+                }
 
                 // Add tree shake effect
                 state
@@ -2848,19 +2864,31 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let rock_x = extract_i32(value, "rock_x").unwrap_or(0);
                 let rock_y = extract_i32(value, "rock_y").unwrap_or(0);
 
-                // Server says player swung - play attack animation and sound
-                let has_weapon = state
-                    .players
-                    .get(&player_id)
-                    .map(|p| p.equipped_weapon.is_some())
-                    .unwrap_or(false);
+                // Check if the action is close enough to the local player to hear
+                let is_local = state.local_player_id.as_deref() == Some(&player_id);
+                let in_audio_range = is_local || {
+                    state.local_player_id.as_ref().and_then(|id| state.players.get(id)).map(|lp| {
+                        let dx = (lp.x - rock_x as f32).abs();
+                        let dy = (lp.y - rock_y as f32).abs();
+                        dx.max(dy) <= SFX_AUDIBLE_RANGE
+                    }).unwrap_or(false)
+                };
+
+                // Server says player swung - play attack animation (always) and sound (if in range)
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.play_attack();
                 }
-                state.pending_attack_sounds.push(has_weapon);
+                if in_audio_range {
+                    let has_weapon = state
+                        .players
+                        .get(&player_id)
+                        .map(|p| p.equipped_weapon.is_some())
+                        .unwrap_or(false);
+                    state.pending_attack_sounds.push(has_weapon);
 
-                // Play mining sound effect
-                state.pending_sfx.push("mining".to_string());
+                    // Play mining sound effect
+                    state.pending_sfx.push("mining".to_string());
+                }
 
                 // Add rock shake effect
                 state
