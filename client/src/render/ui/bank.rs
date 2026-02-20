@@ -21,20 +21,24 @@ impl Renderer {
         layout: &mut UiLayout,
     ) {
         let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
 
-        let slot_size = INV_SLOT_SIZE;
-        let slot_gap = SLOT_SPACING;
+        let slot_size = INV_SLOT_SIZE * s;
+        let slot_gap = SLOT_SPACING * s;
 
         // Calculate panel size from grid dimensions
         let bank_grid_w = BANK_COLS as f32 * (slot_size + slot_gap) - slot_gap;
         let inv_grid_w = INV_COLS as f32 * (slot_size + slot_gap) - slot_gap;
-        let padding = 12.0;
+        let padding = 12.0 * s;
         let panel_width =
-            (padding * 2.0 + bank_grid_w + COLUMN_GAP + inv_grid_w + FRAME_THICKNESS * 2.0)
+            (padding * 2.0 + bank_grid_w + COLUMN_GAP * s + inv_grid_w + FRAME_THICKNESS * 2.0)
                 .min(sw - 16.0);
-        let panel_height = (500.0_f32).min(sh - 16.0);
+        let panel_height = (500.0 * s).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
+
+        let header_h = HEADER_HEIGHT * s;
+        let gold_bar_h = GOLD_BAR_HEIGHT * s;
 
         // Semi-transparent overlay
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
@@ -48,12 +52,12 @@ impl Renderer {
         let header_y = panel_y + FRAME_THICKNESS;
         let header_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(header_x, header_y, header_w, HEADER_HEIGHT, HEADER_BG);
+        draw_rectangle(header_x, header_y, header_w, header_h, HEADER_BG);
         draw_line(
             header_x,
-            header_y + HEADER_HEIGHT,
+            header_y + header_h,
             header_x + header_w,
-            header_y + HEADER_HEIGHT,
+            header_y + header_h,
             1.0,
             HEADER_BORDER,
         );
@@ -63,15 +67,15 @@ impl Renderer {
         self.draw_text_sharp(
             title,
             header_x + (header_w - title_dims.width) / 2.0,
-            header_y + 20.0,
+            header_y + header_h * 0.71,
             16.0,
             TEXT_TITLE,
         );
 
         // Help button (?) on the left side of header
-        let help_size = 20.0;
-        let help_x = header_x + 6.0;
-        let help_y = header_y + (HEADER_HEIGHT - help_size) / 2.0;
+        let help_size = 20.0 * s;
+        let help_x = header_x + 6.0 * s;
+        let help_y = header_y + (header_h - help_size) / 2.0;
         let help_rect = Rect::new(help_x, help_y, help_size, help_size);
         layout.add(UiElementId::BankHelpButton, help_rect);
         let help_hovered = matches!(hovered, Some(UiElementId::BankHelpButton));
@@ -102,32 +106,32 @@ impl Renderer {
         self.draw_text_sharp(
             "?",
             help_x + (help_size - q_dims.width) / 2.0,
-            help_y + (help_size + 12.0) / 2.0,
+            help_y + help_size * 0.71,
             16.0,
             help_text_color,
         );
 
         // Close button
-        let close_size = 20.0;
-        let close_x = header_x + header_w - close_size - 6.0;
-        let close_y = header_y + (HEADER_HEIGHT - close_size) / 2.0;
+        let close_size = 20.0 * s;
+        let close_x = header_x + header_w - close_size - 6.0 * s;
+        let close_y = header_y + (header_h - close_size) / 2.0;
         let close_rect = Rect::new(close_x, close_y, close_size, close_size);
         layout.add(UiElementId::BankCloseButton, close_rect);
         let close_hovered = matches!(hovered, Some(UiElementId::BankCloseButton));
         let close_color = if close_hovered { TEXT_GOLD } else { TEXT_DIM };
-        self.draw_text_sharp("X", close_x + 4.0, close_y + 15.0, 16.0, close_color);
+        self.draw_text_sharp("X", close_x + (close_size - self.measure_text_sharp("X", 16.0).width) / 2.0, close_y + close_size * 0.71, 16.0, close_color);
 
         // Content area
         let content_x = panel_x + FRAME_THICKNESS + padding;
-        let content_y = header_y + HEADER_HEIGHT + 4.0;
-        let content_height = panel_height - FRAME_THICKNESS * 2.0 - HEADER_HEIGHT - 4.0;
+        let content_y = header_y + header_h + 4.0 * s;
+        let content_height = panel_height - FRAME_THICKNESS * 2.0 - header_h - 4.0 * s;
 
-        let col_header_h = 26.0;
-        let grid_y = content_y + col_header_h + 4.0;
-        let grid_height = content_height - col_header_h - 4.0 - GOLD_BAR_HEIGHT - 12.0;
-        let gold_y = grid_y + grid_height + 6.0;
+        let col_header_h = 26.0 * s;
+        let grid_y = content_y + col_header_h + 4.0 * s;
+        let grid_height = content_height - col_header_h - 4.0 * s - gold_bar_h - 12.0 * s;
+        let gold_y = grid_y + grid_height + 6.0 * s;
 
-        let right_x = content_x + bank_grid_w + COLUMN_GAP;
+        let right_x = content_x + bank_grid_w + COLUMN_GAP * s;
 
         // Render grids
         self.render_bank_grid(
@@ -181,7 +185,7 @@ impl Renderer {
         self.draw_text_sharp(
             hdr,
             content_x + (bank_grid_w - hdr_dims.width) / 2.0,
-            content_y + 17.0,
+            content_y + col_header_h * 0.65,
             16.0,
             TEXT_TITLE,
         );
@@ -207,18 +211,18 @@ impl Renderer {
         self.draw_text_sharp(
             hdr2,
             right_x + (inv_grid_w - hdr2_dims.width) / 2.0,
-            content_y + 17.0,
+            content_y + col_header_h * 0.65,
             16.0,
             TEXT_TITLE,
         );
 
         // Divider
-        let divider_x = content_x + bank_grid_w + COLUMN_GAP / 2.0;
+        let divider_x = content_x + bank_grid_w + COLUMN_GAP * s / 2.0;
         draw_line(
             divider_x,
             content_y,
             divider_x,
-            gold_y + GOLD_BAR_HEIGHT,
+            gold_y + gold_bar_h,
             1.0,
             HEADER_BORDER,
         );
@@ -248,9 +252,10 @@ impl Renderer {
         slot_size: f32,
         slot_gap: f32,
     ) {
+        let s = self.font_scale.get();
         let total_slots = state.ui_state.bank_slots.len();
         if total_slots == 0 {
-            self.draw_text_sharp("Empty", x + 10.0, grid_y + 20.0, 16.0, TEXT_DIM);
+            self.draw_text_sharp("Empty", x + 10.0 * s, grid_y + 20.0 * s, 16.0, TEXT_DIM);
             return;
         }
 
@@ -306,15 +311,15 @@ impl Renderer {
                     let qty_text = quantity.to_string();
                     self.draw_text_sharp(
                         &qty_text,
-                        sx + 3.0,
-                        sy + slot_size - 4.0,
+                        sx + 3.0 * s,
+                        sy + slot_size - 4.0 * s,
                         16.0,
                         Color::new(0.0, 0.0, 0.0, 0.8),
                     );
                     self.draw_text_sharp(
                         &qty_text,
-                        sx + 2.0,
-                        sy + slot_size - 5.0,
+                        sx + 2.0 * s,
+                        sy + slot_size - 5.0 * s,
                         16.0,
                         TEXT_NORMAL,
                     );
@@ -335,6 +340,7 @@ impl Renderer {
         slot_size: f32,
         slot_gap: f32,
     ) {
+        let s = self.font_scale.get();
         let row_height = slot_size + slot_gap;
         let total_slots = 20; // Standard inventory size
         let total_rows = (total_slots + INV_COLS - 1) / INV_COLS;
@@ -395,15 +401,15 @@ impl Renderer {
                     let qty_text = inv_slot.quantity.to_string();
                     self.draw_text_sharp(
                         &qty_text,
-                        sx + 3.0,
-                        sy + slot_size - 4.0,
+                        sx + 3.0 * s,
+                        sy + slot_size - 4.0 * s,
                         16.0,
                         Color::new(0.0, 0.0, 0.0, 0.8),
                     );
                     self.draw_text_sharp(
                         &qty_text,
-                        sx + 2.0,
-                        sy + slot_size - 5.0,
+                        sx + 2.0 * s,
+                        sy + slot_size - 5.0 * s,
                         16.0,
                         TEXT_NORMAL,
                     );
@@ -423,22 +429,25 @@ impl Renderer {
         bank_w: f32,
         inv_w: f32,
     ) {
+        let s = self.font_scale.get();
+        let gold_bar_h = GOLD_BAR_HEIGHT * s;
+
         // Bank gold (left side)
-        draw_rectangle(left_x, gold_y, bank_w, GOLD_BAR_HEIGHT, SLOT_BORDER);
+        draw_rectangle(left_x, gold_y, bank_w, gold_bar_h, SLOT_BORDER);
         draw_rectangle(
             left_x + 1.0,
             gold_y + 1.0,
             bank_w - 2.0,
-            GOLD_BAR_HEIGHT - 2.0,
+            gold_bar_h - 2.0,
             PANEL_BG_MID,
         );
 
-        let gold_icon_size = 14.0;
+        let gold_icon_size = 14.0 * s;
         if let Some(texture) = &self.gold_nugget_texture {
             draw_texture_ex(
                 texture,
-                left_x + 8.0,
-                gold_y + 10.0,
+                left_x + 8.0 * s,
+                gold_y + 10.0 * s,
                 WHITE,
                 DrawTextureParams {
                     dest_size: Some(vec2(gold_icon_size, gold_icon_size)),
@@ -449,17 +458,17 @@ impl Renderer {
         let bank_gold_text = format!("{}g", state.ui_state.bank_gold);
         self.draw_text_sharp(
             &bank_gold_text,
-            left_x + 8.0 + gold_icon_size + 4.0,
-            gold_y + 23.0,
+            left_x + 8.0 * s + gold_icon_size + 4.0 * s,
+            gold_y + gold_bar_h * 0.64,
             16.0,
             TEXT_GOLD,
         );
 
         // Withdraw gold button
-        let btn_w = 76.0;
-        let btn_h = 24.0;
-        let withdraw_x = left_x + bank_w - btn_w - 6.0;
-        let withdraw_y = gold_y + (GOLD_BAR_HEIGHT - btn_h) / 2.0;
+        let btn_w = 76.0 * s;
+        let btn_h = 24.0 * s;
+        let withdraw_x = left_x + bank_w - btn_w - 6.0 * s;
+        let withdraw_y = gold_y + (gold_bar_h - btn_h) / 2.0;
         let withdraw_rect = Rect::new(withdraw_x, withdraw_y, btn_w, btn_h);
         layout.add(UiElementId::BankWithdrawGoldButton, withdraw_rect);
         let w_hovered = matches!(hovered, Some(UiElementId::BankWithdrawGoldButton));
@@ -481,26 +490,26 @@ impl Renderer {
         self.draw_text_sharp(
             w_text,
             withdraw_x + (btn_w - w_dims.width) / 2.0,
-            withdraw_y + 17.0,
+            withdraw_y + btn_h * 0.71,
             16.0,
             TEXT_NORMAL,
         );
 
         // Inventory gold (right side)
-        draw_rectangle(right_x, gold_y, inv_w, GOLD_BAR_HEIGHT, SLOT_BORDER);
+        draw_rectangle(right_x, gold_y, inv_w, gold_bar_h, SLOT_BORDER);
         draw_rectangle(
             right_x + 1.0,
             gold_y + 1.0,
             inv_w - 2.0,
-            GOLD_BAR_HEIGHT - 2.0,
+            gold_bar_h - 2.0,
             PANEL_BG_MID,
         );
 
         if let Some(texture) = &self.gold_nugget_texture {
             draw_texture_ex(
                 texture,
-                right_x + 8.0,
-                gold_y + 10.0,
+                right_x + 8.0 * s,
+                gold_y + 10.0 * s,
                 WHITE,
                 DrawTextureParams {
                     dest_size: Some(vec2(gold_icon_size, gold_icon_size)),
@@ -511,15 +520,15 @@ impl Renderer {
         let inv_gold_text = format!("{}g", state.inventory.gold);
         self.draw_text_sharp(
             &inv_gold_text,
-            right_x + 8.0 + gold_icon_size + 4.0,
-            gold_y + 23.0,
+            right_x + 8.0 * s + gold_icon_size + 4.0 * s,
+            gold_y + gold_bar_h * 0.64,
             16.0,
             TEXT_GOLD,
         );
 
         // Deposit gold button
-        let deposit_x = right_x + inv_w - btn_w - 6.0;
-        let deposit_y = gold_y + (GOLD_BAR_HEIGHT - btn_h) / 2.0;
+        let deposit_x = right_x + inv_w - btn_w - 6.0 * s;
+        let deposit_y = gold_y + (gold_bar_h - btn_h) / 2.0;
         let deposit_rect = Rect::new(deposit_x, deposit_y, btn_w, btn_h);
         layout.add(UiElementId::BankDepositGoldButton, deposit_rect);
         let d_hovered = matches!(hovered, Some(UiElementId::BankDepositGoldButton));
@@ -541,7 +550,7 @@ impl Renderer {
         self.draw_text_sharp(
             d_text,
             deposit_x + (btn_w - d_dims.width) / 2.0,
-            deposit_y + 17.0,
+            deposit_y + btn_h * 0.71,
             16.0,
             TEXT_NORMAL,
         );
@@ -555,12 +564,13 @@ impl Renderer {
         layout: &mut UiLayout,
     ) {
         let (sw, sh) = virtual_screen_size();
+        let s = self.font_scale.get();
 
         // Semi-transparent overlay to focus attention
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
 
-        let box_width = 280.0;
-        let box_height = 140.0;
+        let box_width = 280.0 * s;
+        let box_height = 140.0 * s;
         let box_x = (sw - box_width) / 2.0;
         let box_y = (sh - box_height) / 2.0;
 
@@ -575,10 +585,10 @@ impl Renderer {
             BankQuantityAction::DepositGold => "DEPOSIT GOLD",
             BankQuantityAction::WithdrawGold => "WITHDRAW GOLD",
         };
-        let title_width = self.measure_text_sharp(title_text, 16.0).width + 28.0;
+        let title_width = self.measure_text_sharp(title_text, 16.0).width + 28.0 * s;
         let title_x = box_x + (box_width - title_width) / 2.0;
-        let title_y = box_y - 8.0;
-        let title_h = 26.0;
+        let title_y = box_y - 8.0 * s;
+        let title_h = 26.0 * s;
 
         // Title tab with beveled effect
         draw_rectangle(
@@ -608,16 +618,16 @@ impl Renderer {
         );
 
         // Title text in gold
-        self.draw_text_sharp(title_text, title_x + 14.0, title_y + 18.0, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(title_text, title_x + 14.0 * s, title_y + title_h * 0.69, 16.0, TEXT_TITLE);
 
         // Small decorative accent on title tab corners
         draw_rectangle(title_x, title_y, 3.0, 1.0, FRAME_ACCENT);
         draw_rectangle(title_x + title_width - 3.0, title_y, 3.0, 1.0, FRAME_ACCENT);
 
         // ===== CONTENT AREA =====
-        let content_x = box_x + FRAME_THICKNESS + 12.0;
-        let content_y = box_y + FRAME_THICKNESS + 16.0;
-        let content_width = box_width - FRAME_THICKNESS * 2.0 - 24.0;
+        let content_x = box_x + FRAME_THICKNESS + 12.0 * s;
+        let content_y = box_y + FRAME_THICKNESS + 16.0 * s;
+        let content_width = box_width - FRAME_THICKNESS * 2.0 - 24.0 * s;
 
         // Available quantity display
         let available_text = if matches!(
@@ -631,14 +641,14 @@ impl Renderer {
         self.draw_text_sharp(
             &available_text,
             content_x,
-            content_y + 16.0,
+            content_y + 16.0 * s,
             16.0,
             TEXT_GOLD,
         );
 
         // ===== INPUT FIELD =====
-        let input_y = content_y + 36.0;
-        let input_height = 28.0;
+        let input_y = content_y + 36.0 * s;
+        let input_height = 28.0 * s;
         let input_width = content_width;
 
         // Input field background
@@ -670,8 +680,8 @@ impl Renderer {
         );
 
         // Input text
-        let input_text_x = content_x + 8.0;
-        let input_text_y = input_y + 19.0;
+        let input_text_x = content_x + 8.0 * s;
+        let input_text_y = input_y + input_height * 0.68;
 
         if dialog.input.is_empty() {
             self.draw_text_sharp(
@@ -692,17 +702,17 @@ impl Renderer {
             let cursor_x = input_text_x + self.measure_text_sharp(&text_before_cursor, 16.0).width;
             draw_rectangle(
                 cursor_x,
-                input_y + 6.0,
+                input_y + 6.0 * s,
                 2.0,
-                input_height - 12.0,
+                input_height - 12.0 * s,
                 TEXT_NORMAL,
             );
         }
 
         // ===== BUTTONS =====
-        let button_y = input_y + input_height + 12.0;
-        let button_width = (content_width - 12.0) / 2.0;
-        let button_height = 28.0;
+        let button_y = input_y + input_height + 12.0 * s;
+        let button_width = (content_width - 12.0 * s) / 2.0;
+        let button_height = 28.0 * s;
 
         // Confirm button
         let confirm_x = content_x;
@@ -752,13 +762,13 @@ impl Renderer {
         self.draw_text_sharp(
             confirm_text,
             confirm_x + (button_width - confirm_text_width) / 2.0,
-            button_y + 19.0,
+            button_y + button_height * 0.68,
             16.0,
             confirm_text_color,
         );
 
         // Cancel button
-        let cancel_x = content_x + button_width + 12.0;
+        let cancel_x = content_x + button_width + 12.0 * s;
         let cancel_bounds = Rect::new(cancel_x, button_y, button_width, button_height);
         layout.add(UiElementId::BankQuantityCancel, cancel_bounds);
 
@@ -808,7 +818,7 @@ impl Renderer {
         self.draw_text_sharp(
             cancel_text,
             cancel_x + (button_width - cancel_text_width) / 2.0,
-            button_y + 19.0,
+            button_y + button_height * 0.68,
             16.0,
             cancel_text_color,
         );
@@ -821,12 +831,13 @@ impl Renderer {
         layout: &mut UiLayout,
     ) {
         let (screen_w, screen_h) = virtual_screen_size();
+        let s = self.font_scale.get();
 
-        let overlay_w = 240.0_f32.min(screen_w - 20.0);
+        let overlay_w = (240.0 * s).min(screen_w - 20.0);
         let font_size = 16.0;
-        let line_height = 20.0;
-        let padding = 10.0;
-        let section_gap = 6.0;
+        let line_height = 20.0 * s;
+        let padding = 10.0 * s;
+        let section_gap = 6.0 * s;
 
         let lines: Vec<(&str, Color)> = vec![
             ("Bank Controls", TEXT_TITLE),
@@ -838,7 +849,7 @@ impl Renderer {
         ];
 
         let content_height = lines.len() as f32 * line_height + section_gap;
-        let close_btn_height = 22.0;
+        let close_btn_height = 22.0 * s;
         let overlay_h = padding * 2.0 + content_height + close_btn_height + 4.0;
 
         let overlay_x = ((screen_w - overlay_w) / 2.0).floor();
@@ -866,7 +877,7 @@ impl Renderer {
         draw_rectangle(overlay_x, overlay_y, overlay_w, overlay_h, TOOLTIP_BG);
 
         // Draw text lines
-        let mut text_y = overlay_y + padding + 12.0;
+        let mut text_y = overlay_y + padding + 12.0 * s;
         for (text, color) in &lines {
             if !text.is_empty() {
                 self.draw_text_sharp(
@@ -884,7 +895,7 @@ impl Renderer {
         // Close button
         let close_text = "Got it!";
         let close_dims = self.measure_text_sharp(close_text, 16.0);
-        let close_btn_w = (close_dims.width + 20.0).min(overlay_w - padding * 2.0);
+        let close_btn_w = (close_dims.width + 20.0 * s).min(overlay_w - padding * 2.0);
         let close_btn_x = overlay_x + (overlay_w - close_btn_w) / 2.0;
         let close_btn_y = text_y;
 
@@ -923,7 +934,7 @@ impl Renderer {
         self.draw_text_sharp(
             close_text,
             close_text_x.floor(),
-            (close_btn_y + (close_btn_height + 12.0) / 2.0).floor(),
+            (close_btn_y + close_btn_height * 0.71).floor(),
             16.0,
             close_text_color,
         );

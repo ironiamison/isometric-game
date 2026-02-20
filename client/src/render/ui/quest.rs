@@ -51,15 +51,18 @@ impl Renderer {
         layout: &mut UiLayout,
     ) {
         let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
 
-        let panel_width = 380.0;
-        let panel_height = 420.0;
+        let panel_width = (380.0 * s).min(sw - 16.0);
+        let panel_height = (420.0 * s).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 
-        let line_height = 17.0;
-        let objective_spacing = 16.0;
-        let entry_padding = 6.0;
+        let line_height = 17.0 * s;
+        let objective_spacing = 16.0 * s;
+        let entry_padding = 6.0 * s;
+        let header_h = HEADER_HEIGHT * s;
+        let footer_h = FOOTER_HEIGHT * s;
 
         // Semi-transparent overlay
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
@@ -74,26 +77,26 @@ impl Renderer {
         let header_w = panel_width - FRAME_THICKNESS * 2.0;
 
         // Header background
-        draw_rectangle(header_x, header_y, header_w, HEADER_HEIGHT, HEADER_BG);
+        draw_rectangle(header_x, header_y, header_w, header_h, HEADER_BG);
 
         // Header bottom separator with decorative dots
         draw_line(
-            header_x + 10.0,
-            header_y + HEADER_HEIGHT,
-            header_x + header_w - 10.0,
-            header_y + HEADER_HEIGHT,
+            header_x + 10.0 * s,
+            header_y + header_h,
+            header_x + header_w - 10.0 * s,
+            header_y + header_h,
             2.0,
             HEADER_BORDER,
         );
 
-        let dot_spacing = 50.0;
-        let num_dots = ((header_w - 40.0) / dot_spacing) as i32;
-        let start_dot_x = header_x + 20.0;
+        let dot_spacing = 50.0 * s;
+        let num_dots = ((header_w - 40.0 * s) / dot_spacing) as i32;
+        let start_dot_x = header_x + 20.0 * s;
         for i in 0..num_dots {
             let dot_x = start_dot_x + i as f32 * dot_spacing;
             draw_rectangle(
                 dot_x - 1.5,
-                header_y + HEADER_HEIGHT - 1.5,
+                header_y + header_h - 1.5,
                 3.0,
                 3.0,
                 FRAME_ACCENT,
@@ -103,17 +106,17 @@ impl Renderer {
         // Title
         self.draw_text_sharp(
             "QUEST LOG",
-            header_x + 12.0,
-            header_y + 26.0,
+            header_x + 12.0 * s,
+            header_y + header_h * 0.65,
             16.0,
             TEXT_TITLE,
         );
 
         // ===== CONTENT AREA =====
-        let content_x = panel_x + FRAME_THICKNESS + 8.0;
-        let content_y = panel_y + FRAME_THICKNESS + HEADER_HEIGHT + 8.0;
-        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0;
-        let content_h = panel_height - FRAME_THICKNESS * 2.0 - HEADER_HEIGHT - FOOTER_HEIGHT - 16.0;
+        let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
+        let content_y = panel_y + FRAME_THICKNESS + header_h + 8.0 * s;
+        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
+        let content_h = panel_height - FRAME_THICKNESS * 2.0 - header_h - footer_h - 16.0 * s;
 
         // Quest list panel with inset effect
         draw_rectangle(content_x, content_y, content_w, content_h, SLOT_BORDER);
@@ -150,45 +153,45 @@ impl Renderer {
         );
 
         if state.ui_state.active_quests.is_empty() {
-            let y = content_y + 10.0;
+            let y = content_y + 10.0 * s;
             // Empty state with themed styling
             self.draw_text_sharp(
                 "No Active Quests",
-                content_x + 12.0,
-                y + 10.0,
+                content_x + 12.0 * s,
+                y + 10.0 * s,
                 16.0,
                 TEXT_DIM,
             );
-            let y = y + line_height + 8.0;
+            let y = y + line_height + 8.0 * s;
             self.draw_text_sharp(
                 "Talk to NPCs with",
-                content_x + 12.0,
-                y + 10.0,
+                content_x + 12.0 * s,
+                y + 10.0 * s,
                 16.0,
                 Color::new(0.392, 0.392, 0.431, 1.0),
             );
-            self.draw_text_sharp("!", content_x + 140.0, y + 10.0, 16.0, TEXT_GOLD);
+            self.draw_text_sharp("!", content_x + 140.0 * s, y + 10.0 * s, 16.0, TEXT_GOLD);
             self.draw_text_sharp(
                 "above their heads",
-                content_x + 155.0,
-                y + 10.0,
+                content_x + 155.0 * s,
+                y + 10.0 * s,
                 16.0,
                 Color::new(0.392, 0.392, 0.431, 1.0),
             );
         } else {
             // Calculate total content height for scrolling
-            let mut total_content_h = 10.0; // top padding
+            let mut total_content_h = 10.0 * s; // top padding
             for (i, quest) in state.ui_state.active_quests.iter().enumerate() {
                 total_content_h += entry_padding
                     + line_height
-                    + 4.0
+                    + 4.0 * s
                     + quest.objectives.len() as f32 * objective_spacing
                     + entry_padding;
                 if i < state.ui_state.active_quests.len() - 1 {
-                    total_content_h += 8.0; // separator
+                    total_content_h += 8.0 * s; // separator
                 }
             }
-            total_content_h += 10.0; // bottom padding
+            total_content_h += 10.0 * s; // bottom padding
 
             let max_scroll = (total_content_h - content_h).max(0.0);
             let scroll_offset = state.ui_state.quest_log_scroll.clamp(0.0, max_scroll);
@@ -210,14 +213,14 @@ impl Renderer {
                 )));
             }
 
-            let mut y = content_y + 10.0 - scroll_offset;
+            let mut y = content_y + 10.0 * s - scroll_offset;
 
             for (quest_idx, quest) in state.ui_state.active_quests.iter().enumerate() {
                 // Calculate entry height
                 let title_height = line_height;
                 let objectives_height = quest.objectives.len() as f32 * objective_spacing;
                 let entry_height =
-                    entry_padding + title_height + 2.0 + objectives_height + entry_padding;
+                    entry_padding + title_height + 4.0 * s + objectives_height + entry_padding;
 
                 let entry_start_y = y;
 
@@ -225,7 +228,7 @@ impl Renderer {
                 if y + entry_height < content_y || y > content_y + content_h {
                     y += entry_height;
                     if quest_idx < state.ui_state.active_quests.len() - 1 {
-                        y += 8.0;
+                        y += 8.0 * s;
                     }
                     continue;
                 }
@@ -235,9 +238,9 @@ impl Renderer {
                 let vis_bottom = (entry_start_y + entry_height).min(content_y + content_h);
                 if vis_bottom > vis_top {
                     let bounds = Rect::new(
-                        content_x + 4.0,
+                        content_x + 4.0 * s,
                         vis_top,
-                        content_w - 8.0,
+                        content_w - 8.0 * s,
                         vis_bottom - vis_top,
                     );
                     layout.add(UiElementId::QuestLogEntry(quest_idx), bounds);
@@ -250,16 +253,16 @@ impl Renderer {
                 // Draw quest entry background with slot-like styling
                 if is_hovered {
                     draw_rectangle(
-                        content_x + 4.0,
+                        content_x + 4.0 * s,
                         entry_start_y,
-                        content_w - 8.0,
+                        content_w - 8.0 * s,
                         entry_height,
                         SLOT_HOVER_BORDER,
                     );
                     draw_rectangle(
-                        content_x + 5.0,
+                        content_x + 5.0 * s,
                         entry_start_y + 1.0,
-                        content_w - 10.0,
+                        content_w - 10.0 * s,
                         entry_height - 2.0,
                         SLOT_HOVER_BG,
                     );
@@ -270,9 +273,9 @@ impl Renderer {
 
                 // Quest name with star icon
                 let name_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
-                self.draw_text_sharp("*", content_x + 12.0, y + 12.0, 16.0, TEXT_GOLD);
-                self.draw_text_sharp(&quest.name, content_x + 28.0, y + 12.0, 16.0, name_color);
-                y += title_height + 4.0;
+                self.draw_text_sharp("*", content_x + 12.0 * s, y + 12.0 * s, 16.0, TEXT_GOLD);
+                self.draw_text_sharp(&quest.name, content_x + 28.0 * s, y + 12.0 * s, 16.0, name_color);
+                y += title_height + 4.0 * s;
 
                 // Objectives with styled checkmarks
                 for obj in &quest.objectives {
@@ -284,8 +287,8 @@ impl Renderer {
 
                     self.draw_text_sharp(
                         check_icon,
-                        content_x + 20.0,
-                        y + 12.0,
+                        content_x + 20.0 * s,
+                        y + 12.0 * s,
                         16.0,
                         status_color,
                     );
@@ -296,7 +299,7 @@ impl Renderer {
                     } else {
                         TEXT_DIM
                     };
-                    self.draw_text_sharp(&obj_text, content_x + 52.0, y + 12.0, 16.0, text_color);
+                    self.draw_text_sharp(&obj_text, content_x + 52.0 * s, y + 12.0 * s, 16.0, text_color);
                     y += objective_spacing;
                 }
 
@@ -306,14 +309,14 @@ impl Renderer {
                 // Decorative separator between quests
                 if quest_idx < state.ui_state.active_quests.len() - 1 {
                     draw_line(
-                        content_x + 20.0,
-                        y + 2.0,
-                        content_x + content_w - 20.0,
-                        y + 2.0,
+                        content_x + 20.0 * s,
+                        y + 2.0 * s,
+                        content_x + content_w - 20.0 * s,
+                        y + 2.0 * s,
                         1.0,
                         SLOT_BORDER,
                     );
-                    y += 8.0;
+                    y += 8.0 * s;
                 }
             }
 
@@ -324,12 +327,12 @@ impl Renderer {
                 gl.quad_gl.scissor(None);
 
                 // Draw scrollbar
-                let scrollbar_w = 4.0;
-                let scrollbar_x = content_x + content_w - scrollbar_w - 3.0;
+                let scrollbar_w = 4.0 * s;
+                let scrollbar_x = content_x + content_w - scrollbar_w - 3.0 * s;
                 let track_h = content_h - 4.0;
                 let track_y = content_y + 2.0;
                 let thumb_ratio = content_h / total_content_h;
-                let thumb_h = (track_h * thumb_ratio).max(20.0);
+                let thumb_h = (track_h * thumb_ratio).max(20.0 * s);
                 let scroll_ratio = if max_scroll > 0.0 {
                     scroll_offset / max_scroll
                 } else {
@@ -358,14 +361,14 @@ impl Renderer {
 
         // ===== FOOTER SECTION =====
         let footer_x = panel_x + FRAME_THICKNESS;
-        let footer_y = panel_y + panel_height - FRAME_THICKNESS - FOOTER_HEIGHT;
+        let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
         let footer_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(footer_x, footer_y, footer_w, FOOTER_HEIGHT, FOOTER_BG);
+        draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
         draw_line(
-            footer_x + 10.0,
+            footer_x + 10.0 * s,
             footer_y,
-            footer_x + footer_w - 10.0,
+            footer_x + footer_w - 10.0 * s,
             footer_y,
             1.0,
             HEADER_BORDER,
@@ -376,8 +379,8 @@ impl Renderer {
         let count_width = self.measure_text_sharp(&count_text, 16.0).width;
         self.draw_text_sharp(
             &count_text,
-            footer_x + footer_w - count_width - 10.0,
-            footer_y + 20.0,
+            footer_x + footer_w - count_width - 10.0 * s,
+            footer_y + footer_h * 0.67,
             16.0,
             FRAME_MID,
         );
