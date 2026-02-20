@@ -12,6 +12,8 @@ use crate::ui::UiElementId;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 const MAX_CHAT_LOG_MESSAGES: usize = 120;
+const HIGH_PING_ENABLE_MS: f64 = 120.0;
+const HIGH_PING_DISABLE_MS: f64 = 95.0;
 
 /// State of a map transition (fade effect)
 #[derive(Debug, Clone, PartialEq)]
@@ -1432,6 +1434,8 @@ pub struct GameState {
     pub last_acked_move_seq: u32,
     /// Unacked directional move commands awaiting server processing.
     pending_move_seqs: VecDeque<u32>,
+    /// Adaptive movement mode for elevated latency.
+    pub high_ping_movement_mode: bool,
 
     // Debug
     pub debug_mode: bool,
@@ -1558,6 +1562,7 @@ impl GameState {
             next_move_seq: 0,
             last_acked_move_seq: 0,
             pending_move_seqs: VecDeque::new(),
+            high_ping_movement_mode: false,
             debug_mode: false,
             hovered_tile: None,
             hovered_entity_id: None,
@@ -1627,6 +1632,42 @@ impl GameState {
         self.pending_move_seqs.clear();
     }
 
+    pub fn refresh_high_ping_movement_mode(&mut self) {
+        if !self.ping_stats.has_data() {
+            self.high_ping_movement_mode = false;
+            return;
+        }
+
+        let avg = self.ping_stats.avg_ms;
+        if self.high_ping_movement_mode {
+            if avg < HIGH_PING_DISABLE_MS {
+                self.high_ping_movement_mode = false;
+            }
+        } else if avg > HIGH_PING_ENABLE_MS {
+            self.high_ping_movement_mode = true;
+        }
+    }
+
+    pub fn local_prediction_lead_scale(&self) -> f32 {
+        if !self.high_ping_movement_mode || !self.ping_stats.has_data() {
+            return 1.0;
+        }
+
+        let avg = self.ping_stats.avg_ms as f32;
+        let t = ((avg - 120.0) / 100.0).clamp(0.0, 1.0);
+        1.0 - t * 0.55
+    }
+
+    pub fn local_reconciliation_softness(&self) -> f32 {
+        if !self.high_ping_movement_mode || !self.ping_stats.has_data() {
+            return 1.0;
+        }
+
+        let avg = self.ping_stats.avg_ms as f32;
+        let t = ((avg - 120.0) / 100.0).clamp(0.0, 1.0);
+        1.0 + t * 0.5
+    }
+
     /// Append a chat message and bump revision so renderer cache invalidates once.
     pub fn push_chat_message(&mut self, message: ChatMessage) {
         self.ui_state.chat_messages.push(message);
@@ -1635,6 +1676,8 @@ impl GameState {
 
     /// Update all players in a server-authoritative step model.
     pub fn update(&mut self, delta: f32) {
+        self.refresh_high_ping_movement_mode();
+
         // Trigger fade-in when world first becomes ready
         if !self.world_was_ready && self.is_world_ready() {
             self.world_was_ready = true;

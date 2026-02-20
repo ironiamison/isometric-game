@@ -295,7 +295,7 @@ impl Player {
 
     /// Set server-authoritative position (convenience method for stopped state)
     pub fn set_server_position(&mut self, new_x: f32, new_y: f32) {
-        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction, false, false);
+        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction, false, false, 1.0, 1.0);
     }
 
     /// Set server state - simple server-authoritative model
@@ -310,6 +310,8 @@ impl Player {
         dir: Direction,
         is_local_player: bool,
         has_pending_local_moves: bool,
+        local_lead_scale: f32,
+        local_reconciliation_softness: f32,
     ) {
         let old_server_x = self.server_x;
         let old_server_y = self.server_y;
@@ -357,9 +359,15 @@ impl Player {
             return;
         }
 
-        // Teleport detection (>2 tiles = snap immediately)
+        // Teleport detection. For high-ping local play, allow a slightly larger
+        // visual divergence before hard snap to reduce perceived "rubber band."
+        let teleport_snap_distance = if is_local_player {
+            2.0 * local_reconciliation_softness.clamp(1.0, 1.75)
+        } else {
+            2.0
+        };
         let dist = ((self.x - x).powi(2) + (self.y - y).powi(2)).sqrt();
-        if dist > 2.0 {
+        if dist > teleport_snap_distance {
             self.x = x;
             self.y = y;
             self.target_x = x;
@@ -378,15 +386,16 @@ impl Player {
             if !has_pending_local_moves {
                 0.0
             } else {
-                LOCAL_PREDICTION_LOOKAHEAD
+                LOCAL_PREDICTION_LOOKAHEAD * local_lead_scale.clamp(0.35, 1.0)
             }
         } else {
             1.0
         };
 
         if is_local_player {
+            let max_lead = LOCAL_MAX_LEAD_TILES * local_reconciliation_softness.clamp(1.0, 1.75);
             let lead = (self.x - x).abs().max((self.y - y).abs());
-            if lead > LOCAL_MAX_LEAD_TILES {
+            if lead > max_lead {
                 self.target_x = x;
                 self.target_y = y;
                 return;

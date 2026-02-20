@@ -225,6 +225,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         }
                         let has_pending_local_moves =
                             is_local_player && state.has_pending_move_sequences();
+                        let local_lead_scale = if is_local_player {
+                            state.local_prediction_lead_scale()
+                        } else {
+                            1.0
+                        };
+                        let local_reconciliation_softness = if is_local_player {
+                            state.local_reconciliation_softness()
+                        } else {
+                            1.0
+                        };
 
                         if let Some(player) = state.players.get_mut(&id) {
                             // Read velocity (movement intent) from server
@@ -251,6 +261,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     dir,
                                     is_local_player,
                                     has_pending_local_moves,
+                                    local_lead_scale,
+                                    local_reconciliation_softness,
                                 );
                             } else if direction.is_some() && !is_local_player {
                                 // Direction-only update for remote players
@@ -3411,6 +3423,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let now = macroquad::time::get_time();
                 let latency_ms = (now - sent_at) * 1000.0;
                 state.ping_stats.record(latency_ms);
+                state.refresh_high_ping_movement_mode();
                 // Only show in chat if it was a manual /ping (not auto-ping)
                 if !state.debug_mode {
                     state
