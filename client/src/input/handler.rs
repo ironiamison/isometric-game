@@ -5052,14 +5052,21 @@ impl InputHandler {
                                 .filter(|s| magic_level >= s.magic_level_req)
                                 .collect();
                             if let Some(spell_def) = unlocked_spells.get(*idx) {
-                                commands.push(InputCommand::CastSpell {
-                                    spell_id: spell_def.id.to_string(),
-                                });
-                                let cooldown_end = macroquad::time::get_time()
-                                    + (spell_def.cooldown_ms as f64 / 1000.0);
-                                state
+                                let now = macroquad::time::get_time();
+                                let on_cooldown = state
                                     .spell_cooldowns
-                                    .insert(spell_def.id.to_string(), cooldown_end);
+                                    .get(spell_def.id)
+                                    .map_or(false, |&t| now < t);
+                                if !on_cooldown {
+                                    commands.push(InputCommand::CastSpell {
+                                        spell_id: spell_def.id.to_string(),
+                                    });
+                                    let cooldown_end = now
+                                        + (spell_def.cooldown_ms as f64 / 1000.0);
+                                    state
+                                        .spell_cooldowns
+                                        .insert(spell_def.id.to_string(), cooldown_end);
+                                }
                             }
                         } else {
                             // Item mode: use/equip item at inventory slot idx
@@ -5732,14 +5739,21 @@ impl InputHandler {
                         .filter(|s| magic_level >= s.magic_level_req)
                         .collect();
                     if let Some(spell_def) = unlocked_spells.get(slot_idx) {
-                        commands.push(InputCommand::CastSpell {
-                            spell_id: spell_def.id.to_string(),
-                        });
-                        let cooldown_end =
-                            macroquad::time::get_time() + (spell_def.cooldown_ms as f64 / 1000.0);
-                        state
+                        let now = macroquad::time::get_time();
+                        let on_cooldown = state
                             .spell_cooldowns
-                            .insert(spell_def.id.to_string(), cooldown_end);
+                            .get(spell_def.id)
+                            .map_or(false, |&t| now < t);
+                        if !on_cooldown {
+                            commands.push(InputCommand::CastSpell {
+                                spell_id: spell_def.id.to_string(),
+                            });
+                            let cooldown_end =
+                                now + (spell_def.cooldown_ms as f64 / 1000.0);
+                            state
+                                .spell_cooldowns
+                                .insert(spell_def.id.to_string(), cooldown_end);
+                        }
                     }
                 } else {
                     // Item mode: use/equip from inventory slot directly
