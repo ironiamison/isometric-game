@@ -1780,8 +1780,9 @@ impl Renderer {
 
     fn minimap_stats_stack_position(&self, state: &GameState, bar_width: f32) -> (f32, f32) {
         let _ = bar_width;
+        let s = self.font_scale.get();
         let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
-        (name_tag_x.floor(), (name_tag_y + 22.0 + 4.0).floor())
+        (name_tag_x.floor(), (name_tag_y + 22.0 * s + 4.0 * s).floor())
     }
 
     fn draw_minimap_preview_frame(&self, x: f32, y: f32, w: f32, h: f32) {

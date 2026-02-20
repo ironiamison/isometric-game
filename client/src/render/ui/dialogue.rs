@@ -874,10 +874,11 @@ impl Renderer {
         layout: &mut UiLayout,
     ) {
         let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.55));
 
-        let panel_w = sw.min(780.0);
-        let panel_h = sh.min(470.0);
+        let panel_w = sw.min(780.0 * s);
+        let panel_h = sh.min(470.0 * s);
         let panel_x = ((sw - panel_w) * 0.5).floor();
         let panel_y = ((sh - panel_h) * 0.5).floor();
         self.draw_panel_frame(panel_x, panel_y, panel_w, panel_h);
@@ -885,22 +886,24 @@ impl Renderer {
 
         self.draw_text_sharp(
             "ADVENTURE PATHS",
-            panel_x + 18.0,
-            panel_y + 28.0,
+            panel_x + 18.0 * s,
+            panel_y + 28.0 * s,
             16.0,
             TEXT_TITLE,
         );
 
-        let close_x = panel_x + panel_w - 32.0;
-        let close_y = panel_y + 8.0;
-        let close_bounds = Rect::new(close_x, close_y, 20.0, 16.0);
+        let close_w = 20.0 * s;
+        let close_h = 16.0 * s;
+        let close_x = panel_x + panel_w - 32.0 * s;
+        let close_y = panel_y + 8.0 * s;
+        let close_bounds = Rect::new(close_x, close_y, close_w, close_h);
         layout.add(UiElementId::DialogueClose, close_bounds);
         let close_hovered = matches!(hovered, Some(UiElementId::DialogueClose));
         draw_rectangle(
             close_x,
             close_y,
-            20.0,
-            16.0,
+            close_w,
+            close_h,
             if close_hovered {
                 SLOT_SELECTED_BORDER
             } else {
@@ -910,8 +913,8 @@ impl Renderer {
         draw_rectangle(
             close_x + 1.0,
             close_y + 1.0,
-            18.0,
-            14.0,
+            close_w - 2.0,
+            close_h - 2.0,
             if close_hovered {
                 SLOT_HOVER_BG
             } else {
@@ -920,8 +923,8 @@ impl Renderer {
         );
         self.draw_text_sharp(
             "X",
-            close_x + 7.0,
-            close_y + 12.0,
+            close_x + close_w * 0.35,
+            close_y + close_h * 0.75,
             16.0,
             if close_hovered { TEXT_TITLE } else { TEXT_DIM },
         );
@@ -933,10 +936,10 @@ impl Renderer {
         let selected_track = GUIDE_TRACKS[selected_track_idx];
         let has_active_guide_task = has_active_adventurer_guide_task(state);
 
-        let tab_y = panel_y + 36.0;
-        let tab_h = 28.0;
-        let tab_w = 116.0;
-        let mut tab_x = panel_x + 18.0;
+        let tab_y = panel_y + 36.0 * s;
+        let tab_h = 28.0 * s;
+        let tab_w = 116.0 * s;
+        let mut tab_x = panel_x + 18.0 * s;
         for (idx, track) in GUIDE_TRACKS.iter().enumerate() {
             let tab_bounds = Rect::new(tab_x, tab_y, tab_w, tab_h);
             layout.add(UiElementId::AdventurerTab(idx), tab_bounds);
@@ -960,7 +963,7 @@ impl Renderer {
             self.draw_text_sharp(
                 track.title,
                 tab_x + (tab_w - label_w) * 0.5,
-                tab_y + 19.0,
+                tab_y + tab_h * 0.68,
                 16.0,
                 if tab_selected {
                     TEXT_TITLE
@@ -968,13 +971,13 @@ impl Renderer {
                     TEXT_NORMAL
                 },
             );
-            tab_x += tab_w + 8.0;
+            tab_x += tab_w + 8.0 * s;
         }
 
-        let left_w = 220.0;
-        let left_x = panel_x + 12.0;
-        let left_y = tab_y + tab_h + 8.0;
-        let left_h = panel_y + panel_h - left_y - 12.0;
+        let left_w = 220.0 * s;
+        let left_x = panel_x + 12.0 * s;
+        let left_y = tab_y + tab_h + 8.0 * s;
+        let left_h = panel_y + panel_h - left_y - 12.0 * s;
         draw_rectangle(left_x, left_y, left_w, left_h, SLOT_BORDER);
         draw_rectangle(
             left_x + 1.0,
@@ -989,7 +992,7 @@ impl Renderer {
             .adventurer_selected_tier
             .min(selected_track.tiers.len().saturating_sub(1));
 
-        let mut row_y = left_y + 8.0;
+        let mut row_y = left_y + 8.0 * s;
         for (idx, tier) in selected_track.tiers.iter().enumerate() {
             let is_selected = idx == selected_idx;
             let completed = is_tier_completed(state, selected_track_idx, tier);
@@ -997,8 +1000,8 @@ impl Renderer {
             let unlocked = is_tier_unlocked(state, selected_track_idx, selected_track.tiers, idx)
                 && (!has_active_guide_task || is_active || completed);
 
-            let row_h = 52.0;
-            let row_bounds = Rect::new(left_x + 6.0, row_y, left_w - 12.0, row_h);
+            let row_h = 52.0 * s;
+            let row_bounds = Rect::new(left_x + 6.0 * s, row_y, left_w - 12.0 * s, row_h);
             layout.add(UiElementId::AdventurerTier(idx), row_bounds);
             let row_hovered = matches!(hovered, Some(UiElementId::AdventurerTier(i)) if *i == idx);
 
@@ -1048,33 +1051,33 @@ impl Renderer {
                 TEXT_DIM
             };
             let status_w = self.measure_text_sharp(status, 16.0).width;
-            let status_x = row_bounds.x + row_bounds.w - status_w - 8.0;
-            let title_x = row_bounds.x + 8.0;
-            let title_max_w = (status_x - title_x - 10.0).max(20.0);
+            let status_x = row_bounds.x + row_bounds.w - status_w - 8.0 * s;
+            let title_x = row_bounds.x + 8.0 * s;
+            let title_max_w = (status_x - title_x - 10.0 * s).max(20.0 * s);
             let title_text = self.truncate_text_to_width(tier.title, title_max_w, 16.0);
 
             self.draw_text_sharp(
                 tier.subtitle,
-                row_bounds.x + 8.0,
-                row_bounds.y + 16.0,
+                row_bounds.x + 8.0 * s,
+                row_bounds.y + row_h * 0.31,
                 16.0,
                 TEXT_DIM,
             );
             self.draw_text_sharp(
                 &title_text,
                 title_x,
-                row_bounds.y + 32.0,
+                row_bounds.y + row_h * 0.62,
                 16.0,
                 if unlocked { TEXT_NORMAL } else { TEXT_DIM },
             );
-            self.draw_text_sharp(status, status_x, row_bounds.y + 32.0, 16.0, status_color);
+            self.draw_text_sharp(status, status_x, row_bounds.y + row_h * 0.62, 16.0, status_color);
 
-            row_y += row_h + 8.0;
+            row_y += row_h + 8.0 * s;
         }
 
-        let right_x = left_x + left_w + 12.0;
+        let right_x = left_x + left_w + 12.0 * s;
         let right_y = left_y;
-        let right_w = panel_x + panel_w - right_x - 12.0;
+        let right_w = panel_x + panel_w - right_x - 12.0 * s;
         let right_h = left_h;
         draw_rectangle(right_x, right_y, right_w, right_h, SLOT_BORDER);
         draw_rectangle(
@@ -1104,34 +1107,34 @@ impl Renderer {
         ) && (!has_active_guide_task || tier_is_active || completed);
 
         let right_subtitle_w = self.measure_text_sharp(tier.subtitle, 16.0).width;
-        let right_subtitle_x = right_x + right_w - right_subtitle_w - 12.0;
-        let right_title_x = right_x + 12.0;
-        let right_title_max_w = (right_subtitle_x - right_title_x - 12.0).max(20.0);
+        let right_subtitle_x = right_x + right_w - right_subtitle_w - 12.0 * s;
+        let right_title_x = right_x + 12.0 * s;
+        let right_title_max_w = (right_subtitle_x - right_title_x - 12.0 * s).max(20.0 * s);
         let right_title = self.truncate_text_to_width(tier.title, right_title_max_w, 16.0);
 
         self.draw_text_sharp(
             &right_title,
             right_title_x,
-            right_y + 26.0,
+            right_y + 26.0 * s,
             16.0,
             TEXT_TITLE,
         );
         self.draw_text_sharp(
             tier.subtitle,
             right_subtitle_x,
-            right_y + 26.0,
+            right_y + 26.0 * s,
             16.0,
             FRAME_MID,
         );
 
-        let mut desc_y = right_y + 48.0;
+        let mut desc_y = right_y + 48.0 * s;
         for line in self
-            .wrap_text(tier.description, right_w - 24.0, 16.0)
+            .wrap_text(tier.description, right_w - 24.0 * s, 16.0)
             .iter()
             .take(3)
         {
-            self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_NORMAL);
-            desc_y += 18.0;
+            self.draw_text_sharp(line, right_x + 12.0 * s, desc_y, 16.0, TEXT_NORMAL);
+            desc_y += 18.0 * s;
         }
         if selected_track_idx == 1 {
             let missing = skilling_missing_tier_requirements(state, tier.id);
@@ -1150,34 +1153,34 @@ impl Renderer {
             };
 
             if let Some(text) = req_text {
-                for line in self.wrap_text(&text, right_w - 24.0, 16.0).iter().take(2) {
-                    self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_DIM);
-                    desc_y += 17.0;
+                for line in self.wrap_text(&text, right_w - 24.0 * s, 16.0).iter().take(2) {
+                    self.draw_text_sharp(line, right_x + 12.0 * s, desc_y, 16.0, TEXT_DIM);
+                    desc_y += 17.0 * s;
                 }
             }
         } else if dialogue.quest_id == tier.id {
             for line in self
-                .wrap_text(&dialogue.text, right_w - 24.0, 16.0)
+                .wrap_text(&dialogue.text, right_w - 24.0 * s, 16.0)
                 .iter()
                 .take(2)
             {
-                self.draw_text_sharp(line, right_x + 12.0, desc_y, 16.0, TEXT_DIM);
-                desc_y += 17.0;
+                self.draw_text_sharp(line, right_x + 12.0 * s, desc_y, 16.0, TEXT_DIM);
+                desc_y += 17.0 * s;
             }
         }
 
         draw_line(
-            right_x + 12.0,
-            desc_y + 4.0,
-            right_x + right_w - 12.0,
-            desc_y + 4.0,
+            right_x + 12.0 * s,
+            desc_y + 4.0 * s,
+            right_x + right_w - 12.0 * s,
+            desc_y + 4.0 * s,
             1.0,
             HEADER_BORDER,
         );
-        let mut y = desc_y + 24.0;
+        let mut y = desc_y + 24.0 * s;
 
-        self.draw_text_sharp("Objectives", right_x + 12.0, y, 16.0, FRAME_INNER);
-        y += 18.0;
+        self.draw_text_sharp("Objectives", right_x + 12.0 * s, y, 16.0, FRAME_INNER);
+        y += 18.0 * s;
 
         let mut completed_count = 0;
         for objective in tier.objectives {
@@ -1206,7 +1209,7 @@ impl Renderer {
             );
             self.draw_text_sharp(
                 &line,
-                right_x + 14.0,
+                right_x + 14.0 * s,
                 y,
                 16.0,
                 if done {
@@ -1215,36 +1218,38 @@ impl Renderer {
                     TEXT_NORMAL
                 },
             );
-            y += 18.0;
+            y += 18.0 * s;
         }
 
         let progress = format!("Progress: {}/{}", completed_count, tier.objectives.len());
-        self.draw_text_sharp(&progress, right_x + 12.0, y + 6.0, 16.0, TEXT_GOLD);
-        y += 26.0;
+        self.draw_text_sharp(&progress, right_x + 12.0 * s, y + 6.0 * s, 16.0, TEXT_GOLD);
+        y += 26.0 * s;
 
-        self.draw_text_sharp("Rewards", right_x + 12.0, y, 16.0, FRAME_INNER);
-        y += 18.0;
+        self.draw_text_sharp("Rewards", right_x + 12.0 * s, y, 16.0, FRAME_INNER);
+        y += 18.0 * s;
         self.draw_text_sharp(
             &format!("EXP: {}   Gold: {}", tier.reward_exp, tier.reward_gold),
-            right_x + 14.0,
+            right_x + 14.0 * s,
             y,
             16.0,
             TEXT_NORMAL,
         );
-        y += 18.0;
+        y += 18.0 * s;
         for reward in tier.reward_items.iter().take(3) {
-            self.draw_text_sharp(&format!("* {}", reward), right_x + 14.0, y, 16.0, TEXT_DIM);
-            y += 16.0;
+            self.draw_text_sharp(&format!("* {}", reward), right_x + 14.0 * s, y, 16.0, TEXT_DIM);
+            y += 16.0 * s;
         }
 
-        let action_base_y = right_y + right_h - 72.0;
+        let action_base_y = right_y + right_h - 72.0 * s;
         let actions_locked_by_active_task = has_active_guide_task && !tier_is_active;
         if dialogue.quest_id == tier.id && !actions_locked_by_active_task {
             if completed {
                 // Completed tiers intentionally expose no dialogue actions.
             } else if tier_is_active {
                 if tier_is_completable && dialogue.choices.is_empty() {
-                    let btn = Rect::new(right_x + right_w - 170.0, action_base_y, 150.0, 30.0);
+                    let btn_w = 150.0 * s;
+                    let btn_h = 30.0 * s;
+                    let btn = Rect::new(right_x + right_w - (btn_w + 20.0 * s), action_base_y, btn_w, btn_h);
                     layout.add(UiElementId::DialogueContinue, btn);
                     let hovered_continue = matches!(hovered, Some(UiElementId::DialogueContinue));
                     draw_rectangle(
@@ -1271,8 +1276,8 @@ impl Renderer {
                     );
                     self.draw_text_sharp(
                         "Complete",
-                        btn.x + 46.0,
-                        btn.y + 20.0,
+                        btn.x + 46.0 * s,
+                        btn.y + btn_h * 0.67,
                         16.0,
                         if hovered_continue {
                             TEXT_TITLE
@@ -1282,7 +1287,9 @@ impl Renderer {
                     );
                 }
             } else if dialogue.choices.is_empty() {
-                let btn = Rect::new(right_x + right_w - 170.0, action_base_y, 150.0, 30.0);
+                let btn_w = 150.0 * s;
+                let btn_h = 30.0 * s;
+                let btn = Rect::new(right_x + right_w - (btn_w + 20.0 * s), action_base_y, btn_w, btn_h);
                 layout.add(UiElementId::DialogueContinue, btn);
                 let hovered_continue = matches!(hovered, Some(UiElementId::DialogueContinue));
                 draw_rectangle(
@@ -1309,8 +1316,8 @@ impl Renderer {
                 );
                 self.draw_text_sharp(
                     "Continue",
-                    btn.x + 46.0,
-                    btn.y + 20.0,
+                    btn.x + 46.0 * s,
+                    btn.y + btn_h * 0.67,
                     16.0,
                     if hovered_continue {
                         TEXT_TITLE
@@ -1319,10 +1326,12 @@ impl Renderer {
                     },
                 );
             } else {
+                let choice_btn_w = 240.0 * s;
+                let choice_btn_h = 30.0 * s;
                 let mut btn_y =
-                    action_base_y - ((dialogue.choices.len().saturating_sub(1) as f32) * 34.0);
+                    action_base_y - ((dialogue.choices.len().saturating_sub(1) as f32) * 34.0 * s);
                 for (i, choice) in dialogue.choices.iter().enumerate() {
-                    let btn = Rect::new(right_x + right_w - 260.0, btn_y, 240.0, 30.0);
+                    let btn = Rect::new(right_x + right_w - (choice_btn_w + 20.0 * s), btn_y, choice_btn_w, choice_btn_h);
                     layout.add(UiElementId::DialogueChoice(i), btn);
                     let btn_hovered =
                         matches!(hovered, Some(UiElementId::DialogueChoice(idx)) if *idx == i);
@@ -1350,31 +1359,31 @@ impl Renderer {
                     );
                     self.draw_text_sharp(
                         &choice.text,
-                        btn.x + 12.0,
-                        btn.y + 20.0,
+                        btn.x + 12.0 * s,
+                        btn.y + choice_btn_h * 0.67,
                         16.0,
                         if btn_hovered { TEXT_TITLE } else { TEXT_NORMAL },
                     );
-                    btn_y += 34.0;
+                    btn_y += 34.0 * s;
                 }
             }
         } else {
             if actions_locked_by_active_task {
                 self.draw_text_sharp(
                     "Finish your active Adventurer task first.",
-                    right_x + right_w - 300.0,
-                    action_base_y + 20.0,
+                    right_x + right_w - 300.0 * s,
+                    action_base_y + 20.0 * s,
                     16.0,
                     TEXT_DIM,
                 );
             } else if unlocked && !completed {
                 if !selected_track.no_action_hint.is_empty() {
                     let hint =
-                        self.truncate_text_to_width(selected_track.no_action_hint, 268.0, 16.0);
+                        self.truncate_text_to_width(selected_track.no_action_hint, 268.0 * s, 16.0);
                     self.draw_text_sharp(
                         &hint,
-                        right_x + right_w - 280.0,
-                        action_base_y + 20.0,
+                        right_x + right_w - 280.0 * s,
+                        action_base_y + 20.0 * s,
                         16.0,
                         TEXT_DIM,
                     );
@@ -1384,11 +1393,11 @@ impl Renderer {
                     skilling_missing_unlock_requirements(state, selected_track.tiers, selected_idx);
                 if !missing.is_empty() {
                     let missing_text = format!("Missing: {}", missing.join(", "));
-                    let hint = self.truncate_text_to_width(&missing_text, 268.0, 16.0);
+                    let hint = self.truncate_text_to_width(&missing_text, 268.0 * s, 16.0);
                     self.draw_text_sharp(
                         &hint,
-                        right_x + right_w - 280.0,
-                        action_base_y + 20.0,
+                        right_x + right_w - 280.0 * s,
+                        action_base_y + 20.0 * s,
                         16.0,
                         TEXT_DIM,
                     );

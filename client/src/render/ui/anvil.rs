@@ -158,8 +158,9 @@ impl Renderer {
         let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
         let content_y = tab_y + tab_h + 4.0 * s;
         let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
-        let controls_strip_h = 44.0 * s; // space reserved for controls strip above footer
-        let full_content_h = panel_y + panel_height - FRAME_THICKNESS - footer_h - 4.0 * s - content_y;
+        let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
+        let controls_strip_h = 40.0 * s;
+        let full_content_h = footer_y - content_y;
 
         if state.ui_state.crafting_in_progress {
             self.render_anvil_progress(state, hovered, layout, content_x, content_y, content_w, full_content_h);
@@ -170,7 +171,6 @@ impl Renderer {
 
         // ===== FOOTER =====
         let footer_x = panel_x + FRAME_THICKNESS;
-        let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
         let footer_w = panel_width - FRAME_THICKNESS * 2.0;
 
         draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
@@ -454,7 +454,7 @@ impl Renderer {
 
         // ===== CONTROLS (below grid) =====
         // Only show when not crafting
-        self.render_anvil_controls(state, hovered, layout, &anvil_recipes, content_x, content_y + content_h + 2.0 * s, content_w);
+        self.render_anvil_controls(state, hovered, layout, &anvil_recipes, content_x, content_y + content_h, content_w);
     }
 
     /// Render quantity buttons and SMITH button below the grid
@@ -470,16 +470,12 @@ impl Renderer {
     ) {
         let s = self.font_scale.get();
 
-        // Controls are placed in the footer area, but we need space
-        // Actually let's place them inside the content area at the bottom
-        // The footer already has keybind hints. Put controls just above footer.
-
-        let controls_h = 34.0 * s;
-        let controls_y = area_y - controls_h - 2.0 * s;
+        // Controls strip fills space between grid and footer
+        let controls_y = area_y + 8.0 * s;
 
         // Background strip behind controls
-        draw_rectangle(area_x, controls_y - 4.0 * s, _area_w, controls_h + 8.0 * s, PANEL_BG_DARK);
-        draw_line(area_x + 8.0 * s, controls_y - 4.0 * s, area_x + _area_w - 8.0 * s, controls_y - 4.0 * s, 1.0, SLOT_BORDER);
+        draw_rectangle(area_x, area_y, _area_w, 40.0 * s, PANEL_BG_DARK);
+        draw_line(area_x + 8.0 * s, area_y, area_x + _area_w - 8.0 * s, area_y, 1.0, SLOT_BORDER);
 
         // Quantity buttons: [1] [X] [All]
         let qty_btn_w = 32.0 * s;
