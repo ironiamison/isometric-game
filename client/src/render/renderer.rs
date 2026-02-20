@@ -32,6 +32,7 @@ use macroquad::miniquad::ShaderSource;
 use macroquad::miniquad::UniformDesc;
 use macroquad::models::{draw_mesh, Mesh, Vertex};
 use macroquad::prelude::*;
+use macroquad::texture::{render_target_ex, RenderTargetParams};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
@@ -84,13 +85,10 @@ pub const SKINS: &[&str] = &["tan", "pale", "brown", "fish", "orc", "panda", "sk
 
 /// Render target size for silhouette compositing (pixels at 1x scale).
 /// Must be large enough to contain the player sprite plus equipment/weapon overhang.
-#[cfg(not(target_arch = "wasm32"))]
 const SILHOUETTE_RT_SIZE: u32 = 160;
 /// Anchor X in the render target where the player sprite's draw_x maps to.
-#[cfg(not(target_arch = "wasm32"))]
 const SILHOUETTE_ANCHOR_X: f32 = 63.0;
 /// Anchor Y in the render target where the player sprite's draw_y maps to.
-#[cfg(not(target_arch = "wasm32"))]
 const SILHOUETTE_ANCHOR_Y: f32 = 41.0;
 
 /// Objects tileset firstgid (GID = firstGid + spriteFileId, matching mapper-config.json)
@@ -3443,8 +3441,6 @@ impl Renderer {
         timings.overhead_ms = (get_time() - t2) * 1000.0;
 
         // 4.2. Render local player silhouette (on top of overhead, visible through trees)
-        // Disabled on WASM: render_target() calls new_render_pass_mrt which isn't supported on WebGL 1
-        #[cfg(not(target_arch = "wasm32"))]
         if let Some(ref local_id) = state.local_player_id {
             if let Some(local_player) = state.players.get(local_id) {
                 self.render_player_silhouette(local_player, &state.camera, &state.item_registry);
@@ -6016,7 +6012,6 @@ impl Renderer {
     /// Renders a semi-transparent silhouette of the player that's always visible.
     /// Composites all layers at full opacity onto an off-screen render target first,
     /// then draws the result with low alpha so equipment properly occludes skin.
-    #[cfg(not(target_arch = "wasm32"))]
     fn render_player_silhouette(&self, player: &Player, camera: &Camera, item_registry: &crate::game::item_registry::ItemRegistry) {
         if player.is_dead {
             return;
@@ -6026,7 +6021,16 @@ impl Renderer {
         {
             let mut rt_opt = self.silhouette_rt.borrow_mut();
             if rt_opt.is_none() {
-                let rt = render_target(SILHOUETTE_RT_SIZE, SILHOUETTE_RT_SIZE);
+                // Use sample_count: 0 to skip the resolve-texture path, which
+                // calls glDrawBuffers — unavailable on WebGL 1.
+                let rt = render_target_ex(
+                    SILHOUETTE_RT_SIZE,
+                    SILHOUETTE_RT_SIZE,
+                    RenderTargetParams {
+                        sample_count: 0,
+                        depth: false,
+                    },
+                );
                 rt.texture.set_filter(FilterMode::Nearest);
                 *rt_opt = Some(rt);
             }
