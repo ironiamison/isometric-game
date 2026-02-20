@@ -67,6 +67,11 @@ pub const TILES_PER_SECOND: f32 = 4.0;
 // Linear interpolation speed - must match server movement rate
 // Server: 250ms per tile = 4 tiles per second
 const VISUAL_SPEED: f32 = 4.0;
+// Local player prediction: keep some lead for responsiveness but avoid
+// full-tile overshoot that creates correction slides/teleports.
+const LOCAL_PREDICTION_LOOKAHEAD: f32 = 0.55;
+// If local visual position drifts too far ahead of server authority, clamp.
+const LOCAL_MAX_LEAD_TILES: f32 = 0.85;
 
 #[derive(Debug, Clone)]
 pub struct Player {
@@ -345,19 +350,33 @@ impl Player {
         let at_tile_center =
             (self.x - self.x.round()).abs() < 0.1 && (self.y - self.y.round()).abs() < 0.1;
         let vel_changed = (vel_x as i32, vel_y as i32) != (old_vel_x as i32, old_vel_y as i32);
+        let lookahead = if is_local_player {
+            LOCAL_PREDICTION_LOOKAHEAD
+        } else {
+            1.0
+        };
 
-        if vel_changed && !server_moved && !stopped {
+        if is_local_player {
+            let lead = (self.x - x).abs().max((self.y - y).abs());
+            if lead > LOCAL_MAX_LEAD_TILES {
+                self.target_x = x;
+                self.target_y = y;
+                return;
+            }
+        }
+
+        if !is_local_player && vel_changed && !server_moved && !stopped {
             // Direction changed during cooldown: finish current step before retargeting.
             let near_target =
                 (self.x - self.target_x).abs() < 0.15 && (self.y - self.target_y).abs() < 0.15;
             if near_target && (vel_x != 0.0 || vel_y != 0.0) {
-                self.target_x = x + vel_x;
-                self.target_y = y + vel_y;
+                self.target_x = x + vel_x * lookahead;
+                self.target_y = y + vel_y * lookahead;
             }
         } else if server_moved || stopped || at_tile_center {
             if vel_x != 0.0 || vel_y != 0.0 {
-                self.target_x = x + vel_x;
-                self.target_y = y + vel_y;
+                self.target_x = x + vel_x * lookahead;
+                self.target_y = y + vel_y * lookahead;
             } else {
                 self.target_x = x;
                 self.target_y = y;
