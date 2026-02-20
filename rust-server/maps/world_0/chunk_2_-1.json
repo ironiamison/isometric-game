@@ -3122,6 +3122,12 @@
       "x": 25,
       "y": 27,
       "level": 1
+    },
+    {
+      "entityId": "witch_sister",
+      "x": 14,
+      "y": 7,
+      "level": 1
     }
   ],
   "mapObjects": [

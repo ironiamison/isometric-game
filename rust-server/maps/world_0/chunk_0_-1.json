@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AADAAAAAwAAMAEAAHwBAAD8AQAA/AEAAEwBAEC8AACA+AAAAAAAAIAAAADAAAEAAAABAAAAAeAD//08A/v9/0QIAAFEKAABQCgAAUAJ4AFACaAFwAigAYAIoAEAKaATAAmQAwAMgAMAAAADAAAAAQAMAAMACAABAAwQAQAIMCFA=",
+  "collision": "AADAAAAAwAAMAEAAHwBAAD8AQAA/AEAAEwBAEC8AAAA+AAAAAAAAIAAAADAAAEAAAABAAAAAeAD//08A/v9/0QIAAFEKAABQCgAAUAJ4QFACeAFwAjgAYAI4AEAKeATAAmwAwAMAAMAAAADAAAAAQAMAAMADAABAAwcAQAIPCMA=",
   "entities": [
     {
       "entityId": "crow",
@@ -3548,13 +3548,6 @@
       "height": 31
     },
     {
-      "gid": 1265,
-      "x": 28,
-      "y": 31,
-      "width": 72,
-      "height": 116
-    },
-    {
       "gid": 2334,
       "x": 31,
       "y": 24,
@@ -3583,27 +3576,6 @@
       "height": 52
     },
     {
-      "gid": 2269,
-      "x": 13,
-      "y": 25,
-      "width": 33,
-      "height": 56
-    },
-    {
-      "gid": 2247,
-      "x": 17,
-      "y": 26,
-      "width": 47,
-      "height": 51
-    },
-    {
-      "gid": 2247,
-      "x": 19,
-      "y": 26,
-      "width": 47,
-      "height": 51
-    },
-    {
       "gid": 2318,
       "x": 23,
       "y": 1,
@@ -3625,11 +3597,53 @@
       "height": 190
     },
     {
-      "gid": 2098,
-      "x": 29,
-      "y": 7,
-      "width": 50,
-      "height": 74
+      "gid": 1993,
+      "x": 31,
+      "y": 31,
+      "width": 120,
+      "height": 182
+    },
+    {
+      "gid": 2250,
+      "x": 17,
+      "y": 26,
+      "width": 47,
+      "height": 51
+    },
+    {
+      "gid": 2250,
+      "x": 19,
+      "y": 26,
+      "width": 47,
+      "height": 51
+    },
+    {
+      "gid": 1397,
+      "x": 11,
+      "y": 26,
+      "width": 26,
+      "height": 40
+    },
+    {
+      "gid": 1393,
+      "x": 23,
+      "y": 29,
+      "width": 24,
+      "height": 29
+    },
+    {
+      "gid": 2258,
+      "x": 13,
+      "y": 23,
+      "width": 33,
+      "height": 56
+    },
+    {
+      "gid": 2258,
+      "x": 13,
+      "y": 22,
+      "width": 33,
+      "height": 56
     }
   ],
   "walls": [
@@ -4364,6 +4378,12 @@
       "x": 29,
       "y": 9,
       "edge": "right"
+    },
+    {
+      "gid": 352,
+      "x": 30,
+      "y": 31,
+      "edge": "down"
     }
   ],
   "portals": [

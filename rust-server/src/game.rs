@@ -9490,6 +9490,33 @@ impl GameRoom {
             out
         };
 
+        // For merchant+quest_giver NPCs, hide is_quest_giver when all quests are done.
+        // Build NPC -> quest IDs, then check per-player completion.
+        let all_npc_quests_done_by_player: HashMap<String, HashSet<String>> = {
+            let quests = self.quest_registry.all_quests().await;
+            let mut npc_quest_ids: HashMap<String, Vec<String>> = HashMap::new();
+            for q in &quests {
+                if !q.giver_npc.is_empty() {
+                    npc_quest_ids.entry(q.giver_npc.clone()).or_default().push(q.id.clone());
+                }
+            }
+
+            let mut out: HashMap<String, HashSet<String>> = HashMap::new();
+            let quest_states = self.player_quest_states.read().await;
+            for (player_id, state) in quest_states.iter() {
+                let mut done_npcs: HashSet<String> = HashSet::new();
+                for (npc_id, quest_ids) in &npc_quest_ids {
+                    if !quest_ids.is_empty() && quest_ids.iter().all(|qid| state.is_quest_completed(qid)) {
+                        done_npcs.insert(npc_id.clone());
+                    }
+                }
+                if !done_npcs.is_empty() {
+                    out.insert(player_id.clone(), done_npcs);
+                }
+            }
+            out
+        };
+
         // Build position lookup for O(1) access during culling
         let player_pos_map: HashMap<&str, (i32, i32)> = player_updates.iter()
             .map(|p| (p.id.as_str(), (p.x, p.y)))
@@ -9549,10 +9576,17 @@ impl GameRoom {
 
             for (pid, sender) in active_receivers {
                 let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(pid.as_str());
+                let done_npcs = all_npc_quests_done_by_player.get(pid.as_str());
                 let npc_values: Vec<rmpv::Value> = instance_npcs
                     .iter()
                     .map(|n| {
                         let mut n_for_player = n.clone();
+                        // Hide quest giver icon for merchant NPCs whose quests are all done
+                        if n_for_player.is_quest_giver && n_for_player.is_merchant {
+                            if done_npcs.map(|set| set.contains(n_for_player.prototype_id.as_str())).unwrap_or(false) {
+                                n_for_player.is_quest_giver = false;
+                            }
+                        }
                         n_for_player.can_turn_in_quest = n_for_player.is_quest_giver
                             && ready_turnin_npcs
                                 .map(|set| set.contains(n_for_player.prototype_id.as_str()))
@@ -9676,10 +9710,17 @@ impl GameRoom {
                 .map(|(_, p)| (p.id.clone(), *p))
                 .collect();
             let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(player_id.as_str());
+            let done_npcs = all_npc_quests_done_by_player.get(player_id.as_str());
             let nearby_npcs: HashMap<String, NpcUpdate> = npc_map.iter()
                 .filter(|(_, n)| (n.x - px).abs().max((n.y - py).abs()) <= VIEW_DISTANCE)
                 .map(|(_, n)| {
                     let mut n_for_player = (*n).clone();
+                    // Hide quest giver icon for merchant NPCs whose quests are all done
+                    if n_for_player.is_quest_giver && n_for_player.is_merchant {
+                        if done_npcs.map(|set| set.contains(n_for_player.prototype_id.as_str())).unwrap_or(false) {
+                            n_for_player.is_quest_giver = false;
+                        }
+                    }
                     n_for_player.can_turn_in_quest = n_for_player.is_quest_giver
                         && ready_turnin_npcs
                             .map(|set| set.contains(n_for_player.prototype_id.as_str()))

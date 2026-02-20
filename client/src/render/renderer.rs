@@ -6560,6 +6560,7 @@ impl Renderer {
                 alpha = alpha.min(icon_alpha);
             }
 
+            // Center icon on world position (screen_x is from world_to_screen, already tile-centered)
             let icon_x = screen_x - (icon_size * zoom) / 2.0;
             let icon_y = top_y - 20.0 * zoom;
 

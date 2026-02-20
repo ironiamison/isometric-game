@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAwAwEAEAAAAHgAAAB0AAAAQAAAAAAAAAAAAAAAAAAAA/AAAAwYBcAIDAnACQQQwAAEYcEIBIHACAkBiAwKA/wATgIEABAAPAAiAHwAIgA9AEIAHACCAH3BAwg9QwOABUAATBRAAFAVQABT/UAAUAHAAFwAAABEAAMBxAP+/7/8=",
+  "collision": "AA8AAEAHAAAAHwAAAB0AAAAQAAAAAAAAAAAAAAAAAAAA/AAAAwYBcAMDAnADQQQwAQEYcEMBIHADAkBiAwKA/wATgIEABAAPAAiAHwAIgA9AEIAHACCAH3BAwg9wwOABcAATBTAAFAVwAJT/cCAUAHAAFwAAABEAAMBxAP+/7/8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3716,25 +3716,25 @@
       "height": 38
     },
     {
-      "gid": 2246,
+      "gid": 2344,
+      "x": 31,
+      "y": 17,
+      "width": 32,
+      "height": 20
+    },
+    {
+      "gid": 2251,
       "x": 14,
       "y": 2,
       "width": 47,
       "height": 51
     },
     {
-      "gid": 2246,
+      "gid": 2251,
       "x": 14,
       "y": 0,
       "width": 47,
       "height": 51
-    },
-    {
-      "gid": 2344,
-      "x": 31,
-      "y": 17,
-      "width": 32,
-      "height": 20
     }
   ],
   "walls": [
@@ -4319,24 +4319,6 @@
       "x": 1,
       "y": 12,
       "edge": "right"
-    },
-    {
-      "gid": 353,
-      "x": 30,
-      "y": 0,
-      "edge": "right"
-    },
-    {
-      "gid": 352,
-      "x": 30,
-      "y": 0,
-      "edge": "down"
-    },
-    {
-      "gid": 352,
-      "x": 31,
-      "y": 0,
-      "edge": "down"
     },
     {
       "gid": 174,

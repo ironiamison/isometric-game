@@ -1,6 +1,8 @@
 use macroquad::miniquad::window::show_keyboard;
 use macroquad::prelude::*;
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::mpsc;
 
 use crate::audio::AudioManager;
 #[cfg(target_arch = "wasm32")]
@@ -408,6 +410,8 @@ pub struct LoginScreen {
     server_url: String,
     server_online: bool,
     last_ping_time: f32,
+    #[cfg(not(target_arch = "wasm32"))]
+    health_rx: Option<mpsc::Receiver<bool>>,
     #[cfg(target_arch = "wasm32")]
     loading: bool,
     // Remember me
@@ -464,6 +468,8 @@ impl LoginScreen {
             server_url: server_url.to_string(),
             server_online: false,
             last_ping_time: -10.0, // trigger immediate ping
+            #[cfg(not(target_arch = "wasm32"))]
+            health_rx: None,
             #[cfg(target_arch = "wasm32")]
             loading: false,
             remember_me,
@@ -588,15 +594,31 @@ impl Screen for LoginScreen {
             }
         }
 
-        // Ping server every 5 seconds
+        // Ping server every 5 seconds (non-blocking)
         #[cfg(not(target_arch = "wasm32"))]
-        if self.frame_counter - self.last_ping_time > 5.0 {
-            self.last_ping_time = self.frame_counter;
-            let health_url = format!("{}/health", self.server_url);
-            self.server_online = ureq::get(&health_url)
-                .timeout(std::time::Duration::from_secs(2))
-                .call()
-                .is_ok();
+        {
+            // Check for result from previous health check
+            if let Some(rx) = &self.health_rx {
+                if let Ok(online) = rx.try_recv() {
+                    self.server_online = online;
+                    self.health_rx = None;
+                }
+            }
+
+            // Start a new health check if none is in flight
+            if self.health_rx.is_none() && self.frame_counter - self.last_ping_time > 5.0 {
+                self.last_ping_time = self.frame_counter;
+                let (tx, rx) = mpsc::channel();
+                let health_url = format!("{}/health", self.server_url);
+                std::thread::spawn(move || {
+                    let online = ureq::get(&health_url)
+                        .timeout(std::time::Duration::from_secs(2))
+                        .call()
+                        .is_ok();
+                    let _ = tx.send(online);
+                });
+                self.health_rx = Some(rx);
+            }
         }
 
         #[cfg(target_arch = "wasm32")]

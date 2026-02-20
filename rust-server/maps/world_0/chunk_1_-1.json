@@ -3124,12 +3124,6 @@
       "level": 1
     },
     {
-      "entityId": "slime",
-      "x": 19,
-      "y": 8,
-      "level": 1
-    },
-    {
       "entityId": "slime_blue",
       "x": 16,
       "y": 18,

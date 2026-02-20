@@ -186,6 +186,12 @@ impl QuestRegistry {
         quests.keys().cloned().collect()
     }
 
+    /// Get all quest definitions
+    pub async fn all_quests(&self) -> Vec<Arc<Quest>> {
+        let quests = self.quests.read().await;
+        quests.values().cloned().collect()
+    }
+
     /// Get quests available from a specific NPC
     pub async fn get_quests_for_npc(&self, npc_id: &str) -> Vec<Arc<Quest>> {
         let quests = self.quests.read().await;
