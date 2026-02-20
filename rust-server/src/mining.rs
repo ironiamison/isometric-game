@@ -73,6 +73,30 @@ pub struct MineResult {
     pub respawn_delay_ms: Option<u64>,
     /// Ore type ID (e.g., "bronze", "iron") - for quest tracking
     pub ore_type_id: String,
+    /// Bonus gem drop (if any) - item ID of the uncut gem
+    pub gem_drop: Option<String>,
+}
+
+/// Gem tiers with drop rates (increasingly rare for higher-level gems).
+/// Checked on every successful ore mine.
+const GEM_DROP_TABLE: &[(&str, f64)] = &[
+    ("uncut_sapphire", 1.0 / 64.0),   // ~1.56%
+    ("uncut_emerald", 1.0 / 128.0),    // ~0.78%
+    ("uncut_ruby", 1.0 / 256.0),       // ~0.39%
+    ("uncut_diamond", 1.0 / 512.0),    // ~0.20%
+];
+
+/// Roll for a bonus gem drop. Returns the item ID if one drops.
+fn roll_gem_drop(rng: &mut impl Rng) -> Option<String> {
+    let roll: f64 = rng.r#gen();
+    let mut cumulative = 0.0;
+    for &(gem_id, chance) in GEM_DROP_TABLE {
+        cumulative += chance;
+        if roll < cumulative {
+            return Some(gem_id.to_string());
+        }
+    }
+    None
 }
 
 #[derive(Debug, Clone)]
@@ -270,6 +294,7 @@ impl MiningSystem {
                 rock_depleted: false,
                 respawn_delay_ms: None,
                 ore_type_id,
+                gem_drop: None,
             });
         }
 
@@ -299,6 +324,15 @@ impl MiningSystem {
             None
         };
 
+        // Roll for bonus gem drop
+        let gem_drop = roll_gem_drop(&mut rng);
+        if let Some(ref gem) = gem_drop {
+            info!(
+                "Gem drop at ({}, {}): {} while mining {}",
+                rock_x, rock_y, gem, ore_item_id
+            );
+        }
+
         info!(
             "Mine success at ({}, {}): {} (+{}xp, depleted={})",
             rock_x, rock_y, ore_item_id, xp_gained, rock_depleted
@@ -311,6 +345,7 @@ impl MiningSystem {
             rock_depleted,
             respawn_delay_ms,
             ore_type_id,
+            gem_drop,
         })
     }
 }

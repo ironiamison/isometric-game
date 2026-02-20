@@ -6952,12 +6952,22 @@ impl GameRoom {
                             return;
                         }
 
+                        // If a gem dropped, try to add to inventory
+                        let gem_dropped_on_ground = if let Some(ref gem_id) = result.gem_drop {
+                            let gem_leftover = player.inventory.add_item(gem_id, 1, &self.item_registry);
+                            gem_leftover > 0 // true = inventory full, need to drop on ground
+                        } else {
+                            false
+                        };
+
                         // Award XP
                         let leveled_up = player.skills.mining.add_xp(result.xp_gained);
                         let new_xp = player.skills.mining.xp;
                         let new_level = player.skills.mining.level;
                         let inv_update = player.inventory.to_update();
                         let gold = player.inventory.gold;
+                        let player_x = player.x;
+                        let player_y = player.y;
                         drop(players);
 
                         // Send inventory update
@@ -6982,6 +6992,49 @@ impl GameRoom {
                             item_id: result.ore_item_id.clone(),
                             xp_gained: result.xp_gained,
                         }).await;
+
+                        // Handle gem drop notification + ground drop if needed
+                        if let Some(ref gem_id) = result.gem_drop {
+                            let gem_name = self.item_registry.get(gem_id)
+                                .map(|d| d.display_name.clone())
+                                .unwrap_or_else(|| gem_id.clone());
+
+                            if gem_dropped_on_ground {
+                                // Drop gem on the ground at player's position
+                                let ground_item = crate::item::GroundItem::new(
+                                    &uuid::Uuid::new_v4().to_string(),
+                                    gem_id,
+                                    player_x as f32,
+                                    player_y as f32,
+                                    1,
+                                    Some(player_id.to_string()),
+                                    current_time,
+                                );
+
+                                self.broadcast_to_zone(player_id, ServerMessage::ItemDropped {
+                                    id: ground_item.id.clone(),
+                                    item_id: gem_id.clone(),
+                                    x: player_x as f32,
+                                    y: player_y as f32,
+                                    quantity: 1,
+                                }).await;
+
+                                {
+                                    let mut items = self.ground_items.write().await;
+                                    items.insert(ground_item.id.clone(), ground_item);
+                                }
+
+                                self.send_system_message(player_id, &format!(
+                                    "You found a {}! Your inventory is full, so it dropped on the ground.",
+                                    gem_name,
+                                )).await;
+                            } else {
+                                self.send_system_message(player_id, &format!(
+                                    "You found a {} while mining!",
+                                    gem_name,
+                                )).await;
+                            }
+                        }
 
                         // Process quest item collection for mining drops
                         self.process_quest_item_collect(player_id, &result.ore_item_id, 1).await;
