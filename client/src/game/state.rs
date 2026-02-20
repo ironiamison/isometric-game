@@ -1314,7 +1314,7 @@ impl Default for UiState {
             inventory_scrollbar_drag_last_y: 0.0,
             settings_slider_dragging: None,
             classic_controls: false,
-            prayer_spell_tab: 0,
+            prayer_spell_tab: 1,
             spell_bar_active: false,
             prayer_help_open: false,
             spell_help_open: false,

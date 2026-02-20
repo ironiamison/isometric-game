@@ -3429,6 +3429,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "error" => {
+            if let Some(value) = data {
+                let message = extract_string(value, "message").unwrap_or_default();
+                log::warn!("Server error: {}", message);
+                state
+                    .ui_state
+                    .chat_messages
+                    .push(ChatMessage::system(message));
+                state.pending_sfx.push("error".to_string());
+            }
+        }
+
         _ => {
             log::debug!("Unhandled message type: {}", msg_type);
         }
