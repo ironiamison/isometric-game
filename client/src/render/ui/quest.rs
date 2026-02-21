@@ -527,16 +527,22 @@ impl Renderer {
             total_h += line_height;
         }
 
-        // Objectives section (only if active)
-        if is_active {
+        // Objectives section
+        if !entry.objectives.is_empty() {
             total_h += 8.0 * s; // separator
             total_h += line_height; // "Objectives:" label
-            if let Some(quest) = state.ui_state.active_quests.iter().find(|q| q.id == *selected_id) {
-                for obj in &quest.objectives {
-                    let obj_text = format!("[+] {} ({}/{})", obj.description, obj.current, obj.target);
-                    let obj_lines = self.wrap_text(&obj_text, wrap_w, 16.0);
-                    total_h += obj_lines.len().max(1) as f32 * line_height;
-                }
+            let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == *selected_id);
+            for cat_obj in &entry.objectives {
+                let (current, target) = if let Some(aq) = active_quest {
+                    aq.objectives.iter().find(|o| o.id == cat_obj.id)
+                        .map(|o| (o.current, o.target))
+                        .unwrap_or((0, cat_obj.target))
+                } else {
+                    (0, cat_obj.target)
+                };
+                let obj_text = format!("[+] {} ({}/{})", cat_obj.description, current, target);
+                let obj_lines = self.wrap_text(&obj_text, wrap_w, 16.0);
+                total_h += obj_lines.len().max(1) as f32 * line_height;
             }
         }
 
@@ -700,8 +706,8 @@ impl Renderer {
             y += line_height;
         }
 
-        // ----- Objectives section (only if active) -----
-        if is_active {
+        // ----- Objectives section -----
+        if !entry.objectives.is_empty() {
             // Separator
             draw_line(
                 content_x + text_x_offset,
@@ -723,61 +729,70 @@ impl Renderer {
             );
             y += line_height;
 
-            if let Some(quest) = state.ui_state.active_quests.iter().find(|q| q.id == *selected_id) {
-                let obj_complete_check = Color::new(0.392, 0.784, 0.392, 1.0);
-                let obj_complete_text = Color::new(0.392, 0.627, 0.392, 1.0);
-                let obj_incomplete_check = Color::new(0.502, 0.502, 0.541, 1.0);
+            let obj_complete_check = Color::new(0.392, 0.784, 0.392, 1.0);
+            let obj_complete_text = Color::new(0.392, 0.627, 0.392, 1.0);
+            let obj_incomplete_check = Color::new(0.502, 0.502, 0.541, 1.0);
 
-                for obj in &quest.objectives {
-                    let check = if obj.completed { "[+]" } else { "[ ]" };
-                    let check_color = if obj.completed {
-                        obj_complete_check
+            let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == *selected_id);
+
+            for cat_obj in &entry.objectives {
+                // Overlay progress from active quest if available
+                let (current, target, completed) = if let Some(aq) = active_quest {
+                    aq.objectives.iter().find(|o| o.id == cat_obj.id)
+                        .map(|o| (o.current, o.target, o.completed))
+                        .unwrap_or((0, cat_obj.target, false))
+                } else if is_completed {
+                    (cat_obj.target, cat_obj.target, true)
+                } else {
+                    (0, cat_obj.target, false)
+                };
+
+                let check = if completed { "[+]" } else { "[ ]" };
+                let check_color = if completed {
+                    obj_complete_check
+                } else {
+                    obj_incomplete_check
+                };
+                let text_color = if completed {
+                    obj_complete_text
+                } else {
+                    TEXT_DIM
+                };
+
+                let obj_text = format!(
+                    "{} {} ({}/{})",
+                    check, cat_obj.description, current, target
+                );
+                let obj_lines = self.wrap_text(&obj_text, wrap_w, 16.0);
+
+                for (idx, line) in obj_lines.iter().enumerate() {
+                    if idx == 0 {
+                        let check_w = self.measure_text_sharp(check, 16.0).width;
+                        self.draw_text_sharp(
+                            check,
+                            content_x + text_x_offset,
+                            y + 12.0 * s,
+                            16.0,
+                            check_color,
+                        );
+                        let rest = &line[check.len()..];
+                        self.draw_text_sharp(
+                            rest,
+                            content_x + text_x_offset + check_w,
+                            y + 12.0 * s,
+                            16.0,
+                            text_color,
+                        );
                     } else {
-                        obj_incomplete_check
-                    };
-                    let text_color = if obj.completed {
-                        obj_complete_text
-                    } else {
-                        TEXT_DIM
-                    };
-
-                    let obj_text = format!(
-                        "{} {} ({}/{})",
-                        check, obj.description, obj.current, obj.target
-                    );
-                    let obj_lines = self.wrap_text(&obj_text, wrap_w, 16.0);
-
-                    for (idx, line) in obj_lines.iter().enumerate() {
-                        // First line: draw checkbox in its color, rest in text color
-                        if idx == 0 {
-                            let check_w = self.measure_text_sharp(check, 16.0).width;
-                            self.draw_text_sharp(
-                                check,
-                                content_x + text_x_offset,
-                                y + 12.0 * s,
-                                16.0,
-                                check_color,
-                            );
-                            // Draw rest of line (after the check part) in text color
-                            let rest = &line[check.len()..];
-                            self.draw_text_sharp(
-                                rest,
-                                content_x + text_x_offset + check_w,
-                                y + 12.0 * s,
-                                16.0,
-                                text_color,
-                            );
-                        } else {
-                            self.draw_text_sharp(
-                                line,
-                                content_x + text_x_offset,
-                                y + 12.0 * s,
-                                16.0,
-                                text_color,
-                            );
-                        }
-                        y += line_height;
+                        self.draw_text_sharp(
+                            line,
+                            content_x + text_x_offset,
+                            y + 12.0 * s,
+                            16.0,
+                            text_color,
+                        );
                     }
+                    y += line_height;
                 }
             }
         }

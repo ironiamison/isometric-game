@@ -33,7 +33,7 @@ pub use state::{
     ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice, DoubleClickState, DragSource,
     DragState, FarmingContractInfo, FarmingPatch, FrameTimings, FriendInfo, GameState,
     GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent, MapTransition, OnlinePlayerInfo,
-    PendingRequestInfo, Projectile, QuestCatalogEntry, QuestCompletedEvent, QuestObjective,
+    PendingRequestInfo, Projectile, CatalogObjective, QuestCatalogEntry, QuestCompletedEvent, QuestObjective,
     SkillXpEvent, SocialState,
     SocialTab, SpellEffect, TransitionState, UiState, XpDropFeed, quest_status_order,
 };

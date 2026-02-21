@@ -13,6 +13,9 @@ pub struct ShopData {
     /// Which recipe categories this shop offers (e.g. ["smithing"], ["alchemy"])
     /// Empty = no crafting tab
     pub crafting_categories: Vec<String>,
+    /// Which crafting stations this shop provides access to (e.g. ["workbench", "tanning_rack"])
+    /// Empty = no station filter (all stations allowed)
+    pub crafting_stations: Vec<String>,
     pub stock: Vec<ShopStockItem>,
 }
 

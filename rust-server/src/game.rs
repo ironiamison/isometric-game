@@ -1905,6 +1905,13 @@ impl GameRoom {
                 (None, None)
             };
 
+            let objectives = quest.objectives.iter().map(|o| QuestObjectiveData {
+                id: o.id.clone(),
+                description: o.description.clone(),
+                current: 0,
+                target: o.count,
+                completed: false,
+            }).collect();
             entries.push(QuestCatalogEntryData {
                 quest_id: quest.id.clone(),
                 name: quest.name.clone(),
@@ -1913,6 +1920,7 @@ impl GameRoom {
                 level_required: quest.level_required,
                 required_quest_id,
                 required_quest_name,
+                objectives,
             });
         }
 
@@ -4853,6 +4861,7 @@ impl GameRoom {
                             buy_multiplier: merchant_config.buy_multiplier,
                             sell_multiplier: merchant_config.sell_multiplier,
                             crafting_categories: merchant_config.crafting_categories.clone(),
+                            crafting_stations: merchant_config.crafting_stations.clone(),
                             stock,
                         };
 
@@ -5106,16 +5115,66 @@ impl GameRoom {
                             quest_state.start_quest(&quest_id, &objective_targets);
                             tracing::info!("Player {} accepted quest {}", player_id, quest_id);
 
-                            // Send QuestAccepted to client
+                            // Evaluate cumulative objectives (reach_level, reach_gold)
+                            // against the player's current state so they're immediately
+                            // marked complete if already met.
+                            let mut progression_results = Vec::new();
+                            if let Some(snapshot) = self.players.read().await.get(player_id).map(|p| {
+                                (
+                                    p.inventory.gold,
+                                    vec![
+                                        ("hitpoints", p.skills.hitpoints.level),
+                                        ("combat", p.skills.combat.level),
+                                        ("fishing", p.skills.fishing.level),
+                                        ("farming", p.skills.farming.level),
+                                        ("smithing", p.skills.smithing.level),
+                                        ("prayer", p.skills.prayer.level),
+                                        ("magic", p.skills.magic.level),
+                                        ("woodcutting", p.skills.woodcutting.level),
+                                        ("mining", p.skills.mining.level),
+                                        ("alchemy", p.skills.alchemy.level),
+                                    ],
+                                )
+                            }) {
+                                let (gold, skill_levels) = snapshot;
+                                for (skill, level) in &skill_levels {
+                                    let event = QuestEvent::SkillLevelChanged {
+                                        player_id: player_id.to_string(),
+                                        skill: (*skill).to_string(),
+                                        level: *level,
+                                    };
+                                    progression_results.extend(
+                                        self.quest_registry.process_event(&event, quest_state).await,
+                                    );
+                                }
+                                let gold_event = QuestEvent::GoldAmountChanged {
+                                    player_id: player_id.to_string(),
+                                    amount: gold,
+                                };
+                                progression_results.extend(
+                                    self.quest_registry.process_event(&gold_event, quest_state).await,
+                                );
+                            }
+
+                            // Build QuestAccepted with current objective state
                             let objectives: Vec<QuestObjectiveData> = quest
                                 .objectives
                                 .iter()
-                                .map(|o| QuestObjectiveData {
-                                    id: o.id.clone(),
-                                    description: o.description.clone(),
-                                    current: 0,
-                                    target: o.count,
-                                    completed: false,
+                                .map(|o| {
+                                    let (current, completed) = quest_state
+                                        .get_quest(&quest_id)
+                                        .and_then(|progress| {
+                                            progress.objectives.get(&o.id)
+                                        })
+                                        .map(|obj| (obj.current, obj.completed))
+                                        .unwrap_or((0, false));
+                                    QuestObjectiveData {
+                                        id: o.id.clone(),
+                                        description: o.description.clone(),
+                                        current,
+                                        target: o.count,
+                                        completed,
+                                    }
                                 })
                                 .collect();
                             let msg = ServerMessage::QuestAccepted {

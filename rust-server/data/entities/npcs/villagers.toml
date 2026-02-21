@@ -87,6 +87,7 @@ buy_multiplier = 0.5
 sell_multiplier = 1.0
 restock_interval_minutes = 5
 crafting_categories = ["smithing"]
+crafting_stations = ["workbench", "tanning_rack"]
 
 [blacksmith.speech]
 radius = 5
@@ -501,6 +502,7 @@ buy_multiplier = 0.5
 sell_multiplier = 1.0
 restock_interval_minutes = 5
 crafting_categories = ["smithing"]
+crafting_stations = ["workbench", "tanning_rack"]
 
 [blacksmith_master.speech]
 radius = 5

@@ -7,7 +7,7 @@ use crate::game::{
     ActiveDialogue, ActiveQuest, BonusTile, ChatBubble, ChatChannel, ChatMessage, ConnectionStatus,
     DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch, FriendInfo, GameState,
     GatheringBuff, GatheringMarker, GroundItem, InventorySlot, ItemDefinition, LevelUpEvent,
-    MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal, QuestCatalogEntry,
+    MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal, CatalogObjective, QuestCatalogEntry,
     QuestCompletedEvent, QuestObjective, RecipeDefinition, RecipeIngredient, RecipeResult,
     ShopData, ShopStockItem,
     SkillType, SkillXpEvent, SpellEffect, TransitionState, Wall, WallEdge,
@@ -1581,6 +1581,15 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let level_required = extract_i32(q, "level_required").unwrap_or(0);
                         let required_quest_id = extract_string(q, "required_quest_id");
                         let required_quest_name = extract_string(q, "required_quest_name");
+                        let mut objectives = Vec::new();
+                        if let Some(obj_arr) = extract_array(q, "objectives") {
+                            for obj in obj_arr {
+                                let id = extract_string(obj, "id").unwrap_or_default();
+                                let description = extract_string(obj, "description").unwrap_or_default();
+                                let target = extract_i32(obj, "target").unwrap_or(1);
+                                objectives.push(CatalogObjective { id, description, target });
+                            }
+                        }
                         state.ui_state.quest_catalog.push(QuestCatalogEntry {
                             quest_id,
                             name,
@@ -1589,6 +1598,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             level_required,
                             required_quest_id,
                             required_quest_name,
+                            objectives,
                         });
                     }
                 }
@@ -2216,6 +2226,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             .collect()
                     })
                     .unwrap_or_default();
+                let crafting_stations: Vec<String> = extract_array(shop_value, "craftingStations")
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 let show_crafting = !crafting_categories.is_empty();
 
                 let mut stock = Vec::new();
@@ -2247,6 +2264,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     sell_multiplier,
                     show_crafting,
                     crafting_categories,
+                    crafting_stations,
                     stock,
                 });
                 state.ui_state.crafting_open = true; // Open crafting window (which has shop tab)

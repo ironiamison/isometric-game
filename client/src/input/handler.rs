@@ -3303,7 +3303,9 @@ impl InputHandler {
 
                     // Only auto-scroll when keyboard navigated, not every frame
                     if key_navigated {
-                        let craft_line_h = 28.0_f32;
+                        let s = state.ui_state.ui_scale;
+                        let craft_line_h = 28.0 * s;
+                        let section_h = SECTION_HEADER_HEIGHT * s;
                         // Count the actual row position including undiscovered "????" entries
                         // and section headers (must match renderer layout)
                         let mut all_in_category: Vec<&crate::game::RecipeDefinition> =
@@ -3337,7 +3339,7 @@ impl InputHandler {
                                 && current_section != Some(recipe_section)
                             {
                                 current_section = Some(recipe_section);
-                                pixel_y += SECTION_HEADER_HEIGHT;
+                                pixel_y += section_h;
                             }
                             let is_disc = !r.requires_discovery
                                 || state.discovered_recipes.contains(&r.id);
@@ -3354,17 +3356,17 @@ impl InputHandler {
                         if item_top < state.ui_state.crafting_scroll_offset {
                             state.ui_state.crafting_scroll_offset = item_top;
                         }
-                        // Calculate visible height matching renderer layout
+                        // Calculate visible height matching renderer layout (scaled)
                         let (_, sh) = crate::util::virtual_screen_size();
-                        let panel_h = (450.0_f32).min(sh - 16.0);
-                        let content_height = panel_h - 8.0 - 40.0 - 30.0 - 12.0;
+                        let panel_h = (450.0 * s).min(sh - 16.0);
+                        let content_height = panel_h - 8.0 - 40.0 * s - 30.0 * s - 12.0 * s;
                         let has_tabs = categories.len() > 1;
                         let list_height = if has_tabs {
-                            content_height - 28.0 - 20.0
+                            content_height - 28.0 * s - 20.0 * s
                         } else {
-                            content_height - 10.0
+                            content_height - 10.0 * s
                         };
-                        let visible_h = list_height - 8.0;
+                        let visible_h = list_height - 8.0 * s;
                         if item_bottom > state.ui_state.crafting_scroll_offset + visible_h {
                             state.ui_state.crafting_scroll_offset = item_bottom - visible_h;
                         }
@@ -3392,8 +3394,9 @@ impl InputHandler {
                 // Mouse wheel scrolling for crafting recipe list (same logic as shop tab)
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
+                    let s = state.ui_state.ui_scale;
                     const SCROLL_SPEED: f32 = 30.0;
-                    let line_height = 28.0;
+                    let line_height = 28.0 * s;
                     // Count all recipes in category (discovered + undiscovered) to match renderer
                     let sel_idx = state
                         .ui_state
@@ -3401,7 +3404,7 @@ impl InputHandler {
                         .min(categories.len().saturating_sub(1));
                     let cur_cat = categories
                         .get(sel_idx)
-                        .map(|s| s.as_str())
+                        .map(|sc| sc.as_str())
                         .unwrap_or("supplies");
                     let recipes_in_cat: Vec<&crate::game::RecipeDefinition> = filtered_recipes
                         .iter()
@@ -3418,27 +3421,27 @@ impl InputHandler {
                     let num_scroll_sections = {
                         let mut seen = std::collections::HashSet::new();
                         for r in &recipes_in_cat {
-                            if let Some(ref s) = r.section {
-                                if !s.is_empty() {
-                                    seen.insert(s.as_str());
+                            if let Some(ref sec) = r.section {
+                                if !sec.is_empty() {
+                                    seen.insert(sec.as_str());
                                 }
                             }
                         }
                         seen.len()
                     };
-                    // Match renderer layout constants
+                    // Match renderer layout constants (scaled by ui_scale)
                     let (_, sh) = crate::util::virtual_screen_size();
-                    let panel_height = (450.0_f32).min(sh - 16.0);
-                    let content_height = panel_height - 8.0 - 40.0 - 30.0 - 12.0; // FRAME*2=8, HEADER=40, FOOTER=30
+                    let panel_height = (450.0 * s).min(sh - 16.0);
+                    let content_height = panel_height - 8.0 - 40.0 * s - 30.0 * s - 12.0 * s;
                     let has_tabs = categories.len() > 1;
                     let list_height = if has_tabs {
-                        content_height - 28.0 - 20.0 // tab_height=28
+                        content_height - 28.0 * s - 20.0 * s
                     } else {
-                        content_height - 10.0
+                        content_height - 10.0 * s
                     };
-                    let list_content_height = list_height - 8.0;
+                    let list_content_height = list_height - 8.0 * s;
                     let total_content = total_visible as f32 * line_height
-                        + num_scroll_sections as f32 * SECTION_HEADER_HEIGHT;
+                        + num_scroll_sections as f32 * SECTION_HEADER_HEIGHT * s;
                     let max_scroll = (total_content - list_content_height).max(0.0);
                     state.ui_state.crafting_scroll_offset = (state.ui_state.crafting_scroll_offset
                         - wheel_y * SCROLL_SPEED)

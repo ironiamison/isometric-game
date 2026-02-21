@@ -822,6 +822,14 @@ pub struct QuestCatalogEntry {
     pub level_required: i32,
     pub required_quest_id: Option<String>,
     pub required_quest_name: Option<String>,
+    pub objectives: Vec<CatalogObjective>,
+}
+
+/// Objective definition from the quest catalog (static, no progress)
+pub struct CatalogObjective {
+    pub id: String,
+    pub description: String,
+    pub target: i32,
 }
 
 /// Quest completion notification

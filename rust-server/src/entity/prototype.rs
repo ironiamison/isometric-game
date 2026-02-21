@@ -158,6 +158,10 @@ pub struct MerchantConfig {
     /// Empty = no crafting tab shown
     #[serde(default)]
     pub crafting_categories: Vec<String>,
+    /// Which crafting stations this merchant provides access to (e.g. ["workbench", "tanning_rack"])
+    /// Empty = no station filter (all stations allowed)
+    #[serde(default)]
+    pub crafting_stations: Vec<String>,
     /// Quest that must be completed before this shop is accessible
     #[serde(default)]
     pub required_quest: Option<String>,

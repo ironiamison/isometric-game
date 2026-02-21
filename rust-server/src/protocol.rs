@@ -1074,6 +1074,7 @@ pub struct QuestCatalogEntryData {
     pub level_required: i32,
     pub required_quest_id: Option<String>,
     pub required_quest_name: Option<String>,
+    pub objectives: Vec<QuestObjectiveData>,
 }
 
 /// Recipe ingredient for client sync
@@ -1117,6 +1118,7 @@ pub struct ShopData {
     pub buy_multiplier: f32,
     pub sell_multiplier: f32,
     pub crafting_categories: Vec<String>,
+    pub crafting_stations: Vec<String>,
     pub stock: Vec<ShopStockItemData>,
 }
 
@@ -2492,6 +2494,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                             Value::String(req_name.clone().into()),
                         ));
                     }
+                    let obj_values: Vec<Value> = q.objectives.iter().map(|obj| {
+                        let mut omap = Vec::new();
+                        omap.push((Value::String("id".into()), Value::String(obj.id.clone().into())));
+                        omap.push((Value::String("description".into()), Value::String(obj.description.clone().into())));
+                        omap.push((Value::String("target".into()), Value::Integer((obj.target as i64).into())));
+                        Value::Map(omap)
+                    }).collect();
+                    qmap.push((Value::String("objectives".into()), Value::Array(obj_values)));
                     Value::Map(qmap)
                 })
                 .collect();
@@ -3059,6 +3069,13 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             shop_map.push((
                 Value::String("craftingCategories".into()),
                 Value::Array(cat_values),
+            ));
+            let station_values: Vec<Value> = shop.crafting_stations.iter()
+                .map(|s| Value::String(s.clone().into()))
+                .collect();
+            shop_map.push((
+                Value::String("craftingStations".into()),
+                Value::Array(station_values),
             ));
 
             let stock_values: Vec<Value> = shop
