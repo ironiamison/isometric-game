@@ -8839,11 +8839,12 @@ impl Renderer {
                 let px = player.x;
                 let py = player.y;
                 if px >= 0.0 && px <= 29.0 && py >= -42.0 && py <= -16.0 {
+                    let s = self.font_scale.get();
                     let bar_width_contract = 120.0f32;
                     let (bar_x, stats_y) =
                         self.minimap_stats_stack_position(state, bar_width_contract);
-                    // Below 3 stat bars (HP + MP + Prayer, each 18px + 4px gap) + extra gap
-                    let contract_y = stats_y + 3.0 * (18.0 + 4.0) + 14.0;
+                    // Below 3 stat bars (HP + MP + Prayer, each 18*s + 4*s gap) + extra gap
+                    let contract_y = stats_y + 3.0 * (18.0 + 4.0) * s + 14.0 * s;
                     self.render_farming_contract_tracker(state, bar_x, contract_y, 240.0);
                 }
             }

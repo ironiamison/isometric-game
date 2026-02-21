@@ -1440,6 +1440,17 @@ impl InputHandler {
                         }
                         return commands;
                     }
+                    UiElementId::MenuButtonQuest => {
+                        audio.play_sfx("enter");
+                        // Toggle quest log
+                        if state.ui_state.quest_log_open {
+                            state.ui_state.quest_log_open = false;
+                        } else {
+                            state.ui_state.quest_log_open = true;
+                            state.ui_state.quest_log_scroll = 0.0;
+                        }
+                        return commands;
+                    }
                     UiElementId::MenuButtonSettings => {
                         audio.play_sfx("enter");
                         // Toggle escape/settings menu

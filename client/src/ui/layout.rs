@@ -74,6 +74,7 @@ pub enum UiElementId {
     MenuButtonSocial,
     MenuButtonSkills,
     MenuButtonPrayer,
+    MenuButtonQuest,
     MenuButtonSettings,
 
     // Skills Panel

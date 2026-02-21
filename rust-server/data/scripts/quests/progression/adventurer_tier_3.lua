@@ -49,12 +49,12 @@ function show_progress_dialogue(ctx)
     local gold = ctx:get_objective_progress("gather_gold_2600")
 
     local text = string.format(
-        "Tier III status:\n- Pigs defeated: %d/30\n- Wild boars defeated: %d/20\n- Farming level: %d/12\n- Combat level: %d/25\n- Gold: %d/2600",
-        pigs.current,
-        boars.current,
-        farming.current,
-        combat.current,
-        gold.current
+        "Tier III status:\n- Pigs defeated: %d/%d\n- Wild boars defeated: %d/%d\n- Farming level: %d/%d\n- Combat level: %d/%d\n- Gold: %d/%d",
+        pigs.current, pigs.target,
+        boars.current, boars.target,
+        farming.current, farming.target,
+        combat.current, combat.target,
+        gold.current, gold.target
     )
 
     ctx:show_dialogue({

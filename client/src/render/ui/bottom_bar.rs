@@ -16,8 +16,9 @@ const ICON_SKILLS: usize = 3;
 const ICON_SOCIAL: usize = 4;
 const ICON_PRAYER: usize = 5;
 const ICON_MAGIC: usize = 6;
+const ICON_QUEST: usize = 7;
 
-/// Icon dimensions in the sprite sheet (7 icons, 32x32 each)
+/// Icon dimensions in the sprite sheet (8 icons, 32x32 each)
 const ICON_SIZE: f32 = 32.0;
 
 impl Renderer {
@@ -105,8 +106,8 @@ impl Renderer {
         // Floor to integer pixels for crisp pixel art
         let button_y = (screen_h - exp_bar_gap - button_size).floor();
 
-        // 6 buttons: Inventory, Character, Skills, Prayer, Social, Settings
-        let num_buttons = 6;
+        // 7 buttons: Inventory, Character, Skills, Prayer, Quest, Social, Settings
+        let num_buttons = 7;
         let total_width =
             num_buttons as f32 * button_size + (num_buttons - 1) as f32 * button_spacing;
 
@@ -138,6 +139,11 @@ impl Renderer {
                     ICON_PRAYER
                 },
                 state.ui_state.prayer_book_open,
+            ),
+            (
+                UiElementId::MenuButtonQuest,
+                ICON_QUEST,
+                state.ui_state.quest_log_open,
             ),
             (
                 UiElementId::MenuButtonSocial,

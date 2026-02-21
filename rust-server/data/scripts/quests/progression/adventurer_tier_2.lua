@@ -51,14 +51,14 @@ function show_progress_dialogue(ctx)
     local gold = ctx:get_objective_progress("gather_gold_1200")
 
     local text = string.format(
-        "Tier II status:\n- Blue slimes: %d/10\n- Worms: %d/12\n- Woodcutting level: %d/8\n- Mining level: %d/8\n- Smithing level: %d/8\n- Combat level: %d/14\n- Gold: %d/1200",
-        slimes.current,
-        worms.current,
-        woodcutting.current,
-        mining.current,
-        smithing.current,
-        combat.current,
-        gold.current
+        "Tier II status:\n- Blue slimes: %d/%d\n- Worms: %d/%d\n- Woodcutting level: %d/%d\n- Mining level: %d/%d\n- Smithing level: %d/%d\n- Combat level: %d/%d\n- Gold: %d/%d",
+        slimes.current, slimes.target,
+        worms.current, worms.target,
+        woodcutting.current, woodcutting.target,
+        mining.current, mining.target,
+        smithing.current, smithing.target,
+        combat.current, combat.target,
+        gold.current, gold.target
     )
 
     ctx:show_dialogue({

@@ -47,10 +47,10 @@ function show_progress_dialogue(ctx)
     local gold = ctx:get_objective_progress("gather_gold_150")
 
     local text = string.format(
-        "Tier I status:\n- Crows: %d/8\n- Combat level: %d/8\n- Gold: %d/150",
-        crows.current,
-        combat.current,
-        gold.current
+        "Tier I status:\n- Crows: %d/%d\n- Combat level: %d/%d\n- Gold: %d/%d",
+        crows.current, crows.target,
+        combat.current, combat.target,
+        gold.current, gold.target
     )
 
     ctx:show_dialogue({
