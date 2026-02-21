@@ -53,20 +53,30 @@ const COMBAT_T1_OBJECTIVES: [GuideObjectiveTemplate; 3] = [
         target: 150,
     },
 ];
-const COMBAT_T2_OBJECTIVES: [GuideObjectiveTemplate; 5] = [
+const COMBAT_T2_OBJECTIVES: [GuideObjectiveTemplate; 7] = [
     GuideObjectiveTemplate {
         id: "kill_blue_slimes",
         label: "Defeat blue slimes",
-        target: 24,
+        target: 10,
     },
     GuideObjectiveTemplate {
-        id: "kill_crows",
-        label: "Defeat crows",
-        target: 16,
+        id: "kill_worms",
+        label: "Defeat worms",
+        target: 12,
     },
     GuideObjectiveTemplate {
         id: "reach_woodcutting_8",
         label: "Reach Woodcutting level",
+        target: 8,
+    },
+    GuideObjectiveTemplate {
+        id: "reach_mining_8",
+        label: "Reach Mining level",
+        target: 8,
+    },
+    GuideObjectiveTemplate {
+        id: "reach_smithing_8",
+        label: "Reach Smithing level",
         target: 8,
     },
     GuideObjectiveTemplate {
