@@ -112,11 +112,22 @@ impl Renderer {
             TEXT_TITLE,
         );
 
-        // ===== EARLY RETURN FOR DETAIL VIEW =====
-        // If a quest is selected, the detail view will be rendered instead (Task 5).
-        // For now, just return early so it compiles without the detail method.
+        // ===== DETAIL VIEW =====
         if state.ui_state.selected_quest_id.is_some() {
-            // Placeholder: render_quest_detail will be called here in Task 5
+            self.render_quest_detail(state, hovered, layout, panel_x, panel_y, panel_width, panel_height);
+            // Still draw footer
+            let footer_x = panel_x + FRAME_THICKNESS;
+            let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
+            let footer_w = panel_width - FRAME_THICKNESS * 2.0;
+            draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
+            draw_line(
+                footer_x + 10.0 * s,
+                footer_y,
+                footer_x + footer_w - 10.0 * s,
+                footer_y,
+                1.0,
+                HEADER_BORDER,
+            );
             return;
         }
 
@@ -381,6 +392,433 @@ impl Renderer {
             16.0,
             FRAME_MID,
         );
+    }
+
+    fn render_quest_detail(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+        panel_x: f32,
+        panel_y: f32,
+        panel_width: f32,
+        panel_height: f32,
+    ) {
+        let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
+        let header_h = HEADER_HEIGHT * s;
+        let footer_h = FOOTER_HEIGHT * s;
+        let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
+        let content_y = panel_y + FRAME_THICKNESS + header_h + 8.0 * s;
+        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
+        let content_h = panel_height - FRAME_THICKNESS * 2.0 - header_h - footer_h - 16.0 * s;
+
+        // Inset background
+        draw_rectangle(content_x, content_y, content_w, content_h, SLOT_BORDER);
+        draw_rectangle(
+            content_x + 1.0,
+            content_y + 1.0,
+            content_w - 2.0,
+            content_h - 2.0,
+            SLOT_BG_EMPTY,
+        );
+        // Inner shadow (top/left)
+        draw_line(
+            content_x + 2.0,
+            content_y + 2.0,
+            content_x + content_w - 2.0,
+            content_y + 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
+        draw_line(
+            content_x + 2.0,
+            content_y + 2.0,
+            content_x + 2.0,
+            content_y + content_h - 2.0,
+            2.0,
+            SLOT_INNER_SHADOW,
+        );
+
+        // Register scroll area
+        layout.add(
+            UiElementId::QuestLogScrollArea,
+            Rect::new(content_x, content_y, content_w, content_h),
+        );
+
+        // Find the selected quest in catalog
+        let selected_id = match &state.ui_state.selected_quest_id {
+            Some(id) => id,
+            None => return,
+        };
+
+        let entry = match state
+            .ui_state
+            .quest_catalog
+            .iter()
+            .find(|e| e.quest_id == *selected_id)
+        {
+            Some(e) => e,
+            None => {
+                self.draw_text_sharp(
+                    "Quest not found",
+                    content_x + 12.0 * s,
+                    content_y + 20.0 * s,
+                    16.0,
+                    TEXT_DIM,
+                );
+                return;
+            }
+        };
+
+        // Determine quest status
+        let is_completed = state.ui_state.completed_quest_ids.contains(selected_id);
+        let is_active = state
+            .ui_state
+            .active_quests
+            .iter()
+            .any(|q| q.id == *selected_id);
+
+        let color_in_progress = Color::new(1.0, 0.843, 0.0, 1.0);
+        let color_not_started = Color::new(1.0, 0.267, 0.267, 1.0);
+        let color_completed = Color::new(0.0, 0.8, 0.0, 1.0);
+
+        let status_color = if is_completed {
+            color_completed
+        } else if is_active {
+            color_in_progress
+        } else {
+            color_not_started
+        };
+
+        // Layout constants
+        let line_height = 17.0 * s;
+        let text_x_offset = 12.0 * s;
+        let right_pad = 8.0 * s;
+        let wrap_w = content_w - text_x_offset - right_pad;
+        let section_gap = 10.0 * s;
+
+        // Calculate total content height for scrolling
+        let mut total_h = 6.0 * s; // top padding
+
+        // Back button
+        total_h += line_height + 4.0 * s;
+
+        // Quest name (wrapped)
+        let name_lines = self.wrap_text(&entry.name, wrap_w, 16.0);
+        total_h += name_lines.len().max(1) as f32 * line_height + section_gap;
+
+        // Separator
+        total_h += 8.0 * s;
+
+        // Description (wrapped)
+        let desc_lines = self.wrap_text(&entry.description, wrap_w, 16.0);
+        total_h += desc_lines.len().max(1) as f32 * line_height + section_gap;
+
+        // Separator
+        total_h += 8.0 * s;
+
+        // Requirements section
+        total_h += line_height; // "Start: NPC"
+        if entry.level_required > 0 {
+            total_h += line_height;
+        }
+        if entry.required_quest_name.is_some() {
+            total_h += line_height;
+        }
+
+        // Objectives section (only if active)
+        if is_active {
+            total_h += 8.0 * s; // separator
+            total_h += line_height; // "Objectives:" label
+            if let Some(quest) = state.ui_state.active_quests.iter().find(|q| q.id == *selected_id) {
+                for obj in &quest.objectives {
+                    let obj_text = format!("[+] {} ({}/{})", obj.description, obj.current, obj.target);
+                    let obj_lines = self.wrap_text(&obj_text, wrap_w, 16.0);
+                    total_h += obj_lines.len().max(1) as f32 * line_height;
+                }
+            }
+        }
+
+        total_h += 6.0 * s; // bottom padding
+
+        let max_scroll = (total_h - content_h).max(0.0);
+        let scroll_offset = state.ui_state.quest_log_scroll.clamp(0.0, max_scroll);
+        let needs_scroll = max_scroll > 0.0;
+
+        // Enable scissor clipping
+        if needs_scroll {
+            let physical_w = screen_width();
+            let physical_h = screen_height();
+            let scale_x = physical_w / sw;
+            let scale_y = physical_h / sh;
+            let mut gl = unsafe { macroquad::window::get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(Some((
+                ((content_x + 2.0) * scale_x) as i32,
+                ((content_y + 2.0) * scale_y) as i32,
+                ((content_w - 4.0) * scale_x) as i32,
+                ((content_h - 4.0) * scale_y) as i32,
+            )));
+        }
+
+        let mut y = content_y + 6.0 * s - scroll_offset;
+
+        // ----- "< Back" button -----
+        let back_text = "< Back";
+        let back_color = if matches!(hovered, Some(UiElementId::QuestDetailBack)) {
+            TEXT_TITLE
+        } else {
+            TEXT_DIM
+        };
+        self.draw_text_sharp(
+            back_text,
+            content_x + text_x_offset,
+            y + 12.0 * s,
+            16.0,
+            back_color,
+        );
+        let back_dims = self.measure_text_sharp(back_text, 16.0);
+        let back_bounds = Rect::new(
+            content_x + text_x_offset,
+            y,
+            back_dims.width + 8.0 * s,
+            line_height,
+        );
+        layout.add(UiElementId::QuestDetailBack, back_bounds);
+        y += line_height + 4.0 * s;
+
+        // ----- Quest name -----
+        for line in &name_lines {
+            self.draw_text_sharp(
+                line,
+                content_x + text_x_offset,
+                y + 12.0 * s,
+                16.0,
+                status_color,
+            );
+            y += line_height;
+        }
+        y += section_gap;
+
+        // ----- Separator -----
+        draw_line(
+            content_x + text_x_offset,
+            y,
+            content_x + content_w - right_pad,
+            y,
+            1.0,
+            SLOT_BORDER,
+        );
+        y += 8.0 * s;
+
+        // ----- Description -----
+        for line in &desc_lines {
+            self.draw_text_sharp(
+                line,
+                content_x + text_x_offset,
+                y + 12.0 * s,
+                16.0,
+                TEXT_DIM,
+            );
+            y += line_height;
+        }
+        y += section_gap;
+
+        // ----- Separator -----
+        draw_line(
+            content_x + text_x_offset,
+            y,
+            content_x + content_w - right_pad,
+            y,
+            1.0,
+            SLOT_BORDER,
+        );
+        y += 8.0 * s;
+
+        // ----- Requirements section -----
+        // Start: NPC name
+        let start_label = "Start: ";
+        let start_label_w = self.measure_text_sharp(start_label, 16.0).width;
+        self.draw_text_sharp(
+            start_label,
+            content_x + text_x_offset,
+            y + 12.0 * s,
+            16.0,
+            TEXT_DIM,
+        );
+        self.draw_text_sharp(
+            &entry.giver_npc_name,
+            content_x + text_x_offset + start_label_w,
+            y + 12.0 * s,
+            16.0,
+            TEXT_NORMAL,
+        );
+        y += line_height;
+
+        // Level requirement
+        if entry.level_required > 0 {
+            let level_text = format!("Level: {}", entry.level_required);
+            self.draw_text_sharp(
+                &level_text,
+                content_x + text_x_offset,
+                y + 12.0 * s,
+                16.0,
+                TEXT_DIM,
+            );
+            y += line_height;
+        }
+
+        // Required quest
+        if let Some(req_quest_name) = &entry.required_quest_name {
+            let req_label = "Requires: ";
+            let req_label_w = self.measure_text_sharp(req_label, 16.0).width;
+            self.draw_text_sharp(
+                req_label,
+                content_x + text_x_offset,
+                y + 12.0 * s,
+                16.0,
+                TEXT_DIM,
+            );
+            // Color based on whether the required quest is completed
+            let req_color = if let Some(req_id) = &entry.required_quest_id {
+                if state.ui_state.completed_quest_ids.contains(req_id) {
+                    color_completed
+                } else {
+                    color_not_started
+                }
+            } else {
+                TEXT_NORMAL
+            };
+            self.draw_text_sharp(
+                req_quest_name,
+                content_x + text_x_offset + req_label_w,
+                y + 12.0 * s,
+                16.0,
+                req_color,
+            );
+            y += line_height;
+        }
+
+        // ----- Objectives section (only if active) -----
+        if is_active {
+            // Separator
+            draw_line(
+                content_x + text_x_offset,
+                y + 4.0 * s,
+                content_x + content_w - right_pad,
+                y + 4.0 * s,
+                1.0,
+                SLOT_BORDER,
+            );
+            y += 8.0 * s;
+
+            // "Objectives:" label
+            self.draw_text_sharp(
+                "Objectives:",
+                content_x + text_x_offset,
+                y + 12.0 * s,
+                16.0,
+                TEXT_DIM,
+            );
+            y += line_height;
+
+            if let Some(quest) = state.ui_state.active_quests.iter().find(|q| q.id == *selected_id) {
+                let obj_complete_check = Color::new(0.392, 0.784, 0.392, 1.0);
+                let obj_complete_text = Color::new(0.392, 0.627, 0.392, 1.0);
+                let obj_incomplete_check = Color::new(0.502, 0.502, 0.541, 1.0);
+
+                for obj in &quest.objectives {
+                    let check = if obj.completed { "[+]" } else { "[ ]" };
+                    let check_color = if obj.completed {
+                        obj_complete_check
+                    } else {
+                        obj_incomplete_check
+                    };
+                    let text_color = if obj.completed {
+                        obj_complete_text
+                    } else {
+                        TEXT_DIM
+                    };
+
+                    let obj_text = format!(
+                        "{} {} ({}/{})",
+                        check, obj.description, obj.current, obj.target
+                    );
+                    let obj_lines = self.wrap_text(&obj_text, wrap_w, 16.0);
+
+                    for (idx, line) in obj_lines.iter().enumerate() {
+                        // First line: draw checkbox in its color, rest in text color
+                        if idx == 0 {
+                            let check_w = self.measure_text_sharp(check, 16.0).width;
+                            self.draw_text_sharp(
+                                check,
+                                content_x + text_x_offset,
+                                y + 12.0 * s,
+                                16.0,
+                                check_color,
+                            );
+                            // Draw rest of line (after the check part) in text color
+                            let rest = &line[check.len()..];
+                            self.draw_text_sharp(
+                                rest,
+                                content_x + text_x_offset + check_w,
+                                y + 12.0 * s,
+                                16.0,
+                                text_color,
+                            );
+                        } else {
+                            self.draw_text_sharp(
+                                line,
+                                content_x + text_x_offset,
+                                y + 12.0 * s,
+                                16.0,
+                                text_color,
+                            );
+                        }
+                        y += line_height;
+                    }
+                }
+            }
+        }
+
+        // Disable scissor clipping
+        if needs_scroll {
+            let mut gl = unsafe { macroquad::window::get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(None);
+
+            // Draw scrollbar
+            let scrollbar_w = 4.0 * s;
+            let scrollbar_x = content_x + content_w - scrollbar_w - 3.0 * s;
+            let track_h = content_h - 4.0;
+            let track_y = content_y + 2.0;
+            let thumb_ratio = content_h / total_h;
+            let thumb_h = (track_h * thumb_ratio).max(20.0 * s);
+            let scroll_ratio = if max_scroll > 0.0 {
+                scroll_offset / max_scroll
+            } else {
+                0.0
+            };
+            let thumb_y = track_y + (track_h - thumb_h) * scroll_ratio;
+
+            // Track
+            draw_rectangle(
+                scrollbar_x,
+                track_y,
+                scrollbar_w,
+                track_h,
+                Color::new(1.0, 1.0, 1.0, 0.08),
+            );
+            // Thumb
+            draw_rectangle(
+                scrollbar_x,
+                thumb_y,
+                scrollbar_w,
+                thumb_h,
+                Color::new(1.0, 1.0, 1.0, 0.3),
+            );
+        }
     }
 
     pub(crate) fn render_quest_tracker(
