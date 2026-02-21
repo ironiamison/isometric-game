@@ -58,8 +58,10 @@ pub fn maybe_start_tutorial(game_state: &mut GameState) {
     }
     // Wait for any active dialogue (e.g. control scheme) to close first
     if game_state.ui_state.active_dialogue.is_some() {
+        log::warn!("TUTORIAL: pending but dialogue is open, waiting...");
         return;
     }
+    log::warn!("TUTORIAL: starting tutorial now!");
     game_state.tutorial_pending = false;
 
     // Create the tutorial manager
@@ -374,6 +376,13 @@ pub fn run_game_frame(
                 }
                 if quest_id == "__tutorial__" {
                     game_state.ui_state.active_dialogue = None;
+                    // Create TutorialManager if it doesn't exist yet
+                    // (e.g. player clicked Old Thomas directly instead of auto-start)
+                    if game_state.tutorial.is_none() {
+                        game_state.tutorial = Some(TutorialManager::new(
+                            game_state.ui_state.classic_controls,
+                        ));
+                    }
                     if let Some(tutorial) = &mut game_state.tutorial {
                         if tutorial.phase == crate::game::tutorial::TutorialPhase::AwaitingAccept {
                             if choice_id == "accept" {

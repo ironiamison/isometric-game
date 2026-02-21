@@ -74,7 +74,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     // Check if this is a new character (for tutorial)
                     let is_new = extract_bool(value, "is_new_character").unwrap_or(false);
                     let tutorial_done = crate::settings::load_tutorial_completed();
-                    log::info!("Tutorial check: is_new={}, tutorial_done={}", is_new, tutorial_done);
+                    log::warn!("TUTORIAL: Welcome data={:?}", value);
+                    log::warn!("TUTORIAL: is_new={}, tutorial_done={}", is_new, tutorial_done);
                     if is_new && !tutorial_done {
                         log::info!("Tutorial: setting tutorial_pending = true");
                         state.tutorial_pending = true;

@@ -4844,17 +4844,38 @@ impl GameRoom {
             // Show greeting dialogue for NPCs that have one (e.g. Old Thomas)
             if let Some(proto) = prototype.as_ref() {
                 if let Some(ref greeting) = proto.dialogue.greeting {
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::ShowDialogue {
-                            quest_id: String::new(),
-                            npc_id: npc_id.to_string(),
-                            speaker: proto.display_name.clone(),
-                            text: greeting.clone(),
-                            choices: vec![crate::protocol::DialogueChoice {
+                    // Old Thomas triggers the client-side tutorial flow
+                    let (quest_id, choices) = if entity_type == "old_thomas" {
+                        (
+                            "__tutorial__".to_string(),
+                            vec![
+                                crate::protocol::DialogueChoice {
+                                    id: "accept".to_string(),
+                                    text: "Yes, show me around!".to_string(),
+                                },
+                                crate::protocol::DialogueChoice {
+                                    id: "skip".to_string(),
+                                    text: "No thanks, I'll figure it out.".to_string(),
+                                },
+                            ],
+                        )
+                    } else {
+                        (
+                            String::new(),
+                            vec![crate::protocol::DialogueChoice {
                                 id: "close".to_string(),
                                 text: "Goodbye".to_string(),
                             }],
+                        )
+                    };
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::ShowDialogue {
+                            quest_id,
+                            npc_id: npc_id.to_string(),
+                            speaker: proto.display_name.clone(),
+                            text: greeting.clone(),
+                            choices,
                         },
                     )
                     .await;
