@@ -20,6 +20,10 @@ const IRON: OreTypeInfo = OreTypeInfo {
     name: "Iron Rock",
     level_required: 15,
 };
+const COAL: OreTypeInfo = OreTypeInfo {
+    name: "Coal Rock",
+    level_required: 20,
+};
 const STEEL: OreTypeInfo = OreTypeInfo {
     name: "Steel Rock",
     level_required: 30,
@@ -34,8 +38,11 @@ pub fn get_ore_info(gid: u32) -> Option<&'static OreTypeInfo> {
         // Tin rocks (reuses old iron rock sprite)
         1581 => Some(&TIN),
 
-        // Iron rocks: mapper id 455 → GID 1617
-        1617 => Some(&IRON),
+        // Coal rocks: mapper id 422 → GID 1584
+        1584 => Some(&COAL),
+
+        // Iron rocks: mapper ids 455, 423 → GIDs 1617, 1585
+        1617 | 1585 => Some(&IRON),
 
         // Steel rocks: GID 9997
         9997 => Some(&STEEL),
