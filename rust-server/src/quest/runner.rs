@@ -52,14 +52,14 @@ impl PlayerLuaState {
     }
 
     fn load_script(&mut self, script_path: &str, source: &str) -> LuaResult<()> {
-        if self.loaded_scripts.contains(&script_path.to_string()) {
-            return Ok(());
-        }
-
-        // Load the script as a chunk and execute it to define functions
+        // Always re-execute the script to redefine global functions (on_interact, etc.).
+        // Scripts share a single Lua state per player, so loading a different quest's
+        // script overwrites the globals. We must re-execute to restore them.
         self.lua.load(source).set_name(script_path).exec()?;
 
-        self.loaded_scripts.push(script_path.to_string());
+        if !self.loaded_scripts.contains(&script_path.to_string()) {
+            self.loaded_scripts.push(script_path.to_string());
+        }
         Ok(())
     }
 
