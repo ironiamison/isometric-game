@@ -8207,7 +8207,7 @@ impl Renderer {
             let tag_height = 22.0 * s;
             let bar_height = 18.0 * s;
 
-            if self.minimap_preview_enabled(state) {
+            if !cfg!(target_os = "android") && self.minimap_preview_enabled(state) {
                 self.render_minimap_preview(state);
             }
 
@@ -8879,7 +8879,9 @@ impl Renderer {
         self.render_prayer_help_overlay(state, hovered, &mut layout);
 
         // Minimap interactions and expanded map overlay
-        self.render_minimap_overlay(state, hovered, &mut layout);
+        if !cfg!(target_os = "android") {
+            self.render_minimap_overlay(state, hovered, &mut layout);
+        }
 
         // Render context menu on top of everything (except modal minimap)
         if state.ui_state.minimap_panel_open {

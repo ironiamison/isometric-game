@@ -240,23 +240,26 @@ impl Renderer {
             y += row_height - 4.0 * s;
         }
 
-        // UI Scale slider
-        let ui_slider_width = inner_width - 50.0 * s;
-        let ui_slider_x = content_x + 42.0 * s;
-        let scale_bounds = Rect::new(ui_slider_x, y, ui_slider_width, slider_height);
-        layout.add(UiElementId::EscapeMenuUiScaleSlider, scale_bounds);
-        let scale_normalized = (state.ui_state.ui_scale - 0.75) / 1.25; // 0.75-2.0 range
-        self.draw_compact_slider(
-            "Scale",
-            ui_slider_x,
-            y,
-            ui_slider_width,
-            slider_height,
-            scale_normalized,
-            false,
-            is_hovered(scale_bounds),
-        );
-        y += row_height;
+        // UI Scale slider (not on Android — mobile is one-size-fits-all)
+        #[cfg(not(target_os = "android"))]
+        {
+            let ui_slider_width = inner_width - 50.0 * s;
+            let ui_slider_x = content_x + 42.0 * s;
+            let scale_bounds = Rect::new(ui_slider_x, y, ui_slider_width, slider_height);
+            layout.add(UiElementId::EscapeMenuUiScaleSlider, scale_bounds);
+            let scale_normalized = (state.ui_state.ui_scale - 0.75) / 1.25; // 0.75-2.0 range
+            self.draw_compact_slider(
+                "Scale",
+                ui_slider_x,
+                y,
+                ui_slider_width,
+                slider_height,
+                scale_normalized,
+                false,
+                is_hovered(scale_bounds),
+            );
+            y += row_height;
+        }
 
         // ===== TOGGLE BUTTONS (2 per row) =====
         let toggle_w = (inner_width - 6.0 * s) / 2.0;

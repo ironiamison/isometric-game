@@ -20,9 +20,6 @@ impl Default for UiSettings {
     fn default() -> Self {
         Self {
             zoom: 1.0,
-            #[cfg(target_os = "android")]
-            ui_scale: 0.75,
-            #[cfg(not(target_os = "android"))]
             ui_scale: 1.0,
             shift_drop_enabled: true,
             #[cfg(target_os = "android")]
@@ -79,10 +76,13 @@ pub fn load_ui_settings() -> UiSettings {
     let Some(path) = ui_settings_path() else {
         return UiSettings::default();
     };
-    match std::fs::read_to_string(&path) {
+    let mut settings: UiSettings = match std::fs::read_to_string(&path) {
         Ok(contents) => toml::from_str(&contents).unwrap_or_default(),
         Err(_) => UiSettings::default(),
-    }
+    };
+    // Force ui_scale to 1.0 on Android — mobile is one-size-fits-all
+    settings.ui_scale = 1.0;
+    settings
 }
 
 #[cfg(target_os = "android")]

@@ -416,8 +416,8 @@ impl Renderer {
         // Semi-transparent overlay to focus attention
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.45));
 
-        // Responsive width: cap at 620, with 10px margin each side
-        let box_width = sw.min(620.0 + 20.0) - 20.0;
+        // Responsive width: cap at 620 (scaled), with 10px margin each side
+        let box_width = sw.min(620.0 * s + 20.0) - 20.0;
 
         // Scale-aware line height and spacing
         let line_h = 22.0 * s;

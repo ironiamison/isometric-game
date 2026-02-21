@@ -1103,7 +1103,7 @@ pub struct UiState {
     pub audio_volume: f32,
     pub audio_sfx_volume: f32,
     pub audio_muted: bool,
-    // UI scale (0.75 to 1.25, default 1.0 on desktop, 0.75 on mobile)
+    // UI scale (0.75 to 2.0, default 1.0; fixed at 1.0 on Android)
     pub ui_scale: f32,
     // Input settings
     pub shift_drop_enabled: bool,
@@ -1257,9 +1257,6 @@ impl Default for UiState {
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,
             audio_muted: false,
-            #[cfg(target_os = "android")]
-            ui_scale: 0.75,
-            #[cfg(not(target_os = "android"))]
             ui_scale: 1.0,
             shift_drop_enabled: true,
             social_open: false,
