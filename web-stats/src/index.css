@@ -22,13 +22,16 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   background:
-    radial-gradient(circle at 10% 0%, color-mix(in oklab, var(--bg-accent) 70%, transparent), transparent 40%),
-    radial-gradient(circle at 90% 0%, color-mix(in oklab, var(--gold) 16%, transparent), transparent 48%),
-    var(--bg);
+    radial-gradient(1100px 520px at 10% -12%, rgba(56, 123, 199, 0.32), transparent 62%),
+    radial-gradient(900px 480px at 90% -8%, rgba(217, 178, 95, 0.18), transparent 58%),
+    radial-gradient(1300px 760px at 50% 112%, rgba(20, 70, 106, 0.32), transparent 66%),
+    repeating-linear-gradient(90deg, rgba(120, 156, 196, 0.04) 0 1px, transparent 1px 72px),
+    linear-gradient(180deg, #091321 0%, #0a1320 36%, #090f18 100%);
   color: var(--text);
   font-family: var(--font-body);
+  background-attachment: fixed;
 }
 
 #root {

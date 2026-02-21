@@ -57,7 +57,11 @@ export function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg)]">
+    <div className="relative flex min-h-screen overflow-x-clip bg-[var(--bg)]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(1100px_520px_at_12%_-10%,rgba(56,123,199,0.28),transparent_62%),radial-gradient(900px_460px_at_96%_0%,rgba(217,178,95,0.15),transparent_58%),radial-gradient(1200px_740px_at_50%_100%,rgba(28,88,128,0.24),transparent_65%)]"
+      />
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
@@ -69,9 +73,9 @@ export function Layout() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 z-50 flex h-full w-64 flex-col border-r border-[var(--panel-border)] bg-[var(--panel)]
+          fixed top-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-[var(--panel-border)] bg-[linear-gradient(180deg,#12263a_0%,#112033_42%,#101c2d_100%)]
           transition-transform duration-300 ease-in-out
-          md:translate-x-0 md:static md:z-auto
+          md:translate-x-0 md:sticky md:top-0 md:z-20
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
@@ -121,7 +125,7 @@ export function Layout() {
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col md:ml-0">
+      <div className="relative z-10 flex flex-1 flex-col md:ml-0">
         {/* Mobile header */}
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--panel-border)] bg-[var(--panel)]/90 px-4 py-3 backdrop-blur md:hidden">
           <button
