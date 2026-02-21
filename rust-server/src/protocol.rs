@@ -462,6 +462,9 @@ pub enum ServerMessage {
     QuestStateSync {
         completed_quest_ids: Vec<String>,
     },
+    QuestCatalog {
+        quests: Vec<QuestCatalogEntryData>,
+    },
     ShowDialogue {
         quest_id: String,
         npc_id: String,
@@ -1061,6 +1064,18 @@ pub struct QuestObjectiveData {
     pub completed: bool,
 }
 
+/// Quest catalog entry for sending all quest info to client
+#[derive(Debug, Clone, Serialize)]
+pub struct QuestCatalogEntryData {
+    pub quest_id: String,
+    pub name: String,
+    pub description: String,
+    pub giver_npc_name: String,
+    pub level_required: i32,
+    pub required_quest_id: Option<String>,
+    pub required_quest_name: Option<String>,
+}
+
 /// Recipe ingredient for client sync
 #[derive(Debug, Clone, Serialize)]
 pub struct RecipeIngredient {
@@ -1142,6 +1157,7 @@ impl ServerMessage {
             ServerMessage::QuestObjectiveProgress { .. } => "questObjectiveProgress",
             ServerMessage::QuestCompleted { .. } => "questCompleted",
             ServerMessage::QuestStateSync { .. } => "questStateSync",
+            ServerMessage::QuestCatalog { .. } => "questCatalog",
             ServerMessage::ShowDialogue { .. } => "showDialogue",
             ServerMessage::Error { .. } => "error",
             ServerMessage::ChunkData { .. } => "chunkData",
@@ -2436,6 +2452,50 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         .collect(),
                 ),
             ));
+            Value::Map(map)
+        }
+        ServerMessage::QuestCatalog { quests } => {
+            let mut map = Vec::new();
+            let quest_values: Vec<Value> = quests
+                .iter()
+                .map(|q| {
+                    let mut qmap = Vec::new();
+                    qmap.push((
+                        Value::String("quest_id".into()),
+                        Value::String(q.quest_id.clone().into()),
+                    ));
+                    qmap.push((
+                        Value::String("name".into()),
+                        Value::String(q.name.clone().into()),
+                    ));
+                    qmap.push((
+                        Value::String("description".into()),
+                        Value::String(q.description.clone().into()),
+                    ));
+                    qmap.push((
+                        Value::String("giver_npc_name".into()),
+                        Value::String(q.giver_npc_name.clone().into()),
+                    ));
+                    qmap.push((
+                        Value::String("level_required".into()),
+                        Value::Integer((q.level_required as i64).into()),
+                    ));
+                    if let Some(ref req_id) = q.required_quest_id {
+                        qmap.push((
+                            Value::String("required_quest_id".into()),
+                            Value::String(req_id.clone().into()),
+                        ));
+                    }
+                    if let Some(ref req_name) = q.required_quest_name {
+                        qmap.push((
+                            Value::String("required_quest_name".into()),
+                            Value::String(req_name.clone().into()),
+                        ));
+                    }
+                    Value::Map(qmap)
+                })
+                .collect();
+            map.push((Value::String("quests".into()), Value::Array(quest_values)));
             Value::Map(map)
         }
         ServerMessage::ShowDialogue {
