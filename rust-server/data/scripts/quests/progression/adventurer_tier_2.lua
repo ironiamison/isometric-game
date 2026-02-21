@@ -17,7 +17,7 @@ end
 function show_offer_dialogue(ctx)
     local choice = ctx:show_dialogue({
         speaker = "Adventurer Guide",
-        text = "Tier II raises the bar: defeat 10 blue slimes and 16 crows, reach Woodcutting 8, Mining 10, Smithing 8, and Combat 14, then build your gold reserve to 1,200.",
+        text = "Tier II raises the bar: defeat 10 blue slimes and 12 worms, reach Woodcutting 8, Mining 8, Smithing 8, and Combat 14, then build your gold reserve to 1,200.",
         choices = {
             { id = "accept", text = "Start Tier II." },
             { id = "ask_tips", text = "What's the efficient route?" }
@@ -43,17 +43,17 @@ end
 
 function show_progress_dialogue(ctx)
     local slimes = ctx:get_objective_progress("kill_blue_slimes")
-    local crows = ctx:get_objective_progress("kill_crows")
+    local worms = ctx:get_objective_progress("kill_worms")
     local woodcutting = ctx:get_objective_progress("reach_woodcutting_8")
-    local mining = ctx:get_objective_progress("reach_mining_10")
+    local mining = ctx:get_objective_progress("reach_mining_8")
     local smithing = ctx:get_objective_progress("reach_smithing_8")
     local combat = ctx:get_objective_progress("reach_combat_14")
     local gold = ctx:get_objective_progress("gather_gold_1200")
 
     local text = string.format(
-        "Tier II status:\n- Blue slimes: %d/10\n- Crows: %d/16\n- Woodcutting level: %d/8\n- Mining level: %d/10\n- Smithing level: %d/8\n- Combat level: %d/14\n- Gold: %d/1200",
+        "Tier II status:\n- Blue slimes: %d/10\n- Worms: %d/12\n- Woodcutting level: %d/8\n- Mining level: %d/8\n- Smithing level: %d/8\n- Combat level: %d/14\n- Gold: %d/1200",
         slimes.current,
-        crows.current,
+        worms.current,
         woodcutting.current,
         mining.current,
         smithing.current,

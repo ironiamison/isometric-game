@@ -21,11 +21,11 @@ count = 10
 description = "Defeat 10 blue slimes"
 
 [[quest.objectives]]
-id = "kill_crows"
+id = "kill_worms"
 type = "kill_monster"
-target = "crow"
-count = 16
-description = "Defeat 16 crows"
+target = "worm"
+count = 12
+description = "Defeat 12 worms"
 
 [[quest.objectives]]
 id = "reach_woodcutting_8"
@@ -35,11 +35,11 @@ count = 8
 description = "Reach Woodcutting level 8"
 
 [[quest.objectives]]
-id = "reach_mining_10"
+id = "reach_mining_8"
 type = "reach_level"
 target = "mining"
-count = 10
-description = "Reach Mining level 10"
+count = 8
+description = "Reach Mining level 8"
 
 [[quest.objectives]]
 id = "reach_smithing_8"

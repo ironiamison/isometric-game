@@ -3634,6 +3634,7 @@ impl GameRoom {
                         ("prayer", p.skills.prayer.level),
                         ("magic", p.skills.magic.level),
                         ("woodcutting", p.skills.woodcutting.level),
+                        ("mining", p.skills.mining.level),
                         ("alchemy", p.skills.alchemy.level),
                     ],
                 )
