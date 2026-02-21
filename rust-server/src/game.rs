@@ -4264,20 +4264,9 @@ impl GameRoom {
         let (gold, skill_levels) = match player_snapshot {
             Some(snapshot) => snapshot,
             None => {
-                tracing::warn!(
-                    "Quest progression snapshot: player {} not found in players map",
-                    player_id
-                );
                 return;
             }
         };
-
-        tracing::info!(
-            "Quest progression snapshot for {}: gold={}, skills={:?}",
-            player_id,
-            gold,
-            skill_levels
-        );
 
         let results = {
             let mut quest_states = self.player_quest_states.write().await;
@@ -4288,23 +4277,6 @@ impl GameRoom {
             // Reconcile objectives with current quest definitions (handles quest updates)
             self.quest_registry.reconcile_active_quests(quest_state).await;
 
-            let active_quest_ids: Vec<String> = quest_state.active_quests.keys().cloned().collect();
-            tracing::info!(
-                "Quest progression snapshot for {}: active quests = {:?}",
-                player_id,
-                active_quest_ids
-            );
-            for (qid, progress) in &quest_state.active_quests {
-                let obj_summary: Vec<String> = progress
-                    .objectives
-                    .iter()
-                    .map(|(oid, op)| {
-                        format!("{}={}/{} done={}", oid, op.current, op.target, op.completed)
-                    })
-                    .collect();
-                tracing::info!("  Quest {}: objectives = {:?}", qid, obj_summary);
-            }
-
             let mut results = Vec::new();
             for (skill, level) in &skill_levels {
                 let event = QuestEvent::SkillLevelChanged {
@@ -4312,47 +4284,14 @@ impl GameRoom {
                     skill: (*skill).to_string(),
                     level: *level,
                 };
-                let event_results = self.quest_registry.process_event(&event, quest_state).await;
-                if !event_results.is_empty() {
-                    tracing::info!(
-                        "  Skill {} level {} produced {} updates",
-                        skill,
-                        level,
-                        event_results.len()
-                    );
-                }
-                results.extend(event_results);
+                results.extend(self.quest_registry.process_event(&event, quest_state).await);
             }
 
             let gold_event = QuestEvent::GoldAmountChanged {
                 player_id: player_id.to_string(),
                 amount: gold,
             };
-            let gold_results = self
-                .quest_registry
-                .process_event(&gold_event, quest_state)
-                .await;
-            if !gold_results.is_empty() {
-                tracing::info!("  Gold {} produced {} updates", gold, gold_results.len());
-            }
-            results.extend(gold_results);
-
-            // Log final state after processing
-            for (qid, progress) in &quest_state.active_quests {
-                let obj_summary: Vec<String> = progress
-                    .objectives
-                    .iter()
-                    .map(|(oid, op)| {
-                        format!("{}={}/{} done={}", oid, op.current, op.target, op.completed)
-                    })
-                    .collect();
-                tracing::info!(
-                    "  After snapshot - Quest {}: objectives = {:?}",
-                    qid,
-                    obj_summary
-                );
-            }
-
+            results.extend(self.quest_registry.process_event(&gold_event, quest_state).await);
             results
         };
 
