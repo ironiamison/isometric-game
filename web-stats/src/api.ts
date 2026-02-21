@@ -19,9 +19,34 @@ export interface LeaderboardEntry {
   combat_level: number
   hitpoints_level: number
   combat_skill_level: number
+  fishing_level: number
+  farming_level: number
+  smithing_level: number
+  prayer_level: number
+  magic_level: number
+  woodcutting_level: number
+  mining_level: number
+  alchemy_level: number
   total_level: number
   played_time: number
+  monster_kills: number
 }
+
+export type LeaderboardSort =
+  | 'combat_level'
+  | 'hitpoints_level'
+  | 'combat_skill_level'
+  | 'fishing_level'
+  | 'farming_level'
+  | 'smithing_level'
+  | 'prayer_level'
+  | 'magic_level'
+  | 'woodcutting_level'
+  | 'mining_level'
+  | 'alchemy_level'
+  | 'total_level'
+  | 'played_time'
+  | 'monster_kills'
 
 export interface Equipment {
   slot_type: string
@@ -55,7 +80,7 @@ async function get<T>(path: string): Promise<T> {
 export const api = {
   overview: () => get<Overview>('/overview'),
   online: () => get<OnlinePlayer[]>('/online'),
-  leaderboard: (sort = 'combat_level', limit = 50) =>
+  leaderboard: (sort: LeaderboardSort = 'total_level', limit = 50) =>
     get<LeaderboardEntry[]>(`/leaderboard?sort=${sort}&limit=${limit}`),
   items: () => get<Item[]>('/items'),
 }

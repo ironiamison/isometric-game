@@ -648,7 +648,7 @@ impl World {
 
     /// Get a safe spawn position in the world (prefers chunk 0,0)
     pub async fn get_spawn_position(&self) -> (i32, i32) {
-        (15, 4)
+        (-30, 19)
     }
 
     /// Check if a chunk exists (either loaded or loadable)

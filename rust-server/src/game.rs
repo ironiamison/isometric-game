@@ -1,20 +1,20 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{RwLock, broadcast, mpsc};
 use uuid::Uuid;
 
 use crate::chunk::ChunkCoord;
-use crate::entity::{EntityPrototype, EntityRegistry};
 use crate::data::ItemRegistry;
-use crate::prayer::PrayerRegistry;
 use crate::data::item_def::WeaponType;
-use crate::skills::{Skills, SkillType, calculate_hit, calculate_max_hit, roll_damage};
-use crate::item::{self, GroundItem, Inventory, GOLD_ITEM_ID};
+use crate::entity::{EntityPrototype, EntityRegistry};
+use crate::item::{self, GOLD_ITEM_ID, GroundItem, Inventory};
 use crate::npc::{Npc, NpcUpdate};
-use crate::protocol::{ServerMessage, QuestObjectiveData};
-use crate::quest::{QuestRegistry, QuestRunner, PlayerQuestState, QuestEvent, ObjectiveType};
-use crate::shop::{ShopRegistry, ShopDefinition, ShopStockItem};
+use crate::prayer::PrayerRegistry;
+use crate::protocol::{QuestObjectiveData, ServerMessage};
+use crate::quest::{ObjectiveType, PlayerQuestState, QuestEvent, QuestRegistry, QuestRunner};
+use crate::shop::{ShopDefinition, ShopRegistry, ShopStockItem};
+use crate::skills::{SkillType, Skills, calculate_hit, calculate_max_hit, roll_damage};
 use crate::world::World;
 
 // ============================================================================
@@ -92,7 +92,8 @@ fn check_npc_speech(
     if npc.next_speech_at == 0 {
         // First time a player is nearby — set initial timer
         let delay = npc.speech_interval_min_ms
-            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+            + (rand::random::<u64>()
+                % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
         npc.next_speech_at = current_time + delay;
     } else if current_time >= npc.next_speech_at {
         // Time to speak!
@@ -103,7 +104,8 @@ fn check_npc_speech(
             speech_events.push((pid.to_string(), npc_id.clone(), message.clone()));
         }
         let delay = npc.speech_interval_min_ms
-            + (rand::random::<u64>() % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
+            + (rand::random::<u64>()
+                % (npc.speech_interval_max_ms - npc.speech_interval_min_ms + 1));
         npc.next_speech_at = current_time + delay;
     }
 }
@@ -195,7 +197,8 @@ impl Direction {
         }
 
         let angle = dy.atan2(dx);
-        let octant = ((angle + std::f32::consts::PI) / (std::f32::consts::PI / 4.0)).round() as i32 % 8;
+        let octant =
+            ((angle + std::f32::consts::PI) / (std::f32::consts::PI / 4.0)).round() as i32 % 8;
 
         match octant {
             0 => Direction::Left,
@@ -247,16 +250,16 @@ pub struct Player {
     pub last_move_tick: u64, // Tick-based movement cooldown
     pub direction: Direction,
     pub hp: i32,
-    pub skills: Skills, // Combat skills (Hitpoints determines max HP)
-    pub active: bool, // Whether WebSocket is connected
+    pub skills: Skills,            // Combat skills (Hitpoints determines max HP)
+    pub active: bool,              // Whether WebSocket is connected
     pub target_id: Option<String>, // Currently targeted entity (player or NPC)
-    pub last_attack_time: u64, // Timestamp of last attack (ms)
+    pub last_attack_time: u64,     // Timestamp of last attack (ms)
     pub is_dead: bool,
     pub death_time: u64, // When the player died (for respawn timer)
     pub inventory: Inventory,
     // Character appearance
-    pub gender: String, // "male" or "female"
-    pub skin: String,   // "tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"
+    pub gender: String,          // "male" or "female"
+    pub skin: String,            // "tan", "pale", "brown", "purple", "orc", "ghost", "skeleton"
     pub hair_style: Option<i32>, // 0-5 (or None for bald)
     pub hair_color: Option<i32>, // 0-6 (color variant index)
     // Equipment
@@ -300,15 +303,24 @@ pub struct Player {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ActiveBuff {
-    pub stat: String,      // "attack", "strength", "defence"
+    pub stat: String, // "attack", "strength", "defence"
     pub amount: i32,
-    pub expires_at: u64,   // millisecond timestamp when buff expires
+    pub expires_at: u64, // millisecond timestamp when buff expires
 }
 
 const PLAYER_RESPAWN_TIME_MS: u64 = 5000; // 5 seconds to respawn
 
 impl Player {
-    pub fn new(id: &str, name: &str, spawn_x: i32, spawn_y: i32, gender: &str, skin: &str, hair_style: Option<i32>, hair_color: Option<i32>) -> Self {
+    pub fn new(
+        id: &str,
+        name: &str,
+        spawn_x: i32,
+        spawn_y: i32,
+        gender: &str,
+        skin: &str,
+        hair_style: Option<i32>,
+        hair_color: Option<i32>,
+    ) -> Self {
         let skills = Skills::new(); // HP 10, Attack/Strength/Defence 1
         Self {
             id: id.to_string(),
@@ -459,9 +471,19 @@ impl Player {
         // Award Combat XP
         let combat_leveled = self.skills.combat.add_xp(combat_xp);
         if combat_leveled {
-            tracing::info!("{} leveled up Combat to {}!", self.name, self.skills.combat.level);
+            tracing::info!(
+                "{} leveled up Combat to {}!",
+                self.name,
+                self.skills.combat.level
+            );
         }
-        results.push((SkillType::Combat, combat_xp, self.skills.combat.xp, self.skills.combat.level, combat_leveled));
+        results.push((
+            SkillType::Combat,
+            combat_xp,
+            self.skills.combat.xp,
+            self.skills.combat.level,
+            combat_leveled,
+        ));
 
         // Award Hitpoints XP
         let old_hp_level = self.skills.hitpoints.level;
@@ -469,11 +491,22 @@ impl Player {
         if hp_leveled {
             // Hitpoints level up means max HP increased
             let new_max = self.skills.hitpoints.level;
-            tracing::info!("{} leveled up Hitpoints to {}! (Max HP: {})", self.name, new_max, new_max);
+            tracing::info!(
+                "{} leveled up Hitpoints to {}! (Max HP: {})",
+                self.name,
+                new_max,
+                new_max
+            );
             // Heal the difference (new levels worth of HP)
             self.hp += new_max - old_hp_level;
         }
-        results.push((SkillType::Hitpoints, hp_xp, self.skills.hitpoints.xp, self.skills.hitpoints.level, hp_leveled));
+        results.push((
+            SkillType::Hitpoints,
+            hp_xp,
+            self.skills.hitpoints.xp,
+            self.skills.hitpoints.level,
+            hp_leveled,
+        ));
 
         results
     }
@@ -547,7 +580,9 @@ impl Player {
             let max_hp = self.max_hp();
             if self.hp < max_hp && self.hp > 0 {
                 // Base regen calculation with prayer multiplier
-                let base_regen = ((max_hp as f32 * PLAYER_HP_REGEN_PERCENT) / 100.0).ceil().max(1.0);
+                let base_regen = ((max_hp as f32 * PLAYER_HP_REGEN_PERCENT) / 100.0)
+                    .ceil()
+                    .max(1.0);
                 let regen = (base_regen * hp_regen_multiplier).ceil() as i32;
                 self.hp = (self.hp + regen).min(max_hp);
             }
@@ -564,7 +599,13 @@ impl Player {
     }
 
     /// Apply a buff, replacing any existing buff for the same stat (no stacking)
-    pub fn apply_buff(&mut self, stat: String, amount: i32, duration_ms: u64, current_time_ms: u64) {
+    pub fn apply_buff(
+        &mut self,
+        stat: String,
+        amount: i32,
+        duration_ms: u64,
+        current_time_ms: u64,
+    ) {
         self.active_buffs.retain(|b| b.stat != stat);
         self.active_buffs.push(ActiveBuff {
             stat,
@@ -791,7 +832,9 @@ impl GameRoom {
         for coord in &chunk_coords {
             if let Some(chunk) = world.get_or_load_chunk(*coord).await {
                 for spawn in &chunk.entity_spawns {
-                    let npc_id = spawn.unique_id.clone()
+                    let npc_id = spawn
+                        .unique_id
+                        .clone()
                         .unwrap_or_else(|| format!("npc_{}", npc_counter));
                     npc_counter += 1;
 
@@ -800,7 +843,10 @@ impl GameRoom {
                         let level = spawn.level.unwrap_or(prototype.stats.level);
                         tracing::info!(
                             "Spawning {} at ({}, {}) level {}",
-                            spawn.entity_id, spawn.world_x, spawn.world_y, level
+                            spawn.entity_id,
+                            spawn.world_x,
+                            spawn.world_y,
+                            level
                         );
                         let npc = Npc::from_prototype(
                             &npc_id,
@@ -829,16 +875,17 @@ impl GameRoom {
         tracing::info!("Loaded {} shop definitions", shop_registry.len());
 
         // Load gathering system
-        let mut gathering = match crate::gathering::GatheringSystem::load(std::path::Path::new("data")) {
-            Ok(g) => {
-                tracing::info!("Loaded gathering system with {} zones", g.zones.len());
-                g
-            }
-            Err(e) => {
-                tracing::warn!("Failed to load gathering system: {} (using empty)", e);
-                crate::gathering::GatheringSystem::new()
-            }
-        };
+        let mut gathering =
+            match crate::gathering::GatheringSystem::load(std::path::Path::new("data")) {
+                Ok(g) => {
+                    tracing::info!("Loaded gathering system with {} zones", g.zones.len());
+                    g
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load gathering system: {} (using empty)", e);
+                    crate::gathering::GatheringSystem::new()
+                }
+            };
 
         // Load gathering markers from chunk data
         let mut chunk_marker_count = 0;
@@ -855,7 +902,10 @@ impl GameRoom {
             }
         }
         if chunk_marker_count > 0 {
-            tracing::info!("Loaded {} gathering markers from chunk data", chunk_marker_count);
+            tracing::info!(
+                "Loaded {} gathering markers from chunk data",
+                chunk_marker_count
+            );
         }
 
         // Cache portal tile positions (immutable, computed once at startup)
@@ -874,13 +924,16 @@ impl GameRoom {
             }
         }
         if !portal_tiles.is_empty() {
-            tracing::info!("Cached {} portal tiles for NPC collision", portal_tiles.len());
+            tracing::info!(
+                "Cached {} portal tiles for NPC collision",
+                portal_tiles.len()
+            );
         }
 
         // Load quest locations for reach_location objectives
-        let quest_locations: HashMap<String, QuestLocation> = match std::fs::read_to_string("data/quest_locations.toml") {
-            Ok(content) => {
-                match toml::from_str::<HashMap<String, QuestLocation>>(&content) {
+        let quest_locations: HashMap<String, QuestLocation> =
+            match std::fs::read_to_string("data/quest_locations.toml") {
+                Ok(content) => match toml::from_str::<HashMap<String, QuestLocation>>(&content) {
                     Ok(locs) => {
                         tracing::info!("Loaded {} quest locations", locs.len());
                         locs
@@ -889,25 +942,28 @@ impl GameRoom {
                         tracing::warn!("Failed to parse quest_locations.toml: {}", e);
                         HashMap::new()
                     }
+                },
+                Err(_) => {
+                    tracing::info!("No quest_locations.toml found, skipping");
+                    HashMap::new()
                 }
-            }
-            Err(_) => {
-                tracing::info!("No quest_locations.toml found, skipping");
-                HashMap::new()
-            }
-        };
+            };
 
         // Load woodcutting system
-        let woodcutting = match crate::woodcutting::WoodcuttingSystem::load(std::path::Path::new("data")) {
-            Ok(w) => {
-                tracing::info!("Loaded woodcutting system with {} tree types", w.tree_types.len());
-                w
-            }
-            Err(e) => {
-                tracing::warn!("Failed to load woodcutting system: {} (using empty)", e);
-                crate::woodcutting::WoodcuttingSystem::new()
-            }
-        };
+        let woodcutting =
+            match crate::woodcutting::WoodcuttingSystem::load(std::path::Path::new("data")) {
+                Ok(w) => {
+                    tracing::info!(
+                        "Loaded woodcutting system with {} tree types",
+                        w.tree_types.len()
+                    );
+                    w
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load woodcutting system: {} (using empty)", e);
+                    crate::woodcutting::WoodcuttingSystem::new()
+                }
+            };
 
         // Load mining system
         let mining = match crate::mining::MiningSystem::load(std::path::Path::new("data")) {
@@ -924,7 +980,11 @@ impl GameRoom {
         // Load farming system
         let mut farming = match crate::farming::FarmingSystem::load(std::path::Path::new("data")) {
             Ok(f) => {
-                tracing::info!("Loaded farming system with {} crops, {} patches", f.crops.len(), f.patches.len());
+                tracing::info!(
+                    "Loaded farming system with {} crops, {} patches",
+                    f.crops.len(),
+                    f.patches.len()
+                );
                 f
             }
             Err(e) => {
@@ -974,8 +1034,23 @@ impl GameRoom {
             match db.load_farming_contracts().await {
                 Ok(contracts) => {
                     let count = contracts.len();
-                    for (player_id, difficulty, crop_id, amount_required, amount_harvested, created_at) in &contracts {
-                        farming.restore_contract(player_id, difficulty, crop_id, *amount_required, *amount_harvested, *created_at);
+                    for (
+                        player_id,
+                        difficulty,
+                        crop_id,
+                        amount_required,
+                        amount_harvested,
+                        created_at,
+                    ) in &contracts
+                    {
+                        farming.restore_contract(
+                            player_id,
+                            difficulty,
+                            crop_id,
+                            *amount_required,
+                            *amount_harvested,
+                            *created_at,
+                        );
                     }
                     if count > 0 {
                         tracing::info!("Restored {} farming contracts from database", count);
@@ -990,24 +1065,22 @@ impl GameRoom {
         // Load chair config
         let mut chair_gids: HashMap<u32, Direction> = HashMap::new();
         match std::fs::read_to_string("data/chairs.toml") {
-            Ok(content) => {
-                match toml::from_str::<ChairsConfig>(&content) {
-                    Ok(config) => {
-                        for entry in config.chairs {
-                            let dir = match entry.direction.as_str() {
-                                "down" => Direction::Down,
-                                "left" => Direction::Left,
-                                "up" => Direction::Up,
-                                "right" => Direction::Right,
-                                _ => Direction::Down,
-                            };
-                            chair_gids.insert(entry.gid, dir);
-                        }
-                        tracing::info!("Loaded {} chair GID definitions", chair_gids.len());
+            Ok(content) => match toml::from_str::<ChairsConfig>(&content) {
+                Ok(config) => {
+                    for entry in config.chairs {
+                        let dir = match entry.direction.as_str() {
+                            "down" => Direction::Down,
+                            "left" => Direction::Left,
+                            "up" => Direction::Up,
+                            "right" => Direction::Right,
+                            _ => Direction::Down,
+                        };
+                        chair_gids.insert(entry.gid, dir);
                     }
-                    Err(e) => tracing::warn!("Failed to parse chairs.toml: {}", e),
+                    tracing::info!("Loaded {} chair GID definitions", chair_gids.len());
                 }
-            }
+                Err(e) => tracing::warn!("Failed to parse chairs.toml: {}", e),
+            },
             Err(e) => tracing::warn!("Failed to read chairs.toml: {} (no chairs)", e),
         }
 
@@ -1017,10 +1090,13 @@ impl GameRoom {
             if let Some(chunk) = world.get_or_load_chunk(*coord).await {
                 for obj in &chunk.objects {
                     if let Some(&dir) = chair_gids.get(&obj.gid) {
-                        chairs.insert((obj.tile_x, obj.tile_y), ChairState {
-                            direction: dir,
-                            occupied_by: None,
-                        });
+                        chairs.insert(
+                            (obj.tile_x, obj.tile_y),
+                            ChairState {
+                                direction: dir,
+                                occupied_by: None,
+                            },
+                        );
                     }
                 }
             }
@@ -1052,7 +1128,9 @@ impl GameRoom {
             sync_states: RwLock::new(HashMap::new()),
             player_instances,
             instance_manager,
-            arena_manager: RwLock::new(crate::arena::ArenaManager::new(crate::arena::ArenaConfig::default())),
+            arena_manager: RwLock::new(crate::arena::ArenaManager::new(
+                crate::arena::ArenaConfig::default(),
+            )),
             db,
             gathering: RwLock::new(gathering),
             woodcutting: RwLock::new(woodcutting),
@@ -1117,7 +1195,10 @@ impl GameRoom {
     pub async fn register_player_sender(&self, player_id: &str, sender: mpsc::Sender<Vec<u8>>) {
         let mut senders = self.player_senders.write().await;
         senders.insert(player_id.to_string(), sender);
-        self.sync_states.write().await.insert(player_id.to_string(), PlayerSyncState::new());
+        self.sync_states
+            .write()
+            .await
+            .insert(player_id.to_string(), PlayerSyncState::new());
         tracing::debug!("Registered sender for player {}", player_id);
     }
 
@@ -1164,21 +1245,33 @@ impl GameRoom {
             let world_y = chunk_base_y + p.y;
             trace!(
                 "Portal '{}' at local ({}, {}) -> world ({}, {}) to ({}, {}), target: {}",
-                p.id, p.x, p.y, world_x, world_y,
-                world_x + p.width, world_y + p.height, p.target_map
+                p.id,
+                p.x,
+                p.y,
+                world_x,
+                world_y,
+                world_x + p.width,
+                world_y + p.height,
+                p.target_map
             );
         }
 
-        chunk.portals.iter().find(|p| {
-            let world_x = chunk_base_x + p.x;
-            let world_y = chunk_base_y + p.y;
-            let in_portal = player.x >= world_x && player.x < world_x + p.width &&
-                           player.y >= world_y && player.y < world_y + p.height;
-            if in_portal {
-                debug!("Player {} is inside portal '{}'", player_id, p.id);
-            }
-            in_portal
-        }).cloned()
+        chunk
+            .portals
+            .iter()
+            .find(|p| {
+                let world_x = chunk_base_x + p.x;
+                let world_y = chunk_base_y + p.y;
+                let in_portal = player.x >= world_x
+                    && player.x < world_x + p.width
+                    && player.y >= world_y
+                    && player.y < world_y + p.height;
+                if in_portal {
+                    debug!("Player {} is inside portal '{}'", player_id, p.id);
+                }
+                in_portal
+            })
+            .cloned()
     }
 
     /// Send a message to a specific player (unicast)
@@ -1192,7 +1285,10 @@ impl GameRoom {
                 if let Err(e) = sender.try_send(bytes) {
                     match e {
                         tokio::sync::mpsc::error::TrySendError::Full(_) => {
-                            tracing::debug!("Unicast queue full for {}; dropping message", player_id);
+                            tracing::debug!(
+                                "Unicast queue full for {}; dropping message",
+                                player_id
+                            );
                         }
                         tokio::sync::mpsc::error::TrySendError::Closed(_) => {
                             tracing::warn!(
@@ -1208,10 +1304,20 @@ impl GameRoom {
         }
     }
 
-    pub async fn reserve_player(&self, player_id: &str, name: &str, gender: &str, skin: &str, hair_style: Option<i32>, hair_color: Option<i32>) {
+    pub async fn reserve_player(
+        &self,
+        player_id: &str,
+        name: &str,
+        gender: &str,
+        skin: &str,
+        hair_style: Option<i32>,
+        hair_color: Option<i32>,
+    ) {
         let (spawn_x, spawn_y) = self.world.get_spawn_position().await;
         let mut players = self.players.write().await;
-        let player = Player::new(player_id, name, spawn_x, spawn_y, gender, skin, hair_style, hair_color);
+        let player = Player::new(
+            player_id, name, spawn_x, spawn_y, gender, skin, hair_style, hair_color,
+        );
         players.insert(player_id.to_string(), player);
 
         // Track player's starting chunk
@@ -1273,7 +1379,8 @@ impl GameRoom {
             // New format: (slot_idx, item_id, quantity)
             for (slot_idx, item_id, quantity) in slots {
                 if slot_idx < player.inventory.slots.len() && !item_id.is_empty() && quantity > 0 {
-                    player.inventory.slots[slot_idx] = Some(item::InventorySlot::new(item_id, quantity));
+                    player.inventory.slots[slot_idx] =
+                        Some(item::InventorySlot::new(item_id, quantity));
                 }
             }
         } else if let Ok(slots) = serde_json::from_str::<Vec<(usize, u8, i32)>>(inventory_json) {
@@ -1287,8 +1394,10 @@ impl GameRoom {
                         4 => "iron_ore",
                         5 => "goblin_ear",
                         _ => continue, // Skip unknown items (2 was gold, handled separately)
-                    }.to_string();
-                    player.inventory.slots[slot_idx] = Some(item::InventorySlot::new(item_id, quantity));
+                    }
+                    .to_string();
+                    player.inventory.slots[slot_idx] =
+                        Some(item::InventorySlot::new(item_id, quantity));
                 }
             }
         }
@@ -1316,7 +1425,14 @@ impl GameRoom {
 
         tracing::info!(
             "Restored player {} at ({}, {}) with {} HP, combat level {}, {} gold, appearance: {} {}",
-            name, x, y, hp, player.combat_level(), gold, gender, skin
+            name,
+            x,
+            y,
+            hp,
+            player.combat_level(),
+            gold,
+            gender,
+            skin
         );
 
         let mut players = self.players.write().await;
@@ -1364,19 +1480,21 @@ impl GameRoom {
                         }
                     }
 
-                    let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements.iter().map(|p| {
-                        crate::protocol::ArenaPlacementData {
+                    let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements
+                        .iter()
+                        .map(|p| crate::protocol::ArenaPlacementData {
                             rank: p.rank,
                             player_id: p.player_id.clone(),
                             player_name: p.player_name.clone(),
                             kills: p.kills,
                             gold_reward: p.gold_reward,
-                        }
-                    }).collect();
+                        })
+                        .collect();
 
                     self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
                         placements: placement_data,
-                    }).await;
+                    })
+                    .await;
 
                     // Broadcast elimination for the disconnected player
                     self.broadcast_to_arena(ServerMessage::ArenaPlayerEliminated {
@@ -1385,7 +1503,8 @@ impl GameRoom {
                         killer_id: "disconnect".to_string(),
                         killer_name: "Disconnect".to_string(),
                         remaining: 0,
-                    }).await;
+                    })
+                    .await;
                 } else {
                     // Refund if was queued (escrow removed in on_player_disconnect)
                     let _ = &disconnected_id; // already handled
@@ -1438,7 +1557,9 @@ impl GameRoom {
     pub async fn get_player_save_data(&self, player_id: &str) -> Option<PlayerSaveData> {
         // Check if player is in an instance and get the map_id
         let current_map = if self.player_instances.read().await.contains_key(player_id) {
-            self.instance_manager.find_player_instance(player_id).await
+            self.instance_manager
+                .find_player_instance(player_id)
+                .await
                 .map(|inst| inst.map_id.clone())
         } else {
             None
@@ -1448,7 +1569,9 @@ impl GameRoom {
         players.get(player_id).map(|p| {
             // Serialize inventory to JSON - new format with string item IDs
             // Filter out empty/invalid slots to prevent ghost items
-            let inventory_slots: Vec<(usize, String, i32)> = p.inventory.slots
+            let inventory_slots: Vec<(usize, String, i32)> = p
+                .inventory
+                .slots
                 .iter()
                 .enumerate()
                 .filter_map(|(idx, slot)| {
@@ -1457,10 +1580,13 @@ impl GameRoom {
                         .map(|s| (idx, s.item_id.clone(), s.quantity))
                 })
                 .collect();
-            let inventory_json = serde_json::to_string(&inventory_slots).unwrap_or_else(|_| "[]".to_string());
+            let inventory_json =
+                serde_json::to_string(&inventory_slots).unwrap_or_else(|_| "[]".to_string());
 
             // Serialize bank to JSON
-            let bank_slots: Vec<(usize, String, i32)> = p.bank.slots
+            let bank_slots: Vec<(usize, String, i32)> = p
+                .bank
+                .slots
                 .iter()
                 .enumerate()
                 .filter_map(|(idx, slot)| {
@@ -1501,7 +1627,10 @@ impl GameRoom {
 
     /// Batch-snapshot save data for multiple players in a single lock acquisition.
     /// Returns a map of player_id -> (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)
-    pub async fn get_bulk_save_data(&self, player_ids: &[String]) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)> {
+    pub async fn get_bulk_save_data(
+        &self,
+        player_ids: &[String],
+    ) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>)> {
         struct RawPlayerSnapshot {
             x: i32,
             y: i32,
@@ -1533,7 +1662,8 @@ impl GameRoom {
         // Snapshot instance assignments once
         let instance_map: HashMap<String, String> = {
             let instances = self.player_instances.read().await;
-            player_ids.iter()
+            player_ids
+                .iter()
                 .filter_map(|pid| instances.get(pid).map(|inst| (pid.clone(), inst.clone())))
                 .collect()
         };
@@ -1553,7 +1683,9 @@ impl GameRoom {
             let mut snapshots = HashMap::new();
             for pid in player_ids {
                 if let Some(p) = players.get(pid) {
-                    let inventory_slots: Vec<(usize, String, i32)> = p.inventory.slots
+                    let inventory_slots: Vec<(usize, String, i32)> = p
+                        .inventory
+                        .slots
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, slot)| {
@@ -1563,39 +1695,44 @@ impl GameRoom {
                         })
                         .collect();
 
-                    snapshots.insert(pid.clone(), RawPlayerSnapshot {
-                        x: p.x,
-                        y: p.y,
-                        hp: p.hp,
-                        prayer_points: p.prayer_points,
-                        skills: p.skills.clone(),
-                        gold: p.inventory.gold,
-                        inventory_slots,
-                        gender: p.gender.clone(),
-                        skin: p.skin.clone(),
-                        equipped_head: p.equipped_head.clone(),
-                        equipped_body: p.equipped_body.clone(),
-                        equipped_weapon: p.equipped_weapon.clone(),
-                        equipped_back: p.equipped_back.clone(),
-                        equipped_feet: p.equipped_feet.clone(),
-                        equipped_ring: p.equipped_ring.clone(),
-                        equipped_gloves: p.equipped_gloves.clone(),
-                        equipped_necklace: p.equipped_necklace.clone(),
-                        equipped_belt: p.equipped_belt.clone(),
-                        sitting_at_x: p.sitting_at.map(|(x, _)| x),
-                        sitting_at_y: p.sitting_at.map(|(_, y)| y),
-                        recipes: p.discovered_recipes.clone(),
-                        bank_slots: p.bank.slots
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(idx, slot)| {
-                                slot.as_ref()
-                                    .filter(|s| s.quantity > 0 && !s.item_id.is_empty())
-                                    .map(|s| (idx, s.item_id.clone(), s.quantity))
-                            })
-                            .collect(),
-                        bank_gold: p.bank.gold,
-                    });
+                    snapshots.insert(
+                        pid.clone(),
+                        RawPlayerSnapshot {
+                            x: p.x,
+                            y: p.y,
+                            hp: p.hp,
+                            prayer_points: p.prayer_points,
+                            skills: p.skills.clone(),
+                            gold: p.inventory.gold,
+                            inventory_slots,
+                            gender: p.gender.clone(),
+                            skin: p.skin.clone(),
+                            equipped_head: p.equipped_head.clone(),
+                            equipped_body: p.equipped_body.clone(),
+                            equipped_weapon: p.equipped_weapon.clone(),
+                            equipped_back: p.equipped_back.clone(),
+                            equipped_feet: p.equipped_feet.clone(),
+                            equipped_ring: p.equipped_ring.clone(),
+                            equipped_gloves: p.equipped_gloves.clone(),
+                            equipped_necklace: p.equipped_necklace.clone(),
+                            equipped_belt: p.equipped_belt.clone(),
+                            sitting_at_x: p.sitting_at.map(|(x, _)| x),
+                            sitting_at_y: p.sitting_at.map(|(_, y)| y),
+                            recipes: p.discovered_recipes.clone(),
+                            bank_slots: p
+                                .bank
+                                .slots
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(idx, slot)| {
+                                    slot.as_ref()
+                                        .filter(|s| s.quantity > 0 && !s.item_id.is_empty())
+                                        .map(|s| (idx, s.item_id.clone(), s.quantity))
+                                })
+                                .collect(),
+                            bank_gold: p.bank.gold,
+                        },
+                    );
                 }
             }
             snapshots
@@ -1603,7 +1740,8 @@ impl GameRoom {
 
         // Build save payloads outside the players lock.
         for (pid, raw) in raw_snapshots {
-            let inventory_json = serde_json::to_string(&raw.inventory_slots).unwrap_or_else(|_| "[]".to_string());
+            let inventory_json =
+                serde_json::to_string(&raw.inventory_slots).unwrap_or_else(|_| "[]".to_string());
             let save_data = PlayerSaveData {
                 x: raw.x as f32,
                 y: raw.y as f32,
@@ -1626,7 +1764,8 @@ impl GameRoom {
                 current_map: map_ids.get(&pid).cloned(),
                 sitting_at_x: raw.sitting_at_x,
                 sitting_at_y: raw.sitting_at_y,
-                bank_json: serde_json::to_string(&raw.bank_slots).unwrap_or_else(|_| "[]".to_string()),
+                bank_json: serde_json::to_string(&raw.bank_slots)
+                    .unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: raw.bank_gold,
             };
             result.insert(pid, (save_data, None, raw.recipes));
@@ -1668,7 +1807,8 @@ impl GameRoom {
     /// Get discovered recipes for a player (for saving to DB)
     pub async fn get_player_discovered_recipes(&self, player_id: &str) -> HashSet<String> {
         let players = self.players.read().await;
-        players.get(player_id)
+        players
+            .get(player_id)
             .map(|p| p.discovered_recipes.clone())
             .unwrap_or_default()
     }
@@ -1694,11 +1834,13 @@ impl GameRoom {
         let mut messages = Vec::new();
         for (quest_id, progress) in &quest_state.active_quests {
             if let Some(quest) = self.quest_registry.get(quest_id).await {
-                let objectives: Vec<QuestObjectiveData> = quest.objectives
+                let objectives: Vec<QuestObjectiveData> = quest
+                    .objectives
                     .iter()
                     .map(|o| {
                         // Get current progress from saved state
-                        let (current, completed) = progress.objectives
+                        let (current, completed) = progress
+                            .objectives
                             .get(&o.id)
                             .map(|p| (p.current, p.completed))
                             .unwrap_or((0, false));
@@ -1729,7 +1871,9 @@ impl GameRoom {
             .map(|state| state.completed_quests.clone())
             .unwrap_or_default();
 
-        ServerMessage::QuestStateSync { completed_quest_ids }
+        ServerMessage::QuestStateSync {
+            completed_quest_ids,
+        }
     }
 
     pub async fn player_count(&self) -> usize {
@@ -1769,7 +1913,9 @@ impl GameRoom {
 
     pub async fn get_player_appearance(&self, player_id: &str) -> Option<(String, String)> {
         let players = self.players.read().await;
-        players.get(player_id).map(|p| (p.gender.clone(), p.skin.clone()))
+        players
+            .get(player_id)
+            .map(|p| (p.gender.clone(), p.skin.clone()))
     }
 
     pub async fn get_player_hair(&self, player_id: &str) -> Option<(Option<i32>, Option<i32>)> {
@@ -1783,14 +1929,18 @@ impl GameRoom {
     }
 
     /// Get all ground items in a specific instance (or overworld if None)
-    pub async fn get_ground_items_in_instance(&self, instance_id: Option<&str>) -> Vec<ServerMessage> {
+    pub async fn get_ground_items_in_instance(
+        &self,
+        instance_id: Option<&str>,
+    ) -> Vec<ServerMessage> {
         let items = self.ground_items.read().await;
-        items.values()
+        items
+            .values()
             .filter(|item| {
                 match (&item.instance_id, instance_id) {
-                    (None, None) => true,  // Both overworld
-                    (Some(a), Some(b)) => a == b,  // Same instance
-                    _ => false,  // Different zones
+                    (None, None) => true,         // Both overworld
+                    (Some(a), Some(b)) => a == b, // Same instance
+                    _ => false,                   // Different zones
                 }
             })
             .map(|item| ServerMessage::ItemDropped {
@@ -1806,11 +1956,13 @@ impl GameRoom {
     /// Get the initial inventory update message for a player (used on connection)
     pub async fn get_player_inventory_update(&self, player_id: &str) -> Option<ServerMessage> {
         let players = self.players.read().await;
-        players.get(player_id).map(|p| ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: p.inventory.to_update(),
-            gold: p.inventory.gold,
-        })
+        players
+            .get(player_id)
+            .map(|p| ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: p.inventory.to_update(),
+                gold: p.inventory.gold,
+            })
     }
 
     /// Get the initial skills sync message for a player (used on connection)
@@ -1843,11 +1995,13 @@ impl GameRoom {
 
     pub async fn get_player_prayer_state(&self, player_id: &str) -> Option<ServerMessage> {
         let players = self.players.read().await;
-        players.get(player_id).map(|p| ServerMessage::PrayerStateUpdate {
-            points: p.prayer_points,
-            max_points: p.max_prayer_points(),
-            active_prayers: p.active_prayers.iter().cloned().collect(),
-        })
+        players
+            .get(player_id)
+            .map(|p| ServerMessage::PrayerStateUpdate {
+                points: p.prayer_points,
+                max_points: p.max_prayer_points(),
+                active_prayers: p.active_prayers.iter().cloned().collect(),
+            })
     }
 
     pub async fn get_all_npcs(&self) -> Vec<Npc> {
@@ -1884,7 +2038,8 @@ impl GameRoom {
         {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                let move_seq = seq.unwrap_or_else(|| player.last_received_move_seq.saturating_add(1));
+                let move_seq =
+                    seq.unwrap_or_else(|| player.last_received_move_seq.saturating_add(1));
                 if move_seq <= player.last_received_move_seq {
                     return;
                 }
@@ -1894,9 +2049,19 @@ impl GameRoom {
                 if let Some(pos) = player.sitting_at {
                     // Determine intended movement direction
                     let move_dir = if dx.abs() > dy.abs() {
-                        if dx > 0.1 { Some(Direction::Right) } else if dx < -0.1 { Some(Direction::Left) } else { None }
+                        if dx > 0.1 {
+                            Some(Direction::Right)
+                        } else if dx < -0.1 {
+                            Some(Direction::Left)
+                        } else {
+                            None
+                        }
                     } else if dy.abs() > 0.1 {
-                        if dy > 0.1 { Some(Direction::Down) } else { Some(Direction::Up) }
+                        if dy > 0.1 {
+                            Some(Direction::Down)
+                        } else {
+                            Some(Direction::Up)
+                        }
                     } else {
                         None
                     };
@@ -1926,12 +2091,24 @@ impl GameRoom {
 
                     if dx.abs() > dy.abs() {
                         // Horizontal priority
-                        move_dx = if dx > 0.1 { 1 } else if dx < -0.1 { -1 } else { 0 };
+                        move_dx = if dx > 0.1 {
+                            1
+                        } else if dx < -0.1 {
+                            -1
+                        } else {
+                            0
+                        };
                         move_dy = 0;
                     } else if dy.abs() > 0.1 {
                         // Vertical priority
                         move_dx = 0;
-                        move_dy = if dy > 0.1 { 1 } else if dy < -0.1 { -1 } else { 0 };
+                        move_dy = if dy > 0.1 {
+                            1
+                        } else if dy < -0.1 {
+                            -1
+                        } else {
+                            0
+                        };
                     } else {
                         move_dx = 0;
                         move_dy = 0;
@@ -1970,7 +2147,15 @@ impl GameRoom {
         let (px, py, direction, last_dash_tick, is_sitting, is_dead, active) = {
             let players = self.players.read().await;
             match players.get(player_id) {
-                Some(p) => (p.x, p.y, p.direction, p.last_dash_tick, p.sitting_at.is_some(), p.is_dead, p.active),
+                Some(p) => (
+                    p.x,
+                    p.y,
+                    p.direction,
+                    p.last_dash_tick,
+                    p.sitting_at.is_some(),
+                    p.is_dead,
+                    p.active,
+                ),
                 None => return,
             }
         };
@@ -2000,15 +2185,19 @@ impl GameRoom {
         let (overworld_player_pos, npc_positions, chair_positions) = {
             let players = self.players.read().await;
             let instances = self.player_instances.read().await;
-            let overworld: std::collections::HashSet<(i32, i32)> = players.values()
-                .filter(|p| p.active && !p.is_dead && p.id != player_id && !instances.contains_key(&p.id))
+            let overworld: std::collections::HashSet<(i32, i32)> = players
+                .values()
+                .filter(|p| {
+                    p.active && !p.is_dead && p.id != player_id && !instances.contains_key(&p.id)
+                })
                 .map(|p| (p.x, p.y))
                 .collect();
             drop(instances);
             drop(players);
 
             let npcs = self.npcs.read().await;
-            let npc_pos: std::collections::HashSet<(i32, i32)> = npcs.values()
+            let npc_pos: std::collections::HashSet<(i32, i32)> = npcs
+                .values()
                 .filter(|n| n.is_alive())
                 .map(|n| (n.x, n.y))
                 .collect();
@@ -2039,11 +2228,19 @@ impl GameRoom {
                 } else {
                     false
                 };
-                if !walkable { break; }
+                if !walkable {
+                    break;
+                }
 
-                if overworld_player_pos.contains(&(check_x, check_y)) { break; }
-                if npc_positions.contains(&(check_x, check_y)) { break; }
-                if chair_positions.contains(&(check_x, check_y)) { break; }
+                if overworld_player_pos.contains(&(check_x, check_y)) {
+                    break;
+                }
+                if npc_positions.contains(&(check_x, check_y)) {
+                    break;
+                }
+                if chair_positions.contains(&(check_x, check_y)) {
+                    break;
+                }
             }
 
             final_x = check_x;
@@ -2208,9 +2405,20 @@ impl GameRoom {
         };
 
         // Admin-only commands check
-        let admin_commands = ["/give", "/setlevel", "/teleport", "/spawn", "/heal", "/kill", "/god", "/announce", "/arena"];
+        let admin_commands = [
+            "/give",
+            "/setlevel",
+            "/teleport",
+            "/spawn",
+            "/heal",
+            "/kill",
+            "/god",
+            "/announce",
+            "/arena",
+        ];
         if admin_commands.contains(&command.as_str()) && !is_admin {
-            self.send_system_message(player_id, "This command requires admin privileges.").await;
+            self.send_system_message(player_id, "This command requires admin privileges.")
+                .await;
             return;
         }
 
@@ -2218,7 +2426,8 @@ impl GameRoom {
             "/give" => {
                 // /give item_id [quantity]
                 if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /give <item_id> [quantity]").await;
+                    self.send_system_message(player_id, "Usage: /give <item_id> [quantity]")
+                        .await;
                     return;
                 }
 
@@ -2227,7 +2436,8 @@ impl GameRoom {
 
                 // Validate item exists
                 if self.item_registry.get(item_id).is_none() {
-                    self.send_system_message(player_id, &format!("Unknown item: {}", item_id)).await;
+                    self.send_system_message(player_id, &format!("Unknown item: {}", item_id))
+                        .await;
                     return;
                 }
 
@@ -2236,8 +2446,15 @@ impl GameRoom {
                 let (leftover, inventory_update, gold) = {
                     let mut players = self.players.write().await;
                     if let Some(player) = players.get_mut(player_id) {
-                        let leftover = player.inventory.add_item(item_id, quantity, &self.item_registry);
-                        (leftover, player.inventory.to_update(), player.inventory.gold)
+                        let leftover =
+                            player
+                                .inventory
+                                .add_item(item_id, quantity, &self.item_registry);
+                        (
+                            leftover,
+                            player.inventory.to_update(),
+                            player.inventory.gold,
+                        )
                     } else {
                         (quantity, vec![], 0)
                     }
@@ -2246,14 +2463,19 @@ impl GameRoom {
                 let added = quantity - leftover;
                 if added > 0 {
                     tracing::info!("Player {} spawned {}x {}", player_id, added, item_id);
-                    self.send_system_message(player_id, &format!("Gave {}x {}", added, item_id)).await;
+                    self.send_system_message(player_id, &format!("Gave {}x {}", added, item_id))
+                        .await;
 
                     // Send inventory update
-                    self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                        player_id: player_id.to_string(),
-                        slots: inventory_update,
-                        gold,
-                    }).await;
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::InventoryUpdate {
+                            player_id: player_id.to_string(),
+                            slots: inventory_update,
+                            gold,
+                        },
+                    )
+                    .await;
                 } else {
                     self.send_system_message(player_id, "Inventory full").await;
                 }
@@ -2264,7 +2486,11 @@ impl GameRoom {
                 use crate::skills::{Skill, SkillType};
 
                 if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /setlevel <skill> <level> or /setlevel <level>").await;
+                    self.send_system_message(
+                        player_id,
+                        "Usage: /setlevel <skill> <level> or /setlevel <level>",
+                    )
+                    .await;
                     return;
                 }
 
@@ -2273,15 +2499,25 @@ impl GameRoom {
                     let skill_type = match SkillType::from_str(parts[1]) {
                         Some(st) => st,
                         None => {
-                            let valid: Vec<&str> = SkillType::all().iter().map(|s| s.as_str()).collect();
-                            self.send_system_message(player_id, &format!("Unknown skill '{}'. Valid skills: {}", parts[1], valid.join(", "))).await;
+                            let valid: Vec<&str> =
+                                SkillType::all().iter().map(|s| s.as_str()).collect();
+                            self.send_system_message(
+                                player_id,
+                                &format!(
+                                    "Unknown skill '{}'. Valid skills: {}",
+                                    parts[1],
+                                    valid.join(", ")
+                                ),
+                            )
+                            .await;
                             return;
                         }
                     };
                     let level: i32 = match parts[2].parse() {
                         Ok(l) if l >= 1 && l <= 99 => l,
                         _ => {
-                            self.send_system_message(player_id, "Level must be between 1 and 99").await;
+                            self.send_system_message(player_id, "Level must be between 1 and 99")
+                                .await;
                             return;
                         }
                     };
@@ -2293,9 +2529,17 @@ impl GameRoom {
                         _ => {
                             // Maybe they typed a skill name without a level
                             if SkillType::from_str(parts[1]).is_some() {
-                                self.send_system_message(player_id, "Usage: /setlevel <skill> <level>").await;
+                                self.send_system_message(
+                                    player_id,
+                                    "Usage: /setlevel <skill> <level>",
+                                )
+                                .await;
                             } else {
-                                self.send_system_message(player_id, "Level must be between 1 and 99").await;
+                                self.send_system_message(
+                                    player_id,
+                                    "Level must be between 1 and 99",
+                                )
+                                .await;
                             }
                             return;
                         }
@@ -2311,13 +2555,22 @@ impl GameRoom {
                             if st == SkillType::Hitpoints {
                                 player.hp = player.max_hp();
                             }
-                            tracing::info!("Player {} set {} to level {}", player_id, st.as_str(), level);
+                            tracing::info!(
+                                "Player {} set {} to level {}",
+                                player_id,
+                                st.as_str(),
+                                level
+                            );
                         } else {
                             for &st in SkillType::all() {
                                 *player.skills.get_mut(st) = Skill::new(level);
                             }
                             player.hp = player.max_hp();
-                            tracing::info!("Player {} set all skills to level {}", player_id, level);
+                            tracing::info!(
+                                "Player {} set all skills to level {}",
+                                player_id,
+                                level
+                            );
                         }
                     } else {
                         return;
@@ -2325,45 +2578,68 @@ impl GameRoom {
                 };
 
                 if let Some(st) = skill_type {
-                    self.send_system_message(player_id, &format!("{} set to level {}", st.as_str(), level)).await;
+                    self.send_system_message(
+                        player_id,
+                        &format!("{} set to level {}", st.as_str(), level),
+                    )
+                    .await;
                 } else {
                     let combat_level = {
                         let players = self.players.read().await;
-                        players.get(player_id).map(|p| p.skills.combat_level()).unwrap_or(0)
+                        players
+                            .get(player_id)
+                            .map(|p| p.skills.combat_level())
+                            .unwrap_or(0)
                     };
-                    self.send_system_message(player_id, &format!("All skills set to level {} (Combat Level: {})", level, combat_level)).await;
+                    self.send_system_message(
+                        player_id,
+                        &format!(
+                            "All skills set to level {} (Combat Level: {})",
+                            level, combat_level
+                        ),
+                    )
+                    .await;
                 }
             }
             "/help" => {
                 if is_admin {
                     self.send_system_message(player_id, "Commands: /give <item> [qty], /setlevel [skill] <lvl>, /teleport <x> <y>, /spawn <npc> [x] [y], /heal [player], /kill <player>, /god, /announce <msg>, /items, /help").await;
                 } else {
-                    self.send_system_message(player_id, "Commands: /items, /help").await;
+                    self.send_system_message(player_id, "Commands: /items, /help")
+                        .await;
                 }
             }
             "/items" => {
                 // List available items
                 let items: Vec<&String> = self.item_registry.ids().collect();
-                let list = items.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-                self.send_system_message(player_id, &format!("Items: {}", list)).await;
+                let list = items
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                self.send_system_message(player_id, &format!("Items: {}", list))
+                    .await;
             }
             "/teleport" => {
                 // /teleport <x> <y>
                 if parts.len() < 3 {
-                    self.send_system_message(player_id, "Usage: /teleport <x> <y>").await;
+                    self.send_system_message(player_id, "Usage: /teleport <x> <y>")
+                        .await;
                     return;
                 }
                 let x: i32 = match parts[1].parse() {
                     Ok(v) => v,
                     Err(_) => {
-                        self.send_system_message(player_id, "Invalid x coordinate").await;
+                        self.send_system_message(player_id, "Invalid x coordinate")
+                            .await;
                         return;
                     }
                 };
                 let y: i32 = match parts[2].parse() {
                     Ok(v) => v,
                     Err(_) => {
-                        self.send_system_message(player_id, "Invalid y coordinate").await;
+                        self.send_system_message(player_id, "Invalid y coordinate")
+                            .await;
                         return;
                     }
                 };
@@ -2375,20 +2651,26 @@ impl GameRoom {
                         tracing::info!("Player {} teleported to ({}, {})", player_id, x, y);
                     }
                 }
-                self.send_system_message(player_id, &format!("Teleported to ({}, {})", x, y)).await;
+                self.send_system_message(player_id, &format!("Teleported to ({}, {})", x, y))
+                    .await;
                 // Send teleport warp visual effect at the destination
-                self.broadcast_to_zone(player_id, ServerMessage::SpellEffect {
-                    caster_id: player_id.to_string(),
-                    target_id: None,
-                    spell_id: "teleport".to_string(),
-                    target_x: x,
-                    target_y: y,
-                }).await;
+                self.broadcast_to_zone(
+                    player_id,
+                    ServerMessage::SpellEffect {
+                        caster_id: player_id.to_string(),
+                        target_id: None,
+                        spell_id: "teleport".to_string(),
+                        target_x: x,
+                        target_y: y,
+                    },
+                )
+                .await;
             }
             "/spawn" => {
                 // /spawn <npc_id> [x] [y]
                 if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /spawn <npc_id> [x] [y]").await;
+                    self.send_system_message(player_id, "Usage: /spawn <npc_id> [x] [y]")
+                        .await;
                     return;
                 }
                 let npc_id = parts[1];
@@ -2397,8 +2679,14 @@ impl GameRoom {
                 let (spawn_x, spawn_y) = {
                     let players = self.players.read().await;
                     if let Some(player) = players.get(player_id) {
-                        let x = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(player.x);
-                        let y = parts.get(3).and_then(|s| s.parse().ok()).unwrap_or(player.y);
+                        let x = parts
+                            .get(2)
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(player.x);
+                        let y = parts
+                            .get(3)
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(player.y);
                         (x, y)
                     } else {
                         return;
@@ -2408,15 +2696,39 @@ impl GameRoom {
                 // Check if NPC type exists
                 if self.entity_registry.get(npc_id).is_none() {
                     let available: Vec<&String> = self.entity_registry.ids().collect();
-                    let list = available.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-                    self.send_system_message(player_id, &format!("Unknown NPC: {}. Available: {}", npc_id, list)).await;
+                    let list = available
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    self.send_system_message(
+                        player_id,
+                        &format!("Unknown NPC: {}. Available: {}", npc_id, list),
+                    )
+                    .await;
                     return;
                 }
 
                 // Spawn the NPC
-                if let Some(spawned_id) = self.spawn_npc_at(npc_id, spawn_x as f32, spawn_y as f32).await {
-                    self.send_system_message(player_id, &format!("Spawned {} at ({}, {}) [id: {}]", npc_id, spawn_x, spawn_y, spawned_id)).await;
-                    tracing::info!("Admin {} spawned {} at ({}, {})", player_id, npc_id, spawn_x, spawn_y);
+                if let Some(spawned_id) = self
+                    .spawn_npc_at(npc_id, spawn_x as f32, spawn_y as f32)
+                    .await
+                {
+                    self.send_system_message(
+                        player_id,
+                        &format!(
+                            "Spawned {} at ({}, {}) [id: {}]",
+                            npc_id, spawn_x, spawn_y, spawned_id
+                        ),
+                    )
+                    .await;
+                    tracing::info!(
+                        "Admin {} spawned {} at ({}, {})",
+                        player_id,
+                        npc_id,
+                        spawn_x,
+                        spawn_y
+                    );
                 }
             }
             "/heal" => {
@@ -2427,7 +2739,10 @@ impl GameRoom {
                     let mut players = self.players.write().await;
                     if let Some(name) = target_name {
                         // Find player by name
-                        if let Some(player) = players.values_mut().find(|p| p.name.eq_ignore_ascii_case(name)) {
+                        if let Some(player) = players
+                            .values_mut()
+                            .find(|p| p.name.eq_ignore_ascii_case(name))
+                        {
                             player.hp = player.max_hp();
                             player.is_dead = false;
                             Some(player.name.clone())
@@ -2447,14 +2762,21 @@ impl GameRoom {
                 };
 
                 match healed {
-                    Some(name) => self.send_system_message(player_id, &format!("Healed {} to full HP", name)).await,
-                    None => self.send_system_message(player_id, "Player not found").await,
+                    Some(name) => {
+                        self.send_system_message(player_id, &format!("Healed {} to full HP", name))
+                            .await
+                    }
+                    None => {
+                        self.send_system_message(player_id, "Player not found")
+                            .await
+                    }
                 }
             }
             "/kill" => {
                 // /kill <player_name>
                 if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /kill <player_name>").await;
+                    self.send_system_message(player_id, "Usage: /kill <player_name>")
+                        .await;
                     return;
                 }
                 let target_name = parts[1];
@@ -2465,7 +2787,10 @@ impl GameRoom {
                         .unwrap()
                         .as_millis() as u64;
                     let mut players = self.players.write().await;
-                    if let Some(player) = players.values_mut().find(|p| p.name.eq_ignore_ascii_case(target_name)) {
+                    if let Some(player) = players
+                        .values_mut()
+                        .find(|p| p.name.eq_ignore_ascii_case(target_name))
+                    {
                         let id = player.id.clone();
                         let name = player.name.clone();
                         player.die(current_time);
@@ -2477,7 +2802,8 @@ impl GameRoom {
 
                 match killed {
                     Some((target_id, name)) => {
-                        self.send_system_message(player_id, &format!("Killed {}", name)).await;
+                        self.send_system_message(player_id, &format!("Killed {}", name))
+                            .await;
                         tracing::info!("Admin {} killed player {}", player_id, name);
 
                         // Handle arena death if applicable
@@ -2489,8 +2815,18 @@ impl GameRoom {
                             let (eliminated_name, killer_name, remaining) = {
                                 let mut arena = self.arena_manager.write().await;
                                 arena.on_player_death(&target_id, Some(player_id));
-                                let eliminated_name = arena.match_stats.fighter_names.get(&target_id).cloned().unwrap_or_default();
-                                let killer_name = arena.match_stats.fighter_names.get(player_id).cloned().unwrap_or_default();
+                                let eliminated_name = arena
+                                    .match_stats
+                                    .fighter_names
+                                    .get(&target_id)
+                                    .cloned()
+                                    .unwrap_or_default();
+                                let killer_name = arena
+                                    .match_stats
+                                    .fighter_names
+                                    .get(player_id)
+                                    .cloned()
+                                    .unwrap_or_default();
                                 let remaining = arena.active_fighters.len() as u32;
                                 (eliminated_name, killer_name, remaining)
                             };
@@ -2516,7 +2852,8 @@ impl GameRoom {
                                 killer_id: player_id.to_string(),
                                 killer_name,
                                 remaining,
-                            }).await;
+                            })
+                            .await;
 
                             // Check match end
                             let should_end = {
@@ -2527,7 +2864,8 @@ impl GameRoom {
                                 let current_time = std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
                                     .unwrap()
-                                    .as_millis() as u64;
+                                    .as_millis()
+                                    as u64;
                                 let placements = {
                                     let mut arena = self.arena_manager.write().await;
                                     arena.end_match(current_time)
@@ -2545,14 +2883,18 @@ impl GameRoom {
                                 }
 
                                 self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
-                                    placements: placements.iter().map(|p| crate::protocol::ArenaPlacementData {
-                                        rank: p.rank,
-                                        player_id: p.player_id.clone(),
-                                        player_name: p.player_name.clone(),
-                                        kills: p.kills,
-                                        gold_reward: p.gold_reward,
-                                    }).collect(),
-                                }).await;
+                                    placements: placements
+                                        .iter()
+                                        .map(|p| crate::protocol::ArenaPlacementData {
+                                            rank: p.rank,
+                                            player_id: p.player_id.clone(),
+                                            player_name: p.player_name.clone(),
+                                            kills: p.kills,
+                                            gold_reward: p.gold_reward,
+                                        })
+                                        .collect(),
+                                })
+                                .await;
 
                                 self.broadcast_to_arena(ServerMessage::ArenaStateUpdate {
                                     state: "results".to_string(),
@@ -2563,17 +2905,22 @@ impl GameRoom {
                                         let arena = self.arena_manager.read().await;
                                         arena.config.entry_fee
                                     },
-                                }).await;
+                                })
+                                .await;
                             }
                         } else {
                             // Normal death broadcast
                             self.broadcast(ServerMessage::PlayerDied {
                                 id: target_id,
                                 killer_id: player_id.to_string(),
-                            }).await;
+                            })
+                            .await;
                         }
                     }
-                    None => self.send_system_message(player_id, "Player not found").await,
+                    None => {
+                        self.send_system_message(player_id, "Player not found")
+                            .await
+                    }
                 }
             }
             "/god" => {
@@ -2588,13 +2935,20 @@ impl GameRoom {
                     }
                 };
                 let status = if enabled { "enabled" } else { "disabled" };
-                self.send_system_message(player_id, &format!("God mode {}", status)).await;
-                tracing::info!("Admin {} ({}) toggled god mode: {}", player_name, player_id, status);
+                self.send_system_message(player_id, &format!("God mode {}", status))
+                    .await;
+                tracing::info!(
+                    "Admin {} ({}) toggled god mode: {}",
+                    player_name,
+                    player_id,
+                    status
+                );
             }
             "/announce" => {
                 // /announce <message>
                 if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /announce <message>").await;
+                    self.send_system_message(player_id, "Usage: /announce <message>")
+                        .await;
                     return;
                 }
                 let message = parts[1..].join(" ");
@@ -2602,13 +2956,15 @@ impl GameRoom {
                 // Broadcast announcement to all players
                 self.broadcast(ServerMessage::Announcement {
                     text: message.clone(),
-                }).await;
+                })
+                .await;
                 tracing::info!("Admin {} announced: {}", player_id, message);
             }
             "/arena" => {
                 // Arena commands (admin only)
                 if !is_admin {
-                    self.send_system_message(player_id, "Arena commands require admin privileges.").await;
+                    self.send_system_message(player_id, "Arena commands require admin privileges.")
+                        .await;
                     return;
                 }
 
@@ -2622,14 +2978,20 @@ impl GameRoom {
                     "fee" => {
                         if let Some(fee) = parts.get(2).and_then(|s| s.parse::<i32>().ok()) {
                             if fee < 0 {
-                                self.send_system_message(player_id, "Fee must be non-negative.").await;
+                                self.send_system_message(player_id, "Fee must be non-negative.")
+                                    .await;
                                 return;
                             }
                             let mut arena = self.arena_manager.write().await;
                             arena.set_entry_fee(fee);
-                            self.send_system_message(player_id, &format!("Arena entry fee set to {} gold.", fee)).await;
+                            self.send_system_message(
+                                player_id,
+                                &format!("Arena entry fee set to {} gold.", fee),
+                            )
+                            .await;
                         } else {
-                            self.send_system_message(player_id, "Usage: /arena fee <gold>").await;
+                            self.send_system_message(player_id, "Usage: /arena fee <gold>")
+                                .await;
                         }
                     }
                     "start" => {
@@ -2652,17 +3014,24 @@ impl GameRoom {
                                 for (pid, _) in &charges {
                                     let update = {
                                         let players = self.players.read().await;
-                                        players.get(pid).map(|p| (p.inventory.to_update(), p.inventory.gold))
+                                        players
+                                            .get(pid)
+                                            .map(|p| (p.inventory.to_update(), p.inventory.gold))
                                     };
                                     if let Some((slots, gold)) = update {
-                                        self.send_to_player(pid, ServerMessage::InventoryUpdate {
-                                            player_id: pid.clone(),
-                                            slots,
-                                            gold,
-                                        }).await;
+                                        self.send_to_player(
+                                            pid,
+                                            ServerMessage::InventoryUpdate {
+                                                player_id: pid.clone(),
+                                                slots,
+                                                gold,
+                                            },
+                                        )
+                                        .await;
                                     }
                                 }
-                                self.send_system_message(player_id, "Arena countdown started!").await;
+                                self.send_system_message(player_id, "Arena countdown started!")
+                                    .await;
                             }
                             Err(e) => {
                                 self.send_system_message(player_id, &e).await;
@@ -2688,22 +3057,33 @@ impl GameRoom {
                                     for (pid, _) in &charges {
                                         let update = {
                                             let players = self.players.read().await;
-                                            players.get(pid).map(|p| (p.inventory.to_update(), p.inventory.gold))
+                                            players.get(pid).map(|p| {
+                                                (p.inventory.to_update(), p.inventory.gold)
+                                            })
                                         };
                                         if let Some((slots, gold)) = update {
-                                            self.send_to_player(pid, ServerMessage::InventoryUpdate {
-                                                player_id: pid.clone(),
-                                                slots,
-                                                gold,
-                                            }).await;
+                                            self.send_to_player(
+                                                pid,
+                                                ServerMessage::InventoryUpdate {
+                                                    player_id: pid.clone(),
+                                                    slots,
+                                                    gold,
+                                                },
+                                            )
+                                            .await;
                                         }
                                     }
-                                    self.send_system_message(player_id, &format!("Arena countdown started ({}s)!", seconds)).await;
+                                    self.send_system_message(
+                                        player_id,
+                                        &format!("Arena countdown started ({}s)!", seconds),
+                                    )
+                                    .await;
                                 }
                                 Err(e) => self.send_system_message(player_id, &e).await,
                             }
                         } else {
-                            self.send_system_message(player_id, "Usage: /arena timer <seconds>").await;
+                            self.send_system_message(player_id, "Usage: /arena timer <seconds>")
+                                .await;
                         }
                     }
                     "cancel" => {
@@ -2723,17 +3103,24 @@ impl GameRoom {
                         for (pid, _) in &refunds {
                             let update = {
                                 let players = self.players.read().await;
-                                players.get(pid).map(|p| (p.inventory.to_update(), p.inventory.gold))
+                                players
+                                    .get(pid)
+                                    .map(|p| (p.inventory.to_update(), p.inventory.gold))
                             };
                             if let Some((slots, gold)) = update {
-                                self.send_to_player(pid, ServerMessage::InventoryUpdate {
-                                    player_id: pid.clone(),
-                                    slots,
-                                    gold,
-                                }).await;
+                                self.send_to_player(
+                                    pid,
+                                    ServerMessage::InventoryUpdate {
+                                        player_id: pid.clone(),
+                                        slots,
+                                        gold,
+                                    },
+                                )
+                                .await;
                             }
                         }
-                        self.send_system_message(player_id, "Arena cancelled. All fees refunded.").await;
+                        self.send_system_message(player_id, "Arena cancelled. All fees refunded.")
+                            .await;
                     }
                     "status" => {
                         let status = {
@@ -2743,12 +3130,20 @@ impl GameRoom {
                         self.send_system_message(player_id, &status).await;
                     }
                     _ => {
-                        self.send_system_message(player_id, "Usage: /arena <start|timer|fee|cancel|status>").await;
+                        self.send_system_message(
+                            player_id,
+                            "Usage: /arena <start|timer|fee|cancel|status>",
+                        )
+                        .await;
                     }
                 }
             }
             _ => {
-                self.send_system_message(player_id, &format!("Unknown command: {}. Try /help", command)).await;
+                self.send_system_message(
+                    player_id,
+                    &format!("Unknown command: {}. Try /help", command),
+                )
+                .await;
             }
         }
     }
@@ -2778,8 +3173,16 @@ impl GameRoom {
             .as_millis() as u64;
 
         // Get attacker info including combat stats
-        let (attacker_name, attacker_x, attacker_y, attacker_dir, last_attack,
-             combat_level, attack_bonus, strength_bonus) = {
+        let (
+            attacker_name,
+            attacker_x,
+            attacker_y,
+            attacker_dir,
+            last_attack,
+            combat_level,
+            attack_bonus,
+            strength_bonus,
+        ) = {
             let players = self.players.read().await;
             let player = match players.get(player_id) {
                 Some(p) => p,
@@ -2805,7 +3208,9 @@ impl GameRoom {
 
             (
                 player.name.clone(),
-                player.x, player.y, player.direction,
+                player.x,
+                player.y,
+                player.direction,
                 player.last_attack_time,
                 player.skills.combat.level,
                 atk_bonus,
@@ -2815,7 +3220,12 @@ impl GameRoom {
 
         // Check cooldown
         if current_time - last_attack < ATTACK_COOLDOWN_MS {
-            tracing::info!("[ATTACK] Cooldown not met: current_time={}, last_attack={}, ATTACK_COOLDOWN_MS={}", current_time, last_attack, ATTACK_COOLDOWN_MS);
+            tracing::info!(
+                "[ATTACK] Cooldown not met: current_time={}, last_attack={}, ATTACK_COOLDOWN_MS={}",
+                current_time,
+                last_attack,
+                ATTACK_COOLDOWN_MS
+            );
             return;
         }
 
@@ -2849,7 +3259,8 @@ impl GameRoom {
         self.broadcast(ServerMessage::PlayerAttack {
             player_id: player_id.to_string(),
             attack_type: attack_type.to_string(),
-        }).await;
+        })
+        .await;
 
         // Find target based on weapon range
         let mut target_id: Option<String> = None;
@@ -2875,8 +3286,18 @@ impl GameRoom {
             let check_y = attacker_y + dir_dy * dist;
 
             // For ranged weapons, check line of sight
-            if weapon_range > 1 && !self.world.has_line_of_sight(attacker_x, attacker_y, check_x, check_y).await {
-                tracing::debug!("{} ranged attack blocked by wall at ({}, {})", attacker_name, check_x, check_y);
+            if weapon_range > 1
+                && !self
+                    .world
+                    .has_line_of_sight(attacker_x, attacker_y, check_x, check_y)
+                    .await
+            {
+                tracing::debug!(
+                    "{} ranged attack blocked by wall at ({}, {})",
+                    attacker_name,
+                    check_x,
+                    check_y
+                );
                 break;
             }
 
@@ -2884,24 +3305,39 @@ impl GameRoom {
             if attacker_instance.is_none() {
                 let npcs = self.npcs.read().await;
                 for (npc_id, npc) in npcs.iter() {
-                    if npc.is_alive() && npc.is_attackable() && npc.x == check_x && npc.y == check_y {
+                    if npc.is_alive() && npc.is_attackable() && npc.x == check_x && npc.y == check_y
+                    {
                         target_id = Some(npc_id.clone());
                         is_npc = true;
                         target_tile_x = check_x;
                         target_tile_y = check_y;
-                        tracing::info!("{} found NPC target: {} at ({}, {}) range {}", attacker_name, npc.name(), check_x, check_y, dist);
+                        tracing::info!(
+                            "{} found NPC target: {} at ({}, {}) range {}",
+                            attacker_name,
+                            npc.name(),
+                            check_x,
+                            check_y,
+                            dist
+                        );
                         break;
                     }
                 }
             }
-            if target_id.is_some() { break; }
+            if target_id.is_some() {
+                break;
+            }
 
             // Check players at this tile (must be in same instance context)
             {
                 let players = self.players.read().await;
                 let instances = self.player_instances.read().await;
                 for (pid, player) in players.iter() {
-                    if pid != player_id && player.active && player.hp > 0 && player.x == check_x && player.y == check_y {
+                    if pid != player_id
+                        && player.active
+                        && player.hp > 0
+                        && player.x == check_x
+                        && player.y == check_y
+                    {
                         // Only target players in the same context (both overworld, or same instance)
                         let target_instance = instances.get(pid.as_str()).cloned();
                         if target_instance != attacker_instance {
@@ -2911,19 +3347,33 @@ impl GameRoom {
                         is_npc = false;
                         target_tile_x = check_x;
                         target_tile_y = check_y;
-                        tracing::info!("{} found player target: {} at ({}, {}) range {}", attacker_name, player.name, check_x, check_y, dist);
+                        tracing::info!(
+                            "{} found player target: {} at ({}, {}) range {}",
+                            attacker_name,
+                            player.name,
+                            check_x,
+                            check_y,
+                            dist
+                        );
                         break;
                     }
                 }
             }
-            if target_id.is_some() { break; }
+            if target_id.is_some() {
+                break;
+            }
         }
 
         // No valid target found
         let target_id = match target_id {
             Some(id) => id,
             None => {
-                tracing::debug!("{} attack missed - no target in range {} facing {:?}", attacker_name, weapon_range, attacker_dir);
+                tracing::debug!(
+                    "{} attack missed - no target in range {} facing {:?}",
+                    attacker_name,
+                    weapon_range,
+                    attacker_dir
+                );
                 return;
             }
         };
@@ -2950,14 +3400,24 @@ impl GameRoom {
                 let npc_defence_bonus = npc.stats.defence_bonus;
 
                 // Check if attack hits (combat_level used for both attack and strength)
-                if !calculate_hit(combat_level, attack_bonus, npc_defence_level, npc_defence_bonus) {
+                if !calculate_hit(
+                    combat_level,
+                    attack_bonus,
+                    npc_defence_level,
+                    npc_defence_bonus,
+                ) {
                     // Miss - deal 0 damage
                     // Still register aggro so attack attempts interrupt wandering/pathing.
                     npc.take_damage(0, current_time, Some(player_id));
                     let name = npc.name();
                     tracing::info!(
                         "{} misses {} (atk {} + {} vs def {} + {})",
-                        attacker_name, name, combat_level, attack_bonus, npc_defence_level, npc_defence_bonus
+                        attacker_name,
+                        name,
+                        combat_level,
+                        attack_bonus,
+                        npc_defence_level,
+                        npc_defence_bonus
                     );
                     (npc.hp, name, false, 0)
                 } else {
@@ -2968,7 +3428,11 @@ impl GameRoom {
                     let name = npc.name();
                     tracing::info!(
                         "{} hits {} for {} damage (max: {}, HP: {})",
-                        attacker_name, name, damage, max_hit, npc.hp
+                        attacker_name,
+                        name,
+                        damage,
+                        max_hit,
+                        npc.hp
                     );
                     (npc.hp, name, died, damage)
                 }
@@ -2992,17 +3456,30 @@ impl GameRoom {
                 let base_defence_bonus = target.defence_bonus(&self.item_registry);
 
                 // Apply prayer bonuses to target's defence
-                let target_active_ids: Vec<String> = target.active_prayers.iter().cloned().collect();
-                let target_prayer_effects = self.prayer_registry.calculate_effects(&target_active_ids);
-                let target_defence_bonus = target_prayer_effects.apply_defence_bonus(base_defence_bonus);
+                let target_active_ids: Vec<String> =
+                    target.active_prayers.iter().cloned().collect();
+                let target_prayer_effects =
+                    self.prayer_registry.calculate_effects(&target_active_ids);
+                let target_defence_bonus =
+                    target_prayer_effects.apply_defence_bonus(base_defence_bonus);
 
                 // Check if attack hits
-                if !calculate_hit(combat_level, attack_bonus, target_combat_level, target_defence_bonus) {
+                if !calculate_hit(
+                    combat_level,
+                    attack_bonus,
+                    target_combat_level,
+                    target_defence_bonus,
+                ) {
                     // Miss - deal 0 damage
                     let name = target.name.clone();
                     tracing::info!(
                         "{} misses {} (cmb {} + {} vs cmb {} + {})",
-                        attacker_name, name, combat_level, attack_bonus, target_combat_level, target_defence_bonus
+                        attacker_name,
+                        name,
+                        combat_level,
+                        attack_bonus,
+                        target_combat_level,
+                        target_defence_bonus
                     );
                     (target.hp, name, false, 0)
                 } else {
@@ -3019,7 +3496,12 @@ impl GameRoom {
                     }
                     tracing::info!(
                         "{} hits {} for {} damage (max: {}, raw: {}, HP: {})",
-                        attacker_name, name, damage, max_hit, raw_damage, target.hp
+                        attacker_name,
+                        name,
+                        damage,
+                        max_hit,
+                        raw_damage,
+                        target.hp
                     );
                     (target.hp, name, died, damage)
                 }
@@ -3072,21 +3554,31 @@ impl GameRoom {
             if let Some(results) = xp_results {
                 let mut progression_needs_sync = false;
                 for (skill_type, xp_gained, total_xp, level, leveled_up) in results {
-                    self.send_to_player(player_id, ServerMessage::SkillXp {
-                        player_id: player_id.to_string(),
-                        skill: skill_type.as_str().to_string(),
-                        xp_gained,
-                        total_xp,
-                        level,
-                    }).await;
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::SkillXp {
+                            player_id: player_id.to_string(),
+                            skill: skill_type.as_str().to_string(),
+                            xp_gained,
+                            total_xp,
+                            level,
+                        },
+                    )
+                    .await;
 
                     if leveled_up {
-                        tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
+                        tracing::info!(
+                            "Player {} leveled up {} to {}",
+                            player_id,
+                            skill_type.as_str(),
+                            level
+                        );
                         self.broadcast(ServerMessage::SkillLevelUp {
                             player_id: player_id.to_string(),
                             skill: skill_type.as_str().to_string(),
                             new_level: level,
-                        }).await;
+                        })
+                        .await;
                         progression_needs_sync = true;
                     }
                 }
@@ -3121,6 +3613,9 @@ impl GameRoom {
                 };
                 self.broadcast(death_msg).await;
 
+                // Persist monster kill count for stats leaderboards.
+                self.record_monster_kill(player_id).await;
+
                 // Process quest kill event
                 self.process_quest_kill(player_id, &prototype_id).await;
 
@@ -3138,7 +3633,13 @@ impl GameRoom {
 
                 let drops = if let Some(prototype) = self.entity_registry.get(&prototype_id) {
                     crate::entity::generate_loot_from_prototype(
-                        prototype, target_x, target_y, player_id, current_time, npc_level, killer_instance
+                        prototype,
+                        target_x,
+                        target_y,
+                        player_id,
+                        current_time,
+                        npc_level,
+                        killer_instance,
                     )
                 } else {
                     vec![] // No prototype found, no drops
@@ -3153,7 +3654,8 @@ impl GameRoom {
                         let tile_y = item.y.floor() as i32;
 
                         // Find existing gold at same tile with same owner
-                        let existing_gold_id = items.iter()
+                        let existing_gold_id = items
+                            .iter()
                             .find(|(_, existing)| {
                                 existing.item_id == "gold"
                                     && existing.x.floor() as i32 == tile_x
@@ -3201,8 +3703,18 @@ impl GameRoom {
                     let (eliminated_name, killer_name, remaining) = {
                         let mut arena = self.arena_manager.write().await;
                         arena.on_player_death(&target_id, Some(player_id));
-                        let eliminated_name = arena.match_stats.fighter_names.get(&target_id).cloned().unwrap_or_default();
-                        let killer_name = arena.match_stats.fighter_names.get(player_id).cloned().unwrap_or_default();
+                        let eliminated_name = arena
+                            .match_stats
+                            .fighter_names
+                            .get(&target_id)
+                            .cloned()
+                            .unwrap_or_default();
+                        let killer_name = arena
+                            .match_stats
+                            .fighter_names
+                            .get(player_id)
+                            .cloned()
+                            .unwrap_or_default();
                         let remaining = arena.active_fighters.len() as u32;
                         (eliminated_name, killer_name, remaining)
                     };
@@ -3229,13 +3741,18 @@ impl GameRoom {
                         killer_id: player_id.to_string(),
                         killer_name,
                         remaining,
-                    }).await;
+                    })
+                    .await;
 
                     // Check if match should end
                     let should_end = {
                         let arena = self.arena_manager.read().await;
-                        tracing::info!("[ARENA] After death: active_fighters={:?}, state={:?}, check_match_end={}",
-                            arena.active_fighters, arena.state, arena.check_match_end());
+                        tracing::info!(
+                            "[ARENA] After death: active_fighters={:?}, state={:?}, check_match_end={}",
+                            arena.active_fighters,
+                            arena.state,
+                            arena.check_match_end()
+                        );
                         arena.check_match_end()
                     };
                     if should_end {
@@ -3261,19 +3778,21 @@ impl GameRoom {
                             }
                         }
 
-                        let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements.iter().map(|p| {
-                            crate::protocol::ArenaPlacementData {
+                        let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements
+                            .iter()
+                            .map(|p| crate::protocol::ArenaPlacementData {
                                 rank: p.rank,
                                 player_id: p.player_id.clone(),
                                 player_name: p.player_name.clone(),
                                 kills: p.kills,
                                 gold_reward: p.gold_reward,
-                            }
-                        }).collect();
+                            })
+                            .collect();
 
                         self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
                             placements: placement_data,
-                        }).await;
+                        })
+                        .await;
 
                         self.broadcast_to_arena(ServerMessage::ArenaStateUpdate {
                             state: "results".to_string(),
@@ -3284,7 +3803,8 @@ impl GameRoom {
                                 let arena = self.arena_manager.read().await;
                                 arena.config.entry_fee
                             },
-                        }).await;
+                        })
+                        .await;
 
                         // Teleport all fighters (including winner) to spectator spawn
                         {
@@ -3310,16 +3830,20 @@ impl GameRoom {
                             if placement.gold_reward > 0 {
                                 let update = {
                                     let players = self.players.read().await;
-                                    players.get(&placement.player_id).map(|p| {
-                                        (p.inventory.to_update(), p.inventory.gold)
-                                    })
+                                    players
+                                        .get(&placement.player_id)
+                                        .map(|p| (p.inventory.to_update(), p.inventory.gold))
                                 };
                                 if let Some((slots, gold)) = update {
-                                    self.send_to_player(&placement.player_id, ServerMessage::InventoryUpdate {
-                                        player_id: placement.player_id.clone(),
-                                        slots,
-                                        gold,
-                                    }).await;
+                                    self.send_to_player(
+                                        &placement.player_id,
+                                        ServerMessage::InventoryUpdate {
+                                            player_id: placement.player_id.clone(),
+                                            slots,
+                                            gold,
+                                        },
+                                    )
+                                    .await;
                                 }
                             }
                         }
@@ -3327,17 +3851,28 @@ impl GameRoom {
                         // Save arena stats to DB
                         if let Some(ref db) = self.db {
                             for placement in &placements {
-                                if let Some(char_id) = placement.player_id.strip_prefix("char_").and_then(|s| s.parse::<i64>().ok()) {
+                                if let Some(char_id) = placement
+                                    .player_id
+                                    .strip_prefix("char_")
+                                    .and_then(|s| s.parse::<i64>().ok())
+                                {
                                     let won = placement.rank == 1;
                                     let died = placement.rank > 1;
-                                    if let Err(e) = db.update_arena_stats(
-                                        char_id,
-                                        won,
-                                        placement.kills,
-                                        died,
-                                        placement.gold_reward,
-                                    ).await {
-                                        tracing::warn!("Failed to save arena stats for {}: {}", placement.player_id, e);
+                                    if let Err(e) = db
+                                        .update_arena_stats(
+                                            char_id,
+                                            won,
+                                            placement.kills,
+                                            died,
+                                            placement.gold_reward,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            "Failed to save arena stats for {}: {}",
+                                            placement.player_id,
+                                            e
+                                        );
                                     }
                                 }
                             }
@@ -3345,9 +3880,11 @@ impl GameRoom {
 
                         // Notify winner
                         if let Some(winner) = placements.iter().find(|p| p.rank == 1) {
-                            self.send_system_message(&winner.player_id, &format!(
-                                "You won the arena match! +{} gold", winner.gold_reward
-                            )).await;
+                            self.send_system_message(
+                                &winner.player_id,
+                                &format!("You won the arena match! +{} gold", winner.gold_reward),
+                            )
+                            .await;
                         }
                     }
                 } else {
@@ -3367,13 +3904,34 @@ impl GameRoom {
                             (0, 1)
                         }
                     };
-                    self.send_to_player(&target_id, ServerMessage::PrayerStateUpdate {
-                        points,
-                        max_points,
-                        active_prayers: vec![],  // Cleared on death
-                    }).await;
+                    self.send_to_player(
+                        &target_id,
+                        ServerMessage::PrayerStateUpdate {
+                            points,
+                            max_points,
+                            active_prayers: vec![], // Cleared on death
+                        },
+                    )
+                    .await;
                 }
             }
+        }
+    }
+
+    async fn record_monster_kill(&self, player_id: &str) {
+        let Some(db) = self.db.as_ref() else {
+            return;
+        };
+
+        let Some(character_id) = player_id
+            .strip_prefix("char_")
+            .and_then(|s| s.parse::<i64>().ok())
+        else {
+            return;
+        };
+
+        if let Err(e) = db.increment_character_monster_kills(character_id, 1).await {
+            tracing::warn!("Failed to persist monster kill for {}: {}", player_id, e);
         }
     }
 
@@ -3381,7 +3939,8 @@ impl GameRoom {
     async fn process_quest_kill(&self, player_id: &str, entity_type: &str) {
         // Get player's quest state
         let mut quest_states = self.player_quest_states.write().await;
-        let quest_state = quest_states.entry(player_id.to_string())
+        let quest_state = quest_states
+            .entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
 
         // Create kill event
@@ -3401,7 +3960,11 @@ impl GameRoom {
             {
                 tracing::info!(
                     "Player {} progress on objective {} for quest {}: {}/{}",
-                    player_id, objective_id, result.quest_id, current, target
+                    player_id,
+                    objective_id,
+                    result.quest_id,
+                    current,
+                    target
                 );
 
                 // Send objective progress update to player
@@ -3420,7 +3983,9 @@ impl GameRoom {
                 if result.objective_completed {
                     tracing::info!(
                         "Player {} completed objective {} for quest {}",
-                        player_id, objective_id, result.quest_id
+                        player_id,
+                        objective_id,
+                        result.quest_id
                     );
                 }
             }
@@ -3428,7 +3993,8 @@ impl GameRoom {
             if result.quest_ready {
                 tracing::info!(
                     "Player {} quest {} is ready to complete!",
-                    player_id, result.quest_id
+                    player_id,
+                    result.quest_id
                 );
             }
         }
@@ -3437,7 +4003,8 @@ impl GameRoom {
     /// Process quest item collection event
     async fn process_quest_item_collect(&self, player_id: &str, item_id: &str, count: i32) {
         let mut quest_states = self.player_quest_states.write().await;
-        let quest_state = quest_states.entry(player_id.to_string())
+        let quest_state = quest_states
+            .entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
 
         let event = QuestEvent::ItemCollected {
@@ -3454,7 +4021,11 @@ impl GameRoom {
             {
                 tracing::info!(
                     "Player {} collected quest item objective {} for quest {}: {}/{}",
-                    player_id, objective_id, result.quest_id, current, target
+                    player_id,
+                    objective_id,
+                    result.quest_id,
+                    current,
+                    target
                 );
 
                 if let Some(sender) = self.player_senders.read().await.get(player_id) {
@@ -3473,14 +4044,24 @@ impl GameRoom {
     }
 
     /// Process quest tree depletion event
-    async fn process_quest_tree_deplete(&self, player_id: &str, tree_type: &str, tree_x: i32, tree_y: i32) {
+    async fn process_quest_tree_deplete(
+        &self,
+        player_id: &str,
+        tree_type: &str,
+        tree_x: i32,
+        tree_y: i32,
+    ) {
         tracing::info!(
             "Processing tree depletion quest event: player={}, tree_type={}, pos=({}, {})",
-            player_id, tree_type, tree_x, tree_y
+            player_id,
+            tree_type,
+            tree_x,
+            tree_y
         );
 
         let mut quest_states = self.player_quest_states.write().await;
-        let quest_state = quest_states.entry(player_id.to_string())
+        let quest_state = quest_states
+            .entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
 
         let event = QuestEvent::TreeDepleted {
@@ -3491,7 +4072,10 @@ impl GameRoom {
         };
 
         let results = self.quest_registry.process_event(&event, quest_state).await;
-        tracing::info!("Tree depletion quest event returned {} results", results.len());
+        tracing::info!(
+            "Tree depletion quest event returned {} results",
+            results.len()
+        );
 
         for result in results {
             if let (Some(objective_id), Some(current), Some(target)) =
@@ -3499,7 +4083,11 @@ impl GameRoom {
             {
                 tracing::info!(
                     "Player {} depleted tree for quest objective {} in quest {}: {}/{}",
-                    player_id, objective_id, result.quest_id, current, target
+                    player_id,
+                    objective_id,
+                    result.quest_id,
+                    current,
+                    target
                 );
 
                 if let Some(sender) = self.player_senders.read().await.get(player_id) {
@@ -3518,14 +4106,24 @@ impl GameRoom {
     }
 
     /// Process quest rock depletion event
-    async fn process_quest_rock_deplete(&self, player_id: &str, rock_type: &str, rock_x: i32, rock_y: i32) {
+    async fn process_quest_rock_deplete(
+        &self,
+        player_id: &str,
+        rock_type: &str,
+        rock_x: i32,
+        rock_y: i32,
+    ) {
         tracing::info!(
             "Processing rock depletion quest event: player={}, rock_type={}, pos=({}, {})",
-            player_id, rock_type, rock_x, rock_y
+            player_id,
+            rock_type,
+            rock_x,
+            rock_y
         );
 
         let mut quest_states = self.player_quest_states.write().await;
-        let quest_state = quest_states.entry(player_id.to_string())
+        let quest_state = quest_states
+            .entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
 
         let event = QuestEvent::RockDepleted {
@@ -3536,7 +4134,10 @@ impl GameRoom {
         };
 
         let results = self.quest_registry.process_event(&event, quest_state).await;
-        tracing::info!("Rock depletion quest event returned {} results", results.len());
+        tracing::info!(
+            "Rock depletion quest event returned {} results",
+            results.len()
+        );
 
         for result in results {
             if let (Some(objective_id), Some(current), Some(target)) =
@@ -3544,7 +4145,11 @@ impl GameRoom {
             {
                 tracing::info!(
                     "Player {} depleted rock for quest objective {} in quest {}: {}/{}",
-                    player_id, objective_id, result.quest_id, current, target
+                    player_id,
+                    objective_id,
+                    result.quest_id,
+                    current,
+                    target
                 );
 
                 if let Some(sender) = self.player_senders.read().await.get(player_id) {
@@ -3563,9 +4168,16 @@ impl GameRoom {
     }
 
     /// Process quest location reached event
-    async fn process_quest_location_reached(&self, player_id: &str, location_id: &str, x: i32, y: i32) {
+    async fn process_quest_location_reached(
+        &self,
+        player_id: &str,
+        location_id: &str,
+        x: i32,
+        y: i32,
+    ) {
         let mut quest_states = self.player_quest_states.write().await;
-        let quest_state = quest_states.entry(player_id.to_string())
+        let quest_state = quest_states
+            .entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
 
         let event = QuestEvent::LocationReached {
@@ -3583,7 +4195,11 @@ impl GameRoom {
             {
                 tracing::info!(
                     "Player {} reached location {} for quest {}: {}/{}",
-                    player_id, location_id, result.quest_id, current, target
+                    player_id,
+                    location_id,
+                    result.quest_id,
+                    current,
+                    target
                 );
 
                 if let Some(sender) = self.player_senders.read().await.get(player_id) {
@@ -3603,13 +4219,17 @@ impl GameRoom {
                     if let Some(quest) = self.quest_registry.get(&result.quest_id).await {
                         if let Some(obj) = quest.objectives.iter().find(|o| o.id == *objective_id) {
                             if let Some(ref dlg) = obj.dialogue {
-                                self.send_to_player(player_id, ServerMessage::ShowDialogue {
-                                    quest_id: String::new(),
-                                    npc_id: String::new(),
-                                    speaker: String::new(),
-                                    text: dlg.clone(),
-                                    choices: vec![],
-                                }).await;
+                                self.send_to_player(
+                                    player_id,
+                                    ServerMessage::ShowDialogue {
+                                        quest_id: String::new(),
+                                        npc_id: String::new(),
+                                        speaker: String::new(),
+                                        text: dlg.clone(),
+                                        choices: vec![],
+                                    },
+                                )
+                                .await;
                             }
                         }
                     }
@@ -3644,14 +4264,19 @@ impl GameRoom {
         let (gold, skill_levels) = match player_snapshot {
             Some(snapshot) => snapshot,
             None => {
-                tracing::warn!("Quest progression snapshot: player {} not found in players map", player_id);
+                tracing::warn!(
+                    "Quest progression snapshot: player {} not found in players map",
+                    player_id
+                );
                 return;
             }
         };
 
         tracing::info!(
             "Quest progression snapshot for {}: gold={}, skills={:?}",
-            player_id, gold, skill_levels
+            player_id,
+            gold,
+            skill_levels
         );
 
         let results = {
@@ -3663,11 +4288,16 @@ impl GameRoom {
             let active_quest_ids: Vec<String> = quest_state.active_quests.keys().cloned().collect();
             tracing::info!(
                 "Quest progression snapshot for {}: active quests = {:?}",
-                player_id, active_quest_ids
+                player_id,
+                active_quest_ids
             );
             for (qid, progress) in &quest_state.active_quests {
-                let obj_summary: Vec<String> = progress.objectives.iter()
-                    .map(|(oid, op)| format!("{}={}/{} done={}", oid, op.current, op.target, op.completed))
+                let obj_summary: Vec<String> = progress
+                    .objectives
+                    .iter()
+                    .map(|(oid, op)| {
+                        format!("{}={}/{} done={}", oid, op.current, op.target, op.completed)
+                    })
                     .collect();
                 tracing::info!("  Quest {}: objectives = {:?}", qid, obj_summary);
             }
@@ -3683,7 +4313,9 @@ impl GameRoom {
                 if !event_results.is_empty() {
                     tracing::info!(
                         "  Skill {} level {} produced {} updates",
-                        skill, level, event_results.len()
+                        skill,
+                        level,
+                        event_results.len()
                     );
                 }
                 results.extend(event_results);
@@ -3693,7 +4325,10 @@ impl GameRoom {
                 player_id: player_id.to_string(),
                 amount: gold,
             };
-            let gold_results = self.quest_registry.process_event(&gold_event, quest_state).await;
+            let gold_results = self
+                .quest_registry
+                .process_event(&gold_event, quest_state)
+                .await;
             if !gold_results.is_empty() {
                 tracing::info!("  Gold {} produced {} updates", gold, gold_results.len());
             }
@@ -3701,10 +4336,18 @@ impl GameRoom {
 
             // Log final state after processing
             for (qid, progress) in &quest_state.active_quests {
-                let obj_summary: Vec<String> = progress.objectives.iter()
-                    .map(|(oid, op)| format!("{}={}/{} done={}", oid, op.current, op.target, op.completed))
+                let obj_summary: Vec<String> = progress
+                    .objectives
+                    .iter()
+                    .map(|(oid, op)| {
+                        format!("{}={}/{} done={}", oid, op.current, op.target, op.completed)
+                    })
                     .collect();
-                tracing::info!("  After snapshot - Quest {}: objectives = {:?}", qid, obj_summary);
+                tracing::info!(
+                    "  After snapshot - Quest {}: objectives = {:?}",
+                    qid,
+                    obj_summary
+                );
             }
 
             results
@@ -3716,7 +4359,11 @@ impl GameRoom {
             {
                 tracing::info!(
                     "Player {} progression objective {} for quest {}: {}/{}",
-                    player_id, objective_id, result.quest_id, current, target
+                    player_id,
+                    objective_id,
+                    result.quest_id,
+                    current,
+                    target
                 );
 
                 if let Some(sender) = self.player_senders.read().await.get(player_id) {
@@ -3745,7 +4392,11 @@ impl GameRoom {
     }
 
     pub async fn handle_target(&self, player_id: &str, target_id: &str) {
-        tracing::info!("Target request: player {} -> target '{}'", player_id, target_id);
+        tracing::info!(
+            "Target request: player {} -> target '{}'",
+            player_id,
+            target_id
+        );
 
         // Validate target exists (can be player or NPC)
         let valid_target = {
@@ -3831,11 +4482,15 @@ impl GameRoom {
         };
 
         if let Some(secs) = protection_remaining {
-            self.send_system_message(player_id, &format!(
-                "That item is protected for {} more second{}.",
-                secs,
-                if secs == 1 { "" } else { "s" }
-            )).await;
+            self.send_system_message(
+                player_id,
+                &format!(
+                    "That item is protected for {} more second{}.",
+                    secs,
+                    if secs == 1 { "" } else { "s" }
+                ),
+            )
+            .await;
             return;
         }
 
@@ -3844,13 +4499,18 @@ impl GameRoom {
             let has_space = {
                 let players = self.players.read().await;
                 match players.get(player_id) {
-                    Some(player) => player.inventory.has_space_for(&picked_item_id, quantity, &self.item_registry),
+                    Some(player) => player.inventory.has_space_for(
+                        &picked_item_id,
+                        quantity,
+                        &self.item_registry,
+                    ),
                     None => return,
                 }
             };
 
             if !has_space {
-                self.send_system_message(player_id, "Your inventory is full.").await;
+                self.send_system_message(player_id, "Your inventory is full.")
+                    .await;
                 return;
             }
 
@@ -3862,17 +4522,25 @@ impl GameRoom {
 
             if removed {
                 // Get display name from registry for logging
-                let display_name = self.item_registry
+                let display_name = self
+                    .item_registry
                     .get(&picked_item_id)
                     .map(|def| def.display_name.as_str())
                     .unwrap_or(&picked_item_id);
-                tracing::debug!("Player {} picked up {} x{}", player_id, display_name, quantity);
+                tracing::debug!(
+                    "Player {} picked up {} x{}",
+                    player_id,
+                    display_name,
+                    quantity
+                );
 
                 // Add to player's inventory
                 let (inventory_update, gold) = {
                     let mut players = self.players.write().await;
                     if let Some(player) = players.get_mut(player_id) {
-                        player.inventory.add_item(&picked_item_id, quantity, &self.item_registry);
+                        player
+                            .inventory
+                            .add_item(&picked_item_id, quantity, &self.item_registry);
                         (player.inventory.to_update(), player.inventory.gold)
                     } else {
                         return;
@@ -3880,7 +4548,8 @@ impl GameRoom {
                 };
 
                 // Process quest item collection
-                self.process_quest_item_collect(player_id, &picked_item_id, quantity).await;
+                self.process_quest_item_collect(player_id, &picked_item_id, quantity)
+                    .await;
 
                 // Broadcast pickup to players in same zone
                 let pickup_msg = ServerMessage::ItemPickedUp {
@@ -3930,7 +4599,11 @@ impl GameRoom {
                     (entity_type, distance, npc.is_alive())
                 })
             } else {
-                tracing::warn!("Player {} in instance {} but instance not found", player_id, inst_id);
+                tracing::warn!(
+                    "Player {} in instance {} but instance not found",
+                    player_id,
+                    inst_id
+                );
                 None
             }
         } else {
@@ -3948,7 +4621,11 @@ impl GameRoom {
         let (entity_type, distance, is_alive): (String, f32, bool) = match npc_info {
             Some(info) => info,
             None => {
-                tracing::warn!("Player {} tried to interact with unknown NPC {}", player_id, npc_id);
+                tracing::warn!(
+                    "Player {} tried to interact with unknown NPC {}",
+                    player_id,
+                    npc_id
+                );
                 return;
             }
         };
@@ -3957,7 +4634,10 @@ impl GameRoom {
         if distance > 2.5 || !is_alive {
             tracing::debug!(
                 "Player {} can't interact with NPC {} (distance: {}, alive: {})",
-                player_id, npc_id, distance, is_alive
+                player_id,
+                npc_id,
+                distance,
+                is_alive
             );
             return;
         }
@@ -3975,24 +4655,33 @@ impl GameRoom {
                             for (i, (name, kills, wins, gold)) in entries.iter().enumerate() {
                                 text.push_str(&format!(
                                     "#{} | {} | {} | {} | {}\n",
-                                    i + 1, name, wins, kills, gold
+                                    i + 1,
+                                    name,
+                                    wins,
+                                    kills,
+                                    gold
                                 ));
                             }
                         }
-                        self.send_to_player(player_id, ServerMessage::ShowDialogue {
-                            quest_id: String::new(),
-                            npc_id: npc_id.to_string(),
-                            speaker: "Arena Leaderboard".to_string(),
-                            text,
-                            choices: vec![crate::protocol::DialogueChoice {
-                                id: "close".to_string(),
-                                text: "Close".to_string(),
-                            }],
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::ShowDialogue {
+                                quest_id: String::new(),
+                                npc_id: npc_id.to_string(),
+                                speaker: "Arena Leaderboard".to_string(),
+                                text,
+                                choices: vec![crate::protocol::DialogueChoice {
+                                    id: "close".to_string(),
+                                    text: "Close".to_string(),
+                                }],
+                            },
+                        )
+                        .await;
                     }
                     Err(e) => {
                         tracing::error!("Failed to fetch arena leaderboard: {}", e);
-                        self.send_system_message(player_id, "Failed to load leaderboard.").await;
+                        self.send_system_message(player_id, "Failed to load leaderboard.")
+                            .await;
                     }
                 }
             }
@@ -4000,7 +4689,9 @@ impl GameRoom {
         }
 
         // Altar interaction - show pray option and prayer point restoration
-        let is_altar = self.entity_registry.get(&entity_type)
+        let is_altar = self
+            .entity_registry
+            .get(&entity_type)
             .map(|p| p.behaviors.altar)
             .unwrap_or(false);
 
@@ -4014,7 +4705,9 @@ impl GameRoom {
                 }
             };
 
-            let altar_name = self.entity_registry.get(&entity_type)
+            let altar_name = self
+                .entity_registry
+                .get(&entity_type)
                 .map(|p| p.display_name.clone())
                 .unwrap_or_else(|| "Altar".to_string());
 
@@ -4031,27 +4724,33 @@ impl GameRoom {
             };
 
             // Use a special quest_id format "altar:{npc_id}" to identify altar dialogues
-            self.send_to_player(player_id, ServerMessage::ShowDialogue {
-                quest_id: format!("altar:{}", npc_id),
-                npc_id: npc_id.to_string(),
-                speaker: altar_name,
-                text,
-                choices: vec![
-                    crate::protocol::DialogueChoice {
-                        id: "pray".to_string(),
-                        text: "Pray".to_string(),
-                    },
-                    crate::protocol::DialogueChoice {
-                        id: "close".to_string(),
-                        text: "Close".to_string(),
-                    },
-                ],
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::ShowDialogue {
+                    quest_id: format!("altar:{}", npc_id),
+                    npc_id: npc_id.to_string(),
+                    speaker: altar_name,
+                    text,
+                    choices: vec![
+                        crate::protocol::DialogueChoice {
+                            id: "pray".to_string(),
+                            text: "Pray".to_string(),
+                        },
+                        crate::protocol::DialogueChoice {
+                            id: "close".to_string(),
+                            text: "Close".to_string(),
+                        },
+                    ],
+                },
+            )
+            .await;
             return;
         }
 
         // Plot seller interaction - show plot purchase dialogue
-        let is_plot_seller = self.entity_registry.get(&entity_type)
+        let is_plot_seller = self
+            .entity_registry
+            .get(&entity_type)
             .map(|p| p.behaviors.plot_seller)
             .unwrap_or(false);
 
@@ -4061,7 +4760,9 @@ impl GameRoom {
         }
 
         // Banker interaction - open bank vault
-        let is_banker = self.entity_registry.get(&entity_type)
+        let is_banker = self
+            .entity_registry
+            .get(&entity_type)
             .map(|p| p.behaviors.banker)
             .unwrap_or(false);
 
@@ -4074,7 +4775,8 @@ impl GameRoom {
         let prototype = self.entity_registry.get(&entity_type);
 
         // Check if this NPC is a merchant/craftsman
-        let is_merchant = prototype.as_ref()
+        let is_merchant = prototype
+            .as_ref()
             .map(|p| p.behaviors.merchant || p.behaviors.craftsman)
             .unwrap_or(false);
 
@@ -4082,7 +4784,8 @@ impl GameRoom {
         let quests = self.quest_registry.get_quests_for_npc(&entity_type).await;
 
         // If merchant/craftsman and no quests (or quest_giver behavior is not set), open shop
-        let is_quest_giver = prototype.as_ref()
+        let is_quest_giver = prototype
+            .as_ref()
             .map(|p| p.behaviors.quest_giver)
             .unwrap_or(false);
 
@@ -4104,7 +4807,8 @@ impl GameRoom {
                 if let Some(merchant_config) = &proto.merchant {
                     if let Some(ref required_quest) = merchant_config.required_quest {
                         let quest_states = self.player_quest_states.read().await;
-                        quest_states.get(player_id)
+                        quest_states
+                            .get(player_id)
                             .map(|qs| qs.is_quest_completed(required_quest))
                             .unwrap_or(false)
                     } else {
@@ -4120,8 +4824,16 @@ impl GameRoom {
             false
         };
 
-        if is_merchant && merchant_quest_met && (quests.is_empty() || !is_quest_giver || all_quests_completed) {
-            tracing::info!("Player {} opening shop with NPC {} ({})", player_id, npc_id, entity_type);
+        if is_merchant
+            && merchant_quest_met
+            && (quests.is_empty() || !is_quest_giver || all_quests_completed)
+        {
+            tracing::info!(
+                "Player {} opening shop with NPC {} ({})",
+                player_id,
+                npc_id,
+                entity_type
+            );
 
             // Get merchant config to load shop data
             if let Some(proto) = prototype {
@@ -4130,19 +4842,25 @@ impl GameRoom {
                     let shop_registry = self.shop_registry.read().await;
                     if let Some(shop_def) = shop_registry.get(&merchant_config.shop_id) {
                         // Build shop data with current prices
-                        let stock = shop_def.stock.iter().map(|item| {
-                            let base_price = self.item_registry
-                                .get(&item.item_id)
-                                .map(|def| def.base_price)
-                                .unwrap_or(10);
-                            let price = (base_price as f32 * merchant_config.sell_multiplier).max(1.0) as i32;
+                        let stock = shop_def
+                            .stock
+                            .iter()
+                            .map(|item| {
+                                let base_price = self
+                                    .item_registry
+                                    .get(&item.item_id)
+                                    .map(|def| def.base_price)
+                                    .unwrap_or(10);
+                                let price = (base_price as f32 * merchant_config.sell_multiplier)
+                                    .max(1.0) as i32;
 
-                            crate::protocol::ShopStockItemData {
-                                item_id: item.item_id.clone(),
-                                quantity: item.current_quantity,
-                                price,
-                            }
-                        }).collect();
+                                crate::protocol::ShopStockItemData {
+                                    item_id: item.item_id.clone(),
+                                    quantity: item.current_quantity,
+                                    price,
+                                }
+                            })
+                            .collect();
 
                         let shop_data = crate::protocol::ShopData {
                             shop_id: shop_def.id.clone(),
@@ -4162,7 +4880,11 @@ impl GameRoom {
                         self.send_to_player(player_id, msg).await;
                         return;
                     } else {
-                        tracing::warn!("Shop '{}' not found for merchant NPC {}", merchant_config.shop_id, npc_id);
+                        tracing::warn!(
+                            "Shop '{}' not found for merchant NPC {}",
+                            merchant_config.shop_id,
+                            npc_id
+                        );
                     }
                 }
             }
@@ -4186,7 +4908,8 @@ impl GameRoom {
 
         // Get or create player quest state
         let mut quest_states = self.player_quest_states.write().await;
-        let quest_state = quest_states.entry(player_id.to_string())
+        let quest_state = quest_states
+            .entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
 
         // Fire NpcInteraction event unconditionally so talk_to objectives
@@ -4204,7 +4927,11 @@ impl GameRoom {
                 {
                     tracing::info!(
                         "Player {} talked to NPC for quest objective {} in quest {}: {}/{}",
-                        player_id, objective_id, result.quest_id, current, target
+                        player_id,
+                        objective_id,
+                        result.quest_id,
+                        current,
+                        target
                     );
 
                     // Send objective progress update to player
@@ -4223,7 +4950,9 @@ impl GameRoom {
                     // Check if this objective has dialogue to show
                     if result.objective_completed {
                         if let Some(quest) = self.quest_registry.get(&result.quest_id).await {
-                            if let Some(obj) = quest.objectives.iter().find(|o| o.id == *objective_id) {
+                            if let Some(obj) =
+                                quest.objectives.iter().find(|o| o.id == *objective_id)
+                            {
                                 if let Some(ref dlg) = obj.dialogue {
                                     talk_objective_dialogue = Some(dlg.clone());
                                 }
@@ -4235,7 +4964,8 @@ impl GameRoom {
                 if result.quest_ready {
                     tracing::info!(
                         "Player {} quest {} is now ready to complete after talking to NPC",
-                        player_id, result.quest_id
+                        player_id,
+                        result.quest_id
                     );
                 }
             }
@@ -4296,22 +5026,28 @@ impl GameRoom {
         if let Some((quest_id, state)) = target_quest {
             tracing::info!(
                 "Player {} interacting with quest {} (state: {})",
-                player_id, quest_id, state
+                player_id,
+                quest_id,
+                state
             );
 
             // Run the quest script interaction
-            let result = self.quest_runner.run_on_interact(
-                player_id,
-                &quest_id,
-                quest_state,
-                None, // No choice yet
-            ).await;
+            let result = self
+                .quest_runner
+                .run_on_interact(
+                    player_id,
+                    &quest_id,
+                    quest_state,
+                    None, // No choice yet
+                )
+                .await;
 
             match result {
                 Ok(script_result) => {
                     // Send dialogue to player
                     if let Some(dialogue) = script_result.dialogue {
-                        let choices: Vec<crate::protocol::DialogueChoice> = dialogue.choices
+                        let choices: Vec<crate::protocol::DialogueChoice> = dialogue
+                            .choices
                             .into_iter()
                             .map(|c| crate::protocol::DialogueChoice {
                                 id: c.id,
@@ -4338,7 +5074,8 @@ impl GameRoom {
                     // Handle quest acceptance
                     if script_result.quest_accepted {
                         if let Some(quest) = self.quest_registry.get(&quest_id).await {
-                            let objective_targets: Vec<(String, i32)> = quest.objectives
+                            let objective_targets: Vec<(String, i32)> = quest
+                                .objectives
                                 .iter()
                                 .map(|o| (o.id.clone(), o.count))
                                 .collect();
@@ -4346,7 +5083,8 @@ impl GameRoom {
                             tracing::info!("Player {} accepted quest {}", player_id, quest_id);
 
                             // Send QuestAccepted to client
-                            let objectives: Vec<QuestObjectiveData> = quest.objectives
+                            let objectives: Vec<QuestObjectiveData> = quest
+                                .objectives
                                 .iter()
                                 .map(|o| QuestObjectiveData {
                                     id: o.id.clone(),
@@ -4383,23 +5121,33 @@ impl GameRoom {
                                 // Remove items required by CollectItem objectives
                                 for objective in &quest.objectives {
                                     if objective.objective_type == ObjectiveType::CollectItem {
-                                        player.inventory.remove_item(&objective.target, objective.count);
+                                        player
+                                            .inventory
+                                            .remove_item(&objective.target, objective.count);
                                     }
                                 }
 
                                 // Grant rewards
                                 player.inventory.gold += quest.rewards.gold;
                                 for item_reward in &quest.rewards.items {
-                                    player.inventory.add_item(&item_reward.item_id, item_reward.count, &self.item_registry);
+                                    player.inventory.add_item(
+                                        &item_reward.item_id,
+                                        item_reward.count,
+                                        &self.item_registry,
+                                    );
                                 }
                                 let slots = player.inventory.to_update();
                                 let gold = player.inventory.gold;
                                 drop(players);
-                                self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                                    player_id: player_id.to_string(),
-                                    slots,
-                                    gold,
-                                }).await;
+                                self.send_to_player(
+                                    player_id,
+                                    ServerMessage::InventoryUpdate {
+                                        player_id: player_id.to_string(),
+                                        slots,
+                                        gold,
+                                    },
+                                )
+                                .await;
                             }
                         }
                         tracing::info!("Player {} completed quest {}", player_id, quest_id);
@@ -4410,16 +5158,22 @@ impl GameRoom {
                         let mut players = self.players.write().await;
                         if let Some(player) = players.get_mut(player_id) {
                             for (item_id, count) in &script_result.granted_items {
-                                player.inventory.add_item(item_id, *count, &self.item_registry);
+                                player
+                                    .inventory
+                                    .add_item(item_id, *count, &self.item_registry);
                             }
                             let slots = player.inventory.to_update();
                             let gold = player.inventory.gold;
                             drop(players);
-                            self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                                player_id: player_id.to_string(),
-                                slots,
-                                gold,
-                            }).await;
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::InventoryUpdate {
+                                    player_id: player_id.to_string(),
+                                    slots,
+                                    gold,
+                                },
+                            )
+                            .await;
                         }
                     }
 
@@ -4435,16 +5189,22 @@ impl GameRoom {
             }
         } else if let Some(dialogue_text) = talk_objective_dialogue {
             // No quest from this NPC, but a talk_to objective completed with dialogue
-            let speaker = self.entity_registry.get(&entity_type)
+            let speaker = self
+                .entity_registry
+                .get(&entity_type)
                 .map(|p| p.display_name.clone())
                 .unwrap_or_else(|| entity_type.clone());
-            self.send_to_player(player_id, ServerMessage::ShowDialogue {
-                quest_id: String::new(),
-                npc_id: npc_id.to_string(),
-                speaker,
-                text: dialogue_text,
-                choices: vec![],
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::ShowDialogue {
+                    quest_id: String::new(),
+                    npc_id: npc_id.to_string(),
+                    speaker,
+                    text: dialogue_text,
+                    choices: vec![],
+                },
+            )
+            .await;
         }
     }
 
@@ -4452,13 +5212,15 @@ impl GameRoom {
     pub async fn handle_dialogue_choice(&self, player_id: &str, quest_id: &str, choice_id: &str) {
         // Non-quest dialogues (e.g. leaderboard) just close
         if quest_id.is_empty() {
-            self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+            self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                .await;
             return;
         }
 
         // Handle altar dialogue choices (format: "altar:{altar_id}")
         if let Some(altar_id) = quest_id.strip_prefix("altar:") {
-            self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+            self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                .await;
             if choice_id == "pray" {
                 self.handle_pray_at_altar(player_id, altar_id).await;
             }
@@ -4475,16 +5237,20 @@ impl GameRoom {
                 // Show the farming contracts screen
                 self.show_contract_dialogue(player_id, npc_id).await;
             } else if let Some(diff_str) = choice_id.strip_prefix("accept_") {
-                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
                 self.handle_accept_contract(player_id, diff_str).await;
             } else if choice_id == "claim_contract" {
-                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
                 self.handle_claim_contract(player_id).await;
             } else if choice_id == "abandon_contract" {
-                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
                 self.handle_abandon_contract(player_id).await;
             } else if let Some(plot_str) = choice_id.strip_prefix("unlock_") {
-                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
                 if let Ok(plot_id) = plot_str.parse::<u32>() {
                     self.handle_plot_purchase(player_id, plot_id).await;
                 }
@@ -4493,22 +5259,22 @@ impl GameRoom {
                 self.show_master_farmer_dialogue(player_id, npc_id).await;
             } else {
                 // "close", "owned_N", "locked_N" just close
-                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
             }
             return;
         }
 
         let mut quest_states = self.player_quest_states.write().await;
-        let quest_state = quest_states.entry(player_id.to_string())
+        let quest_state = quest_states
+            .entry(player_id.to_string())
             .or_insert_with(PlayerQuestState::new);
 
         // Run the quest script with the player's choice
-        let result = self.quest_runner.run_on_interact(
-            player_id,
-            quest_id,
-            quest_state,
-            Some(choice_id),
-        ).await;
+        let result = self
+            .quest_runner
+            .run_on_interact(player_id, quest_id, quest_state, Some(choice_id))
+            .await;
 
         // Get the NPC id from the quest giver
         let npc_id = if let Some(quest) = self.quest_registry.get(quest_id).await {
@@ -4521,7 +5287,8 @@ impl GameRoom {
             Ok(script_result) => {
                 // Send next dialogue if any, otherwise close the dialogue
                 if let Some(dialogue) = script_result.dialogue {
-                    let choices: Vec<crate::protocol::DialogueChoice> = dialogue.choices
+                    let choices: Vec<crate::protocol::DialogueChoice> = dialogue
+                        .choices
                         .into_iter()
                         .map(|c| crate::protocol::DialogueChoice {
                             id: c.id,
@@ -4555,7 +5322,8 @@ impl GameRoom {
                 // Handle quest acceptance
                 if script_result.quest_accepted {
                     if let Some(quest) = self.quest_registry.get(quest_id).await {
-                        let objective_targets: Vec<(String, i32)> = quest.objectives
+                        let objective_targets: Vec<(String, i32)> = quest
+                            .objectives
                             .iter()
                             .map(|o| (o.id.clone(), o.count))
                             .collect();
@@ -4563,7 +5331,8 @@ impl GameRoom {
                         tracing::info!("Player {} accepted quest {}", player_id, quest_id);
 
                         // Send QuestAccepted to client
-                        let objectives: Vec<QuestObjectiveData> = quest.objectives
+                        let objectives: Vec<QuestObjectiveData> = quest
+                            .objectives
                             .iter()
                             .map(|o| QuestObjectiveData {
                                 id: o.id.clone(),
@@ -4600,23 +5369,33 @@ impl GameRoom {
                             // Remove items required by CollectItem objectives
                             for objective in &quest.objectives {
                                 if objective.objective_type == ObjectiveType::CollectItem {
-                                    player.inventory.remove_item(&objective.target, objective.count);
+                                    player
+                                        .inventory
+                                        .remove_item(&objective.target, objective.count);
                                 }
                             }
 
                             // Grant rewards
                             player.inventory.gold += quest.rewards.gold;
                             for item_reward in &quest.rewards.items {
-                                player.inventory.add_item(&item_reward.item_id, item_reward.count, &self.item_registry);
+                                player.inventory.add_item(
+                                    &item_reward.item_id,
+                                    item_reward.count,
+                                    &self.item_registry,
+                                );
                             }
                             let slots = player.inventory.to_update();
                             let gold = player.inventory.gold;
                             drop(players);
-                            self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                                player_id: player_id.to_string(),
-                                slots,
-                                gold,
-                            }).await;
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::InventoryUpdate {
+                                    player_id: player_id.to_string(),
+                                    slots,
+                                    gold,
+                                },
+                            )
+                            .await;
                         }
                     }
                     tracing::info!("Player {} completed quest {}", player_id, quest_id);
@@ -4627,16 +5406,22 @@ impl GameRoom {
                     let mut players = self.players.write().await;
                     if let Some(player) = players.get_mut(player_id) {
                         for (item_id, count) in &script_result.granted_items {
-                            player.inventory.add_item(item_id, *count, &self.item_registry);
+                            player
+                                .inventory
+                                .add_item(item_id, *count, &self.item_registry);
                         }
                         let slots = player.inventory.to_update();
                         let gold = player.inventory.gold;
                         drop(players);
-                        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                            player_id: player_id.to_string(),
-                            slots,
-                            gold,
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::InventoryUpdate {
+                                player_id: player_id.to_string(),
+                                slots,
+                                gold,
+                            },
+                        )
+                        .await;
                     }
                 }
             }
@@ -4651,7 +5436,8 @@ impl GameRoom {
         {
             let arena = self.arena_manager.read().await;
             if arena.is_fighting() && arena.is_in_ring(player_id) {
-                self.send_system_message(player_id, "You can't use items during an arena fight!").await;
+                self.send_system_message(player_id, "You can't use items during an arena fight!")
+                    .await;
                 return;
             }
         }
@@ -4663,7 +5449,12 @@ impl GameRoom {
                 if player.is_dead {
                     return;
                 }
-                if let Some(slot) = player.inventory.slots.get(slot_index as usize).and_then(|s| s.as_ref()) {
+                if let Some(slot) = player
+                    .inventory
+                    .slots
+                    .get(slot_index as usize)
+                    .and_then(|s| s.as_ref())
+                {
                     if slot.item_id.starts_with("recipe_") {
                         drop(players);
                         self.handle_use_recipe_scroll(player_id, slot_index).await;
@@ -4682,7 +5473,10 @@ impl GameRoom {
                     return;
                 }
 
-                if let Some(item_id) = player.inventory.use_item(slot_index as usize, &self.item_registry) {
+                if let Some(item_id) = player
+                    .inventory
+                    .use_item(slot_index as usize, &self.item_registry)
+                {
                     // Get effect from registry
                     let effect = if let Some(def) = self.item_registry.get(&item_id) {
                         use crate::data::UseEffect;
@@ -4703,11 +5497,16 @@ impl GameRoom {
                                 let prayer_level = player.skills.prayer.level;
                                 let restore_amount = amount + (prayer_level / 4);
                                 let old_points = player.prayer_points;
-                                player.prayer_points = (player.prayer_points + restore_amount).min(player.max_prayer_points());
+                                player.prayer_points = (player.prayer_points + restore_amount)
+                                    .min(player.max_prayer_points());
                                 let actual_restored = player.prayer_points - old_points;
                                 format!("prayer:{}", actual_restored)
                             }
-                            Some(UseEffect::Buff { stat, amount, duration_ms }) => {
+                            Some(UseEffect::Buff {
+                                stat,
+                                amount,
+                                duration_ms,
+                            }) => {
                                 let now = std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
                                     .unwrap()
@@ -4736,7 +5535,8 @@ impl GameRoom {
         };
 
         if let Some(item_id) = used_item_id {
-            let display_name = self.item_registry
+            let display_name = self
+                .item_registry
                 .get(&item_id)
                 .map(|def| def.display_name.as_str())
                 .unwrap_or(&item_id);
@@ -4771,7 +5571,12 @@ impl GameRoom {
             };
 
             // Get item from slot
-            let item_id = match player.inventory.slots.get(slot_index as usize).and_then(|s| s.as_ref()) {
+            let item_id = match player
+                .inventory
+                .slots
+                .get(slot_index as usize)
+                .and_then(|s| s.as_ref())
+            {
                 Some(slot) => slot.item_id.clone(),
                 None => return,
             };
@@ -4785,14 +5590,16 @@ impl GameRoom {
             // Verify the recipe exists in the crafting registry
             if self.crafting_registry.get(&recipe_id).is_none() {
                 drop(players);
-                self.send_system_message(player_id, "This recipe scroll is for an unknown recipe.").await;
+                self.send_system_message(player_id, "This recipe scroll is for an unknown recipe.")
+                    .await;
                 return;
             }
 
             // Check if already discovered
             if player.discovered_recipes.contains(&recipe_id) {
                 drop(players);
-                self.send_system_message(player_id, "You already know this recipe.").await;
+                self.send_system_message(player_id, "You already know this recipe.")
+                    .await;
                 return;
             }
 
@@ -4812,11 +5619,17 @@ impl GameRoom {
             (item_id, recipe_id, update, gold)
         };
 
-        let display_name = self.item_registry
+        let display_name = self
+            .item_registry
             .get(&item_id)
             .map(|def| def.display_name.clone())
             .unwrap_or_else(|| item_id.clone());
-        tracing::info!("Player {} used recipe scroll {} -> discovered recipe {}", player_id, display_name, recipe_id);
+        tracing::info!(
+            "Player {} used recipe scroll {} -> discovered recipe {}",
+            player_id,
+            display_name,
+            recipe_id
+        );
 
         // Save to database
         if let Some(ref db) = self.db {
@@ -4833,7 +5646,8 @@ impl GameRoom {
             ServerMessage::RecipeDiscovered {
                 recipe_id: recipe_id.clone(),
             },
-        ).await;
+        )
+        .await;
 
         // Send inventory update
         self.send_to_player(
@@ -4843,7 +5657,8 @@ impl GameRoom {
                 slots: inventory_update,
                 gold,
             },
-        ).await;
+        )
+        .await;
     }
 
     /// Handle a crafting request from a player
@@ -4895,7 +5710,10 @@ impl GameRoom {
                 ServerMessage::CraftResult {
                     success: false,
                     recipe_id: recipe_id.to_string(),
-                    error: Some(format!("Requires {} level {}", skill_name, recipe.level_required)),
+                    error: Some(format!(
+                        "Requires {} level {}",
+                        skill_name, recipe.level_required
+                    )),
                     items_gained: vec![],
                 },
             )
@@ -4905,7 +5723,10 @@ impl GameRoom {
 
         // Check all ingredients (using string IDs now)
         for ingredient in &recipe.ingredients {
-            if !player.inventory.has_item(&ingredient.item_id, ingredient.count) {
+            if !player
+                .inventory
+                .has_item(&ingredient.item_id, ingredient.count)
+            {
                 drop(players);
                 self.send_to_player(
                     player_id,
@@ -4923,7 +5744,10 @@ impl GameRoom {
 
         // Check inventory space for results
         for result in &recipe.results {
-            if !player.inventory.has_space_for(&result.item_id, result.count, &self.item_registry) {
+            if !player
+                .inventory
+                .has_space_for(&result.item_id, result.count, &self.item_registry)
+            {
                 drop(players);
                 self.send_to_player(
                     player_id,
@@ -4941,14 +5765,19 @@ impl GameRoom {
 
         // All checks passed - consume ingredients
         for ingredient in &recipe.ingredients {
-            player.inventory.remove_item(&ingredient.item_id, ingredient.count);
+            player
+                .inventory
+                .remove_item(&ingredient.item_id, ingredient.count);
         }
 
         // Add results
         let mut items_gained = Vec::new();
         for result in &recipe.results {
-            player.inventory.add_item(&result.item_id, result.count, &self.item_registry);
-            let display_name = self.item_registry
+            player
+                .inventory
+                .add_item(&result.item_id, result.count, &self.item_registry);
+            let display_name = self
+                .item_registry
                 .get(&result.item_id)
                 .map(|def| def.display_name.clone())
                 .unwrap_or_else(|| result.item_id.clone());
@@ -5021,21 +5850,31 @@ impl GameRoom {
         // Send XP updates
         let mut any_leveled = false;
         for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
-            self.send_to_player(player_id, ServerMessage::SkillXp {
-                player_id: player_id.to_string(),
-                skill: skill_type.as_str().to_string(),
-                xp_gained: xp_amount,
-                total_xp,
-                level,
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::SkillXp {
+                    player_id: player_id.to_string(),
+                    skill: skill_type.as_str().to_string(),
+                    xp_gained: xp_amount,
+                    total_xp,
+                    level,
+                },
+            )
+            .await;
 
             if leveled_up {
-                tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
+                tracing::info!(
+                    "Player {} leveled up {} to {}",
+                    player_id,
+                    skill_type.as_str(),
+                    level
+                );
                 self.broadcast(ServerMessage::SkillLevelUp {
                     player_id: player_id.to_string(),
                     skill: skill_type.as_str().to_string(),
                     new_level: level,
-                }).await;
+                })
+                .await;
                 any_leveled = true;
             }
         }
@@ -5126,7 +5965,11 @@ impl GameRoom {
             if have < ingredient.count {
                 tracing::warn!(
                     "Player {} craft {} failed: need {}x '{}' but have {}",
-                    player_id, recipe_id, ingredient.count, ingredient.item_id, have
+                    player_id,
+                    recipe_id,
+                    ingredient.count,
+                    ingredient.item_id,
+                    have
                 );
                 drop(players);
                 self.send_to_player(
@@ -5145,7 +5988,10 @@ impl GameRoom {
 
         // Check inventory space for results
         for result in &recipe.results {
-            if !player.inventory.has_space_for(&result.item_id, result.count, &self.item_registry) {
+            if !player
+                .inventory
+                .has_space_for(&result.item_id, result.count, &self.item_registry)
+            {
                 drop(players);
                 self.send_to_player(
                     player_id,
@@ -5161,7 +6007,9 @@ impl GameRoom {
         // All checks passed - consume ingredients
         let mut consumed_materials = Vec::new();
         for ingredient in &recipe.ingredients {
-            player.inventory.remove_item(&ingredient.item_id, ingredient.count);
+            player
+                .inventory
+                .remove_item(&ingredient.item_id, ingredient.count);
             consumed_materials.push((ingredient.item_id.clone(), ingredient.count));
         }
 
@@ -5169,7 +6017,9 @@ impl GameRoom {
             // Instant craft - add results immediately
             let mut items_gained = Vec::new();
             for result in &recipe.results {
-                player.inventory.add_item(&result.item_id, result.count, &self.item_registry);
+                player
+                    .inventory
+                    .add_item(&result.item_id, result.count, &self.item_registry);
                 items_gained.push((result.item_id.clone(), result.count as u32));
             }
 
@@ -5203,7 +6053,9 @@ impl GameRoom {
 
             tracing::info!(
                 "Player {} instant-crafted {} (gained {:?})",
-                player_id, recipe_id, items_gained
+                player_id,
+                recipe_id,
+                items_gained
             );
 
             // Send crafting completed
@@ -5231,21 +6083,31 @@ impl GameRoom {
             // Send XP updates
             let mut any_leveled = false;
             for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
-                self.send_to_player(player_id, ServerMessage::SkillXp {
-                    player_id: player_id.to_string(),
-                    skill: skill_type.as_str().to_string(),
-                    xp_gained: xp_amount,
-                    total_xp,
-                    level,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SkillXp {
+                        player_id: player_id.to_string(),
+                        skill: skill_type.as_str().to_string(),
+                        xp_gained: xp_amount,
+                        total_xp,
+                        level,
+                    },
+                )
+                .await;
 
                 if leveled_up {
-                    tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
+                    tracing::info!(
+                        "Player {} leveled up {} to {}",
+                        player_id,
+                        skill_type.as_str(),
+                        level
+                    );
                     self.broadcast(ServerMessage::SkillLevelUp {
                         player_id: player_id.to_string(),
                         skill: skill_type.as_str().to_string(),
                         new_level: level,
-                    }).await;
+                    })
+                    .await;
                     any_leveled = true;
                 }
             }
@@ -5269,7 +6131,9 @@ impl GameRoom {
 
             tracing::info!(
                 "Player {} started timed craft {} ({}ms)",
-                player_id, recipe_id, recipe.craft_time_ms
+                player_id,
+                recipe_id,
+                recipe.craft_time_ms
             );
 
             // Send inventory update (materials consumed)
@@ -5308,7 +6172,9 @@ impl GameRoom {
                 if let Some(crafting) = player.crafting_state.take() {
                     // Refund consumed materials
                     for (item_id, count) in &crafting.consumed_materials {
-                        player.inventory.add_item(item_id, *count, &self.item_registry);
+                        player
+                            .inventory
+                            .add_item(item_id, *count, &self.item_registry);
                     }
                     Some((player.inventory.to_update(), player.inventory.gold))
                 } else {
@@ -5430,7 +6296,10 @@ impl GameRoom {
 
         // Check ingredients for first craft
         for ingredient in &recipe.ingredients {
-            if !player.inventory.has_item(&ingredient.item_id, ingredient.count) {
+            if !player
+                .inventory
+                .has_item(&ingredient.item_id, ingredient.count)
+            {
                 drop(players);
                 self.send_to_player(
                     player_id,
@@ -5445,7 +6314,10 @@ impl GameRoom {
 
         // Check inventory space for results
         for result in &recipe.results {
-            if !player.inventory.has_space_for(&result.item_id, result.count, &self.item_registry) {
+            if !player
+                .inventory
+                .has_space_for(&result.item_id, result.count, &self.item_registry)
+            {
                 drop(players);
                 self.send_to_player(
                     player_id,
@@ -5461,7 +6333,9 @@ impl GameRoom {
         // Consume materials for first craft only
         let mut consumed_materials = Vec::new();
         for ingredient in &recipe.ingredients {
-            player.inventory.remove_item(&ingredient.item_id, ingredient.count);
+            player
+                .inventory
+                .remove_item(&ingredient.item_id, ingredient.count);
             consumed_materials.push((ingredient.item_id.clone(), ingredient.count));
         }
 
@@ -5481,7 +6355,10 @@ impl GameRoom {
 
         tracing::info!(
             "Player {} started batch craft {} x{} ({}ms each)",
-            player_id, recipe_id, actual_quantity, recipe.craft_time_ms
+            player_id,
+            recipe_id,
+            actual_quantity,
+            recipe.craft_time_ms
         );
 
         // Send inventory update (materials consumed)
@@ -5562,7 +6439,10 @@ impl GameRoom {
         }
 
         // Check bank has space
-        if !player.bank.has_space_for(item_id, quantity, &self.item_registry) {
+        if !player
+            .bank
+            .has_space_for(item_id, quantity, &self.item_registry)
+        {
             let msg = ServerMessage::BankResult {
                 success: false,
                 action: "deposit".to_string(),
@@ -5616,7 +6496,10 @@ impl GameRoom {
         }
 
         // Check inventory has space
-        if !player.inventory.has_space_for(item_id, quantity, &self.item_registry) {
+        if !player
+            .inventory
+            .has_space_for(item_id, quantity, &self.item_registry)
+        {
             let msg = ServerMessage::BankResult {
                 success: false,
                 action: "withdraw".to_string(),
@@ -5629,7 +6512,9 @@ impl GameRoom {
 
         // Transfer
         player.bank.remove_item(item_id, quantity);
-        player.inventory.add_item(item_id, quantity, &self.item_registry);
+        player
+            .inventory
+            .add_item(item_id, quantity, &self.item_registry);
 
         let inv_msg = ServerMessage::InventoryUpdate {
             player_id: player_id.to_string(),
@@ -5726,10 +6611,25 @@ impl GameRoom {
     }
 
     /// Handle shop buy transaction
-    pub async fn handle_shop_buy(&self, player_id: &str, npc_id: &str, item_id: &str, quantity: i32) {
+    pub async fn handle_shop_buy(
+        &self,
+        player_id: &str,
+        npc_id: &str,
+        item_id: &str,
+        quantity: i32,
+    ) {
         // Validate quantity
         if quantity <= 0 {
-            self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Invalid quantity")).await;
+            self.send_shop_result(
+                player_id,
+                false,
+                "buy",
+                item_id,
+                0,
+                0,
+                Some("Invalid quantity"),
+            )
+            .await;
             return;
         }
 
@@ -5759,7 +6659,11 @@ impl GameRoom {
                     (npc.prototype_id.clone(), distance, npc.is_alive())
                 })
             } else {
-                tracing::warn!("Player {} in instance {} but instance not found", player_id, inst_id);
+                tracing::warn!(
+                    "Player {} in instance {} but instance not found",
+                    player_id,
+                    inst_id
+                );
                 None
             }
         } else {
@@ -5775,14 +6679,32 @@ impl GameRoom {
         let (prototype_id, distance, is_alive) = match npc_info {
             Some(info) => info,
             None => {
-                self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("NPC not found")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "buy",
+                    item_id,
+                    0,
+                    0,
+                    Some("NPC not found"),
+                )
+                .await;
                 return;
             }
         };
 
         // Check distance (must be within 10 tiles — generous to allow for NPC wandering)
         if distance > 10.0 || !is_alive {
-            self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Too far from merchant")).await;
+            self.send_shop_result(
+                player_id,
+                false,
+                "buy",
+                item_id,
+                0,
+                0,
+                Some("Too far from merchant"),
+            )
+            .await;
             return;
         }
 
@@ -5791,12 +6713,30 @@ impl GameRoom {
             Some(proto) => match &proto.merchant {
                 Some(config) => config.clone(),
                 None => {
-                    self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Not a merchant")).await;
+                    self.send_shop_result(
+                        player_id,
+                        false,
+                        "buy",
+                        item_id,
+                        0,
+                        0,
+                        Some("Not a merchant"),
+                    )
+                    .await;
                     return;
                 }
             },
             None => {
-                self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Invalid merchant")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "buy",
+                    item_id,
+                    0,
+                    0,
+                    Some("Invalid merchant"),
+                )
+                .await;
                 return;
             }
         };
@@ -5807,7 +6747,16 @@ impl GameRoom {
             Some(s) => s,
             None => {
                 drop(shop_registry);
-                self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Shop not found")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "buy",
+                    item_id,
+                    0,
+                    0,
+                    Some("Shop not found"),
+                )
+                .await;
                 return;
             }
         };
@@ -5817,7 +6766,16 @@ impl GameRoom {
             Some(s) => s,
             None => {
                 drop(shop_registry);
-                self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Item not sold here")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "buy",
+                    item_id,
+                    0,
+                    0,
+                    Some("Item not sold here"),
+                )
+                .await;
                 return;
             }
         };
@@ -5825,7 +6783,16 @@ impl GameRoom {
         // Check stock quantity
         if stock_item.current_quantity < quantity {
             drop(shop_registry);
-            self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Insufficient stock")).await;
+            self.send_shop_result(
+                player_id,
+                false,
+                "buy",
+                item_id,
+                0,
+                0,
+                Some("Insufficient stock"),
+            )
+            .await;
             return;
         }
 
@@ -5834,7 +6801,16 @@ impl GameRoom {
             Some(def) => def.clone(),
             None => {
                 drop(shop_registry);
-                self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Item not found")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "buy",
+                    item_id,
+                    0,
+                    0,
+                    Some("Item not found"),
+                )
+                .await;
                 return;
             }
         };
@@ -5847,7 +6823,16 @@ impl GameRoom {
         // Check if player has enough gold
         if player_gold < total_cost {
             drop(shop_registry);
-            self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Not enough gold")).await;
+            self.send_shop_result(
+                player_id,
+                false,
+                "buy",
+                item_id,
+                0,
+                0,
+                Some("Not enough gold"),
+            )
+            .await;
             return;
         }
 
@@ -5862,9 +6847,21 @@ impl GameRoom {
                 }
             };
 
-            if !player.inventory.has_space_for(item_id, quantity, &self.item_registry) {
+            if !player
+                .inventory
+                .has_space_for(item_id, quantity, &self.item_registry)
+            {
                 drop(shop_registry);
-                self.send_shop_result(player_id, false, "buy", item_id, 0, 0, Some("Inventory full")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "buy",
+                    item_id,
+                    0,
+                    0,
+                    Some("Inventory full"),
+                )
+                .await;
                 return;
             }
         }
@@ -5879,14 +6876,17 @@ impl GameRoom {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 player.inventory.gold -= total_cost;
-                player.inventory.add_item(item_id, quantity, &self.item_registry);
+                player
+                    .inventory
+                    .add_item(item_id, quantity, &self.item_registry);
 
                 let inventory_update = player.inventory.to_update();
                 let gold = player.inventory.gold;
                 drop(players);
 
                 // Send success result
-                self.send_shop_result(player_id, true, "buy", item_id, quantity, -total_cost, None).await;
+                self.send_shop_result(player_id, true, "buy", item_id, quantity, -total_cost, None)
+                    .await;
 
                 // Send inventory update
                 self.send_to_player(
@@ -5900,11 +6900,16 @@ impl GameRoom {
                 .await;
 
                 // Broadcast stock update to nearby players
-                self.broadcast_shop_stock_update(npc_id, item_id, new_stock).await;
+                self.broadcast_shop_stock_update(npc_id, item_id, new_stock)
+                    .await;
 
                 tracing::info!(
                     "Player {} bought {}x{} from {} for {} gold",
-                    player_id, quantity, item_id, npc_id, total_cost
+                    player_id,
+                    quantity,
+                    item_id,
+                    npc_id,
+                    total_cost
                 );
             }
         }
@@ -5946,10 +6951,25 @@ impl GameRoom {
     }
 
     /// Handle shop sell transaction
-    pub async fn handle_shop_sell(&self, player_id: &str, npc_id: &str, item_id: &str, quantity: i32) {
+    pub async fn handle_shop_sell(
+        &self,
+        player_id: &str,
+        npc_id: &str,
+        item_id: &str,
+        quantity: i32,
+    ) {
         // Validate quantity
         if quantity <= 0 {
-            self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("Invalid quantity")).await;
+            self.send_shop_result(
+                player_id,
+                false,
+                "sell",
+                item_id,
+                0,
+                0,
+                Some("Invalid quantity"),
+            )
+            .await;
             return;
         }
 
@@ -5979,7 +6999,11 @@ impl GameRoom {
                     (npc.prototype_id.clone(), distance, npc.is_alive())
                 })
             } else {
-                tracing::warn!("Player {} in instance {} but instance not found", player_id, inst_id);
+                tracing::warn!(
+                    "Player {} in instance {} but instance not found",
+                    player_id,
+                    inst_id
+                );
                 None
             }
         } else {
@@ -5995,14 +7019,32 @@ impl GameRoom {
         let (prototype_id, distance, is_alive) = match npc_info {
             Some(info) => info,
             None => {
-                self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("NPC not found")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "sell",
+                    item_id,
+                    0,
+                    0,
+                    Some("NPC not found"),
+                )
+                .await;
                 return;
             }
         };
 
         // Check distance (must be within 10 tiles — generous to allow for NPC wandering)
         if distance > 10.0 || !is_alive {
-            self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("Too far from merchant")).await;
+            self.send_shop_result(
+                player_id,
+                false,
+                "sell",
+                item_id,
+                0,
+                0,
+                Some("Too far from merchant"),
+            )
+            .await;
             return;
         }
 
@@ -6011,12 +7053,30 @@ impl GameRoom {
             Some(proto) => match &proto.merchant {
                 Some(config) => config.clone(),
                 None => {
-                    self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("Not a merchant")).await;
+                    self.send_shop_result(
+                        player_id,
+                        false,
+                        "sell",
+                        item_id,
+                        0,
+                        0,
+                        Some("Not a merchant"),
+                    )
+                    .await;
                     return;
                 }
             },
             None => {
-                self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("Invalid merchant")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "sell",
+                    item_id,
+                    0,
+                    0,
+                    Some("Invalid merchant"),
+                )
+                .await;
                 return;
             }
         };
@@ -6025,14 +7085,32 @@ impl GameRoom {
         let item_def = match self.item_registry.get(item_id) {
             Some(def) => def.clone(),
             None => {
-                self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("Item not found")).await;
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "sell",
+                    item_id,
+                    0,
+                    0,
+                    Some("Item not found"),
+                )
+                .await;
                 return;
             }
         };
 
         // Check if item is sellable
         if !item_def.sellable {
-            self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("Item cannot be sold")).await;
+            self.send_shop_result(
+                player_id,
+                false,
+                "sell",
+                item_id,
+                0,
+                0,
+                Some("Item cannot be sold"),
+            )
+            .await;
             return;
         }
 
@@ -6046,7 +7124,16 @@ impl GameRoom {
         };
 
         if !has_item {
-            self.send_shop_result(player_id, false, "sell", item_id, 0, 0, Some("You don't have enough of that item")).await;
+            self.send_shop_result(
+                player_id,
+                false,
+                "sell",
+                item_id,
+                0,
+                0,
+                Some("You don't have enough of that item"),
+            )
+            .await;
             return;
         }
 
@@ -6069,7 +7156,16 @@ impl GameRoom {
                 drop(players);
 
                 // Send success result
-                self.send_shop_result(player_id, true, "sell", item_id, quantity, total_value, None).await;
+                self.send_shop_result(
+                    player_id,
+                    true,
+                    "sell",
+                    item_id,
+                    quantity,
+                    total_value,
+                    None,
+                )
+                .await;
 
                 // Send inventory update
                 self.send_to_player(
@@ -6084,7 +7180,11 @@ impl GameRoom {
 
                 tracing::info!(
                     "Player {} sold {}x{} to {} for {} gold",
-                    player_id, quantity, item_id, npc_id, total_value
+                    player_id,
+                    quantity,
+                    item_id,
+                    npc_id,
+                    total_value
                 );
             }
         }
@@ -6123,15 +7223,32 @@ impl GameRoom {
             }
         };
 
-        let (item_id, combat_level, woodcutting_level, equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet, equipped_ring, equipped_gloves, equipped_necklace, equipped_belt) = match item_info {
+        let (
+            item_id,
+            combat_level,
+            woodcutting_level,
+            equipped_head,
+            equipped_body,
+            equipped_weapon,
+            equipped_back,
+            equipped_feet,
+            equipped_ring,
+            equipped_gloves,
+            equipped_necklace,
+            equipped_belt,
+        ) = match item_info {
             Some(info) => info,
             None => {
-                self.send_to_player(player_id, ServerMessage::EquipResult {
-                    success: false,
-                    slot_type: "unknown".to_string(),
-                    item_id: None,
-                    error: Some("No item in that slot".to_string()),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::EquipResult {
+                        success: false,
+                        slot_type: "unknown".to_string(),
+                        item_id: None,
+                        error: Some("No item in that slot".to_string()),
+                    },
+                )
+                .await;
                 return;
             }
         };
@@ -6140,12 +7257,16 @@ impl GameRoom {
         let item_def = match self.item_registry.get(&item_id) {
             Some(def) => def,
             None => {
-                self.send_to_player(player_id, ServerMessage::EquipResult {
-                    success: false,
-                    slot_type: "unknown".to_string(),
-                    item_id: None,
-                    error: Some("Item not found".to_string()),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::EquipResult {
+                        success: false,
+                        slot_type: "unknown".to_string(),
+                        item_id: None,
+                        error: Some("Item not found".to_string()),
+                    },
+                )
+                .await;
                 return;
             }
         };
@@ -6154,12 +7275,16 @@ impl GameRoom {
         let (equip_stats, equip_slot) = match &item_def.equipment {
             Some(stats) if stats.slot_type != EquipmentSlot::None => (stats, stats.slot_type),
             _ => {
-                self.send_to_player(player_id, ServerMessage::EquipResult {
-                    success: false,
-                    slot_type: "unknown".to_string(),
-                    item_id: None,
-                    error: Some("Item cannot be equipped".to_string()),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::EquipResult {
+                        success: false,
+                        slot_type: "unknown".to_string(),
+                        item_id: None,
+                        error: Some("Item cannot be equipped".to_string()),
+                    },
+                )
+                .await;
                 return;
             }
         };
@@ -6168,25 +7293,40 @@ impl GameRoom {
 
         // Check skill level requirements
         // Both attack and defence requirements are checked against the unified combat level
-        let level_required = equip_stats.attack_level_required.max(equip_stats.defence_level_required);
+        let level_required = equip_stats
+            .attack_level_required
+            .max(equip_stats.defence_level_required);
         if level_required > 0 && combat_level < level_required {
-            self.send_to_player(player_id, ServerMessage::EquipResult {
-                success: false,
-                slot_type: slot_type_str,
-                item_id: None,
-                error: Some(format!("Requires Combat level {}", level_required)),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::EquipResult {
+                    success: false,
+                    slot_type: slot_type_str,
+                    item_id: None,
+                    error: Some(format!("Requires Combat level {}", level_required)),
+                },
+            )
+            .await;
             return;
         }
 
         // Check woodcutting level requirement for axes
-        if equip_stats.woodcutting_level_required > 0 && woodcutting_level < equip_stats.woodcutting_level_required {
-            self.send_to_player(player_id, ServerMessage::EquipResult {
-                success: false,
-                slot_type: slot_type_str,
-                item_id: None,
-                error: Some(format!("Requires Woodcutting level {}", equip_stats.woodcutting_level_required)),
-            }).await;
+        if equip_stats.woodcutting_level_required > 0
+            && woodcutting_level < equip_stats.woodcutting_level_required
+        {
+            self.send_to_player(
+                player_id,
+                ServerMessage::EquipResult {
+                    success: false,
+                    slot_type: slot_type_str,
+                    item_id: None,
+                    error: Some(format!(
+                        "Requires Woodcutting level {}",
+                        equip_stats.woodcutting_level_required
+                    )),
+                },
+            )
+            .await;
             return;
         }
 
@@ -6214,7 +7354,8 @@ impl GameRoom {
 
             // If something is equipped in this slot, swap it to the inventory slot
             if let Some(ref old_item_id) = currently_equipped {
-                player.inventory.slots[slot_idx] = Some(item::InventorySlot::new(old_item_id.clone(), 1));
+                player.inventory.slots[slot_idx] =
+                    Some(item::InventorySlot::new(old_item_id.clone(), 1));
             } else {
                 player.inventory.slots[slot_idx] = None;
             }
@@ -6250,7 +7391,12 @@ impl GameRoom {
             )
         };
 
-        tracing::info!("Player {} equipped {} to {} slot", player_id, item_id, slot_type_str);
+        tracing::info!(
+            "Player {} equipped {} to {} slot",
+            player_id,
+            item_id,
+            slot_type_str
+        );
 
         // If equipping a non-fishing-rod weapon while gathering, stop gathering
         if equip_slot == EquipmentSlot::Weapon && item_id != "fishing_rod" {
@@ -6264,19 +7410,27 @@ impl GameRoom {
         }
 
         // Send success result
-        self.send_to_player(player_id, ServerMessage::EquipResult {
-            success: true,
-            slot_type: slot_type_str,
-            item_id: Some(item_id.clone()),
-            error: None,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::EquipResult {
+                success: true,
+                slot_type: slot_type_str,
+                item_id: Some(item_id.clone()),
+                error: None,
+            },
+        )
+        .await;
 
         // Send inventory update
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inventory_update,
-            gold,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold,
+            },
+        )
+        .await;
 
         // Broadcast equipment update to all players
         self.broadcast(ServerMessage::EquipmentUpdate {
@@ -6290,20 +7444,27 @@ impl GameRoom {
             equipped_gloves: new_equipment.6,
             equipped_necklace: new_equipment.7,
             equipped_belt: new_equipment.8,
-        }).await;
+        })
+        .await;
     }
 
     /// Handle unequipping an item
     pub async fn handle_unequip(&self, player_id: &str, slot_type: &str) {
         // Validate slot type
-        let valid_slots = ["head", "body", "weapon", "back", "feet", "ring", "gloves", "necklace", "belt"];
+        let valid_slots = [
+            "head", "body", "weapon", "back", "feet", "ring", "gloves", "necklace", "belt",
+        ];
         if !valid_slots.contains(&slot_type) {
-            self.send_to_player(player_id, ServerMessage::EquipResult {
-                success: false,
-                slot_type: slot_type.to_string(),
-                item_id: None,
-                error: Some("Unknown equipment slot".to_string()),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::EquipResult {
+                    success: false,
+                    slot_type: slot_type.to_string(),
+                    item_id: None,
+                    error: Some("Unknown equipment slot".to_string()),
+                },
+            )
+            .await;
             return;
         }
 
@@ -6331,24 +7492,35 @@ impl GameRoom {
             match equipped_ref {
                 Some(item_id) => {
                     // Check if inventory has space
-                    if !player.inventory.has_space_for(item_id, 1, &self.item_registry) {
-                        self.send_to_player(player_id, ServerMessage::EquipResult {
-                            success: false,
-                            slot_type: slot_type.to_string(),
-                            item_id: None,
-                            error: Some("Inventory full".to_string()),
-                        }).await;
+                    if !player
+                        .inventory
+                        .has_space_for(item_id, 1, &self.item_registry)
+                    {
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::EquipResult {
+                                success: false,
+                                slot_type: slot_type.to_string(),
+                                item_id: None,
+                                error: Some("Inventory full".to_string()),
+                            },
+                        )
+                        .await;
                         return;
                     }
                     Some(item_id.clone())
                 }
                 None => {
-                    self.send_to_player(player_id, ServerMessage::EquipResult {
-                        success: false,
-                        slot_type: slot_type.to_string(),
-                        item_id: None,
-                        error: Some("Nothing equipped".to_string()),
-                    }).await;
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::EquipResult {
+                            success: false,
+                            slot_type: slot_type.to_string(),
+                            item_id: None,
+                            error: Some("Nothing equipped".to_string()),
+                        },
+                    )
+                    .await;
                     return;
                 }
             }
@@ -6401,7 +7573,12 @@ impl GameRoom {
             )
         };
 
-        tracing::info!("Player {} unequipped {} from {} slot", player_id, item_id, slot_type);
+        tracing::info!(
+            "Player {} unequipped {} from {} slot",
+            player_id,
+            item_id,
+            slot_type
+        );
 
         // If unequipping weapon while gathering, stop gathering
         if slot_type == "weapon" {
@@ -6415,19 +7592,27 @@ impl GameRoom {
         }
 
         // Send success result
-        self.send_to_player(player_id, ServerMessage::EquipResult {
-            success: true,
-            slot_type: slot_type.to_string(),
-            item_id: Some(item_id),
-            error: None,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::EquipResult {
+                success: true,
+                slot_type: slot_type.to_string(),
+                item_id: Some(item_id),
+                error: None,
+            },
+        )
+        .await;
 
         // Send inventory update
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inventory_update,
-            gold,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold,
+            },
+        )
+        .await;
 
         // Broadcast equipment update to all players
         self.broadcast(ServerMessage::EquipmentUpdate {
@@ -6441,12 +7626,20 @@ impl GameRoom {
             equipped_gloves: new_equipment.6,
             equipped_necklace: new_equipment.7,
             equipped_belt: new_equipment.8,
-        }).await;
+        })
+        .await;
     }
 
     /// Handle dropping an item from inventory to the ground
     /// If target_x/target_y provided, drop at that tile (must be adjacent to player)
-    pub async fn handle_drop_item(&self, player_id: &str, slot_index: u8, quantity: u32, target_x: Option<i32>, target_y: Option<i32>) {
+    pub async fn handle_drop_item(
+        &self,
+        player_id: &str,
+        slot_index: u8,
+        quantity: u32,
+        target_x: Option<i32>,
+        target_y: Option<i32>,
+    ) {
         let slot_idx = slot_index as usize;
 
         // Get player position and item info
@@ -6532,16 +7725,25 @@ impl GameRoom {
             instance_id,
         );
 
-        tracing::info!("Player {} dropped {}x {} (protected for 10s)", player_id, qty_to_drop, item_id);
+        tracing::info!(
+            "Player {} dropped {}x {} (protected for 10s)",
+            player_id,
+            qty_to_drop,
+            item_id
+        );
 
         // Broadcast item drop to players in same zone
-        self.broadcast_to_zone(player_id, ServerMessage::ItemDropped {
-            id: ground_item.id.clone(),
-            item_id: item_id.clone(),
-            x: drop_x_f,
-            y: drop_y_f,
-            quantity: qty_to_drop,
-        }).await;
+        self.broadcast_to_zone(
+            player_id,
+            ServerMessage::ItemDropped {
+                id: ground_item.id.clone(),
+                item_id: item_id.clone(),
+                x: drop_x_f,
+                y: drop_y_f,
+                quantity: qty_to_drop,
+            },
+        )
+        .await;
 
         // Store in ground_items
         {
@@ -6550,11 +7752,15 @@ impl GameRoom {
         }
 
         // Send inventory update to dropping player
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inventory_update,
-            gold,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold,
+            },
+        )
+        .await;
     }
 
     /// Handle dropping gold to the ground
@@ -6621,16 +7827,24 @@ impl GameRoom {
             instance_id,
         );
 
-        tracing::info!("Player {} dropped {}g (protected for 10s)", player_id, amount);
+        tracing::info!(
+            "Player {} dropped {}g (protected for 10s)",
+            player_id,
+            amount
+        );
 
         // Broadcast item drop to players in same zone
-        self.broadcast_to_zone(player_id, ServerMessage::ItemDropped {
-            id: ground_item.id.clone(),
-            item_id: GOLD_ITEM_ID.to_string(),
-            x: drop_x,
-            y: drop_y,
-            quantity: amount,
-        }).await;
+        self.broadcast_to_zone(
+            player_id,
+            ServerMessage::ItemDropped {
+                id: ground_item.id.clone(),
+                item_id: GOLD_ITEM_ID.to_string(),
+                x: drop_x,
+                y: drop_y,
+                quantity: amount,
+            },
+        )
+        .await;
 
         // Store in ground_items
         {
@@ -6639,11 +7853,15 @@ impl GameRoom {
         }
 
         // Send inventory update to dropping player
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inventory_update,
-            gold: new_gold,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold: new_gold,
+            },
+        )
+        .await;
     }
 
     /// Swap two inventory slots
@@ -6670,29 +7888,44 @@ impl GameRoom {
             (player.inventory.to_update(), player.inventory.gold)
         };
 
-        tracing::debug!("Player {} swapped slots {} <-> {}", player_id, from_slot, to_slot);
+        tracing::debug!(
+            "Player {} swapped slots {} <-> {}",
+            player_id,
+            from_slot,
+            to_slot
+        );
 
         // Send inventory update to the player
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inventory_update,
-            gold,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold,
+            },
+        )
+        .await;
     }
 
     pub async fn get_gathering_markers_message(&self) -> ServerMessage {
         let gathering = self.gathering.read().await;
-        let markers = gathering.markers.iter().map(|m| {
-            let skill = gathering.zones.get(&m.zone_id)
-                .map(|z| z.skill.clone())
-                .unwrap_or_else(|| "unknown".to_string());
-            crate::protocol::GatheringMarkerData {
-                x: m.x,
-                y: m.y,
-                zone_id: m.zone_id.clone(),
-                skill,
-            }
-        }).collect();
+        let markers = gathering
+            .markers
+            .iter()
+            .map(|m| {
+                let skill = gathering
+                    .zones
+                    .get(&m.zone_id)
+                    .map(|z| z.skill.clone())
+                    .unwrap_or_else(|| "unknown".to_string());
+                crate::protocol::GatheringMarkerData {
+                    x: m.x,
+                    y: m.y,
+                    zone_id: m.zone_id.clone(),
+                    skill,
+                }
+            })
+            .collect();
         ServerMessage::GatheringMarkers { markers }
     }
 
@@ -6710,7 +7943,13 @@ impl GameRoom {
         let (fishing_level, player_x, player_y, player_dir, equipped_weapon) = {
             let players = self.players.read().await;
             match players.get(player_id) {
-                Some(p) => (p.skills.fishing.level, p.x, p.y, p.direction, p.equipped_weapon.clone()),
+                Some(p) => (
+                    p.skills.fishing.level,
+                    p.x,
+                    p.y,
+                    p.direction,
+                    p.equipped_weapon.clone(),
+                ),
                 None => return,
             }
         };
@@ -6727,10 +7966,14 @@ impl GameRoom {
             Direction::UpRight => (1, -1),
         };
         if player_x + fdx != marker_x || player_y + fdy != marker_y {
-            self.send_to_player(player_id, ServerMessage::Error {
-                code: 400,
-                message: "You must face the gathering spot".to_string(),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::Error {
+                    code: 400,
+                    message: "You must face the gathering spot".to_string(),
+                },
+            )
+            .await;
             return;
         }
 
@@ -6745,10 +7988,17 @@ impl GameRoom {
                 if let Some(required) = required_weapon {
                     if equipped_weapon.as_deref() != Some(required) {
                         drop(gathering);
-                        self.send_to_player(player_id, ServerMessage::Error {
-                            code: 400,
-                            message: format!("You need a {} to do that", required.replace('_', " ")),
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::Error {
+                                code: 400,
+                                message: format!(
+                                    "You need a {} to do that",
+                                    required.replace('_', " ")
+                                ),
+                            },
+                        )
+                        .await;
                         return;
                     }
                 }
@@ -6756,20 +8006,26 @@ impl GameRoom {
         }
 
         let mut gathering = self.gathering.write().await;
-        match gathering.start_gathering(player_id, marker_x, marker_y, fishing_level, current_time) {
+        match gathering.start_gathering(player_id, marker_x, marker_y, fishing_level, current_time)
+        {
             Ok(zone_id) => {
                 self.broadcast(ServerMessage::GatheringStarted {
                     player_id: player_id.to_string(),
                     marker_x,
                     marker_y,
                     zone_id,
-                }).await;
+                })
+                .await;
             }
             Err(msg) => {
-                self.send_to_player(player_id, ServerMessage::Error {
-                    code: 400,
-                    message: msg,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::Error {
+                        code: 400,
+                        message: msg,
+                    },
+                )
+                .await;
             }
         }
     }
@@ -6780,7 +8036,8 @@ impl GameRoom {
             self.broadcast(ServerMessage::GatheringStopped {
                 player_id: player_id.to_string(),
                 reason: "cancelled".to_string(),
-            }).await;
+            })
+            .await;
         }
     }
 
@@ -6803,7 +8060,13 @@ impl GameRoom {
         let (woodcutting_level, player_x, player_y, player_dir, equipped_weapon) = {
             let players = self.players.read().await;
             match players.get(player_id) {
-                Some(p) => (p.skills.woodcutting.level, p.x, p.y, p.direction, p.equipped_weapon.clone()),
+                Some(p) => (
+                    p.skills.woodcutting.level,
+                    p.x,
+                    p.y,
+                    p.direction,
+                    p.equipped_weapon.clone(),
+                ),
                 None => return,
             }
         };
@@ -6812,10 +8075,14 @@ impl GameRoom {
         let dx = (player_x - tree_x).abs();
         let dy = (player_y - tree_y).abs();
         if dx > 1 || dy > 1 || (dx == 0 && dy == 0) {
-            self.send_to_player(player_id, ServerMessage::Error {
-                code: 400,
-                message: "You need to be next to the tree".to_string(),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::Error {
+                    code: 400,
+                    message: "You need to be next to the tree".to_string(),
+                },
+            )
+            .await;
             return;
         }
 
@@ -6825,13 +8092,17 @@ impl GameRoom {
                 if let Some(ref equip) = item_def.equipment {
                     if equip.chop_speed_multiplier > 0.0 {
                         if equip.woodcutting_level_required > woodcutting_level {
-                            self.send_to_player(player_id, ServerMessage::Error {
-                                code: 400,
-                                message: format!(
-                                    "You need Woodcutting level {} to use this axe",
-                                    equip.woodcutting_level_required
-                                ),
-                            }).await;
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::Error {
+                                    code: 400,
+                                    message: format!(
+                                        "You need Woodcutting level {} to use this axe",
+                                        equip.woodcutting_level_required
+                                    ),
+                                },
+                            )
+                            .await;
                             return;
                         }
                         true
@@ -6849,10 +8120,14 @@ impl GameRoom {
         };
 
         if !has_valid_axe {
-            self.send_to_player(player_id, ServerMessage::Error {
-                code: 400,
-                message: "You need an axe to chop trees".to_string(),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::Error {
+                    code: 400,
+                    message: "You need an axe to chop trees".to_string(),
+                },
+            )
+            .await;
             return;
         }
 
@@ -6862,13 +8137,21 @@ impl GameRoom {
             if let Some(tree_config) = woodcutting.get_tree_type(tree_gid) {
                 let players = self.players.read().await;
                 if let Some(player) = players.get(player_id) {
-                    if !player.inventory.has_space_for(&tree_config.log_item_id, 1, &self.item_registry) {
+                    if !player.inventory.has_space_for(
+                        &tree_config.log_item_id,
+                        1,
+                        &self.item_registry,
+                    ) {
                         drop(players);
                         drop(woodcutting);
-                        self.send_to_player(player_id, ServerMessage::Error {
-                            code: 400,
-                            message: "Your inventory is full!".to_string(),
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::Error {
+                                code: 400,
+                                message: "Your inventory is full!".to_string(),
+                            },
+                        )
+                        .await;
                         return;
                     }
                 }
@@ -6877,7 +8160,8 @@ impl GameRoom {
 
         // Perform the chop
         let mut woodcutting = self.woodcutting.write().await;
-        let chop_result = woodcutting.chop_once(tree_x, tree_y, tree_gid, woodcutting_level, current_time);
+        let chop_result =
+            woodcutting.chop_once(tree_x, tree_y, tree_gid, woodcutting_level, current_time);
         drop(woodcutting);
 
         match chop_result {
@@ -6887,19 +8171,27 @@ impl GameRoom {
                     player_id: player_id.to_string(),
                     tree_x,
                     tree_y,
-                }).await;
+                })
+                .await;
 
                 if result.success {
                     // Add log to inventory
                     let mut players = self.players.write().await;
                     if let Some(player) = players.get_mut(player_id) {
-                        let leftover = player.inventory.add_item(&result.log_item_id, 1, &self.item_registry);
+                        let leftover =
+                            player
+                                .inventory
+                                .add_item(&result.log_item_id, 1, &self.item_registry);
                         if leftover > 0 {
                             drop(players);
-                            self.send_to_player(player_id, ServerMessage::Error {
-                                code: 400,
-                                message: "Your inventory is full!".to_string(),
-                            }).await;
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::Error {
+                                    code: 400,
+                                    message: "Your inventory is full!".to_string(),
+                                },
+                            )
+                            .await;
                             return;
                         }
 
@@ -6912,30 +8204,43 @@ impl GameRoom {
                         drop(players);
 
                         // Send inventory update
-                        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                            player_id: player_id.to_string(),
-                            slots: inv_update,
-                            gold,
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::InventoryUpdate {
+                                player_id: player_id.to_string(),
+                                slots: inv_update,
+                                gold,
+                            },
+                        )
+                        .await;
 
                         // Send XP update
-                        self.send_to_player(player_id, ServerMessage::SkillXp {
-                            player_id: player_id.to_string(),
-                            skill: "woodcutting".to_string(),
-                            xp_gained: result.xp_gained,
-                            total_xp: new_xp,
-                            level: new_level,
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::SkillXp {
+                                player_id: player_id.to_string(),
+                                skill: "woodcutting".to_string(),
+                                xp_gained: result.xp_gained,
+                                total_xp: new_xp,
+                                level: new_level,
+                            },
+                        )
+                        .await;
 
                         // Send chop result
-                        self.send_to_player(player_id, ServerMessage::WoodcuttingResult {
-                            player_id: player_id.to_string(),
-                            item_id: result.log_item_id.clone(),
-                            xp_gained: result.xp_gained,
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::WoodcuttingResult {
+                                player_id: player_id.to_string(),
+                                item_id: result.log_item_id.clone(),
+                                xp_gained: result.xp_gained,
+                            },
+                        )
+                        .await;
 
                         // Process quest item collection for woodcutting drops
-                        self.process_quest_item_collect(player_id, &result.log_item_id, 1).await;
+                        self.process_quest_item_collect(player_id, &result.log_item_id, 1)
+                            .await;
 
                         // Handle level up
                         if leveled_up {
@@ -6943,7 +8248,8 @@ impl GameRoom {
                                 player_id: player_id.to_string(),
                                 skill: "woodcutting".to_string(),
                                 new_level,
-                            }).await;
+                            })
+                            .await;
                             self.process_quest_progression_snapshot(player_id).await;
                         }
                     }
@@ -6957,17 +8263,28 @@ impl GameRoom {
                         y: tree_y,
                         gid: tree_gid,
                         respawn_delay_ms: respawn_delay,
-                    }).await;
+                    })
+                    .await;
 
                     // Process quest event for tree depletion
-                    self.process_quest_tree_deplete(player_id, &result.tree_type_id, tree_x, tree_y).await;
+                    self.process_quest_tree_deplete(
+                        player_id,
+                        &result.tree_type_id,
+                        tree_x,
+                        tree_y,
+                    )
+                    .await;
                 }
             }
             Err(msg) => {
-                self.send_to_player(player_id, ServerMessage::Error {
-                    code: 400,
-                    message: msg,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::Error {
+                        code: 400,
+                        message: msg,
+                    },
+                )
+                .await;
             }
         }
     }
@@ -6990,7 +8307,13 @@ impl GameRoom {
         let (mining_level, player_x, player_y, _player_dir, equipped_weapon) = {
             let players = self.players.read().await;
             match players.get(player_id) {
-                Some(p) => (p.skills.mining.level, p.x, p.y, p.direction, p.equipped_weapon.clone()),
+                Some(p) => (
+                    p.skills.mining.level,
+                    p.x,
+                    p.y,
+                    p.direction,
+                    p.equipped_weapon.clone(),
+                ),
                 None => return,
             }
         };
@@ -6999,10 +8322,14 @@ impl GameRoom {
         let dx = (player_x - rock_x).abs();
         let dy = (player_y - rock_y).abs();
         if dx > 1 || dy > 1 || (dx == 0 && dy == 0) {
-            self.send_to_player(player_id, ServerMessage::Error {
-                code: 400,
-                message: "You need to be next to the rock".to_string(),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::Error {
+                    code: 400,
+                    message: "You need to be next to the rock".to_string(),
+                },
+            )
+            .await;
             return;
         }
 
@@ -7012,13 +8339,17 @@ impl GameRoom {
                 if let Some(ref equip) = item_def.equipment {
                     if equip.mine_speed_multiplier > 0.0 {
                         if equip.mining_level_required > mining_level {
-                            self.send_to_player(player_id, ServerMessage::Error {
-                                code: 400,
-                                message: format!(
-                                    "You need Mining level {} to use this pickaxe",
-                                    equip.mining_level_required
-                                ),
-                            }).await;
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::Error {
+                                    code: 400,
+                                    message: format!(
+                                        "You need Mining level {} to use this pickaxe",
+                                        equip.mining_level_required
+                                    ),
+                                },
+                            )
+                            .await;
                             return;
                         }
                         true
@@ -7036,10 +8367,14 @@ impl GameRoom {
         };
 
         if !has_valid_pickaxe {
-            self.send_to_player(player_id, ServerMessage::Error {
-                code: 400,
-                message: "You need a pickaxe to mine rocks".to_string(),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::Error {
+                    code: 400,
+                    message: "You need a pickaxe to mine rocks".to_string(),
+                },
+            )
+            .await;
             return;
         }
 
@@ -7049,13 +8384,21 @@ impl GameRoom {
             if let Some(ore_config) = mining.get_ore_type(rock_gid) {
                 let players = self.players.read().await;
                 if let Some(player) = players.get(player_id) {
-                    if !player.inventory.has_space_for(&ore_config.ore_item_id, 1, &self.item_registry) {
+                    if !player.inventory.has_space_for(
+                        &ore_config.ore_item_id,
+                        1,
+                        &self.item_registry,
+                    ) {
                         drop(players);
                         drop(mining);
-                        self.send_to_player(player_id, ServerMessage::Error {
-                            code: 400,
-                            message: "Your inventory is full!".to_string(),
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::Error {
+                                code: 400,
+                                message: "Your inventory is full!".to_string(),
+                            },
+                        )
+                        .await;
                         return;
                     }
                 }
@@ -7074,25 +8417,34 @@ impl GameRoom {
                     player_id: player_id.to_string(),
                     rock_x,
                     rock_y,
-                }).await;
+                })
+                .await;
 
                 if result.success {
                     // Add ore to inventory
                     let mut players = self.players.write().await;
                     if let Some(player) = players.get_mut(player_id) {
-                        let leftover = player.inventory.add_item(&result.ore_item_id, 1, &self.item_registry);
+                        let leftover =
+                            player
+                                .inventory
+                                .add_item(&result.ore_item_id, 1, &self.item_registry);
                         if leftover > 0 {
                             drop(players);
-                            self.send_to_player(player_id, ServerMessage::Error {
-                                code: 400,
-                                message: "Your inventory is full!".to_string(),
-                            }).await;
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::Error {
+                                    code: 400,
+                                    message: "Your inventory is full!".to_string(),
+                                },
+                            )
+                            .await;
                             return;
                         }
 
                         // If a gem dropped, try to add to inventory
                         let gem_dropped_on_ground = if let Some(ref gem_id) = result.gem_drop {
-                            let gem_leftover = player.inventory.add_item(gem_id, 1, &self.item_registry);
+                            let gem_leftover =
+                                player.inventory.add_item(gem_id, 1, &self.item_registry);
                             gem_leftover > 0 // true = inventory full, need to drop on ground
                         } else {
                             false
@@ -7109,31 +8461,45 @@ impl GameRoom {
                         drop(players);
 
                         // Send inventory update
-                        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                            player_id: player_id.to_string(),
-                            slots: inv_update,
-                            gold,
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::InventoryUpdate {
+                                player_id: player_id.to_string(),
+                                slots: inv_update,
+                                gold,
+                            },
+                        )
+                        .await;
 
                         // Send XP update
-                        self.send_to_player(player_id, ServerMessage::SkillXp {
-                            player_id: player_id.to_string(),
-                            skill: "mining".to_string(),
-                            xp_gained: result.xp_gained,
-                            total_xp: new_xp,
-                            level: new_level,
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::SkillXp {
+                                player_id: player_id.to_string(),
+                                skill: "mining".to_string(),
+                                xp_gained: result.xp_gained,
+                                total_xp: new_xp,
+                                level: new_level,
+                            },
+                        )
+                        .await;
 
                         // Send mine result
-                        self.send_to_player(player_id, ServerMessage::MiningResult {
-                            player_id: player_id.to_string(),
-                            item_id: result.ore_item_id.clone(),
-                            xp_gained: result.xp_gained,
-                        }).await;
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::MiningResult {
+                                player_id: player_id.to_string(),
+                                item_id: result.ore_item_id.clone(),
+                                xp_gained: result.xp_gained,
+                            },
+                        )
+                        .await;
 
                         // Handle gem drop notification + ground drop if needed
                         if let Some(ref gem_id) = result.gem_drop {
-                            let gem_name = self.item_registry.get(gem_id)
+                            let gem_name = self
+                                .item_registry
+                                .get(gem_id)
                                 .map(|d| d.display_name.clone())
                                 .unwrap_or_else(|| gem_id.clone());
 
@@ -7149,13 +8515,17 @@ impl GameRoom {
                                     current_time,
                                 );
 
-                                self.broadcast_to_zone(player_id, ServerMessage::ItemDropped {
-                                    id: ground_item.id.clone(),
-                                    item_id: gem_id.clone(),
-                                    x: player_x as f32,
-                                    y: player_y as f32,
-                                    quantity: 1,
-                                }).await;
+                                self.broadcast_to_zone(
+                                    player_id,
+                                    ServerMessage::ItemDropped {
+                                        id: ground_item.id.clone(),
+                                        item_id: gem_id.clone(),
+                                        x: player_x as f32,
+                                        y: player_y as f32,
+                                        quantity: 1,
+                                    },
+                                )
+                                .await;
 
                                 {
                                     let mut items = self.ground_items.write().await;
@@ -7167,15 +8537,17 @@ impl GameRoom {
                                     gem_name,
                                 )).await;
                             } else {
-                                self.send_system_message(player_id, &format!(
-                                    "You found a {} while mining!",
-                                    gem_name,
-                                )).await;
+                                self.send_system_message(
+                                    player_id,
+                                    &format!("You found a {} while mining!", gem_name,),
+                                )
+                                .await;
                             }
                         }
 
                         // Process quest item collection for mining drops
-                        self.process_quest_item_collect(player_id, &result.ore_item_id, 1).await;
+                        self.process_quest_item_collect(player_id, &result.ore_item_id, 1)
+                            .await;
 
                         // Handle level up
                         if leveled_up {
@@ -7183,7 +8555,8 @@ impl GameRoom {
                                 player_id: player_id.to_string(),
                                 skill: "mining".to_string(),
                                 new_level,
-                            }).await;
+                            })
+                            .await;
                             self.process_quest_progression_snapshot(player_id).await;
                         }
                     }
@@ -7197,17 +8570,23 @@ impl GameRoom {
                         y: rock_y,
                         gid: rock_gid,
                         respawn_delay_ms: respawn_delay,
-                    }).await;
+                    })
+                    .await;
 
                     // Process quest event for rock depletion
-                    self.process_quest_rock_deplete(player_id, &result.ore_type_id, rock_x, rock_y).await;
+                    self.process_quest_rock_deplete(player_id, &result.ore_type_id, rock_x, rock_y)
+                        .await;
                 }
             }
             Err(msg) => {
-                self.send_to_player(player_id, ServerMessage::Error {
-                    code: 400,
-                    message: msg,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::Error {
+                        code: 400,
+                        message: msg,
+                    },
+                )
+                .await;
             }
         }
     }
@@ -7234,18 +8613,26 @@ impl GameRoom {
             let chair = match chairs.get(&(tile_x, tile_y)) {
                 Some(c) => c,
                 None => {
-                    self.send_to_player(player_id, ServerMessage::Error {
-                        code: 400,
-                        message: "No chair at that position".to_string(),
-                    }).await;
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::Error {
+                            code: 400,
+                            message: "No chair at that position".to_string(),
+                        },
+                    )
+                    .await;
                     return;
                 }
             };
             if chair.occupied_by.is_some() {
-                self.send_to_player(player_id, ServerMessage::Error {
-                    code: 400,
-                    message: "Chair is occupied".to_string(),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::Error {
+                        code: 400,
+                        message: "Chair is occupied".to_string(),
+                    },
+                )
+                .await;
                 return;
             }
         }
@@ -7282,10 +8669,14 @@ impl GameRoom {
         };
 
         if player_x != expected_x || player_y != expected_y {
-            self.send_to_player(player_id, ServerMessage::Error {
-                code: 400,
-                message: "Must approach chair from the front".to_string(),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::Error {
+                    code: 400,
+                    message: "Must approach chair from the front".to_string(),
+                },
+            )
+            .await;
             return;
         }
 
@@ -7318,12 +8709,16 @@ impl GameRoom {
             }
         }
 
-        self.send_to_player(player_id, ServerMessage::SitResult {
-            success: true,
-            tile_x,
-            tile_y,
-            direction: direction as u8,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::SitResult {
+                success: true,
+                tile_x,
+                tile_y,
+                direction: direction as u8,
+            },
+        )
+        .await;
     }
 
     pub async fn handle_stand_up(&self, player_id: &str) {
@@ -7386,10 +8781,14 @@ impl GameRoom {
                 None => return,
             };
             if !player.inventory.has_item(item_id, 1) {
-                self.send_to_player(player_id, ServerMessage::Error {
-                    code: 400,
-                    message: "You don't have that seed".to_string(),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::Error {
+                        code: 400,
+                        message: "You don't have that seed".to_string(),
+                    },
+                )
+                .await;
                 return;
             }
             player.skills.farming.level
@@ -7414,58 +8813,85 @@ impl GameRoom {
                     let skill = &player.skills.farming;
                     let gold = player.inventory.gold;
 
-                    (player.inventory.to_update(), gold, skill.xp, skill.level, leveled)
+                    (
+                        player.inventory.to_update(),
+                        gold,
+                        skill.xp,
+                        skill.level,
+                        leveled,
+                    )
                 };
 
                 // Send inventory update
-                self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                    player_id: player_id.to_string(),
-                    slots: inv_update.0,
-                    gold: inv_update.1,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::InventoryUpdate {
+                        player_id: player_id.to_string(),
+                        slots: inv_update.0,
+                        gold: inv_update.1,
+                    },
+                )
+                .await;
 
                 // Send XP gain
-                self.send_to_player(player_id, ServerMessage::SkillXp {
-                    player_id: player_id.to_string(),
-                    skill: "farming".to_string(),
-                    xp_gained: xp,
-                    total_xp: inv_update.2,
-                    level: inv_update.3,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SkillXp {
+                        player_id: player_id.to_string(),
+                        skill: "farming".to_string(),
+                        xp_gained: xp,
+                        total_xp: inv_update.2,
+                        level: inv_update.3,
+                    },
+                )
+                .await;
 
                 if inv_update.4 {
                     self.broadcast(ServerMessage::SkillLevelUp {
                         player_id: player_id.to_string(),
                         skill: "farming".to_string(),
                         new_level: inv_update.3,
-                    }).await;
+                    })
+                    .await;
                     self.process_quest_progression_snapshot(player_id).await;
                 }
 
                 // Persist to database
                 if let Some(ref db) = self.db {
-                    if let Err(e) = db.save_farming_patch(patch_id, player_id, &crop_id, current_time).await {
+                    if let Err(e) = db
+                        .save_farming_patch(patch_id, player_id, &crop_id, current_time)
+                        .await
+                    {
                         tracing::warn!("Failed to save farming patch {}: {}", patch_id, e);
                     }
                 }
 
                 // Send patch update to this player only (per-player instanced)
-                self.send_to_player(player_id, ServerMessage::PatchStateUpdate {
-                    patch_id: patch_id.to_string(),
-                    state: "growing".to_string(),
-                    crop_id,
-                    growth_stage: 0,
-                    owner_id: player_id.to_string(),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::PatchStateUpdate {
+                        patch_id: patch_id.to_string(),
+                        state: "growing".to_string(),
+                        crop_id,
+                        growth_stage: 0,
+                        owner_id: player_id.to_string(),
+                    },
+                )
+                .await;
 
                 // Fire quest event for planting
-                self.process_quest_item_collect(player_id, &format!("plant_{}", item_id), 1).await;
+                self.process_quest_item_collect(player_id, &format!("plant_{}", item_id), 1)
+                    .await;
             }
             Err(e) => {
-                self.send_to_player(player_id, ServerMessage::Error {
-                    code: 400,
-                    message: e,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::Error {
+                        code: 400,
+                        message: e,
+                    },
+                )
+                .await;
             }
         }
     }
@@ -7478,7 +8904,10 @@ impl GameRoom {
 
         let farming_level = {
             let players = self.players.read().await;
-            players.get(player_id).map(|p| p.skills.farming.level).unwrap_or(1)
+            players
+                .get(player_id)
+                .map(|p| p.skills.farming.level)
+                .unwrap_or(1)
         };
 
         // Check inventory space before harvesting (harvest destroys the crop)
@@ -7490,8 +8919,13 @@ impl GameRoom {
                     let players = self.players.read().await;
                     if let Some(player) = players.get(player_id) {
                         // Check for max possible yield to be safe
-                        if !player.inventory.has_space_for(&crop.produce_item, crop.harvest_amount_max, &self.item_registry) {
-                            self.send_system_message(player_id, "Your inventory is full.").await;
+                        if !player.inventory.has_space_for(
+                            &crop.produce_item,
+                            crop.harvest_amount_max,
+                            &self.item_registry,
+                        ) {
+                            self.send_system_message(player_id, "Your inventory is full.")
+                                .await;
                             return;
                         }
                     }
@@ -7511,51 +8945,76 @@ impl GameRoom {
                     let mut players = self.players.write().await;
                     let player = players.get_mut(player_id).unwrap();
 
-                    player.inventory.add_item(&harvest.produce_item, harvest.amount, &self.item_registry);
+                    player.inventory.add_item(
+                        &harvest.produce_item,
+                        harvest.amount,
+                        &self.item_registry,
+                    );
                     if harvest.seed_returned {
-                        player.inventory.add_item(&harvest.seed_item, 1, &self.item_registry);
+                        player
+                            .inventory
+                            .add_item(&harvest.seed_item, 1, &self.item_registry);
                     }
 
                     let leveled = player.skills.farming.add_xp(harvest.xp_gained);
                     let skill = &player.skills.farming;
                     let gold = player.inventory.gold;
 
-                    (player.inventory.to_update(), gold, skill.xp, skill.level, leveled)
+                    (
+                        player.inventory.to_update(),
+                        gold,
+                        skill.xp,
+                        skill.level,
+                        leveled,
+                    )
                 };
 
                 // Send inventory update
-                self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                    player_id: player_id.to_string(),
-                    slots: inv_update.0,
-                    gold: inv_update.1,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::InventoryUpdate {
+                        player_id: player_id.to_string(),
+                        slots: inv_update.0,
+                        gold: inv_update.1,
+                    },
+                )
+                .await;
 
                 // Send XP gain
-                self.send_to_player(player_id, ServerMessage::SkillXp {
-                    player_id: player_id.to_string(),
-                    skill: "farming".to_string(),
-                    xp_gained: harvest.xp_gained,
-                    total_xp: inv_update.2,
-                    level: inv_update.3,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SkillXp {
+                        player_id: player_id.to_string(),
+                        skill: "farming".to_string(),
+                        xp_gained: harvest.xp_gained,
+                        total_xp: inv_update.2,
+                        level: inv_update.3,
+                    },
+                )
+                .await;
 
                 if inv_update.4 {
                     self.broadcast(ServerMessage::SkillLevelUp {
                         player_id: player_id.to_string(),
                         skill: "farming".to_string(),
                         new_level: inv_update.3,
-                    }).await;
+                    })
+                    .await;
                     self.process_quest_progression_snapshot(player_id).await;
                 }
 
                 // Send patch reset to this player only (per-player instanced)
-                self.send_to_player(player_id, ServerMessage::PatchStateUpdate {
-                    patch_id: patch_id.to_string(),
-                    state: "empty".to_string(),
-                    crop_id: String::new(),
-                    growth_stage: 0,
-                    owner_id: String::new(),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::PatchStateUpdate {
+                        patch_id: patch_id.to_string(),
+                        state: "empty".to_string(),
+                        crop_id: String::new(),
+                        growth_stage: 0,
+                        owner_id: String::new(),
+                    },
+                )
+                .await;
 
                 // Delete from database
                 if let Some(ref db) = self.db {
@@ -7565,32 +9024,50 @@ impl GameRoom {
                 }
 
                 // Fire quest event for harvesting (prefixed for farming-specific quests, and raw for general collect quests)
-                self.process_quest_item_collect(player_id, &format!("harvest_{}", harvest.produce_item), harvest.amount).await;
-                self.process_quest_item_collect(player_id, &harvest.produce_item, harvest.amount).await;
+                self.process_quest_item_collect(
+                    player_id,
+                    &format!("harvest_{}", harvest.produce_item),
+                    harvest.amount,
+                )
+                .await;
+                self.process_quest_item_collect(player_id, &harvest.produce_item, harvest.amount)
+                    .await;
 
                 // Track farming contract progress
                 {
                     let mut farming = self.farming.write().await;
-                    let crop_id = farming.crops.iter()
+                    let crop_id = farming
+                        .crops
+                        .iter()
                         .find(|(_, c)| c.produce_item == harvest.produce_item)
                         .map(|(id, _)| id.clone());
 
                     if let Some(crop_id) = crop_id {
-                        if let Some((harvested, required, complete)) = farming.record_contract_harvest(player_id, &crop_id, harvest.amount) {
+                        if let Some((harvested, required, complete)) =
+                            farming.record_contract_harvest(player_id, &crop_id, harvest.amount)
+                        {
                             drop(farming);
                             if complete {
                                 self.send_system_message(player_id,
                                     &format!("Contract complete! ({}/{}) Return to the Master Farmer to claim your rewards.", harvested, required)
                                 ).await;
                             } else {
-                                self.send_system_message(player_id,
-                                    &format!("Contract progress: {}/{} harvested.", harvested, required)
-                                ).await;
+                                self.send_system_message(
+                                    player_id,
+                                    &format!(
+                                        "Contract progress: {}/{} harvested.",
+                                        harvested, required
+                                    ),
+                                )
+                                .await;
                             }
 
                             // Update database
                             if let Some(ref db) = self.db {
-                                if let Err(e) = db.update_farming_contract_progress(player_id, harvested).await {
+                                if let Err(e) = db
+                                    .update_farming_contract_progress(player_id, harvested)
+                                    .await
+                                {
                                     tracing::warn!("Failed to update contract progress: {}", e);
                                 }
                             }
@@ -7602,10 +9079,14 @@ impl GameRoom {
                 }
             }
             Err(e) => {
-                self.send_to_player(player_id, ServerMessage::Error {
-                    code: 400,
-                    message: e,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::Error {
+                        code: 400,
+                        message: e,
+                    },
+                )
+                .await;
             }
         }
     }
@@ -7615,9 +9096,12 @@ impl GameRoom {
         let npc_name = {
             let npcs = self.npcs.read().await;
             npcs.get(npc_id)
-                .map(|n| self.entity_registry.get(&n.prototype_id)
-                    .map(|p| p.display_name.clone())
-                    .unwrap_or_else(|| "Master Farmer".to_string()))
+                .map(|n| {
+                    self.entity_registry
+                        .get(&n.prototype_id)
+                        .map(|p| p.display_name.clone())
+                        .unwrap_or_else(|| "Master Farmer".to_string())
+                })
                 .unwrap_or_else(|| "Master Farmer".to_string())
         };
 
@@ -7646,12 +9130,18 @@ impl GameRoom {
             } else if farming_level < req.farming_level {
                 choices.push(crate::protocol::DialogueChoice {
                     id: format!("locked_{}", req.plot_id),
-                    text: format!("Plot {} - {}gp (Requires Farming {})", req.plot_id, req.gold_cost, req.farming_level),
+                    text: format!(
+                        "Plot {} - {}gp (Requires Farming {})",
+                        req.plot_id, req.gold_cost, req.farming_level
+                    ),
                 });
             } else if gold < req.gold_cost {
                 choices.push(crate::protocol::DialogueChoice {
                     id: format!("locked_{}", req.plot_id),
-                    text: format!("Plot {} - {}gp (Not enough gold)", req.plot_id, req.gold_cost),
+                    text: format!(
+                        "Plot {} - {}gp (Not enough gold)",
+                        req.plot_id, req.gold_cost
+                    ),
                 });
             } else {
                 choices.push(crate::protocol::DialogueChoice {
@@ -7670,13 +9160,17 @@ impl GameRoom {
             gold, farming_level
         );
 
-        self.send_to_player(player_id, ServerMessage::ShowDialogue {
-            quest_id: format!("plot_seller:{}", npc_id),
-            npc_id: npc_id.to_string(),
-            speaker: npc_name,
-            text,
-            choices,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::ShowDialogue {
+                quest_id: format!("plot_seller:{}", npc_id),
+                npc_id: npc_id.to_string(),
+                speaker: npc_name,
+                text,
+                choices,
+            },
+        )
+        .await;
     }
 
     /// Show the main master farmer dialogue menu
@@ -7684,9 +9178,12 @@ impl GameRoom {
         let npc_name = {
             let npcs = self.npcs.read().await;
             npcs.get(npc_id)
-                .map(|n| self.entity_registry.get(&n.prototype_id)
-                    .map(|p| p.display_name.clone())
-                    .unwrap_or_else(|| "Master Farmer".to_string()))
+                .map(|n| {
+                    self.entity_registry
+                        .get(&n.prototype_id)
+                        .map(|p| p.display_name.clone())
+                        .unwrap_or_else(|| "Master Farmer".to_string())
+                })
                 .unwrap_or_else(|| "Master Farmer".to_string())
         };
 
@@ -7717,9 +9214,12 @@ impl GameRoom {
         let npc_name = {
             let npcs = self.npcs.read().await;
             npcs.get(npc_id)
-                .map(|n| self.entity_registry.get(&n.prototype_id)
-                    .map(|p| p.display_name.clone())
-                    .unwrap_or_else(|| "Master Farmer".to_string()))
+                .map(|n| {
+                    self.entity_registry
+                        .get(&n.prototype_id)
+                        .map(|p| p.display_name.clone())
+                        .unwrap_or_else(|| "Master Farmer".to_string())
+                })
                 .unwrap_or_else(|| "Master Farmer".to_string())
         };
 
@@ -7734,7 +9234,9 @@ impl GameRoom {
         let farming = self.farming.read().await;
 
         if let Some(contract) = farming.get_contract(player_id) {
-            let crop_name = farming.crops.get(&contract.crop_id)
+            let crop_name = farming
+                .crops
+                .get(&contract.crop_id)
                 .map(|c| c.produce_item.clone())
                 .unwrap_or_else(|| contract.crop_id.clone());
 
@@ -7751,22 +9253,26 @@ impl GameRoom {
                     contract.difficulty.seed_reward_count(),
                 );
 
-                self.send_to_player(player_id, ServerMessage::ShowDialogue {
-                    quest_id: format!("plot_seller:{}", npc_id),
-                    npc_id: npc_id.to_string(),
-                    speaker: npc_name,
-                    text,
-                    choices: vec![
-                        crate::protocol::DialogueChoice {
-                            id: "claim_contract".to_string(),
-                            text: "Claim rewards".to_string(),
-                        },
-                        crate::protocol::DialogueChoice {
-                            id: "nevermind".to_string(),
-                            text: "Go back".to_string(),
-                        },
-                    ],
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::ShowDialogue {
+                        quest_id: format!("plot_seller:{}", npc_id),
+                        npc_id: npc_id.to_string(),
+                        speaker: npc_name,
+                        text,
+                        choices: vec![
+                            crate::protocol::DialogueChoice {
+                                id: "claim_contract".to_string(),
+                                text: "Claim rewards".to_string(),
+                            },
+                            crate::protocol::DialogueChoice {
+                                id: "nevermind".to_string(),
+                                text: "Go back".to_string(),
+                            },
+                        ],
+                    },
+                )
+                .await;
             } else {
                 // Contract in progress - show progress
                 let text = format!(
@@ -7778,22 +9284,26 @@ impl GameRoom {
                     contract.amount_required,
                 );
 
-                self.send_to_player(player_id, ServerMessage::ShowDialogue {
-                    quest_id: format!("plot_seller:{}", npc_id),
-                    npc_id: npc_id.to_string(),
-                    speaker: npc_name,
-                    text,
-                    choices: vec![
-                        crate::protocol::DialogueChoice {
-                            id: "abandon_contract".to_string(),
-                            text: "Abandon contract".to_string(),
-                        },
-                        crate::protocol::DialogueChoice {
-                            id: "nevermind".to_string(),
-                            text: "Go back".to_string(),
-                        },
-                    ],
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::ShowDialogue {
+                        quest_id: format!("plot_seller:{}", npc_id),
+                        npc_id: npc_id.to_string(),
+                        speaker: npc_name,
+                        text,
+                        choices: vec![
+                            crate::protocol::DialogueChoice {
+                                id: "abandon_contract".to_string(),
+                                text: "Abandon contract".to_string(),
+                            },
+                            crate::protocol::DialogueChoice {
+                                id: "nevermind".to_string(),
+                                text: "Go back".to_string(),
+                            },
+                        ],
+                    },
+                )
+                .await;
             }
         } else {
             // No active contract - show difficulty selection
@@ -7808,12 +9318,21 @@ impl GameRoom {
                 if farming_level >= diff.level_required() {
                     choices.push(crate::protocol::DialogueChoice {
                         id: format!("accept_{}", diff.as_str()),
-                        text: format!("{} - {}xp, {}gp", diff.display_name(), diff.xp_reward(), diff.gold_reward()),
+                        text: format!(
+                            "{} - {}xp, {}gp",
+                            diff.display_name(),
+                            diff.xp_reward(),
+                            diff.gold_reward()
+                        ),
                     });
                 } else {
                     choices.push(crate::protocol::DialogueChoice {
                         id: format!("locked_{}", diff.as_str()),
-                        text: format!("{} (Requires Farming {})", diff.display_name(), diff.level_required()),
+                        text: format!(
+                            "{} (Requires Farming {})",
+                            diff.display_name(),
+                            diff.level_required()
+                        ),
                     });
                 }
             }
@@ -7838,7 +9357,8 @@ impl GameRoom {
         let difficulty = match crate::farming::ContractDifficulty::from_str(difficulty_str) {
             Some(d) => d,
             None => {
-                self.send_system_message(player_id, "Invalid contract difficulty.").await;
+                self.send_system_message(player_id, "Invalid contract difficulty.")
+                    .await;
                 return;
             }
         };
@@ -7862,7 +9382,9 @@ impl GameRoom {
                 Ok(contract) => {
                     let crop_id = contract.crop_id.clone();
                     let amount = contract.amount_required;
-                    let crop_name = farming.crops.get(&crop_id)
+                    let crop_name = farming
+                        .crops
+                        .get(&crop_id)
                         .map(|c| c.produce_item.clone())
                         .unwrap_or_else(|| crop_id);
                     (crop_name, amount)
@@ -7878,22 +9400,27 @@ impl GameRoom {
         if let Some(ref db) = self.db {
             let farming = self.farming.read().await;
             if let Some(contract) = farming.get_contract(player_id) {
-                if let Err(e) = db.save_farming_contract(
-                    player_id,
-                    contract.difficulty.as_str(),
-                    &contract.crop_id,
-                    contract.amount_required,
-                    contract.amount_harvested,
-                    contract.created_at,
-                ).await {
+                if let Err(e) = db
+                    .save_farming_contract(
+                        player_id,
+                        contract.difficulty.as_str(),
+                        &contract.crop_id,
+                        contract.amount_required,
+                        contract.amount_harvested,
+                        contract.created_at,
+                    )
+                    .await
+                {
                     tracing::error!("Failed to save farming contract: {}", e);
                 }
             }
         }
 
-        self.send_system_message(player_id,
-            &format!("Contract accepted! Harvest {} {}.", amount, crop_name)
-        ).await;
+        self.send_system_message(
+            player_id,
+            &format!("Contract accepted! Harvest {} {}.", amount, crop_name),
+        )
+        .await;
 
         // Send contract update to client
         self.send_farming_contract_update(player_id).await;
@@ -7913,12 +9440,14 @@ impl GameRoom {
                 )),
                 Some(_) => {
                     drop(farming);
-                    self.send_system_message(player_id, "Your contract isn't complete yet.").await;
+                    self.send_system_message(player_id, "Your contract isn't complete yet.")
+                        .await;
                     return;
                 }
                 None => {
                     drop(farming);
-                    self.send_system_message(player_id, "You don't have an active contract.").await;
+                    self.send_system_message(player_id, "You don't have an active contract.")
+                        .await;
                     return;
                 }
             }
@@ -7939,7 +9468,9 @@ impl GameRoom {
         let mut seed_names = Vec::new();
         for _ in 0..seed_count {
             if let Some(seed_id) = farming.random_seed_for_level(player.skills.farming.level) {
-                let seed_name = self.item_registry.get(&seed_id)
+                let seed_name = self
+                    .item_registry
+                    .get(&seed_id)
                     .map(|d| d.display_name.clone())
                     .unwrap_or_else(|| seed_id.clone());
                 player.inventory.add_item(&seed_id, 1, &self.item_registry);
@@ -7970,27 +9501,36 @@ impl GameRoom {
         }
 
         // Send inventory update
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inv_slots,
-            gold,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inv_slots,
+                gold,
+            },
+        )
+        .await;
 
         // Send XP gain
-        self.send_to_player(player_id, ServerMessage::SkillXp {
-            player_id: player_id.to_string(),
-            skill: "farming".to_string(),
-            xp_gained: xp_reward,
-            total_xp: skill_xp,
-            level: skill_level,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::SkillXp {
+                player_id: player_id.to_string(),
+                skill: "farming".to_string(),
+                xp_gained: xp_reward,
+                total_xp: skill_xp,
+                level: skill_level,
+            },
+        )
+        .await;
 
         if leveled {
             self.broadcast(ServerMessage::SkillLevelUp {
                 player_id: player_id.to_string(),
                 skill: "farming".to_string(),
                 new_level: skill_level,
-            }).await;
+            })
+            .await;
             self.process_quest_progression_snapshot(player_id).await;
         }
 
@@ -8000,10 +9540,14 @@ impl GameRoom {
             format!(" and {}", seed_names.join(", "))
         };
 
-        self.send_system_message(player_id,
-            &format!("{} contract complete! Received {} Farming XP, {}gp{}.",
-                diff_name, xp_reward, gold_reward, seed_text)
-        ).await;
+        self.send_system_message(
+            player_id,
+            &format!(
+                "{} contract complete! Received {} Farming XP, {}gp{}.",
+                diff_name, xp_reward, gold_reward, seed_text
+            ),
+        )
+        .await;
 
         // Send cleared contract to client
         self.send_farming_contract_update(player_id).await;
@@ -8014,7 +9558,8 @@ impl GameRoom {
         {
             let mut farming = self.farming.write().await;
             if farming.remove_contract(player_id).is_none() {
-                self.send_system_message(player_id, "You don't have an active contract.").await;
+                self.send_system_message(player_id, "You don't have an active contract.")
+                    .await;
                 return;
             }
         }
@@ -8025,7 +9570,8 @@ impl GameRoom {
             }
         }
 
-        self.send_system_message(player_id, "Contract abandoned.").await;
+        self.send_system_message(player_id, "Contract abandoned.")
+            .await;
 
         // Send cleared contract to client
         self.send_farming_contract_update(player_id).await;
@@ -8034,7 +9580,10 @@ impl GameRoom {
     /// Handle a player purchasing a farming plot
     async fn handle_plot_purchase(&self, player_id: &str, plot_id: u32) {
         // Find the plot requirement
-        let req = match crate::farming::PLOT_REQUIREMENTS.iter().find(|r| r.plot_id == plot_id) {
+        let req = match crate::farming::PLOT_REQUIREMENTS
+            .iter()
+            .find(|r| r.plot_id == plot_id)
+        {
             Some(r) => r,
             None => {
                 self.send_system_message(player_id, "Invalid plot.").await;
@@ -8046,7 +9595,8 @@ impl GameRoom {
         {
             let farming = self.farming.read().await;
             if farming.is_plot_unlocked(player_id, plot_id) {
-                self.send_system_message(player_id, "You already own this plot.").await;
+                self.send_system_message(player_id, "You already own this plot.")
+                    .await;
                 return;
             }
         }
@@ -8061,16 +9611,26 @@ impl GameRoom {
         };
 
         if farming_level < req.farming_level {
-            self.send_system_message(player_id,
-                &format!("You need Farming level {} to unlock this plot.", req.farming_level)
-            ).await;
+            self.send_system_message(
+                player_id,
+                &format!(
+                    "You need Farming level {} to unlock this plot.",
+                    req.farming_level
+                ),
+            )
+            .await;
             return;
         }
 
         if gold < req.gold_cost {
-            self.send_system_message(player_id,
-                &format!("You need {}gp to unlock this plot. You have {}gp.", req.gold_cost, gold)
-            ).await;
+            self.send_system_message(
+                player_id,
+                &format!(
+                    "You need {}gp to unlock this plot. You have {}gp.",
+                    req.gold_cost, gold
+                ),
+            )
+            .await;
             return;
         }
 
@@ -8086,11 +9646,15 @@ impl GameRoom {
         };
 
         // Send inventory update (gold changed)
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inv_update.0,
-            gold: inv_update.1,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inv_update.0,
+                gold: inv_update.1,
+            },
+        )
+        .await;
 
         // Unlock the plot
         {
@@ -8106,9 +9670,14 @@ impl GameRoom {
         }
 
         // Send success message
-        self.send_system_message(player_id,
-            &format!("You've unlocked Plot {}! 16 new allotment patches are now available.", plot_id)
-        ).await;
+        self.send_system_message(
+            player_id,
+            &format!(
+                "You've unlocked Plot {}! 16 new allotment patches are now available.",
+                plot_id
+            ),
+        )
+        .await;
 
         // Send updated farming patches (now includes newly unlocked plot)
         let patches_msg = self.get_farming_patches_message(player_id).await;
@@ -8123,31 +9692,46 @@ impl GameRoom {
             .as_millis() as u64;
         let farming = self.farming.read().await;
         let updates = farming.get_player_patch_states(player_id, current_time);
-        let patches = updates.into_iter().map(|u| {
-            let patch = farming.patches.get(&u.patch_id).unwrap();
-            crate::protocol::FarmingPatchData {
-                patch_id: u.patch_id,
-                x: patch.x,
-                y: patch.y,
-                state: u.state,
-                crop_id: u.crop_id,
-                growth_stage: u.growth_stage,
-                owner_id: u.owner_id,
-            }
-        }).collect();
+        let patches = updates
+            .into_iter()
+            .map(|u| {
+                let patch = farming.patches.get(&u.patch_id).unwrap();
+                crate::protocol::FarmingPatchData {
+                    patch_id: u.patch_id,
+                    x: patch.x,
+                    y: patch.y,
+                    state: u.state,
+                    crop_id: u.crop_id,
+                    growth_stage: u.growth_stage,
+                    owner_id: u.owner_id,
+                }
+            })
+            .collect();
         let unlocked_plots = farming.get_unlocked_plots(player_id);
 
         // Build tile overrides for all farming patches (locked=65, unlocked=62)
-        let tile_overrides = farming.patches.values().map(|patch| {
-            let tile_id = if farming.is_plot_unlocked(player_id, patch.plot) { 62 } else { 65 };
-            crate::protocol::TileOverride {
-                x: patch.x,
-                y: patch.y,
-                tile_id,
-            }
-        }).collect();
+        let tile_overrides = farming
+            .patches
+            .values()
+            .map(|patch| {
+                let tile_id = if farming.is_plot_unlocked(player_id, patch.plot) {
+                    62
+                } else {
+                    65
+                };
+                crate::protocol::TileOverride {
+                    x: patch.x,
+                    y: patch.y,
+                    tile_id,
+                }
+            })
+            .collect();
 
-        ServerMessage::FarmingPatchStates { patches, unlocked_plots, tile_overrides }
+        ServerMessage::FarmingPatchStates {
+            patches,
+            unlocked_plots,
+            tile_overrides,
+        }
     }
 
     /// Build farming contract state message for a player
@@ -8155,7 +9739,9 @@ impl GameRoom {
         let farming = self.farming.read().await;
         match farming.get_contract(player_id) {
             Some(contract) => {
-                let crop_name = farming.crops.get(&contract.crop_id)
+                let crop_name = farming
+                    .crops
+                    .get(&contract.crop_id)
                     .map(|c| c.produce_item.clone())
                     .unwrap_or_else(|| contract.crop_id.clone());
                 ServerMessage::FarmingContractUpdate {
@@ -8278,14 +9864,24 @@ impl GameRoom {
         // Broadcast respawns
         for (id, x, y, hp, prayer_points, max_prayer_points) in respawned_players {
             tracing::info!("Player {} respawned at ({}, {})", id, x, y);
-            self.broadcast(ServerMessage::PlayerRespawned { id: id.clone(), x, y, hp }).await;
+            self.broadcast(ServerMessage::PlayerRespawned {
+                id: id.clone(),
+                x,
+                y,
+                hp,
+            })
+            .await;
 
             // Send prayer state update with restored prayer points
-            self.send_to_player(&id, ServerMessage::PrayerStateUpdate {
-                points: prayer_points,
-                max_points: max_prayer_points,
-                active_prayers: vec![],  // No active prayers after respawn
-            }).await;
+            self.send_to_player(
+                &id,
+                ServerMessage::PrayerStateUpdate {
+                    points: prayer_points,
+                    max_points: max_prayer_points,
+                    active_prayers: vec![], // No active prayers after respawn
+                },
+            )
+            .await;
         }
 
         // Collect pending moves from a snapshot.
@@ -8294,7 +9890,8 @@ impl GameRoom {
         // Use tick-based cooldown for deterministic timing (5 ticks = 250ms)
         let pending_moves: Vec<(String, i32, i32, i32, i32, u32)> = {
             let players = self.players.read().await;
-            players.values()
+            players
+                .values()
                 .filter(|p| p.active && !p.is_dead)
                 .filter(|p| p.move_dx != 0 || p.move_dy != 0)
                 .filter(|p| current_tick - p.last_move_tick >= MOVE_COOLDOWN_TICKS)
@@ -8333,8 +9930,10 @@ impl GameRoom {
 
         // Collect entity positions separated by context (overworld vs per-instance)
         // so that overworld collision doesn't leak into instances and vice versa
-        let mut overworld_player_positions: std::collections::HashSet<(i32, i32)> = std::collections::HashSet::new();
-        let mut instance_player_positions: HashMap<String, std::collections::HashSet<(i32, i32)>> = HashMap::new();
+        let mut overworld_player_positions: std::collections::HashSet<(i32, i32)> =
+            std::collections::HashSet::new();
+        let mut instance_player_positions: HashMap<String, std::collections::HashSet<(i32, i32)>> =
+            HashMap::new();
         {
             let players = self.players.read().await;
             for p in players.values().filter(|p| p.active && !p.is_dead) {
@@ -8360,7 +9959,10 @@ impl GameRoom {
         // Snapshot chair state for collision checking (position -> (occupied_by, direction))
         let chair_snapshot: HashMap<(i32, i32), (Option<String>, Direction)> = {
             let chairs = self.chairs.read().await;
-            chairs.iter().map(|(k, v)| (*k, (v.occupied_by.clone(), v.direction))).collect()
+            chairs
+                .iter()
+                .map(|(k, v)| (*k, (v.occupied_by.clone(), v.direction)))
+                .collect()
         };
 
         // Check walkability and entity collision for each pending move
@@ -8468,7 +10070,8 @@ impl GameRoom {
             .iter()
             .map(|(id, _, _, _, _, _)| id.clone())
             .collect();
-        tick_telemetry.rejected_moves = pending_player_ids.len().saturating_sub(moved_players.len());
+        tick_telemetry.rejected_moves =
+            pending_player_ids.len().saturating_sub(moved_players.len());
 
         // Get set of gathering player IDs for state sync
         let gathering_player_ids: std::collections::HashSet<String> = {
@@ -8477,7 +10080,10 @@ impl GameRoom {
         };
 
         // Stop woodcutting for moved players + get remaining IDs for StateSync (single lock)
-        let (woodcutting_player_ids, woodcutting_stopped): (std::collections::HashSet<String>, Vec<String>) = {
+        let (woodcutting_player_ids, woodcutting_stopped): (
+            std::collections::HashSet<String>,
+            Vec<String>,
+        ) = {
             let mut woodcutting = self.woodcutting.write().await;
             let mut stopped = Vec::new();
             for id in &moved_players {
@@ -8509,7 +10115,8 @@ impl GameRoom {
                 if let Some(player) = players.get_mut(&id) {
                     if sampled_dx != 0 || sampled_dy != 0 {
                         // Facing changes only when movement is actually applied.
-                        player.direction = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
+                        player.direction =
+                            Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
                     }
                     player.x = target_x;
                     player.y = target_y;
@@ -8562,7 +10169,8 @@ impl GameRoom {
                 let dx = (px - loc.x).abs();
                 let dy = (py - loc.y).abs();
                 if dx <= loc.radius && dy <= loc.radius {
-                    self.process_quest_location_reached(player_id, loc_id, *px, *py).await;
+                    self.process_quest_location_reached(player_id, loc_id, *px, *py)
+                        .await;
                 }
             }
         }
@@ -8596,7 +10204,8 @@ impl GameRoom {
 
                     // Prayer drain
                     if !player.active_prayers.is_empty() {
-                        let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
+                        let active_ids: Vec<String> =
+                            player.active_prayers.iter().cloned().collect();
                         let effects = self.prayer_registry.calculate_effects(&active_ids);
                         let drain_amount = effects.total_drain_rate.ceil() as i32;
 
@@ -8629,14 +10238,22 @@ impl GameRoom {
 
             // Send prayer state updates to affected players
             for update in updates {
-                self.send_to_player(&update.player_id, ServerMessage::PrayerStateUpdate {
-                    points: update.new_points,
-                    max_points: update.max_points,
-                    active_prayers: update.active_prayers,
-                }).await;
+                self.send_to_player(
+                    &update.player_id,
+                    ServerMessage::PrayerStateUpdate {
+                        points: update.new_points,
+                        max_points: update.max_points,
+                        active_prayers: update.active_prayers,
+                    },
+                )
+                .await;
 
                 if update.depleted {
-                    self.send_system_message(&update.player_id, "You have run out of prayer points").await;
+                    self.send_system_message(
+                        &update.player_id,
+                        "You have run out of prayer points",
+                    )
+                    .await;
                 }
             }
             prayer_drain_ms = drain_start.elapsed().as_millis();
@@ -8721,7 +10338,8 @@ impl GameRoom {
                 self.broadcast(ServerMessage::GatheringStopped {
                     player_id: id.clone(),
                     reason: "moved".to_string(),
-                }).await;
+                })
+                .await;
             }
         }
 
@@ -8730,15 +10348,21 @@ impl GameRoom {
             self.broadcast(ServerMessage::WoodcuttingStopped {
                 player_id: id.clone(),
                 reason: "moved".to_string(),
-            }).await;
+            })
+            .await;
         }
 
         // Cancel crafting for any player who moved
         {
             let crafting_to_cancel: Vec<String> = {
                 let players = self.players.read().await;
-                moved_players.iter()
-                    .filter(|id| players.get(*id).map_or(false, |p| p.crafting_state.is_some()))
+                moved_players
+                    .iter()
+                    .filter(|id| {
+                        players
+                            .get(*id)
+                            .map_or(false, |p| p.crafting_state.is_some())
+                    })
                     .cloned()
                     .collect()
             };
@@ -8770,9 +10394,9 @@ impl GameRoom {
                 alchemy_level: i32,
                 alchemy_leveled: bool,
                 // Batch info
-                batch_continued: bool,  // true if next batch craft was started
-                batch_completed: u32,   // how many have completed so far
-                batch_total: u32,       // original total
+                batch_continued: bool, // true if next batch craft was started
+                batch_completed: u32,  // how many have completed so far
+                batch_total: u32,      // original total
             }
 
             let completions = {
@@ -8803,7 +10427,11 @@ impl GameRoom {
                     // Add results to inventory
                     let mut items_gained = Vec::new();
                     for result in &recipe.results {
-                        player.inventory.add_item(&result.item_id, result.count, &self.item_registry);
+                        player.inventory.add_item(
+                            &result.item_id,
+                            result.count,
+                            &self.item_registry,
+                        );
                         items_gained.push((result.item_id.clone(), result.count as u32));
                     }
 
@@ -8814,14 +10442,24 @@ impl GameRoom {
                     let (smithing_xp, smithing_total_xp, smithing_level, smithing_leveled) =
                         if xp_gained > 0 && is_smithing {
                             let leveled = player.skills.smithing.add_xp(xp_gained as i64);
-                            (xp_gained as i64, player.skills.smithing.xp, player.skills.smithing.level, leveled)
+                            (
+                                xp_gained as i64,
+                                player.skills.smithing.xp,
+                                player.skills.smithing.level,
+                                leveled,
+                            )
                         } else {
                             (0, 0, 0, false)
                         };
                     let (alchemy_xp, alchemy_total_xp, alchemy_level, alchemy_leveled) =
                         if xp_gained > 0 && is_alchemy {
                             let leveled = player.skills.alchemy.add_xp(xp_gained as i64);
-                            (xp_gained as i64, player.skills.alchemy.xp, player.skills.alchemy.level, leveled)
+                            (
+                                xp_gained as i64,
+                                player.skills.alchemy.xp,
+                                player.skills.alchemy.level,
+                                leveled,
+                            )
                         } else {
                             (0, 0, 0, false)
                         };
@@ -8832,18 +10470,23 @@ impl GameRoom {
                     // Batch continuation: if more crafts remain, try to start next one
                     let batch_continued = if crafting.batch_remaining > 0 {
                         // Check ingredients for next craft
-                        let has_ingredients = recipe.ingredients.iter().all(|i| {
-                            player.inventory.has_item(&i.item_id, i.count)
-                        });
+                        let has_ingredients = recipe
+                            .ingredients
+                            .iter()
+                            .all(|i| player.inventory.has_item(&i.item_id, i.count));
                         let has_space = recipe.results.iter().all(|r| {
-                            player.inventory.has_space_for(&r.item_id, r.count, &self.item_registry)
+                            player
+                                .inventory
+                                .has_space_for(&r.item_id, r.count, &self.item_registry)
                         });
 
                         if has_ingredients && has_space {
                             // Consume materials for next craft
                             let mut next_consumed = Vec::new();
                             for ingredient in &recipe.ingredients {
-                                player.inventory.remove_item(&ingredient.item_id, ingredient.count);
+                                player
+                                    .inventory
+                                    .remove_item(&ingredient.item_id, ingredient.count);
                                 next_consumed.push((ingredient.item_id.clone(), ingredient.count));
                             }
                             player.crafting_state = Some(CraftingState {
@@ -8891,58 +10534,86 @@ impl GameRoom {
             for comp in completions {
                 tracing::info!(
                     "Player {} completed timed craft {} (gained {:?})",
-                    comp.pid, comp.recipe_id, comp.items_gained
+                    comp.pid,
+                    comp.recipe_id,
+                    comp.items_gained
                 );
 
-                self.send_to_player(&comp.pid, ServerMessage::CraftingCompleted {
-                    recipe_id: comp.recipe_id.clone(),
-                    items_gained: comp.items_gained,
-                    xp_gained: comp.xp_gained,
-                }).await;
+                self.send_to_player(
+                    &comp.pid,
+                    ServerMessage::CraftingCompleted {
+                        recipe_id: comp.recipe_id.clone(),
+                        items_gained: comp.items_gained,
+                        xp_gained: comp.xp_gained,
+                    },
+                )
+                .await;
 
-                self.send_to_player(&comp.pid, ServerMessage::InventoryUpdate {
-                    player_id: comp.pid.clone(),
-                    slots: comp.inv_update,
-                    gold: comp.gold,
-                }).await;
+                self.send_to_player(
+                    &comp.pid,
+                    ServerMessage::InventoryUpdate {
+                        player_id: comp.pid.clone(),
+                        slots: comp.inv_update,
+                        gold: comp.gold,
+                    },
+                )
+                .await;
 
                 // Send smithing XP if applicable
                 if comp.is_smithing && comp.smithing_xp > 0 {
-                    self.send_to_player(&comp.pid, ServerMessage::SkillXp {
-                        player_id: comp.pid.clone(),
-                        skill: "smithing".to_string(),
-                        xp_gained: comp.smithing_xp,
-                        total_xp: comp.smithing_total_xp,
-                        level: comp.smithing_level,
-                    }).await;
+                    self.send_to_player(
+                        &comp.pid,
+                        ServerMessage::SkillXp {
+                            player_id: comp.pid.clone(),
+                            skill: "smithing".to_string(),
+                            xp_gained: comp.smithing_xp,
+                            total_xp: comp.smithing_total_xp,
+                            level: comp.smithing_level,
+                        },
+                    )
+                    .await;
 
                     if comp.smithing_leveled {
-                        tracing::info!("Player {} leveled up smithing to {}", comp.pid, comp.smithing_level);
+                        tracing::info!(
+                            "Player {} leveled up smithing to {}",
+                            comp.pid,
+                            comp.smithing_level
+                        );
                         self.broadcast(ServerMessage::SkillLevelUp {
                             player_id: comp.pid.clone(),
                             skill: "smithing".to_string(),
                             new_level: comp.smithing_level,
-                        }).await;
+                        })
+                        .await;
                     }
                 }
 
                 // Send alchemy XP if applicable
                 if comp.is_alchemy && comp.alchemy_xp > 0 {
-                    self.send_to_player(&comp.pid, ServerMessage::SkillXp {
-                        player_id: comp.pid.clone(),
-                        skill: "alchemy".to_string(),
-                        xp_gained: comp.alchemy_xp,
-                        total_xp: comp.alchemy_total_xp,
-                        level: comp.alchemy_level,
-                    }).await;
+                    self.send_to_player(
+                        &comp.pid,
+                        ServerMessage::SkillXp {
+                            player_id: comp.pid.clone(),
+                            skill: "alchemy".to_string(),
+                            xp_gained: comp.alchemy_xp,
+                            total_xp: comp.alchemy_total_xp,
+                            level: comp.alchemy_level,
+                        },
+                    )
+                    .await;
 
                     if comp.alchemy_leveled {
-                        tracing::info!("Player {} leveled up alchemy to {}", comp.pid, comp.alchemy_level);
+                        tracing::info!(
+                            "Player {} leveled up alchemy to {}",
+                            comp.pid,
+                            comp.alchemy_level
+                        );
                         self.broadcast(ServerMessage::SkillLevelUp {
                             player_id: comp.pid.clone(),
                             skill: "alchemy".to_string(),
                             new_level: comp.alchemy_level,
-                        }).await;
+                        })
+                        .await;
                     }
                 }
 
@@ -8954,23 +10625,37 @@ impl GameRoom {
                 // Batch continuation: send next crafting started + progress
                 if comp.batch_continued {
                     // Look up recipe for duration
-                    let duration = self.crafting_registry.get(&comp.recipe_id)
+                    let duration = self
+                        .crafting_registry
+                        .get(&comp.recipe_id)
                         .map(|r| r.craft_time_ms)
                         .unwrap_or(2000);
-                    self.send_to_player(&comp.pid, ServerMessage::CraftingStarted {
-                        recipe_id: comp.recipe_id,
-                        duration_ms: duration,
-                    }).await;
-                    self.send_to_player(&comp.pid, ServerMessage::CraftingBatchProgress {
-                        completed: comp.batch_completed,
-                        total: comp.batch_total,
-                    }).await;
+                    self.send_to_player(
+                        &comp.pid,
+                        ServerMessage::CraftingStarted {
+                            recipe_id: comp.recipe_id,
+                            duration_ms: duration,
+                        },
+                    )
+                    .await;
+                    self.send_to_player(
+                        &comp.pid,
+                        ServerMessage::CraftingBatchProgress {
+                            completed: comp.batch_completed,
+                            total: comp.batch_total,
+                        },
+                    )
+                    .await;
                 } else if comp.batch_total > 1 {
                     // Batch ended (ran out of materials/space or completed all)
-                    self.send_to_player(&comp.pid, ServerMessage::CraftingBatchProgress {
-                        completed: comp.batch_completed,
-                        total: comp.batch_total,
-                    }).await;
+                    self.send_to_player(
+                        &comp.pid,
+                        ServerMessage::CraftingBatchProgress {
+                            completed: comp.batch_completed,
+                            total: comp.batch_total,
+                        },
+                    )
+                    .await;
                 }
             }
         }
@@ -8983,7 +10668,8 @@ impl GameRoom {
             let players = self.players.read().await;
             let gathering = self.gathering.read().await;
             let instances = self.player_instances.read().await;
-            players.values()
+            players
+                .values()
                 .filter(|p| p.active && p.is_alive())
                 // Players in instances are invisible to overworld NPCs
                 .filter(|p| !instances.contains_key(&p.id))
@@ -9000,7 +10686,10 @@ impl GameRoom {
             for (pid, px, py, _) in &player_positions {
                 let cx = px.div_euclid(CHUNK_SIZE as i32);
                 let cy = py.div_euclid(CHUNK_SIZE as i32);
-                players_by_chunk.entry((cx, cy)).or_default().push((pid.as_str(), *px, *py));
+                players_by_chunk
+                    .entry((cx, cy))
+                    .or_default()
+                    .push((pid.as_str(), *px, *py));
             }
         }
 
@@ -9048,14 +10737,31 @@ impl GameRoom {
                 occupied_tiles.remove(&old_pos);
 
                 // Run NPC AI update
-                if let Some((target_id, max_hit)) = npc.update(delta_time, &player_positions, &occupied_tiles, current_time, &walkable_check) {
-                    npc_attacks.push((npc.id.clone(), target_id, npc.level, max_hit, npc.stats.attack_bonus));
+                if let Some((target_id, max_hit)) = npc.update(
+                    delta_time,
+                    &player_positions,
+                    &occupied_tiles,
+                    current_time,
+                    &walkable_check,
+                ) {
+                    npc_attacks.push((
+                        npc.id.clone(),
+                        target_id,
+                        npc.level,
+                        max_hit,
+                        npc.stats.attack_bonus,
+                    ));
                 }
 
                 // Verify NPC isn't on a blocked tile (debug check)
                 let new_pos = (npc.x, npc.y);
                 if old_pos != new_pos && !walkable_check(npc.x, npc.y) {
-                    tracing::error!("BUG: NPC {} moved from {:?} to blocked tile {:?}!", npc.id, old_pos, new_pos);
+                    tracing::error!(
+                        "BUG: NPC {} moved from {:?} to blocked tile {:?}!",
+                        npc.id,
+                        old_pos,
+                        new_pos
+                    );
                 }
 
                 // Re-insert updated position
@@ -9075,7 +10781,8 @@ impl GameRoom {
                     let mut nearby: Vec<(&str, i32, i32)> = Vec::new();
                     for dx in -chunk_radius..=chunk_radius {
                         for dy in -chunk_radius..=chunk_radius {
-                            if let Some(players) = players_by_chunk.get(&(npc_cx + dx, npc_cy + dy)) {
+                            if let Some(players) = players_by_chunk.get(&(npc_cx + dx, npc_cy + dy))
+                            {
                                 nearby.extend_from_slice(players);
                             }
                         }
@@ -9090,10 +10797,14 @@ impl GameRoom {
 
         // Send NPC speech bubbles to nearby players
         for (player_id, npc_id, message) in npc_speech_events {
-            self.send_to_player(&player_id, ServerMessage::NpcSpeech {
-                npc_id: npc_id.clone(),
-                message: message.clone(),
-            }).await;
+            self.send_to_player(
+                &player_id,
+                ServerMessage::NpcSpeech {
+                    npc_id: npc_id.clone(),
+                    message: message.clone(),
+                },
+            )
+            .await;
         }
 
         // Process NPC AI updates + speech for instance NPCs (interiors)
@@ -9104,7 +10815,11 @@ impl GameRoom {
             for (pid, inst_id) in player_inst.iter() {
                 if let Some(p) = players.get(pid) {
                     if p.active && p.is_alive() {
-                        instance_players.entry(inst_id.clone()).or_default().push((pid.clone(), p.x, p.y));
+                        instance_players.entry(inst_id.clone()).or_default().push((
+                            pid.clone(),
+                            p.x,
+                            p.y,
+                        ));
                     }
                 }
             }
@@ -9114,24 +10829,35 @@ impl GameRoom {
             let mut instance_speech_events: Vec<(String, String, String)> = Vec::new();
 
             // Update AI + speech for public and private instance NPCs
-            for entry in self.instance_manager.public_instances.iter()
+            for entry in self
+                .instance_manager
+                .public_instances
+                .iter()
                 .map(|e| e.value().clone())
-                .chain(self.instance_manager.private_instances.iter().map(|e| e.value().clone()))
+                .chain(
+                    self.instance_manager
+                        .private_instances
+                        .iter()
+                        .map(|e| e.value().clone()),
+                )
             {
                 // Build player positions for this instance (format matches npc.update signature)
-                let inst_player_list: Vec<(String, i32, i32, i32)> = if let Some(inst_players) = instance_players.get(&entry.id) {
-                    let players_guard = self.players.read().await;
-                    inst_players.iter().filter_map(|(pid, x, y)| {
-                        players_guard.get(pid).map(|p| (pid.clone(), *x, *y, p.hp))
-                    }).collect()
-                } else {
-                    continue; // No players in this instance, skip AI updates
-                };
+                let inst_player_list: Vec<(String, i32, i32, i32)> =
+                    if let Some(inst_players) = instance_players.get(&entry.id) {
+                        let players_guard = self.players.read().await;
+                        inst_players
+                            .iter()
+                            .filter_map(|(pid, x, y)| {
+                                players_guard.get(pid).map(|p| (pid.clone(), *x, *y, p.hp))
+                            })
+                            .collect()
+                    } else {
+                        continue; // No players in this instance, skip AI updates
+                    };
 
                 let collision = entry.collision.read().await;
-                let walkable_check = |wx: i32, wy: i32| -> bool {
-                    entry.is_walkable_sync(&collision, wx, wy)
-                };
+                let walkable_check =
+                    |wx: i32, wy: i32| -> bool { entry.is_walkable_sync(&collision, wx, wy) };
 
                 // Build occupied tiles for this instance (NPC + player positions)
                 let mut npcs = entry.npcs.write().await;
@@ -9156,8 +10882,20 @@ impl GameRoom {
                     occupied_tiles.remove(&old_pos);
 
                     // Run NPC AI update (wandering, chasing, attacking)
-                    if let Some((target_id, max_hit)) = npc.update(delta_time, &inst_player_list, &occupied_tiles, current_time, &walkable_check) {
-                        npc_attacks.push((npc.id.clone(), target_id, npc.level, max_hit, npc.stats.attack_bonus));
+                    if let Some((target_id, max_hit)) = npc.update(
+                        delta_time,
+                        &inst_player_list,
+                        &occupied_tiles,
+                        current_time,
+                        &walkable_check,
+                    ) {
+                        npc_attacks.push((
+                            npc.id.clone(),
+                            target_id,
+                            npc.level,
+                            max_hit,
+                            npc.stats.attack_bonus,
+                        ));
                     }
 
                     // Re-insert updated position
@@ -9169,7 +10907,8 @@ impl GameRoom {
                     npc.apply_regen(current_time);
 
                     // Check NPC speech
-                    let as_refs: Vec<(&str, i32, i32)> = inst_player_list.iter()
+                    let as_refs: Vec<(&str, i32, i32)> = inst_player_list
+                        .iter()
                         .map(|(pid, x, y, _)| (pid.as_str(), *x, *y))
                         .collect();
                     check_npc_speech(npc, &as_refs, current_time, &mut instance_speech_events);
@@ -9177,10 +10916,14 @@ impl GameRoom {
             }
 
             for (player_id, npc_id, message) in instance_speech_events {
-                self.send_to_player(&player_id, ServerMessage::NpcSpeech {
-                    npc_id: npc_id.clone(),
-                    message: message.clone(),
-                }).await;
+                self.send_to_player(
+                    &player_id,
+                    ServerMessage::NpcSpeech {
+                        npc_id: npc_id.clone(),
+                        message: message.clone(),
+                    },
+                )
+                .await;
             }
         }
 
@@ -9214,14 +10957,24 @@ impl GameRoom {
                     // Apply prayer bonuses to player's defence
                     let active_ids: Vec<String> = target.active_prayers.iter().cloned().collect();
                     let prayer_effects = self.prayer_registry.calculate_effects(&active_ids);
-                    let player_defence_bonus = prayer_effects.apply_defence_bonus(base_defence_bonus);
+                    let player_defence_bonus =
+                        prayer_effects.apply_defence_bonus(base_defence_bonus);
 
                     // Roll hit/miss
-                    if !calculate_hit(npc_attack_level, npc_attack_bonus, player_defence_level, player_defence_bonus) {
+                    if !calculate_hit(
+                        npc_attack_level,
+                        npc_attack_bonus,
+                        player_defence_level,
+                        player_defence_bonus,
+                    ) {
                         // Miss - deal 0 damage
                         tracing::debug!(
                             "NPC {} misses {} (atk {} vs def {} + {})",
-                            npc_id, target_id, npc_attack_level, player_defence_level, player_defence_bonus
+                            npc_id,
+                            target_id,
+                            npc_attack_level,
+                            player_defence_level,
+                            player_defence_bonus
                         );
                         (target.hp, target.x as f32, target.y as f32, false, 0)
                     } else {
@@ -9235,7 +10988,12 @@ impl GameRoom {
                         }
                         tracing::debug!(
                             "NPC {} hits {} for {} damage (max: {}, raw: {}, HP: {})",
-                            npc_id, target_id, damage, max_hit, raw_damage, target.hp
+                            npc_id,
+                            target_id,
+                            damage,
+                            max_hit,
+                            raw_damage,
+                            target.hp
                         );
                         (target.hp, target.x as f32, target.y as f32, died, damage)
                     }
@@ -9245,15 +11003,19 @@ impl GameRoom {
             };
 
             // Broadcast damage event to players in the same zone
-            self.broadcast_to_zone(&target_id, ServerMessage::DamageEvent {
-                source_id: npc_id.clone(),
-                target_id: target_id.clone(),
-                damage,
-                target_hp,
-                target_x,
-                target_y,
-                projectile: None,
-            }).await;
+            self.broadcast_to_zone(
+                &target_id,
+                ServerMessage::DamageEvent {
+                    source_id: npc_id.clone(),
+                    target_id: target_id.clone(),
+                    damage,
+                    target_hp,
+                    target_x,
+                    target_y,
+                    projectile: None,
+                },
+            )
+            .await;
 
             // Interrupt crafting if player took damage
             if damage > 0 {
@@ -9266,7 +11028,8 @@ impl GameRoom {
                 self.broadcast(ServerMessage::PlayerDied {
                     id: target_id.clone(),
                     killer_id: npc_id.clone(),
-                }).await;
+                })
+                .await;
 
                 // Send prayer state update to dying player (prayers cleared on death)
                 let (points, max_points) = {
@@ -9277,23 +11040,29 @@ impl GameRoom {
                         (0, 1)
                     }
                 };
-                self.send_to_player(&target_id, ServerMessage::PrayerStateUpdate {
-                    points,
-                    max_points,
-                    active_prayers: vec![],  // Cleared on death
-                }).await;
+                self.send_to_player(
+                    &target_id,
+                    ServerMessage::PrayerStateUpdate {
+                        points,
+                        max_points,
+                        active_prayers: vec![], // Cleared on death
+                    },
+                )
+                .await;
             }
         }
 
         // Broadcast respawns
         for (id, x, y) in respawned_npcs {
-            self.broadcast(ServerMessage::NpcRespawned { id, x, y }).await;
+            self.broadcast(ServerMessage::NpcRespawned { id, x, y })
+                .await;
         }
 
         // Check for expired items (60 second lifetime)
         let expired_items: Vec<String> = {
             let items = self.ground_items.read().await;
-            items.iter()
+            items
+                .iter()
                 .filter(|(_, item)| item.is_expired(current_time))
                 .map(|(id, _)| id.clone())
                 .collect()
@@ -9304,7 +11073,8 @@ impl GameRoom {
             let mut items = self.ground_items.write().await;
             if items.remove(&item_id).is_some() {
                 drop(items);
-                self.broadcast(ServerMessage::ItemDespawned { item_id }).await;
+                self.broadcast(ServerMessage::ItemDespawned { item_id })
+                    .await;
             }
         }
 
@@ -9325,27 +11095,43 @@ impl GameRoom {
         let gatherer_stats: HashMap<String, (i32, f32)> = {
             let players = self.players.read().await;
             let gathering = self.gathering.read().await;
-            gathering.player_states.keys()
+            gathering
+                .player_states
+                .keys()
                 .filter_map(|pid| {
                     players.get(pid).map(|p| {
                         let active_ids: Vec<String> = p.active_prayers.iter().cloned().collect();
                         let effects = self.prayer_registry.calculate_effects(&active_ids);
-                        (pid.clone(), (p.skills.fishing.level, effects.gather_speed_multiplier()))
+                        (
+                            pid.clone(),
+                            (p.skills.fishing.level, effects.gather_speed_multiplier()),
+                        )
                     })
                 })
                 .collect()
         };
 
         // Phase 1b: Process gathering ticks (gathering.write only)
-        struct GatherResult { pid: String, item_id: String, xp_gained: i64 }
+        struct GatherResult {
+            pid: String,
+            item_id: String,
+            xp_gained: i64,
+        }
         let (gather_results, bonus_events) = {
             let mut gathering = self.gathering.write().await;
             let mut results: Vec<GatherResult> = Vec::new();
             let gatherer_ids: Vec<String> = gathering.player_states.keys().cloned().collect();
             for pid in &gatherer_ids {
-                let (fishing_level, prayer_speed) = gatherer_stats.get(pid).copied().unwrap_or((1, 1.0));
-                if let Some(result) = gathering.tick_gathering(pid, fishing_level, current_time, prayer_speed) {
-                    results.push(GatherResult { pid: pid.clone(), item_id: result.item_id, xp_gained: result.xp_gained });
+                let (fishing_level, prayer_speed) =
+                    gatherer_stats.get(pid).copied().unwrap_or((1, 1.0));
+                if let Some(result) =
+                    gathering.tick_gathering(pid, fishing_level, current_time, prayer_speed)
+                {
+                    results.push(GatherResult {
+                        pid: pid.clone(),
+                        item_id: result.item_id,
+                        xp_gained: result.xp_gained,
+                    });
                 }
             }
             let bonus_events = gathering.tick_bonus_tiles(current_time);
@@ -9359,7 +11145,9 @@ impl GameRoom {
             let mut ticks: Vec<GatherTick> = Vec::new();
             for gr in &gather_results {
                 if let Some(player) = players.get_mut(&gr.pid) {
-                    let leftover = player.inventory.add_item(&gr.item_id, 1, &self.item_registry);
+                    let leftover = player
+                        .inventory
+                        .add_item(&gr.item_id, 1, &self.item_registry);
                     if leftover > 0 {
                         inventory_full_players.push(gr.pid.clone());
                         continue;
@@ -9391,31 +11179,45 @@ impl GameRoom {
         // Phase 2: Send messages (no locks held)
         for tick in gather_ticks {
             // Process quest item collection for gathering drops
-            self.process_quest_item_collect(&tick.pid, &tick.item_id, 1).await;
+            self.process_quest_item_collect(&tick.pid, &tick.item_id, 1)
+                .await;
 
-            self.send_to_player(&tick.pid, ServerMessage::GatheringResult {
-                player_id: tick.pid.clone(),
-                item_id: tick.item_id,
-                xp_gained: tick.xp_gained,
-            }).await;
-            self.send_to_player(&tick.pid, ServerMessage::InventoryUpdate {
-                player_id: tick.pid.clone(),
-                slots: tick.inv_update,
-                gold: tick.gold,
-            }).await;
-            self.send_to_player(&tick.pid, ServerMessage::SkillXp {
-                player_id: tick.pid.clone(),
-                skill: "fishing".to_string(),
-                xp_gained: tick.xp_gained,
-                total_xp: tick.total_xp,
-                level: tick.level,
-            }).await;
+            self.send_to_player(
+                &tick.pid,
+                ServerMessage::GatheringResult {
+                    player_id: tick.pid.clone(),
+                    item_id: tick.item_id,
+                    xp_gained: tick.xp_gained,
+                },
+            )
+            .await;
+            self.send_to_player(
+                &tick.pid,
+                ServerMessage::InventoryUpdate {
+                    player_id: tick.pid.clone(),
+                    slots: tick.inv_update,
+                    gold: tick.gold,
+                },
+            )
+            .await;
+            self.send_to_player(
+                &tick.pid,
+                ServerMessage::SkillXp {
+                    player_id: tick.pid.clone(),
+                    skill: "fishing".to_string(),
+                    xp_gained: tick.xp_gained,
+                    total_xp: tick.total_xp,
+                    level: tick.level,
+                },
+            )
+            .await;
             if tick.leveled {
                 self.broadcast(ServerMessage::SkillLevelUp {
                     player_id: tick.pid.clone(),
                     skill: "fishing".to_string(),
                     new_level: tick.level,
-                }).await;
+                })
+                .await;
                 self.process_quest_progression_snapshot(&tick.pid).await;
             }
         }
@@ -9423,18 +11225,27 @@ impl GameRoom {
             self.broadcast(ServerMessage::GatheringStopped {
                 player_id: pid.clone(),
                 reason: "inventory_full".to_string(),
-            }).await;
+            })
+            .await;
         }
         // Bonus tiles only appear in chunk 0,0 of the overworld (not in instances)
         for event in bonus_events {
             match event {
                 crate::gathering::BonusTileEvent::Spawned { x, y, zone_id } => {
-                    self.send_to_overworld_players(ServerMessage::BonusTileSpawned {
-                        x, y, zone_id, telegraph_duration: 5000,
-                    }, None).await;
+                    self.send_to_overworld_players(
+                        ServerMessage::BonusTileSpawned {
+                            x,
+                            y,
+                            zone_id,
+                            telegraph_duration: 5000,
+                        },
+                        None,
+                    )
+                    .await;
                 }
                 crate::gathering::BonusTileEvent::Expired { x, y } => {
-                    self.send_to_overworld_players(ServerMessage::BonusTileExpired { x, y }, None).await;
+                    self.send_to_overworld_players(ServerMessage::BonusTileExpired { x, y }, None)
+                        .await;
                 }
             }
         }
@@ -9449,7 +11260,8 @@ impl GameRoom {
                 x: event.x,
                 y: event.y,
                 gid: event.gid,
-            }).await;
+            })
+            .await;
         }
 
         // Rock respawn tick: check for rocks that should respawn
@@ -9462,7 +11274,8 @@ impl GameRoom {
                 x: event.x,
                 y: event.y,
                 gid: event.gid,
-            }).await;
+            })
+            .await;
         }
 
         // Farming tick: check growth stage transitions (every 5 seconds / ~100 ticks)
@@ -9473,13 +11286,17 @@ impl GameRoom {
                 farming.tick_growth(current_time)
             };
             for (target_player_id, update) in updates {
-                self.send_to_player(&target_player_id, ServerMessage::PatchStateUpdate {
-                    patch_id: update.patch_id,
-                    state: update.state,
-                    crop_id: update.crop_id,
-                    growth_stage: update.growth_stage,
-                    owner_id: update.owner_id,
-                }).await;
+                self.send_to_player(
+                    &target_player_id,
+                    ServerMessage::PatchStateUpdate {
+                        patch_id: update.patch_id,
+                        state: update.state,
+                        crop_id: update.crop_id,
+                        growth_stage: update.growth_stage,
+                        owner_id: update.owner_id,
+                    },
+                )
+                .await;
             }
             farming_growth_ms = farming_growth_start.elapsed().as_millis();
         }
@@ -9605,7 +11422,10 @@ impl GameRoom {
             let mut npc_quest_ids: HashMap<String, Vec<String>> = HashMap::new();
             for q in &quests {
                 if !q.giver_npc.is_empty() {
-                    npc_quest_ids.entry(q.giver_npc.clone()).or_default().push(q.id.clone());
+                    npc_quest_ids
+                        .entry(q.giver_npc.clone())
+                        .or_default()
+                        .push(q.id.clone());
                 }
             }
 
@@ -9614,7 +11434,9 @@ impl GameRoom {
             for (player_id, state) in quest_states.iter() {
                 let mut done_npcs: HashSet<String> = HashSet::new();
                 for (npc_id, quest_ids) in &npc_quest_ids {
-                    if !quest_ids.is_empty() && quest_ids.iter().all(|qid| state.is_quest_completed(qid)) {
+                    if !quest_ids.is_empty()
+                        && quest_ids.iter().all(|qid| state.is_quest_completed(qid))
+                    {
                         done_npcs.insert(npc_id.clone());
                     }
                 }
@@ -9626,16 +11448,21 @@ impl GameRoom {
         };
 
         // Build position lookup for O(1) access during culling
-        let player_pos_map: HashMap<&str, (i32, i32)> = player_updates.iter()
+        let player_pos_map: HashMap<&str, (i32, i32)> = player_updates
+            .iter()
             .map(|p| (p.id.as_str(), (p.x, p.y)))
             .collect();
 
         // Separate overworld vs instance senders
-        let mut instance_groups: HashMap<&str, Vec<(&String, &mpsc::Sender<Vec<u8>>)>> = HashMap::new();
+        let mut instance_groups: HashMap<&str, Vec<(&String, &mpsc::Sender<Vec<u8>>)>> =
+            HashMap::new();
         let mut overworld_senders: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = Vec::new();
         for (player_id, sender) in senders_snapshot.iter() {
             match instance_snapshot.get(player_id) {
-                Some(inst_id) => instance_groups.entry(inst_id.as_str()).or_default().push((player_id, sender)),
+                Some(inst_id) => instance_groups
+                    .entry(inst_id.as_str())
+                    .or_default()
+                    .push((player_id, sender)),
                 None => overworld_senders.push((player_id, sender)),
             }
         }
@@ -9645,7 +11472,10 @@ impl GameRoom {
         let mut overworld_players: Vec<&PlayerUpdate> = Vec::new();
         for p in &player_updates {
             match instance_snapshot.get(&p.id) {
-                Some(inst_id) => players_by_instance.entry(inst_id.as_str()).or_default().push(p),
+                Some(inst_id) => players_by_instance
+                    .entry(inst_id.as_str())
+                    .or_default()
+                    .push(p),
                 None => overworld_players.push(p),
             }
         }
@@ -9663,8 +11493,10 @@ impl GameRoom {
             }
             tick_telemetry.state_sync_capacity_skips += low_capacity_receivers.len();
 
-            let players_in_instance: Vec<&PlayerUpdate> =
-                players_by_instance.get(inst_id).cloned().unwrap_or_default();
+            let players_in_instance: Vec<&PlayerUpdate> = players_by_instance
+                .get(inst_id)
+                .cloned()
+                .unwrap_or_default();
             let player_values: Vec<rmpv::Value> = players_in_instance
                 .iter()
                 .map(|p| crate::protocol::player_update_to_value(p))
@@ -9674,13 +11506,12 @@ impl GameRoom {
                 .map(|p| (p.id.as_str(), *p))
                 .collect();
 
-            let instance_npcs: Vec<NpcUpdate> = if let Some(instance) =
-                self.instance_manager.get_by_instance_id(inst_id)
-            {
-                instance.get_npc_updates().await
-            } else {
-                Vec::new()
-            };
+            let instance_npcs: Vec<NpcUpdate> =
+                if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                    instance.get_npc_updates().await
+                } else {
+                    Vec::new()
+                };
 
             for (pid, sender) in active_receivers {
                 let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(pid.as_str());
@@ -9691,7 +11522,10 @@ impl GameRoom {
                         let mut n_for_player = n.clone();
                         // Hide quest giver icon for merchant NPCs whose quests are all done
                         if n_for_player.is_quest_giver && n_for_player.is_merchant {
-                            if done_npcs.map(|set| set.contains(n_for_player.prototype_id.as_str())).unwrap_or(false) {
+                            if done_npcs
+                                .map(|set| set.contains(n_for_player.prototype_id.as_str()))
+                                .unwrap_or(false)
+                            {
                                 n_for_player.is_quest_giver = false;
                             }
                         }
@@ -9760,12 +11594,12 @@ impl GameRoom {
 
         // Overworld: delta-compressed per-player StateSync
         // Build lookup maps for nearby entity filtering
-        let overworld_player_map: HashMap<&str, &PlayerUpdate> = overworld_players.iter()
+        let overworld_player_map: HashMap<&str, &PlayerUpdate> = overworld_players
+            .iter()
             .map(|p| (p.id.as_str(), *p))
             .collect();
-        let npc_map: HashMap<&str, &NpcUpdate> = npc_updates.iter()
-            .map(|n| (n.id.as_str(), n))
-            .collect();
+        let npc_map: HashMap<&str, &NpcUpdate> =
+            npc_updates.iter().map(|n| (n.id.as_str(), n)).collect();
 
         let current_tick = tick;
         let mut sync_states = self.sync_states.write().await;
@@ -9775,7 +11609,8 @@ impl GameRoom {
                 tick_telemetry.state_sync_capacity_skips += 1;
                 if sender.capacity() > 0 {
                     if let Some(self_update) = overworld_player_map.get(player_id.as_str()) {
-                        let self_values = vec![crate::protocol::player_update_to_value(self_update)];
+                        let self_values =
+                            vec![crate::protocol::player_update_to_value(self_update)];
                         if let Ok(raw) = crate::protocol::encode_delta_state_sync(
                             tick,
                             self_values,
@@ -9795,11 +11630,7 @@ impl GameRoom {
                             tick_telemetry.state_sync_bytes_sent += bytes_len;
                             if let Err(e) = sender.try_send(bytes) {
                                 tick_telemetry.state_sync_try_send_drops += 1;
-                                tracing::debug!(
-                                    "StateSync fallback drop for {}: {}",
-                                    player_id,
-                                    e
-                                );
+                                tracing::debug!("StateSync fallback drop for {}: {}", player_id, e);
                             }
                         }
                     }
@@ -9813,19 +11644,24 @@ impl GameRoom {
             };
 
             // Filter nearby entities by view distance
-            let nearby_players: HashMap<String, &PlayerUpdate> = overworld_player_map.iter()
+            let nearby_players: HashMap<String, &PlayerUpdate> = overworld_player_map
+                .iter()
                 .filter(|(_, p)| (p.x - px).abs().max((p.y - py).abs()) <= VIEW_DISTANCE)
                 .map(|(_, p)| (p.id.clone(), *p))
                 .collect();
             let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(player_id.as_str());
             let done_npcs = all_npc_quests_done_by_player.get(player_id.as_str());
-            let nearby_npcs: HashMap<String, NpcUpdate> = npc_map.iter()
+            let nearby_npcs: HashMap<String, NpcUpdate> = npc_map
+                .iter()
                 .filter(|(_, n)| (n.x - px).abs().max((n.y - py).abs()) <= VIEW_DISTANCE)
                 .map(|(_, n)| {
                     let mut n_for_player = (*n).clone();
                     // Hide quest giver icon for merchant NPCs whose quests are all done
                     if n_for_player.is_quest_giver && n_for_player.is_merchant {
-                        if done_npcs.map(|set| set.contains(n_for_player.prototype_id.as_str())).unwrap_or(false) {
+                        if done_npcs
+                            .map(|set| set.contains(n_for_player.prototype_id.as_str()))
+                            .unwrap_or(false)
+                        {
                             n_for_player.is_quest_giver = false;
                         }
                     }
@@ -9837,20 +11673,29 @@ impl GameRoom {
                 })
                 .collect();
 
-            let sync_state = sync_states.entry(player_id.to_string()).or_insert_with(PlayerSyncState::new);
+            let sync_state = sync_states
+                .entry(player_id.to_string())
+                .or_insert_with(PlayerSyncState::new);
             let needs_full = sync_state.last_full_sync_tick == 0
                 || (current_tick - sync_state.last_full_sync_tick) >= FULL_SYNC_INTERVAL;
 
             if needs_full {
                 // Full sync: encode all nearby entities
-                let player_values: Vec<rmpv::Value> = nearby_players.values()
+                let player_values: Vec<rmpv::Value> = nearby_players
+                    .values()
                     .map(|p| crate::protocol::player_update_to_value(p))
                     .collect();
-                let npc_values: Vec<rmpv::Value> = nearby_npcs.values()
+                let npc_values: Vec<rmpv::Value> = nearby_npcs
+                    .values()
                     .map(|n| crate::protocol::npc_update_to_value(n))
                     .collect();
 
-                if let Ok(raw) = crate::protocol::encode_state_sync_from_values(tick, player_values, npc_values, "") {
+                if let Ok(raw) = crate::protocol::encode_state_sync_from_values(
+                    tick,
+                    player_values,
+                    npc_values,
+                    "",
+                ) {
                     let raw_len = raw.len();
                     let bytes = crate::protocol::maybe_compress(raw);
                     let bytes_len = bytes.len();
@@ -9864,7 +11709,8 @@ impl GameRoom {
                     } else {
                         // Only update sync state if send succeeded
                         sync_state.last_full_sync_tick = current_tick;
-                        sync_state.last_players = nearby_players.into_iter()
+                        sync_state.last_players = nearby_players
+                            .into_iter()
                             .map(|(id, p)| (id, p.clone()))
                             .collect();
                         sync_state.last_npcs = nearby_npcs;
@@ -9896,17 +11742,27 @@ impl GameRoom {
                 }
 
                 // Find removed entities (were in last sync but not nearby now)
-                let removed_players: Vec<String> = sync_state.last_players.keys()
+                let removed_players: Vec<String> = sync_state
+                    .last_players
+                    .keys()
                     .filter(|id| !nearby_players.contains_key(id.as_str()))
                     .cloned()
                     .collect();
-                let removed_npcs: Vec<String> = sync_state.last_npcs.keys()
+                let removed_npcs: Vec<String> = sync_state
+                    .last_npcs
+                    .keys()
                     .filter(|id| !nearby_npcs.contains_key(id.as_str()))
                     .cloned()
                     .collect();
 
                 if let Ok(raw) = crate::protocol::encode_delta_state_sync(
-                    tick, changed_players, changed_npcs, "", false, &removed_players, &removed_npcs,
+                    tick,
+                    changed_players,
+                    changed_npcs,
+                    "",
+                    false,
+                    &removed_players,
+                    &removed_npcs,
                 ) {
                     let raw_len = raw.len();
                     let bytes = crate::protocol::maybe_compress(raw);
@@ -9958,7 +11814,9 @@ impl GameRoom {
                 prayer_drain_ms,
                 farming_growth_ms,
                 restock_ms,
-                tick_telemetry.pending_moves.saturating_sub(tick_telemetry.rejected_moves),
+                tick_telemetry
+                    .pending_moves
+                    .saturating_sub(tick_telemetry.rejected_moves),
                 tick_telemetry.pending_moves,
                 tick_telemetry.rejected_tile_blocked,
                 tick_telemetry.rejected_player_blocked,
@@ -10000,9 +11858,12 @@ impl GameRoom {
                     let in_queue_zone = arena.is_in_queue_zone(player.x, player.y);
                     let is_queued = arena.queued_players.contains(&player_id.to_string());
 
-                    if in_queue_zone && !is_queued && arena.state == crate::arena::ArenaState::Idle {
+                    if in_queue_zone && !is_queued && arena.state == crate::arena::ArenaState::Idle
+                    {
                         if !arena.queue_rejected.contains(player_id) {
-                            if let Err(e) = arena.queue_player(player_id, &player.name, player.inventory.gold) {
+                            if let Err(e) =
+                                arena.queue_player(player_id, &player.name, player.inventory.gold)
+                            {
                                 arena.queue_rejected.insert(player_id.clone());
                                 queue_errors.push((player_id.clone(), e));
                             }
@@ -10029,7 +11890,8 @@ impl GameRoom {
         for event in events {
             match event {
                 crate::arena::ArenaEvent::FightStarted { fighters } => {
-                    let fighter_ids: Vec<String> = fighters.iter().map(|(id, _)| id.clone()).collect();
+                    let fighter_ids: Vec<String> =
+                        fighters.iter().map(|(id, _)| id.clone()).collect();
 
                     // Teleport fighters to spawn points
                     {
@@ -10043,9 +11905,8 @@ impl GameRoom {
                     }
 
                     // Broadcast match start to all arena players
-                    self.broadcast_to_arena(ServerMessage::ArenaMatchStart {
-                        fighter_ids,
-                    }).await;
+                    self.broadcast_to_arena(ServerMessage::ArenaMatchStart { fighter_ids })
+                        .await;
                 }
                 crate::arena::ArenaEvent::MatchEnded { placements } => {
                     // Distribute gold rewards
@@ -10067,47 +11928,60 @@ impl GameRoom {
                         for placement in &placements {
                             let won = placement.rank == 1;
                             let died = placement.rank > 1;
-                            if let Err(e) = db.update_arena_stats(
-                                0, // character_id will be resolved in the save path
-                                won,
-                                placement.kills,
-                                died,
-                                placement.gold_reward,
-                            ).await {
-                                tracing::warn!("Failed to save arena stats for {}: {}", placement.player_id, e);
+                            if let Err(e) = db
+                                .update_arena_stats(
+                                    0, // character_id will be resolved in the save path
+                                    won,
+                                    placement.kills,
+                                    died,
+                                    placement.gold_reward,
+                                )
+                                .await
+                            {
+                                tracing::warn!(
+                                    "Failed to save arena stats for {}: {}",
+                                    placement.player_id,
+                                    e
+                                );
                             }
                         }
                     }
 
-                    let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements.iter().map(|p| {
-                        crate::protocol::ArenaPlacementData {
+                    let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements
+                        .iter()
+                        .map(|p| crate::protocol::ArenaPlacementData {
                             rank: p.rank,
                             player_id: p.player_id.clone(),
                             player_name: p.player_name.clone(),
                             kills: p.kills,
                             gold_reward: p.gold_reward,
-                        }
-                    }).collect();
+                        })
+                        .collect();
 
                     self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
                         placements: placement_data,
-                    }).await;
+                    })
+                    .await;
 
                     // Send inventory updates to all fighters who earned gold
                     for placement in &placements {
                         if placement.gold_reward > 0 {
                             let update = {
                                 let players = self.players.read().await;
-                                players.get(&placement.player_id).map(|p| {
-                                    (p.inventory.to_update(), p.inventory.gold)
-                                })
+                                players
+                                    .get(&placement.player_id)
+                                    .map(|p| (p.inventory.to_update(), p.inventory.gold))
                             };
                             if let Some((slots, gold)) = update {
-                                self.send_to_player(&placement.player_id, ServerMessage::InventoryUpdate {
-                                    player_id: placement.player_id.clone(),
-                                    slots,
-                                    gold,
-                                }).await;
+                                self.send_to_player(
+                                    &placement.player_id,
+                                    ServerMessage::InventoryUpdate {
+                                        player_id: placement.player_id.clone(),
+                                        slots,
+                                        gold,
+                                    },
+                                )
+                                .await;
                             }
                         }
                     }
@@ -10135,7 +12009,8 @@ impl GameRoom {
                         queued_count,
                         fighter_count,
                         entry_fee,
-                    }).await;
+                    })
+                    .await;
                 }
                 crate::arena::ArenaEvent::ResultsExpired => {
                     // Reset broadcast
@@ -10148,7 +12023,8 @@ impl GameRoom {
                             let arena = self.arena_manager.read().await;
                             arena.config.entry_fee
                         },
-                    }).await;
+                    })
+                    .await;
                 }
                 _ => {}
             }
@@ -10200,11 +12076,7 @@ impl GameRoom {
                         // Collect stock updates for broadcasting
                         for npc_id in npc_ids {
                             for (item_id, quantity) in &changed_stock {
-                                restocked_shops.push((
-                                    npc_id.clone(),
-                                    item_id.clone(),
-                                    *quantity,
-                                ));
+                                restocked_shops.push((npc_id.clone(), item_id.clone(), *quantity));
                             }
                         }
 
@@ -10224,45 +12096,54 @@ impl GameRoom {
 
         // Broadcast all stock updates
         for (npc_id, item_id, quantity) in restocked_shops {
-            self.broadcast_shop_stock_update(&npc_id, &item_id, quantity).await;
+            self.broadcast_shop_stock_update(&npc_id, &item_id, quantity)
+                .await;
         }
     }
 
     /// Handle chunk request from client
     pub async fn handle_chunk_request(&self, chunk_x: i32, chunk_y: i32) -> Option<ServerMessage> {
-        use crate::protocol::{ChunkLayerData, ChunkObjectData, ChunkWallData, ChunkPortalData};
         use crate::chunk::WallEdge;
+        use crate::protocol::{ChunkLayerData, ChunkObjectData, ChunkPortalData, ChunkWallData};
 
         let coord = ChunkCoord::new(chunk_x, chunk_y);
         if let Some(chunk) = self.world.get_chunk_data(coord).await {
-            let layers: Vec<ChunkLayerData> = chunk.layers.iter().map(|layer| {
-                ChunkLayerData {
+            let layers: Vec<ChunkLayerData> = chunk
+                .layers
+                .iter()
+                .map(|layer| ChunkLayerData {
                     layer_type: layer.layer_type as u8,
                     tiles: layer.tiles.clone(),
-                }
-            }).collect();
+                })
+                .collect();
 
             let collision = chunk.pack_collision();
 
-            let objects: Vec<ChunkObjectData> = chunk.objects.iter().map(|obj| {
-                ChunkObjectData {
+            let objects: Vec<ChunkObjectData> = chunk
+                .objects
+                .iter()
+                .map(|obj| ChunkObjectData {
                     gid: obj.gid,
                     tile_x: obj.tile_x,
                     tile_y: obj.tile_y,
                     width: obj.width,
                     height: obj.height,
-                }
-            }).collect();
+                })
+                .collect();
 
-            let portals: Vec<ChunkPortalData> = chunk.portals.iter().map(|p| ChunkPortalData {
-                id: p.id.clone(),
-                x: p.x,
-                y: p.y,
-                width: p.width,
-                height: p.height,
-                target_map: p.target_map.clone(),
-                target_spawn: p.target_spawn.clone(),
-            }).collect();
+            let portals: Vec<ChunkPortalData> = chunk
+                .portals
+                .iter()
+                .map(|p| ChunkPortalData {
+                    id: p.id.clone(),
+                    x: p.x,
+                    y: p.y,
+                    width: p.width,
+                    height: p.height,
+                    target_map: p.target_map.clone(),
+                    target_spawn: p.target_spawn.clone(),
+                })
+                .collect();
 
             Some(ServerMessage::ChunkData {
                 chunk_x,
@@ -10270,15 +12151,19 @@ impl GameRoom {
                 layers,
                 collision,
                 objects,
-                walls: chunk.walls.iter().map(|w| ChunkWallData {
-                    gid: w.gid,
-                    tile_x: w.tile_x,
-                    tile_y: w.tile_y,
-                    edge: match w.edge {
-                        WallEdge::Down => "down".to_string(),
-                        WallEdge::Right => "right".to_string(),
-                    },
-                }).collect(),
+                walls: chunk
+                    .walls
+                    .iter()
+                    .map(|w| ChunkWallData {
+                        gid: w.gid,
+                        tile_x: w.tile_x,
+                        tile_y: w.tile_y,
+                        edge: match w.edge {
+                            WallEdge::Down => "down".to_string(),
+                            WallEdge::Right => "right".to_string(),
+                        },
+                    })
+                    .collect(),
                 portals,
             })
         } else {
@@ -10306,7 +12191,8 @@ impl GameRoom {
     pub fn get_entity_definitions(&self) -> ServerMessage {
         use crate::protocol::ClientEntityDef;
 
-        let entities: Vec<ClientEntityDef> = self.entity_registry
+        let entities: Vec<ClientEntityDef> = self
+            .entity_registry
             .all()
             .map(|proto| ClientEntityDef {
                 id: proto.id.clone(),
@@ -10337,11 +12223,15 @@ impl GameRoom {
     /// Handle sending a friend request
     pub async fn handle_send_friend_request(&self, player_id: &str, target_name: &str) {
         let Some(db) = &self.db else {
-            self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                action: "send_request".to_string(),
-                success: false,
-                error: Some("Database not available".to_string()),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::FriendActionResult {
+                    action: "send_request".to_string(),
+                    success: false,
+                    error: Some("Database not available".to_string()),
+                },
+            )
+            .await;
             return;
         };
 
@@ -10353,31 +12243,43 @@ impl GameRoom {
         let target_id = match db.get_character_id_by_name(target_name).await {
             Ok(Some(id)) => id,
             Ok(None) => {
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "send_request".to_string(),
-                    success: false,
-                    error: Some(format!("Player '{}' not found", target_name)),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "send_request".to_string(),
+                        success: false,
+                        error: Some(format!("Player '{}' not found", target_name)),
+                    },
+                )
+                .await;
                 return;
             }
             Err(e) => {
                 tracing::error!("Failed to look up player: {}", e);
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "send_request".to_string(),
-                    success: false,
-                    error: Some("Failed to look up player".to_string()),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "send_request".to_string(),
+                        success: false,
+                        error: Some("Failed to look up player".to_string()),
+                    },
+                )
+                .await;
                 return;
             }
         };
 
         // Can't friend yourself
         if requester_id == target_id {
-            self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                action: "send_request".to_string(),
-                success: false,
-                error: Some("You can't add yourself as a friend".to_string()),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::FriendActionResult {
+                    action: "send_request".to_string(),
+                    success: false,
+                    error: Some("You can't add yourself as a friend".to_string()),
+                },
+            )
+            .await;
             return;
         }
 
@@ -10387,40 +12289,59 @@ impl GameRoom {
                 // Get requester's name
                 let requester_name = {
                     let players = self.players.read().await;
-                    players.get(player_id).map(|p| p.name.clone()).unwrap_or_default()
+                    players
+                        .get(player_id)
+                        .map(|p| p.name.clone())
+                        .unwrap_or_default()
                 };
 
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "send_request".to_string(),
-                    success: true,
-                    error: None,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "send_request".to_string(),
+                        success: true,
+                        error: None,
+                    },
+                )
+                .await;
 
                 // Notify the target if they're online
                 let target_player_id = Self::make_player_id(target_id);
-                self.send_to_player(&target_player_id, ServerMessage::FriendRequestReceived {
-                    from_id: requester_id,
-                    from_name: requester_name.clone(),
-                }).await;
+                self.send_to_player(
+                    &target_player_id,
+                    ServerMessage::FriendRequestReceived {
+                        from_id: requester_id,
+                        from_name: requester_name.clone(),
+                    },
+                )
+                .await;
 
                 // Also send them a chat notification
-                self.send_to_player(&target_player_id, ServerMessage::ChatMessage {
-                    sender_id: "system".to_string(),
-                    sender_name: "System".to_string(),
-                    text: format!("{} sent you a friend request!", requester_name),
-                    timestamp: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64,
-                    channel: "system".to_string(),
-                }).await;
+                self.send_to_player(
+                    &target_player_id,
+                    ServerMessage::ChatMessage {
+                        sender_id: "system".to_string(),
+                        sender_name: "System".to_string(),
+                        text: format!("{} sent you a friend request!", requester_name),
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as u64,
+                        channel: "system".to_string(),
+                    },
+                )
+                .await;
             }
             Err(e) => {
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "send_request".to_string(),
-                    success: false,
-                    error: Some(e),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "send_request".to_string(),
+                        success: false,
+                        error: Some(e),
+                    },
+                )
+                .await;
             }
         }
     }
@@ -10428,11 +12349,15 @@ impl GameRoom {
     /// Handle accepting a friend request
     pub async fn handle_accept_friend_request(&self, player_id: &str, requester_id: i64) {
         let Some(db) = &self.db else {
-            self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                action: "accept_request".to_string(),
-                success: false,
-                error: Some("Database not available".to_string()),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::FriendActionResult {
+                    action: "accept_request".to_string(),
+                    success: false,
+                    error: Some("Database not available".to_string()),
+                },
+            )
+            .await;
             return;
         };
 
@@ -10449,7 +12374,12 @@ impl GameRoom {
                 };
                 let recipient_name = match recipient_name {
                     Some(name) => name,
-                    None => db.get_character_name_by_id(recipient_id).await.ok().flatten().unwrap_or_default(),
+                    None => db
+                        .get_character_name_by_id(recipient_id)
+                        .await
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default(),
                 };
 
                 // Get requester name (the one who sent the request) - try online players first, then database
@@ -10460,46 +12390,71 @@ impl GameRoom {
                 };
                 let requester_name = match requester_name {
                     Some(name) => name,
-                    None => db.get_character_name_by_id(requester_id).await.ok().flatten().unwrap_or_default(),
+                    None => db
+                        .get_character_name_by_id(requester_id)
+                        .await
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default(),
                 };
 
                 // Notify the accepting player
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "accept_request".to_string(),
-                    success: true,
-                    error: None,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "accept_request".to_string(),
+                        success: true,
+                        error: None,
+                    },
+                )
+                .await;
 
                 // Also send them the new friend info
-                self.send_to_player(player_id, ServerMessage::FriendRequestAccepted {
-                    friend_id: requester_id,
-                    friend_name: requester_name.clone(),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendRequestAccepted {
+                        friend_id: requester_id,
+                        friend_name: requester_name.clone(),
+                    },
+                )
+                .await;
 
                 // Notify the original requester if online
-                self.send_to_player(&requester_player_id, ServerMessage::FriendRequestAccepted {
-                    friend_id: recipient_id,
-                    friend_name: recipient_name.clone(),
-                }).await;
+                self.send_to_player(
+                    &requester_player_id,
+                    ServerMessage::FriendRequestAccepted {
+                        friend_id: recipient_id,
+                        friend_name: recipient_name.clone(),
+                    },
+                )
+                .await;
 
                 // Send chat notification to requester
-                self.send_to_player(&requester_player_id, ServerMessage::ChatMessage {
-                    sender_id: "system".to_string(),
-                    sender_name: "System".to_string(),
-                    text: format!("{} accepted your friend request!", recipient_name),
-                    timestamp: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64,
-                    channel: "system".to_string(),
-                }).await;
+                self.send_to_player(
+                    &requester_player_id,
+                    ServerMessage::ChatMessage {
+                        sender_id: "system".to_string(),
+                        sender_name: "System".to_string(),
+                        text: format!("{} accepted your friend request!", recipient_name),
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as u64,
+                        channel: "system".to_string(),
+                    },
+                )
+                .await;
             }
             Err(e) => {
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "accept_request".to_string(),
-                    success: false,
-                    error: Some(e),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "accept_request".to_string(),
+                        success: false,
+                        error: Some(e),
+                    },
+                )
+                .await;
             }
         }
     }
@@ -10507,11 +12462,15 @@ impl GameRoom {
     /// Handle declining a friend request
     pub async fn handle_decline_friend_request(&self, player_id: &str, requester_id: i64) {
         let Some(db) = &self.db else {
-            self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                action: "decline_request".to_string(),
-                success: false,
-                error: Some("Database not available".to_string()),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::FriendActionResult {
+                    action: "decline_request".to_string(),
+                    success: false,
+                    error: Some("Database not available".to_string()),
+                },
+            )
+            .await;
             return;
         };
 
@@ -10521,24 +12480,36 @@ impl GameRoom {
 
         match db.decline_friend_request(requester_id, recipient_id).await {
             Ok(()) => {
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "decline_request".to_string(),
-                    success: true,
-                    error: None,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "decline_request".to_string(),
+                        success: true,
+                        error: None,
+                    },
+                )
+                .await;
 
                 // Optionally notify the requester
                 let requester_player_id = Self::make_player_id(requester_id);
-                self.send_to_player(&requester_player_id, ServerMessage::FriendRequestDeclined {
-                    by_id: recipient_id,
-                }).await;
+                self.send_to_player(
+                    &requester_player_id,
+                    ServerMessage::FriendRequestDeclined {
+                        by_id: recipient_id,
+                    },
+                )
+                .await;
             }
             Err(e) => {
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "decline_request".to_string(),
-                    success: false,
-                    error: Some(e),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "decline_request".to_string(),
+                        success: false,
+                        error: Some(e),
+                    },
+                )
+                .await;
             }
         }
     }
@@ -10546,11 +12517,15 @@ impl GameRoom {
     /// Handle removing a friend
     pub async fn handle_remove_friend(&self, player_id: &str, friend_id: i64) {
         let Some(db) = &self.db else {
-            self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                action: "remove_friend".to_string(),
-                success: false,
-                error: Some("Database not available".to_string()),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::FriendActionResult {
+                    action: "remove_friend".to_string(),
+                    success: false,
+                    error: Some("Database not available".to_string()),
+                },
+            )
+            .await;
             return;
         };
 
@@ -10560,28 +12535,39 @@ impl GameRoom {
 
         match db.remove_friend(character_id, friend_id).await {
             Ok(()) => {
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "remove_friend".to_string(),
-                    success: true,
-                    error: None,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "remove_friend".to_string(),
+                        success: true,
+                        error: None,
+                    },
+                )
+                .await;
 
                 // Notify both players
-                self.send_to_player(player_id, ServerMessage::FriendRemoved {
-                    friend_id,
-                }).await;
+                self.send_to_player(player_id, ServerMessage::FriendRemoved { friend_id })
+                    .await;
 
                 let friend_player_id = Self::make_player_id(friend_id);
-                self.send_to_player(&friend_player_id, ServerMessage::FriendRemoved {
-                    friend_id: character_id,
-                }).await;
+                self.send_to_player(
+                    &friend_player_id,
+                    ServerMessage::FriendRemoved {
+                        friend_id: character_id,
+                    },
+                )
+                .await;
             }
             Err(e) => {
-                self.send_to_player(player_id, ServerMessage::FriendActionResult {
-                    action: "remove_friend".to_string(),
-                    success: false,
-                    error: Some(e),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendActionResult {
+                        action: "remove_friend".to_string(),
+                        success: false,
+                        error: Some(e),
+                    },
+                )
+                .await;
             }
         }
     }
@@ -10617,13 +12603,21 @@ impl GameRoom {
             }
         }
 
-        self.send_to_player(player_id, ServerMessage::OnlinePlayersList {
-            players: online_players,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::OnlinePlayersList {
+                players: online_players,
+            },
+        )
+        .await;
     }
 
     /// Send friends list and pending requests to a player (called on connect)
-    pub async fn send_friends_data(&self, player_id: &str, online_characters: &dashmap::DashSet<i64>) {
+    pub async fn send_friends_data(
+        &self,
+        player_id: &str,
+        online_characters: &dashmap::DashSet<i64>,
+    ) {
         tracing::info!("send_friends_data called for player_id: {}", player_id);
 
         let Some(db) = &self.db else {
@@ -10641,7 +12635,11 @@ impl GameRoom {
         // Get friends list
         match db.get_friends_list(character_id).await {
             Ok(friends) => {
-                tracing::info!("Found {} friends for character {}", friends.len(), character_id);
+                tracing::info!(
+                    "Found {} friends for character {}",
+                    friends.len(),
+                    character_id
+                );
                 let friend_infos: Vec<crate::protocol::FriendInfo> = friends
                     .into_iter()
                     .map(|(id, name)| {
@@ -10650,9 +12648,13 @@ impl GameRoom {
                     })
                     .collect();
 
-                self.send_to_player(player_id, ServerMessage::FriendsList {
-                    friends: friend_infos,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::FriendsList {
+                        friends: friend_infos,
+                    },
+                )
+                .await;
             }
             Err(e) => {
                 tracing::error!("Error fetching friends list: {:?}", e);
@@ -10662,7 +12664,11 @@ impl GameRoom {
         // Get pending friend requests
         match db.get_pending_requests(character_id).await {
             Ok(requests) => {
-                tracing::info!("Found {} pending friend requests for character {}", requests.len(), character_id);
+                tracing::info!(
+                    "Found {} pending friend requests for character {}",
+                    requests.len(),
+                    character_id
+                );
                 let request_infos: Vec<crate::protocol::PendingRequestInfo> = requests
                     .into_iter()
                     .map(|(from_id, from_name)| {
@@ -10671,9 +12677,13 @@ impl GameRoom {
                     })
                     .collect();
 
-                self.send_to_player(player_id, ServerMessage::PendingFriendRequests {
-                    requests: request_infos,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::PendingFriendRequests {
+                        requests: request_infos,
+                    },
+                )
+                .await;
             }
             Err(e) => {
                 tracing::error!("Error fetching pending requests: {:?}", e);
@@ -10695,10 +12705,14 @@ impl GameRoom {
         if let Ok(friends) = db.get_friends_list(character_id).await {
             for (friend_id, _) in friends {
                 let friend_player_id = Self::make_player_id(friend_id);
-                self.send_to_player(&friend_player_id, ServerMessage::FriendStatusChanged {
-                    friend_id: character_id,
-                    online,
-                }).await;
+                self.send_to_player(
+                    &friend_player_id,
+                    ServerMessage::FriendStatusChanged {
+                        friend_id: character_id,
+                        online,
+                    },
+                )
+                .await;
             }
         }
     }
@@ -10713,7 +12727,11 @@ impl GameRoom {
         let prayer = match self.prayer_registry.get(prayer_id) {
             Some(p) => p.clone(),
             None => {
-                tracing::warn!("Player {} tried to toggle unknown prayer: {}", player_id, prayer_id);
+                tracing::warn!(
+                    "Player {} tried to toggle unknown prayer: {}",
+                    player_id,
+                    prayer_id
+                );
                 return;
             }
         };
@@ -10737,17 +12755,22 @@ impl GameRoom {
             // Check prayer level requirement
             if player.skills.prayer.level < prayer.level_req {
                 drop(players);
-                self.send_system_message(player_id, &format!(
-                    "You need Prayer level {} to use {}",
-                    prayer.level_req, prayer.name
-                )).await;
+                self.send_system_message(
+                    player_id,
+                    &format!(
+                        "You need Prayer level {} to use {}",
+                        prayer.level_req, prayer.name
+                    ),
+                )
+                .await;
                 return;
             }
 
             // Check if player has prayer points
             if player.prayer_points <= 0 {
                 drop(players);
-                self.send_system_message(player_id, "You have no prayer points remaining").await;
+                self.send_system_message(player_id, "You have no prayer points remaining")
+                    .await;
                 return;
             }
 
@@ -10767,7 +12790,9 @@ impl GameRoom {
                 player.active_prayers.remove(&conflict_id);
                 tracing::debug!(
                     "Player {} deactivated conflicting prayer {} to activate {}",
-                    player_id, conflict_id, prayer_id
+                    player_id,
+                    conflict_id,
+                    prayer_id
                 );
             }
 
@@ -10782,11 +12807,15 @@ impl GameRoom {
         let active_prayers: Vec<String> = player.active_prayers.iter().cloned().collect();
         drop(players);
 
-        self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
-            points,
-            max_points,
-            active_prayers,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::PrayerStateUpdate {
+                points,
+                max_points,
+                active_prayers,
+            },
+        )
+        .await;
     }
 
     /// Handle burying bones from inventory
@@ -10806,7 +12835,8 @@ impl GameRoom {
                 Some(item) => item,
                 None => {
                     drop(players);
-                    self.send_system_message(player_id, "There's nothing in that slot.").await;
+                    self.send_system_message(player_id, "There's nothing in that slot.")
+                        .await;
                     return;
                 }
             };
@@ -10826,7 +12856,8 @@ impl GameRoom {
             // Check if it's bones (has prayer_xp > 0)
             if !item_def.is_bones() {
                 drop(players);
-                self.send_system_message(player_id, "You can only bury bones.").await;
+                self.send_system_message(player_id, "You can only bury bones.")
+                    .await;
                 return;
             }
 
@@ -10869,23 +12900,35 @@ impl GameRoom {
         };
 
         // Send chat message
-        self.send_system_message(player_id, &format!("You bury the {}.", item_name.to_lowercase())).await;
+        self.send_system_message(
+            player_id,
+            &format!("You bury the {}.", item_name.to_lowercase()),
+        )
+        .await;
 
         // Send inventory update
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inv_update.0,
-            gold: inv_update.1,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inv_update.0,
+                gold: inv_update.1,
+            },
+        )
+        .await;
 
         // Send XP update
-        self.send_to_player(player_id, ServerMessage::SkillXp {
-            player_id: player_id.to_string(),
-            skill: "prayer".to_string(),
-            xp_gained: xp_result.0,
-            total_xp: xp_result.1,
-            level: xp_result.2,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::SkillXp {
+                player_id: player_id.to_string(),
+                skill: "prayer".to_string(),
+                xp_gained: xp_result.0,
+                total_xp: xp_result.1,
+                level: xp_result.2,
+            },
+        )
+        .await;
 
         // Broadcast level up if applicable
         if xp_result.3 {
@@ -10894,7 +12937,8 @@ impl GameRoom {
                 player_id: player_id.to_string(),
                 skill: "prayer".to_string(),
                 new_level: xp_result.2,
-            }).await;
+            })
+            .await;
 
             // Send updated prayer state with new max points
             let (points, max_points, active_prayers) = {
@@ -10910,11 +12954,15 @@ impl GameRoom {
                 }
             };
 
-            self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
-                points,
-                max_points,
-                active_prayers,
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::PrayerStateUpdate {
+                    points,
+                    max_points,
+                    active_prayers,
+                },
+            )
+            .await;
 
             self.process_quest_progression_snapshot(player_id).await;
         }
@@ -10967,24 +13015,29 @@ impl GameRoom {
         let (entity_type, distance) = match altar_info {
             Some(info) => info,
             None => {
-                self.send_system_message(player_id, "Altar not found.").await;
+                self.send_system_message(player_id, "Altar not found.")
+                    .await;
                 return;
             }
         };
 
         // Check distance
         if distance > 2.5 {
-            self.send_system_message(player_id, "You need to be closer to the altar.").await;
+            self.send_system_message(player_id, "You need to be closer to the altar.")
+                .await;
             return;
         }
 
         // Validate it's actually an altar
-        let is_altar = self.entity_registry.get(&entity_type)
+        let is_altar = self
+            .entity_registry
+            .get(&entity_type)
             .map(|proto| proto.behaviors.altar)
             .unwrap_or(false);
 
         if !is_altar {
-            self.send_system_message(player_id, "That's not an altar.").await;
+            self.send_system_message(player_id, "That's not an altar.")
+                .await;
             return;
         }
 
@@ -11000,29 +13053,51 @@ impl GameRoom {
             let old_points = player.prayer_points;
 
             if player.prayer_points >= max_points {
-                (0, max_points, max_points, player.active_prayers.iter().cloned().collect::<Vec<_>>())
+                (
+                    0,
+                    max_points,
+                    max_points,
+                    player.active_prayers.iter().cloned().collect::<Vec<_>>(),
+                )
             } else {
                 player.prayer_points = max_points;
                 let restored = max_points - old_points;
-                (restored, max_points, max_points, player.active_prayers.iter().cloned().collect::<Vec<_>>())
+                (
+                    restored,
+                    max_points,
+                    max_points,
+                    player.active_prayers.iter().cloned().collect::<Vec<_>>(),
+                )
             }
         };
 
         if restored > 0 {
-            self.send_system_message(player_id, &format!(
-                "You pray at the altar. Your prayer points have been restored. (+{} points)",
-                restored
-            )).await;
+            self.send_system_message(
+                player_id,
+                &format!(
+                    "You pray at the altar. Your prayer points have been restored. (+{} points)",
+                    restored
+                ),
+            )
+            .await;
         } else {
-            self.send_system_message(player_id, "You pray at the altar. Your prayer is already full.").await;
+            self.send_system_message(
+                player_id,
+                "You pray at the altar. Your prayer is already full.",
+            )
+            .await;
         }
 
         // Send prayer state update
-        self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
-            points,
-            max_points,
-            active_prayers,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::PrayerStateUpdate {
+                points,
+                max_points,
+                active_prayers,
+            },
+        )
+        .await;
     }
 
     /// Handle casting a spell
@@ -11031,10 +13106,14 @@ impl GameRoom {
         let spell_def = match crate::spell::get_spell(spell_id) {
             Some(s) => s,
             None => {
-                self.send_to_player(player_id, ServerMessage::SpellResult {
-                    success: false,
-                    reason: Some("Unknown spell".to_string()),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SpellResult {
+                        success: false,
+                        reason: Some("Unknown spell".to_string()),
+                    },
+                )
+                .await;
                 return;
             }
         };
@@ -11054,27 +13133,39 @@ impl GameRoom {
 
             // Check magic level
             if player.skills.magic.level < spell_def.magic_level_req {
-                self.send_to_player(player_id, ServerMessage::SpellResult {
-                    success: false,
-                    reason: Some("Magic level too low".to_string()),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SpellResult {
+                        success: false,
+                        reason: Some("Magic level too low".to_string()),
+                    },
+                )
+                .await;
                 return;
             }
             // Check mana
             if player.mp < spell_def.mana_cost {
-                self.send_to_player(player_id, ServerMessage::SpellResult {
-                    success: false,
-                    reason: Some("Not enough mana".to_string()),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SpellResult {
+                        success: false,
+                        reason: Some("Not enough mana".to_string()),
+                    },
+                )
+                .await;
                 return;
             }
             // Check cooldown
             if let Some(&last_cast) = player.spell_cooldowns.get(spell_def.id) {
                 if current_time < last_cast + spell_def.cooldown_ms {
-                    self.send_to_player(player_id, ServerMessage::SpellResult {
-                        success: false,
-                        reason: Some("Spell on cooldown".to_string()),
-                    }).await;
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::SpellResult {
+                            success: false,
+                            reason: Some("Spell on cooldown".to_string()),
+                        },
+                    )
+                    .await;
                     return;
                 }
             }
@@ -11082,14 +13173,28 @@ impl GameRoom {
 
         // 3. Dispatch based on spell type
         match spell_def.spell_type {
-            crate::spell::SpellType::Damage => self.cast_damage_spell(player_id, spell_def, current_time).await,
-            crate::spell::SpellType::Heal => self.cast_heal_spell(player_id, spell_def, current_time).await,
-            crate::spell::SpellType::Teleport => { self.cast_return_home_spell(player_id, spell_def, current_time).await; },
+            crate::spell::SpellType::Damage => {
+                self.cast_damage_spell(player_id, spell_def, current_time)
+                    .await
+            }
+            crate::spell::SpellType::Heal => {
+                self.cast_heal_spell(player_id, spell_def, current_time)
+                    .await
+            }
+            crate::spell::SpellType::Teleport => {
+                self.cast_return_home_spell(player_id, spell_def, current_time)
+                    .await;
+            }
         }
     }
 
     /// Cast a damage spell on the player's current target
-    async fn cast_damage_spell(&self, player_id: &str, spell_def: &crate::spell::SpellDef, current_time: u64) {
+    async fn cast_damage_spell(
+        &self,
+        player_id: &str,
+        spell_def: &crate::spell::SpellDef,
+        current_time: u64,
+    ) {
         // 1. Get attacker info and target
         let (caster_name, caster_x, caster_y, target_id_opt, magic_level, combat_level) = {
             let players = self.players.read().await;
@@ -11114,10 +13219,14 @@ impl GameRoom {
         let target_id = match target_id_opt {
             Some(id) => id,
             None => {
-                self.send_to_player(player_id, ServerMessage::SpellResult {
-                    success: false,
-                    reason: Some("No target selected".to_string()),
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SpellResult {
+                        success: false,
+                        reason: Some("No target selected".to_string()),
+                    },
+                )
+                .await;
                 return;
             }
         };
@@ -11150,7 +13259,11 @@ impl GameRoom {
             let instances = self.player_instances.read().await;
             let target_instance = instances.get(target_id.as_str()).cloned();
             if let Some(target) = players.get(&target_id) {
-                if target.active && target.hp > 0 && !target.is_dead && target_instance == caster_instance {
+                if target.active
+                    && target.hp > 0
+                    && !target.is_dead
+                    && target_instance == caster_instance
+                {
                     is_npc = false;
                     target_x = target.x;
                     target_y = target.y;
@@ -11160,10 +13273,14 @@ impl GameRoom {
         }
 
         if !target_exists {
-            self.send_to_player(player_id, ServerMessage::SpellResult {
-                success: false,
-                reason: Some("Invalid target".to_string()),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::SpellResult {
+                    success: false,
+                    reason: Some("Invalid target".to_string()),
+                },
+            )
+            .await;
             return;
         }
 
@@ -11172,10 +13289,14 @@ impl GameRoom {
         let dy = (caster_y - target_y).abs();
         let distance = dx.max(dy);
         if distance > 5 {
-            self.send_to_player(player_id, ServerMessage::SpellResult {
-                success: false,
-                reason: Some("Target out of range".to_string()),
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::SpellResult {
+                    success: false,
+                    reason: Some("Target out of range".to_string()),
+                },
+            )
+            .await;
             return;
         }
 
@@ -11184,17 +13305,23 @@ impl GameRoom {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 player.mp -= spell_def.mana_cost;
-                player.spell_cooldowns.insert(spell_def.id.to_string(), current_time);
+                player
+                    .spell_cooldowns
+                    .insert(spell_def.id.to_string(), current_time);
                 // Stop movement when casting
                 player.reject_pending_move();
             }
         }
 
         // 5. Broadcast casting animation
-        self.broadcast_to_zone(player_id, ServerMessage::PlayerAttack {
-            player_id: player_id.to_string(),
-            attack_type: "spell".to_string(),
-        }).await;
+        self.broadcast_to_zone(
+            player_id,
+            ServerMessage::PlayerAttack {
+                player_id: player_id.to_string(),
+                attack_type: "spell".to_string(),
+            },
+        )
+        .await;
 
         // 6. Calculate hit/miss using blended combat+magic level
         let attack_bonus = 0; // Spells don't use equipment attack bonus
@@ -11204,25 +13331,40 @@ impl GameRoom {
                 let npc_defence_level = npc.level;
                 let npc_defence_bonus = npc.stats.defence_bonus;
 
-                if !crate::skills::calculate_hit(effective_level, attack_bonus, npc_defence_level, npc_defence_bonus) {
+                if !crate::skills::calculate_hit(
+                    effective_level,
+                    attack_bonus,
+                    npc_defence_level,
+                    npc_defence_bonus,
+                ) {
                     // Miss
                     // Still register aggro so attack attempts interrupt wandering/pathing.
                     npc.take_damage(0, current_time, Some(player_id));
                     let name = npc.name();
                     tracing::info!(
                         "{} spell misses {} (eff {} [cmb{}+mag{}] vs def {})",
-                        caster_name, name, effective_level, combat_level, magic_level, npc_defence_level
+                        caster_name,
+                        name,
+                        effective_level,
+                        combat_level,
+                        magic_level,
+                        npc_defence_level
                     );
                     (npc.hp, name, false, 0)
                 } else {
                     // Hit
-                    let max_hit = crate::spell::calculate_spell_max_hit(magic_level, spell_def.base_power);
+                    let max_hit =
+                        crate::spell::calculate_spell_max_hit(magic_level, spell_def.base_power);
                     let damage = crate::spell::roll_spell_damage(max_hit);
                     let died = npc.take_damage(damage, current_time, Some(player_id));
                     let name = npc.name();
                     tracing::info!(
                         "{} spell hits {} for {} damage (max: {}, HP: {})",
-                        caster_name, name, damage, max_hit, npc.hp
+                        caster_name,
+                        name,
+                        damage,
+                        max_hit,
+                        npc.hp
                     );
                     (npc.hp, name, died, damage)
                 }
@@ -11243,21 +13385,36 @@ impl GameRoom {
                 let base_defence_bonus = target.defence_bonus(&self.item_registry);
 
                 // Apply prayer bonuses to target's defence
-                let target_active_ids: Vec<String> = target.active_prayers.iter().cloned().collect();
-                let target_prayer_effects = self.prayer_registry.calculate_effects(&target_active_ids);
-                let target_defence_bonus = target_prayer_effects.apply_defence_bonus(base_defence_bonus);
+                let target_active_ids: Vec<String> =
+                    target.active_prayers.iter().cloned().collect();
+                let target_prayer_effects =
+                    self.prayer_registry.calculate_effects(&target_active_ids);
+                let target_defence_bonus =
+                    target_prayer_effects.apply_defence_bonus(base_defence_bonus);
 
-                if !crate::skills::calculate_hit(effective_level, attack_bonus, target_combat_level, target_defence_bonus) {
+                if !crate::skills::calculate_hit(
+                    effective_level,
+                    attack_bonus,
+                    target_combat_level,
+                    target_defence_bonus,
+                ) {
                     // Miss
                     let name = target.name.clone();
                     tracing::info!(
                         "{} spell misses {} (eff {} [cmb{}+mag{}] vs cmb {} + {})",
-                        caster_name, name, effective_level, combat_level, magic_level, target_combat_level, target_defence_bonus
+                        caster_name,
+                        name,
+                        effective_level,
+                        combat_level,
+                        magic_level,
+                        target_combat_level,
+                        target_defence_bonus
                     );
                     (target.hp, name, false, 0)
                 } else {
                     // Hit
-                    let max_hit = crate::spell::calculate_spell_max_hit(magic_level, spell_def.base_power);
+                    let max_hit =
+                        crate::spell::calculate_spell_max_hit(magic_level, spell_def.base_power);
                     let raw_damage = crate::spell::roll_spell_damage(max_hit);
                     let damage = target_prayer_effects.apply_damage_reduction(raw_damage);
                     target.hp = (target.hp - damage).max(0);
@@ -11268,7 +13425,12 @@ impl GameRoom {
                     }
                     tracing::info!(
                         "{} spell hits {} for {} damage (max: {}, raw: {}, HP: {})",
-                        caster_name, name, damage, max_hit, raw_damage, target.hp
+                        caster_name,
+                        name,
+                        damage,
+                        max_hit,
+                        raw_damage,
+                        target.hp
                     );
                     (target.hp, name, died, damage)
                 }
@@ -11278,13 +13440,17 @@ impl GameRoom {
         };
 
         // 7. Broadcast SpellEffect to nearby players in the zone
-        self.broadcast_to_zone(player_id, ServerMessage::SpellEffect {
-            caster_id: player_id.to_string(),
-            target_id: Some(target_id.clone()),
-            spell_id: spell_def.id.to_string(),
-            target_x,
-            target_y,
-        }).await;
+        self.broadcast_to_zone(
+            player_id,
+            ServerMessage::SpellEffect {
+                caster_id: player_id.to_string(),
+                target_id: Some(target_id.clone()),
+                spell_id: spell_def.id.to_string(),
+                target_x,
+                target_y,
+            },
+        )
+        .await;
 
         // 8. Broadcast DamageEvent
         let damage_msg = ServerMessage::DamageEvent {
@@ -11303,14 +13469,22 @@ impl GameRoom {
             let xp_results = {
                 let mut players = self.players.write().await;
                 if let Some(attacker) = players.get_mut(player_id) {
-                    let magic_xp = (actual_damage as f64 * crate::skills::MAGIC_XP_PER_DAMAGE) as i64;
-                    let hp_xp = (actual_damage as f64 * crate::skills::HITPOINTS_XP_PER_DAMAGE) as i64;
+                    let magic_xp =
+                        (actual_damage as f64 * crate::skills::MAGIC_XP_PER_DAMAGE) as i64;
+                    let hp_xp =
+                        (actual_damage as f64 * crate::skills::HITPOINTS_XP_PER_DAMAGE) as i64;
 
                     let mut results = Vec::new();
 
                     // Award Magic XP
                     let magic_leveled = attacker.skills.magic.add_xp(magic_xp);
-                    results.push((SkillType::Magic, magic_xp, attacker.skills.magic.xp, attacker.skills.magic.level, magic_leveled));
+                    results.push((
+                        SkillType::Magic,
+                        magic_xp,
+                        attacker.skills.magic.xp,
+                        attacker.skills.magic.level,
+                        magic_leveled,
+                    ));
 
                     // Award Hitpoints XP
                     let old_hp_level = attacker.skills.hitpoints.level;
@@ -11319,7 +13493,13 @@ impl GameRoom {
                         let new_max = attacker.skills.hitpoints.level;
                         attacker.hp += new_max - old_hp_level;
                     }
-                    results.push((SkillType::Hitpoints, hp_xp, attacker.skills.hitpoints.xp, attacker.skills.hitpoints.level, hp_leveled));
+                    results.push((
+                        SkillType::Hitpoints,
+                        hp_xp,
+                        attacker.skills.hitpoints.xp,
+                        attacker.skills.hitpoints.level,
+                        hp_leveled,
+                    ));
 
                     Some(results)
                 } else {
@@ -11330,21 +13510,31 @@ impl GameRoom {
             if let Some(results) = xp_results {
                 let mut progression_needs_sync = false;
                 for (skill_type, xp_gained, total_xp, level, leveled_up) in results {
-                    self.send_to_player(player_id, ServerMessage::SkillXp {
-                        player_id: player_id.to_string(),
-                        skill: skill_type.as_str().to_string(),
-                        xp_gained,
-                        total_xp,
-                        level,
-                    }).await;
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::SkillXp {
+                            player_id: player_id.to_string(),
+                            skill: skill_type.as_str().to_string(),
+                            xp_gained,
+                            total_xp,
+                            level,
+                        },
+                    )
+                    .await;
 
                     if leveled_up {
-                        tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
+                        tracing::info!(
+                            "Player {} leveled up {} to {}",
+                            player_id,
+                            skill_type.as_str(),
+                            level
+                        );
                         self.broadcast(ServerMessage::SkillLevelUp {
                             player_id: player_id.to_string(),
                             skill: skill_type.as_str().to_string(),
                             new_level: level,
-                        }).await;
+                        })
+                        .await;
                         progression_needs_sync = true;
                     }
                 }
@@ -11362,7 +13552,12 @@ impl GameRoom {
 
         // 11. Handle death
         if target_died {
-            tracing::info!("{} killed {} with spell {}", caster_name, target_name, spell_def.name);
+            tracing::info!(
+                "{} killed {} with spell {}",
+                caster_name,
+                target_name,
+                spell_def.name
+            );
             if is_npc {
                 // Get NPC info for exp and loot
                 let (prototype_id, npc_level) = {
@@ -11376,7 +13571,11 @@ impl GameRoom {
                 self.broadcast(ServerMessage::NpcDied {
                     id: target_id.clone(),
                     killer_id: player_id.to_string(),
-                }).await;
+                })
+                .await;
+
+                // Persist monster kill count for stats leaderboards.
+                self.record_monster_kill(player_id).await;
 
                 // Process quest kill event
                 self.process_quest_kill(player_id, &prototype_id).await;
@@ -11394,7 +13593,13 @@ impl GameRoom {
 
                 let drops = if let Some(prototype) = self.entity_registry.get(&prototype_id) {
                     crate::entity::generate_loot_from_prototype(
-                        prototype, target_x as f32, target_y as f32, player_id, drop_time, npc_level, killer_instance
+                        prototype,
+                        target_x as f32,
+                        target_y as f32,
+                        player_id,
+                        drop_time,
+                        npc_level,
+                        killer_instance,
                     )
                 } else {
                     vec![]
@@ -11408,7 +13613,8 @@ impl GameRoom {
                         let tile_x = item.x.floor() as i32;
                         let tile_y = item.y.floor() as i32;
 
-                        let existing_gold_id = items.iter()
+                        let existing_gold_id = items
+                            .iter()
                             .find(|(_, existing)| {
                                 existing.item_id == "gold"
                                     && existing.x.floor() as i32 == tile_x
@@ -11454,8 +13660,18 @@ impl GameRoom {
                     let (eliminated_name, killer_name, remaining) = {
                         let mut arena = self.arena_manager.write().await;
                         arena.on_player_death(&target_id, Some(player_id));
-                        let eliminated_name = arena.match_stats.fighter_names.get(&target_id).cloned().unwrap_or_default();
-                        let killer_name = arena.match_stats.fighter_names.get(player_id).cloned().unwrap_or_default();
+                        let eliminated_name = arena
+                            .match_stats
+                            .fighter_names
+                            .get(&target_id)
+                            .cloned()
+                            .unwrap_or_default();
+                        let killer_name = arena
+                            .match_stats
+                            .fighter_names
+                            .get(player_id)
+                            .cloned()
+                            .unwrap_or_default();
                         let remaining = arena.active_fighters.len() as u32;
                         (eliminated_name, killer_name, remaining)
                     };
@@ -11480,7 +13696,8 @@ impl GameRoom {
                         killer_id: player_id.to_string(),
                         killer_name,
                         remaining,
-                    }).await;
+                    })
+                    .await;
 
                     let should_end = {
                         let arena = self.arena_manager.read().await;
@@ -11507,19 +13724,21 @@ impl GameRoom {
                             }
                         }
 
-                        let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements.iter().map(|p| {
-                            crate::protocol::ArenaPlacementData {
+                        let placement_data: Vec<crate::protocol::ArenaPlacementData> = placements
+                            .iter()
+                            .map(|p| crate::protocol::ArenaPlacementData {
                                 rank: p.rank,
                                 player_id: p.player_id.clone(),
                                 player_name: p.player_name.clone(),
                                 kills: p.kills,
                                 gold_reward: p.gold_reward,
-                            }
-                        }).collect();
+                            })
+                            .collect();
 
                         self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
                             placements: placement_data,
-                        }).await;
+                        })
+                        .await;
 
                         self.broadcast_to_arena(ServerMessage::ArenaStateUpdate {
                             state: "results".to_string(),
@@ -11530,7 +13749,8 @@ impl GameRoom {
                                 let arena = self.arena_manager.read().await;
                                 arena.config.entry_fee
                             },
-                        }).await;
+                        })
+                        .await;
 
                         // Teleport all fighters to spectator spawn
                         {
@@ -11556,16 +13776,20 @@ impl GameRoom {
                             if placement.gold_reward > 0 {
                                 let update = {
                                     let players = self.players.read().await;
-                                    players.get(&placement.player_id).map(|p| {
-                                        (p.inventory.to_update(), p.inventory.gold)
-                                    })
+                                    players
+                                        .get(&placement.player_id)
+                                        .map(|p| (p.inventory.to_update(), p.inventory.gold))
                                 };
                                 if let Some((slots, gold)) = update {
-                                    self.send_to_player(&placement.player_id, ServerMessage::InventoryUpdate {
-                                        player_id: placement.player_id.clone(),
-                                        slots,
-                                        gold,
-                                    }).await;
+                                    self.send_to_player(
+                                        &placement.player_id,
+                                        ServerMessage::InventoryUpdate {
+                                            player_id: placement.player_id.clone(),
+                                            slots,
+                                            gold,
+                                        },
+                                    )
+                                    .await;
                                 }
                             }
                         }
@@ -11573,26 +13797,39 @@ impl GameRoom {
                         // Save arena stats to DB
                         if let Some(ref db) = self.db {
                             for placement in &placements {
-                                if let Some(char_id) = placement.player_id.strip_prefix("char_").and_then(|s| s.parse::<i64>().ok()) {
+                                if let Some(char_id) = placement
+                                    .player_id
+                                    .strip_prefix("char_")
+                                    .and_then(|s| s.parse::<i64>().ok())
+                                {
                                     let won = placement.rank == 1;
                                     let died = placement.rank > 1;
-                                    if let Err(e) = db.update_arena_stats(
-                                        char_id,
-                                        won,
-                                        placement.kills,
-                                        died,
-                                        placement.gold_reward,
-                                    ).await {
-                                        tracing::warn!("Failed to save arena stats for {}: {}", placement.player_id, e);
+                                    if let Err(e) = db
+                                        .update_arena_stats(
+                                            char_id,
+                                            won,
+                                            placement.kills,
+                                            died,
+                                            placement.gold_reward,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            "Failed to save arena stats for {}: {}",
+                                            placement.player_id,
+                                            e
+                                        );
                                     }
                                 }
                             }
                         }
 
                         if let Some(winner) = placements.iter().find(|p| p.rank == 1) {
-                            self.send_system_message(&winner.player_id, &format!(
-                                "You won the arena match! +{} gold", winner.gold_reward
-                            )).await;
+                            self.send_system_message(
+                                &winner.player_id,
+                                &format!("You won the arena match! +{} gold", winner.gold_reward),
+                            )
+                            .await;
                         }
                     }
                 } else {
@@ -11600,7 +13837,8 @@ impl GameRoom {
                     self.broadcast(ServerMessage::PlayerDied {
                         id: target_id.clone(),
                         killer_id: player_id.to_string(),
-                    }).await;
+                    })
+                    .await;
 
                     // Send prayer state update to dying player (prayers cleared on death)
                     let (points, max_points) = {
@@ -11611,18 +13849,27 @@ impl GameRoom {
                             (0, 1)
                         }
                     };
-                    self.send_to_player(&target_id, ServerMessage::PrayerStateUpdate {
-                        points,
-                        max_points,
-                        active_prayers: vec![],
-                    }).await;
+                    self.send_to_player(
+                        &target_id,
+                        ServerMessage::PrayerStateUpdate {
+                            points,
+                            max_points,
+                            active_prayers: vec![],
+                        },
+                    )
+                    .await;
                 }
             }
         }
     }
 
     /// Cast a heal spell on self
-    async fn cast_heal_spell(&self, player_id: &str, spell_def: &crate::spell::SpellDef, current_time: u64) {
+    async fn cast_heal_spell(
+        &self,
+        player_id: &str,
+        spell_def: &crate::spell::SpellDef,
+        current_time: u64,
+    ) {
         // Get caster info
         let (caster_x, caster_y, magic_level, current_hp, max_hp) = {
             let players = self.players.read().await;
@@ -11630,7 +13877,13 @@ impl GameRoom {
                 Some(p) if !p.is_dead && p.active => p,
                 _ => return,
             };
-            (player.x, player.y, player.skills.magic.level, player.hp, player.max_hp())
+            (
+                player.x,
+                player.y,
+                player.skills.magic.level,
+                player.hp,
+                player.max_hp(),
+            )
         };
 
         // 1. Deduct mana and set cooldown
@@ -11638,7 +13891,9 @@ impl GameRoom {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 player.mp -= spell_def.mana_cost;
-                player.spell_cooldowns.insert(spell_def.id.to_string(), current_time);
+                player
+                    .spell_cooldowns
+                    .insert(spell_def.id.to_string(), current_time);
             }
         }
 
@@ -11655,19 +13910,27 @@ impl GameRoom {
         }
 
         // 4. Broadcast SpellEffect (target_id = None, target position = caster position)
-        self.broadcast_to_zone(player_id, ServerMessage::SpellEffect {
-            caster_id: player_id.to_string(),
-            target_id: None,
-            spell_id: spell_def.id.to_string(),
-            target_x: caster_x,
-            target_y: caster_y,
-        }).await;
+        self.broadcast_to_zone(
+            player_id,
+            ServerMessage::SpellEffect {
+                caster_id: player_id.to_string(),
+                target_id: None,
+                spell_id: spell_def.id.to_string(),
+                target_x: caster_x,
+                target_y: caster_y,
+            },
+        )
+        .await;
 
         // 5. Broadcast casting animation
-        self.broadcast_to_zone(player_id, ServerMessage::PlayerAttack {
-            player_id: player_id.to_string(),
-            attack_type: "spell".to_string(),
-        }).await;
+        self.broadcast_to_zone(
+            player_id,
+            ServerMessage::PlayerAttack {
+                player_id: player_id.to_string(),
+                attack_type: "spell".to_string(),
+            },
+        )
+        .await;
 
         // 6. Award Magic XP based on amount healed
         if actual_heal > 0 {
@@ -11677,38 +13940,64 @@ impl GameRoom {
                     let magic_xp = (actual_heal as f64 * crate::skills::MAGIC_XP_PER_HEAL) as i64;
 
                     let magic_leveled = caster.skills.magic.add_xp(magic_xp);
-                    Some((SkillType::Magic, magic_xp, caster.skills.magic.xp, caster.skills.magic.level, magic_leveled))
+                    Some((
+                        SkillType::Magic,
+                        magic_xp,
+                        caster.skills.magic.xp,
+                        caster.skills.magic.level,
+                        magic_leveled,
+                    ))
                 } else {
                     None
                 }
             };
 
             if let Some((skill_type, xp_gained, total_xp, level, leveled_up)) = xp_results {
-                self.send_to_player(player_id, ServerMessage::SkillXp {
-                    player_id: player_id.to_string(),
-                    skill: skill_type.as_str().to_string(),
-                    xp_gained,
-                    total_xp,
-                    level,
-                }).await;
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SkillXp {
+                        player_id: player_id.to_string(),
+                        skill: skill_type.as_str().to_string(),
+                        xp_gained,
+                        total_xp,
+                        level,
+                    },
+                )
+                .await;
 
                 if leveled_up {
-                    tracing::info!("Player {} leveled up {} to {}", player_id, skill_type.as_str(), level);
+                    tracing::info!(
+                        "Player {} leveled up {} to {}",
+                        player_id,
+                        skill_type.as_str(),
+                        level
+                    );
                     self.broadcast(ServerMessage::SkillLevelUp {
                         player_id: player_id.to_string(),
                         skill: skill_type.as_str().to_string(),
                         new_level: level,
-                    }).await;
+                    })
+                    .await;
                     self.process_quest_progression_snapshot(player_id).await;
                 }
             }
         }
 
-        tracing::info!("Player {} healed for {} HP with spell {}", player_id, actual_heal, spell_def.name);
+        tracing::info!(
+            "Player {} healed for {} HP with spell {}",
+            player_id,
+            actual_heal,
+            spell_def.name
+        );
     }
 
     /// Cast the Return Home teleport spell. Returns true if the spell was successfully cast.
-    pub async fn cast_return_home_spell(&self, player_id: &str, spell_def: &crate::spell::SpellDef, current_time: u64) -> bool {
+    pub async fn cast_return_home_spell(
+        &self,
+        player_id: &str,
+        spell_def: &crate::spell::SpellDef,
+        current_time: u64,
+    ) -> bool {
         // Validate and set cooldown under write lock
         {
             let mut players = self.players.write().await;
@@ -11721,42 +14010,66 @@ impl GameRoom {
             if let Some(&last_cast) = player.spell_cooldowns.get(spell_def.id) {
                 if current_time < last_cast + spell_def.cooldown_ms {
                     drop(players);
-                    self.send_to_player(player_id, ServerMessage::SpellResult {
-                        success: false,
-                        reason: Some("Spell on cooldown".to_string()),
-                    }).await;
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::SpellResult {
+                            success: false,
+                            reason: Some("Spell on cooldown".to_string()),
+                        },
+                    )
+                    .await;
                     return false;
                 }
             }
 
             // Set cooldown and move player to spawn
-            player.spell_cooldowns.insert(spell_def.id.to_string(), current_time);
+            player
+                .spell_cooldowns
+                .insert(spell_def.id.to_string(), current_time);
             player.x = WORLD_SPAWN_X;
             player.y = WORLD_SPAWN_Y;
         }
 
         // Send success result
-        self.send_to_player(player_id, ServerMessage::SpellResult {
-            success: true,
-            reason: None,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::SpellResult {
+                success: true,
+                reason: None,
+            },
+        )
+        .await;
 
         // Send spell effect to the player
-        self.send_to_player(player_id, ServerMessage::SpellEffect {
-            caster_id: player_id.to_string(),
-            target_id: None,
-            spell_id: spell_def.id.to_string(),
-            target_x: WORLD_SPAWN_X,
-            target_y: WORLD_SPAWN_Y,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::SpellEffect {
+                caster_id: player_id.to_string(),
+                target_id: None,
+                spell_id: spell_def.id.to_string(),
+                target_x: WORLD_SPAWN_X,
+                target_y: WORLD_SPAWN_Y,
+            },
+        )
+        .await;
 
-        tracing::info!("Player {} cast Return Home, teleporting to ({}, {})", player_id, WORLD_SPAWN_X, WORLD_SPAWN_Y);
+        tracing::info!(
+            "Player {} cast Return Home, teleporting to ({}, {})",
+            player_id,
+            WORLD_SPAWN_X,
+            WORLD_SPAWN_Y
+        );
         true
     }
 
     /// Handle offering bones at an altar for bonus XP
     pub async fn handle_offer_bones(&self, player_id: &str, slot: usize, altar_id: &str) {
-        tracing::debug!("Player {} offering bones at altar {} from slot {}", player_id, altar_id, slot);
+        tracing::debug!(
+            "Player {} offering bones at altar {} from slot {}",
+            player_id,
+            altar_id,
+            slot
+        );
 
         // Get player position
         let player_pos = {
@@ -11801,24 +14114,29 @@ impl GameRoom {
         let (entity_type, distance) = match altar_info {
             Some(info) => info,
             None => {
-                self.send_system_message(player_id, "Altar not found.").await;
+                self.send_system_message(player_id, "Altar not found.")
+                    .await;
                 return;
             }
         };
 
         // Check distance
         if distance > 2.5 {
-            self.send_system_message(player_id, "You need to be closer to the altar.").await;
+            self.send_system_message(player_id, "You need to be closer to the altar.")
+                .await;
             return;
         }
 
         // Validate it's actually an altar
-        let is_altar = self.entity_registry.get(&entity_type)
+        let is_altar = self
+            .entity_registry
+            .get(&entity_type)
             .map(|proto| proto.behaviors.altar)
             .unwrap_or(false);
 
         if !is_altar {
-            self.send_system_message(player_id, "That's not an altar.").await;
+            self.send_system_message(player_id, "That's not an altar.")
+                .await;
             return;
         }
 
@@ -11835,7 +14153,8 @@ impl GameRoom {
                 Some(item) => item,
                 None => {
                     drop(players);
-                    self.send_system_message(player_id, "There's nothing in that slot.").await;
+                    self.send_system_message(player_id, "There's nothing in that slot.")
+                        .await;
                     return;
                 }
             };
@@ -11855,7 +14174,8 @@ impl GameRoom {
             // Check if it's bones (has prayer_xp > 0)
             if !item_def.is_bones() {
                 drop(players);
-                self.send_system_message(player_id, "You can only offer bones at the altar.").await;
+                self.send_system_message(player_id, "You can only offer bones at the altar.")
+                    .await;
                 return;
             }
 
@@ -11907,26 +14227,38 @@ impl GameRoom {
         };
 
         // Send chat message
-        self.send_system_message(player_id, &format!(
-            "The gods are pleased with your offering. (+{} Prayer XP)",
-            altar_xp
-        )).await;
+        self.send_system_message(
+            player_id,
+            &format!(
+                "The gods are pleased with your offering. (+{} Prayer XP)",
+                altar_xp
+            ),
+        )
+        .await;
 
         // Send inventory update
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inv_update.0,
-            gold: inv_update.1,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inv_update.0,
+                gold: inv_update.1,
+            },
+        )
+        .await;
 
         // Send XP update
-        self.send_to_player(player_id, ServerMessage::SkillXp {
-            player_id: player_id.to_string(),
-            skill: "prayer".to_string(),
-            xp_gained: xp_result.0,
-            total_xp: xp_result.1,
-            level: xp_result.2,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::SkillXp {
+                player_id: player_id.to_string(),
+                skill: "prayer".to_string(),
+                xp_gained: xp_result.0,
+                total_xp: xp_result.1,
+                level: xp_result.2,
+            },
+        )
+        .await;
 
         // Broadcast level up if applicable
         if xp_result.3 {
@@ -11935,7 +14267,8 @@ impl GameRoom {
                 player_id: player_id.to_string(),
                 skill: "prayer".to_string(),
                 new_level: xp_result.2,
-            }).await;
+            })
+            .await;
 
             // Send updated prayer state with new max points
             let (points, max_points, active_prayers) = {
@@ -11951,18 +14284,27 @@ impl GameRoom {
                 }
             };
 
-            self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
-                points,
-                max_points,
-                active_prayers,
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::PrayerStateUpdate {
+                    points,
+                    max_points,
+                    active_prayers,
+                },
+            )
+            .await;
 
             self.process_quest_progression_snapshot(player_id).await;
         }
     }
 
     pub async fn handle_offer_all_bones(&self, player_id: &str, item_id: &str, altar_id: &str) {
-        tracing::debug!("Player {} offering all {} at altar {}", player_id, item_id, altar_id);
+        tracing::debug!(
+            "Player {} offering all {} at altar {}",
+            player_id,
+            item_id,
+            altar_id
+        );
 
         // Get player position
         let player_pos = {
@@ -12005,22 +14347,27 @@ impl GameRoom {
         let (entity_type, distance) = match altar_info {
             Some(info) => info,
             None => {
-                self.send_system_message(player_id, "Altar not found.").await;
+                self.send_system_message(player_id, "Altar not found.")
+                    .await;
                 return;
             }
         };
 
         if distance > 2.5 {
-            self.send_system_message(player_id, "You need to be closer to the altar.").await;
+            self.send_system_message(player_id, "You need to be closer to the altar.")
+                .await;
             return;
         }
 
-        let is_altar = self.entity_registry.get(&entity_type)
+        let is_altar = self
+            .entity_registry
+            .get(&entity_type)
             .map(|proto| proto.behaviors.altar)
             .unwrap_or(false);
 
         if !is_altar {
-            self.send_system_message(player_id, "That's not an altar.").await;
+            self.send_system_message(player_id, "That's not an altar.")
+                .await;
             return;
         }
 
@@ -12028,7 +14375,8 @@ impl GameRoom {
         let (item_name, base_prayer_xp) = match self.item_registry.get(item_id) {
             Some(def) if def.is_bones() => (def.display_name.clone(), def.prayer_xp),
             _ => {
-                self.send_system_message(player_id, "You can only offer bones at the altar.").await;
+                self.send_system_message(player_id, "You can only offer bones at the altar.")
+                    .await;
                 return;
             }
         };
@@ -12062,7 +14410,8 @@ impl GameRoom {
 
             if total == 0 {
                 drop(players);
-                self.send_system_message(player_id, "You don't have any of those bones.").await;
+                self.send_system_message(player_id, "You don't have any of those bones.")
+                    .await;
                 return;
             }
 
@@ -12083,24 +14432,36 @@ impl GameRoom {
             (total, inv_update, xp_result)
         };
 
-        self.send_system_message(player_id, &format!(
-            "The gods are pleased with your offering of {} {}. (+{} Prayer XP)",
-            total_bones, item_name, xp_result.0
-        )).await;
+        self.send_system_message(
+            player_id,
+            &format!(
+                "The gods are pleased with your offering of {} {}. (+{} Prayer XP)",
+                total_bones, item_name, xp_result.0
+            ),
+        )
+        .await;
 
-        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: inv_update.0,
-            gold: inv_update.1,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inv_update.0,
+                gold: inv_update.1,
+            },
+        )
+        .await;
 
-        self.send_to_player(player_id, ServerMessage::SkillXp {
-            player_id: player_id.to_string(),
-            skill: "prayer".to_string(),
-            xp_gained: xp_result.0,
-            total_xp: xp_result.1,
-            level: xp_result.2,
-        }).await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::SkillXp {
+                player_id: player_id.to_string(),
+                skill: "prayer".to_string(),
+                xp_gained: xp_result.0,
+                total_xp: xp_result.1,
+                level: xp_result.2,
+            },
+        )
+        .await;
 
         if xp_result.3 {
             tracing::info!("Player {} leveled up Prayer to {}", player_id, xp_result.2);
@@ -12108,7 +14469,8 @@ impl GameRoom {
                 player_id: player_id.to_string(),
                 skill: "prayer".to_string(),
                 new_level: xp_result.2,
-            }).await;
+            })
+            .await;
 
             // Send updated prayer state with new max points
             let (points, max_points, active_prayers) = {
@@ -12124,11 +14486,15 @@ impl GameRoom {
                 }
             };
 
-            self.send_to_player(player_id, ServerMessage::PrayerStateUpdate {
-                points,
-                max_points,
-                active_prayers,
-            }).await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::PrayerStateUpdate {
+                    points,
+                    max_points,
+                    active_prayers,
+                },
+            )
+            .await;
 
             self.process_quest_progression_snapshot(player_id).await;
         }

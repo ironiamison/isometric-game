@@ -326,6 +326,7 @@
       418,
       418,
       418,
+      381,
       418,
       418,
       418,
@@ -356,6 +357,8 @@
       418,
       418,
       418,
+      381,
+      381,
       418,
       418,
       418,
@@ -386,6 +389,8 @@
       418,
       418,
       418,
+      381,
+      381,
       418,
       418,
       418,
@@ -416,6 +421,8 @@
       418,
       418,
       418,
+      381,
+      381,
       418,
       418,
       418,
@@ -446,6 +453,8 @@
       418,
       418,
       418,
+      381,
+      381,
       418,
       418,
       418,
@@ -476,6 +485,8 @@
       418,
       418,
       418,
+      381,
+      381,
       418,
       418,
       418,
@@ -506,6 +517,8 @@
       418,
       418,
       418,
+      381,
+      381,
       418,
       418,
       418,
@@ -537,6 +550,7 @@
       418,
       418,
       418,
+      381,
       418,
       418,
       418,
@@ -568,6 +582,7 @@
       418,
       418,
       418,
+      381,
       418,
       418,
       418,
@@ -599,22 +614,7 @@
       418,
       418,
       418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
-      418,
+      381,
       418,
       418,
       418,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAEAAAAAAAAAAAAAAAEAAAACAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAIAAAA=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAEAAAAAAACAAAAAgAEAAIACAACAAAAAgAAAAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAIAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3194,7 +3194,50 @@
       "height": 104
     }
   ],
-  "walls": [],
+  "walls": [
+    {
+      "gid": 1391,
+      "x": 31,
+      "y": 16,
+      "edge": "down"
+    },
+    {
+      "gid": 1396,
+      "x": 31,
+      "y": 16,
+      "edge": "right"
+    },
+    {
+      "gid": 1396,
+      "x": 31,
+      "y": 15,
+      "edge": "right"
+    },
+    {
+      "gid": 1396,
+      "x": 31,
+      "y": 14,
+      "edge": "right"
+    },
+    {
+      "gid": 1396,
+      "x": 31,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 1396,
+      "x": 31,
+      "y": 12,
+      "edge": "right"
+    },
+    {
+      "gid": 1396,
+      "x": 31,
+      "y": 11,
+      "edge": "right"
+    }
+  ],
   "portals": [],
   "gatheringZones": []
 }

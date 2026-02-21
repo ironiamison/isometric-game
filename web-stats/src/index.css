@@ -1,1 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --font-display: 'Cinzel', Georgia, serif;
+  --font-body: 'Space Grotesk', 'Trebuchet MS', sans-serif;
+  --bg: #0b1118;
+  --bg-accent: #102033;
+  --panel: #121c28;
+  --panel-soft: #1a2636;
+  --panel-border: #243244;
+  --gold: #d9b25f;
+  --text: #ecf2ff;
+  --text-soft: #9db0c8;
+  --muted: #73839a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in oklab, var(--bg-accent) 70%, transparent), transparent 40%),
+    radial-gradient(circle at 90% 0%, color-mix(in oklab, var(--gold) 16%, transparent), transparent 48%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--gold) 45%, transparent);
+  color: var(--text);
+}

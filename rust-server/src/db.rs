@@ -1,11 +1,11 @@
 use crate::quest::state::{ObjectiveProgress, PlayerQuestState, QuestProgress, QuestStatus};
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 use chrono::{DateTime, Utc};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
 use sqlx::Row;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
 use std::collections::HashMap;
 
 /// Account data - separate from character data
@@ -124,8 +124,8 @@ impl Database {
                 name TEXT UNIQUE NOT NULL,
                 gender TEXT NOT NULL DEFAULT 'male',
                 skin TEXT NOT NULL DEFAULT 'tan',
-                x REAL DEFAULT 15.0,
-                y REAL DEFAULT 4.0,
+                x REAL DEFAULT -30.0,
+                y REAL DEFAULT 19.0,
                 hp INTEGER DEFAULT 10,
                 max_hp INTEGER DEFAULT 10,
                 level INTEGER DEFAULT 3,
@@ -142,6 +142,7 @@ impl Database {
                 inventory_json TEXT DEFAULT '[]',
                 skills_json TEXT,
                 played_time INTEGER DEFAULT 0,
+                monster_kills INTEGER DEFAULT 0,
                 is_admin BOOLEAN DEFAULT FALSE,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -165,6 +166,21 @@ impl Database {
                 .execute(pool)
                 .await
                 .ok(); // Ignore error if column already exists
+        }
+
+        // Migration: Add monster_kills column if it doesn't exist
+        let monster_kills_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'monster_kills'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !monster_kills_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN monster_kills INTEGER DEFAULT 0")
+                .execute(pool)
+                .await
+                .ok();
         }
 
         // Migration: Add hair_style column if it doesn't exist
@@ -517,6 +533,27 @@ impl Database {
         Ok(rows)
     }
 
+    /// Increment a character's persistent monster kill counter.
+    pub async fn increment_character_monster_kills(
+        &self,
+        character_id: i64,
+        kills: i32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE characters
+            SET monster_kills = COALESCE(monster_kills, 0) + ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(kills)
+        .bind(character_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     // =========================================================================
     // Account CRUD Functions (new)
     // =========================================================================
@@ -693,7 +730,9 @@ impl Database {
                         .unwrap_or(None),
                     sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
                     sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
-                    bank_json: r.try_get::<String, _>("bank_json").unwrap_or_else(|_| "[]".to_string()),
+                    bank_json: r
+                        .try_get::<String, _>("bank_json")
+                        .unwrap_or_else(|_| "[]".to_string()),
                     bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
                 }
             })
@@ -771,7 +810,7 @@ impl Database {
             r#"INSERT INTO characters
                (account_id, name, gender, skin, hair_style, hair_color,
                 equipped_weapon, equipped_body, equipped_feet, gold, x, y)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 15.0, 4.0)"#,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, -30.0, 19.0)"#,
         )
         .bind(account_id)
         .bind(name)
@@ -794,8 +833,13 @@ impl Database {
         })?;
 
         let character_id = result.last_insert_rowid();
-        tracing::info!("Created character: {} (id: {}) for account {} with starting gear (pitchfork, clothes, sandals, {}g)",
-            name, character_id, account_id, starting_gold);
+        tracing::info!(
+            "Created character: {} (id: {}) for account {} with starting gear (pitchfork, clothes, sandals, {}g)",
+            name,
+            character_id,
+            account_id,
+            starting_gold
+        );
 
         // Fetch and return the created character
         self.get_character(character_id)
@@ -902,7 +946,9 @@ impl Database {
                     .unwrap_or(None),
                 sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
                 sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
-                bank_json: r.try_get::<String, _>("bank_json").unwrap_or_else(|_| "[]".to_string()),
+                bank_json: r
+                    .try_get::<String, _>("bank_json")
+                    .unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
             }
         }))

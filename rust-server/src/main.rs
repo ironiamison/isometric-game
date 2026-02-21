@@ -1,31 +1,26 @@
+use crate::data::item_def::EquipmentSlot;
+use crate::skills::Skills;
 use axum::{
+    Json, Router,
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         ConnectInfo, Path, Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
 use dashmap::{DashMap, DashSet};
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
 use futures::{SinkExt, StreamExt};
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::Arc,
-    time::Duration,
-};
-use tokio::sync::{broadcast, mpsc, RwLock};
+use sha2::Sha256;
+use sqlx::Row;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::sync::{RwLock, broadcast, mpsc};
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use uuid::Uuid;
-use crate::skills::Skills;
-use crate::data::item_def::EquipmentSlot;
-use sqlx::Row;
 
 mod arena;
 mod chunk;
@@ -40,7 +35,10 @@ mod instance;
 mod interior;
 mod interior_registry;
 mod item;
+mod log_buffer;
+mod mining;
 mod npc;
+mod perf_metrics;
 mod prayer;
 mod protocol;
 mod quest;
@@ -48,9 +46,6 @@ mod shop;
 mod skills;
 mod spell;
 mod tilemap;
-mod log_buffer;
-mod perf_metrics;
-mod mining;
 mod woodcutting;
 mod world;
 
@@ -58,12 +53,12 @@ use crafting::CraftingRegistry;
 use data::ItemRegistry;
 use db::Database;
 use entity::EntityRegistry;
+use game::{GameRoom, Player, PlayerUpdate};
 use instance::InstanceManager;
 use interior_registry::InteriorRegistry;
 use prayer::PrayerRegistry;
-use quest::QuestRegistry;
-use game::{GameRoom, Player, PlayerUpdate};
 use protocol::{ClientMessage, ServerMessage};
+use quest::QuestRegistry;
 
 // ============================================================================
 // App State
@@ -74,12 +69,12 @@ use protocol::{ClientMessage, ServerMessage};
 struct GameSession {
     room_id: String,
     player_id: String,
-    character_name: String,   // Character name for display
-    character_id: i64,        // Database character ID
-    account_id: i64,          // Database account ID
-    auth_token: String,       // Token used for this session (for validation)
+    character_name: String,      // Character name for display
+    character_id: i64,           // Database character ID
+    account_id: i64,             // Database account ID
+    auth_token: String,          // Token used for this session (for validation)
     current_map: Option<String>, // Interior map ID to auto-enter on connect (None = overworld)
-    is_new_character: bool,   // True if played_time == 0 (for tutorial)
+    is_new_character: bool,      // True if played_time == 0 (for tutorial)
 }
 
 #[derive(Clone)]
@@ -157,7 +152,7 @@ impl AppState {
         // Load interior registry from JSON files
         let interior_registry = Arc::new(
             InteriorRegistry::load_from_directory("maps/interiors")
-                .expect("Failed to load interior registry")
+                .expect("Failed to load interior registry"),
         );
 
         // Initialize instance manager
@@ -225,17 +220,20 @@ impl AppState {
         }
 
         // Create new room and store by its UUID
-        let room = Arc::new(GameRoom::new(
-            room_name,
-            self.entity_registry.clone(),
-            self.quest_registry.clone(),
-            self.crafting_registry.clone(),
-            self.item_registry.clone(),
-            self.prayer_registry.clone(),
-            self.player_instances.clone(),
-            self.instance_manager.clone(),
-            Some(self.db.clone()),
-        ).await);
+        let room = Arc::new(
+            GameRoom::new(
+                room_name,
+                self.entity_registry.clone(),
+                self.quest_registry.clone(),
+                self.crafting_registry.clone(),
+                self.item_registry.clone(),
+                self.prayer_registry.clone(),
+                self.player_instances.clone(),
+                self.instance_manager.clone(),
+                Some(self.db.clone()),
+            )
+            .await,
+        );
         self.rooms.insert(room.id.clone(), room.clone());
         room
     }
@@ -284,16 +282,21 @@ impl SessionTokenSigner {
         let expiry = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs() + SESSION_TOKEN_EXPIRY_SECS;
+            .as_secs()
+            + SESSION_TOKEN_EXPIRY_SECS;
 
         let payload = format!("{}:{}:{}", session_id, room_id, expiry);
 
-        let mut mac = HmacSha256::new_from_slice(&self.secret)
-            .expect("HMAC can take key of any size");
+        let mut mac =
+            HmacSha256::new_from_slice(&self.secret).expect("HMAC can take key of any size");
         mac.update(payload.as_bytes());
         let signature = mac.finalize().into_bytes();
 
-        let token_data = format!("{}:{}", payload, base64::engine::general_purpose::STANDARD.encode(signature));
+        let token_data = format!(
+            "{}:{}",
+            payload,
+            base64::engine::general_purpose::STANDARD.encode(signature)
+        );
         base64::engine::general_purpose::URL_SAFE.encode(token_data)
     }
 
@@ -303,7 +306,9 @@ impl SessionTokenSigner {
         use base64::Engine;
 
         // Decode base64
-        let token_data = base64::engine::general_purpose::URL_SAFE.decode(token).ok()?;
+        let token_data = base64::engine::general_purpose::URL_SAFE
+            .decode(token)
+            .ok()?;
         let token_str = String::from_utf8(token_data).ok()?;
 
         // Parse: session_id:room_id:expiry:signature
@@ -329,10 +334,12 @@ impl SessionTokenSigner {
 
         // Verify signature
         let payload = format!("{}:{}:{}", session_id, room_id, expiry);
-        let expected_sig = base64::engine::general_purpose::STANDARD.decode(signature_b64).ok()?;
+        let expected_sig = base64::engine::general_purpose::STANDARD
+            .decode(signature_b64)
+            .ok()?;
 
-        let mut mac = HmacSha256::new_from_slice(&self.secret)
-            .expect("HMAC can take key of any size");
+        let mut mac =
+            HmacSha256::new_from_slice(&self.secret).expect("HMAC can take key of any size");
         mac.update(payload.as_bytes());
 
         if mac.verify_slice(&expected_sig).is_err() {
@@ -459,9 +466,14 @@ async fn register_account(
         Ok(account_id) => {
             // Create auth token - note: (account_id, username) order now
             let token = Uuid::new_v4().to_string();
-            state.auth_sessions.insert(token.clone(), (account_id, req.username.clone()));
+            state
+                .auth_sessions
+                .insert(token.clone(), (account_id, req.username.clone()));
 
-            info!("Account registered: {} (id: {}) from {}", req.username, account_id, client_ip);
+            info!(
+                "Account registered: {} (id: {}) from {}",
+                req.username, account_id, client_ip
+            );
 
             Json(AuthResponse {
                 success: true,
@@ -471,15 +483,13 @@ async fn register_account(
                 error: None,
             })
         }
-        Err(e) => {
-            Json(AuthResponse {
-                success: false,
-                token: None,
-                username: None,
-                characters: None,
-                error: Some(e),
-            })
-        }
+        Err(e) => Json(AuthResponse {
+            success: false,
+            token: None,
+            username: None,
+            characters: None,
+            error: Some(e),
+        }),
     }
 }
 
@@ -501,45 +511,77 @@ async fn login_account(
         });
     }
 
-    match state.db.verify_account_password(&req.username, &req.password).await {
+    match state
+        .db
+        .verify_account_password(&req.username, &req.password)
+        .await
+    {
         Some(account) => {
             // Create auth token - note: (account_id, username) order now
             let token = Uuid::new_v4().to_string();
-            state.auth_sessions.insert(token.clone(), (account.id, req.username.clone()));
+            state
+                .auth_sessions
+                .insert(token.clone(), (account.id, req.username.clone()));
 
-            info!("Account logged in: {} (id: {}) from {}", req.username, account.id, client_ip);
+            info!(
+                "Account logged in: {} (id: {}) from {}",
+                req.username, account.id, client_ip
+            );
 
             // Fetch characters for this account to include in response
             let characters = match state.db.get_characters_for_account(account.id).await {
-                Ok(chars) => Some(chars.into_iter().map(|c| {
-                    let sprite_head = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_head);
-                    let sprite_body = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_body);
-                    let sprite_weapon = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_weapon);
-                    let sprite_back = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_back);
-                    let sprite_feet = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_feet);
-                    CharacterInfo {
-                        id: c.id,
-                        name: c.name.clone(),
-                        level: c.skills.combat_level(),
-                        gender: c.gender,
-                        skin: c.skin,
-                        hair_style: c.hair_style,
-                        hair_color: c.hair_color,
-                        played_time: c.played_time,
-                        equipped_head: c.equipped_head,
-                        equipped_body: c.equipped_body,
-                        equipped_weapon: c.equipped_weapon,
-                        equipped_back: c.equipped_back,
-                        equipped_feet: c.equipped_feet,
-                        sprite_head,
-                        sprite_body,
-                        sprite_weapon,
-                        sprite_back,
-                        sprite_feet,
-                    }
-                }).collect()),
+                Ok(chars) => Some(
+                    chars
+                        .into_iter()
+                        .map(|c| {
+                            let sprite_head = CharacterInfo::resolve_sprite(
+                                &state.item_registry,
+                                &c.equipped_head,
+                            );
+                            let sprite_body = CharacterInfo::resolve_sprite(
+                                &state.item_registry,
+                                &c.equipped_body,
+                            );
+                            let sprite_weapon = CharacterInfo::resolve_sprite(
+                                &state.item_registry,
+                                &c.equipped_weapon,
+                            );
+                            let sprite_back = CharacterInfo::resolve_sprite(
+                                &state.item_registry,
+                                &c.equipped_back,
+                            );
+                            let sprite_feet = CharacterInfo::resolve_sprite(
+                                &state.item_registry,
+                                &c.equipped_feet,
+                            );
+                            CharacterInfo {
+                                id: c.id,
+                                name: c.name.clone(),
+                                level: c.skills.combat_level(),
+                                gender: c.gender,
+                                skin: c.skin,
+                                hair_style: c.hair_style,
+                                hair_color: c.hair_color,
+                                played_time: c.played_time,
+                                equipped_head: c.equipped_head,
+                                equipped_body: c.equipped_body,
+                                equipped_weapon: c.equipped_weapon,
+                                equipped_back: c.equipped_back,
+                                equipped_feet: c.equipped_feet,
+                                sprite_head,
+                                sprite_body,
+                                sprite_weapon,
+                                sprite_back,
+                                sprite_feet,
+                            }
+                        })
+                        .collect(),
+                ),
                 Err(e) => {
-                    warn!("Failed to fetch characters for account {}: {}", account.id, e);
+                    warn!(
+                        "Failed to fetch characters for account {}: {}",
+                        account.id, e
+                    );
                     None
                 }
             };
@@ -554,7 +596,10 @@ async fn login_account(
         }
         None => {
             state.auth_rate_limiter.record_failure(&client_ip);
-            warn!("Failed login attempt for '{}' from {}", req.username, client_ip);
+            warn!(
+                "Failed login attempt for '{}' from {}",
+                req.username, client_ip
+            );
 
             Json(AuthResponse {
                 success: false,
@@ -631,10 +676,13 @@ struct CharacterInfo {
 }
 
 impl CharacterInfo {
-    fn resolve_sprite(item_registry: &crate::data::item_registry::ItemRegistry, item_id: &Option<String>) -> Option<String> {
-        item_id.as_ref().and_then(|id| {
-            item_registry.get(id).map(|def| def.sprite.clone())
-        })
+    fn resolve_sprite(
+        item_registry: &crate::data::item_registry::ItemRegistry,
+        item_id: &Option<String>,
+    ) -> Option<String> {
+        item_id
+            .as_ref()
+            .and_then(|id| item_registry.get(id).map(|def| def.sprite.clone()))
     }
 }
 
@@ -691,33 +739,41 @@ async fn list_characters(
 
     match state.db.get_characters_for_account(account_id).await {
         Ok(chars) => {
-            let char_infos: Vec<CharacterInfo> = chars.into_iter().map(|c| {
-                let sprite_head = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_head);
-                let sprite_body = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_body);
-                let sprite_weapon = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_weapon);
-                let sprite_back = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_back);
-                let sprite_feet = CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_feet);
-                CharacterInfo {
-                    id: c.id,
-                    name: c.name.clone(),
-                    level: c.skills.combat_level(),
-                    gender: c.gender,
-                    skin: c.skin,
-                    hair_style: c.hair_style,
-                    hair_color: c.hair_color,
-                    played_time: c.played_time,
-                    equipped_head: c.equipped_head,
-                    equipped_body: c.equipped_body,
-                    equipped_weapon: c.equipped_weapon,
-                    equipped_back: c.equipped_back,
-                    equipped_feet: c.equipped_feet,
-                    sprite_head,
-                    sprite_body,
-                    sprite_weapon,
-                    sprite_back,
-                    sprite_feet,
-                }
-            }).collect();
+            let char_infos: Vec<CharacterInfo> = chars
+                .into_iter()
+                .map(|c| {
+                    let sprite_head =
+                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_head);
+                    let sprite_body =
+                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_body);
+                    let sprite_weapon =
+                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_weapon);
+                    let sprite_back =
+                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_back);
+                    let sprite_feet =
+                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_feet);
+                    CharacterInfo {
+                        id: c.id,
+                        name: c.name.clone(),
+                        level: c.skills.combat_level(),
+                        gender: c.gender,
+                        skin: c.skin,
+                        hair_style: c.hair_style,
+                        hair_color: c.hair_color,
+                        played_time: c.played_time,
+                        equipped_head: c.equipped_head,
+                        equipped_body: c.equipped_body,
+                        equipped_weapon: c.equipped_weapon,
+                        equipped_back: c.equipped_back,
+                        equipped_feet: c.equipped_feet,
+                        sprite_head,
+                        sprite_body,
+                        sprite_weapon,
+                        sprite_back,
+                        sprite_feet,
+                    }
+                })
+                .collect();
 
             (
                 StatusCode::OK,
@@ -729,7 +785,10 @@ async fn list_characters(
             )
         }
         Err(e) => {
-            error!("Failed to list characters for account {}: {}", account_id, e);
+            error!(
+                "Failed to list characters for account {}: {}",
+                account_id, e
+            );
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(CharacterListResponse {
@@ -791,7 +850,9 @@ async fn create_character(
             Json(CreateCharacterResponse {
                 success: false,
                 character: None,
-                error: Some("Character name can only contain letters, numbers, and spaces".to_string()),
+                error: Some(
+                    "Character name can only contain letters, numbers, and spaces".to_string(),
+                ),
             }),
         );
     }
@@ -804,7 +865,10 @@ async fn create_character(
                 Json(CreateCharacterResponse {
                     success: false,
                     character: None,
-                    error: Some(format!("Character limit reached (max {})", MAX_CHARACTERS_PER_ACCOUNT)),
+                    error: Some(format!(
+                        "Character limit reached (max {})",
+                        MAX_CHARACTERS_PER_ACCOUNT
+                    )),
                 }),
             );
         }
@@ -823,7 +887,18 @@ async fn create_character(
     }
 
     // Create the character
-    match state.db.create_character(account_id, name, &req.gender, &req.skin, req.hair_style, req.hair_color).await {
+    match state
+        .db
+        .create_character(
+            account_id,
+            name,
+            &req.gender,
+            &req.skin,
+            req.hair_style,
+            req.hair_color,
+        )
+        .await
+    {
         Ok(char_data) => {
             info!("Created character '{}' for account {}", name, account_id);
             (
@@ -831,11 +906,26 @@ async fn create_character(
                 Json(CreateCharacterResponse {
                     success: true,
                     character: Some({
-                        let sprite_head = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_head);
-                        let sprite_body = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_body);
-                        let sprite_weapon = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_weapon);
-                        let sprite_back = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_back);
-                        let sprite_feet = CharacterInfo::resolve_sprite(&state.item_registry, &char_data.equipped_feet);
+                        let sprite_head = CharacterInfo::resolve_sprite(
+                            &state.item_registry,
+                            &char_data.equipped_head,
+                        );
+                        let sprite_body = CharacterInfo::resolve_sprite(
+                            &state.item_registry,
+                            &char_data.equipped_body,
+                        );
+                        let sprite_weapon = CharacterInfo::resolve_sprite(
+                            &state.item_registry,
+                            &char_data.equipped_weapon,
+                        );
+                        let sprite_back = CharacterInfo::resolve_sprite(
+                            &state.item_registry,
+                            &char_data.equipped_back,
+                        );
+                        let sprite_feet = CharacterInfo::resolve_sprite(
+                            &state.item_registry,
+                            &char_data.equipped_feet,
+                        );
                         CharacterInfo {
                             id: char_data.id,
                             name: char_data.name,
@@ -899,7 +989,10 @@ async fn delete_character(
     };
 
     if state.online_characters.contains(&character_id) {
-        warn!("Delete rejected: Character {} is currently online", character_id);
+        warn!(
+            "Delete rejected: Character {} is currently online",
+            character_id
+        );
         return (
             StatusCode::CONFLICT,
             Json(DeleteCharacterResponse {
@@ -911,7 +1004,10 @@ async fn delete_character(
 
     match state.db.delete_character(character_id, account_id).await {
         Ok(true) => {
-            info!("Deleted character {} for account {}", character_id, account_id);
+            info!(
+                "Deleted character {} for account {}",
+                character_id, account_id
+            );
             (
                 StatusCode::OK,
                 Json(DeleteCharacterResponse {
@@ -982,41 +1078,41 @@ async fn matchmake_join_or_create(
         warn!("Rate limit exceeded for matchmaking from {}", client_ip);
         return (
             StatusCode::TOO_MANY_REQUESTS,
-            Json(serde_json::json!({ "error": "Too many requests. Please try again later." }))
-        ).into_response();
+            Json(serde_json::json!({ "error": "Too many requests. Please try again later." })),
+        )
+            .into_response();
     }
 
     let auth_token = match headers.get("Authorization") {
-        Some(auth_header) => {
-            match auth_header.to_str() {
-                Ok(auth_str) => {
-                    match auth_str.strip_prefix("Bearer ") {
-                        Some(token) => token.to_string(),
-                        None => {
-                            warn!("Matchmaking rejected: Invalid Authorization format");
-                            return (
-                                StatusCode::UNAUTHORIZED,
-                                Json(serde_json::json!({
-                                    "error": "Invalid authorization format. Use 'Bearer <token>'"
-                                }))
-                            ).into_response();
-                        }
-                    }
-                }
-                Err(_) => {
+        Some(auth_header) => match auth_header.to_str() {
+            Ok(auth_str) => match auth_str.strip_prefix("Bearer ") {
+                Some(token) => token.to_string(),
+                None => {
+                    warn!("Matchmaking rejected: Invalid Authorization format");
                     return (
                         StatusCode::UNAUTHORIZED,
-                        Json(serde_json::json!({ "error": "Invalid authorization header" }))
-                    ).into_response();
+                        Json(serde_json::json!({
+                            "error": "Invalid authorization format. Use 'Bearer <token>'"
+                        })),
+                    )
+                        .into_response();
                 }
+            },
+            Err(_) => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(serde_json::json!({ "error": "Invalid authorization header" })),
+                )
+                    .into_response();
             }
-        }
+        },
         None => {
             warn!("Matchmaking rejected: No Authorization header");
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({ "error": "Authorization required. Please login first." }))
-            ).into_response();
+                Json(serde_json::json!({ "error": "Authorization required. Please login first." })),
+            )
+                .into_response();
         }
     };
 
@@ -1027,8 +1123,11 @@ async fn matchmake_join_or_create(
             warn!("Matchmaking rejected: Invalid or expired token");
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({ "error": "Invalid or expired token. Please login again." }))
-            ).into_response();
+                Json(
+                    serde_json::json!({ "error": "Invalid or expired token. Please login again." }),
+                ),
+            )
+                .into_response();
         }
     };
 
@@ -1037,11 +1136,17 @@ async fn matchmake_join_or_create(
     let character_data = match state.db.get_character(character_id).await {
         Ok(Some(char)) => {
             if char.account_id != account_id {
-                warn!("Matchmaking rejected: Character {} does not belong to account {}", character_id, account_id);
+                warn!(
+                    "Matchmaking rejected: Character {} does not belong to account {}",
+                    character_id, account_id
+                );
                 return (
                     StatusCode::FORBIDDEN,
-                    Json(serde_json::json!({ "error": "Character does not belong to this account" }))
-                ).into_response();
+                    Json(
+                        serde_json::json!({ "error": "Character does not belong to this account" }),
+                    ),
+                )
+                    .into_response();
             }
             char
         }
@@ -1049,21 +1154,26 @@ async fn matchmake_join_or_create(
             warn!("Matchmaking rejected: Character {} not found", character_id);
             return (
                 StatusCode::NOT_FOUND,
-                Json(serde_json::json!({ "error": "Character not found" }))
-            ).into_response();
+                Json(serde_json::json!({ "error": "Character not found" })),
+            )
+                .into_response();
         }
         Err(e) => {
             error!("Failed to load character {}: {}", character_id, e);
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": "Failed to load character" }))
-            ).into_response();
+                Json(serde_json::json!({ "error": "Failed to load character" })),
+            )
+                .into_response();
         }
     };
 
     // Check if character is already online
     if state.online_characters.contains(&character_id) {
-        warn!("Matchmaking rejected: Character {} is already online", character_id);
+        warn!(
+            "Matchmaking rejected: Character {} is already online",
+            character_id
+        );
         return (
             StatusCode::CONFLICT,
             Json(serde_json::json!({ "error": "This character is already logged in from another session" }))
@@ -1095,13 +1205,23 @@ async fn matchmake_join_or_create(
         },
     );
 
+    info!("Tutorial: character '{}' played_time={}, is_new_character={}", character_data.name, character_data.played_time, character_data.played_time == 0);
+
     // Start tracking play time for this character
-    state.play_time_anchors.insert(character_id, std::time::Instant::now());
+    state
+        .play_time_anchors
+        .insert(character_id, std::time::Instant::now());
 
     // Load saved character into the game room
-    info!("Loading character: {} (id: {}) at ({}, {}) as {} {}",
-        character_data.name, character_id, character_data.x, character_data.y,
-        character_data.gender, character_data.skin);
+    info!(
+        "Loading character: {} (id: {}) at ({}, {}) as {} {}",
+        character_data.name,
+        character_id,
+        character_data.x,
+        character_data.y,
+        character_data.gender,
+        character_data.skin
+    );
 
     room.reserve_player_with_data(
         &player_id,
@@ -1130,7 +1250,8 @@ async fn matchmake_join_or_create(
         character_data.sitting_at_y,
         &character_data.bank_json,
         character_data.bank_gold,
-    ).await;
+    )
+    .await;
 
     // Load quest state from database
     match state.db.load_character_quest_state(character_id).await {
@@ -1139,12 +1260,18 @@ async fn matchmake_join_or_create(
             let completed_count = quest_state.completed_quests.len();
             room.set_player_quest_state(&player_id, quest_state).await;
             if active_count > 0 || completed_count > 0 {
-                info!("Loaded quest state for {}: {} active, {} completed",
-                    character_data.name, active_count, completed_count);
+                info!(
+                    "Loaded quest state for {}: {} active, {} completed",
+                    character_data.name, active_count, completed_count
+                );
             }
         }
         Err(e) => {
-            tracing::warn!("Failed to load quest state for character {}: {}", character_id, e);
+            tracing::warn!(
+                "Failed to load quest state for character {}: {}",
+                character_id,
+                e
+            );
             // Continue with empty quest state (default)
         }
     }
@@ -1154,13 +1281,21 @@ async fn matchmake_join_or_create(
         Ok(recipes) => {
             let count = recipes.len();
             let recipe_set: std::collections::HashSet<String> = recipes.into_iter().collect();
-            room.set_player_discovered_recipes(&player_id, recipe_set).await;
+            room.set_player_discovered_recipes(&player_id, recipe_set)
+                .await;
             if count > 0 {
-                info!("Loaded {} discovered recipes for {}", count, character_data.name);
+                info!(
+                    "Loaded {} discovered recipes for {}",
+                    count, character_data.name
+                );
             }
         }
         Err(e) => {
-            tracing::warn!("Failed to load discovered recipes for character {}: {}", character_id, e);
+            tracing::warn!(
+                "Failed to load discovered recipes for character {}: {}",
+                character_id,
+                e
+            );
         }
     }
 
@@ -1181,7 +1316,8 @@ async fn matchmake_join_or_create(
             clients: client_count,
         },
         session_token,
-    }).into_response()
+    })
+    .into_response()
 }
 
 // ============================================================================
@@ -1253,8 +1389,12 @@ struct LeaderboardQuery {
     limit: usize,
 }
 
-fn default_leaderboard_sort() -> String { "combat_level".to_string() }
-fn default_leaderboard_limit() -> usize { 50 }
+fn default_leaderboard_sort() -> String {
+    "total_level".to_string()
+}
+fn default_leaderboard_limit() -> usize {
+    50
+}
 
 #[derive(Serialize)]
 struct LeaderboardEntry {
@@ -1262,8 +1402,17 @@ struct LeaderboardEntry {
     combat_level: i32,
     hitpoints_level: i32,
     combat_skill_level: i32,
+    fishing_level: i32,
+    farming_level: i32,
+    smithing_level: i32,
+    prayer_level: i32,
+    magic_level: i32,
+    woodcutting_level: i32,
+    mining_level: i32,
+    alchemy_level: i32,
     total_level: i32,
     played_time: i64,
+    monster_kills: i32,
 }
 
 async fn stats_leaderboard(
@@ -1271,7 +1420,7 @@ async fn stats_leaderboard(
     Query(query): Query<LeaderboardQuery>,
 ) -> impl IntoResponse {
     let pool = state.db.pool();
-    let rows = sqlx::query("SELECT name, skills_json, played_time FROM characters")
+    let rows = sqlx::query("SELECT name, skills_json, played_time, monster_kills FROM characters")
         .fetch_all(pool)
         .await
         .unwrap_or_default();
@@ -1282,14 +1431,24 @@ async fn stats_leaderboard(
             let name: String = row.try_get("name").ok()?;
             let skills_json: String = row.try_get("skills_json").unwrap_or_default();
             let played_time: i64 = row.try_get("played_time").unwrap_or(0);
+            let monster_kills: i32 = row.try_get("monster_kills").unwrap_or(0);
             let skills: Skills = serde_json::from_str(&skills_json).unwrap_or_default();
             Some(LeaderboardEntry {
                 name,
                 combat_level: skills.combat_level(),
                 hitpoints_level: skills.hitpoints.level,
                 combat_skill_level: skills.combat.level,
+                fishing_level: skills.fishing.level,
+                farming_level: skills.farming.level,
+                smithing_level: skills.smithing.level,
+                prayer_level: skills.prayer.level,
+                magic_level: skills.magic.level,
+                woodcutting_level: skills.woodcutting.level,
+                mining_level: skills.mining.level,
+                alchemy_level: skills.alchemy.level,
                 total_level: skills.total_level(),
                 played_time,
+                monster_kills,
             })
         })
         .collect();
@@ -1297,7 +1456,20 @@ async fn stats_leaderboard(
     match query.sort.as_str() {
         "combat_level" => entries.sort_by(|a, b| b.combat_level.cmp(&a.combat_level)),
         "hitpoints_level" => entries.sort_by(|a, b| b.hitpoints_level.cmp(&a.hitpoints_level)),
-        "combat_skill_level" => entries.sort_by(|a, b| b.combat_skill_level.cmp(&a.combat_skill_level)),
+        "combat_skill_level" => {
+            entries.sort_by(|a, b| b.combat_skill_level.cmp(&a.combat_skill_level))
+        }
+        "fishing_level" => entries.sort_by(|a, b| b.fishing_level.cmp(&a.fishing_level)),
+        "farming_level" => entries.sort_by(|a, b| b.farming_level.cmp(&a.farming_level)),
+        "smithing_level" => entries.sort_by(|a, b| b.smithing_level.cmp(&a.smithing_level)),
+        "prayer_level" => entries.sort_by(|a, b| b.prayer_level.cmp(&a.prayer_level)),
+        "magic_level" => entries.sort_by(|a, b| b.magic_level.cmp(&a.magic_level)),
+        "woodcutting_level" => {
+            entries.sort_by(|a, b| b.woodcutting_level.cmp(&a.woodcutting_level))
+        }
+        "mining_level" => entries.sort_by(|a, b| b.mining_level.cmp(&a.mining_level)),
+        "alchemy_level" => entries.sort_by(|a, b| b.alchemy_level.cmp(&a.alchemy_level)),
+        "monster_kills" => entries.sort_by(|a, b| b.monster_kills.cmp(&a.monster_kills)),
         "played_time" => entries.sort_by(|a, b| b.played_time.cmp(&a.played_time)),
         _ => entries.sort_by(|a, b| b.total_level.cmp(&a.total_level)),
     }
@@ -1332,8 +1504,10 @@ struct StatsItem {
 }
 
 async fn stats_items(State(state): State<AppState>) -> impl IntoResponse {
-    let items: Vec<StatsItem> = state.item_registry.all().map(|item| {
-        StatsItem {
+    let items: Vec<StatsItem> = state
+        .item_registry
+        .all()
+        .map(|item| StatsItem {
             id: item.id.clone(),
             display_name: item.display_name.clone(),
             sprite: item.sprite.clone(),
@@ -1357,8 +1531,8 @@ async fn stats_items(State(state): State<AppState>) -> impl IntoResponse {
                     range: eq.range,
                 })
             }),
-        }
-    }).collect();
+        })
+        .collect();
     Json(items)
 }
 
@@ -1402,7 +1576,10 @@ async fn api_logs(
 
     let entries: Vec<_> = if let Some(level_filter) = &params.level {
         let level_upper = level_filter.to_uppercase();
-        entries.into_iter().filter(|e| e.level == level_upper).collect()
+        entries
+            .into_iter()
+            .filter(|e| e.level == level_upper)
+            .collect()
     } else {
         entries
     };
@@ -1444,8 +1621,15 @@ async fn ws_handler(
     let session_id = match state.token_signer.validate_token(&query.session_token) {
         Some((sid, rid)) => {
             if rid != room_id {
-                warn!("WebSocket rejected: Token room_id mismatch ({} != {})", rid, room_id);
-                return (StatusCode::FORBIDDEN, "Invalid session token: room mismatch").into_response();
+                warn!(
+                    "WebSocket rejected: Token room_id mismatch ({} != {})",
+                    rid, room_id
+                );
+                return (
+                    StatusCode::FORBIDDEN,
+                    "Invalid session token: room mismatch",
+                )
+                    .into_response();
             }
             sid
         }
@@ -1462,8 +1646,15 @@ async fn ws_handler(
         Some(session) if session.room_id == room_id => {
             // Verify the auth token is still valid
             if !state.auth_sessions.contains_key(&session.auth_token) {
-                warn!("WebSocket rejected: Auth token expired for session {}", session_id);
-                return (StatusCode::UNAUTHORIZED, "Auth token expired. Please login again.").into_response();
+                warn!(
+                    "WebSocket rejected: Auth token expired for session {}",
+                    session_id
+                );
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    "Auth token expired. Please login again.",
+                )
+                    .into_response();
             }
 
             // Valid session, upgrade to WebSocket
@@ -1473,7 +1664,17 @@ async fn ws_handler(
             let current_map = session.current_map.clone();
             let is_new_character = session.is_new_character;
             ws.on_upgrade(move |socket| {
-                handle_socket(socket, state, room_id, player_id, session_id, character_name, character_id, current_map, is_new_character)
+                handle_socket(
+                    socket,
+                    state,
+                    room_id,
+                    player_id,
+                    session_id,
+                    character_name,
+                    character_id,
+                    current_map,
+                    is_new_character,
+                )
             })
         }
         _ => {
@@ -1491,8 +1692,8 @@ async fn handle_socket(
     session_id: String,
     character_name: String,
     character_id: i64,
-    current_map: Option<String>,  // Interior map to auto-enter on reconnect
-    is_new_character: bool,       // True if played_time == 0 (for tutorial)
+    current_map: Option<String>, // Interior map to auto-enter on reconnect
+    is_new_character: bool,      // True if played_time == 0 (for tutorial)
 ) {
     let (mut sender, mut receiver) = socket.split();
 
@@ -1507,7 +1708,10 @@ async fn handle_socket(
 
     // Activate the player
     let player_name = room.activate_player(&player_id).await;
-    info!("Player {} ({}) connected to room {}", player_name, player_id, room_id);
+    info!(
+        "Player {} ({}) connected to room {}",
+        player_name, player_id, room_id
+    );
 
     // Subscribe to room broadcasts
     let mut broadcast_rx = room.subscribe();
@@ -1604,7 +1808,9 @@ async fn handle_socket(
         {
             let instanced_players = state.player_instances.read().await;
             for existing_player in room.get_all_players().await {
-                if existing_player.id != player_id && !instanced_players.contains_key(&existing_player.id) {
+                if existing_player.id != player_id
+                    && !instanced_players.contains_key(&existing_player.id)
+                {
                     let msg = ServerMessage::PlayerJoined {
                         id: existing_player.id.clone(),
                         name: existing_player.name.clone(),
@@ -1621,14 +1827,19 @@ async fn handle_socket(
                 }
             }
         }
-
     }
 
     // Notify others about this player joining
     // Instance players will ignore this via state sync filtering
     let (x, y) = room.get_player_position(&player_id).await.unwrap_or((0, 0));
-    let (gender, skin) = room.get_player_appearance(&player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
-    let (hair_style, hair_color) = room.get_player_hair(&player_id).await.unwrap_or((None, None));
+    let (gender, skin) = room
+        .get_player_appearance(&player_id)
+        .await
+        .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+    let (hair_style, hair_color) = room
+        .get_player_hair(&player_id)
+        .await
+        .unwrap_or((None, None));
     let player_joined_msg = ServerMessage::PlayerJoined {
         id: player_id.clone(),
         name: player_name.clone(),
@@ -1646,7 +1857,8 @@ async fn handle_socket(
     }
 
     // Notify other overworld players (exclude self to avoid double-receive which overwrites skills)
-    room.send_to_overworld_players(player_joined_msg, Some(&player_id)).await;
+    room.send_to_overworld_players(player_joined_msg, Some(&player_id))
+        .await;
 
     // If player was sitting on a chair, send SitResult so client shows sitting animation
     if let Some((sx, sy, direction)) = room.get_player_sitting_info(&player_id).await {
@@ -1698,14 +1910,18 @@ async fn handle_socket(
     room.register_player_sender(&player_id, tx).await;
 
     // Send friends list and pending requests (must be after sender is registered)
-    room.send_friends_data(&player_id, &state.online_characters).await;
+    room.send_friends_data(&player_id, &state.online_characters)
+        .await;
 
     // Notify friends that this player came online
     room.broadcast_friend_status(&player_id, true).await;
 
     // If player was in an instance when they disconnected, auto-re-enter it
     if let Some(ref map_id) = current_map {
-        info!("Auto-re-entering instance '{}' for reconnecting player {}", map_id, player_id);
+        info!(
+            "Auto-re-entering instance '{}' for reconnecting player {}",
+            map_id, player_id
+        );
         auto_enter_instance(&state, &room, &player_id, map_id).await;
     }
 
@@ -1767,7 +1983,9 @@ async fn handle_socket(
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
                 Message::Binary(data) => {
-                    if let Err(e) = handle_client_message(&state_clone, &room_clone, &player_id_clone, &data).await
+                    if let Err(e) =
+                        handle_client_message(&state_clone, &room_clone, &player_id_clone, &data)
+                            .await
                     {
                         warn!("Error handling message: {}", e);
                     }
@@ -1785,20 +2003,29 @@ async fn handle_socket(
     }
 
     // Cleanup - save character data before removing
-    info!("Character {} disconnected from room {}", character_name, room_id);
+    info!(
+        "Character {} disconnected from room {}",
+        character_name, room_id
+    );
 
-    let should_save = state.sessions.get(&session_id)
+    let should_save = state
+        .sessions
+        .get(&session_id)
         .map(|s| state.auth_sessions.contains_key(&s.auth_token))
         .unwrap_or(false);
 
     if should_save {
         // Get character_id from session
-        let character_id = state.sessions.get(&session_id)
+        let character_id = state
+            .sessions
+            .get(&session_id)
             .map(|s| s.character_id)
             .unwrap_or(0);
 
         // Compute played time delta from anchor
-        let played_time_delta = state.play_time_anchors.remove(&character_id)
+        let played_time_delta = state
+            .play_time_anchors
+            .remove(&character_id)
             .map(|(_, anchor)| anchor.elapsed().as_secs() as i64)
             .unwrap_or(0);
 
@@ -1814,45 +2041,68 @@ async fn handle_socket(
                 }
             }
 
-            if let Err(e) = state.db.save_character(
-                character_id,
-                save_data.x,
-                save_data.y,
-                save_data.hp,
-                save_data.prayer_points,
-                &save_data.skills,
-                save_data.gold,
-                &save_data.inventory_json,
-                save_data.equipped_head.as_deref(),
-                save_data.equipped_body.as_deref(),
-                save_data.equipped_weapon.as_deref(),
-                save_data.equipped_back.as_deref(),
-                save_data.equipped_feet.as_deref(),
-                save_data.equipped_ring.as_deref(),
-                save_data.equipped_gloves.as_deref(),
-                save_data.equipped_necklace.as_deref(),
-                save_data.equipped_belt.as_deref(),
-                played_time_delta,
-                save_data.current_map.as_deref(),
-                save_data.sitting_at_x,
-                save_data.sitting_at_y,
-                &save_data.bank_json,
-                save_data.bank_gold,
-            ).await {
-                error!("Failed to save character {} on disconnect: {}", character_name, e);
+            if let Err(e) = state
+                .db
+                .save_character(
+                    character_id,
+                    save_data.x,
+                    save_data.y,
+                    save_data.hp,
+                    save_data.prayer_points,
+                    &save_data.skills,
+                    save_data.gold,
+                    &save_data.inventory_json,
+                    save_data.equipped_head.as_deref(),
+                    save_data.equipped_body.as_deref(),
+                    save_data.equipped_weapon.as_deref(),
+                    save_data.equipped_back.as_deref(),
+                    save_data.equipped_feet.as_deref(),
+                    save_data.equipped_ring.as_deref(),
+                    save_data.equipped_gloves.as_deref(),
+                    save_data.equipped_necklace.as_deref(),
+                    save_data.equipped_belt.as_deref(),
+                    played_time_delta,
+                    save_data.current_map.as_deref(),
+                    save_data.sitting_at_x,
+                    save_data.sitting_at_y,
+                    &save_data.bank_json,
+                    save_data.bank_gold,
+                )
+                .await
+            {
+                error!(
+                    "Failed to save character {} on disconnect: {}",
+                    character_name, e
+                );
             } else {
-                info!("Saved character {} to database on disconnect (played_time +{}s)", character_name, played_time_delta);
+                info!(
+                    "Saved character {} to database on disconnect (played_time +{}s)",
+                    character_name, played_time_delta
+                );
             }
         }
 
         // Save quest state to database
         if character_id > 0 {
             if let Some(quest_state) = room.get_player_quest_state(&player_id).await {
-                if let Err(e) = state.db.save_character_quest_state(character_id, &quest_state).await {
-                    error!("Failed to save quest state for {} on disconnect: {}", character_name, e);
-                } else if !quest_state.active_quests.is_empty() || !quest_state.completed_quests.is_empty() {
-                    info!("Saved quest state for {}: {} active, {} completed",
-                        character_name, quest_state.active_quests.len(), quest_state.completed_quests.len());
+                if let Err(e) = state
+                    .db
+                    .save_character_quest_state(character_id, &quest_state)
+                    .await
+                {
+                    error!(
+                        "Failed to save quest state for {} on disconnect: {}",
+                        character_name, e
+                    );
+                } else if !quest_state.active_quests.is_empty()
+                    || !quest_state.completed_quests.is_empty()
+                {
+                    info!(
+                        "Saved quest state for {}: {} active, {} completed",
+                        character_name,
+                        quest_state.active_quests.len(),
+                        quest_state.completed_quests.len()
+                    );
                 }
             }
         }
@@ -1861,16 +2111,30 @@ async fn handle_socket(
         if character_id > 0 {
             let discovered = room.get_player_discovered_recipes(&player_id).await;
             for recipe_id in &discovered {
-                if let Err(e) = state.db.save_discovered_recipe(character_id, recipe_id).await {
-                    error!("Failed to save discovered recipe {} for {}: {}", recipe_id, character_name, e);
+                if let Err(e) = state
+                    .db
+                    .save_discovered_recipe(character_id, recipe_id)
+                    .await
+                {
+                    error!(
+                        "Failed to save discovered recipe {} for {}: {}",
+                        recipe_id, character_name, e
+                    );
                 }
             }
             if !discovered.is_empty() {
-                info!("Saved {} discovered recipes for {}", discovered.len(), character_name);
+                info!(
+                    "Saved {} discovered recipes for {}",
+                    discovered.len(),
+                    character_name
+                );
             }
         }
     } else {
-        warn!("Skipping save for {} on disconnect: invalid auth", character_name);
+        warn!(
+            "Skipping save for {} on disconnect: invalid auth",
+            character_name
+        );
     }
 
     // Clean up instance tracking when player disconnects
@@ -1886,7 +2150,9 @@ async fn handle_socket(
             // Use get_by_instance_id (direct lookup) instead of find_player_instance (scan)
             if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
                 // Get other players BEFORE removing, so we can notify them
-                let other_players: Vec<String> = instance.get_player_ids().await
+                let other_players: Vec<String> = instance
+                    .get_player_ids()
+                    .await
                     .into_iter()
                     .filter(|id| id != &player_id)
                     .collect();
@@ -1900,12 +2166,15 @@ async fn handle_socket(
                         ServerMessage::PlayerLeft {
                             id: player_id.to_string(),
                         },
-                    ).await;
+                    )
+                    .await;
                 }
 
                 if remaining == 0 && instance.instance_type == InstanceType::Private {
                     if let Some(owner_id) = &instance.owner_id {
-                        state.instance_manager.remove_private(owner_id, &instance.map_id);
+                        state
+                            .instance_manager
+                            .remove_private(owner_id, &instance.map_id);
                     }
                 }
             }
@@ -1913,7 +2182,11 @@ async fn handle_socket(
     }
 
     // Clean up entrance position tracking
-    state.player_entrance_positions.write().await.remove(&player_id);
+    state
+        .player_entrance_positions
+        .write()
+        .await
+        .remove(&player_id);
 
     // SECURITY: Unregister player sender before cleanup
     room.unregister_player_sender(&player_id).await;
@@ -1936,16 +2209,12 @@ async fn handle_socket(
             id: player_id.clone(),
         },
         None,
-    ).await;
+    )
+    .await;
 }
 
 /// Auto-enter an instance on reconnect (when current_map was saved in DB)
-async fn auto_enter_instance(
-    state: &AppState,
-    room: &GameRoom,
-    player_id: &str,
-    map_id: &str,
-) {
+async fn auto_enter_instance(state: &AppState, room: &GameRoom, player_id: &str, map_id: &str) {
     use crate::interior::InstanceType;
     use crate::protocol::{ChunkLayerData, ChunkPortalData};
     use base64::Engine;
@@ -1953,7 +2222,10 @@ async fn auto_enter_instance(
     let interior = match state.interior_registry.get(map_id) {
         Some(i) => i,
         None => {
-            warn!("Auto-enter: unknown interior '{}' for player {}, staying in overworld", map_id, player_id);
+            warn!(
+                "Auto-enter: unknown interior '{}' for player {}, staying in overworld",
+                map_id, player_id
+            );
             return;
         }
     };
@@ -1969,22 +2241,30 @@ async fn auto_enter_instance(
 
     // Get or create instance
     let (instance, is_new) = match interior.instance_type {
-        InstanceType::Public => {
-            state.instance_manager.get_or_create_public(&interior.id, interior.size.width, interior.size.height)
-        }
-        InstanceType::Private => {
-            state.instance_manager.get_or_create_private(&interior.id, player_id, interior.size.width, interior.size.height)
-        }
+        InstanceType::Public => state.instance_manager.get_or_create_public(
+            &interior.id,
+            interior.size.width,
+            interior.size.height,
+        ),
+        InstanceType::Private => state.instance_manager.get_or_create_private(
+            &interior.id,
+            player_id,
+            interior.size.width,
+            interior.size.height,
+        ),
     };
 
     if is_new || !*instance.npcs_spawned.read().await {
         // Load collision data for NPC walkability
         if !interior.collision.is_empty() {
-            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision) {
+            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision)
+            {
                 instance.set_collision(&bytes).await;
             }
         }
-        instance.spawn_npcs(&interior.entities, &state.entity_registry).await;
+        instance
+            .spawn_npcs(&interior.entities, &state.entity_registry)
+            .await;
     }
 
     // Store entrance position (current overworld position from DB)
@@ -2006,19 +2286,27 @@ async fn auto_enter_instance(
             id: player_id.to_string(),
         },
         Some(player_id),
-    ).await;
+    )
+    .await;
 
     // Get other players already in the instance BEFORE adding
     let other_players_in_instance: Vec<String> = instance.get_player_ids().await;
 
     instance.add_player(player_id).await;
-    room.set_player_position(player_id, spawn.x as i32, spawn.y as i32).await;
+    room.set_player_position(player_id, spawn.x as i32, spawn.y as i32)
+        .await;
 
     // Notify instance players
     if !other_players_in_instance.is_empty() {
         let player_name = room.get_player_name(player_id).await.unwrap_or_default();
-        let (gender, skin) = room.get_player_appearance(player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
-        let (hair_style, hair_color) = room.get_player_hair(player_id).await.unwrap_or((None, None));
+        let (gender, skin) = room
+            .get_player_appearance(player_id)
+            .await
+            .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+        let (hair_style, hair_color) = room
+            .get_player_hair(player_id)
+            .await
+            .unwrap_or((None, None));
 
         for other_id in &other_players_in_instance {
             room.send_to_player(
@@ -2033,14 +2321,22 @@ async fn auto_enter_instance(
                     hair_style,
                     hair_color,
                 },
-            ).await;
+            )
+            .await;
         }
 
         for other_id in &other_players_in_instance {
             if let Some(other_name) = room.get_player_name(other_id).await {
-                let (other_x, other_y) = room.get_player_position(other_id).await.unwrap_or((spawn.x as i32, spawn.y as i32));
-                let (other_gender, other_skin) = room.get_player_appearance(other_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
-                let (other_hair_style, other_hair_color) = room.get_player_hair(other_id).await.unwrap_or((None, None));
+                let (other_x, other_y) = room
+                    .get_player_position(other_id)
+                    .await
+                    .unwrap_or((spawn.x as i32, spawn.y as i32));
+                let (other_gender, other_skin) = room
+                    .get_player_appearance(other_id)
+                    .await
+                    .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                let (other_hair_style, other_hair_color) =
+                    room.get_player_hair(other_id).await.unwrap_or((None, None));
 
                 room.send_to_player(
                     player_id,
@@ -2054,7 +2350,8 @@ async fn auto_enter_instance(
                         hair_style: other_hair_style,
                         hair_color: other_hair_color,
                     },
-                ).await;
+                )
+                .await;
             }
         }
     }
@@ -2069,45 +2366,69 @@ async fn auto_enter_instance(
             spawn_y: spawn.y,
             instance_id: instance.id.clone(),
         },
-    ).await;
+    )
+    .await;
 
     // Send interior map data
     let layers = vec![
-        ChunkLayerData { layer_type: 0, tiles: interior.layers.ground.clone() },
-        ChunkLayerData { layer_type: 1, tiles: interior.layers.objects.clone() },
-        ChunkLayerData { layer_type: 2, tiles: interior.layers.overhead.clone() },
+        ChunkLayerData {
+            layer_type: 0,
+            tiles: interior.layers.ground.clone(),
+        },
+        ChunkLayerData {
+            layer_type: 1,
+            tiles: interior.layers.objects.clone(),
+        },
+        ChunkLayerData {
+            layer_type: 2,
+            tiles: interior.layers.overhead.clone(),
+        },
     ];
 
     let collision = if interior.collision.is_empty() {
         vec![]
     } else {
-        base64::engine::general_purpose::STANDARD.decode(&interior.collision).unwrap_or_default()
+        base64::engine::general_purpose::STANDARD
+            .decode(&interior.collision)
+            .unwrap_or_default()
     };
 
-    let portals: Vec<ChunkPortalData> = interior.portals.iter().map(|p| ChunkPortalData {
-        id: p.id.clone(),
-        x: p.x,
-        y: p.y,
-        width: p.width,
-        height: p.height,
-        target_map: p.target_map.clone(),
-        target_spawn: p.target_spawn.clone().unwrap_or_default(),
-    }).collect();
+    let portals: Vec<ChunkPortalData> = interior
+        .portals
+        .iter()
+        .map(|p| ChunkPortalData {
+            id: p.id.clone(),
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: p.height,
+            target_map: p.target_map.clone(),
+            target_spawn: p.target_spawn.clone().unwrap_or_default(),
+        })
+        .collect();
 
-    let objects: Vec<protocol::ChunkObjectData> = interior.map_objects.iter().map(|o| protocol::ChunkObjectData {
-        gid: o.gid,
-        tile_x: o.x,
-        tile_y: o.y,
-        width: o.width,
-        height: o.height,
-    }).collect();
+    let objects: Vec<protocol::ChunkObjectData> = interior
+        .map_objects
+        .iter()
+        .map(|o| protocol::ChunkObjectData {
+            gid: o.gid,
+            tile_x: o.x,
+            tile_y: o.y,
+            width: o.width,
+            height: o.height,
+        })
+        .collect();
 
-    let walls: Vec<protocol::ChunkWallData> = interior.walls.iter().map(|w| protocol::ChunkWallData {
-        gid: w.gid,
-        tile_x: w.x,
-        tile_y: w.y,
-        edge: w.edge.clone(),
-    }).collect();
+    let walls: Vec<protocol::ChunkWallData> = interior
+        .walls
+        .iter()
+        .map(|w| protocol::ChunkWallData {
+            gid: w.gid,
+            tile_x: w.x,
+            tile_y: w.y,
+            edge: w.edge.clone(),
+        })
+        .collect();
 
     room.send_to_player(
         player_id,
@@ -2125,7 +2446,8 @@ async fn auto_enter_instance(
             objects,
             walls,
         },
-    ).await;
+    )
+    .await;
 
     // Send NPC updates
     let npc_updates = instance.get_npc_updates().await;
@@ -2138,7 +2460,8 @@ async fn auto_enter_instance(
                 npcs: npc_updates,
                 instance_id: instance.id.clone(),
             },
-        ).await;
+        )
+        .await;
     }
 
     // Send ground items
@@ -2147,20 +2470,21 @@ async fn auto_enter_instance(
         room.send_to_player(player_id, item_msg).await;
     }
 
-    info!("Auto-entered player {} into instance {} (map: {})", player_id, instance.id, map_id);
+    info!(
+        "Auto-entered player {} into instance {} (map: {})",
+        player_id, instance.id, map_id
+    );
 }
 
-async fn handle_enter_portal(
-    state: &AppState,
-    room: &GameRoom,
-    player_id: &str,
-    portal_id: &str,
-) {
+async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str, portal_id: &str) {
     use crate::interior::InstanceType;
     use crate::protocol::{ChunkLayerData, ChunkPortalData};
     use base64::Engine;
 
-    info!("Player {} attempting to enter portal '{}'", player_id, portal_id);
+    info!(
+        "Player {} attempting to enter portal '{}'",
+        player_id, portal_id
+    );
 
     // Check if player is currently in an interior
     let current_instance_id = {
@@ -2170,17 +2494,24 @@ async fn handle_enter_portal(
 
     // If player is in an interior, handle exit portal
     if let Some(instance_id) = current_instance_id {
-        info!("Player {} is in instance '{}', checking for interior exit portal", player_id, instance_id);
+        info!(
+            "Player {} is in instance '{}', checking for interior exit portal",
+            player_id, instance_id
+        );
 
         // Find the interior this instance belongs to
-        let interior_id = instance_id.strip_prefix("pub_")
+        let interior_id = instance_id
+            .strip_prefix("pub_")
             .or_else(|| instance_id.split('_').nth(1))
             .unwrap_or(&instance_id);
 
         let interior = match state.interior_registry.get(interior_id) {
             Some(i) => i,
             None => {
-                error!("Could not find interior definition for instance '{}'", instance_id);
+                error!(
+                    "Could not find interior definition for instance '{}'",
+                    instance_id
+                );
                 return;
             }
         };
@@ -2196,15 +2527,19 @@ async fn handle_enter_portal(
 
         // Find the portal in the interior's portal list
         let exit_portal = interior.portals.iter().find(|p| {
-            p.id == portal_id &&
-            player_x >= p.x && player_x < p.x + p.width &&
-            player_y >= p.y && player_y < p.y + p.height
+            p.id == portal_id
+                && player_x >= p.x
+                && player_x < p.x + p.width
+                && player_y >= p.y
+                && player_y < p.y + p.height
         });
 
         match exit_portal {
             Some(portal) => {
-                info!("Found exit portal '{}' targeting '{}' at ({}, {})",
-                    portal.id, portal.target_map, portal.target_x, portal.target_y);
+                info!(
+                    "Found exit portal '{}' targeting '{}' at ({}, {})",
+                    portal.id, portal.target_map, portal.target_x, portal.target_y
+                );
 
                 // Remove player from both tracking systems and notify others.
                 // Use get_by_instance_id (direct lookup by known ID) instead of
@@ -2218,7 +2553,9 @@ async fn handle_enter_portal(
 
                 if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
                     // Get other players in the instance BEFORE removing this player
-                    let other_players: Vec<String> = instance.get_player_ids().await
+                    let other_players: Vec<String> = instance
+                        .get_player_ids()
+                        .await
                         .into_iter()
                         .filter(|id| id != player_id)
                         .collect();
@@ -2226,7 +2563,9 @@ async fn handle_enter_portal(
                     let remaining = instance.remove_player(player_id).await;
                     if remaining == 0 && instance.instance_type == InstanceType::Private {
                         if let Some(owner_id) = &instance.owner_id {
-                            state.instance_manager.remove_private(owner_id, &instance.map_id);
+                            state
+                                .instance_manager
+                                .remove_private(owner_id, &instance.map_id);
                         }
                     }
 
@@ -2239,7 +2578,8 @@ async fn handle_enter_portal(
                             ServerMessage::PlayerLeft {
                                 id: player_id.to_string(),
                             },
-                        ).await;
+                        )
+                        .await;
 
                         // Tell the exiting player that the instance players are gone from their view
                         room.send_to_player(
@@ -2247,7 +2587,8 @@ async fn handle_enter_portal(
                             ServerMessage::PlayerLeft {
                                 id: other_id.clone(),
                             },
-                        ).await;
+                        )
+                        .await;
                     }
                 }
 
@@ -2256,16 +2597,24 @@ async fn handle_enter_portal(
                     let (spawn_x, spawn_y) = {
                         if portal.target_x != 0.0 || portal.target_y != 0.0 {
                             // Portal has explicit exit coordinates - use them
-                            info!("Using portal exit coordinates ({}, {}) for player {}", portal.target_x, portal.target_y, player_id);
+                            info!(
+                                "Using portal exit coordinates ({}, {}) for player {}",
+                                portal.target_x, portal.target_y, player_id
+                            );
                             // Clean up stored entrance since we're not using it
-                            let mut entrance_positions = state.player_entrance_positions.write().await;
+                            let mut entrance_positions =
+                                state.player_entrance_positions.write().await;
                             entrance_positions.remove(player_id);
                             (portal.target_x, portal.target_y)
                         } else {
                             // Fall back to stored entrance position
-                            let mut entrance_positions = state.player_entrance_positions.write().await;
+                            let mut entrance_positions =
+                                state.player_entrance_positions.write().await;
                             if let Some((x, y)) = entrance_positions.remove(player_id) {
-                                info!("Using stored entrance position ({}, {}) for player {}", x, y, player_id);
+                                info!(
+                                    "Using stored entrance position ({}, {}) for player {}",
+                                    x, y, player_id
+                                );
                                 (x as f32, y as f32)
                             } else {
                                 // Default spawn if nothing specified
@@ -2274,10 +2623,14 @@ async fn handle_enter_portal(
                         }
                     };
 
-                    info!("Player {} exiting to overworld at ({}, {})", player_id, spawn_x, spawn_y);
+                    info!(
+                        "Player {} exiting to overworld at ({}, {})",
+                        player_id, spawn_x, spawn_y
+                    );
 
                     // Update player position in room
-                    room.set_player_position(player_id, spawn_x as i32, spawn_y as i32).await;
+                    room.set_player_position(player_id, spawn_x as i32, spawn_y as i32)
+                        .await;
 
                     // Send transition back to overworld
                     room.send_to_player(
@@ -2289,23 +2642,26 @@ async fn handle_enter_portal(
                             spawn_y,
                             instance_id: String::new(),
                         },
-                    ).await;
+                    )
+                    .await;
 
                     // Re-send overworld data that was cleared on instance entry
-                    room.send_to_player(
-                        player_id,
-                        room.get_chair_positions_message().await,
-                    ).await;
-                    room.send_to_player(
-                        player_id,
-                        room.get_gathering_markers_message().await,
-                    ).await;
+                    room.send_to_player(player_id, room.get_chair_positions_message().await)
+                        .await;
+                    room.send_to_player(player_id, room.get_gathering_markers_message().await)
+                        .await;
 
                     // Notify overworld players that this player has returned
                     {
                         let player_name = room.get_player_name(player_id).await.unwrap_or_default();
-                        let (gender, skin) = room.get_player_appearance(player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
-                        let (hair_style, hair_color) = room.get_player_hair(player_id).await.unwrap_or((None, None));
+                        let (gender, skin) = room
+                            .get_player_appearance(player_id)
+                            .await
+                            .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                        let (hair_style, hair_color) = room
+                            .get_player_hair(player_id)
+                            .await
+                            .unwrap_or((None, None));
                         room.send_to_overworld_players(
                             ServerMessage::PlayerJoined {
                                 id: player_id.to_string(),
@@ -2318,20 +2674,26 @@ async fn handle_enter_portal(
                                 hair_color,
                             },
                             Some(player_id),
-                        ).await;
+                        )
+                        .await;
                     }
 
                     return;
                 } else {
                     // Portal leads to another interior - fall through to normal handling
                     // (would need to update portal struct to work with interior->interior)
-                    info!("Portal leads to another interior '{}' - not yet supported", portal.target_map);
+                    info!(
+                        "Portal leads to another interior '{}' - not yet supported",
+                        portal.target_map
+                    );
                     return;
                 }
             }
             None => {
-                warn!("Player {} tried to use portal '{}' but no matching exit portal found at ({}, {})",
-                    player_id, portal_id, player_x, player_y);
+                warn!(
+                    "Player {} tried to use portal '{}' but no matching exit portal found at ({}, {})",
+                    player_id, portal_id, player_x, player_y
+                );
                 return;
             }
         }
@@ -2340,18 +2702,25 @@ async fn handle_enter_portal(
     // Player is in overworld - find portal in world chunks
     let portal = match room.find_portal_at_player(player_id).await {
         Some(p) => {
-            info!("Found portal at player position: id='{}', target_map='{}', target_spawn='{}'",
-                p.id, p.target_map, p.target_spawn);
+            info!(
+                "Found portal at player position: id='{}', target_map='{}', target_spawn='{}'",
+                p.id, p.target_map, p.target_spawn
+            );
             if p.id == portal_id {
                 p
             } else {
-                warn!("Player {} tried to use portal '{}' but is standing on portal '{}'",
-                    player_id, portal_id, p.id);
+                warn!(
+                    "Player {} tried to use portal '{}' but is standing on portal '{}'",
+                    player_id, portal_id, p.id
+                );
                 return;
             }
         }
         None => {
-            warn!("Player {} tried to use portal '{}' but no portal found at position", player_id, portal_id);
+            warn!(
+                "Player {} tried to use portal '{}' but no portal found at position",
+                player_id, portal_id
+            );
             return;
         }
     };
@@ -2360,18 +2729,29 @@ async fn handle_enter_portal(
     info!("Looking up interior map '{}'", portal.target_map);
     let interior = match state.interior_registry.get(&portal.target_map) {
         Some(i) => {
-            info!("Found interior '{}' with {} spawn points", i.id, i.spawn_points.len());
+            info!(
+                "Found interior '{}' with {} spawn points",
+                i.id,
+                i.spawn_points.len()
+            );
             i
         }
         None => {
-            error!("Portal '{}' references unknown interior '{}'. Available interiors: {:?}",
-                portal_id, portal.target_map, state.interior_registry.list_ids());
+            error!(
+                "Portal '{}' references unknown interior '{}'. Available interiors: {:?}",
+                portal_id,
+                portal.target_map,
+                state.interior_registry.list_ids()
+            );
             return;
         }
     };
 
     // Get spawn point - try exact name, then "entrance", then first available
-    info!("Looking up spawn point '{}' in interior '{}'", portal.target_spawn, interior.id);
+    info!(
+        "Looking up spawn point '{}' in interior '{}'",
+        portal.target_spawn, interior.id
+    );
     let spawn = if !portal.target_spawn.is_empty() {
         interior.get_spawn_point(&portal.target_spawn)
     } else {
@@ -2382,7 +2762,10 @@ async fn handle_enter_portal(
         .or_else(|| interior.spawn_points.values().next())
     {
         Some(s) => {
-            info!("Using spawn point at ({}, {}) in interior '{}'", s.x, s.y, interior.id);
+            info!(
+                "Using spawn point at ({}, {}) in interior '{}'",
+                s.x, s.y, interior.id
+            );
             s
         }
         None => {
@@ -2393,30 +2776,41 @@ async fn handle_enter_portal(
 
     // Get or create instance based on type
     let (instance, is_new) = match interior.instance_type {
-        InstanceType::Public => {
-            state.instance_manager.get_or_create_public(&interior.id, interior.size.width, interior.size.height)
-        }
-        InstanceType::Private => {
-            state.instance_manager.get_or_create_private(&interior.id, player_id, interior.size.width, interior.size.height)
-        }
+        InstanceType::Public => state.instance_manager.get_or_create_public(
+            &interior.id,
+            interior.size.width,
+            interior.size.height,
+        ),
+        InstanceType::Private => state.instance_manager.get_or_create_private(
+            &interior.id,
+            player_id,
+            interior.size.width,
+            interior.size.height,
+        ),
     };
 
     // Spawn NPCs if this is a new instance
     if is_new || !*instance.npcs_spawned.read().await {
         // Load collision data for NPC walkability
         if !interior.collision.is_empty() {
-            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision) {
+            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision)
+            {
                 instance.set_collision(&bytes).await;
             }
         }
-        instance.spawn_npcs(&interior.entities, &state.entity_registry).await;
+        instance
+            .spawn_npcs(&interior.entities, &state.entity_registry)
+            .await;
     }
 
     // Store player's entrance position (where they came from) for return teleport
     if let Some((entrance_x, entrance_y)) = room.get_player_position(player_id).await {
         let mut entrance_positions = state.player_entrance_positions.write().await;
         entrance_positions.insert(player_id.to_string(), (entrance_x, entrance_y));
-        info!("Stored entrance position ({}, {}) for player {}", entrance_x, entrance_y, player_id);
+        info!(
+            "Stored entrance position ({}, {}) for player {}",
+            entrance_x, entrance_y, player_id
+        );
     }
 
     // Track player's instance
@@ -2432,7 +2826,8 @@ async fn handle_enter_portal(
             id: player_id.to_string(),
         },
         Some(player_id),
-    ).await;
+    )
+    .await;
 
     // Get other players already in the instance BEFORE adding this player
     let other_players_in_instance: Vec<String> = instance.get_player_ids().await;
@@ -2441,13 +2836,20 @@ async fn handle_enter_portal(
     instance.add_player(player_id).await;
 
     // Update player position to spawn point
-    room.set_player_position(player_id, spawn.x as i32, spawn.y as i32).await;
+    room.set_player_position(player_id, spawn.x as i32, spawn.y as i32)
+        .await;
 
     // Notify other players in the instance that this player joined
     if !other_players_in_instance.is_empty() {
         let player_name = room.get_player_name(player_id).await.unwrap_or_default();
-        let (gender, skin) = room.get_player_appearance(player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
-        let (hair_style, hair_color) = room.get_player_hair(player_id).await.unwrap_or((None, None));
+        let (gender, skin) = room
+            .get_player_appearance(player_id)
+            .await
+            .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+        let (hair_style, hair_color) = room
+            .get_player_hair(player_id)
+            .await
+            .unwrap_or((None, None));
 
         for other_id in &other_players_in_instance {
             room.send_to_player(
@@ -2462,15 +2864,23 @@ async fn handle_enter_portal(
                     hair_style,
                     hair_color,
                 },
-            ).await;
+            )
+            .await;
         }
 
         // Also send existing instance players to the joining player
         for other_id in &other_players_in_instance {
             if let Some(other_name) = room.get_player_name(other_id).await {
-                let (other_x, other_y) = room.get_player_position(other_id).await.unwrap_or((spawn.x as i32, spawn.y as i32));
-                let (other_gender, other_skin) = room.get_player_appearance(other_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
-                let (other_hair_style, other_hair_color) = room.get_player_hair(other_id).await.unwrap_or((None, None));
+                let (other_x, other_y) = room
+                    .get_player_position(other_id)
+                    .await
+                    .unwrap_or((spawn.x as i32, spawn.y as i32));
+                let (other_gender, other_skin) = room
+                    .get_player_appearance(other_id)
+                    .await
+                    .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                let (other_hair_style, other_hair_color) =
+                    room.get_player_hair(other_id).await.unwrap_or((None, None));
 
                 room.send_to_player(
                     player_id,
@@ -2484,7 +2894,8 @@ async fn handle_enter_portal(
                         hair_style: other_hair_style,
                         hair_color: other_hair_color,
                     },
-                ).await;
+                )
+                .await;
             }
         }
     }
@@ -2504,45 +2915,69 @@ async fn handle_enter_portal(
             spawn_y: spawn.y,
             instance_id: instance.id.clone(),
         },
-    ).await;
+    )
+    .await;
 
     // Send interior map data
     let layers = vec![
-        ChunkLayerData { layer_type: 0, tiles: interior.layers.ground.clone() },
-        ChunkLayerData { layer_type: 1, tiles: interior.layers.objects.clone() },
-        ChunkLayerData { layer_type: 2, tiles: interior.layers.overhead.clone() },
+        ChunkLayerData {
+            layer_type: 0,
+            tiles: interior.layers.ground.clone(),
+        },
+        ChunkLayerData {
+            layer_type: 1,
+            tiles: interior.layers.objects.clone(),
+        },
+        ChunkLayerData {
+            layer_type: 2,
+            tiles: interior.layers.overhead.clone(),
+        },
     ];
 
     let collision = if interior.collision.is_empty() {
         vec![]
     } else {
-        base64::engine::general_purpose::STANDARD.decode(&interior.collision).unwrap_or_default()
+        base64::engine::general_purpose::STANDARD
+            .decode(&interior.collision)
+            .unwrap_or_default()
     };
 
-    let portals: Vec<ChunkPortalData> = interior.portals.iter().map(|p| ChunkPortalData {
-        id: p.id.clone(),
-        x: p.x,
-        y: p.y,
-        width: p.width,
-        height: p.height,
-        target_map: p.target_map.clone(),
-        target_spawn: p.target_spawn.clone().unwrap_or_default(),
-    }).collect();
+    let portals: Vec<ChunkPortalData> = interior
+        .portals
+        .iter()
+        .map(|p| ChunkPortalData {
+            id: p.id.clone(),
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: p.height,
+            target_map: p.target_map.clone(),
+            target_spawn: p.target_spawn.clone().unwrap_or_default(),
+        })
+        .collect();
 
-    let objects: Vec<protocol::ChunkObjectData> = interior.map_objects.iter().map(|o| protocol::ChunkObjectData {
-        gid: o.gid,
-        tile_x: o.x,
-        tile_y: o.y,
-        width: o.width,
-        height: o.height,
-    }).collect();
+    let objects: Vec<protocol::ChunkObjectData> = interior
+        .map_objects
+        .iter()
+        .map(|o| protocol::ChunkObjectData {
+            gid: o.gid,
+            tile_x: o.x,
+            tile_y: o.y,
+            width: o.width,
+            height: o.height,
+        })
+        .collect();
 
-    let walls: Vec<protocol::ChunkWallData> = interior.walls.iter().map(|w| protocol::ChunkWallData {
-        gid: w.gid,
-        tile_x: w.x,
-        tile_y: w.y,
-        edge: w.edge.clone(),
-    }).collect();
+    let walls: Vec<protocol::ChunkWallData> = interior
+        .walls
+        .iter()
+        .map(|w| protocol::ChunkWallData {
+            gid: w.gid,
+            tile_x: w.x,
+            tile_y: w.y,
+            edge: w.edge.clone(),
+        })
+        .collect();
 
     room.send_to_player(
         player_id,
@@ -2560,12 +2995,17 @@ async fn handle_enter_portal(
             objects,
             walls,
         },
-    ).await;
+    )
+    .await;
 
     // Send NPC updates for this instance
     let npc_updates = instance.get_npc_updates().await;
     if !npc_updates.is_empty() {
-        info!("Sending {} instance NPCs to player {}", npc_updates.len(), player_id);
+        info!(
+            "Sending {} instance NPCs to player {}",
+            npc_updates.len(),
+            player_id
+        );
         room.send_to_player(
             player_id,
             ServerMessage::StateSync {
@@ -2574,7 +3014,8 @@ async fn handle_enter_portal(
                 npcs: npc_updates,
                 instance_id: instance.id.clone(),
             },
-        ).await;
+        )
+        .await;
     }
 
     // Send existing ground items in this instance
@@ -2627,8 +3068,12 @@ async fn handle_client_message(
         ClientMessage::Interact { npc_id } => {
             room.handle_npc_interact(player_id, &npc_id).await;
         }
-        ClientMessage::DialogueChoiceMsg { quest_id, choice_id } => {
-            room.handle_dialogue_choice(player_id, &quest_id, &choice_id).await;
+        ClientMessage::DialogueChoiceMsg {
+            quest_id,
+            choice_id,
+        } => {
+            room.handle_dialogue_choice(player_id, &quest_id, &choice_id)
+                .await;
         }
         ClientMessage::AcceptQuest { quest_id: _ } => {
             // Quest acceptance is handled through dialogue choices
@@ -2652,8 +3097,14 @@ async fn handle_client_message(
         ClientMessage::Unequip { slot_type } => {
             room.handle_unequip(player_id, &slot_type).await;
         }
-        ClientMessage::DropItem { slot_index, quantity, target_x, target_y } => {
-            room.handle_drop_item(player_id, slot_index, quantity, target_x, target_y).await;
+        ClientMessage::DropItem {
+            slot_index,
+            quantity,
+            target_x,
+            target_y,
+        } => {
+            room.handle_drop_item(player_id, slot_index, quantity, target_x, target_y)
+                .await;
         }
         ClientMessage::DropGold { amount } => {
             room.handle_drop_gold(player_id, amount).await;
@@ -2661,26 +3112,47 @@ async fn handle_client_message(
         ClientMessage::SwapSlots { from_slot, to_slot } => {
             room.handle_swap_slots(player_id, from_slot, to_slot).await;
         }
-        ClientMessage::ShopBuy { npc_id, item_id, quantity } => {
-            room.handle_shop_buy(player_id, &npc_id, &item_id, quantity).await;
+        ClientMessage::ShopBuy {
+            npc_id,
+            item_id,
+            quantity,
+        } => {
+            room.handle_shop_buy(player_id, &npc_id, &item_id, quantity)
+                .await;
         }
-        ClientMessage::ShopSell { npc_id, item_id, quantity } => {
-            room.handle_shop_sell(player_id, &npc_id, &item_id, quantity).await;
+        ClientMessage::ShopSell {
+            npc_id,
+            item_id,
+            quantity,
+        } => {
+            room.handle_shop_sell(player_id, &npc_id, &item_id, quantity)
+                .await;
         }
         ClientMessage::EnterPortal { portal_id } => {
             handle_enter_portal(state, room, player_id, &portal_id).await;
         }
         ClientMessage::StartGathering { marker_x, marker_y } => {
-            room.handle_start_gathering(player_id, marker_x, marker_y).await;
+            room.handle_start_gathering(player_id, marker_x, marker_y)
+                .await;
         }
         ClientMessage::StopGathering => {
             room.handle_stop_gathering(player_id).await;
         }
-        ClientMessage::ChopTree { tree_x, tree_y, tree_gid } => {
-            room.handle_chop_tree(player_id, tree_x, tree_y, tree_gid).await;
+        ClientMessage::ChopTree {
+            tree_x,
+            tree_y,
+            tree_gid,
+        } => {
+            room.handle_chop_tree(player_id, tree_x, tree_y, tree_gid)
+                .await;
         }
-        ClientMessage::MineRock { rock_x, rock_y, rock_gid } => {
-            room.handle_mine_rock(player_id, rock_x, rock_y, rock_gid).await;
+        ClientMessage::MineRock {
+            rock_x,
+            rock_y,
+            rock_gid,
+        } => {
+            room.handle_mine_rock(player_id, rock_x, rock_y, rock_gid)
+                .await;
         }
         ClientMessage::SitChair { tile_x, tile_y } => {
             room.handle_sit_chair(player_id, tile_x, tile_y).await;
@@ -2696,13 +3168,16 @@ async fn handle_client_message(
         }
         // Friend system messages
         ClientMessage::SendFriendRequest { target_name } => {
-            room.handle_send_friend_request(player_id, &target_name).await;
+            room.handle_send_friend_request(player_id, &target_name)
+                .await;
         }
         ClientMessage::AcceptFriendRequest { requester_id } => {
-            room.handle_accept_friend_request(player_id, requester_id).await;
+            room.handle_accept_friend_request(player_id, requester_id)
+                .await;
         }
         ClientMessage::DeclineFriendRequest { requester_id } => {
-            room.handle_decline_friend_request(player_id, requester_id).await;
+            room.handle_decline_friend_request(player_id, requester_id)
+                .await;
         }
         ClientMessage::RemoveFriend { friend_id } => {
             room.handle_remove_friend(player_id, friend_id).await;
@@ -2721,7 +3196,8 @@ async fn handle_client_message(
             room.handle_offer_bones(player_id, slot, &altar_id).await;
         }
         ClientMessage::OfferAllBones { item_id, altar_id } => {
-            room.handle_offer_all_bones(player_id, &item_id, &altar_id).await;
+            room.handle_offer_all_bones(player_id, &item_id, &altar_id)
+                .await;
         }
         ClientMessage::PrayAtAltar { altar_id } => {
             room.handle_pray_at_altar(player_id, &altar_id).await;
@@ -2749,7 +3225,9 @@ async fn handle_client_message(
                     instances.get(player_id).cloned()
                 };
 
-                let success = room.cast_return_home_spell(player_id, spell_def, current_time).await;
+                let success = room
+                    .cast_return_home_spell(player_id, spell_def, current_time)
+                    .await;
 
                 if success {
                     if let Some(instance_id) = instance_id {
@@ -2759,8 +3237,12 @@ async fn handle_client_message(
                             instances.remove(player_id);
                         }
 
-                        if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
-                            let other_players: Vec<String> = instance.get_player_ids().await
+                        if let Some(instance) =
+                            state.instance_manager.get_by_instance_id(&instance_id)
+                        {
+                            let other_players: Vec<String> = instance
+                                .get_player_ids()
+                                .await
                                 .into_iter()
                                 .filter(|id| id != player_id)
                                 .collect();
@@ -2768,31 +3250,40 @@ async fn handle_client_message(
                             let remaining = instance.remove_player(player_id).await;
                             if remaining == 0 && instance.instance_type == InstanceType::Private {
                                 if let Some(owner_id) = &instance.owner_id {
-                                    state.instance_manager.remove_private(owner_id, &instance.map_id);
+                                    state
+                                        .instance_manager
+                                        .remove_private(owner_id, &instance.map_id);
                                 }
                             }
 
                             for other_id in &other_players {
                                 room.send_to_player(
                                     other_id,
-                                    ServerMessage::PlayerLeft { id: player_id.to_string() },
-                                ).await;
+                                    ServerMessage::PlayerLeft {
+                                        id: player_id.to_string(),
+                                    },
+                                )
+                                .await;
                                 room.send_to_player(
                                     player_id,
-                                    ServerMessage::PlayerLeft { id: other_id.clone() },
-                                ).await;
+                                    ServerMessage::PlayerLeft {
+                                        id: other_id.clone(),
+                                    },
+                                )
+                                .await;
                             }
                         }
 
                         // Clean up entrance position
                         {
-                            let mut entrance_positions = state.player_entrance_positions.write().await;
+                            let mut entrance_positions =
+                                state.player_entrance_positions.write().await;
                             entrance_positions.remove(player_id);
                         }
 
                         // Send map transition to overworld
-                        let spawn_x = 15.0_f32;
-                        let spawn_y = 4.0_f32;
+                        let spawn_x = -30.0_f32;
+                        let spawn_y = 19.0_f32;
                         room.send_to_player(
                             player_id,
                             ServerMessage::MapTransition {
@@ -2802,17 +3293,27 @@ async fn handle_client_message(
                                 spawn_y,
                                 instance_id: String::new(),
                             },
-                        ).await;
+                        )
+                        .await;
 
                         // Re-send overworld data
-                        room.send_to_player(player_id, room.get_chair_positions_message().await).await;
-                        room.send_to_player(player_id, room.get_gathering_markers_message().await).await;
+                        room.send_to_player(player_id, room.get_chair_positions_message().await)
+                            .await;
+                        room.send_to_player(player_id, room.get_gathering_markers_message().await)
+                            .await;
 
                         // Notify overworld players
                         {
-                            let player_name = room.get_player_name(player_id).await.unwrap_or_default();
-                            let (gender, skin) = room.get_player_appearance(player_id).await.unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
-                            let (hair_style, hair_color) = room.get_player_hair(player_id).await.unwrap_or((None, None));
+                            let player_name =
+                                room.get_player_name(player_id).await.unwrap_or_default();
+                            let (gender, skin) = room
+                                .get_player_appearance(player_id)
+                                .await
+                                .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                            let (hair_style, hair_color) = room
+                                .get_player_hair(player_id)
+                                .await
+                                .unwrap_or((None, None));
                             room.send_to_overworld_players(
                                 ServerMessage::PlayerJoined {
                                     id: player_id.to_string(),
@@ -2825,7 +3326,8 @@ async fn handle_client_message(
                                     hair_color,
                                 },
                                 Some(player_id),
-                            ).await;
+                            )
+                            .await;
                         }
                     }
                 }
@@ -2836,10 +3338,12 @@ async fn handle_client_message(
         // Auth and Register are handled via HTTP endpoints, not WebSocket
         // ===== Bank Messages =====
         ClientMessage::BankDeposit { item_id, quantity } => {
-            room.handle_bank_deposit(player_id, &item_id, quantity).await;
+            room.handle_bank_deposit(player_id, &item_id, quantity)
+                .await;
         }
         ClientMessage::BankWithdraw { item_id, quantity } => {
-            room.handle_bank_withdraw(player_id, &item_id, quantity).await;
+            room.handle_bank_withdraw(player_id, &item_id, quantity)
+                .await;
         }
         ClientMessage::BankDepositGold { amount } => {
             room.handle_bank_deposit_gold(player_id, amount).await;
@@ -2849,12 +3353,17 @@ async fn handle_client_message(
         }
 
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
-        ClientMessage::StartCraftBatch { recipe_id, quantity } => {
-            room.handle_start_craft_batch(player_id, &recipe_id, quantity).await;
+        ClientMessage::StartCraftBatch {
+            recipe_id,
+            quantity,
+        } => {
+            room.handle_start_craft_batch(player_id, &recipe_id, quantity)
+                .await;
         }
         // Ping/Pong for latency measurement
         ClientMessage::Ping { timestamp } => {
-            room.send_to_player(player_id, ServerMessage::Pong { timestamp }).await;
+            room.send_to_player(player_id, ServerMessage::Pong { timestamp })
+                .await;
         }
     }
 
@@ -2862,7 +3371,12 @@ async fn handle_client_message(
     let handler_ms = handler_duration.as_secs_f64() * 1000.0;
     state.perf_metrics.record_handler(msg_name, handler_ms);
     if handler_duration.as_millis() > 20 {
-        tracing::warn!("Slow handler: {} took {:.2}ms for player {}", msg_name, handler_ms, player_id);
+        tracing::warn!(
+            "Slow handler: {} took {:.2}ms for player {}",
+            msg_name,
+            handler_ms,
+            player_id
+        );
     }
 
     Ok(())
@@ -2907,7 +3421,9 @@ async fn main() {
                 let room_start = std::time::Instant::now();
                 let tick_telemetry = room.tick().await;
                 let room_ms = room_start.elapsed().as_secs_f64() * 1000.0;
-                tick_state.perf_metrics.record_room_tick(&room.name, room_ms);
+                tick_state
+                    .perf_metrics
+                    .record_room_tick(&room.name, room_ms);
                 tick_state.perf_metrics.record_movement(
                     tick_telemetry.pending_moves,
                     tick_telemetry.rejected_moves,
@@ -2929,9 +3445,14 @@ async fn main() {
                 );
             }
             let loop_ms = loop_start.elapsed().as_secs_f64() * 1000.0;
-            tick_state.perf_metrics.record_tick_loop(loop_ms, room_count);
+            tick_state
+                .perf_metrics
+                .record_tick_loop(loop_ms, room_count);
             if loop_ms > 50.0 {
-                warn!("Tick loop overrun: {:.2}ms across {} room(s)", loop_ms, room_count);
+                warn!(
+                    "Tick loop overrun: {:.2}ms across {} room(s)",
+                    loop_ms, room_count
+                );
             }
         }
     });
@@ -2951,41 +3472,69 @@ async fn main() {
             let mut snapshots = Vec::new();
 
             // Group sessions by room for batch snapshotting
-            let mut room_players: std::collections::HashMap<String, Vec<(i64, String, String)>> = std::collections::HashMap::new();
+            let mut room_players: std::collections::HashMap<String, Vec<(i64, String, String)>> =
+                std::collections::HashMap::new();
             for session in save_state.sessions.iter() {
                 let session_data = session.value().clone();
-                if !save_state.auth_sessions.contains_key(&session_data.auth_token) {
-                    warn!("Auto-save skipped for {}: auth token no longer valid", session_data.character_name);
+                if !save_state
+                    .auth_sessions
+                    .contains_key(&session_data.auth_token)
+                {
+                    warn!(
+                        "Auto-save skipped for {}: auth token no longer valid",
+                        session_data.character_name
+                    );
                     continue;
                 }
-                room_players.entry(session_data.room_id.clone())
+                room_players
+                    .entry(session_data.room_id.clone())
                     .or_default()
-                    .push((session_data.character_id, session_data.character_name.clone(), session_data.player_id.clone()));
+                    .push((
+                        session_data.character_id,
+                        session_data.character_name.clone(),
+                        session_data.player_id.clone(),
+                    ));
             }
 
             // Batch-snapshot all players per room (single lock acquisition per room)
             for (room_id, players) in &room_players {
                 if let Some(room) = save_state.rooms.get(room_id) {
-                    let player_ids: Vec<String> = players.iter().map(|(_, _, pid)| pid.clone()).collect();
+                    let player_ids: Vec<String> =
+                        players.iter().map(|(_, _, pid)| pid.clone()).collect();
                     let bulk_data = room.get_bulk_save_data(&player_ids).await;
 
                     for (character_id, character_name, player_id) in players {
-                        if let Some((mut save_data, quest_state, discovered_recipes)) = bulk_data.get(player_id).cloned() {
-                            let played_time_delta = save_state.play_time_anchors
+                        if let Some((mut save_data, quest_state, discovered_recipes)) =
+                            bulk_data.get(player_id).cloned()
+                        {
+                            let played_time_delta = save_state
+                                .play_time_anchors
                                 .get(character_id)
                                 .map(|anchor| anchor.elapsed().as_secs() as i64)
                                 .unwrap_or(0);
-                            save_state.play_time_anchors.insert(*character_id, std::time::Instant::now());
+                            save_state
+                                .play_time_anchors
+                                .insert(*character_id, std::time::Instant::now());
 
                             if save_data.current_map.is_some() {
-                                let entrance_positions = save_state.player_entrance_positions.read().await;
-                                if let Some(&(entrance_x, entrance_y)) = entrance_positions.get(player_id) {
+                                let entrance_positions =
+                                    save_state.player_entrance_positions.read().await;
+                                if let Some(&(entrance_x, entrance_y)) =
+                                    entrance_positions.get(player_id)
+                                {
                                     save_data.x = entrance_x as f32;
                                     save_data.y = entrance_y as f32;
                                 }
                             }
 
-                            snapshots.push((*character_id, character_name.clone(), save_data, quest_state, played_time_delta, discovered_recipes));
+                            snapshots.push((
+                                *character_id,
+                                character_name.clone(),
+                                save_data,
+                                quest_state,
+                                played_time_delta,
+                                discovered_recipes,
+                            ));
                         }
                     }
                 }
@@ -3000,39 +3549,52 @@ async fn main() {
                 let save_count = snapshots.len();
                 let mut save_tasks = Vec::with_capacity(save_count);
 
-                for (character_id, character_name, save_data, quest_state, played_time_delta, discovered_recipes) in snapshots {
+                for (
+                    character_id,
+                    character_name,
+                    save_data,
+                    quest_state,
+                    played_time_delta,
+                    discovered_recipes,
+                ) in snapshots
+                {
                     let db = save_state.db.clone();
                     save_tasks.push(tokio::spawn(async move {
-                        if let Err(e) = db.save_character(
-                            character_id,
-                            save_data.x,
-                            save_data.y,
-                            save_data.hp,
-                            save_data.prayer_points,
-                            &save_data.skills,
-                            save_data.gold,
-                            &save_data.inventory_json,
-                            save_data.equipped_head.as_deref(),
-                            save_data.equipped_body.as_deref(),
-                            save_data.equipped_weapon.as_deref(),
-                            save_data.equipped_back.as_deref(),
-                            save_data.equipped_feet.as_deref(),
-                            save_data.equipped_ring.as_deref(),
-                            save_data.equipped_gloves.as_deref(),
-                            save_data.equipped_necklace.as_deref(),
-                            save_data.equipped_belt.as_deref(),
-                            played_time_delta,
-                            save_data.current_map.as_deref(),
-                            save_data.sitting_at_x,
-                            save_data.sitting_at_y,
-                            &save_data.bank_json,
-                            save_data.bank_gold,
-                        ).await {
+                        if let Err(e) = db
+                            .save_character(
+                                character_id,
+                                save_data.x,
+                                save_data.y,
+                                save_data.hp,
+                                save_data.prayer_points,
+                                &save_data.skills,
+                                save_data.gold,
+                                &save_data.inventory_json,
+                                save_data.equipped_head.as_deref(),
+                                save_data.equipped_body.as_deref(),
+                                save_data.equipped_weapon.as_deref(),
+                                save_data.equipped_back.as_deref(),
+                                save_data.equipped_feet.as_deref(),
+                                save_data.equipped_ring.as_deref(),
+                                save_data.equipped_gloves.as_deref(),
+                                save_data.equipped_necklace.as_deref(),
+                                save_data.equipped_belt.as_deref(),
+                                played_time_delta,
+                                save_data.current_map.as_deref(),
+                                save_data.sitting_at_x,
+                                save_data.sitting_at_y,
+                                &save_data.bank_json,
+                                save_data.bank_gold,
+                            )
+                            .await
+                        {
                             warn!("Auto-save failed for character {}: {}", character_name, e);
                         }
 
                         if let Some(quest_state) = quest_state {
-                            let _ = db.save_character_quest_state(character_id, &quest_state).await;
+                            let _ = db
+                                .save_character_quest_state(character_id, &quest_state)
+                                .await;
                         }
 
                         // Save discovered recipes
@@ -3147,10 +3709,16 @@ async fn main() {
         .route("/api/login", post(login_account))
         .route("/api/logout", post(logout_account))
         // Characters
-        .route("/api/characters", get(list_characters).post(create_character))
+        .route(
+            "/api/characters",
+            get(list_characters).post(create_character),
+        )
         .route("/api/characters/:id", delete(delete_character))
         // Matchmaking
-        .route("/matchmake/joinOrCreate/:room", post(matchmake_join_or_create))
+        .route(
+            "/matchmake/joinOrCreate/:room",
+            post(matchmake_join_or_create),
+        )
         // WebSocket
         .route("/:room_id", get(ws_handler))
         // Stats API (public, read-only)
@@ -3168,14 +3736,14 @@ async fn main() {
             CorsLayer::new()
                 .allow_origin(tower_http::cors::Any)
                 .allow_methods([
-                    axum::http::Method::GET, 
+                    axum::http::Method::GET,
                     axum::http::Method::POST,
-                    axum::http::Method::OPTIONS
+                    axum::http::Method::OPTIONS,
                 ])
                 .allow_headers([
-                    axum::http::header::CONTENT_TYPE, 
-                    axum::http::header::AUTHORIZATION
-                ])
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::header::AUTHORIZATION,
+                ]),
         );
 
     // Graceful shutdown: save all players on Ctrl+C
@@ -3192,7 +3760,8 @@ async fn main() {
         // Group sessions by room_id for bulk saving
         let mut room_players: HashMap<String, Vec<(String, i64)>> = HashMap::new();
         for entry in shutdown_state.sessions.iter() {
-            room_players.entry(entry.room_id.clone())
+            room_players
+                .entry(entry.room_id.clone())
                 .or_default()
                 .push((entry.player_id.clone(), entry.character_id));
         }
@@ -3205,7 +3774,10 @@ async fn main() {
                 None => continue,
             };
             let player_ids: Vec<String> = players.iter().map(|(pid, _)| pid.clone()).collect();
-            let char_id_map: HashMap<&str, i64> = players.iter().map(|(pid, cid)| (pid.as_str(), *cid)).collect();
+            let char_id_map: HashMap<&str, i64> = players
+                .iter()
+                .map(|(pid, cid)| (pid.as_str(), *cid))
+                .collect();
 
             let bulk_data = room.get_bulk_save_data(&player_ids).await;
             for (player_id, (save_data, quest_state, discovered_recipes)) in bulk_data {
@@ -3214,42 +3786,52 @@ async fn main() {
                     None => continue,
                 };
 
-                if let Err(e) = shutdown_state.db.save_character(
-                    character_id,
-                    save_data.x,
-                    save_data.y,
-                    save_data.hp,
-                    save_data.prayer_points,
-                    &save_data.skills,
-                    save_data.gold,
-                    &save_data.inventory_json,
-                    save_data.equipped_head.as_deref(),
-                    save_data.equipped_body.as_deref(),
-                    save_data.equipped_weapon.as_deref(),
-                    save_data.equipped_back.as_deref(),
-                    save_data.equipped_feet.as_deref(),
-                    save_data.equipped_ring.as_deref(),
-                    save_data.equipped_gloves.as_deref(),
-                    save_data.equipped_necklace.as_deref(),
-                    save_data.equipped_belt.as_deref(),
-                    0, // played_time_delta - skip for shutdown
-                    save_data.current_map.as_deref(),
-                    save_data.sitting_at_x,
-                    save_data.sitting_at_y,
-                    &save_data.bank_json,
-                    save_data.bank_gold,
-                ).await {
+                if let Err(e) = shutdown_state
+                    .db
+                    .save_character(
+                        character_id,
+                        save_data.x,
+                        save_data.y,
+                        save_data.hp,
+                        save_data.prayer_points,
+                        &save_data.skills,
+                        save_data.gold,
+                        &save_data.inventory_json,
+                        save_data.equipped_head.as_deref(),
+                        save_data.equipped_body.as_deref(),
+                        save_data.equipped_weapon.as_deref(),
+                        save_data.equipped_back.as_deref(),
+                        save_data.equipped_feet.as_deref(),
+                        save_data.equipped_ring.as_deref(),
+                        save_data.equipped_gloves.as_deref(),
+                        save_data.equipped_necklace.as_deref(),
+                        save_data.equipped_belt.as_deref(),
+                        0, // played_time_delta - skip for shutdown
+                        save_data.current_map.as_deref(),
+                        save_data.sitting_at_x,
+                        save_data.sitting_at_y,
+                        &save_data.bank_json,
+                        save_data.bank_gold,
+                    )
+                    .await
+                {
                     error!("Shutdown save failed for player {}: {}", player_id, e);
                 } else {
                     saved_count += 1;
                 }
 
                 if let Some(quest_state) = quest_state {
-                    let _ = shutdown_state.db.save_character_quest_state(character_id, &quest_state).await;
+                    let _ = shutdown_state
+                        .db
+                        .save_character_quest_state(character_id, &quest_state)
+                        .await;
                 }
 
                 for recipe_id in &discovered_recipes {
-                    let _ = shutdown_state.db.save_discovered_recipe(character_id, recipe_id).await;
+                    let _ = shutdown_state
+                        .db
+                        .save_discovered_recipe(character_id, recipe_id)
+                        .await;
                 }
             }
         }
@@ -3258,9 +3840,12 @@ async fn main() {
     };
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .tcp_nodelay(true)
-        .with_graceful_shutdown(shutdown_signal)
-        .await
-        .unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .tcp_nodelay(true)
+    .with_graceful_shutdown(shutdown_signal)
+    .await
+    .unwrap();
 }
