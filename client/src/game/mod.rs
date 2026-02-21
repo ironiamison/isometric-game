@@ -35,6 +35,6 @@ pub use state::{
     GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent, MapTransition, OnlinePlayerInfo,
     PendingRequestInfo, Projectile, QuestCatalogEntry, QuestCompletedEvent, QuestObjective,
     SkillXpEvent, SocialState,
-    SocialTab, SpellEffect, TransitionState, UiState, XpDropFeed,
+    SocialTab, SpellEffect, TransitionState, UiState, XpDropFeed, quest_status_order,
 };
 pub use tilemap::{LayerType, Tilemap, TilemapLayer};

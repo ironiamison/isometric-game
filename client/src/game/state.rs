@@ -1339,6 +1339,25 @@ impl Default for UiState {
     }
 }
 
+impl UiState {
+    pub fn close_quest_log(&mut self) {
+        self.quest_log_open = false;
+        self.quest_log_scroll = 0.0;
+        self.selected_quest_id = None;
+    }
+}
+
+/// Returns sort order for quest status: 0 = in-progress, 1 = not started, 2 = completed
+pub fn quest_status_order(quest_id: &str, ui_state: &UiState) -> u8 {
+    if ui_state.completed_quest_ids.contains(quest_id) {
+        2
+    } else if ui_state.active_quests.iter().any(|q| q.id == quest_id) {
+        0
+    } else {
+        1
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionStatus {
     Disconnected,
@@ -1918,7 +1937,7 @@ impl GameState {
             .and_then(|id| self.players.get(id))
     }
 
-    /// Get recipes filtered by the current shop's crafting categories.
+    /// Get recipes filtered by the current shop's crafting categories and stations.
     /// Returns all recipes if no shop is open.
     pub fn shop_filtered_recipes(&self) -> Vec<RecipeDefinition> {
         if let Some(ref shop) = self.ui_state.shop_data {
@@ -1928,6 +1947,15 @@ impl GameState {
                 self.recipe_definitions
                     .iter()
                     .filter(|r| shop.crafting_categories.contains(&r.category))
+                    .filter(|r| {
+                        if shop.crafting_stations.is_empty() {
+                            true
+                        } else if let Some(ref station) = r.station {
+                            shop.crafting_stations.contains(station)
+                        } else {
+                            true
+                        }
+                    })
                     .cloned()
                     .collect()
             }

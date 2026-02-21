@@ -2,7 +2,8 @@ use super::touch::TouchControls;
 use crate::audio::AudioManager;
 use crate::game::{
     pathfinding, BankQuantityAction, BankQuantityDialog, ChatChannel, ContextMenu,
-    ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState, CHUNK_SIZE,
+    ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState,
+    QuestCatalogEntry, quest_status_order, CHUNK_SIZE,
 };
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
@@ -1372,7 +1373,7 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
-                            state.ui_state.quest_log_open = false;
+                            state.ui_state.close_quest_log();
                         }
                         return commands;
                     }
@@ -1388,7 +1389,7 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
-                            state.ui_state.quest_log_open = false;
+                            state.ui_state.close_quest_log();
                         }
                         return commands;
                     }
@@ -1405,7 +1406,7 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
-                            state.ui_state.quest_log_open = false;
+                            state.ui_state.close_quest_log();
                             // Request online players list when opening panel
                             commands.push(InputCommand::GetOnlinePlayers);
                         }
@@ -1423,7 +1424,7 @@ impl InputHandler {
                             state.ui_state.social_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
-                            state.ui_state.quest_log_open = false;
+                            state.ui_state.close_quest_log();
                         }
                         return commands;
                     }
@@ -1439,7 +1440,7 @@ impl InputHandler {
                             state.ui_state.social_open = false;
                             state.ui_state.skills_open = false;
                             state.ui_state.minimap_panel_open = false;
-                            state.ui_state.quest_log_open = false;
+                            state.ui_state.close_quest_log();
                         }
                         return commands;
                     }
@@ -1447,10 +1448,11 @@ impl InputHandler {
                         audio.play_sfx("enter");
                         // Toggle quest log, close others if opening
                         if state.ui_state.quest_log_open {
-                            state.ui_state.quest_log_open = false;
+                            state.ui_state.close_quest_log();
                         } else {
                             state.ui_state.quest_log_open = true;
                             state.ui_state.quest_log_scroll = 0.0;
+                            state.ui_state.selected_quest_id = None;
                             state.ui_state.inventory_open = false;
                             state.ui_state.character_panel_open = false;
                             state.ui_state.social_open = false;
@@ -1480,7 +1482,7 @@ impl InputHandler {
                             state.ui_state.social_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
-                            state.ui_state.quest_log_open = false;
+                            state.ui_state.close_quest_log();
                         }
                     }
                     UiElementId::MinimapToggle => {
@@ -1492,7 +1494,7 @@ impl InputHandler {
                             state.ui_state.social_open = false;
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
-                            state.ui_state.quest_log_open = false;
+                            state.ui_state.close_quest_log();
                             state.ui_state.chat_panel_open = false;
                             state.ui_state.chat_open = false;
                             state.ui_state.minimap_panel_zoom = 1.0;
@@ -1775,6 +1777,25 @@ impl InputHandler {
                                 audio.play_sfx("error");
                             }
                         }
+                    }
+                    UiElementId::QuestLogEntry(idx) => {
+                        audio.play_sfx("enter");
+                        // Rebuild sorted quest list matching render_quest_log order
+                        let mut sorted: Vec<&QuestCatalogEntry> = state.ui_state.quest_catalog.iter().collect();
+                        sorted.sort_by(|a, b| {
+                            let sa = quest_status_order(&a.quest_id, &state.ui_state);
+                            let sb = quest_status_order(&b.quest_id, &state.ui_state);
+                            sa.cmp(&sb).then(a.name.cmp(&b.name))
+                        });
+                        if let Some(entry) = sorted.get(*idx) {
+                            state.ui_state.selected_quest_id = Some(entry.quest_id.clone());
+                            state.ui_state.quest_log_scroll = 0.0;
+                        }
+                    }
+                    UiElementId::QuestDetailBack => {
+                        audio.play_sfx("enter");
+                        state.ui_state.selected_quest_id = None;
+                        state.ui_state.quest_log_scroll = 0.0;
                     }
                     _ => {
                         // Clicking elsewhere unfocuses the add friend input
@@ -5560,8 +5581,7 @@ impl InputHandler {
                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
                 state.ui_state.prayer_book_open = false;
-                state.ui_state.quest_log_open = false;
-                state.ui_state.quest_log_scroll = 0.0;
+                state.ui_state.close_quest_log();
                 // Reset social panel input state
                 state.social_state.add_friend_focused = false;
             } else if state.selected_entity_id.is_some() {
@@ -5586,7 +5606,7 @@ impl InputHandler {
                 state.ui_state.skills_open = false;
                 state.ui_state.prayer_book_open = false;
                 state.ui_state.minimap_panel_open = false;
-                state.ui_state.quest_log_open = false;
+                state.ui_state.close_quest_log();
             }
         }
 
@@ -5602,7 +5622,7 @@ impl InputHandler {
                 state.ui_state.social_open = false;
                 state.ui_state.prayer_book_open = false;
                 state.ui_state.minimap_panel_open = false;
-                state.ui_state.quest_log_open = false;
+                state.ui_state.close_quest_log();
             }
         }
 
@@ -5767,7 +5787,7 @@ impl InputHandler {
                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;
                 state.ui_state.prayer_book_open = false;
-                state.ui_state.quest_log_open = false;
+                state.ui_state.close_quest_log();
                 state.ui_state.chat_panel_open = false;
                 state.ui_state.chat_open = false;
                 state.ui_state.minimap_panel_zoom = 1.0;
@@ -5983,10 +6003,11 @@ impl InputHandler {
         if !classic && is_key_pressed(KeyCode::Q) {
             audio.play_sfx("enter");
             if state.ui_state.quest_log_open {
-                state.ui_state.quest_log_open = false;
+                state.ui_state.close_quest_log();
             } else {
                 state.ui_state.quest_log_open = true;
                 state.ui_state.quest_log_scroll = 0.0;
+                state.ui_state.selected_quest_id = None;
                 state.ui_state.inventory_open = false;
                 state.ui_state.character_panel_open = false;
                 state.ui_state.social_open = false;
