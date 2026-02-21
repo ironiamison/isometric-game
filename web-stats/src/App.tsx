@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { OnlinePlayers } from './pages/OnlinePlayers'
 import { Leaderboards } from './pages/Leaderboards'
 import { ItemRegistry } from './pages/ItemRegistry'
+import { PlayerProfile } from './pages/PlayerProfile'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchInterval: 30000 } },
@@ -13,12 +14,13 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/players" element={<OnlinePlayers />} />
             <Route path="/leaderboards" element={<Leaderboards />} />
+            <Route path="/player/:name" element={<PlayerProfile />} />
             <Route path="/items" element={<ItemRegistry />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

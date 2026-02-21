@@ -48,6 +48,29 @@ export type LeaderboardSort =
   | 'played_time'
   | 'monster_kills'
 
+export interface PlayerProfileRanks {
+  total_level: number
+  combat_level: number
+  hitpoints_level: number
+  combat_skill_level: number
+  fishing_level: number
+  farming_level: number
+  smithing_level: number
+  prayer_level: number
+  magic_level: number
+  woodcutting_level: number
+  mining_level: number
+  alchemy_level: number
+  monster_kills: number
+  played_time: number
+}
+
+export interface PlayerProfileResponse {
+  player: LeaderboardEntry
+  ranks: PlayerProfileRanks
+  total_characters: number
+}
+
 export interface Equipment {
   slot_type: string
   attack_level_required: number
@@ -82,5 +105,7 @@ export const api = {
   online: () => get<OnlinePlayer[]>('/online'),
   leaderboard: (sort: LeaderboardSort = 'total_level', limit = 50) =>
     get<LeaderboardEntry[]>(`/leaderboard?sort=${sort}&limit=${limit}`),
+  playerProfile: (name: string) =>
+    get<PlayerProfileResponse>(`/player/${encodeURIComponent(name)}`),
   items: () => get<Item[]>('/items'),
 }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { api, type LeaderboardEntry, type LeaderboardSort } from '../api'
 
 type NumericField = Exclude<keyof LeaderboardEntry, 'name'>
@@ -117,7 +118,12 @@ export function Leaderboards() {
                 className={`rounded-xl border p-4 transition-colors ${rankStyle(rank)}`}
               >
                 <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Rank {rank}</p>
-                <p className="mt-2 text-xl font-semibold text-[var(--text)]">{entry.name}</p>
+                <Link
+                  to={`/player/${encodeURIComponent(entry.name)}`}
+                  className="mt-2 block text-xl font-semibold text-[var(--text)] hover:text-[var(--gold)]"
+                >
+                  {entry.name}
+                </Link>
                 <p className="mt-1 text-sm text-[var(--text-soft)]">{metricValue(metric, entry)} {metric.label}</p>
               </div>
             ))}
@@ -193,7 +199,14 @@ export function Leaderboards() {
                 filtered.map(({ rank, entry }) => (
                   <tr key={`${entry.name}-${metric.sort}`} className="border-t border-[var(--panel-border)] hover:bg-[var(--panel-soft)]/70">
                     <td className="px-4 py-3 font-mono text-sm text-[var(--text-soft)]">{rank}</td>
-                    <td className="px-4 py-3 font-medium text-[var(--text)]">{entry.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <Link
+                        to={`/player/${encodeURIComponent(entry.name)}`}
+                        className="text-[var(--text)] hover:text-[var(--gold)]"
+                      >
+                        {entry.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 font-mono text-[var(--text)]">{metricValue(metric, entry)}</td>
                     <td className="px-4 py-3 font-mono text-[var(--text-soft)]">{entry.total_level.toLocaleString()}</td>
                     <td className="px-4 py-3 font-mono text-[var(--text-soft)]">{entry.monster_kills.toLocaleString()}</td>

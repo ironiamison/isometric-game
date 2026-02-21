@@ -904,7 +904,7 @@ wander_enabled = false
 facing = "down"
 
 [old_thomas.speech]
-radius = 5
+radius = 8
 interval_min_ms = 25000
 interval_max_ms = 45000
 messages = [

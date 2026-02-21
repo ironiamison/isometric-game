@@ -1396,7 +1396,7 @@ fn default_leaderboard_limit() -> usize {
     50
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct LeaderboardEntry {
     name: String,
     combat_level: i32,
@@ -1415,18 +1415,38 @@ struct LeaderboardEntry {
     monster_kills: i32,
 }
 
-async fn stats_leaderboard(
-    State(state): State<AppState>,
-    Query(query): Query<LeaderboardQuery>,
-) -> impl IntoResponse {
-    let pool = state.db.pool();
+#[derive(Serialize)]
+struct PlayerProfileRanks {
+    total_level: usize,
+    combat_level: usize,
+    hitpoints_level: usize,
+    combat_skill_level: usize,
+    fishing_level: usize,
+    farming_level: usize,
+    smithing_level: usize,
+    prayer_level: usize,
+    magic_level: usize,
+    woodcutting_level: usize,
+    mining_level: usize,
+    alchemy_level: usize,
+    monster_kills: usize,
+    played_time: usize,
+}
+
+#[derive(Serialize)]
+struct PlayerProfileResponse {
+    player: LeaderboardEntry,
+    ranks: PlayerProfileRanks,
+    total_characters: usize,
+}
+
+async fn load_leaderboard_entries(state: &AppState) -> Vec<LeaderboardEntry> {
     let rows = sqlx::query("SELECT name, skills_json, played_time, monster_kills FROM characters")
-        .fetch_all(pool)
+        .fetch_all(state.db.pool())
         .await
         .unwrap_or_default();
 
-    let mut entries: Vec<LeaderboardEntry> = rows
-        .iter()
+    rows.into_iter()
         .filter_map(|row| {
             let name: String = row.try_get("name").ok()?;
             let skills_json: String = row.try_get("skills_json").unwrap_or_default();
@@ -1451,9 +1471,11 @@ async fn stats_leaderboard(
                 monster_kills,
             })
         })
-        .collect();
+        .collect()
+}
 
-    match query.sort.as_str() {
+fn sort_leaderboard_entries(entries: &mut [LeaderboardEntry], sort: &str) {
+    match sort {
         "combat_level" => entries.sort_by(|a, b| b.combat_level.cmp(&a.combat_level)),
         "hitpoints_level" => entries.sort_by(|a, b| b.hitpoints_level.cmp(&a.hitpoints_level)),
         "combat_skill_level" => {
@@ -1464,18 +1486,79 @@ async fn stats_leaderboard(
         "smithing_level" => entries.sort_by(|a, b| b.smithing_level.cmp(&a.smithing_level)),
         "prayer_level" => entries.sort_by(|a, b| b.prayer_level.cmp(&a.prayer_level)),
         "magic_level" => entries.sort_by(|a, b| b.magic_level.cmp(&a.magic_level)),
-        "woodcutting_level" => {
-            entries.sort_by(|a, b| b.woodcutting_level.cmp(&a.woodcutting_level))
-        }
+        "woodcutting_level" => entries.sort_by(|a, b| b.woodcutting_level.cmp(&a.woodcutting_level)),
         "mining_level" => entries.sort_by(|a, b| b.mining_level.cmp(&a.mining_level)),
         "alchemy_level" => entries.sort_by(|a, b| b.alchemy_level.cmp(&a.alchemy_level)),
         "monster_kills" => entries.sort_by(|a, b| b.monster_kills.cmp(&a.monster_kills)),
         "played_time" => entries.sort_by(|a, b| b.played_time.cmp(&a.played_time)),
         _ => entries.sort_by(|a, b| b.total_level.cmp(&a.total_level)),
     }
+}
+
+fn stat_rank<F>(entries: &[LeaderboardEntry], player: &LeaderboardEntry, value: F) -> usize
+where
+    F: Fn(&LeaderboardEntry) -> i64,
+{
+    let player_value = value(player);
+    1 + entries
+        .iter()
+        .filter(|entry| value(entry) > player_value)
+        .count()
+}
+
+async fn stats_leaderboard(
+    State(state): State<AppState>,
+    Query(query): Query<LeaderboardQuery>,
+) -> impl IntoResponse {
+    let mut entries = load_leaderboard_entries(&state).await;
+    sort_leaderboard_entries(&mut entries, &query.sort);
 
     entries.truncate(query.limit.min(100));
     Json(entries)
+}
+
+async fn stats_player_profile(
+    State(state): State<AppState>,
+    Path(player_name): Path<String>,
+) -> impl IntoResponse {
+    let entries = load_leaderboard_entries(&state).await;
+    let Some(player) = entries
+        .iter()
+        .find(|entry| entry.name.eq_ignore_ascii_case(&player_name))
+        .cloned()
+    else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": "Player not found"
+            })),
+        )
+            .into_response();
+    };
+
+    let ranks = PlayerProfileRanks {
+        total_level: stat_rank(&entries, &player, |entry| entry.total_level as i64),
+        combat_level: stat_rank(&entries, &player, |entry| entry.combat_level as i64),
+        hitpoints_level: stat_rank(&entries, &player, |entry| entry.hitpoints_level as i64),
+        combat_skill_level: stat_rank(&entries, &player, |entry| entry.combat_skill_level as i64),
+        fishing_level: stat_rank(&entries, &player, |entry| entry.fishing_level as i64),
+        farming_level: stat_rank(&entries, &player, |entry| entry.farming_level as i64),
+        smithing_level: stat_rank(&entries, &player, |entry| entry.smithing_level as i64),
+        prayer_level: stat_rank(&entries, &player, |entry| entry.prayer_level as i64),
+        magic_level: stat_rank(&entries, &player, |entry| entry.magic_level as i64),
+        woodcutting_level: stat_rank(&entries, &player, |entry| entry.woodcutting_level as i64),
+        mining_level: stat_rank(&entries, &player, |entry| entry.mining_level as i64),
+        alchemy_level: stat_rank(&entries, &player, |entry| entry.alchemy_level as i64),
+        monster_kills: stat_rank(&entries, &player, |entry| entry.monster_kills as i64),
+        played_time: stat_rank(&entries, &player, |entry| entry.played_time),
+    };
+
+    Json(PlayerProfileResponse {
+        player,
+        ranks,
+        total_characters: entries.len(),
+    })
+    .into_response()
 }
 
 #[derive(Serialize)]
@@ -3725,6 +3808,7 @@ async fn main() {
         .route("/api/stats/overview", get(stats_overview))
         .route("/api/stats/online", get(stats_online))
         .route("/api/stats/leaderboard", get(stats_leaderboard))
+        .route("/api/stats/player/:name", get(stats_player_profile))
         .route("/api/stats/items", get(stats_items))
         .route("/api/perf", get(api_perf))
         // Server logs (admin)

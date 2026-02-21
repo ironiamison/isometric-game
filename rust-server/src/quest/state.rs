@@ -185,6 +185,34 @@ impl QuestProgress {
         )
     }
 
+    /// Reconcile saved objectives with current quest definition.
+    /// Adds any objectives present in the definition but missing from saved state,
+    /// and removes any saved objectives no longer in the definition.
+    /// Returns true if the objectives were modified.
+    pub fn reconcile_objectives(&mut self, current_targets: &[(String, i32)]) -> bool {
+        let mut modified = false;
+
+        // Add missing objectives
+        for (id, target) in current_targets {
+            if !self.objectives.contains_key(id) {
+                self.objectives.insert(id.clone(), ObjectiveProgress::new(id, *target));
+                modified = true;
+            }
+        }
+
+        // Remove objectives no longer in the definition
+        let valid_ids: std::collections::HashSet<&String> = current_targets.iter().map(|(id, _)| id).collect();
+        self.objectives.retain(|id, _| {
+            let keep = valid_ids.contains(id);
+            if !keep {
+                modified = true;
+            }
+            keep
+        });
+
+        modified
+    }
+
     /// Serialize objectives to JSON for database storage
     pub fn objectives_to_json(&self) -> String {
         serde_json::to_string(&self.objectives).unwrap_or_else(|_| "{}".to_string())

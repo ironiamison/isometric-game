@@ -212,6 +212,31 @@ impl QuestRegistry {
             .collect()
     }
 
+    /// Reconcile active quest objectives with current quest definitions.
+    /// This handles quest definitions being updated after a player accepted the quest.
+    pub async fn reconcile_active_quests(&self, player_state: &mut PlayerQuestState) {
+        let quests = self.quests.read().await;
+        let quest_ids: Vec<String> = player_state.active_quests.keys().cloned().collect();
+
+        for quest_id in quest_ids {
+            if let Some(quest) = quests.get(&quest_id) {
+                let current_targets: Vec<(String, i32)> = quest.objectives
+                    .iter()
+                    .map(|o| (o.id.clone(), o.count))
+                    .collect();
+
+                if let Some(progress) = player_state.active_quests.get_mut(&quest_id) {
+                    if progress.reconcile_objectives(&current_targets) {
+                        tracing::info!(
+                            "Reconciled objectives for quest {} — synced with current definition",
+                            quest_id
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     /// Check if a player can start a quest
     pub async fn can_start_quest(
         &self,

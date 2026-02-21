@@ -136,7 +136,12 @@ function SpotlightBoard({
             <div key={entry.name} className="flex items-center justify-between rounded-lg border border-[var(--panel-border)] bg-[var(--panel-soft)] px-3 py-2.5">
               <div className="flex items-center gap-3">
                 <span className="w-5 text-xs font-mono text-[var(--muted)]">{index + 1}</span>
-                <span className="font-medium text-[var(--text)]">{entry.name}</span>
+                <Link
+                  to={`/player/${encodeURIComponent(entry.name)}`}
+                  className="font-medium text-[var(--text)] hover:text-[var(--gold)]"
+                >
+                  {entry.name}
+                </Link>
               </div>
               <div className="text-right">
                 <p className="font-mono text-sm text-[var(--text)]">{metric(entry)}</p>

@@ -4285,6 +4285,9 @@ impl GameRoom {
                 .entry(player_id.to_string())
                 .or_insert_with(PlayerQuestState::new);
 
+            // Reconcile objectives with current quest definitions (handles quest updates)
+            self.quest_registry.reconcile_active_quests(quest_state).await;
+
             let active_quest_ids: Vec<String> = quest_state.active_quests.keys().cloned().collect();
             tracing::info!(
                 "Quest progression snapshot for {}: active quests = {:?}",
@@ -4899,7 +4902,25 @@ impl GameRoom {
 
         if quests.is_empty() {
             tracing::debug!("NPC {} ({}) has no quests", npc_id, entity_type);
-            // Could show generic dialogue here
+            // Show greeting dialogue for NPCs that have one (e.g. Old Thomas)
+            if let Some(proto) = prototype.as_ref() {
+                if let Some(ref greeting) = proto.dialogue.greeting {
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::ShowDialogue {
+                            quest_id: String::new(),
+                            npc_id: npc_id.to_string(),
+                            speaker: proto.display_name.clone(),
+                            text: greeting.clone(),
+                            choices: vec![crate::protocol::DialogueChoice {
+                                id: "close".to_string(),
+                                text: "Goodbye".to_string(),
+                            }],
+                        },
+                    )
+                    .await;
+                }
+            }
             return;
         }
 

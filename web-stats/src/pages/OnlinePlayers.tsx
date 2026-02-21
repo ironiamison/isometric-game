@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { api, type OnlinePlayer } from '../api'
 
 type SortKey = keyof OnlinePlayer
@@ -92,7 +93,14 @@ export function OnlinePlayers() {
             ) : (
               sorted.map(player => (
                 <tr key={player.name} className="border-b border-[#2a2d38] hover:bg-[#141722] transition-colors">
-                  <td className="px-4 py-3 text-[#e2e4e9]">{player.name}</td>
+                  <td className="px-4 py-3">
+                    <Link
+                      to={`/player/${encodeURIComponent(player.name)}`}
+                      className="text-[#e2e4e9] hover:text-[var(--gold)]"
+                    >
+                      {player.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 font-mono text-[#e2e4e9]">{player.combat_level}</td>
                   <td className="px-4 py-3 font-mono text-[#e2e4e9]">{player.hitpoints_level}</td>
                   <td className="px-4 py-3 font-mono text-[#e2e4e9]">{player.combat_skill_level}</td>
