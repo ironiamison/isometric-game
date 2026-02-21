@@ -236,13 +236,13 @@ description = "A bouncy creature made of coiled springs."
 [springs.stats]
 level = 8
 max_hp = 18
-damage = 3
-attack_bonus = 7
+damage = 2
+attack_bonus = 4
 defence_bonus = -1
 attack_range = 1
 aggro_range = 5
 chase_range = 7
-move_cooldown_ms = 350
+move_cooldown_ms = 800
 attack_cooldown_ms = 1600
 respawn_time_ms = 10000
 
