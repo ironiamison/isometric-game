@@ -33,7 +33,8 @@ pub use state::{
     ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice, DoubleClickState, DragSource,
     DragState, FarmingContractInfo, FarmingPatch, FrameTimings, FriendInfo, GameState,
     GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent, MapTransition, OnlinePlayerInfo,
-    PendingRequestInfo, Projectile, QuestCompletedEvent, QuestObjective, SkillXpEvent, SocialState,
+    PendingRequestInfo, Projectile, QuestCatalogEntry, QuestCompletedEvent, QuestObjective,
+    SkillXpEvent, SocialState,
     SocialTab, SpellEffect, TransitionState, UiState, XpDropFeed,
 };
 pub use tilemap::{LayerType, Tilemap, TilemapLayer};

@@ -7,8 +7,9 @@ use crate::game::{
     ActiveDialogue, ActiveQuest, BonusTile, ChatBubble, ChatChannel, ChatMessage, ConnectionStatus,
     DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch, FriendInfo, GameState,
     GatheringBuff, GatheringMarker, GroundItem, InventorySlot, ItemDefinition, LevelUpEvent,
-    MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal, QuestCompletedEvent,
-    QuestObjective, RecipeDefinition, RecipeIngredient, RecipeResult, ShopData, ShopStockItem,
+    MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal, QuestCatalogEntry,
+    QuestCompletedEvent, QuestObjective, RecipeDefinition, RecipeIngredient, RecipeResult,
+    ShopData, ShopStockItem,
     SkillType, SkillXpEvent, SpellEffect, TransitionState, Wall, WallEdge,
 };
 use crate::render::OVERWORLD_NAME;
@@ -1565,6 +1566,33 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         }
                     }
                 }
+            }
+        }
+
+        "questCatalog" => {
+            if let Some(value) = data {
+                state.ui_state.quest_catalog.clear();
+                if let Some(quests) = extract_array(value, "quests") {
+                    for q in quests {
+                        let quest_id = extract_string(q, "quest_id").unwrap_or_default();
+                        let name = extract_string(q, "name").unwrap_or_default();
+                        let description = extract_string(q, "description").unwrap_or_default();
+                        let giver_npc_name = extract_string(q, "giver_npc_name").unwrap_or_default();
+                        let level_required = extract_i32(q, "level_required").unwrap_or(0);
+                        let required_quest_id = extract_string(q, "required_quest_id");
+                        let required_quest_name = extract_string(q, "required_quest_name");
+                        state.ui_state.quest_catalog.push(QuestCatalogEntry {
+                            quest_id,
+                            name,
+                            description,
+                            giver_npc_name,
+                            level_required,
+                            required_quest_id,
+                            required_quest_name,
+                        });
+                    }
+                }
+                log::info!("Received quest catalog with {} quests", state.ui_state.quest_catalog.len());
             }
         }
 

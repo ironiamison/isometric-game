@@ -813,6 +813,17 @@ pub struct ActiveQuest {
     pub objectives: Vec<QuestObjective>,
 }
 
+/// A quest from the server catalog (static info for all quests)
+pub struct QuestCatalogEntry {
+    pub quest_id: String,
+    pub name: String,
+    pub description: String,
+    pub giver_npc_name: String,
+    pub level_required: i32,
+    pub required_quest_id: Option<String>,
+    pub required_quest_name: Option<String>,
+}
+
 /// Quest completion notification
 #[derive(Clone, Debug)]
 pub struct QuestCompletedEvent {
@@ -1039,6 +1050,8 @@ pub struct UiState {
     pub quest_completed_events: Vec<QuestCompletedEvent>,
     pub quest_log_open: bool,
     pub quest_log_scroll: f32,
+    pub quest_catalog: Vec<QuestCatalogEntry>,
+    pub selected_quest_id: Option<String>,
     // Crafting UI state
     pub crafting_open: bool,
     pub crafting_selected_category: usize,
@@ -1205,6 +1218,8 @@ impl Default for UiState {
             quest_completed_events: Vec::new(),
             quest_log_open: false,
             quest_log_scroll: 0.0,
+            quest_catalog: Vec::new(),
+            selected_quest_id: None,
             crafting_open: false,
             crafting_selected_category: 0,
             crafting_selected_recipe: 0,
