@@ -1022,7 +1022,31 @@ impl Renderer {
             );
             section_y += 22.0 * s;
 
-            let mut can_craft = true;
+            let mut craft_blocked_reason: Option<&str> = None;
+
+            // Check level requirement
+            if recipe.level_required > 1 {
+                if let Some(player) = state.get_local_player() {
+                    let player_level = match recipe.category.as_str() {
+                        "smithing" => player.skills.smithing.level,
+                        "alchemy" => player.skills.alchemy.level,
+                        _ => player.combat_level(),
+                    };
+                    if player_level < recipe.level_required {
+                        craft_blocked_reason = Some("Requirements Not Met");
+                    }
+                }
+            }
+
+            // Check inventory space
+            if craft_blocked_reason.is_none() {
+                let free_slots = state.inventory.slots.iter().filter(|s| s.is_none()).count();
+                if free_slots == 0 {
+                    craft_blocked_reason = Some("Inventory Full");
+                }
+            }
+
+            let mut missing_ingredients = false;
 
             for ingredient in &recipe.ingredients {
                 let have_count = state.inventory.count_item_by_id(&ingredient.item_id);
@@ -1030,7 +1054,7 @@ impl Renderer {
                 let has_enough = have_count >= need_count;
 
                 if !has_enough {
-                    can_craft = false;
+                    missing_ingredients = true;
                 }
 
                 let (marker, color) = if has_enough {
@@ -1067,6 +1091,11 @@ impl Renderer {
                 );
                 section_y += 32.0 * s;
             }
+
+            if missing_ingredients && craft_blocked_reason.is_none() {
+                craft_blocked_reason = Some("Missing Materials");
+            }
+            let can_craft = craft_blocked_reason.is_none();
 
             // ===== CRAFT BUTTON =====
             let btn_height = 28.0 * s;
@@ -1133,7 +1162,7 @@ impl Renderer {
                     Color::new(0.125, 0.094, 0.094, 1.0),
                 );
 
-                let text = "Missing Materials";
+                let text = craft_blocked_reason.unwrap_or("Missing Materials");
                 let text_w = self.measure_text_sharp(text, 16.0).width;
                 self.draw_text_sharp(
                     text,
