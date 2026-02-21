@@ -832,6 +832,7 @@ fn run_game_frame(
     // maybe_start_tutorial
     if game_state.tutorial_pending {
         if game_state.ui_state.active_dialogue.is_none() {
+            log::warn!("TUTORIAL: auto-starting tutorial now!");
             game_state.tutorial_pending = false;
             let mut tutorial =
                 game::tutorial::TutorialManager::new(game_state.ui_state.classic_controls);

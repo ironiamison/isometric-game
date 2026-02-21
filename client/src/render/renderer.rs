@@ -9298,7 +9298,7 @@ impl Renderer {
         let bar_w = hint_dims.width.max(skip_dims.width) + padding_x * 2.0;
         let bar_h = hint_dims.height + skip_dims.height + padding_y * 3.0;
         let bar_x = ((sw - bar_w) / 2.0).floor();
-        let bar_y = sh - bar_h - 60.0 * s; // Above the hotkey bar
+        let bar_y = 10.0 * s; // Aligned to top edge
 
         // Background
         draw_rectangle(
