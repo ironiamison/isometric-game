@@ -6763,7 +6763,7 @@ impl Renderer {
 
         // Compute weapon draw position (same as render_player)
         let draw_x = screen_x - SPRITE_WIDTH * zoom / 2.0;
-        let draw_y = screen_y - SPRITE_HEIGHT * zoom + 8.0 * zoom;
+        let draw_y = screen_y - SPRITE_HEIGHT * zoom + 16.0 * zoom;
 
         // Get player gender for gender-specific offsets
         let player_gender = Gender::from_str(&player.gender);
