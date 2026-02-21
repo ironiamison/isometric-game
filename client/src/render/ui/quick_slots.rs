@@ -448,6 +448,11 @@ impl Renderer {
         hovered: &Option<UiElementId>,
         layout: &mut UiLayout,
     ) {
+        // Ground item labels are world-space (already scaled by zoom), not UI,
+        // so reset font_scale to avoid double-scaling with ui_scale.
+        let prev_font_scale = self.font_scale.get();
+        self.font_scale.set(1.0);
+
         let zoom = state.camera.zoom;
 
         for (item_id, item) in &state.ground_items {
@@ -507,5 +512,7 @@ impl Renderer {
                 self.draw_text_sharp(&label, label_x, label_y, font_size, WHITE);
             }
         }
+
+        self.font_scale.set(prev_font_scale);
     }
 }
