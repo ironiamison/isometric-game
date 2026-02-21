@@ -1221,7 +1221,14 @@
     ]
   },
   "collision": "AQAQAAABABAAAAEAEAAAAQAQAAABABAAAAEAEBAB/vEPEAEAEQAQAQARABABABEAEAE=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "arcane_scholar",
+      "x": 10,
+      "y": 8,
+      "level": 1
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1363,
