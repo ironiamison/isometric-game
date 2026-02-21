@@ -460,7 +460,7 @@
       381,
       405,
       972,
-      1,
+      294,
       433,
       381,
       381,
@@ -3110,6 +3110,18 @@
       "x": 15,
       "y": 25,
       "level": 1
+    },
+    {
+      "entityId": "crow",
+      "x": 0,
+      "y": 27,
+      "level": 1
+    },
+    {
+      "entityId": "crow",
+      "x": 27,
+      "y": 23,
+      "level": 1
     }
   ],
   "mapObjects": [
@@ -4334,7 +4346,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "ye_old_pub",
-      "targetSpawn": "entrance"
+      "targetSpawn": "enter"
     },
     {
       "x": 30,
@@ -4350,7 +4362,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "tailor",
-      "targetSpawn": ""
+      "targetSpawn": "enter"
     },
     {
       "x": 9,
@@ -4366,7 +4378,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "Oakmere_slayer_house",
-      "targetSpawn": "entrance"
+      "targetSpawn": "enter"
     }
   ],
   "gatheringZones": [
