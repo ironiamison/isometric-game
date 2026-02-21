@@ -829,8 +829,53 @@ fn run_game_frame(
     game_state.frame_timings.record_delta(delta as f64 * 1000.0);
 
     // 3.5. Tutorial: check if we should start, and update phase progress
-    app::maybe_start_tutorial(game_state);
-    app::update_tutorial(game_state);
+    // maybe_start_tutorial
+    if game_state.tutorial_pending {
+        if game_state.ui_state.active_dialogue.is_none() {
+            game_state.tutorial_pending = false;
+            let mut tutorial =
+                game::tutorial::TutorialManager::new(game_state.ui_state.classic_controls);
+            if let Some(dialogue) = tutorial.phase_dialogue() {
+                game_state.ui_state.active_dialogue = Some(dialogue);
+            }
+            tutorial.hint_visible = false;
+            game_state.tutorial = Some(tutorial);
+        }
+    }
+    // update_tutorial
+    if let Some(tutorial) = &mut game_state.tutorial {
+        if !tutorial.is_done() {
+            if tutorial.hint_visible
+                && game_state.ui_state.active_dialogue.is_none()
+                && is_key_pressed(KeyCode::Escape)
+            {
+                tutorial.skip();
+                settings::save_tutorial_completed();
+            } else {
+                if tutorial.pending_dialogue && game_state.ui_state.active_dialogue.is_none() {
+                    tutorial.pending_dialogue = false;
+                    tutorial.hint_visible = true;
+                    if let Some(dialogue) = tutorial.phase_dialogue() {
+                        game_state.ui_state.active_dialogue = Some(dialogue);
+                    }
+                }
+                if game_state.ui_state.inventory_open {
+                    tutorial.on_inventory_opened();
+                }
+                if game_state.ui_state.skills_open {
+                    tutorial.on_skills_opened();
+                }
+                if tutorial.phase == game::tutorial::TutorialPhase::Handoff
+                    && game_state.ui_state.active_dialogue.is_none()
+                    && !tutorial.pending_dialogue
+                {
+                    tutorial.advance();
+                    tutorial.hint_visible = false;
+                    settings::save_tutorial_completed();
+                }
+            }
+        }
+    }
 
     // 4. Update game state
     let update_start = get_time();
