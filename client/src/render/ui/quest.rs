@@ -53,8 +53,8 @@ impl Renderer {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
 
-        let panel_width = (240.0 * s).min(sw - 16.0);
-        let panel_height_full = 300.0 * s;
+        let panel_width = (INV_WIDTH * s).min(sw - 16.0);
+        let panel_height_full = INV_HEIGHT * s;
         let button_area_height = MENU_BUTTON_SIZE * s + EXP_BAR_GAP * s;
         let min_panel_y = 4.0;
         let max_available_height = sh - button_area_height - 8.0 - min_panel_y;
@@ -63,8 +63,7 @@ impl Renderer {
         let panel_y = sh - button_area_height - panel_height - 8.0;
 
         let line_height = 17.0 * s;
-        let objective_spacing = 16.0 * s;
-        let entry_padding = 6.0 * s;
+        let entry_padding = 4.0 * s;
         let header_h = HEADER_HEIGHT * s;
         let footer_h = FOOTER_HEIGHT * s;
 
@@ -106,12 +105,20 @@ impl Renderer {
 
         // Title
         self.draw_text_sharp(
-            "QUEST LOG",
+            "QUESTS",
             header_x + 12.0 * s,
             header_y + header_h * 0.65,
             16.0,
             TEXT_TITLE,
         );
+
+        // ===== EARLY RETURN FOR DETAIL VIEW =====
+        // If a quest is selected, the detail view will be rendered instead (Task 5).
+        // For now, just return early so it compiles without the detail method.
+        if state.ui_state.selected_quest_id.is_some() {
+            // Placeholder: render_quest_detail will be called here in Task 5
+            return;
+        }
 
         // ===== CONTENT AREA =====
         let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
@@ -153,74 +160,62 @@ impl Renderer {
             Rect::new(content_x, content_y, content_w, content_h),
         );
 
-        if state.ui_state.active_quests.is_empty() {
-            let y = content_y + 10.0 * s;
-            // Empty state with themed styling
+        if state.ui_state.quest_catalog.is_empty() {
+            // Empty state
             self.draw_text_sharp(
-                "No Active Quests",
+                "No Quests Available",
                 content_x + 12.0 * s,
-                y + 10.0 * s,
+                content_y + 20.0 * s,
                 16.0,
                 TEXT_DIM,
             );
-            let y = y + line_height + 8.0 * s;
-            let hint_x = content_x + 12.0 * s;
-            let hint_y = y + 10.0 * s;
-            let dim_color = Color::new(0.392, 0.392, 0.431, 1.0);
-            self.draw_text_sharp("Talk to NPCs with a", hint_x, hint_y, 16.0, dim_color);
-            let prefix_w = self.measure_text_sharp("Talk to NPCs with a ", 16.0).width;
-            if let Some(ref tex) = self.chat_small_icon {
-                let icon_h = tex.height();
-                let icon_w = tex.width();
-                let icon_y = hint_y - icon_h + 2.0;
-                draw_texture_ex(
-                    tex,
-                    hint_x + prefix_w,
-                    icon_y,
-                    WHITE,
-                    DrawTextureParams {
-                        dest_size: Some(Vec2::new(icon_w, icon_h)),
-                        ..Default::default()
-                    },
-                );
-            }
-            let y = y + line_height + 2.0 * s;
-            self.draw_text_sharp(
-                "above their heads",
-                content_x + 12.0 * s,
-                y + 10.0 * s,
-                16.0,
-                dim_color,
-            );
         } else {
-            // Wrap widths for text that must fit inside the panel
-            let name_text_x = 28.0 * s; // after star icon
-            let obj_text_x = 52.0 * s; // after checkbox
+            // ===== BUILD SORTED QUEST LIST =====
+            // Determine status for each catalog entry:
+            // 0 = in-progress (yellow), 1 = not started (red), 2 = completed (green)
+            let mut quest_entries: Vec<(usize, &str, &str, u8)> = state
+                .ui_state
+                .quest_catalog
+                .iter()
+                .enumerate()
+                .map(|(idx, entry)| {
+                    let status = if state.ui_state.completed_quest_ids.contains(&entry.quest_id) {
+                        2u8 // completed
+                    } else if state
+                        .ui_state
+                        .active_quests
+                        .iter()
+                        .any(|q| q.id == entry.quest_id)
+                    {
+                        0u8 // in-progress
+                    } else {
+                        1u8 // not started
+                    };
+                    (idx, entry.name.as_str(), entry.quest_id.as_str(), status)
+                })
+                .collect();
+
+            // Sort: in-progress first, not-started second, completed last; alphabetical within group
+            quest_entries.sort_by(|a, b| a.3.cmp(&b.3).then_with(|| a.1.cmp(b.1)));
+
+            // Status colors
+            let color_in_progress = Color::new(1.0, 0.843, 0.0, 1.0); // gold/yellow #FFD700
+            let color_not_started = Color::new(1.0, 0.267, 0.267, 1.0); // red #FF4444
+            let color_completed = Color::new(0.0, 0.8, 0.0, 1.0); // green #00CC00
+
+            // Wrap widths for text
+            let text_x_offset = 12.0 * s;
             let right_pad = 8.0 * s;
-            let name_wrap_w = content_w - name_text_x - right_pad;
-            let obj_wrap_w = content_w - obj_text_x - right_pad;
+            let wrap_w = content_w - text_x_offset - right_pad;
 
             // Calculate total content height for scrolling (with wrapping)
-            let mut total_content_h = 10.0 * s; // top padding
-            for (i, quest) in state.ui_state.active_quests.iter().enumerate() {
-                let name_lines = self.wrap_text(&quest.name, name_wrap_w, 16.0).len().max(1);
-                let title_height = name_lines as f32 * line_height;
-                let mut objectives_height = 0.0;
-                for obj in &quest.objectives {
-                    let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
-                    let obj_lines = self.wrap_text(&obj_text, obj_wrap_w, 16.0).len().max(1);
-                    objectives_height += obj_lines as f32 * objective_spacing;
-                }
-                total_content_h += entry_padding
-                    + title_height
-                    + 4.0 * s
-                    + objectives_height
-                    + entry_padding;
-                if i < state.ui_state.active_quests.len() - 1 {
-                    total_content_h += 8.0 * s; // separator
-                }
+            let mut total_content_h = 6.0 * s; // top padding
+            for (_, name, _, _) in &quest_entries {
+                let lines = self.wrap_text(name, wrap_w, 16.0);
+                let num_lines = lines.len().max(1);
+                total_content_h += entry_padding + num_lines as f32 * line_height + entry_padding;
             }
-            total_content_h += 10.0 * s; // bottom padding
+            total_content_h += 6.0 * s; // bottom padding
 
             let max_scroll = (total_content_h - content_h).max(0.0);
             let scroll_offset = state.ui_state.quest_log_scroll.clamp(0.0, max_scroll);
@@ -242,29 +237,19 @@ impl Renderer {
                 )));
             }
 
-            let mut y = content_y + 10.0 * s - scroll_offset;
+            let mut y = content_y + 6.0 * s - scroll_offset;
 
-            for (quest_idx, quest) in state.ui_state.active_quests.iter().enumerate() {
-                // Calculate entry height with wrapping
-                let name_lines = self.wrap_text(&quest.name, name_wrap_w, 16.0);
-                let title_height = name_lines.len().max(1) as f32 * line_height;
-                let mut objectives_height = 0.0;
-                for obj in &quest.objectives {
-                    let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
-                    let obj_lines = self.wrap_text(&obj_text, obj_wrap_w, 16.0).len().max(1);
-                    objectives_height += obj_lines as f32 * objective_spacing;
-                }
-                let entry_height =
-                    entry_padding + title_height + 4.0 * s + objectives_height + entry_padding;
-
+            for (display_idx, (_catalog_idx, name, _quest_id, status)) in
+                quest_entries.iter().enumerate()
+            {
+                let name_lines = self.wrap_text(name, wrap_w, 16.0);
+                let num_lines = name_lines.len().max(1);
+                let entry_height = entry_padding + num_lines as f32 * line_height + entry_padding;
                 let entry_start_y = y;
 
                 // Skip entries fully outside visible area
                 if y + entry_height < content_y || y > content_y + content_h {
                     y += entry_height;
-                    if quest_idx < state.ui_state.active_quests.len() - 1 {
-                        y += 8.0 * s;
-                    }
                     continue;
                 }
 
@@ -278,14 +263,16 @@ impl Renderer {
                         content_w - 8.0 * s,
                         vis_bottom - vis_top,
                     );
-                    layout.add(UiElementId::QuestLogEntry(quest_idx), bounds);
+                    layout.add(UiElementId::QuestLogEntry(display_idx), bounds);
                 }
 
                 // Check if this quest is hovered
-                let is_hovered =
-                    matches!(hovered, Some(UiElementId::QuestLogEntry(idx)) if *idx == quest_idx);
+                let is_hovered = matches!(
+                    hovered,
+                    Some(UiElementId::QuestLogEntry(idx)) if *idx == display_idx
+                );
 
-                // Draw quest entry background with slot-like styling
+                // Draw hover background
                 if is_hovered {
                     draw_rectangle(
                         content_x + 4.0 * s,
@@ -306,59 +293,27 @@ impl Renderer {
                 // Move y inside the entry box with padding
                 y += entry_padding;
 
-                // Quest name with star icon (wrapped)
-                let name_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
-                self.draw_text_sharp("*", content_x + 12.0 * s, y + 12.0 * s, 16.0, TEXT_GOLD);
+                // Determine quest name color based on status
+                let name_color = match status {
+                    0 => color_in_progress,
+                    1 => color_not_started,
+                    _ => color_completed,
+                };
+
+                // Draw quest name (wrapped lines)
                 for line in &name_lines {
-                    self.draw_text_sharp(line, content_x + name_text_x, y + 12.0 * s, 16.0, name_color);
-                    y += line_height;
-                }
-                y += 4.0 * s;
-
-                // Objectives with styled checkmarks (wrapped)
-                for obj in &quest.objectives {
-                    let (check_icon, status_color) = if obj.completed {
-                        ("[+]", Color::new(0.392, 0.784, 0.392, 1.0))
-                    } else {
-                        ("[ ]", Color::new(0.502, 0.502, 0.541, 1.0))
-                    };
-
                     self.draw_text_sharp(
-                        check_icon,
-                        content_x + 20.0 * s,
+                        line,
+                        content_x + text_x_offset,
                         y + 12.0 * s,
                         16.0,
-                        status_color,
+                        name_color,
                     );
-
-                    let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
-                    let text_color = if obj.completed {
-                        Color::new(0.392, 0.627, 0.392, 1.0)
-                    } else {
-                        TEXT_DIM
-                    };
-                    let obj_lines = self.wrap_text(&obj_text, obj_wrap_w, 16.0);
-                    for line in &obj_lines {
-                        self.draw_text_sharp(line, content_x + obj_text_x, y + 12.0 * s, 16.0, text_color);
-                        y += objective_spacing;
-                    }
+                    y += line_height;
                 }
 
                 // Move past bottom padding
                 y += entry_padding;
-
-                // Decorative separator between quests
-                if quest_idx < state.ui_state.active_quests.len() - 1 {
-                    draw_line(
-                        content_x + 20.0 * s,
-                        y + 2.0 * s,
-                        content_x + content_w - 20.0 * s,
-                        y + 2.0 * s,
-                        1.0,
-                        SLOT_BORDER,
-                    );
-                    y += 8.0 * s;
-                }
             }
 
             // Disable scissor clipping
@@ -415,8 +370,9 @@ impl Renderer {
             HEADER_BORDER,
         );
 
-        let quest_count = state.ui_state.active_quests.len();
-        let count_text = format!("{} Active", quest_count);
+        let completed_count = state.ui_state.completed_quest_ids.len();
+        let total_count = state.ui_state.quest_catalog.len();
+        let count_text = format!("{} / {} Complete", completed_count, total_count);
         let count_width = self.measure_text_sharp(&count_text, 16.0).width;
         self.draw_text_sharp(
             &count_text,
