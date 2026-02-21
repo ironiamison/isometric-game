@@ -48,10 +48,19 @@ max_stack = 99
 base_price = 40
 sellable = true
 
+[coal_ore]
+display_name = "Coal Ore"
+sprite = "iron_ore"
+description = "A chunk of coal. Combine with iron ore to smelt steel bars."
+category = "material"
+max_stack = 5
+base_price = 40
+sellable = true
+
 [iron_ore]
 display_name = "Iron Ore"
 sprite = "iron_ore"
-description = "Raw iron ore. Can be smelted into a bar at an anvil."
+description = "Raw iron ore. Smelt into iron bars, or combine with coal for steel."
 category = "material"
 max_stack = 5
 base_price = 30
@@ -64,15 +73,6 @@ description = "A bar of smelted iron. Used to smith iron equipment."
 category = "material"
 max_stack = 99
 base_price = 80
-sellable = true
-
-[steel_ore]
-display_name = "Steel Ore"
-sprite = "steel_ore"
-description = "Raw steel ore. Can be smelted into a bar at an anvil."
-category = "material"
-max_stack = 5
-base_price = 60
 sellable = true
 
 [steel_bar]
