@@ -3088,6 +3088,12 @@
   "collision": "ASAAAAFYAAABCAAAAYkCAMEQAAAhFAAAERoQAHEKEABRDggAyAUEwI8XAsDBHwLAAAACwAAAMsAAADLAwA8CwMAYBEBBCQhEgQ1wQIFKAEGBCgBAgRIAQQETkEAuFQRAwKUAQBwrAEHkOgBAADcQQBBQAkAAkABAoJABQKAeBv4=",
   "entities": [
     {
+      "entityId": "old_thomas",
+      "x": 2,
+      "y": 13,
+      "level": 1
+    },
+    {
       "entityId": "crow",
       "x": 28,
       "y": 24,

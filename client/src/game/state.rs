@@ -6,6 +6,7 @@ use super::npc::Npc;
 use super::pathfinding::PathState;
 use super::shop::{ShopData, ShopSubTab};
 use super::tilemap::Tilemap;
+use super::tutorial::TutorialManager;
 use crate::render::AreaBanner;
 use crate::render::XpGlobesManager;
 use crate::ui::UiElementId;
@@ -1503,6 +1504,11 @@ pub struct GameState {
     pub world_fade_in: f32,
     /// Whether the world has ever been ready (to trigger fade-in once)
     pub world_was_ready: bool,
+
+    /// Tutorial state machine (None if tutorial not active)
+    pub tutorial: Option<TutorialManager>,
+    /// Flag set by the welcome message handler when is_new_character is true
+    pub tutorial_pending: bool,
 }
 
 impl GameState {
@@ -1592,6 +1598,8 @@ impl GameState {
             ping_stats: PingStats::default(),
             world_fade_in: 0.0,
             world_was_ready: false,
+            tutorial: None,
+            tutorial_pending: false,
         }
     }
 

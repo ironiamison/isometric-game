@@ -16,6 +16,8 @@ use crate::auth::AuthSession;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
+use crate::game::tutorial::TutorialManager;
+
 pub const SERVER_URL: &str = "https://aeven.xyz";
 pub const WS_URL: &str = "wss://aeven.xyz";
 
@@ -45,6 +47,78 @@ pub fn maybe_show_control_scheme_dialogue(game_state: &mut GameState) {
             ],
             show_time: get_time(),
         });
+    }
+}
+
+/// Start the tutorial if the player is new and hasn't completed it yet.
+/// Called each frame — will fire only when tutorial_pending is true and no dialogue is open.
+pub fn maybe_start_tutorial(game_state: &mut GameState) {
+    if !game_state.tutorial_pending {
+        return;
+    }
+    // Wait for any active dialogue (e.g. control scheme) to close first
+    if game_state.ui_state.active_dialogue.is_some() {
+        return;
+    }
+    game_state.tutorial_pending = false;
+
+    // Create the tutorial manager
+    let mut tutorial = TutorialManager::new(game_state.ui_state.classic_controls);
+
+    // Show Old Thomas's initial greeting
+    if let Some(dialogue) = tutorial.phase_dialogue() {
+        game_state.ui_state.active_dialogue = Some(dialogue);
+    }
+    tutorial.hint_visible = false; // No hint during the greeting
+    game_state.tutorial = Some(tutorial);
+}
+
+/// Process tutorial phase completion checks. Called each frame during gameplay.
+pub fn update_tutorial(game_state: &mut GameState) {
+    let Some(tutorial) = &mut game_state.tutorial else {
+        return;
+    };
+    if tutorial.is_done() {
+        return;
+    }
+
+    // Escape key skips the tutorial while the hint bar is visible (not during dialogue)
+    if tutorial.hint_visible
+        && game_state.ui_state.active_dialogue.is_none()
+        && is_key_pressed(KeyCode::Escape)
+    {
+        tutorial.skip();
+        crate::settings::save_tutorial_completed();
+        return;
+    }
+
+    // If there's a pending dialogue to show and no active dialogue, show it
+    if tutorial.pending_dialogue && game_state.ui_state.active_dialogue.is_none() {
+        tutorial.pending_dialogue = false;
+        tutorial.hint_visible = true;
+        if let Some(dialogue) = tutorial.phase_dialogue() {
+            game_state.ui_state.active_dialogue = Some(dialogue);
+        }
+    }
+
+    // Check if inventory was opened (phase 4)
+    if game_state.ui_state.inventory_open {
+        tutorial.on_inventory_opened();
+    }
+
+    // Check if skills panel was opened (phase 5)
+    if game_state.ui_state.skills_open {
+        tutorial.on_skills_opened();
+    }
+
+    // Auto-complete handoff phase after the dialogue is dismissed
+    if tutorial.phase == crate::game::tutorial::TutorialPhase::Handoff
+        && game_state.ui_state.active_dialogue.is_none()
+        && !tutorial.pending_dialogue
+    {
+        tutorial.advance(); // -> Done
+        tutorial.hint_visible = false;
+        crate::settings::save_tutorial_completed();
     }
 }
 
@@ -171,6 +245,12 @@ pub fn run_game_frame(
         use crate::network::messages::ClientMessage;
         let msg = match cmd {
             InputCommand::Move { dx, dy } => {
+                // Notify tutorial of player movement
+                if (*dx != 0.0 || *dy != 0.0) {
+                    if let Some(tutorial) = &mut game_state.tutorial {
+                        tutorial.on_player_moved();
+                    }
+                }
                 let seq = game_state.next_move_sequence(*dx, *dy);
                 ClientMessage::Move {
                     dx: *dx,
@@ -210,6 +290,10 @@ pub fn run_game_frame(
                 }
             }
             InputCommand::Attack => {
+                // Notify tutorial of combat action
+                if let Some(tutorial) = &mut game_state.tutorial {
+                    tutorial.on_combat_action();
+                }
                 // Trigger attack animation and sound on local player
                 if let Some(local_id) = &game_state.local_player_id {
                     let is_ranged = game_state
@@ -263,9 +347,15 @@ pub fn run_game_frame(
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem {
                 slot_index: *slot_index as u32,
             },
-            InputCommand::Interact { npc_id } => ClientMessage::Interact {
-                npc_id: npc_id.clone(),
-            },
+            InputCommand::Interact { npc_id } => {
+                // Notify tutorial of NPC interaction
+                if let Some(tutorial) = &mut game_state.tutorial {
+                    tutorial.on_dialogue_opened();
+                }
+                ClientMessage::Interact {
+                    npc_id: npc_id.clone(),
+                }
+            }
             InputCommand::DialogueChoice {
                 quest_id,
                 choice_id,
@@ -280,6 +370,23 @@ pub fn run_game_frame(
                     crate::settings::save_classic_controls(classic);
                     crate::settings::save_control_scheme_chosen();
                     game_state.ui_state.active_dialogue = None;
+                    continue;
+                }
+                if quest_id == "__tutorial__" {
+                    game_state.ui_state.active_dialogue = None;
+                    if let Some(tutorial) = &mut game_state.tutorial {
+                        if tutorial.phase == crate::game::tutorial::TutorialPhase::AwaitingAccept {
+                            if choice_id == "accept" {
+                                tutorial.advance(); // -> Movement
+                                tutorial.pending_dialogue = true;
+                            } else {
+                                tutorial.skip();
+                                crate::settings::save_tutorial_completed();
+                            }
+                        }
+                        // For all other phases, the dialogue "ok" just closes it
+                        // and the hint bar takes over
+                    }
                     continue;
                 }
                 ClientMessage::DialogueChoice {
@@ -494,6 +601,10 @@ pub fn run_game_frame(
 
     // Record delta for diagnostics
     game_state.frame_timings.record_delta(delta as f64 * 1000.0);
+
+    // 3.5. Tutorial: check if we should start, and update phase progress
+    maybe_start_tutorial(game_state);
+    update_tutorial(game_state);
 
     // 4. Update game state
     let update_start = get_time();
@@ -774,6 +885,7 @@ pub fn run_game_frame(
     // 6. Render overlays
     renderer.render_world_fade_in(game_state);
     renderer.render_transition_overlay(game_state);
+    renderer.render_tutorial_hint(game_state);
 
     // 7. Render touch controls (mobile only)
     // Update attack button icon to show equipped weapon

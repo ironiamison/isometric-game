@@ -9319,4 +9319,90 @@ impl Renderer {
             Color::new(0.0, 0.0, 0.0, alpha),
         );
     }
+
+    /// Render the tutorial hint bar at the bottom of the screen.
+    pub fn render_tutorial_hint(&self, state: &GameState) {
+        let Some(tutorial) = &state.tutorial else {
+            return;
+        };
+        if !tutorial.hint_visible || tutorial.is_done() {
+            return;
+        }
+
+        let hint_text = tutorial.hint_text();
+        if hint_text.is_empty() {
+            return;
+        }
+
+        let (sw, sh) = virtual_screen_size();
+        let s = state.ui_state.ui_scale;
+        let font_size = 18.0;
+        let skip_font_size = 13.0;
+
+        // Fade in based on time since phase started
+        let age = get_time() - tutorial.phase_start_time;
+        let alpha = (age / 0.4).min(1.0) as f32; // 400ms fade in
+
+        // Measure text
+        let hint_dims = self.measure_text_sharp(hint_text, font_size);
+        let skip_text = "Press Esc to skip tutorial";
+        let skip_dims = self.measure_text_sharp(skip_text, skip_font_size);
+
+        // Bar dimensions
+        let padding_x = 20.0 * s;
+        let padding_y = 10.0 * s;
+        let bar_w = hint_dims.width.max(skip_dims.width) + padding_x * 2.0;
+        let bar_h = hint_dims.height + skip_dims.height + padding_y * 3.0;
+        let bar_x = ((sw - bar_w) / 2.0).floor();
+        let bar_y = sh - bar_h - 60.0 * s; // Above the hotkey bar
+
+        // Background
+        draw_rectangle(
+            bar_x,
+            bar_y,
+            bar_w,
+            bar_h,
+            Color::from_rgba(0, 0, 0, (180.0 * alpha) as u8),
+        );
+
+        // Border
+        let border_color = Color::from_rgba(200, 180, 120, (180.0 * alpha) as u8);
+        draw_rectangle_lines(bar_x, bar_y, bar_w, bar_h, 1.0, border_color);
+
+        // Hint text (centered)
+        let hint_x = ((sw - hint_dims.width) / 2.0).floor();
+        let hint_y = bar_y + padding_y + hint_dims.height;
+        let text_alpha = (255.0 * alpha) as u8;
+
+        // Outline
+        for ox in [-1.0_f32, 1.0] {
+            for oy in [-1.0_f32, 1.0] {
+                self.draw_text_sharp(
+                    hint_text,
+                    hint_x + ox,
+                    hint_y + oy,
+                    font_size,
+                    Color::from_rgba(0, 0, 0, text_alpha),
+                );
+            }
+        }
+        self.draw_text_sharp(
+            hint_text,
+            hint_x,
+            hint_y,
+            font_size,
+            Color::from_rgba(255, 255, 220, text_alpha),
+        );
+
+        // Skip text (centered, dimmer)
+        let skip_x = ((sw - skip_dims.width) / 2.0).floor();
+        let skip_y = hint_y + padding_y + skip_dims.height;
+        self.draw_text_sharp(
+            skip_text,
+            skip_x,
+            skip_y,
+            skip_font_size,
+            Color::from_rgba(160, 160, 160, (160.0 * alpha) as u8),
+        );
+    }
 }

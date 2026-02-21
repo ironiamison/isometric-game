@@ -79,6 +79,7 @@ struct GameSession {
     account_id: i64,          // Database account ID
     auth_token: String,       // Token used for this session (for validation)
     current_map: Option<String>, // Interior map ID to auto-enter on connect (None = overworld)
+    is_new_character: bool,   // True if played_time == 0 (for tutorial)
 }
 
 #[derive(Clone)]
@@ -1090,6 +1091,7 @@ async fn matchmake_join_or_create(
             account_id,
             auth_token: auth_token.clone(),
             current_map: character_data.current_map.clone(),
+            is_new_character: character_data.played_time == 0,
         },
     );
 
@@ -1469,8 +1471,9 @@ async fn ws_handler(
             let character_name = session.character_name.clone();
             let character_id = session.character_id;
             let current_map = session.current_map.clone();
+            let is_new_character = session.is_new_character;
             ws.on_upgrade(move |socket| {
-                handle_socket(socket, state, room_id, player_id, session_id, character_name, character_id, current_map)
+                handle_socket(socket, state, room_id, player_id, session_id, character_name, character_id, current_map, is_new_character)
             })
         }
         _ => {
@@ -1489,6 +1492,7 @@ async fn handle_socket(
     character_name: String,
     character_id: i64,
     current_map: Option<String>,  // Interior map to auto-enter on reconnect
+    is_new_character: bool,       // True if played_time == 0 (for tutorial)
 ) {
     let (mut sender, mut receiver) = socket.split();
 
@@ -1511,6 +1515,7 @@ async fn handle_socket(
     // Send welcome message
     let welcome = ServerMessage::Welcome {
         player_id: player_id.clone(),
+        is_new_character,
     };
     if let Ok(bytes) = protocol::encode_server_message(&welcome) {
         let _ = sender.send(Message::Binary(bytes)).await;

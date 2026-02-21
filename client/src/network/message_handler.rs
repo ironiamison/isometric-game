@@ -70,6 +70,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.local_player_id = Some(player_id);
                     state.reset_move_sequence_state();
                     state.connection_status = ConnectionStatus::Connected;
+
+                    // Check if this is a new character (for tutorial)
+                    let is_new = extract_bool(value, "is_new_character").unwrap_or(false);
+                    if is_new && !crate::settings::load_tutorial_completed() {
+                        state.tutorial_pending = true;
+                    }
                 }
             }
         }

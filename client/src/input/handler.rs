@@ -2350,7 +2350,9 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::DialogueClose => {
-                            if dialogue.quest_id != "__control_scheme__" {
+                            if dialogue.quest_id != "__control_scheme__"
+                                && dialogue.quest_id != "__tutorial__"
+                            {
                                 commands.push(InputCommand::CloseDialogue);
                                 state.ui_state.active_dialogue = None;
                                 state.pending_sfx.push("enter".to_string());
@@ -2365,7 +2367,10 @@ impl InputHandler {
             if !dialogue.choices.is_empty() {
                 // Dialogue with choices - Escape cancels, number keys select
                 // Don't allow closing the control scheme choice dialogue with Escape
-                if is_key_pressed(KeyCode::Escape) && dialogue.quest_id != "__control_scheme__" {
+                if is_key_pressed(KeyCode::Escape)
+                    && dialogue.quest_id != "__control_scheme__"
+                    && dialogue.quest_id != "__tutorial__"
+                {
                     commands.push(InputCommand::CloseDialogue);
                     state.ui_state.active_dialogue = None;
                     return commands;

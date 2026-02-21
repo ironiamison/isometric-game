@@ -304,6 +304,7 @@ impl ClientMessage {
 pub enum ServerMessage {
     Welcome {
         player_id: String,
+        is_new_character: bool,
     },
     PlayerJoined {
         id: String,
@@ -1568,11 +1569,15 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
 
     // Convert message to rmpv::Value
     let data = match msg {
-        ServerMessage::Welcome { player_id } => {
+        ServerMessage::Welcome { player_id, is_new_character } => {
             let mut map = Vec::new();
             map.push((
                 Value::String("player_id".into()),
                 Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("is_new_character".into()),
+                Value::Boolean(*is_new_character),
             ));
             Value::Map(map)
         }

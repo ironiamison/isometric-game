@@ -260,3 +260,67 @@ pub fn save_control_scheme_chosen() {
         .expect("storage lock")
         .set("control_scheme_chosen", "true");
 }
+
+// --- Tutorial completion persistence ---
+
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+fn tutorial_completed_path() -> Option<std::path::PathBuf> {
+    dirs::config_dir().map(|p| p.join("new-aeven").join("tutorial_completed"))
+}
+
+#[cfg(target_os = "android")]
+fn tutorial_completed_path() -> Option<std::path::PathBuf> {
+    Some(std::path::PathBuf::from("tutorial_completed"))
+}
+
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+pub fn load_tutorial_completed() -> bool {
+    let Some(path) = tutorial_completed_path() else {
+        return false;
+    };
+    path.exists()
+}
+
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+pub fn save_tutorial_completed() {
+    let Some(path) = tutorial_completed_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&path, "true");
+}
+
+#[cfg(target_os = "android")]
+pub fn load_tutorial_completed() -> bool {
+    let Some(path) = tutorial_completed_path() else {
+        return false;
+    };
+    path.exists()
+}
+
+#[cfg(target_os = "android")]
+pub fn save_tutorial_completed() {
+    let Some(path) = tutorial_completed_path() else {
+        return;
+    };
+    let _ = std::fs::write(&path, "true");
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn load_tutorial_completed() -> bool {
+    quad_storage::STORAGE
+        .lock()
+        .expect("storage lock")
+        .get("tutorial_completed")
+        .is_some()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn save_tutorial_completed() {
+    quad_storage::STORAGE
+        .lock()
+        .expect("storage lock")
+        .set("tutorial_completed", "true");
+}

@@ -12,6 +12,7 @@ pub mod state;
 pub mod tilemap;
 pub mod ore_types;
 pub mod tree_types;
+pub mod tutorial;
 
 pub use chunk::{
     Chunk, ChunkCoord, ChunkLayerType, ChunkManager, MapObject, Portal, Wall, WallEdge, CHUNK_SIZE,
