@@ -84,26 +84,20 @@ defence_bonus = -3
 attack_range = 1
 aggro_range = 7
 chase_range = 10
-move_cooldown_ms = 900
+move_cooldown_ms = 1100
 attack_cooldown_ms = 1400
 respawn_time_ms = 10000
 
 [crow.rewards]
 exp_base = 22
-gold_min = 3
-gold_max = 10
+gold_min = 0
+gold_max = 0
 
 [[crow.loot]]
 item_id = "crow_feather"
 drop_chance = 0.40
 quantity_min = 1
 quantity_max = 3
-
-[[crow.loot]]
-item_id = "recipe_scavenger_bow"
-drop_chance = 0.01
-quantity_min = 1
-quantity_max = 1
 
 [crow.behaviors]
 hostile = false

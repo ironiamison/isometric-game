@@ -53,19 +53,20 @@ impl Renderer {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
 
-        let panel_width = (380.0 * s).min(sw - 16.0);
-        let panel_height = (420.0 * s).min(sh - 16.0);
-        let panel_x = (sw - panel_width) / 2.0;
-        let panel_y = (sh - panel_height) / 2.0;
+        let panel_width = (240.0 * s).min(sw - 16.0);
+        let panel_height_full = 300.0 * s;
+        let button_area_height = MENU_BUTTON_SIZE * s + EXP_BAR_GAP * s;
+        let min_panel_y = 4.0;
+        let max_available_height = sh - button_area_height - 8.0 - min_panel_y;
+        let panel_height = panel_height_full.min(max_available_height);
+        let panel_x = sw - panel_width - 8.0;
+        let panel_y = sh - button_area_height - panel_height - 8.0;
 
         let line_height = 17.0 * s;
         let objective_spacing = 16.0 * s;
         let entry_padding = 6.0 * s;
         let header_h = HEADER_HEIGHT * s;
         let footer_h = FOOTER_HEIGHT * s;
-
-        // Semi-transparent overlay
-        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
 
         // Draw themed panel frame with corner accents
         self.draw_panel_frame(panel_x, panel_y, panel_width, panel_height);
@@ -163,20 +164,19 @@ impl Renderer {
                 TEXT_DIM,
             );
             let y = y + line_height + 8.0 * s;
+            let hint_x = content_x + 12.0 * s;
+            let hint_y = y + 10.0 * s;
+            let dim_color = Color::new(0.392, 0.392, 0.431, 1.0);
+            self.draw_text_sharp("Talk to NPCs with", hint_x, hint_y, 16.0, dim_color);
+            let prefix_w = self.measure_text_sharp("Talk to NPCs with ", 16.0).width;
+            self.draw_text_sharp("!", hint_x + prefix_w, hint_y, 16.0, TEXT_GOLD);
+            let y = y + line_height + 2.0 * s;
             self.draw_text_sharp(
-                "Talk to NPCs with",
+                "above their heads",
                 content_x + 12.0 * s,
                 y + 10.0 * s,
                 16.0,
-                Color::new(0.392, 0.392, 0.431, 1.0),
-            );
-            self.draw_text_sharp("!", content_x + 140.0 * s, y + 10.0 * s, 16.0, TEXT_GOLD);
-            self.draw_text_sharp(
-                "above their heads",
-                content_x + 155.0 * s,
-                y + 10.0 * s,
-                16.0,
-                Color::new(0.392, 0.392, 0.431, 1.0),
+                dim_color,
             );
         } else {
             // Calculate total content height for scrolling

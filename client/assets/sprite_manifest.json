@@ -29575,16 +29575,16 @@
         "w": 60,
         "h": 34
       },
-      "steel_boots": {
+      "ancient_boots": {
         "x": 2566,
         "y": 385,
         "w": 612,
         "h": 27
       },
-      "ancient_boots": {
+      "steel_boots": {
         "x": 3178,
         "y": 385,
-        "w": 544,
+        "w": 612,
         "h": 27
       },
       "bronze_boots": {
