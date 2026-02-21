@@ -16,9 +16,9 @@ const ICON_SKILLS: usize = 3;
 const ICON_SOCIAL: usize = 4;
 const ICON_PRAYER: usize = 5;
 const ICON_MAGIC: usize = 6;
-const ICON_QUEST: usize = 7;
+const ICON_QUEST: usize = 8;
 
-/// Icon dimensions in the sprite sheet (8 icons, 32x32 each)
+/// Icon dimensions in the sprite sheet (9 icons, 32x32 each)
 const ICON_SIZE: f32 = 32.0;
 
 impl Renderer {

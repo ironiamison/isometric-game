@@ -409,6 +409,7 @@ impl Renderer {
             return;
         }
         let (sw, sh) = virtual_screen_size();
+        let s = self.font_scale.get();
 
         let is_mobile = cfg!(target_os = "android");
 
@@ -418,21 +419,24 @@ impl Renderer {
         // Responsive width: cap at 620, with 10px margin each side
         let box_width = sw.min(620.0 + 20.0) - 20.0;
 
-        // Mobile-aware sizing
+        // Scale-aware line height and spacing
+        let line_h = 22.0 * s;
+
+        // Mobile-aware sizing (scaled)
         let (choice_btn_height, choice_spacing) = if is_mobile {
-            (30.0, 38.0)
+            (30.0 * s, 38.0 * s)
         } else {
-            (26.0, 32.0)
+            (26.0 * s, 32.0 * s)
         };
 
         let bottom_margin = if is_mobile { 20.0 } else { 60.0 };
 
         let choice_area_height = if dialogue.choices.is_empty() {
-            40.0 // space for the Continue button
+            40.0 * s // space for the Continue button
         } else {
-            dialogue.choices.len() as f32 * choice_spacing + 36.0
+            dialogue.choices.len() as f32 * choice_spacing + 36.0 * s
         };
-        let text_margin_bottom = 12.0;
+        let text_margin_bottom = 12.0 * s;
 
         // Pre-compute text line count for dynamic height
         let text_line_count = {
@@ -465,8 +469,9 @@ impl Renderer {
             }
             count.max(1)
         };
-        let text_height = text_line_count as f32 * 22.0;
-        let ideal_box_height = 50.0 + text_height + text_margin_bottom + choice_area_height;
+        let text_height = text_line_count as f32 * line_h;
+        let header_h = FRAME_THICKNESS + 20.0 * s + 28.0 * s;
+        let ideal_box_height = header_h + text_height + text_margin_bottom + choice_area_height;
 
         // Clamp height to screen bounds (leave 40px top margin minimum)
         let max_box_height = sh - 40.0 - bottom_margin;
@@ -483,8 +488,8 @@ impl Renderer {
         // ===== CLOSE BUTTON (top-right corner) =====
         if !dialogue.choices.is_empty() {
             let close_size = if is_mobile { 32.0 } else { 24.0 };
-            let close_x = box_x + box_width - close_size - FRAME_THICKNESS - 4.0;
-            let close_y = box_y + FRAME_THICKNESS + 4.0;
+            let close_x = box_x + box_width - close_size - FRAME_THICKNESS - 4.0 * s;
+            let close_y = box_y + FRAME_THICKNESS + 4.0 * s;
 
             let bounds = Rect::new(close_x, close_y, close_size, close_size);
             layout.add(UiElementId::DialogueClose, bounds);
@@ -532,10 +537,10 @@ impl Renderer {
 
         // ===== SPEAKER NAME TAB =====
         let speaker_text = dialogue.speaker.to_uppercase();
-        let speaker_width = self.measure_text_sharp(&speaker_text, 16.0).width + 28.0;
+        let speaker_width = self.measure_text_sharp(&speaker_text, 16.0).width + 28.0 * s;
         let speaker_x = box_x + 20.0;
-        let speaker_y = box_y - 8.0;
-        let speaker_h = 26.0;
+        let speaker_y = box_y - 8.0 * s;
+        let speaker_h = 26.0 * s;
 
         // Speaker tab with beveled effect
         draw_rectangle(
@@ -567,8 +572,8 @@ impl Renderer {
         // Speaker name in gold
         self.draw_text_sharp(
             &speaker_text,
-            speaker_x + 14.0,
-            speaker_y + 18.0,
+            speaker_x + 14.0 * s,
+            speaker_y + 18.0 * s,
             16.0,
             TEXT_TITLE,
         );
@@ -585,7 +590,7 @@ impl Renderer {
 
         // ===== DIALOGUE CONTENT AREA =====
         let content_x = box_x + FRAME_THICKNESS + 12.0;
-        let content_y = box_y + FRAME_THICKNESS + 20.0;
+        let content_y = box_y + FRAME_THICKNESS + 20.0 * s;
         let content_width = box_width - FRAME_THICKNESS * 2.0 - 24.0;
 
         // Decorative line under speaker area (shortened when close button is present)
@@ -606,7 +611,7 @@ impl Renderer {
 
         // Dialogue text with word wrap
         let text_x = content_x;
-        let text_y = content_y + 28.0;
+        let text_y = content_y + 28.0 * s;
         let max_line_width = content_width;
 
         let mut current_line = String::new();
@@ -616,7 +621,7 @@ impl Renderer {
             let words: Vec<&str> = paragraph.split_whitespace().collect();
             if words.is_empty() {
                 // Empty line — advance by line height
-                line_y += 22.0;
+                line_y += line_h;
                 continue;
             }
             for word in words {
@@ -629,7 +634,7 @@ impl Renderer {
                 let line_width = self.measure_text_sharp(&test_line, 16.0).width;
                 if line_width > max_line_width && !current_line.is_empty() {
                     self.draw_text_sharp(&current_line, text_x, line_y, 16.0, TEXT_NORMAL);
-                    line_y += 22.0;
+                    line_y += line_h;
                     current_line = word.to_string();
                 } else {
                     current_line = test_line;
@@ -637,7 +642,7 @@ impl Renderer {
             }
             if !current_line.is_empty() {
                 self.draw_text_sharp(&current_line, text_x, line_y, 16.0, TEXT_NORMAL);
-                line_y += 22.0;
+                line_y += line_h;
                 current_line.clear();
             }
         }
@@ -645,11 +650,12 @@ impl Renderer {
         // ===== CHOICES / CONTINUE =====
         if dialogue.choices.is_empty() {
             let hint = "[ Continue ]";
-            let hint_width = self.measure_text_sharp(hint, 16.0).width + 20.0;
+            let hint_width = self.measure_text_sharp(hint, 16.0).width + 20.0 * s;
+            let btn_h = 24.0 * s;
             let hint_x = box_x + box_width - hint_width - FRAME_THICKNESS - 15.0;
-            let hint_y = box_y + box_height - FRAME_THICKNESS - 32.0;
+            let hint_y = box_y + box_height - FRAME_THICKNESS - 32.0 * s;
 
-            let bounds = Rect::new(hint_x, hint_y, hint_width, 24.0);
+            let bounds = Rect::new(hint_x, hint_y, hint_width, btn_h);
             layout.add(UiElementId::DialogueContinue, bounds);
 
             let is_hovered = matches!(hovered, Some(UiElementId::DialogueContinue));
@@ -660,8 +666,8 @@ impl Renderer {
                 (Color::new(0.157, 0.141, 0.110, 1.0), FRAME_MID)
             };
 
-            draw_rectangle(hint_x, hint_y, hint_width, 24.0, btn_border);
-            draw_rectangle(hint_x + 1.0, hint_y + 1.0, hint_width - 2.0, 22.0, btn_bg);
+            draw_rectangle(hint_x, hint_y, hint_width, btn_h, btn_border);
+            draw_rectangle(hint_x + 1.0, hint_y + 1.0, hint_width - 2.0, btn_h - 2.0, btn_bg);
 
             if is_hovered {
                 draw_line(
@@ -675,22 +681,22 @@ impl Renderer {
             }
 
             let text_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
-            self.draw_text_sharp(hint, hint_x + 10.0, hint_y + 17.0, 16.0, text_color);
+            self.draw_text_sharp(hint, hint_x + 10.0 * s, hint_y + btn_h * 0.7, 16.0, text_color);
 
             self.draw_text_sharp(
                 "[Enter]",
                 box_x + FRAME_THICKNESS + 15.0,
-                hint_y + 17.0,
+                hint_y + btn_h * 0.7,
                 16.0,
                 TEXT_DIM,
             );
         } else {
             // ===== CHOICE BUTTONS =====
-            let choice_start_y = box_y + FRAME_THICKNESS + 70.0 + text_margin_bottom;
+            let choice_start_y = text_y + text_height + text_margin_bottom;
 
             // Calculate visible area for choices when clamped
             let choice_area_top = choice_start_y;
-            let choice_area_bottom = box_y + box_height - FRAME_THICKNESS - 20.0;
+            let choice_area_bottom = box_y + box_height - FRAME_THICKNESS - 20.0 * s;
             let visible_choice_height = choice_area_bottom - choice_area_top;
 
             // Calculate max scroll
@@ -787,7 +793,7 @@ impl Renderer {
                 let num_color = if is_hovered { TEXT_GOLD } else { FRAME_MID };
                 self.draw_text_sharp(
                     &num_text,
-                    choice_x + 8.0,
+                    choice_x + 8.0 * s,
                     choice_y + choice_btn_height * 0.65,
                     16.0,
                     num_color,
@@ -796,7 +802,7 @@ impl Renderer {
                 let text_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
                 self.draw_text_sharp(
                     &choice.text,
-                    choice_x + 40.0,
+                    choice_x + 40.0 * s,
                     choice_y + choice_btn_height * 0.65,
                     16.0,
                     text_color,
@@ -854,11 +860,12 @@ impl Renderer {
                 );
             }
 
-            let hint_y = box_y + box_height - FRAME_THICKNESS - 10.0;
+            let hint_y = box_y + box_height - FRAME_THICKNESS - 10.0 * s;
             self.draw_text_sharp("[1-4] Select", content_x, hint_y, 16.0, TEXT_DIM);
+            let esc_width = self.measure_text_sharp("[Esc] Close", 16.0).width;
             self.draw_text_sharp(
                 "[Esc] Close",
-                content_x + content_width - 75.0,
+                content_x + content_width - esc_width,
                 hint_y,
                 16.0,
                 TEXT_DIM,
