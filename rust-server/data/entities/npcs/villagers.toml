@@ -899,7 +899,7 @@ gold_max = 0
 
 [old_thomas.behaviors]
 hostile = false
-quest_giver = false
+quest_giver = true
 wander_enabled = false
 facing = "down"
 

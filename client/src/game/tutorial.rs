@@ -110,7 +110,7 @@ impl TutorialManager {
                     "Press Space to attack nearby enemies"
                 }
             }
-            TutorialPhase::Inventory => "Press B to open your inventory",
+            TutorialPhase::Inventory => "Press I to open your inventory",
             TutorialPhase::Skills => "Press T to view your skills",
             TutorialPhase::Handoff => "Go talk to the Adventurer Guide!",
             _ => "",
@@ -166,7 +166,7 @@ impl TutorialManager {
                 )
             }
             TutorialPhase::Inventory => (
-                "Nice work, adventurer! Enemies drop useful things. Press B to open your inventory and see what you've got.".to_string(),
+                "Nice work, adventurer! Enemies drop useful things. Press I to open your inventory and see what you've got.".to_string(),
                 vec![DialogueChoice {
                     id: "ok".to_string(),
                     text: "Let me check!".to_string(),

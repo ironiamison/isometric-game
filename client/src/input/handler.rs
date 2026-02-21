@@ -5590,6 +5590,22 @@ impl InputHandler {
             }
         }
 
+        // Toggle skills panel (T key) with mutual exclusivity
+        if !classic && is_key_pressed(KeyCode::T) {
+            audio.play_sfx("enter");
+            if state.ui_state.skills_open {
+                state.ui_state.skills_open = false;
+            } else {
+                state.ui_state.skills_open = true;
+                state.ui_state.inventory_open = false;
+                state.ui_state.character_panel_open = false;
+                state.ui_state.social_open = false;
+                state.ui_state.prayer_book_open = false;
+                state.ui_state.minimap_panel_open = false;
+                state.ui_state.quest_log_open = false;
+            }
+        }
+
         // Chat log scrolling (mouse wheel on desktop) - uses direct bounds check
         // since chat log is not registered for hit detection (allows click-through)
         if state.ui_state.chat_log_visible {

@@ -1434,19 +1434,30 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
+                // If Old Thomas's tutorial dialogue but tutorial is already done,
+                // show a friendly post-tutorial greeting instead
+                let (quest_id, text, choices) = if quest_id == "__tutorial__"
+                    && (crate::settings::load_tutorial_completed()
+                        || state.tutorial.as_ref().map_or(false, |t| t.is_done()))
+                {
+                    (
+                        String::new(),
+                        "Good to see you again, friend! You're doing great out there. Remember, the Adventurer Guide can help you find your next challenge!".to_string(),
+                        vec![DialogueChoice {
+                            id: "close".to_string(),
+                            text: "Thanks, Old Thomas!".to_string(),
+                        }],
+                    )
+                } else {
+                    (quest_id, text, choices)
+                };
+
                 log::info!(
                     "Showing dialogue from {}: {} ({} choices)",
                     speaker,
                     text,
                     choices.len()
                 );
-
-                let already_open = state
-                    .ui_state
-                    .active_dialogue
-                    .as_ref()
-                    .map(|d| d.npc_id == npc_id)
-                    .unwrap_or(false);
 
                 state.ui_state.dialogue_scroll_offset = 0.0;
                 state.ui_state.dialogue_touch_scroll_id = None;

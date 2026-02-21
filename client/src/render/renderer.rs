@@ -1400,65 +1400,9 @@ impl Renderer {
             }
         };
 
-        // Load water animation shader material
-        let water_material = match load_material(
-            ShaderSource::Glsl {
-                vertex: shaders::WATER_VERTEX,
-                fragment: shaders::WATER_FRAGMENT,
-            },
-            MaterialParams {
-                uniforms: vec![UniformDesc::new("Time", UniformType::Float1)],
-                ..Default::default()
-            },
-        ) {
-            Ok(mat) => {
-                log::info!("Loaded water animation shader");
-                Some(mat)
-            }
-            Err(e) => {
-                log::warn!(
-                    "Failed to load water shader: {}. Water tiles will render without animation.",
-                    e
-                );
-                None
-            }
-        };
-
-        // Load water overlay shader material
-        let water_overlay_material = match load_material(
-            ShaderSource::Glsl {
-                vertex: shaders::WATER_VERTEX,
-                fragment: shaders::WATER_OVERLAY_FRAGMENT,
-            },
-            MaterialParams {
-                uniforms: vec![
-                    UniformDesc::new("Time", UniformType::Float1),
-                    UniformDesc::new("WorldPos", UniformType::Float2),
-                ],
-                pipeline_params: macroquad::miniquad::PipelineParams {
-                    color_blend: Some(macroquad::miniquad::BlendState::new(
-                        macroquad::miniquad::Equation::Add,
-                        macroquad::miniquad::BlendFactor::Value(
-                            macroquad::miniquad::BlendValue::SourceAlpha,
-                        ),
-                        macroquad::miniquad::BlendFactor::OneMinusValue(
-                            macroquad::miniquad::BlendValue::SourceAlpha,
-                        ),
-                    )),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        ) {
-            Ok(mat) => {
-                log::info!("Loaded water overlay shader");
-                Some(mat)
-            }
-            Err(e) => {
-                log::warn!("Failed to load water overlay shader: {}", e);
-                None
-            }
-        };
+        // Water shaders disabled for now
+        let water_material: Option<Material> = None;
+        let water_overlay_material: Option<Material> = None;
 
         #[cfg(target_arch = "wasm32")]
         Self::hide_loading();
@@ -9336,8 +9280,8 @@ impl Renderer {
 
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
-        let font_size = 18.0;
-        let skip_font_size = 13.0;
+        let font_size = 24.0;
+        let skip_font_size = 16.0;
 
         // Fade in based on time since phase started
         let age = get_time() - tutorial.phase_start_time;

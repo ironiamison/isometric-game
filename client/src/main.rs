@@ -457,6 +457,12 @@ fn run_game_frame(
         use network::messages::ClientMessage;
         let msg = match cmd {
             InputCommand::Move { dx, dy } => {
+                // Notify tutorial of player movement
+                if (*dx != 0.0 || *dy != 0.0) {
+                    if let Some(tutorial) = &mut game_state.tutorial {
+                        tutorial.on_player_moved();
+                    }
+                }
                 let seq = game_state.next_move_sequence(*dx, *dy);
                 ClientMessage::Move {
                     dx: *dx,
@@ -496,6 +502,10 @@ fn run_game_frame(
                 }
             }
             InputCommand::Attack => {
+                // Notify tutorial of combat action
+                if let Some(tutorial) = &mut game_state.tutorial {
+                    tutorial.on_combat_action();
+                }
                 // Trigger attack animation and sound on local player
                 if let Some(local_id) = &game_state.local_player_id {
                     // Check weapon type to determine animation
@@ -551,9 +561,15 @@ fn run_game_frame(
                 slot_index: *slot_index as u32,
             },
             // Quest-related commands
-            InputCommand::Interact { npc_id } => ClientMessage::Interact {
-                npc_id: npc_id.clone(),
-            },
+            InputCommand::Interact { npc_id } => {
+                // Notify tutorial of NPC interaction
+                if let Some(tutorial) = &mut game_state.tutorial {
+                    tutorial.on_dialogue_opened();
+                }
+                ClientMessage::Interact {
+                    npc_id: npc_id.clone(),
+                }
+            }
             InputCommand::DialogueChoice {
                 quest_id,
                 choice_id,
@@ -568,6 +584,29 @@ fn run_game_frame(
                     settings::save_classic_controls(classic);
                     settings::save_control_scheme_chosen();
                     game_state.ui_state.active_dialogue = None;
+                    continue;
+                }
+                if quest_id == "__tutorial__" {
+                    game_state.ui_state.active_dialogue = None;
+                    // Create TutorialManager if it doesn't exist yet
+                    if game_state.tutorial.is_none() {
+                        game_state.tutorial = Some(
+                            game::tutorial::TutorialManager::new(
+                                game_state.ui_state.classic_controls,
+                            ),
+                        );
+                    }
+                    if let Some(tutorial) = &mut game_state.tutorial {
+                        if tutorial.phase == game::tutorial::TutorialPhase::AwaitingAccept {
+                            if choice_id == "accept" {
+                                tutorial.advance(); // -> Movement
+                                tutorial.pending_dialogue = true;
+                            } else {
+                                tutorial.skip();
+                                settings::save_tutorial_completed();
+                            }
+                        }
+                    }
                     continue;
                 }
                 ClientMessage::DialogueChoice {
@@ -788,6 +827,10 @@ fn run_game_frame(
 
     // Record delta for diagnostics
     game_state.frame_timings.record_delta(delta as f64 * 1000.0);
+
+    // 3.5. Tutorial: check if we should start, and update phase progress
+    app::maybe_start_tutorial(game_state);
+    app::update_tutorial(game_state);
 
     // 4. Update game state
     let update_start = get_time();
@@ -1076,4 +1119,5 @@ fn run_game_frame(
     // 6. Render overlays (must be last, covers everything)
     renderer.render_world_fade_in(game_state);
     renderer.render_transition_overlay(game_state);
+    renderer.render_tutorial_hint(game_state);
 }
