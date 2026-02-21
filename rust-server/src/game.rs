@@ -4979,6 +4979,7 @@ impl GameRoom {
         .await;
 
         // Send XP updates
+        let mut any_leveled = false;
         for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
             self.send_to_player(player_id, ServerMessage::SkillXp {
                 player_id: player_id.to_string(),
@@ -4995,7 +4996,11 @@ impl GameRoom {
                     skill: skill_type.as_str().to_string(),
                     new_level: level,
                 }).await;
+                any_leveled = true;
             }
+        }
+        if any_leveled {
+            self.process_quest_progression_snapshot(player_id).await;
         }
     }
 
@@ -5077,12 +5082,20 @@ impl GameRoom {
 
         // Check all ingredients
         for ingredient in &recipe.ingredients {
-            if !player.inventory.has_item(&ingredient.item_id, ingredient.count) {
+            let have = player.inventory.count_item(&ingredient.item_id);
+            if have < ingredient.count {
+                tracing::warn!(
+                    "Player {} craft {} failed: need {}x '{}' but have {}",
+                    player_id, recipe_id, ingredient.count, ingredient.item_id, have
+                );
                 drop(players);
                 self.send_to_player(
                     player_id,
                     ServerMessage::CraftingCancelled {
-                        reason: "Missing ingredients".to_string(),
+                        reason: format!(
+                            "Missing ingredients: need {}x {} but have {}",
+                            ingredient.count, ingredient.item_id, have
+                        ),
                     },
                 )
                 .await;
@@ -5176,6 +5189,7 @@ impl GameRoom {
             .await;
 
             // Send XP updates
+            let mut any_leveled = false;
             for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
                 self.send_to_player(player_id, ServerMessage::SkillXp {
                     player_id: player_id.to_string(),
@@ -5192,7 +5206,11 @@ impl GameRoom {
                         skill: skill_type.as_str().to_string(),
                         new_level: level,
                     }).await;
+                    any_leveled = true;
                 }
+            }
+            if any_leveled {
+                self.process_quest_progression_snapshot(player_id).await;
             }
         } else {
             // Timed craft - set crafting state, materials already consumed
@@ -6886,6 +6904,7 @@ impl GameRoom {
                                 skill: "woodcutting".to_string(),
                                 new_level,
                             }).await;
+                            self.process_quest_progression_snapshot(player_id).await;
                         }
                     }
                 }
@@ -7125,6 +7144,7 @@ impl GameRoom {
                                 skill: "mining".to_string(),
                                 new_level,
                             }).await;
+                            self.process_quest_progression_snapshot(player_id).await;
                         }
                     }
                 }
@@ -7379,6 +7399,7 @@ impl GameRoom {
                         skill: "farming".to_string(),
                         new_level: inv_update.3,
                     }).await;
+                    self.process_quest_progression_snapshot(player_id).await;
                 }
 
                 // Persist to database
@@ -7484,6 +7505,7 @@ impl GameRoom {
                         skill: "farming".to_string(),
                         new_level: inv_update.3,
                     }).await;
+                    self.process_quest_progression_snapshot(player_id).await;
                 }
 
                 // Send patch reset to this player only (per-player instanced)
@@ -7929,6 +7951,7 @@ impl GameRoom {
                 skill: "farming".to_string(),
                 new_level: skill_level,
             }).await;
+            self.process_quest_progression_snapshot(player_id).await;
         }
 
         let seed_text = if seed_names.is_empty() {
@@ -8883,6 +8906,11 @@ impl GameRoom {
                     }
                 }
 
+                // Sync quest objectives on any skill level-up
+                if comp.smithing_leveled || comp.alchemy_leveled {
+                    self.process_quest_progression_snapshot(&comp.pid).await;
+                }
+
                 // Batch continuation: send next crafting started + progress
                 if comp.batch_continued {
                     // Look up recipe for duration
@@ -9348,6 +9376,7 @@ impl GameRoom {
                     skill: "fishing".to_string(),
                     new_level: tick.level,
                 }).await;
+                self.process_quest_progression_snapshot(&tick.pid).await;
             }
         }
         for pid in inventory_full_players {
@@ -10846,6 +10875,8 @@ impl GameRoom {
                 max_points,
                 active_prayers,
             }).await;
+
+            self.process_quest_progression_snapshot(player_id).await;
         }
     }
 
@@ -11885,6 +11916,8 @@ impl GameRoom {
                 max_points,
                 active_prayers,
             }).await;
+
+            self.process_quest_progression_snapshot(player_id).await;
         }
     }
 
@@ -12056,6 +12089,8 @@ impl GameRoom {
                 max_points,
                 active_prayers,
             }).await;
+
+            self.process_quest_progression_snapshot(player_id).await;
         }
     }
 }
