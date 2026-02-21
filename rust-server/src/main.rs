@@ -1972,6 +1972,12 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send full quest catalog for the quest panel
+    let quest_catalog = room.build_quest_catalog().await;
+    if let Ok(bytes) = protocol::encode_server_message(&quest_catalog) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Send initial inventory to this client
     if let Some(inv_msg) = room.get_player_inventory_update(&player_id).await {
         if let Ok(bytes) = protocol::encode_server_message(&inv_msg) {

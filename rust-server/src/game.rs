@@ -11,7 +11,7 @@ use crate::entity::{EntityPrototype, EntityRegistry};
 use crate::item::{self, GOLD_ITEM_ID, GroundItem, Inventory};
 use crate::npc::{Npc, NpcUpdate};
 use crate::prayer::PrayerRegistry;
-use crate::protocol::{QuestObjectiveData, ServerMessage};
+use crate::protocol::{QuestCatalogEntryData, QuestObjectiveData, ServerMessage};
 use crate::quest::{ObjectiveType, PlayerQuestState, QuestEvent, QuestRegistry, QuestRunner};
 use crate::shop::{ShopDefinition, ShopRegistry, ShopStockItem};
 use crate::skills::{SkillType, Skills, calculate_hit, calculate_max_hit, roll_damage};
@@ -1874,6 +1874,49 @@ impl GameRoom {
         ServerMessage::QuestStateSync {
             completed_quest_ids,
         }
+    }
+
+    /// Build the full quest catalog for sending to client on login
+    pub async fn build_quest_catalog(&self) -> ServerMessage {
+        let all_quests = self.quest_registry.all_quests().await;
+        let npcs = self.npcs.read().await;
+
+        // Build a map of prototype_id -> display_name from loaded NPCs
+        let npc_names: std::collections::HashMap<String, String> = npcs
+            .values()
+            .map(|npc| (npc.prototype_id.clone(), npc.stats.display_name.clone()))
+            .collect();
+
+        let mut entries: Vec<QuestCatalogEntryData> = Vec::new();
+        for quest in &all_quests {
+            let giver_npc_name = npc_names
+                .get(&quest.giver_npc)
+                .cloned()
+                .unwrap_or_else(|| quest.giver_npc.clone());
+
+            // Resolve prerequisite quest name
+            let (required_quest_id, required_quest_name) = if let Some(ref prev_id) = quest.chain.previous {
+                let prev_name = all_quests
+                    .iter()
+                    .find(|q| q.id == *prev_id)
+                    .map(|q| q.name.clone());
+                (Some(prev_id.clone()), prev_name)
+            } else {
+                (None, None)
+            };
+
+            entries.push(QuestCatalogEntryData {
+                quest_id: quest.id.clone(),
+                name: quest.name.clone(),
+                description: quest.description.clone(),
+                giver_npc_name,
+                level_required: quest.level_required,
+                required_quest_id,
+                required_quest_name,
+            });
+        }
+
+        ServerMessage::QuestCatalog { quests: entries }
     }
 
     pub async fn player_count(&self) -> usize {
