@@ -2976,7 +2976,7 @@ impl InputHandler {
                                 .get(selected_idx)
                                 .map(|s| s.as_str())
                                 .unwrap_or("supplies");
-                            let recipes_in_category: Vec<&crate::game::RecipeDefinition> = click_filtered
+                            let mut recipes_in_category: Vec<&crate::game::RecipeDefinition> = click_filtered
                                 .iter()
                                 .filter(|r| {
                                     let cat_match = if current_category == "supplies" {
@@ -2990,6 +2990,15 @@ impl InputHandler {
                                     cat_match && is_discovered
                                 })
                                 .collect();
+                            // Sort to match renderer order (section → level → name)
+                            recipes_in_category.sort_by(|a, b| {
+                                let a_sec = a.section.as_deref().unwrap_or("");
+                                let b_sec = b.section.as_deref().unwrap_or("");
+                                section_sort_key(a_sec)
+                                    .cmp(&section_sort_key(b_sec))
+                                    .then(a.level_required.cmp(&b.level_required))
+                                    .then(a.display_name.cmp(&b.display_name))
+                            });
                             if let Some(recipe) =
                                 recipes_in_category.get(state.ui_state.crafting_selected_recipe)
                             {
@@ -3225,7 +3234,7 @@ impl InputHandler {
                         .get(selected_idx)
                         .map(|s| s.as_str())
                         .unwrap_or("supplies");
-                    let recipes_in_category: Vec<&crate::game::RecipeDefinition> = filtered_recipes
+                    let mut recipes_in_category: Vec<&crate::game::RecipeDefinition> = filtered_recipes
                         .iter()
                         .filter(|r| {
                             let cat_match = if current_category == "supplies" {
@@ -3239,6 +3248,15 @@ impl InputHandler {
                             cat_match && is_discovered
                         })
                         .collect();
+                    // Sort to match renderer order (section → level → name)
+                    recipes_in_category.sort_by(|a, b| {
+                        let a_sec = a.section.as_deref().unwrap_or("");
+                        let b_sec = b.section.as_deref().unwrap_or("");
+                        section_sort_key(a_sec)
+                            .cmp(&section_sort_key(b_sec))
+                            .then(a.level_required.cmp(&b.level_required))
+                            .then(a.display_name.cmp(&b.display_name))
+                    });
 
                     // Up/Down navigate recipes
                     let mut key_navigated = false;
