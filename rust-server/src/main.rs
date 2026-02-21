@@ -1656,6 +1656,9 @@ async fn handle_socket(
         }
     }
 
+    // Bring skill/gold milestone quest objectives up to date before sending quest state
+    room.process_quest_progression_snapshot(&player_id).await;
+
     // Send active quests to this client (from saved state)
     for quest_msg in room.get_active_quest_messages(&player_id).await {
         if let Ok(bytes) = protocol::encode_server_message(&quest_msg) {

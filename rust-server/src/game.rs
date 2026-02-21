@@ -3619,7 +3619,7 @@ impl GameRoom {
     }
 
     /// Sync level/gold milestone objectives against the player's current state.
-    async fn process_quest_progression_snapshot(&self, player_id: &str) {
+    pub async fn process_quest_progression_snapshot(&self, player_id: &str) {
         let player_snapshot = {
             let players = self.players.read().await;
             players.get(player_id).map(|p| {
