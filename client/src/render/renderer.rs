@@ -8839,9 +8839,6 @@ impl Renderer {
             }
         }
 
-        // Quest completion notifications
-        self.render_quest_completed(state);
-
         // Dialogue box (when active)
         if let Some(dialogue) = &state.ui_state.active_dialogue {
             self.render_dialogue(
@@ -8863,6 +8860,9 @@ impl Renderer {
         if let Some(ref panel) = state.ui_state.altar_panel {
             self.render_altar_panel(panel, state, hovered, &mut layout);
         }
+
+        // Quest completion notifications (on top of dialogue/panels)
+        self.render_quest_completed(state);
 
         // Prayer/Spell help overlay (on top of panels)
         self.render_prayer_help_overlay(state, hovered, &mut layout);
