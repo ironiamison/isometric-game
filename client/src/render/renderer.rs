@@ -385,6 +385,11 @@ pub struct Renderer {
     pub(crate) font_scale: Cell<f32>,
     /// Off-screen render target for compositing the player silhouette at full opacity
     silhouette_rt: RefCell<Option<RenderTarget>>,
+    /// Reusable lookup tables for tree/rock effects (cleared + rebuilt each frame to avoid allocations)
+    falling_tree_positions: RefCell<HashSet<(i32, i32)>>,
+    tree_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
+    crumbling_rock_positions: RefCell<HashSet<(i32, i32)>>,
+    rock_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
 }
 
 impl Renderer {
@@ -1499,6 +1504,10 @@ impl Renderer {
             text_wrap_cache: RefCell::new(HashMap::new()),
             font_scale: Cell::new(1.0),
             silhouette_rt: RefCell::new(None),
+            falling_tree_positions: RefCell::new(HashSet::new()),
+            tree_shake_offsets: RefCell::new(HashMap::new()),
+            crumbling_rock_positions: RefCell::new(HashSet::new()),
+            rock_shake_offsets: RefCell::new(HashMap::new()),
         }
     }
 
@@ -3063,23 +3072,31 @@ impl Renderer {
             }
         }
 
-        // Build frame-local lookup tables for tree effects to avoid per-object linear scans.
-        let falling_tree_positions: HashSet<(i32, i32)> =
-            state.falling_trees.iter().map(|ft| (ft.x, ft.y)).collect();
-        let tree_shake_offsets: HashMap<(i32, i32), f32> = state
-            .tree_shake_effects
-            .iter()
-            .map(|shake| ((shake.x, shake.y), shake.get_offset()))
-            .collect();
-
-        // Build frame-local lookup tables for rock effects
-        let crumbling_rock_positions: HashSet<(i32, i32)> =
-            state.crumbling_rocks.iter().map(|cr| (cr.x, cr.y)).collect();
-        let rock_shake_offsets: HashMap<(i32, i32), f32> = state
-            .rock_shake_effects
-            .iter()
-            .map(|shake| ((shake.x, shake.y), shake.get_offset()))
-            .collect();
+        // Reuse struct-level lookup tables for tree/rock effects (clear + rebuild avoids allocation)
+        {
+            let mut ftp = self.falling_tree_positions.borrow_mut();
+            ftp.clear();
+            ftp.extend(state.falling_trees.iter().map(|ft| (ft.x, ft.y)));
+        }
+        {
+            let mut tso = self.tree_shake_offsets.borrow_mut();
+            tso.clear();
+            tso.extend(state.tree_shake_effects.iter().map(|shake| ((shake.x, shake.y), shake.get_offset())));
+        }
+        {
+            let mut crp = self.crumbling_rock_positions.borrow_mut();
+            crp.clear();
+            crp.extend(state.crumbling_rocks.iter().map(|cr| (cr.x, cr.y)));
+        }
+        {
+            let mut rso = self.rock_shake_offsets.borrow_mut();
+            rso.clear();
+            rso.extend(state.rock_shake_effects.iter().map(|shake| ((shake.x, shake.y), shake.get_offset())));
+        }
+        let falling_tree_positions = self.falling_tree_positions.borrow();
+        let tree_shake_offsets = self.tree_shake_offsets.borrow();
+        let crumbling_rock_positions = self.crumbling_rock_positions.borrow();
+        let rock_shake_offsets = self.rock_shake_offsets.borrow();
 
         // Add map objects and walls from loaded chunks with chunk-level pre-culling
         let chunk_size = CHUNK_SIZE as f32;
@@ -3321,6 +3338,8 @@ impl Renderer {
         }
 
         // Render leaf particles (world-space, after depth-sorted objects)
+        // Skip all particles when graphics_low to save draw calls and trig on mobile
+        if !state.ui_state.graphics_low {
         for leaf in &state.leaf_particles {
             if !is_visible_world(leaf.tile_x, leaf.tile_y) {
                 continue;
@@ -3428,6 +3447,7 @@ impl Renderer {
                 color,
             );
         }
+        } // end if !graphics_low (particle rendering)
 
         timings.entities_ms = (get_time() - t1) * 1000.0;
 
@@ -4543,8 +4563,15 @@ impl Renderer {
                 &state.camera,
             );
 
-            // Draw the current frame, centered on the tile
+            // Viewport culling - skip off-screen spell effects
+            let (sw, sh) = virtual_screen_size();
             let zoom = state.camera.zoom;
+            let margin = 100.0 * zoom;
+            if screen_x < -margin || screen_x > sw + margin || screen_y < -margin || screen_y > sh + margin {
+                continue;
+            }
+
+            // Draw the current frame, centered on the tile
             let draw_w = frame_w * zoom;
             let draw_h = frame_h * zoom;
             // Apply atlas offset if present
@@ -4605,6 +4632,14 @@ impl Renderer {
             };
 
             let (screen_x, screen_y) = world_to_screen(event.x, event.y, &state.camera);
+
+            // Viewport culling - skip off-screen damage numbers
+            let (sw, sh) = virtual_screen_size();
+            let margin = 100.0 * zoom;
+            if screen_x < -margin || screen_x > sw + margin || screen_y < -margin || screen_y > sh + margin {
+                continue;
+            }
+
             // Round all positions to whole pixels
             let final_y = (screen_y - height_offset - float_offset).round();
 
@@ -4630,16 +4665,21 @@ impl Renderer {
             // Round center position to whole pixels
             let draw_x = (screen_x - text_dims.width / 2.0).round();
 
-            // Simple outline - scale offset with zoom
+            // Outline/shadow for readability
             let outline_offset = 1.0 * zoom;
             let outline_color = Color::new(0.0, 0.0, 0.0, alpha * 0.9);
-            for &(ox, oy) in &[
-                (-outline_offset, -outline_offset),
-                (outline_offset, -outline_offset),
-                (-outline_offset, outline_offset),
-                (outline_offset, outline_offset),
-            ] {
-                self.draw_text_sharp(&text, draw_x + ox, final_y + oy, font_size, outline_color);
+            if state.ui_state.graphics_low {
+                // Single shadow offset (2 draws total instead of 5)
+                self.draw_text_sharp(&text, draw_x + outline_offset, final_y + outline_offset, font_size, outline_color);
+            } else {
+                for &(ox, oy) in &[
+                    (-outline_offset, -outline_offset),
+                    (outline_offset, -outline_offset),
+                    (-outline_offset, outline_offset),
+                    (outline_offset, outline_offset),
+                ] {
+                    self.draw_text_sharp(&text, draw_x + ox, final_y + oy, font_size, outline_color);
+                }
             }
 
             self.draw_text_sharp(&text, draw_x, final_y, font_size, base_color);
@@ -6014,6 +6054,11 @@ impl Renderer {
     /// then draws the result with low alpha so equipment properly occludes skin.
     fn render_player_silhouette(&self, player: &Player, camera: &Camera, item_registry: &crate::game::item_registry::ItemRegistry) {
         if player.is_dead {
+            return;
+        }
+
+        // Skip silhouette on Android — render target switches are expensive on mobile GPUs
+        if cfg!(target_os = "android") {
             return;
         }
 

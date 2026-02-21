@@ -167,9 +167,23 @@ impl Renderer {
             let hint_x = content_x + 12.0 * s;
             let hint_y = y + 10.0 * s;
             let dim_color = Color::new(0.392, 0.392, 0.431, 1.0);
-            self.draw_text_sharp("Talk to NPCs with", hint_x, hint_y, 16.0, dim_color);
-            let prefix_w = self.measure_text_sharp("Talk to NPCs with ", 16.0).width;
-            self.draw_text_sharp("!", hint_x + prefix_w, hint_y, 16.0, TEXT_GOLD);
+            self.draw_text_sharp("Talk to NPCs with a", hint_x, hint_y, 16.0, dim_color);
+            let prefix_w = self.measure_text_sharp("Talk to NPCs with a ", 16.0).width;
+            if let Some(ref tex) = self.chat_small_icon {
+                let icon_h = tex.height();
+                let icon_w = tex.width();
+                let icon_y = hint_y - icon_h + 2.0;
+                draw_texture_ex(
+                    tex,
+                    hint_x + prefix_w,
+                    icon_y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(icon_w, icon_h)),
+                        ..Default::default()
+                    },
+                );
+            }
             let y = y + line_height + 2.0 * s;
             self.draw_text_sharp(
                 "above their heads",
@@ -179,13 +193,28 @@ impl Renderer {
                 dim_color,
             );
         } else {
-            // Calculate total content height for scrolling
+            // Wrap widths for text that must fit inside the panel
+            let name_text_x = 28.0 * s; // after star icon
+            let obj_text_x = 52.0 * s; // after checkbox
+            let right_pad = 8.0 * s;
+            let name_wrap_w = content_w - name_text_x - right_pad;
+            let obj_wrap_w = content_w - obj_text_x - right_pad;
+
+            // Calculate total content height for scrolling (with wrapping)
             let mut total_content_h = 10.0 * s; // top padding
             for (i, quest) in state.ui_state.active_quests.iter().enumerate() {
+                let name_lines = self.wrap_text(&quest.name, name_wrap_w, 16.0).len().max(1);
+                let title_height = name_lines as f32 * line_height;
+                let mut objectives_height = 0.0;
+                for obj in &quest.objectives {
+                    let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
+                    let obj_lines = self.wrap_text(&obj_text, obj_wrap_w, 16.0).len().max(1);
+                    objectives_height += obj_lines as f32 * objective_spacing;
+                }
                 total_content_h += entry_padding
-                    + line_height
+                    + title_height
                     + 4.0 * s
-                    + quest.objectives.len() as f32 * objective_spacing
+                    + objectives_height
                     + entry_padding;
                 if i < state.ui_state.active_quests.len() - 1 {
                     total_content_h += 8.0 * s; // separator
@@ -216,9 +245,15 @@ impl Renderer {
             let mut y = content_y + 10.0 * s - scroll_offset;
 
             for (quest_idx, quest) in state.ui_state.active_quests.iter().enumerate() {
-                // Calculate entry height
-                let title_height = line_height;
-                let objectives_height = quest.objectives.len() as f32 * objective_spacing;
+                // Calculate entry height with wrapping
+                let name_lines = self.wrap_text(&quest.name, name_wrap_w, 16.0);
+                let title_height = name_lines.len().max(1) as f32 * line_height;
+                let mut objectives_height = 0.0;
+                for obj in &quest.objectives {
+                    let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
+                    let obj_lines = self.wrap_text(&obj_text, obj_wrap_w, 16.0).len().max(1);
+                    objectives_height += obj_lines as f32 * objective_spacing;
+                }
                 let entry_height =
                     entry_padding + title_height + 4.0 * s + objectives_height + entry_padding;
 
@@ -271,13 +306,16 @@ impl Renderer {
                 // Move y inside the entry box with padding
                 y += entry_padding;
 
-                // Quest name with star icon
+                // Quest name with star icon (wrapped)
                 let name_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
                 self.draw_text_sharp("*", content_x + 12.0 * s, y + 12.0 * s, 16.0, TEXT_GOLD);
-                self.draw_text_sharp(&quest.name, content_x + 28.0 * s, y + 12.0 * s, 16.0, name_color);
-                y += title_height + 4.0 * s;
+                for line in &name_lines {
+                    self.draw_text_sharp(line, content_x + name_text_x, y + 12.0 * s, 16.0, name_color);
+                    y += line_height;
+                }
+                y += 4.0 * s;
 
-                // Objectives with styled checkmarks
+                // Objectives with styled checkmarks (wrapped)
                 for obj in &quest.objectives {
                     let (check_icon, status_color) = if obj.completed {
                         ("[+]", Color::new(0.392, 0.784, 0.392, 1.0))
@@ -299,8 +337,11 @@ impl Renderer {
                     } else {
                         TEXT_DIM
                     };
-                    self.draw_text_sharp(&obj_text, content_x + 52.0 * s, y + 12.0 * s, 16.0, text_color);
-                    y += objective_spacing;
+                    let obj_lines = self.wrap_text(&obj_text, obj_wrap_w, 16.0);
+                    for line in &obj_lines {
+                        self.draw_text_sharp(line, content_x + obj_text_x, y + 12.0 * s, 16.0, text_color);
+                        y += objective_spacing;
+                    }
                 }
 
                 // Move past bottom padding

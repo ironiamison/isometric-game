@@ -2718,17 +2718,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .tree_shake_effects
                     .push(crate::game::state::TreeShakeEffect::new(tree_x, tree_y));
 
-                // Spawn leaf particles at the top of the tree
-                // Tree sprites are typically ~64-80 pixels tall
-                let tree_height = 60.0;
-                for _ in 0..3 {
-                    state
-                        .leaf_particles
-                        .push(crate::game::state::LeafParticle::new_at_tree(
-                            tree_x,
-                            tree_y,
-                            tree_height,
-                        ));
+                // Spawn leaf particles at the top of the tree (skip on low graphics)
+                if !state.ui_state.graphics_low {
+                    let tree_height = 60.0;
+                    for _ in 0..3 {
+                        state
+                            .leaf_particles
+                            .push(crate::game::state::LeafParticle::new_at_tree(
+                                tree_x,
+                                tree_y,
+                                tree_height,
+                            ));
+                    }
                 }
             }
         }
@@ -2780,16 +2781,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .falling_trees
                     .push(crate::game::state::FallingTreeEffect::new(x, y, gid));
 
-                // Spawn a burst of leaves when tree falls
-                let tree_height = 60.0;
-                for _ in 0..10 {
-                    state
-                        .leaf_particles
-                        .push(crate::game::state::LeafParticle::new_at_tree(
-                            x,
-                            y,
-                            tree_height,
-                        ));
+                // Spawn a burst of leaves when tree falls (skip on low graphics)
+                if !state.ui_state.graphics_low {
+                    let tree_height = 60.0;
+                    for _ in 0..10 {
+                        state
+                            .leaf_particles
+                            .push(crate::game::state::LeafParticle::new_at_tree(
+                                x,
+                                y,
+                                tree_height,
+                            ));
+                    }
                 }
 
                 // Mark tree as depleted (hides the static tree, shows respawn timer)
@@ -2909,16 +2912,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .rock_shake_effects
                     .push(crate::game::state::RockShakeEffect::new(rock_x, rock_y));
 
-                // Spawn rock debris particles
-                let rock_height = 30.0;
-                for _ in 0..4 {
-                    state
-                        .rock_particles
-                        .push(crate::game::state::RockParticle::new_at_rock(
-                            rock_x,
-                            rock_y,
-                            rock_height,
-                        ));
+                // Spawn rock debris particles (skip on low graphics)
+                if !state.ui_state.graphics_low {
+                    let rock_height = 30.0;
+                    for _ in 0..4 {
+                        state
+                            .rock_particles
+                            .push(crate::game::state::RockParticle::new_at_rock(
+                                rock_x,
+                                rock_y,
+                                rock_height,
+                            ));
+                    }
                 }
             }
         }
@@ -2970,16 +2975,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .crumbling_rocks
                     .push(crate::game::state::CrumblingRockEffect::new(x, y, gid));
 
-                // Spawn a burst of rock debris when rock crumbles
-                let rock_height = 30.0;
-                for _ in 0..12 {
-                    state
-                        .rock_particles
-                        .push(crate::game::state::RockParticle::new_at_rock(
-                            x,
-                            y,
-                            rock_height,
-                        ));
+                // Spawn a burst of rock debris when rock crumbles (skip on low graphics)
+                if !state.ui_state.graphics_low {
+                    let rock_height = 30.0;
+                    for _ in 0..12 {
+                        state
+                            .rock_particles
+                            .push(crate::game::state::RockParticle::new_at_rock(
+                                x,
+                                y,
+                                rock_height,
+                            ));
+                    }
                 }
 
                 // Mark rock as depleted (hides the static rock, shows respawn timer)

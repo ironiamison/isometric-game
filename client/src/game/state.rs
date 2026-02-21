@@ -1315,6 +1315,9 @@ impl Default for UiState {
             spell_bar_active: false,
             prayer_help_open: false,
             spell_help_open: false,
+            #[cfg(target_os = "android")]
+            graphics_low: true,
+            #[cfg(not(target_os = "android"))]
             graphics_low: false,
         }
     }

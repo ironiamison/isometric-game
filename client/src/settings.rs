@@ -31,6 +31,9 @@ impl Default for UiSettings {
             #[cfg(not(target_os = "android"))]
             tap_to_pathfind: true,
             use_joystick: false,
+            #[cfg(target_os = "android")]
+            graphics_low: true,
+            #[cfg(not(target_os = "android"))]
             graphics_low: false,
             chat_log_background: true,
         }
