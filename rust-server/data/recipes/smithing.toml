@@ -71,7 +71,7 @@ count = 1
 # =============================================================================
 
 [bronze_body]
-display_name = "Bronze Platebody"
+display_name = "Bronze Platebody (M)"
 description = "Hammer bronze bars into a sturdy platebody."
 category = "smithing"
 section = "equipment"
@@ -86,6 +86,24 @@ count = 5
 
 [[bronze_body.results]]
 item_id = "bronze_body"
+count = 1
+
+[bronze_body_female]
+display_name = "Bronze Platebody (F)"
+description = "Hammer bronze bars into a sturdy platebody."
+category = "smithing"
+section = "equipment"
+level_required = 5
+station = "anvil"
+craft_time_ms = 5000
+xp = 30
+
+[[bronze_body_female.ingredients]]
+item_id = "bronze_bar"
+count = 5
+
+[[bronze_body_female.results]]
+item_id = "bronze_body_female"
 count = 1
 
 [bronze_boots]
@@ -147,7 +165,7 @@ count = 1
 # =============================================================================
 
 [iron_body]
-display_name = "Iron Platebody"
+display_name = "Iron Platebody (M)"
 description = "Hammer iron bars into solid plate armor."
 category = "smithing"
 section = "equipment"
@@ -162,6 +180,24 @@ count = 5
 
 [[iron_body.results]]
 item_id = "iron_body"
+count = 1
+
+[iron_body_female]
+display_name = "Iron Platebody (F)"
+description = "Hammer iron bars into solid plate armor."
+category = "smithing"
+section = "equipment"
+level_required = 15
+station = "anvil"
+craft_time_ms = 5000
+xp = 60
+
+[[iron_body_female.ingredients]]
+item_id = "iron_bar"
+count = 5
+
+[[iron_body_female.results]]
+item_id = "iron_body_female"
 count = 1
 
 [iron_boots]
@@ -223,7 +259,7 @@ count = 1
 # =============================================================================
 
 [steel_body]
-display_name = "Steel Platebody"
+display_name = "Steel Platebody (M)"
 description = "Forge gleaming steel plate armor."
 category = "smithing"
 section = "equipment"
@@ -238,6 +274,24 @@ count = 5
 
 [[steel_body.results]]
 item_id = "steel_body"
+count = 1
+
+[steel_body_female]
+display_name = "Steel Platebody (F)"
+description = "Forge gleaming steel plate armor."
+category = "smithing"
+section = "equipment"
+level_required = 30
+station = "anvil"
+craft_time_ms = 7000
+xp = 100
+
+[[steel_body_female.ingredients]]
+item_id = "steel_bar"
+count = 5
+
+[[steel_body_female.results]]
+item_id = "steel_body_female"
 count = 1
 
 [steel_boots]
@@ -299,7 +353,7 @@ count = 1
 # =============================================================================
 
 [ancient_body]
-display_name = "Ancient Platebody"
+display_name = "Ancient Platebody (M)"
 description = "Reforge ancient fragments into legendary plate armor."
 category = "smithing"
 section = "equipment"
@@ -314,6 +368,24 @@ count = 8
 
 [[ancient_body.results]]
 item_id = "ancient_body"
+count = 1
+
+[ancient_body_female]
+display_name = "Ancient Platebody (F)"
+description = "Reforge ancient fragments into legendary plate armor."
+category = "smithing"
+section = "equipment"
+level_required = 45
+station = "anvil"
+craft_time_ms = 10000
+xp = 200
+
+[[ancient_body_female.ingredients]]
+item_id = "ancient_fragment"
+count = 8
+
+[[ancient_body_female.results]]
+item_id = "ancient_body_female"
 count = 1
 
 [ancient_boots]

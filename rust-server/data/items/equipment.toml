@@ -1106,7 +1106,7 @@ defence_bonus = 12
 # --- Bronze Tier (Level 5) ---
 
 [bronze_body]
-display_name = "Bronze Platebody"
+display_name = "Bronze Platebody (M)"
 sprite = "bronze_platebody_male"
 description = "A sturdy chestplate hammered from bronze. Reliable protection for new adventurers."
 category = "equipment"
@@ -1114,6 +1114,21 @@ max_stack = 1
 base_price = 200
 sellable = true
 [bronze_body.equipment]
+slot_type = "body"
+defence_level_required = 5
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 4
+
+[bronze_body_female]
+display_name = "Bronze Platebody (F)"
+sprite = "bronze_platebody_female"
+description = "A sturdy chestplate hammered from bronze. Reliable protection for new adventurers."
+category = "equipment"
+max_stack = 1
+base_price = 200
+sellable = true
+[bronze_body_female.equipment]
 slot_type = "body"
 defence_level_required = 5
 attack_bonus = 0
@@ -1168,7 +1183,7 @@ defence_bonus = 0
 # --- Iron Tier (Level 15) ---
 
 [iron_body]
-display_name = "Iron Platebody"
+display_name = "Iron Platebody (M)"
 sprite = "iron_platebody_male"
 description = "Solid iron armor that can withstand serious punishment."
 category = "equipment"
@@ -1176,6 +1191,21 @@ max_stack = 1
 base_price = 600
 sellable = true
 [iron_body.equipment]
+slot_type = "body"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 8
+
+[iron_body_female]
+display_name = "Iron Platebody (F)"
+sprite = "iron_platebody_female"
+description = "Solid iron armor that can withstand serious punishment."
+category = "equipment"
+max_stack = 1
+base_price = 600
+sellable = true
+[iron_body_female.equipment]
 slot_type = "body"
 defence_level_required = 15
 attack_bonus = 0
@@ -1231,7 +1261,7 @@ defence_bonus = 0
 # Note: steel_sword is defined in the WEAPONS section above (replaced from starter to tier 3)
 
 [steel_body]
-display_name = "Steel Platebody"
+display_name = "Steel Platebody (M)"
 sprite = "steel_platebody_male"
 description = "Gleaming steel armor. The standard of any serious fighter."
 category = "equipment"
@@ -1239,6 +1269,21 @@ max_stack = 1
 base_price = 1500
 sellable = true
 [steel_body.equipment]
+slot_type = "body"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 12
+
+[steel_body_female]
+display_name = "Steel Platebody (F)"
+sprite = "steel_platebody_female"
+description = "Gleaming steel armor. The standard of any serious fighter."
+category = "equipment"
+max_stack = 1
+base_price = 1500
+sellable = true
+[steel_body_female.equipment]
 slot_type = "body"
 defence_level_required = 25
 attack_bonus = 0
@@ -1279,7 +1324,7 @@ defence_bonus = 4
 # Note: ancient_boots is defined in the FEET section above (replaced from level 20 to tier 4)
 
 [ancient_body]
-display_name = "Ancient Platebody"
+display_name = "Ancient Platebody (M)"
 sprite = "ancient_platebody_male"
 description = "Armor from a lost age, reforged from fragments of immense power."
 category = "equipment"
@@ -1287,6 +1332,21 @@ max_stack = 1
 base_price = 5000
 sellable = true
 [ancient_body.equipment]
+slot_type = "body"
+defence_level_required = 40
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 17
+
+[ancient_body_female]
+display_name = "Ancient Platebody (F)"
+sprite = "ancient_platebody_female"
+description = "Armor from a lost age, reforged from fragments of immense power."
+category = "equipment"
+max_stack = 1
+base_price = 5000
+sellable = true
+[ancient_body_female.equipment]
 slot_type = "body"
 defence_level_required = 40
 attack_bonus = 0
