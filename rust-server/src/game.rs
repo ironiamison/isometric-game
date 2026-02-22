@@ -7077,9 +7077,7 @@ impl GameRoom {
 
         if player.bank_max_slots >= item::BANK_MAX_SIZE as u32 {
             drop(players);
-            self.send_to_player(player_id, ServerMessage::SystemMessage {
-                message: "Your bank is already fully upgraded!".to_string(),
-            }).await;
+            self.send_system_message(player_id, "Your bank is already fully upgraded!").await;
             self.show_banker_dialogue(player_id, npc_id).await;
             return;
         }
@@ -7087,9 +7085,7 @@ impl GameRoom {
         if player.inventory.gold < item::BANK_UPGRADE_COST {
             let current_gold = player.inventory.gold;
             drop(players);
-            self.send_to_player(player_id, ServerMessage::SystemMessage {
-                message: format!("You need {}gp to upgrade your bank. You only have {}gp.", item::BANK_UPGRADE_COST, current_gold),
-            }).await;
+            self.send_system_message(player_id, &format!("You need {}gp to upgrade your bank. You only have {}gp.", item::BANK_UPGRADE_COST, current_gold)).await;
             self.show_banker_dialogue(player_id, npc_id).await;
             return;
         }
@@ -7108,9 +7104,7 @@ impl GameRoom {
         drop(players);
 
         self.send_to_player(player_id, inv_msg).await;
-        self.send_to_player(player_id, ServerMessage::SystemMessage {
-            message: format!("Bank upgraded! You now have {} slots.", new_slots),
-        }).await;
+        self.send_system_message(player_id, &format!("Bank upgraded! You now have {} slots.", new_slots)).await;
         self.show_banker_dialogue(player_id, npc_id).await;
     }
 
