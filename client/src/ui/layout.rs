@@ -145,6 +145,8 @@ pub enum UiElementId {
     BankWithdrawGoldButton,
     BankScrollArea,
     BankInvScrollArea,
+    BankScrollbar,
+    BankInvScrollbar,
     BankHelpButton,
     BankHelpClose,
 

@@ -266,6 +266,7 @@ impl Renderer {
 
         let max_scroll = (total_grid_height - grid_height).max(0.0);
         let scroll_offset = state.ui_state.bank_scroll.clamp(0.0, max_scroll);
+        layout.set_max_scroll(UiElementId::BankScrollbar, max_scroll);
 
         // Register scroll area
         let grid_w = BANK_COLS as f32 * (slot_size + slot_gap) - slot_gap;
@@ -326,6 +327,37 @@ impl Renderer {
                 }
             }
         }
+
+        // Scrollbar
+        if needs_scroll {
+            let scrollbar_w: f32 = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let track_x = x + grid_w + 2.0;
+            let track_y = grid_y;
+            let track_h = grid_height;
+
+            layout.add_scrollbar(
+                UiElementId::BankScrollbar,
+                Rect::new(track_x, track_y, scrollbar_w, track_h),
+            );
+
+            // Track
+            draw_rectangle(track_x, track_y, scrollbar_w, track_h, Color::new(0.1, 0.09, 0.12, 0.6));
+
+            // Thumb
+            let thumb_ratio = grid_height / total_grid_height;
+            let thumb_h = (track_h * thumb_ratio).max(16.0);
+            let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+            let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
+
+            let is_dragging = state.ui_state.bank_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::BankScrollbar));
+            let thumb_color = if is_dragging || is_hovered {
+                Color::new(0.5, 0.45, 0.55, 0.9)
+            } else {
+                Color::new(0.35, 0.32, 0.40, 0.7)
+            };
+            draw_rectangle(track_x + 1.0, thumb_y, scrollbar_w - 2.0, thumb_h, thumb_color);
+        }
     }
 
     fn render_bank_inv_grid(
@@ -349,6 +381,7 @@ impl Renderer {
 
         let max_scroll = (total_grid_height - grid_height).max(0.0);
         let scroll_offset = state.ui_state.bank_inv_scroll.clamp(0.0, max_scroll);
+        layout.set_max_scroll(UiElementId::BankInvScrollbar, max_scroll);
 
         // Register scroll area
         let grid_w = INV_COLS as f32 * (slot_size + slot_gap) - slot_gap;
@@ -415,6 +448,37 @@ impl Renderer {
                     );
                 }
             }
+        }
+
+        // Scrollbar
+        if needs_scroll {
+            let scrollbar_w: f32 = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let track_x = x + grid_w + 2.0;
+            let track_y = grid_y;
+            let track_h = grid_height;
+
+            layout.add_scrollbar(
+                UiElementId::BankInvScrollbar,
+                Rect::new(track_x, track_y, scrollbar_w, track_h),
+            );
+
+            // Track
+            draw_rectangle(track_x, track_y, scrollbar_w, track_h, Color::new(0.1, 0.09, 0.12, 0.6));
+
+            // Thumb
+            let thumb_ratio = grid_height / total_grid_height;
+            let thumb_h = (track_h * thumb_ratio).max(16.0);
+            let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+            let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
+
+            let is_dragging = state.ui_state.bank_inv_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::BankInvScrollbar));
+            let thumb_color = if is_dragging || is_hovered {
+                Color::new(0.5, 0.45, 0.55, 0.9)
+            } else {
+                Color::new(0.35, 0.32, 0.40, 0.7)
+            };
+            draw_rectangle(track_x + 1.0, thumb_y, scrollbar_w - 2.0, thumb_h, thumb_color);
         }
     }
 

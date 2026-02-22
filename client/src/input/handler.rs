@@ -2661,28 +2661,63 @@ impl InputHandler {
             let (_wheel_x, wheel_y) = mouse_wheel();
             if wheel_y != 0.0 {
                 const SCROLL_SPEED: f32 = 30.0;
-                let row_height = 48.0 + 4.0; // INV_SLOT_SIZE + SLOT_SPACING
 
                 match &state.ui_state.hovered_element {
                     Some(UiElementId::BankScrollArea) | Some(UiElementId::BankSlot(_)) => {
-                        let total_rows = (state.ui_state.bank_slots.len() + 5) / 6; // BANK_COLS=6
-                        let total_h = total_rows as f32 * row_height;
-                        let max_scroll = (total_h - 200.0).max(0.0);
+                        let max_scroll = layout.get_max_scroll(&UiElementId::BankScrollbar).unwrap_or(0.0);
                         state.ui_state.bank_scroll = (state.ui_state.bank_scroll
                             - wheel_y * SCROLL_SPEED)
                             .clamp(0.0, max_scroll);
                     }
                     Some(UiElementId::BankInvScrollArea)
                     | Some(UiElementId::BankInventorySlot(_)) => {
-                        let total_rows = (20 + 3) / 4; // 20 slots, INV_COLS=4
-                        let total_h = total_rows as f32 * row_height;
-                        let max_scroll = (total_h - 200.0).max(0.0);
+                        let max_scroll = layout.get_max_scroll(&UiElementId::BankInvScrollbar).unwrap_or(0.0);
                         state.ui_state.bank_inv_scroll = (state.ui_state.bank_inv_scroll
                             - wheel_y * SCROLL_SPEED)
                             .clamp(0.0, max_scroll);
                     }
                     _ => {}
                 }
+            }
+
+            // Bank scrollbar drag handling
+            if let Some(track_bounds) = layout.get_bounds(&UiElementId::BankScrollbar) {
+                let bank_max = layout.get_max_scroll(&UiElementId::BankScrollbar).unwrap_or(0.0);
+                let bank_content_h = bank_max + track_bounds.h;
+                let clicked_on = matches!(clicked_element, Some(UiElementId::BankScrollbar));
+                crate::ui::scroll::handle_scrollbar_drag(
+                    &mut state.ui_state.bank_scroll_drag,
+                    &mut state.ui_state.bank_scroll,
+                    bank_max,
+                    track_bounds,
+                    bank_content_h,
+                    my,
+                    is_mouse_button_down(MouseButton::Left),
+                    mouse_clicked,
+                    clicked_on,
+                );
+            } else if !is_mouse_button_down(MouseButton::Left) {
+                state.ui_state.bank_scroll_drag.dragging = false;
+            }
+
+            // Bank inventory scrollbar drag handling
+            if let Some(track_bounds) = layout.get_bounds(&UiElementId::BankInvScrollbar) {
+                let inv_max = layout.get_max_scroll(&UiElementId::BankInvScrollbar).unwrap_or(0.0);
+                let inv_content_h = inv_max + track_bounds.h;
+                let clicked_on = matches!(clicked_element, Some(UiElementId::BankInvScrollbar));
+                crate::ui::scroll::handle_scrollbar_drag(
+                    &mut state.ui_state.bank_inv_scroll_drag,
+                    &mut state.ui_state.bank_inv_scroll,
+                    inv_max,
+                    track_bounds,
+                    inv_content_h,
+                    my,
+                    is_mouse_button_down(MouseButton::Left),
+                    mouse_clicked,
+                    clicked_on,
+                );
+            } else if !is_mouse_button_down(MouseButton::Left) {
+                state.ui_state.bank_inv_scroll_drag.dragging = false;
             }
 
             // Click handling

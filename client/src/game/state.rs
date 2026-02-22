@@ -1119,6 +1119,8 @@ pub struct UiState {
     pub bank_max_slots: u32,
     pub bank_scroll: f32,
     pub bank_inv_scroll: f32,
+    pub bank_scroll_drag: crate::ui::scroll::ScrollDragState,
+    pub bank_inv_scroll_drag: crate::ui::scroll::ScrollDragState,
     // Escape menu state
     pub escape_menu_open: bool,
     // Audio settings (synced with AudioManager)
@@ -1282,6 +1284,8 @@ impl Default for UiState {
             bank_max_slots: 48,
             bank_scroll: 0.0,
             bank_inv_scroll: 0.0,
+            bank_scroll_drag: Default::default(),
+            bank_inv_scroll_drag: Default::default(),
             escape_menu_open: false,
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,
