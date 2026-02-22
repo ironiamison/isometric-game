@@ -252,6 +252,19 @@ pub enum ClientMessage {
     /// Remove a blocked monster
     #[serde(rename = "slayerRemoveBlock")]
     SlayerRemoveBlock { monster_id: String },
+
+    // ===== Auto-Action System Messages =====
+    /// Start repeating an action on a target (attack, mine, chop)
+    #[serde(rename = "startAutoAction")]
+    StartAutoAction {
+        target_type: String,
+        target_id: String,
+        action: String,
+    },
+
+    /// Cancel current auto-action
+    #[serde(rename = "cancelAutoAction")]
+    CancelAutoAction,
 }
 
 impl ClientMessage {
@@ -312,6 +325,8 @@ impl ClientMessage {
             ClientMessage::SlayerCancelTask => "slayerCancelTask",
             ClientMessage::SlayerBuyReward { .. } => "slayerBuyReward",
             ClientMessage::SlayerRemoveBlock { .. } => "slayerRemoveBlock",
+            ClientMessage::StartAutoAction { .. } => "StartAutoAction",
+            ClientMessage::CancelAutoAction => "CancelAutoAction",
         }
     }
 }
@@ -979,6 +994,18 @@ pub enum ServerMessage {
         blocked_monsters: Vec<String>,
         unlocked_monsters: Vec<String>,
     },
+
+    // ===== Auto-Action System Messages =====
+    /// Confirms auto-action is now active on the server
+    AutoActionStarted {
+        target_type: String,
+        target_id: String,
+        action: String,
+    },
+    /// Auto-action ended (with reason)
+    AutoActionStopped {
+        reason: String,
+    },
 }
 
 /// Ground tile override for farming plots (locked vs unlocked appearance)
@@ -1333,6 +1360,9 @@ impl ServerMessage {
             ServerMessage::SlayerTaskComplete { .. } => "slayerTaskComplete",
             ServerMessage::SlayerResult { .. } => "slayerResult",
             ServerMessage::SlayerStateSync { .. } => "slayerStateSync",
+            // Auto-action system messages
+            ServerMessage::AutoActionStarted { .. } => "autoActionStarted",
+            ServerMessage::AutoActionStopped { .. } => "autoActionStopped",
         }
     }
 }
@@ -4849,6 +4879,34 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("unlocked_monsters".into()), Value::Array(unlocked)));
             Value::Map(map)
         }
+        ServerMessage::AutoActionStarted {
+            target_type,
+            target_id,
+            action,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("target_type".into()),
+                Value::String(target_type.clone().into()),
+            ));
+            map.push((
+                Value::String("target_id".into()),
+                Value::String(target_id.clone().into()),
+            ));
+            map.push((
+                Value::String("action".into()),
+                Value::String(action.clone().into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::AutoActionStopped { reason } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("reason".into()),
+                Value::String(reason.clone().into()),
+            ));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -5188,6 +5246,13 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let monster_id = extract_string(msg_data, "monster_id").unwrap_or_default();
             Ok(ClientMessage::SlayerRemoveBlock { monster_id })
         }
+        "startAutoAction" => {
+            let target_type = extract_string(msg_data, "target_type").unwrap_or_default();
+            let target_id = extract_string(msg_data, "target_id").unwrap_or_default();
+            let action = extract_string(msg_data, "action").unwrap_or_default();
+            Ok(ClientMessage::StartAutoAction { target_type, target_id, action })
+        }
+        "cancelAutoAction" => Ok(ClientMessage::CancelAutoAction),
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }
