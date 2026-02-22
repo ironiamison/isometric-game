@@ -2056,6 +2056,8 @@ impl GameRoom {
             alchemy_xp: p.skills.alchemy.xp,
             mining_level: p.skills.mining.level,
             mining_xp: p.skills.mining.xp,
+            slayer_level: p.skills.slayer.level,
+            slayer_xp: p.skills.slayer.xp,
         })
     }
 

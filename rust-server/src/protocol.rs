@@ -235,6 +235,23 @@ pub enum ClientMessage {
     /// Ping for latency measurement - server responds with pong
     #[serde(rename = "ping")]
     Ping { timestamp: f64 },
+
+    // ===== Slayer System Messages =====
+    /// Request a new slayer task from a master
+    #[serde(rename = "slayerGetTask")]
+    SlayerGetTask { master_id: String },
+
+    /// Cancel current slayer task
+    #[serde(rename = "slayerCancelTask")]
+    SlayerCancelTask,
+
+    /// Buy a slayer reward
+    #[serde(rename = "slayerBuyReward")]
+    SlayerBuyReward { reward_id: String, #[serde(default)] target_monster_id: Option<String> },
+
+    /// Remove a blocked monster
+    #[serde(rename = "slayerRemoveBlock")]
+    SlayerRemoveBlock { monster_id: String },
 }
 
 impl ClientMessage {
@@ -291,8 +308,38 @@ impl ClientMessage {
             ClientMessage::BankWithdrawGold { .. } => "BankWithdrawGold",
             ClientMessage::StartCraftBatch { .. } => "StartCraftBatch",
             ClientMessage::Ping { .. } => "Ping",
+            ClientMessage::SlayerGetTask { .. } => "slayerGetTask",
+            ClientMessage::SlayerCancelTask => "slayerCancelTask",
+            ClientMessage::SlayerBuyReward { .. } => "slayerBuyReward",
+            ClientMessage::SlayerRemoveBlock { .. } => "slayerRemoveBlock",
         }
     }
+}
+
+// ============================================================================
+// Slayer Data Structs
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SlayerTaskData {
+    pub monster_id: String,
+    pub display_name: String,
+    pub kills_current: i32,
+    pub kills_required: i32,
+    pub xp_per_kill: i64,
+    pub master_id: String,
+    pub points_on_complete: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SlayerRewardData {
+    pub id: String,
+    pub display_name: String,
+    pub description: String,
+    pub cost: i32,
+    pub category: String,
+    pub target_id: Option<String>,
+    pub quantity: i32,
 }
 
 // ============================================================================
@@ -411,6 +458,8 @@ pub enum ServerMessage {
         alchemy_xp: i64,
         mining_level: i32,
         mining_xp: i64,
+        slayer_level: i32,
+        slayer_xp: i64,
     },
     ItemDropped {
         id: String,
@@ -892,6 +941,44 @@ pub enum ServerMessage {
         amount_required: i32,
         amount_harvested: i32,
     },
+
+    // ===== Slayer System Messages =====
+    SlayerPanelOpen {
+        master_id: String,
+        master_name: String,
+        current_task: Option<SlayerTaskData>,
+        points: i32,
+        tasks_completed: i32,
+        rewards: Vec<SlayerRewardData>,
+        blocked_monsters: Vec<String>,
+        unlocked_monsters: Vec<String>,
+    },
+    SlayerTaskProgress {
+        monster_id: String,
+        display_name: String,
+        kills_current: i32,
+        kills_required: i32,
+    },
+    SlayerTaskComplete {
+        monster_id: String,
+        display_name: String,
+        points_awarded: i32,
+        total_points: i32,
+    },
+    SlayerResult {
+        success: bool,
+        action: String,
+        message: String,
+        task: Option<SlayerTaskData>,
+        points: Option<i32>,
+    },
+    SlayerStateSync {
+        current_task: Option<SlayerTaskData>,
+        points: i32,
+        tasks_completed: i32,
+        blocked_monsters: Vec<String>,
+        unlocked_monsters: Vec<String>,
+    },
 }
 
 /// Ground tile override for farming plots (locked vs unlocked appearance)
@@ -1240,6 +1327,12 @@ impl ServerMessage {
             ServerMessage::BankUpdate { .. } => "bankUpdate",
             ServerMessage::BankResult { .. } => "bankResult",
             ServerMessage::FarmingContractUpdate { .. } => "farmingContractUpdate",
+            // Slayer system messages
+            ServerMessage::SlayerPanelOpen { .. } => "slayerPanelOpen",
+            ServerMessage::SlayerTaskProgress { .. } => "slayerTaskProgress",
+            ServerMessage::SlayerTaskComplete { .. } => "slayerTaskComplete",
+            ServerMessage::SlayerResult { .. } => "slayerResult",
+            ServerMessage::SlayerStateSync { .. } => "slayerStateSync",
         }
     }
 }
@@ -1476,6 +1569,7 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
     ));
     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
     nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
+    nmap.push((Value::String("is_slayer_master".into()), Value::Boolean(n.is_slayer_master)));
     if let Some(ref st) = n.station_type {
         nmap.push((Value::String("station_type".into()), Value::String(st.clone().into())));
     }
@@ -1493,6 +1587,42 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
         Value::F32(n.render_offset_y),
     ));
     Value::Map(nmap)
+}
+
+/// Encode a SlayerTaskData to rmpv::Value (or Nil if None).
+fn slayer_task_to_value(task: &Option<SlayerTaskData>) -> rmpv::Value {
+    use rmpv::Value;
+    match task {
+        Some(t) => {
+            let mut map = Vec::new();
+            map.push((Value::String("monster_id".into()), Value::String(t.monster_id.clone().into())));
+            map.push((Value::String("display_name".into()), Value::String(t.display_name.clone().into())));
+            map.push((Value::String("kills_current".into()), Value::Integer((t.kills_current as i64).into())));
+            map.push((Value::String("kills_required".into()), Value::Integer((t.kills_required as i64).into())));
+            map.push((Value::String("xp_per_kill".into()), Value::Integer(t.xp_per_kill.into())));
+            map.push((Value::String("master_id".into()), Value::String(t.master_id.clone().into())));
+            map.push((Value::String("points_on_complete".into()), Value::Integer((t.points_on_complete as i64).into())));
+            Value::Map(map)
+        }
+        None => Value::Nil,
+    }
+}
+
+/// Encode a SlayerRewardData to rmpv::Value.
+fn slayer_reward_to_value(r: &SlayerRewardData) -> rmpv::Value {
+    use rmpv::Value;
+    let mut map = Vec::new();
+    map.push((Value::String("id".into()), Value::String(r.id.clone().into())));
+    map.push((Value::String("display_name".into()), Value::String(r.display_name.clone().into())));
+    map.push((Value::String("description".into()), Value::String(r.description.clone().into())));
+    map.push((Value::String("cost".into()), Value::Integer((r.cost as i64).into())));
+    map.push((Value::String("category".into()), Value::String(r.category.clone().into())));
+    map.push((Value::String("target_id".into()), match &r.target_id {
+        Some(id) => Value::String(id.clone().into()),
+        None => Value::Nil,
+    }));
+    map.push((Value::String("quantity".into()), Value::Integer((r.quantity as i64).into())));
+    Value::Map(map)
 }
 
 /// Encode a StateSync message from pre-built rmpv::Values (avoids re-encoding per player).
@@ -1893,6 +2023,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     ));
                     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
                     nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
+                    nmap.push((Value::String("is_slayer_master".into()), Value::Boolean(n.is_slayer_master)));
                     if let Some(ref st) = n.station_type {
                         nmap.push((Value::String("station_type".into()), Value::String(st.clone().into())));
                     }
@@ -2146,6 +2277,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             alchemy_xp,
             mining_level,
             mining_xp,
+            slayer_level,
+            slayer_xp,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -2231,6 +2364,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("mining_xp".into()),
                 Value::Integer((*mining_xp).into()),
+            ));
+            map.push((
+                Value::String("slayer_level".into()),
+                Value::Integer((*slayer_level as i64).into()),
+            ));
+            map.push((
+                Value::String("slayer_xp".into()),
+                Value::Integer((*slayer_xp).into()),
             ));
             Value::Map(map)
         }
@@ -4620,6 +4761,92 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::String("total".into()),
                 Value::Integer((*total as i64).into()),
             ));
+            Value::Map(map)
+        }
+        // ===== Slayer System Messages =====
+        ServerMessage::SlayerPanelOpen {
+            master_id,
+            master_name,
+            current_task,
+            points,
+            tasks_completed,
+            rewards,
+            blocked_monsters,
+            unlocked_monsters,
+        } => {
+            let mut map = Vec::new();
+            map.push((Value::String("master_id".into()), Value::String(master_id.clone().into())));
+            map.push((Value::String("master_name".into()), Value::String(master_name.clone().into())));
+            map.push((Value::String("current_task".into()), slayer_task_to_value(current_task)));
+            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
+            map.push((Value::String("tasks_completed".into()), Value::Integer((*tasks_completed as i64).into())));
+            let reward_values: Vec<Value> = rewards.iter().map(|r| slayer_reward_to_value(r)).collect();
+            map.push((Value::String("rewards".into()), Value::Array(reward_values)));
+            let blocked: Vec<Value> = blocked_monsters.iter().map(|s| Value::String(s.clone().into())).collect();
+            map.push((Value::String("blocked_monsters".into()), Value::Array(blocked)));
+            let unlocked: Vec<Value> = unlocked_monsters.iter().map(|s| Value::String(s.clone().into())).collect();
+            map.push((Value::String("unlocked_monsters".into()), Value::Array(unlocked)));
+            Value::Map(map)
+        }
+        ServerMessage::SlayerTaskProgress {
+            monster_id,
+            display_name,
+            kills_current,
+            kills_required,
+        } => {
+            let mut map = Vec::new();
+            map.push((Value::String("monster_id".into()), Value::String(monster_id.clone().into())));
+            map.push((Value::String("display_name".into()), Value::String(display_name.clone().into())));
+            map.push((Value::String("kills_current".into()), Value::Integer((*kills_current as i64).into())));
+            map.push((Value::String("kills_required".into()), Value::Integer((*kills_required as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::SlayerTaskComplete {
+            monster_id,
+            display_name,
+            points_awarded,
+            total_points,
+        } => {
+            let mut map = Vec::new();
+            map.push((Value::String("monster_id".into()), Value::String(monster_id.clone().into())));
+            map.push((Value::String("display_name".into()), Value::String(display_name.clone().into())));
+            map.push((Value::String("points_awarded".into()), Value::Integer((*points_awarded as i64).into())));
+            map.push((Value::String("total_points".into()), Value::Integer((*total_points as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::SlayerResult {
+            success,
+            action,
+            message,
+            task,
+            points,
+        } => {
+            let mut map = Vec::new();
+            map.push((Value::String("success".into()), Value::Boolean(*success)));
+            map.push((Value::String("action".into()), Value::String(action.clone().into())));
+            map.push((Value::String("message".into()), Value::String(message.clone().into())));
+            map.push((Value::String("task".into()), slayer_task_to_value(task)));
+            map.push((Value::String("points".into()), match points {
+                Some(p) => Value::Integer((*p as i64).into()),
+                None => Value::Nil,
+            }));
+            Value::Map(map)
+        }
+        ServerMessage::SlayerStateSync {
+            current_task,
+            points,
+            tasks_completed,
+            blocked_monsters,
+            unlocked_monsters,
+        } => {
+            let mut map = Vec::new();
+            map.push((Value::String("current_task".into()), slayer_task_to_value(current_task)));
+            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
+            map.push((Value::String("tasks_completed".into()), Value::Integer((*tasks_completed as i64).into())));
+            let blocked: Vec<Value> = blocked_monsters.iter().map(|s| Value::String(s.clone().into())).collect();
+            map.push((Value::String("blocked_monsters".into()), Value::Array(blocked)));
+            let unlocked: Vec<Value> = unlocked_monsters.iter().map(|s| Value::String(s.clone().into())).collect();
+            map.push((Value::String("unlocked_monsters".into()), Value::Array(unlocked)));
             Value::Map(map)
         }
     };

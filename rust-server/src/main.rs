@@ -3474,6 +3474,13 @@ async fn handle_client_message(
             room.send_to_player(player_id, ServerMessage::Pong { timestamp })
                 .await;
         }
+        // Slayer messages - will be wired up in a later task
+        ClientMessage::SlayerGetTask { .. }
+        | ClientMessage::SlayerCancelTask
+        | ClientMessage::SlayerBuyReward { .. }
+        | ClientMessage::SlayerRemoveBlock { .. } => {
+            tracing::debug!("Slayer message received but not yet wired: {}", msg_name);
+        }
     }
 
     let handler_duration = handler_start.elapsed();
