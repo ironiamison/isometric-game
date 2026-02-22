@@ -1300,6 +1300,16 @@ async fn matchmake_join_or_create(
         }
     }
 
+    // Load slayer state from database
+    let slayer_state = state.db.load_character_slayer_state(character_id).await.unwrap_or_default();
+    room.set_player_slayer_state(&player_id, slayer_state.clone()).await;
+    if slayer_state.current_task.is_some() || slayer_state.tasks_completed > 0 {
+        info!(
+            "Loaded slayer state for {}: {} tasks completed, {} points",
+            character_data.name, slayer_state.tasks_completed, slayer_state.points
+        );
+    }
+
     let client_count = room.player_count().await;
 
     // Generate signed session token for WebSocket upgrade
@@ -1996,6 +2006,30 @@ async fn handle_socket(
         }
     }
 
+    // Send slayer state sync to this client
+    {
+        let slayer_state = room.get_player_slayer_state(&player_id).await;
+        let slayer_task_data = slayer_state.current_task.as_ref().map(|t| crate::protocol::SlayerTaskData {
+            monster_id: t.monster_id.clone(),
+            display_name: t.display_name.clone(),
+            kills_current: t.kills_current,
+            kills_required: t.kills_required,
+            xp_per_kill: t.xp_per_kill,
+            master_id: t.master_id.clone(),
+            points_on_complete: t.points_on_complete,
+        });
+        let slayer_sync = ServerMessage::SlayerStateSync {
+            current_task: slayer_task_data,
+            points: slayer_state.points,
+            tasks_completed: slayer_state.tasks_completed,
+            blocked_monsters: slayer_state.blocked_monsters.clone(),
+            unlocked_monsters: slayer_state.unlocked_monsters.clone(),
+        };
+        if let Ok(bytes) = protocol::encode_server_message(&slayer_sync) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
     // Create channel for sending messages to this client
     let (tx, mut rx) = mpsc::channel::<Vec<u8>>(512);
 
@@ -2221,6 +2255,30 @@ async fn handle_socket(
                     discovered.len(),
                     character_name
                 );
+            }
+        }
+
+        // Save slayer state to database
+        if character_id > 0 {
+            let slayer_state = room.get_player_slayer_state(&player_id).await;
+            if slayer_state.current_task.is_some() || slayer_state.tasks_completed > 0 || slayer_state.points > 0 {
+                if let Err(e) = state
+                    .db
+                    .save_character_slayer_state(character_id, &slayer_state)
+                    .await
+                {
+                    error!(
+                        "Failed to save slayer state for {} on disconnect: {}",
+                        character_name, e
+                    );
+                } else {
+                    info!(
+                        "Saved slayer state for {}: {} tasks completed, {} points",
+                        character_name,
+                        slayer_state.tasks_completed,
+                        slayer_state.points
+                    );
+                }
             }
         }
     } else {
@@ -3474,12 +3532,17 @@ async fn handle_client_message(
             room.send_to_player(player_id, ServerMessage::Pong { timestamp })
                 .await;
         }
-        // Slayer messages - will be wired up in a later task
-        ClientMessage::SlayerGetTask { .. }
-        | ClientMessage::SlayerCancelTask
-        | ClientMessage::SlayerBuyReward { .. }
-        | ClientMessage::SlayerRemoveBlock { .. } => {
-            tracing::debug!("Slayer message received but not yet wired: {}", msg_name);
+        ClientMessage::SlayerGetTask { master_id } => {
+            room.handle_slayer_get_task(player_id, &master_id).await;
+        }
+        ClientMessage::SlayerCancelTask => {
+            room.handle_slayer_cancel_task(player_id).await;
+        }
+        ClientMessage::SlayerBuyReward { reward_id, target_monster_id } => {
+            room.handle_slayer_buy_reward(player_id, &reward_id, target_monster_id).await;
+        }
+        ClientMessage::SlayerRemoveBlock { monster_id } => {
+            room.handle_slayer_remove_block(player_id, &monster_id).await;
         }
     }
 
