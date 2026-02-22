@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "ASAAAAFYAAABCAAAAYkCAMEQAAAhFAAAERoQAHEKEABRDggAyAUEwI8XAsDBHwLAAAACwAAAMsAAADLAwA8CwMAYBEBBCQhEgQ1wwIFKAEGBCgBAgRIAQQETkEAuFQRAwKUAwBwrAEHkOgBAADcQQBBQAkAAkABAoJABQKAeBv4=",
+  "collision": "ASAAAAFYAAABCAAAAYkCAMEQAAAhFAAAERoQAHEKEABRDggAyAUEAI8XAgDBHwIAAAACAAAAMgAAADIAwA8CQMAYBEBBCQhEgQ1wwIFKAEGBCgBAgBIAQQATkEA+FQRAwKUAwBwrAEHkOgBAADcQQBBQAkAAkABAoJABQKAeBv4=",
   "entities": [
     {
       "entityId": "crow",
@@ -3808,12 +3808,6 @@
       "gid": 352,
       "x": 29,
       "y": 31,
-      "edge": "down"
-    },
-    {
-      "gid": 570,
-      "x": 31,
-      "y": 15,
       "edge": "down"
     },
     {
