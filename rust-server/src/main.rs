@@ -2694,15 +2694,60 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                     portal.id, portal.target_map, portal.target_x, portal.target_y
                 );
 
+                // Compute overworld spawn and update position BEFORE removing
+                // from instance tracking, so if the tick loop sees the player as
+                // overworld, they're already at the correct spawn position
+                // (prevents ghost on portal tile).
+                let (spawn_x, spawn_y) = if portal.target_map == "overworld" {
+                    let coords = if portal.target_x != 0.0 || portal.target_y != 0.0 {
+                        // Portal has explicit exit coordinates - use them
+                        info!(
+                            "Using portal exit coordinates ({}, {}) for player {}",
+                            portal.target_x, portal.target_y, player_id
+                        );
+                        // Clean up stored entrance since we're not using it
+                        let mut entrance_positions =
+                            state.player_entrance_positions.write().await;
+                        entrance_positions.remove(player_id);
+                        (portal.target_x, portal.target_y)
+                    } else {
+                        // Fall back to stored entrance position
+                        let mut entrance_positions =
+                            state.player_entrance_positions.write().await;
+                        if let Some((x, y)) = entrance_positions.remove(player_id) {
+                            info!(
+                                "Using stored entrance position ({}, {}) for player {}",
+                                x, y, player_id
+                            );
+                            (x as f32, y as f32)
+                        } else {
+                            // Default spawn if nothing specified
+                            (0.0, 0.0)
+                        }
+                    };
+
+                    info!(
+                        "Player {} exiting to overworld at ({}, {})",
+                        player_id, coords.0, coords.1
+                    );
+
+                    room.set_player_position(player_id, coords.0 as i32, coords.1 as i32)
+                        .await;
+                    coords
+                } else {
+                    (0.0, 0.0)
+                };
+
                 // Remove player from both tracking systems and notify others.
                 // Use get_by_instance_id (direct lookup by known ID) instead of
                 // find_player_instance (scan that races with concurrent removals).
-                // Remove from player_instances FIRST so StateSync won't group them
-                // into the instance while we clean up Instance.players.
+                // Position is already updated (for overworld exits) so the tick loop
+                // won't see the player at the old portal position.
                 {
                     let mut instances = state.player_instances.write().await;
                     instances.remove(player_id);
                 }
+                room.reset_sync_state(player_id).await;
 
                 if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
                     // Get other players in the instance BEFORE removing this player
@@ -2746,44 +2791,6 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                 }
 
                 if portal.target_map == "overworld" {
-                    // Return to overworld - use portal target if specified, otherwise stored entrance position
-                    let (spawn_x, spawn_y) = {
-                        if portal.target_x != 0.0 || portal.target_y != 0.0 {
-                            // Portal has explicit exit coordinates - use them
-                            info!(
-                                "Using portal exit coordinates ({}, {}) for player {}",
-                                portal.target_x, portal.target_y, player_id
-                            );
-                            // Clean up stored entrance since we're not using it
-                            let mut entrance_positions =
-                                state.player_entrance_positions.write().await;
-                            entrance_positions.remove(player_id);
-                            (portal.target_x, portal.target_y)
-                        } else {
-                            // Fall back to stored entrance position
-                            let mut entrance_positions =
-                                state.player_entrance_positions.write().await;
-                            if let Some((x, y)) = entrance_positions.remove(player_id) {
-                                info!(
-                                    "Using stored entrance position ({}, {}) for player {}",
-                                    x, y, player_id
-                                );
-                                (x as f32, y as f32)
-                            } else {
-                                // Default spawn if nothing specified
-                                (0.0, 0.0)
-                            }
-                        }
-                    };
-
-                    info!(
-                        "Player {} exiting to overworld at ({}, {})",
-                        player_id, spawn_x, spawn_y
-                    );
-
-                    // Update player position in room
-                    room.set_player_position(player_id, spawn_x as i32, spawn_y as i32)
-                        .await;
 
                     // Preload chunks around the overworld spawn before transitioning
                     let spawn_chunk = chunk::ChunkCoord::from_world(
