@@ -1295,7 +1295,7 @@ impl Default for UiState {
             bank_open: false,
             bank_slots: Vec::new(),
             bank_gold: 0,
-            bank_max_slots: 48,
+            bank_max_slots: 50,
             bank_scroll: 0.0,
             bank_inv_scroll: 0.0,
             bank_scroll_drag: Default::default(),

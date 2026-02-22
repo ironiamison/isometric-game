@@ -1251,6 +1251,7 @@ async fn matchmake_join_or_create(
         character_data.sitting_at_y,
         &character_data.bank_json,
         character_data.bank_gold,
+        character_data.bank_max_slots,
     )
     .await;
 
@@ -2194,6 +2195,7 @@ async fn handle_socket(
                     save_data.sitting_at_y,
                     &save_data.bank_json,
                     save_data.bank_gold,
+                    save_data.bank_max_slots,
                 )
                 .await
             {
@@ -3766,6 +3768,7 @@ async fn main() {
                                 save_data.sitting_at_y,
                                 &save_data.bank_json,
                                 save_data.bank_gold,
+                                save_data.bank_max_slots,
                             )
                             .await
                         {
@@ -3999,6 +4002,7 @@ async fn main() {
                         save_data.sitting_at_y,
                         &save_data.bank_json,
                         save_data.bank_gold,
+                        save_data.bank_max_slots,
                     )
                     .await
                 {

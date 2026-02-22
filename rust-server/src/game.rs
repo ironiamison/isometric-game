@@ -159,6 +159,7 @@ pub struct PlayerSaveData {
     pub sitting_at_y: Option<i32>,
     pub bank_json: String,
     pub bank_gold: i32,
+    pub bank_max_slots: u32,
 }
 
 // ============================================================================
@@ -297,6 +298,8 @@ pub struct Player {
     pub active_buffs: Vec<ActiveBuff>,
     /// Bank vault for storing items safely
     pub bank: item::Bank,
+    /// Current maximum bank slots (upgradeable from 50 to 100)
+    pub bank_max_slots: u32,
     /// Tick when player last dashed (for cooldown)
     pub last_dash_tick: u64,
     /// True during the tick the player dashed (for StateSync broadcast)
@@ -371,6 +374,7 @@ impl Player {
             spell_cooldowns: HashMap::new(),
             active_buffs: Vec::new(),
             bank: item::Bank::new(),
+            bank_max_slots: item::DEFAULT_BANK_SIZE as u32,
             last_dash_tick: 0,
             is_dashing: false,
         }
@@ -1385,8 +1389,11 @@ impl GameRoom {
         sitting_at_y: Option<i32>,
         bank_json: &str,
         bank_gold: i32,
+        bank_max_slots: u32,
     ) {
         let mut player = Player::new(player_id, name, x, y, gender, skin, hair_style, hair_color);
+        player.bank_max_slots = bank_max_slots;
+        player.bank = item::Bank::new_with_size(bank_max_slots as usize);
 
         // Restore saved stats
         player.hp = hp.min(skills.hitpoints.level); // Cap HP at max (hitpoints level)
@@ -1651,6 +1658,7 @@ impl GameRoom {
                 sitting_at_y: p.sitting_at.map(|(_, y)| y),
                 bank_json,
                 bank_gold: p.bank.gold,
+                bank_max_slots: p.bank_max_slots,
             }
         })
     }
@@ -1685,6 +1693,7 @@ impl GameRoom {
             recipes: HashSet<String>,
             bank_slots: Vec<(usize, String, i32)>,
             bank_gold: i32,
+            bank_max_slots: u32,
         }
 
         let mut result = HashMap::new();
@@ -1761,6 +1770,7 @@ impl GameRoom {
                                 })
                                 .collect(),
                             bank_gold: p.bank.gold,
+                            bank_max_slots: p.bank_max_slots,
                         },
                     );
                 }
@@ -1797,6 +1807,7 @@ impl GameRoom {
                 bank_json: serde_json::to_string(&raw.bank_slots)
                     .unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: raw.bank_gold,
+                bank_max_slots: raw.bank_max_slots,
             };
             result.insert(pid, (save_data, None, raw.recipes, None));
         }
@@ -5239,7 +5250,7 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_banker {
-            self.handle_bank_open(player_id).await;
+            self.show_banker_dialogue(player_id, &npc_id).await;
             return;
         }
 
@@ -5835,6 +5846,19 @@ impl GameRoom {
                 // "close", "owned_N", "locked_N" just close
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
+            }
+            return;
+        }
+
+        // Handle banker dialogue choices (format: "banker:{npc_id}")
+        if let Some(npc_id) = quest_id.strip_prefix("banker:") {
+            if choice_id == "open_bank" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.handle_bank_open(player_id).await;
+            } else if choice_id == "upgrade" {
+                self.handle_bank_upgrade(player_id, npc_id).await;
+            } else {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
             }
             return;
         }
@@ -6982,10 +7006,112 @@ impl GameRoom {
         let msg = ServerMessage::BankOpen {
             slots: player.bank.to_update(),
             gold: player.bank.gold,
-            max_slots: item::BANK_SIZE as u32,
+            max_slots: player.bank_max_slots,
         };
         drop(players);
         self.send_to_player(player_id, msg).await;
+    }
+
+    /// Show banker dialogue menu with bank access and upgrade options
+    async fn show_banker_dialogue(&self, player_id: &str, npc_id: &str) {
+        let npc_name = {
+            let npcs = self.npcs.read().await;
+            npcs.get(npc_id)
+                .map(|n| {
+                    self.entity_registry
+                        .get(&n.prototype_id)
+                        .map(|p| p.display_name.clone())
+                        .unwrap_or_else(|| "Banker".to_string())
+                })
+                .unwrap_or_else(|| "Banker".to_string())
+        };
+
+        let (bank_max_slots, gold) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => (p.bank_max_slots, p.inventory.gold),
+                _ => return,
+            }
+        };
+
+        let upgrade_text = if bank_max_slots >= item::BANK_MAX_SIZE as u32 {
+            "Upgrade slots (fully upgraded)".to_string()
+        } else {
+            format!("Upgrade +{} slots ({}gp)", item::BANK_UPGRADE_SLOTS, item::BANK_UPGRADE_COST)
+        };
+
+        let text = format!(
+            "Welcome to the bank! Your vault currently has {}/{} slots.\n\nYour gold: {}gp",
+            bank_max_slots, item::BANK_MAX_SIZE, gold
+        );
+
+        self.send_to_player(player_id, ServerMessage::ShowDialogue {
+            quest_id: format!("banker:{}", npc_id),
+            npc_id: npc_id.to_string(),
+            speaker: npc_name,
+            text,
+            choices: vec![
+                crate::protocol::DialogueChoice {
+                    id: "open_bank".to_string(),
+                    text: "Access my bank".to_string(),
+                },
+                crate::protocol::DialogueChoice {
+                    id: "upgrade".to_string(),
+                    text: upgrade_text,
+                },
+                crate::protocol::DialogueChoice {
+                    id: "close".to_string(),
+                    text: "Nevermind".to_string(),
+                },
+            ],
+        }).await;
+    }
+
+    /// Handle bank slot upgrade purchase
+    async fn handle_bank_upgrade(&self, player_id: &str, npc_id: &str) {
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        if player.bank_max_slots >= item::BANK_MAX_SIZE as u32 {
+            drop(players);
+            self.send_to_player(player_id, ServerMessage::SystemMessage {
+                message: "Your bank is already fully upgraded!".to_string(),
+            }).await;
+            self.show_banker_dialogue(player_id, npc_id).await;
+            return;
+        }
+
+        if player.inventory.gold < item::BANK_UPGRADE_COST {
+            let current_gold = player.inventory.gold;
+            drop(players);
+            self.send_to_player(player_id, ServerMessage::SystemMessage {
+                message: format!("You need {}gp to upgrade your bank. You only have {}gp.", item::BANK_UPGRADE_COST, current_gold),
+            }).await;
+            self.show_banker_dialogue(player_id, npc_id).await;
+            return;
+        }
+
+        // Deduct gold and expand bank
+        player.inventory.gold -= item::BANK_UPGRADE_COST;
+        player.bank_max_slots += item::BANK_UPGRADE_SLOTS as u32;
+        player.bank.expand(item::BANK_UPGRADE_SLOTS);
+
+        let inv_msg = ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: player.inventory.to_update(),
+            gold: player.inventory.gold,
+        };
+        let new_slots = player.bank_max_slots;
+        drop(players);
+
+        self.send_to_player(player_id, inv_msg).await;
+        self.send_to_player(player_id, ServerMessage::SystemMessage {
+            message: format!("Bank upgraded! You now have {} slots.", new_slots),
+        }).await;
+        self.show_banker_dialogue(player_id, npc_id).await;
     }
 
     /// Deposit an item from inventory into bank
