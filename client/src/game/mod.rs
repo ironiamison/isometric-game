@@ -7,6 +7,7 @@ pub mod pathfinding;
 pub mod prayer;
 pub mod shop;
 pub mod skills;
+pub mod slayer;
 pub mod spell;
 pub mod state;
 pub mod tilemap;

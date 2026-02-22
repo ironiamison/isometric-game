@@ -1211,6 +1211,18 @@ pub struct UiState {
     pub spell_help_open: bool,
     /// Graphics quality: true = low (no water shaders), false = high
     pub graphics_low: bool,
+    // Slayer panel
+    pub slayer_panel_open: bool,
+    pub slayer_master_id: Option<String>,
+    pub slayer_master_name: Option<String>,
+    pub slayer_current_task: Option<crate::game::slayer::SlayerTaskClientData>,
+    pub slayer_points: i32,
+    pub slayer_tasks_completed: i32,
+    pub slayer_rewards: Vec<crate::game::slayer::SlayerRewardClientData>,
+    pub slayer_blocked_monsters: Vec<String>,
+    pub slayer_unlocked_monsters: Vec<String>,
+    pub slayer_reward_tab: usize,
+    pub slayer_reward_scroll: f32,
 }
 
 impl Default for UiState {
@@ -1358,6 +1370,17 @@ impl Default for UiState {
             graphics_low: true,
             #[cfg(not(target_os = "android"))]
             graphics_low: false,
+            slayer_panel_open: false,
+            slayer_master_id: None,
+            slayer_master_name: None,
+            slayer_current_task: None,
+            slayer_points: 0,
+            slayer_tasks_completed: 0,
+            slayer_rewards: Vec::new(),
+            slayer_blocked_monsters: Vec::new(),
+            slayer_unlocked_monsters: Vec::new(),
+            slayer_reward_tab: 0,
+            slayer_reward_scroll: 0.0,
         }
     }
 }
