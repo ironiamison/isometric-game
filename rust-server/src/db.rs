@@ -439,6 +439,18 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Slayer state table - JSON blob per character
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS character_slayer (
+                character_id INTEGER PRIMARY KEY,
+                slayer_state_json TEXT NOT NULL DEFAULT '{}'
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -1716,5 +1728,46 @@ impl Database {
         .await?;
 
         Ok(row.is_some())
+    }
+
+    // =========================================================================
+    // Slayer State Persistence
+    // =========================================================================
+
+    pub async fn load_character_slayer_state(
+        &self,
+        character_id: i64,
+    ) -> Result<crate::slayer::PlayerSlayerState, String> {
+        let row = sqlx::query("SELECT slayer_state_json FROM character_slayer WHERE character_id = ?")
+            .bind(character_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| format!("Failed to load slayer state: {}", e))?;
+
+        match row {
+            Some(row) => {
+                let json: String = sqlx::Row::get(&row, "slayer_state_json");
+                serde_json::from_str(&json).map_err(|e| format!("Failed to parse slayer state: {}", e))
+            }
+            None => Ok(crate::slayer::PlayerSlayerState::default()),
+        }
+    }
+
+    pub async fn save_character_slayer_state(
+        &self,
+        character_id: i64,
+        state: &crate::slayer::PlayerSlayerState,
+    ) -> Result<(), String> {
+        let json = serde_json::to_string(state)
+            .map_err(|e| format!("Failed to serialize slayer state: {}", e))?;
+
+        sqlx::query("INSERT OR REPLACE INTO character_slayer (character_id, slayer_state_json) VALUES (?, ?)")
+            .bind(character_id)
+            .bind(&json)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| format!("Failed to save slayer state: {}", e))?;
+
+        Ok(())
     }
 }
