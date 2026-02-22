@@ -31,7 +31,7 @@ const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
-const DEV_MODE: bool = true;
+const DEV_MODE: bool = false;
 
 fn window_conf() -> Conf {
     Conf {
