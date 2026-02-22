@@ -16,35 +16,35 @@ const METRIC_GROUPS: { title: string; metrics: Metric[] }[] = [
   {
     title: 'Showcase',
     metrics: [
-      { label: 'Total Level', sort: 'total_level', field: 'total_level', hint: 'Overall progression' },
-      { label: 'Combat Power', sort: 'combat_level', field: 'combat_level', hint: 'Combat + hitpoints strength' },
-      { label: 'Played Time', sort: 'played_time', field: 'played_time', hint: 'Most active adventurers' },
-      { label: 'Monster Kills', sort: 'monster_kills', field: 'monster_kills', hint: 'Total monsters defeated' },
+      { label: 'Total Level', sort: 'total_level', field: 'total_level', hint: 'Combined levels' },
+      { label: 'Combat Power', sort: 'combat_level', field: 'combat_level', hint: 'Melee + HP combined' },
+      { label: 'Played Time', sort: 'played_time', field: 'played_time', hint: 'Time played' },
+      { label: 'Monster Kills', sort: 'monster_kills', field: 'monster_kills', hint: 'Lifetime kills' },
     ],
   },
   {
     title: 'Combat',
     metrics: [
-      { label: 'Combat Skill', sort: 'combat_skill_level', field: 'combat_skill_level', hint: 'Direct combat skill level' },
-      { label: 'Hitpoints', sort: 'hitpoints_level', field: 'hitpoints_level', hint: 'Toughness and survivability' },
-      { label: 'Prayer', sort: 'prayer_level', field: 'prayer_level', hint: 'Prayer mastery' },
-      { label: 'Magic', sort: 'magic_level', field: 'magic_level', hint: 'Arcane power' },
+      { label: 'Combat Skill', sort: 'combat_skill_level', field: 'combat_skill_level', hint: 'Melee level' },
+      { label: 'Hitpoints', sort: 'hitpoints_level', field: 'hitpoints_level', hint: 'HP level' },
+      { label: 'Prayer', sort: 'prayer_level', field: 'prayer_level', hint: 'Prayer level' },
+      { label: 'Magic', sort: 'magic_level', field: 'magic_level', hint: 'Magic level' },
     ],
   },
   {
     title: 'Gathering',
     metrics: [
-      { label: 'Fishing', sort: 'fishing_level', field: 'fishing_level', hint: 'Waterside progress' },
-      { label: 'Farming', sort: 'farming_level', field: 'farming_level', hint: 'Harvest expertise' },
-      { label: 'Woodcutting', sort: 'woodcutting_level', field: 'woodcutting_level', hint: 'Forestry strength' },
-      { label: 'Mining', sort: 'mining_level', field: 'mining_level', hint: 'Ore extraction skill' },
+      { label: 'Fishing', sort: 'fishing_level', field: 'fishing_level', hint: 'Fishing level' },
+      { label: 'Farming', sort: 'farming_level', field: 'farming_level', hint: 'Farming level' },
+      { label: 'Woodcutting', sort: 'woodcutting_level', field: 'woodcutting_level', hint: 'Woodcutting level' },
+      { label: 'Mining', sort: 'mining_level', field: 'mining_level', hint: 'Mining level' },
     ],
   },
   {
     title: 'Crafting',
     metrics: [
-      { label: 'Smithing', sort: 'smithing_level', field: 'smithing_level', hint: 'Forge progression' },
-      { label: 'Alchemy', sort: 'alchemy_level', field: 'alchemy_level', hint: 'Potion and transmutation skill' },
+      { label: 'Smithing', sort: 'smithing_level', field: 'smithing_level', hint: 'Smithing level' },
+      { label: 'Alchemy', sort: 'alchemy_level', field: 'alchemy_level', hint: 'Alchemy level' },
     ],
   },
 ]
@@ -68,7 +68,7 @@ function metricValue(metric: Metric, entry: LeaderboardEntry) {
 }
 
 function rankStyle(rank: number) {
-  if (rank === 1) return 'border-[#d9b25f] bg-[#d9b25f]/10'
+  if (rank === 1) return 'border-[var(--gold)] bg-[var(--gold)]/10'
   if (rank === 2) return 'border-[#9ca3af] bg-[#9ca3af]/10'
   if (rank === 3) return 'border-[#ad7b46] bg-[#ad7b46]/10'
   return 'border-[var(--panel-border)] bg-[var(--panel-soft)]'
@@ -99,11 +99,11 @@ export function Leaderboards() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-[radial-gradient(circle_at_20%_15%,rgba(217,178,95,0.25),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(75,136,207,0.18),transparent_45%),var(--panel)] px-6 py-7 md:px-8">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Hall Of Legends</p>
-        <h1 className="mt-2 text-3xl font-semibold text-[var(--text)] md:text-4xl">Player Leaderboards</h1>
+      <section className="pixel-box relative overflow-hidden rounded-xl bg-[radial-gradient(circle_at_20%_15%,rgba(212,168,68,0.22),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(90,114,71,0.16),transparent_45%),var(--panel)] px-6 py-7 md:px-8">
+        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Hall Of Legends</p>
+        <h1 className="mt-2 text-3xl font-bold text-[var(--text)] md:text-4xl">Player Leaderboards</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-soft)]">
-          Browse every major ranking and spot the players setting the pace.
+          Every skill. Every record. Find your name — or someone to beat.
         </p>
       </section>
 
@@ -115,12 +115,12 @@ export function Leaderboards() {
           : champions.map(({ rank, entry }) => (
               <div
                 key={entry.name}
-                className={`rounded-xl border p-4 transition-colors ${rankStyle(rank)}`}
+                className={`pixel-box rounded-xl p-4 transition-colors ${rankStyle(rank)}`}
               >
-                <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Rank {rank}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Rank {rank}</p>
                 <Link
                   to={`/player/${encodeURIComponent(entry.name)}`}
-                  className="mt-2 block text-xl font-semibold text-[var(--text)] hover:text-[var(--gold)]"
+                  className="mt-2 block text-xl font-bold text-[var(--text)] hover:text-[var(--gold)]"
                 >
                   {entry.name}
                 </Link>
@@ -129,19 +129,19 @@ export function Leaderboards() {
             ))}
       </section>
 
-      <section className="space-y-4 rounded-2xl border border-[var(--panel-border)] bg-[var(--panel)] p-4 md:p-5">
+      <section className="space-y-4 pixel-box rounded-xl bg-[var(--panel)] p-4 md:p-5">
         {METRIC_GROUPS.map(group => (
           <div key={group.title}>
-            <p className="mb-2 text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">{group.title}</p>
+            <p className="mb-2 text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>{group.title}</p>
             <div className="flex flex-wrap gap-2">
               {group.metrics.map(item => (
                 <button
                   key={item.sort}
                   onClick={() => setActiveSort(item.sort)}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  className={`pixel-btn rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
                     item.sort === metric.sort
-                      ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--text)]'
-                      : 'border-[var(--panel-border)] bg-[var(--panel-soft)] text-[var(--text-soft)] hover:text-[var(--text)]'
+                      ? 'bg-[var(--gold)] text-[#1a1210]'
+                      : 'bg-[var(--panel-soft)] text-[var(--text-soft)] hover:text-[var(--text)]'
                   }`}
                 >
                   {item.label}
@@ -153,14 +153,14 @@ export function Leaderboards() {
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-[var(--text-soft)]">
-            Active board: <span className="text-[var(--text)]">{metric.label}</span> • {metric.hint}
+            Active board: <span className="text-[var(--text)]">{metric.label}</span> — {metric.hint}
           </p>
           <input
             type="text"
             placeholder="Search player..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-[var(--panel-border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors focus:border-[var(--gold)] md:max-w-xs"
+            className="w-full rounded-lg border border-[var(--panel-border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none transition-colors focus:border-[var(--gold)] md:max-w-xs"
           />
         </div>
 
@@ -180,12 +180,12 @@ export function Leaderboards() {
               {isLoading &&
                 Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i} className="border-t border-[var(--panel-border)]">
-                    <td className="px-4 py-3"><div className="h-3.5 w-8 animate-pulse rounded bg-[var(--panel-border)]" /></td>
-                    <td className="px-4 py-3"><div className="h-3.5 w-24 animate-pulse rounded bg-[var(--panel-border)]" /></td>
-                    <td className="px-4 py-3"><div className="h-3.5 w-16 animate-pulse rounded bg-[var(--panel-border)]" /></td>
-                    <td className="px-4 py-3"><div className="h-3.5 w-14 animate-pulse rounded bg-[var(--panel-border)]" /></td>
-                    <td className="px-4 py-3"><div className="h-3.5 w-14 animate-pulse rounded bg-[var(--panel-border)]" /></td>
-                    <td className="px-4 py-3"><div className="h-3.5 w-16 animate-pulse rounded bg-[var(--panel-border)]" /></td>
+                    <td className="px-4 py-3"><div className="h-3.5 w-8 animate-pulse rounded bg-[var(--panel-soft)]" /></td>
+                    <td className="px-4 py-3"><div className="h-3.5 w-24 animate-pulse rounded bg-[var(--panel-soft)]" /></td>
+                    <td className="px-4 py-3"><div className="h-3.5 w-16 animate-pulse rounded bg-[var(--panel-soft)]" /></td>
+                    <td className="px-4 py-3"><div className="h-3.5 w-14 animate-pulse rounded bg-[var(--panel-soft)]" /></td>
+                    <td className="px-4 py-3"><div className="h-3.5 w-14 animate-pulse rounded bg-[var(--panel-soft)]" /></td>
+                    <td className="px-4 py-3"><div className="h-3.5 w-16 animate-pulse rounded bg-[var(--panel-soft)]" /></td>
                   </tr>
                 ))}
               {!isLoading && filtered.length === 0 && (

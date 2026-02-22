@@ -1,19 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Nunito:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
   color-scheme: dark;
-  --font-display: 'Cinzel', Georgia, serif;
-  --font-body: 'Space Grotesk', 'Trebuchet MS', sans-serif;
-  --bg: #0b1118;
-  --bg-accent: #102033;
-  --panel: #121c28;
-  --panel-soft: #1a2636;
-  --panel-border: #243244;
-  --gold: #d9b25f;
-  --text: #ecf2ff;
-  --text-soft: #9db0c8;
-  --muted: #73839a;
+  --font-display: 'Silkscreen', monospace;
+  --font-body: 'Nunito', sans-serif;
+  --bg: #1a1210;
+  --bg-accent: #2a1e14;
+  --panel: #2a1e14;
+  --panel-soft: #3a2a1a;
+  --panel-border: #5a4030;
+  --gold: #d4a844;
+  --gold-light: #f0cc66;
+  --text: #f5e6c8;
+  --text-soft: #c4a882;
+  --muted: #8a7060;
+  --moss: #5a7247;
+  --moss-light: #7a9a5f;
+  --ember: #c45a3a;
+  --water: #5a8aaa;
+  --pixel-border: 2px;
 }
 
 * {
@@ -24,11 +30,11 @@ body {
   margin: 0;
   min-height: 100dvh;
   background:
-    radial-gradient(1100px 520px at 10% -12%, rgba(56, 123, 199, 0.32), transparent 62%),
-    radial-gradient(900px 480px at 90% -8%, rgba(217, 178, 95, 0.18), transparent 58%),
-    radial-gradient(1300px 760px at 50% 112%, rgba(20, 70, 106, 0.32), transparent 66%),
-    repeating-linear-gradient(90deg, rgba(120, 156, 196, 0.04) 0 1px, transparent 1px 72px),
-    linear-gradient(180deg, #091321 0%, #0a1320 36%, #090f18 100%);
+    radial-gradient(900px 480px at 10% -12%, rgba(90, 64, 30, 0.28), transparent 62%),
+    radial-gradient(800px 440px at 90% -8%, rgba(212, 168, 68, 0.12), transparent 58%),
+    radial-gradient(1100px 700px at 50% 112%, rgba(42, 30, 20, 0.4), transparent 66%),
+    repeating-linear-gradient(90deg, rgba(90, 64, 48, 0.04) 0 1px, transparent 1px 72px),
+    linear-gradient(180deg, #1a1210 0%, #1e1510 36%, #1a1210 100%);
   color: var(--text);
   font-family: var(--font-body);
   background-attachment: fixed;
@@ -43,10 +49,49 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 
 ::selection {
   background: color-mix(in oklab, var(--gold) 45%, transparent);
   color: var(--text);
+}
+
+.pixel-btn {
+  font-family: 'Silkscreen', monospace;
+  border: var(--pixel-border) solid #3b2a1a;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s, box-shadow 0.1s;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+  box-shadow:
+    inset -2px -2px 0 rgba(0, 0, 0, 0.2),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.1),
+    3px 3px 0 rgba(0, 0, 0, 0.3);
+}
+
+.pixel-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow:
+    inset -2px -2px 0 rgba(0, 0, 0, 0.2),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.1),
+    5px 5px 0 rgba(0, 0, 0, 0.3);
+}
+
+.pixel-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow:
+    inset 2px 2px 0 rgba(0, 0, 0, 0.2),
+    inset -2px -2px 0 rgba(255, 255, 255, 0.1),
+    1px 1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.pixel-box {
+  border: var(--pixel-border) solid var(--panel-border);
+  box-shadow:
+    inset -3px -3px 0 rgba(0, 0, 0, 0.12),
+    inset 3px 3px 0 rgba(255, 255, 255, 0.05),
+    4px 4px 0 rgba(0, 0, 0, 0.18);
 }

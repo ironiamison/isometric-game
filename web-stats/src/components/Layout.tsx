@@ -60,7 +60,7 @@ export function Layout() {
     <div className="relative flex min-h-screen overflow-x-clip bg-[var(--bg)]">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(1100px_520px_at_12%_-10%,rgba(56,123,199,0.28),transparent_62%),radial-gradient(900px_460px_at_96%_0%,rgba(217,178,95,0.15),transparent_58%),radial-gradient(1200px_740px_at_50%_100%,rgba(28,88,128,0.24),transparent_65%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_480px_at_12%_-10%,rgba(90,64,30,0.22),transparent_62%),radial-gradient(800px_440px_at_96%_0%,rgba(212,168,68,0.1),transparent_58%),radial-gradient(1100px_700px_at_50%_100%,rgba(42,30,20,0.28),transparent_65%)]"
       />
       {/* Mobile overlay */}
       {mobileOpen && (
@@ -73,7 +73,7 @@ export function Layout() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-[var(--panel-border)] bg-[linear-gradient(180deg,#12263a_0%,#112033_42%,#101c2d_100%)]
+          fixed top-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-[var(--panel-border)] bg-[linear-gradient(180deg,#2a1e14_0%,#231a10_42%,#1e150e_100%)]
           transition-transform duration-300 ease-in-out
           md:translate-x-0 md:sticky md:top-0 md:z-20
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -82,12 +82,12 @@ export function Layout() {
         {/* Brand */}
         <div className="flex flex-col items-start px-6 pt-7 pb-2">
           <span
-            className="text-xl font-semibold tracking-[0.24em] text-[var(--gold)]"
-            style={{ fontVariant: 'small-caps', fontFamily: 'var(--font-display)' }}
+            className="text-xl font-bold tracking-[0.24em] text-[var(--gold)]"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             NEW AEVEN
           </span>
-          <span className="mt-1 text-xs tracking-[0.24em] text-[var(--muted)] uppercase">
+          <span className="mt-1 text-xs tracking-[0.24em] text-[var(--muted)] uppercase" style={{ fontFamily: 'var(--font-display)' }}>
             World Statistics
           </span>
           <div className="mt-4 h-px w-full bg-gradient-to-r from-[var(--gold)]/40 via-[var(--panel-border)] to-transparent" />
@@ -118,8 +118,8 @@ export function Layout() {
         {/* Footer */}
         <div className="px-6 py-4">
           <div className="h-px w-full bg-[var(--panel-border)]" />
-          <p className="mt-3 text-[10px] tracking-[0.16em] text-[var(--muted)] uppercase">
-            Competitive player stats
+          <p className="mt-3 text-[10px] tracking-[0.16em] text-[var(--muted)] uppercase" style={{ fontFamily: 'var(--font-display)' }}>
+            World records & rankings
           </p>
         </div>
       </aside>
@@ -140,8 +140,8 @@ export function Layout() {
             </svg>
           </button>
           <span
-            className="text-sm font-semibold tracking-[0.2em] text-[var(--gold)]"
-            style={{ fontVariant: 'small-caps', fontFamily: 'var(--font-display)' }}
+            className="text-sm font-bold tracking-[0.2em] text-[var(--gold)]"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             NEW AEVEN
           </span>

@@ -47,23 +47,23 @@ export function OnlinePlayers() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold text-[#e2e4e9]">Online Players</h1>
+        <h1 className="text-2xl font-bold text-[var(--text)]">Online Players</h1>
         {data && (
-          <span className="rounded-full bg-[#c9a84c] px-3 py-0.5 text-sm font-semibold text-[#0f1117]">
+          <span className="rounded-full bg-[var(--gold)] px-3 py-0.5 text-sm font-bold text-[#1a1210]">
             {data.length}
           </span>
         )}
       </div>
 
-      <div className="bg-[#1a1d28] rounded-lg border border-[#2a2d38] overflow-x-auto">
+      <div className="pixel-box bg-[var(--panel)] rounded-lg overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-[#141722]">
+            <tr className="bg-[var(--panel-soft)]">
               {columns.map(col => (
                 <th
                   key={col.key}
                   onClick={() => toggleSort(col.key)}
-                  className="cursor-pointer px-4 py-3 text-left text-xs uppercase tracking-wider text-[#8b8fa3] select-none hover:text-[#e2e4e9] transition-colors"
+                  className="cursor-pointer px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--muted)] select-none hover:text-[var(--text)] transition-colors"
                 >
                   {col.label}
                   {sortKey === col.key && (
@@ -76,35 +76,35 @@ export function OnlinePlayers() {
           <tbody>
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i} className="border-b border-[#2a2d38]">
+                <tr key={i} className="border-b border-[var(--panel-border)]">
                   {columns.map(col => (
                     <td key={col.key} className="px-4 py-3">
-                      <div className="h-4 w-16 rounded bg-[#2a2d38] animate-pulse" />
+                      <div className="h-4 w-16 rounded bg-[var(--panel-soft)] animate-pulse" />
                     </td>
                   ))}
                 </tr>
               ))
             ) : sorted.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-12 text-center text-[#8b8fa3]">
-                  No adventurers are currently online
+                <td colSpan={columns.length} className="px-4 py-12 text-center text-[var(--muted)]">
+                  Nobody's online right now
                 </td>
               </tr>
             ) : (
               sorted.map(player => (
-                <tr key={player.name} className="border-b border-[#2a2d38] hover:bg-[#141722] transition-colors">
+                <tr key={player.name} className="border-b border-[var(--panel-border)] hover:bg-[var(--panel-soft)] transition-colors">
                   <td className="px-4 py-3">
                     <Link
                       to={`/player/${encodeURIComponent(player.name)}`}
-                      className="text-[#e2e4e9] hover:text-[var(--gold)]"
+                      className="text-[var(--text)] hover:text-[var(--gold)]"
                     >
                       {player.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 font-mono text-[#e2e4e9]">{player.combat_level}</td>
-                  <td className="px-4 py-3 font-mono text-[#e2e4e9]">{player.hitpoints_level}</td>
-                  <td className="px-4 py-3 font-mono text-[#e2e4e9]">{player.combat_skill_level}</td>
-                  <td className="px-4 py-3 font-mono text-[#e2e4e9]">{player.total_level}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.combat_level}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.hitpoints_level}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.combat_skill_level}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.total_level}</td>
                 </tr>
               ))
             )}

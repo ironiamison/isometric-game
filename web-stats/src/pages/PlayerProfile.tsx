@@ -81,7 +81,7 @@ export function PlayerProfile() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="h-36 animate-pulse rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-soft)]" />
+        <div className="h-36 animate-pulse rounded-xl border border-[var(--panel-border)] bg-[var(--panel-soft)]" />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-28 animate-pulse rounded-xl border border-[var(--panel-border)] bg-[var(--panel-soft)]" />
@@ -95,8 +95,8 @@ export function PlayerProfile() {
     return (
       <div className="space-y-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel)] p-6">
         <h1 className="text-2xl text-[var(--text)]">Player not found</h1>
-        <p className="text-[var(--text-soft)]">No profile data exists for “{playerName}”.</p>
-        <Link to="/leaderboards" className="inline-flex rounded-lg border border-[var(--panel-border)] bg-[var(--panel-soft)] px-3 py-2 text-sm text-[var(--text)]">
+        <p className="text-[var(--text-soft)]">No profile data exists for "{playerName}".</p>
+        <Link to="/leaderboards" className="pixel-btn inline-flex rounded-md bg-[var(--panel-soft)] px-3 py-2 text-sm text-[var(--text)]">
           Back to leaderboards
         </Link>
       </div>
@@ -107,8 +107,8 @@ export function PlayerProfile() {
 
   return (
     <div className="space-y-5">
-      <section className="relative overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-[radial-gradient(circle_at_25%_10%,rgba(217,178,95,0.26),transparent_50%),radial-gradient(circle_at_90%_0%,rgba(75,136,207,0.2),transparent_48%),var(--panel)] p-6 md:p-7">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Player Showcase</p>
+      <section className="pixel-box relative overflow-hidden rounded-xl bg-[radial-gradient(circle_at_25%_10%,rgba(212,168,68,0.22),transparent_50%),radial-gradient(circle_at_90%_0%,rgba(90,114,71,0.16),transparent_48%),var(--panel)] p-6 md:p-7">
+        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Player Showcase</p>
         <h1 className="mt-2 text-4xl text-[var(--text)]">{player.name}</h1>
         <div className="mt-3 flex flex-wrap gap-2 text-sm">
           <span className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-soft)] px-3 py-1 text-[var(--text-soft)]">
@@ -124,13 +124,13 @@ export function PlayerProfile() {
         <div className="mt-5 flex flex-wrap gap-3">
           <button
             onClick={copyUrl}
-            className="rounded-full border border-[var(--gold)] bg-[var(--gold)]/20 px-4 py-2 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--gold)]/30"
+            className="pixel-btn rounded-md bg-[var(--gold)] px-4 py-2 text-sm font-bold text-[#1a1210] hover:bg-[var(--gold-light)]"
           >
             {copied ? 'Link copied' : 'Copy profile URL'}
           </button>
           <Link
             to="/leaderboards"
-            className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-soft)] px-4 py-2 text-sm font-medium text-[var(--text-soft)] transition-colors hover:text-[var(--text)]"
+            className="pixel-btn rounded-md bg-[var(--panel-soft)] px-4 py-2 text-sm font-bold text-[var(--text-soft)] hover:text-[var(--text)]"
           >
             View all leaderboards
           </Link>
@@ -142,12 +142,12 @@ export function PlayerProfile() {
         {PROFILE_STATS.map((stat) => (
           <article
             key={stat.label}
-            className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel)] p-4"
+            className="pixel-box rounded-xl bg-[var(--panel)] p-4"
           >
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">{stat.label}</p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{stat.value(player)}</p>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>{stat.label}</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--text)]">{stat.value(player)}</p>
             <p className="mt-2 text-xs text-[var(--text-soft)]">
-              Global rank <span className="font-mono text-[var(--text)]">#{stat.rank(ranks)}</span>
+              Global rank <span className="font-mono text-[var(--gold)]">#{stat.rank(ranks)}</span>
             </p>
           </article>
         ))}

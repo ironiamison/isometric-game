@@ -21,24 +21,24 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-[radial-gradient(circle_at_20%_10%,rgba(76,135,206,0.2),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(217,178,95,0.3),transparent_50%),var(--panel)] px-6 py-8 md:px-8 md:py-10">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">World Pulse</p>
-        <h1 className="mt-2 text-4xl font-semibold text-[var(--text)] md:text-5xl">New Aeven Stats Hub</h1>
+      <section className="pixel-box relative overflow-hidden rounded-xl bg-[radial-gradient(circle_at_20%_10%,rgba(212,168,68,0.2),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(90,114,71,0.18),transparent_50%),var(--panel)] px-6 py-8 md:px-8 md:py-10">
+        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>World Pulse</p>
+        <h1 className="mt-2 text-4xl font-bold text-[var(--text)] md:text-5xl">New Aeven Stats</h1>
         <p className="mt-3 max-w-2xl text-sm text-[var(--text-soft)]">
-          Track rising players, compare skill progress, and claim spots on the Hall of Legends.
+          See who's been grinding, who's climbing the ranks, and who rules the boards.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
             to="/leaderboards"
-            className="rounded-full border border-[var(--gold)] bg-[var(--gold)]/20 px-4 py-2 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--gold)]/30"
+            className="pixel-btn rounded-md bg-[var(--gold)] px-4 py-2 text-sm font-bold text-[#1a1210] hover:bg-[var(--gold-light)]"
           >
-            View Leaderboards
+            Leaderboards
           </Link>
           <Link
             to="/players"
-            className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-soft)] px-4 py-2 text-sm font-medium text-[var(--text-soft)] transition-colors hover:text-[var(--text)]"
+            className="pixel-btn rounded-md bg-[var(--panel-soft)] px-4 py-2 text-sm font-bold text-[var(--text-soft)] hover:text-[var(--text)]"
           >
-            Watch Online Players
+            Online Players
           </Link>
         </div>
       </section>
@@ -62,7 +62,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <SpotlightBoard
           title="Top Total Level"
-          subtitle="Most progressed characters overall"
+          subtitle="Highest combined skill levels"
           metricLabel="Total Level"
           metric={(entry) => entry.total_level.toLocaleString()}
           data={topLevels}
@@ -70,7 +70,7 @@ export function Dashboard() {
         />
         <SpotlightBoard
           title="Top Monster Hunters"
-          subtitle="Players with the most monster defeats"
+          subtitle="Most monsters slain"
           metricLabel="Kills"
           metric={(entry) => entry.monster_kills.toLocaleString()}
           data={topHunters}
@@ -83,12 +83,12 @@ export function Dashboard() {
 
 function StatCard({ label, value, indicator }: { label: string; value: number; indicator?: boolean }) {
   return (
-    <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel)] p-5 transition-colors hover:border-[var(--gold)]/40">
+    <div className="pixel-box rounded-xl bg-[var(--panel)] p-5 transition-colors hover:border-[var(--gold)]/60">
       <div className="flex items-center gap-2">
-        {indicator && <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#4ade80] shadow-[0_0_8px_#4ade80]" />}
+        {indicator && <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--moss-light)] shadow-[0_0_8px_var(--moss-light)]" />}
         <span className="text-sm text-[var(--text-soft)]">{label}</span>
       </div>
-      <p className="mt-3 text-4xl font-semibold text-[var(--gold)]">{value.toLocaleString()}</p>
+      <p className="mt-3 text-4xl font-bold text-[var(--gold)]">{value.toLocaleString()}</p>
     </div>
   )
 }
@@ -96,8 +96,8 @@ function StatCard({ label, value, indicator }: { label: string; value: number; i
 function SkeletonCard() {
   return (
     <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel)] p-5">
-      <div className="h-4 w-28 animate-pulse rounded bg-[var(--panel-border)]" />
-      <div className="mt-4 h-10 w-20 animate-pulse rounded bg-[var(--panel-border)]" />
+      <div className="h-4 w-28 animate-pulse rounded bg-[var(--panel-soft)]" />
+      <div className="mt-4 h-10 w-20 animate-pulse rounded bg-[var(--panel-soft)]" />
     </div>
   )
 }
@@ -118,8 +118,8 @@ function SpotlightBoard({
   loading: boolean
 }) {
   return (
-    <section className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel)] p-5">
-      <h2 className="text-xl font-semibold text-[var(--text)]">{title}</h2>
+    <section className="pixel-box rounded-xl bg-[var(--panel)] p-5">
+      <h2 className="text-xl font-bold text-[var(--text)]">{title}</h2>
       <p className="mt-1 text-sm text-[var(--text-soft)]">{subtitle}</p>
       <div className="mt-4 space-y-2">
         {loading &&
