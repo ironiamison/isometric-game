@@ -3128,6 +3128,12 @@
       "x": 14,
       "y": 7,
       "level": 1
+    },
+    {
+      "entityId": "slime_blue",
+      "x": 0,
+      "y": 21,
+      "level": 1
     }
   ],
   "mapObjects": [

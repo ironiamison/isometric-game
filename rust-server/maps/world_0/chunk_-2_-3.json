@@ -5588,7 +5588,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "Oakshore_magic_shop",
-      "targetSpawn": ""
+      "targetSpawn": "enter"
     }
   ],
   "gatheringZones": []

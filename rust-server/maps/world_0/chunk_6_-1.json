@@ -25,8 +25,8 @@
       686,
       686,
       666,
-      366,
-      366,
+      666,
+      666,
       681,
       681,
       366,
@@ -189,11 +189,11 @@
       686,
       686,
       686,
-      686,
-      686,
-      686,
-      686,
-      666,
+      368,
+      368,
+      368,
+      368,
+      368,
       666,
       366,
       366,
@@ -222,10 +222,10 @@
       686,
       686,
       686,
-      686,
-      686,
-      686,
-      686,
+      368,
+      368,
+      368,
+      368,
       666,
       666,
       366,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "jAFMAEQAwACEAAYBBAQAAkQMAAx0DAAQLAz8J/wP4kTwD3GNAABxHAgAURwAAAkcAAAdDP8BHwzBAAEMMQDxDzEA8A8JADAACQEgADEHAIAdAwAAHQcAAAcLAACHBwAA/wMEAPwDAAQIIAAAACAAABlAAAgYAAAIGAAAAAAAAAA=",
+  "collision": "jAFAAEQAwACEAAABBAQAAkQM4A90DHgULAxILPwP6EzwD1+MAABpDAgAbw4AAAEOAAABDP8BAQzBAAEMMQDxDzEA8A8JADAACQEgADEHAIAdAwAAHQcAAAcLAACHBwAA/wMEAPwDAAQIIAAAACAAABlAAAgYAAAIGAAAAAAAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3439,20 +3439,6 @@
       "height": 95
     },
     {
-      "gid": 1538,
-      "x": 17,
-      "y": 13,
-      "width": 72,
-      "height": 63
-    },
-    {
-      "gid": 1539,
-      "x": 18,
-      "y": 12,
-      "width": 72,
-      "height": 63
-    },
-    {
       "gid": 1539,
       "x": 26,
       "y": 11,
@@ -3575,13 +3561,6 @@
       "gid": 1406,
       "x": 7,
       "y": 2,
-      "width": 30,
-      "height": 41
-    },
-    {
-      "gid": 1818,
-      "x": 22,
-      "y": 10,
       "width": 30,
       "height": 41
     }
@@ -3954,54 +3933,6 @@
       "edge": "right"
     },
     {
-      "gid": 193,
-      "x": 18,
-      "y": 13,
-      "edge": "right"
-    },
-    {
-      "gid": 194,
-      "x": 19,
-      "y": 13,
-      "edge": "right"
-    },
-    {
-      "gid": 195,
-      "x": 20,
-      "y": 13,
-      "edge": "right"
-    },
-    {
-      "gid": 196,
-      "x": 21,
-      "y": 12,
-      "edge": "down"
-    },
-    {
-      "gid": 198,
-      "x": 21,
-      "y": 11,
-      "edge": "down"
-    },
-    {
-      "gid": 199,
-      "x": 21,
-      "y": 10,
-      "edge": "down"
-    },
-    {
-      "gid": 200,
-      "x": 21,
-      "y": 9,
-      "edge": "down"
-    },
-    {
-      "gid": 201,
-      "x": 21,
-      "y": 8,
-      "edge": "down"
-    },
-    {
       "gid": 595,
       "x": 8,
       "y": 19,
@@ -4262,30 +4193,6 @@
     {
       "gid": 594,
       "x": 16,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 596,
-      "x": 26,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 596,
-      "x": 25,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 596,
-      "x": 24,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 596,
-      "x": 23,
       "y": 6,
       "edge": "down"
     },
@@ -4570,6 +4477,132 @@
       "x": 22,
       "y": 0,
       "edge": "right"
+    },
+    {
+      "gid": 906,
+      "x": 17,
+      "y": 10,
+      "edge": "down"
+    },
+    {
+      "gid": 907,
+      "x": 18,
+      "y": 10,
+      "edge": "down"
+    },
+    {
+      "gid": 908,
+      "x": 19,
+      "y": 10,
+      "edge": "down"
+    },
+    {
+      "gid": 910,
+      "x": 20,
+      "y": 10,
+      "edge": "down"
+    },
+    {
+      "gid": 911,
+      "x": 21,
+      "y": 10,
+      "edge": "down"
+    },
+    {
+      "gid": 912,
+      "x": 22,
+      "y": 10,
+      "edge": "down"
+    },
+    {
+      "gid": 913,
+      "x": 22,
+      "y": 10,
+      "edge": "right"
+    },
+    {
+      "gid": 914,
+      "x": 22,
+      "y": 9,
+      "edge": "right"
+    },
+    {
+      "gid": 915,
+      "x": 22,
+      "y": 8,
+      "edge": "right"
+    },
+    {
+      "gid": 916,
+      "x": 22,
+      "y": 7,
+      "edge": "right"
+    },
+    {
+      "gid": 917,
+      "x": 22,
+      "y": 6,
+      "edge": "right"
+    },
+    {
+      "gid": 918,
+      "x": 22,
+      "y": 5,
+      "edge": "right"
+    },
+    {
+      "gid": 595,
+      "x": 26,
+      "y": 6,
+      "edge": "right"
+    },
+    {
+      "gid": 595,
+      "x": 26,
+      "y": 5,
+      "edge": "right"
+    },
+    {
+      "gid": 598,
+      "x": 26,
+      "y": 4,
+      "edge": "down"
+    },
+    {
+      "gid": 598,
+      "x": 25,
+      "y": 4,
+      "edge": "down"
+    },
+    {
+      "gid": 598,
+      "x": 24,
+      "y": 4,
+      "edge": "down"
+    },
+    {
+      "gid": 598,
+      "x": 23,
+      "y": 4,
+      "edge": "down"
+    },
+    {
+      "gid": 598,
+      "x": 22,
+      "y": 4,
+      "edge": "down"
+    },
+    {
+      "gid": 989,
+      "x": 27,
+      "y": 7,
+      "edge": "right"
+    },
+    {
+      "gid": 989,
+      "x": 27,
+      "y": 6,
+      "edge": "right"
     }
   ],
   "portals": [
@@ -4579,7 +4612,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "swamp_house1",
-      "targetSpawn": ""
+      "targetSpawn": "enter"
     },
     {
       "x": 4,
@@ -4587,7 +4620,15 @@
       "width": 1,
       "height": 1,
       "targetMap": "swamp_starterzone_bank",
-      "targetSpawn": "entrance"
+      "targetSpawn": "enter"
+    },
+    {
+      "x": 20,
+      "y": 10,
+      "width": 1,
+      "height": 1,
+      "targetMap": "swamp_hairdresser",
+      "targetSpawn": ""
     }
   ],
   "gatheringZones": []

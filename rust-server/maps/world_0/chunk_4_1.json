@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "BwAAAQAA4AD//wCAAIAAgQCAAICc8wCAnPMAkJzzAIGc8wGF/3MAgQACAKEAAgCAnHMBwJzzgf+c80AAnPNBAfz/YAAAiEAAAIhAAJzzQACc80AAnPNAAJzzQAD8/0EAAJBAAACQQACc80EAn/9AAJzzQACc80AAnPNAAACgQAA=",
+  "collision": "BwCgAAAA4AD//wCAAIAAgQCAAICc8wCAnPMAkJzzAIGc8wGF/3cAgQACAKEAAgCAnHMBwJzzgf+c80AAnPNBAf3/YAAAiEAAAIhAAJzzQACc80AAnPNAAJzzQAD9/0EAAJBAAACQQACc80EAn/9AAJzzQACc80AAnPNAAACgQAA=",
   "entities": [
     {
       "entityId": "cow",
@@ -4620,6 +4620,27 @@
       "y": 15,
       "width": 23,
       "height": 39
+    },
+    {
+      "gid": 2688,
+      "x": 0,
+      "y": 23,
+      "width": 27,
+      "height": 61
+    },
+    {
+      "gid": 2688,
+      "x": 0,
+      "y": 16,
+      "width": 27,
+      "height": 61
+    },
+    {
+      "gid": 2688,
+      "x": 10,
+      "y": 9,
+      "width": 27,
+      "height": 61
     }
   ],
   "walls": [
@@ -5068,30 +5089,6 @@
       "edge": "right"
     },
     {
-      "gid": 193,
-      "x": 21,
-      "y": 1,
-      "edge": "right"
-    },
-    {
-      "gid": 194,
-      "x": 22,
-      "y": 1,
-      "edge": "right"
-    },
-    {
-      "gid": 195,
-      "x": 23,
-      "y": 1,
-      "edge": "right"
-    },
-    {
-      "gid": 196,
-      "x": 24,
-      "y": 0,
-      "edge": "down"
-    },
-    {
       "gid": 175,
       "x": 31,
       "y": 13,
@@ -5161,6 +5158,36 @@
       "gid": 175,
       "x": 31,
       "y": 9,
+      "edge": "right"
+    },
+    {
+      "gid": 193,
+      "x": 21,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 194,
+      "x": 22,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 195,
+      "x": 23,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 196,
+      "x": 23,
+      "y": 1,
+      "edge": "right"
+    },
+    {
+      "gid": 197,
+      "x": 23,
+      "y": 0,
       "edge": "right"
     }
   ],

@@ -3112,12 +3112,6 @@
       "level": 1
     },
     {
-      "entityId": "wolf_spider",
-      "x": 1,
-      "y": 1,
-      "level": 1
-    },
-    {
       "entityId": "snake",
       "x": 30,
       "y": 31,

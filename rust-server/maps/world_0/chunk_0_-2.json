@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAACAAAAAAAAAAAAAAAAACAIAAAAIAAMAAAAAAgAAAAAAAAAAAD//38AAiBAIAIgQAACIEAAAiBACAIAQAACAEAAAiBAAAIgQAACIEAAAiBAQP75eQAKkEAAAABAAAAAQAAAAEAAAgBAAAMAQBCCB0AIgg1AAPoEQAA=",
+  "collision": "AAAAAAAAAAACAAAAAAAAAAAAAAAAACAIAAAAIAAMAAAAAAgAAAAAAAAAAAD//38AAiBAIAIgQAACIEAAAiBACAIAQAACAEAAAiBAAAIgQAACIEAAAiBAQP75eQAKkEAAAABAAAAAQAAAAEAAAgBAAAMAQBCCB0AIgg1AAMIEQAA=",
   "entities": [
     {
       "entityId": "pig",
@@ -3568,13 +3568,6 @@
       "y": 7,
       "width": 25,
       "height": 54
-    },
-    {
-      "gid": 1540,
-      "x": 6,
-      "y": 31,
-      "width": 72,
-      "height": 95
     }
   ],
   "walls": [
@@ -3786,30 +3779,6 @@
       "gid": 172,
       "x": 1,
       "y": 11,
-      "edge": "down"
-    },
-    {
-      "gid": 174,
-      "x": 5,
-      "y": 31,
-      "edge": "down"
-    },
-    {
-      "gid": 174,
-      "x": 4,
-      "y": 31,
-      "edge": "down"
-    },
-    {
-      "gid": 174,
-      "x": 3,
-      "y": 31,
-      "edge": "down"
-    },
-    {
-      "gid": 174,
-      "x": 2,
-      "y": 31,
       "edge": "down"
     },
     {
@@ -4189,6 +4158,12 @@
       "x": 1,
       "y": 23,
       "edge": "right"
+    },
+    {
+      "gid": 172,
+      "x": 1,
+      "y": 31,
+      "edge": "down"
     }
   ],
   "portals": [],

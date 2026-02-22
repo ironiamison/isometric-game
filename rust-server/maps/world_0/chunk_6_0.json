@@ -3551,7 +3551,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "swamp_witch_house_treeseeds",
-      "targetSpawn": "entrance"
+      "targetSpawn": "enter"
     }
   ],
   "gatheringZones": []

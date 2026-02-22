@@ -3095,12 +3095,6 @@
     },
     {
       "entityId": "wolf_spider",
-      "x": 29,
-      "y": 9,
-      "level": 1
-    },
-    {
-      "entityId": "wolf_spider",
       "x": 24,
       "y": 16,
       "level": 1

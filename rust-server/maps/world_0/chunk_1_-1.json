@@ -3130,18 +3130,6 @@
       "level": 1
     },
     {
-      "entityId": "slime_green",
-      "x": 27,
-      "y": 19,
-      "level": 1
-    },
-    {
-      "entityId": "slime_green",
-      "x": 23,
-      "y": 24,
-      "level": 1
-    },
-    {
       "entityId": "slime_pink",
       "x": 25,
       "y": 5,
@@ -3163,6 +3151,12 @@
       "entityId": "lumberjack_pete",
       "x": 1,
       "y": 27,
+      "level": 1
+    },
+    {
+      "entityId": "slime_blue",
+      "x": 21,
+      "y": 25,
       "level": 1
     }
   ],
@@ -4259,7 +4253,7 @@
       "width": 1,
       "height": 1,
       "targetMap": "Oakmere_Church",
-      "targetSpawn": "entrance"
+      "targetSpawn": "enter"
     }
   ],
   "gatheringZones": []
