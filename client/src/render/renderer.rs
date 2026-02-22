@@ -4730,13 +4730,61 @@ impl Renderer {
                     let cull_top = -tile_margin;
                     let cull_bottom = screen_h + tile_margin;
 
+                    // For large interiors, limit tile iteration to visible world-space bounds
+                    let (min_local_x, max_local_x, min_local_y, max_local_y) = if interior_size.is_some() {
+                        let corners = [
+                            screen_to_world(cull_left, cull_top, &state.camera),
+                            screen_to_world(cull_right, cull_top, &state.camera),
+                            screen_to_world(cull_left, cull_bottom, &state.camera),
+                            screen_to_world(cull_right, cull_bottom, &state.camera),
+                        ];
+                        let mut min_world_x = f32::MAX;
+                        let mut max_world_x = f32::MIN;
+                        let mut min_world_y = f32::MAX;
+                        let mut max_world_y = f32::MIN;
+                        for (wx, wy) in corners {
+                            min_world_x = min_world_x.min(wx);
+                            max_world_x = max_world_x.max(wx);
+                            min_world_y = min_world_y.min(wy);
+                            max_world_y = max_world_y.max(wy);
+                        }
+
+                        // Extra margin (in tiles) to avoid edge pop-in
+                        let world_margin = 2.0;
+                        let min_world_x = (min_world_x - world_margin).floor() as i32;
+                        let max_world_x = (max_world_x + world_margin).ceil() as i32;
+                        let min_world_y = (min_world_y - world_margin).floor() as i32;
+                        let max_world_y = (max_world_y + world_margin).ceil() as i32;
+
+                        let tile_width_i = tile_width as i32;
+                        let tile_height_i = tile_height as i32;
+
+                        let min_local_x = (min_world_x - chunk_offset_x).clamp(0, tile_width_i.saturating_sub(1));
+                        let max_local_x = (max_world_x - chunk_offset_x).clamp(0, tile_width_i.saturating_sub(1));
+                        let min_local_y = (min_world_y - chunk_offset_y).clamp(0, tile_height_i.saturating_sub(1));
+                        let max_local_y = (max_world_y - chunk_offset_y).clamp(0, tile_height_i.saturating_sub(1));
+
+                        (min_local_x, max_local_x, min_local_y, max_local_y)
+                    } else {
+                        (
+                            0,
+                            tile_width.saturating_sub(1) as i32,
+                            0,
+                            tile_height.saturating_sub(1) as i32,
+                        )
+                    };
+
+                    if max_local_x < min_local_x || max_local_y < min_local_y {
+                        continue;
+                    }
+
                     // Render tiles in isometric order
-                    for local_y in 0..tile_height {
+                    for local_y in min_local_y..=max_local_y {
                         let row_sx = base_sx - local_y as f32 * dx;
                         let row_sy = base_sy + local_y as f32 * dy;
 
-                        for local_x in 0..tile_width {
-                            let idx = (local_y * tile_width + local_x) as usize;
+                        for local_x in min_local_x..=max_local_x {
+                            let idx = ((local_y as u32) * tile_width + (local_x as u32)) as usize;
                             let tile_id = layer.tiles.get(idx).copied().unwrap_or(0);
 
                             if tile_id == 0 {
