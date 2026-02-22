@@ -44,6 +44,7 @@ mod protocol;
 mod quest;
 mod shop;
 mod skills;
+mod slayer;
 mod spell;
 mod tilemap;
 mod woodcutting;
@@ -1340,7 +1341,7 @@ async fn stats_overview(State(state): State<AppState>) -> impl IntoResponse {
 
     // Count total characters and accounts from DB
     let pool = state.db.pool();
-    let total_characters: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM characters")
+    let total_characters: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM characters WHERE is_admin = FALSE")
         .fetch_one(pool)
         .await
         .unwrap_or(0);
@@ -1369,6 +1370,9 @@ async fn stats_online(State(state): State<AppState>) -> impl IntoResponse {
     let mut players = Vec::new();
     for entry in state.rooms.iter() {
         for p in entry.value().get_all_players().await {
+            if p.is_admin {
+                continue;
+            }
             players.push(OnlinePlayer {
                 name: p.name.clone(),
                 combat_level: p.skills.combat_level(),
@@ -1441,7 +1445,7 @@ struct PlayerProfileResponse {
 }
 
 async fn load_leaderboard_entries(state: &AppState) -> Vec<LeaderboardEntry> {
-    let rows = sqlx::query("SELECT name, skills_json, played_time, monster_kills FROM characters")
+    let rows = sqlx::query("SELECT name, skills_json, played_time, monster_kills FROM characters WHERE is_admin = FALSE")
         .fetch_all(state.db.pool())
         .await
         .unwrap_or_default();
