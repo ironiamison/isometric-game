@@ -31,6 +31,7 @@ pub enum SkillType {
     Woodcutting,
     Alchemy,
     Mining,
+    Slayer,
 }
 
 impl SkillType {
@@ -46,6 +47,7 @@ impl SkillType {
             SkillType::Woodcutting => "woodcutting",
             SkillType::Alchemy => "alchemy",
             SkillType::Mining => "mining",
+            SkillType::Slayer => "slayer",
         }
     }
 
@@ -61,6 +63,7 @@ impl SkillType {
             "woodcutting" => Some(SkillType::Woodcutting),
             "alchemy" => Some(SkillType::Alchemy),
             "mining" => Some(SkillType::Mining),
+            "slayer" => Some(SkillType::Slayer),
             _ => None,
         }
     }
@@ -77,7 +80,24 @@ impl SkillType {
             SkillType::Woodcutting => "Woodcutting",
             SkillType::Alchemy => "Alchemy",
             SkillType::Mining => "Mining",
+            SkillType::Slayer => "Slayer",
         }
+    }
+
+    pub fn all() -> &'static [SkillType] {
+        &[
+            SkillType::Hitpoints,
+            SkillType::Combat,
+            SkillType::Fishing,
+            SkillType::Farming,
+            SkillType::Smithing,
+            SkillType::Prayer,
+            SkillType::Magic,
+            SkillType::Woodcutting,
+            SkillType::Alchemy,
+            SkillType::Mining,
+            SkillType::Slayer,
+        ]
     }
 }
 
@@ -157,6 +177,8 @@ pub struct Skills {
     pub alchemy: Skill,
     #[serde(default)]
     pub mining: Skill,
+    #[serde(default)]
+    pub slayer: Skill,
 }
 
 impl Default for Skills {
@@ -179,6 +201,7 @@ impl Skills {
             woodcutting: Skill::new(1),
             alchemy: Skill::new(1),
             mining: Skill::new(1),
+            slayer: Skill::new(1),
         }
     }
 
@@ -201,6 +224,7 @@ impl Skills {
             SkillType::Woodcutting => &self.woodcutting,
             SkillType::Alchemy => &self.alchemy,
             SkillType::Mining => &self.mining,
+            SkillType::Slayer => &self.slayer,
         }
     }
 
@@ -217,6 +241,7 @@ impl Skills {
             SkillType::Woodcutting => &mut self.woodcutting,
             SkillType::Alchemy => &mut self.alchemy,
             SkillType::Mining => &mut self.mining,
+            SkillType::Slayer => &mut self.slayer,
         }
     }
 
@@ -239,5 +264,6 @@ impl Skills {
             + self.woodcutting.level
             + self.alchemy.level
             + self.mining.level
+            + self.slayer.level
     }
 }
