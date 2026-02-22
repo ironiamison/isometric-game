@@ -2414,8 +2414,9 @@ impl InputHandler {
                 // Handle scroll wheel for dialogue choices
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y.abs() > 0.0 {
+                    let max_scroll = layout.get_max_scroll(&UiElementId::DialogueScrollbar).unwrap_or(0.0);
                     state.ui_state.dialogue_scroll_offset =
-                        (state.ui_state.dialogue_scroll_offset - wheel_y * 20.0).max(0.0);
+                        (state.ui_state.dialogue_scroll_offset - wheel_y * 20.0).clamp(0.0, max_scroll);
                 }
             } else {
                 // No choices - Escape, Enter, or Space to continue/close
@@ -4249,16 +4250,31 @@ impl InputHandler {
             let (_, wheel_y) = mouse_wheel();
             if wheel_y.abs() > 0.1 {
                 let scroll_speed = 30.0;
+                let row_height = 32.0 * state.ui_state.ui_scale; // SOCIAL_ROW_HEIGHT * scale
+                let visible_h = layout.get_bounds(&UiElementId::SocialScrollArea)
+                    .map(|b| b.h)
+                    .unwrap_or(200.0);
                 match state.social_state.active_tab {
-                    crate::game::SocialTab::Nearby | crate::game::SocialTab::Online => {
+                    crate::game::SocialTab::Nearby => {
+                        let count = state.social_state.nearby_players.len();
+                        let max_scroll = (count as f32 * row_height - visible_h).max(0.0);
                         state.social_state.list_scroll_offset =
                             (state.social_state.list_scroll_offset - wheel_y * scroll_speed)
-                                .max(0.0);
+                                .clamp(0.0, max_scroll);
+                    }
+                    crate::game::SocialTab::Online => {
+                        let count = state.social_state.online_players.len();
+                        let max_scroll = (count as f32 * row_height - visible_h).max(0.0);
+                        state.social_state.list_scroll_offset =
+                            (state.social_state.list_scroll_offset - wheel_y * scroll_speed)
+                                .clamp(0.0, max_scroll);
                     }
                     crate::game::SocialTab::Friends => {
+                        let count = state.social_state.friends.len();
+                        let max_scroll = (count as f32 * row_height - visible_h).max(0.0);
                         state.social_state.friends_scroll_offset =
                             (state.social_state.friends_scroll_offset - wheel_y * scroll_speed)
-                                .max(0.0);
+                                .clamp(0.0, max_scroll);
                     }
                 }
             }
@@ -5813,21 +5829,23 @@ impl InputHandler {
                 );
                 if over_inventory {
                     const SCROLL_SPEED: f32 = 30.0;
+                    let max_scroll = layout.get_max_scroll(&UiElementId::InventoryScrollbar).unwrap_or(0.0);
                     state.ui_state.inventory_scroll_offset =
-                        (state.ui_state.inventory_scroll_offset - wheel_y * SCROLL_SPEED).max(0.0);
-                    // Max scroll will be clamped during rendering
+                        (state.ui_state.inventory_scroll_offset - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
                 }
             }
 
             // Mouse scrollbar dragging (generic system)
             if let Some(track_bounds) = layout.get_bounds(&UiElementId::InventoryScrollbar) {
+                let inv_max_scroll = layout.get_max_scroll(&UiElementId::InventoryScrollbar).unwrap_or(0.0);
+                let inv_content_h = inv_max_scroll + track_bounds.h;
                 let clicked_on = matches!(clicked_element, Some(UiElementId::InventoryScrollbar));
                 crate::ui::scroll::handle_scrollbar_drag(
                     &mut state.ui_state.inventory_scroll_drag,
                     &mut state.ui_state.inventory_scroll_offset,
-                    500.0, // max_scroll estimate (clamped later in rendering)
+                    inv_max_scroll,
                     track_bounds,
-                    500.0, // content_height estimate
+                    inv_content_h,
                     my,
                     is_mouse_button_down(MouseButton::Left),
                     mouse_clicked,
@@ -6159,22 +6177,22 @@ impl InputHandler {
             let (_wheel_x, wheel_y) = mouse_wheel();
             if wheel_y != 0.0 {
                 const SCROLL_SPEED: f32 = 30.0;
+                let max_scroll = layout.get_max_scroll(&UiElementId::QuestLogScrollbar).unwrap_or(0.0);
                 state.ui_state.quest_log_scroll =
-                    (state.ui_state.quest_log_scroll - wheel_y * SCROLL_SPEED).max(0.0);
-                // max_scroll is clamped in the renderer
+                    (state.ui_state.quest_log_scroll - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
             }
 
             // Scrollbar drag handling
             if let Some(track_bounds) = layout.get_bounds(&UiElementId::QuestLogScrollbar) {
-                // Use a generous content height estimate; actual max_scroll is clamped in renderer
-                let content_height = 2000.0;
+                let ql_max_scroll = layout.get_max_scroll(&UiElementId::QuestLogScrollbar).unwrap_or(0.0);
+                let ql_content_h = ql_max_scroll + track_bounds.h;
                 let clicked_on = matches!(clicked_element, Some(UiElementId::QuestLogScrollbar));
                 crate::ui::scroll::handle_scrollbar_drag(
                     &mut state.ui_state.quest_log_scroll_drag,
                     &mut state.ui_state.quest_log_scroll,
-                    content_height, // generous max, clamped in renderer
+                    ql_max_scroll,
                     track_bounds,
-                    content_height,
+                    ql_content_h,
                     my,
                     is_mouse_button_down(MouseButton::Left),
                     mouse_clicked,

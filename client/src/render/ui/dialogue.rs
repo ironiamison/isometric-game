@@ -714,6 +714,7 @@ impl Renderer {
             let max_scroll = (total_choice_content - visible_choice_height).max(0.0);
             let needs_scroll = max_scroll > 0.0;
             let clamped_scroll = scroll_offset.clamp(0.0, max_scroll);
+            layout.set_max_scroll(UiElementId::DialogueScrollbar, max_scroll);
 
             // Scrollbar margin
             let scrollbar_width: f32 = if is_mobile { 20.0 } else { 14.0 };
@@ -830,7 +831,7 @@ impl Renderer {
                 let track_h = visible_choice_height;
 
                 // Register scrollbar hit area
-                layout.add(
+                layout.add_scrollbar(
                     UiElementId::DialogueScrollbar,
                     Rect::new(track_x, track_y, scrollbar_width, track_h),
                 );

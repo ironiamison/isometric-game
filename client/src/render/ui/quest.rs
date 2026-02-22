@@ -231,6 +231,7 @@ impl Renderer {
             let max_scroll = (total_content_h - content_h).max(0.0);
             let scroll_offset = state.ui_state.quest_log_scroll.clamp(0.0, max_scroll);
             let needs_scroll = max_scroll > 0.0;
+            layout.set_max_scroll(UiElementId::QuestLogScrollbar, max_scroll);
 
             // Enable scissor clipping for scrollable content
             if needs_scroll {
@@ -368,7 +369,7 @@ impl Renderer {
                     Color::new(1.0, 1.0, 1.0, thumb_alpha),
                 );
                 // Register scrollbar bounds for drag interaction
-                layout.add(
+                layout.add_scrollbar(
                     UiElementId::QuestLogScrollbar,
                     Rect::new(scrollbar_x, track_y, scrollbar_w, track_h),
                 );
@@ -560,6 +561,7 @@ impl Renderer {
         let max_scroll = (total_h - content_h).max(0.0);
         let scroll_offset = state.ui_state.quest_log_scroll.clamp(0.0, max_scroll);
         let needs_scroll = max_scroll > 0.0;
+        layout.set_max_scroll(UiElementId::QuestLogScrollbar, max_scroll);
 
         // Enable scissor clipping
         if needs_scroll {
@@ -847,7 +849,7 @@ impl Renderer {
                 Color::new(1.0, 1.0, 1.0, thumb_alpha),
             );
             // Register scrollbar bounds for drag interaction
-            layout.add(
+            layout.add_scrollbar(
                 UiElementId::QuestLogScrollbar,
                 Rect::new(scrollbar_x, track_y, scrollbar_w, track_h),
             );

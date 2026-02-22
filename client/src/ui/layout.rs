@@ -202,26 +202,52 @@ pub struct UiElement {
 #[derive(Default)]
 pub struct UiLayout {
     pub elements: Vec<UiElement>,
+    /// Max scroll values stored by renderers for input handler to clamp against
+    scroll_limits: Vec<(UiElementId, f32)>,
 }
 
 impl UiLayout {
     pub fn new() -> Self {
         Self {
             elements: Vec::with_capacity(32),
+            scroll_limits: Vec::new(),
         }
     }
 
     pub fn clear(&mut self) {
         self.elements.clear();
+        self.scroll_limits.clear();
     }
 
     pub fn add(&mut self, id: UiElementId, bounds: Rect) {
         self.elements.push(UiElement { id, bounds });
     }
 
+    /// Add a scrollbar element with a wider hit area for easier clicking.
+    /// Visual bounds stay the same but the clickable area is padded to the left.
+    pub fn add_scrollbar(&mut self, id: UiElementId, bounds: Rect) {
+        const MIN_HIT_WIDTH: f32 = 20.0;
+        let extra = (MIN_HIT_WIDTH - bounds.w).max(0.0);
+        let hit_bounds = Rect::new(bounds.x - extra, bounds.y, bounds.w + extra, bounds.h);
+        self.elements.push(UiElement { id, bounds: hit_bounds });
+    }
+
     /// Get bounds for a specific element
     pub fn get_bounds(&self, id: &UiElementId) -> Option<Rect> {
         self.elements.iter().find(|e| &e.id == id).map(|e| e.bounds)
+    }
+
+    /// Store max scroll value for a scrollbar element (set by renderer)
+    pub fn set_max_scroll(&mut self, id: UiElementId, max_scroll: f32) {
+        self.scroll_limits.push((id, max_scroll));
+    }
+
+    /// Get max scroll value for a scrollbar element (read by input handler)
+    pub fn get_max_scroll(&self, id: &UiElementId) -> Option<f32> {
+        self.scroll_limits
+            .iter()
+            .find(|(eid, _)| eid == id)
+            .map(|(_, v)| *v)
     }
 
     /// Find element at mouse position (topmost - iterate in reverse)

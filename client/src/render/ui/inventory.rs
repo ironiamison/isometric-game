@@ -277,6 +277,9 @@ impl Renderer {
             .inventory_scroll_offset
             .clamp(0.0, max_scroll);
 
+        // Store max_scroll so input handler can clamp properly
+        layout.set_max_scroll(UiElementId::InventoryScrollbar, max_scroll);
+
         // Register grid area for scroll input detection
         if needs_scroll {
             let grid_area = Rect::new(inv_x, grid_y, inv_width, visible_grid_height);
@@ -455,7 +458,7 @@ impl Renderer {
             let track_y = grid_y;
             let track_h = visible_grid_height;
 
-            layout.add(
+            layout.add_scrollbar(
                 UiElementId::InventoryScrollbar,
                 Rect::new(track_x, track_y, scrollbar_w, track_h),
             );

@@ -323,7 +323,7 @@ impl Renderer {
                 Color::new(0.15, 0.15, 0.2, 1.0),
                 thumb_color,
             );
-            layout.add(
+            layout.add_scrollbar(
                 UiElementId::ShopBuyScrollbar,
                 Rect::new(scrollbar_x, list_y, scrollbar_track_w, list_height),
             );
@@ -525,7 +525,7 @@ impl Renderer {
                 Color::new(0.15, 0.15, 0.2, 1.0),
                 thumb_color,
             );
-            layout.add(
+            layout.add_scrollbar(
                 UiElementId::ShopSellScrollbar,
                 Rect::new(scrollbar_x, list_y, scrollbar_track_w, list_height),
             );

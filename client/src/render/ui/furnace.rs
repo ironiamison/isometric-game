@@ -570,7 +570,7 @@ impl Renderer {
             let is_hovered = matches!(hovered, Some(UiElementId::FurnaceScrollbar));
             let thumb_color = if is_dragging || is_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
             draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
-            layout.add(
+            layout.add_scrollbar(
                 UiElementId::FurnaceScrollbar,
                 Rect::new(scrollbar_x, scrollbar_y, scrollbar_w, scrollbar_track_h),
             );

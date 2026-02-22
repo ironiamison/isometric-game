@@ -820,7 +820,7 @@ impl Renderer {
             let is_hovered = matches!(hovered, Some(UiElementId::CraftingScrollbar));
             let thumb_color = if is_dragging || is_hovered { FRAME_ACCENT } else { FRAME_MID };
             draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
-            layout.add(
+            layout.add_scrollbar(
                 UiElementId::CraftingScrollbar,
                 Rect::new(scrollbar_x, scrollbar_y, scrollbar_w, scrollbar_track_h),
             );
