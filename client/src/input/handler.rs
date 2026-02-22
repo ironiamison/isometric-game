@@ -1545,33 +1545,28 @@ impl InputHandler {
                         state.ui_state.chat_message_scroll = 0.0;
                     }
                     UiElementId::ChatSendButton => {
-                        // Block sending on System tab
-                        if matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
-                            state.ui_state.chat_input.clear();
-                            state.ui_state.chat_cursor = 0;
+                        let text = state.ui_state.chat_input.trim().to_string();
+                        // Determine channel: ~ prefix forces global, otherwise match active tab
+                        // System tab sends to public channel
+                        let (send_text, channel) = if text.starts_with('~') {
+                            let trimmed = text[1..].trim().to_string();
+                            (trimmed, "global".to_string())
                         } else {
-                            let text = state.ui_state.chat_input.trim().to_string();
-                            // Determine channel: ~ prefix forces global, otherwise match active tab
-                            let (send_text, channel) = if text.starts_with('~') {
-                                let trimmed = text[1..].trim().to_string();
-                                (trimmed, "global".to_string())
-                            } else {
-                                let ch = match state.ui_state.chat_active_tab {
-                                    ChatChannel::Global => "global",
-                                    _ => "public",
-                                };
-                                (text.clone(), ch.to_string())
+                            let ch = match state.ui_state.chat_active_tab {
+                                ChatChannel::Global => "global",
+                                _ => "public",
                             };
-                            if !send_text.is_empty() {
-                                audio.play_sfx("send_message");
-                                commands.push(InputCommand::Chat {
-                                    text: send_text,
-                                    channel,
-                                });
-                            }
-                            state.ui_state.chat_input.clear();
-                            state.ui_state.chat_cursor = 0;
+                            (text.clone(), ch.to_string())
+                        };
+                        if !send_text.is_empty() {
+                            audio.play_sfx("send_message");
+                            commands.push(InputCommand::Chat {
+                                text: send_text,
+                                channel,
+                            });
                         }
+                        state.ui_state.chat_input.clear();
+                        state.ui_state.chat_cursor = 0;
                     }
                     UiElementId::ChatInputField => {
                         state.ui_state.chat_open = true;

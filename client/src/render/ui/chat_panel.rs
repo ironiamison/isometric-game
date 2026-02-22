@@ -166,12 +166,8 @@ impl Renderer {
         // === MESSAGE LIST ===
         let messages_y = tab_y + tab_h + 4.0 * s;
         let input_bar_h = 48.0 * s;
-        let is_system_tab = matches!(state.ui_state.chat_active_tab, ChatChannel::System);
-        let messages_h = if is_system_tab {
-            panel_y + panel_h - FRAME_THICKNESS - messages_y
-        } else {
-            panel_y + panel_h - FRAME_THICKNESS - input_bar_h - 4.0 * s - messages_y
-        };
+        let messages_h =
+            panel_y + panel_h - FRAME_THICKNESS - input_bar_h - 4.0 * s - messages_y;
         let messages_x = panel_x + FRAME_THICKNESS + 8.0;
         let messages_w = panel_w - FRAME_THICKNESS * 2.0 - 16.0;
 
@@ -297,8 +293,8 @@ impl Renderer {
             draw_rectangle(track_x + 1.0, thumb_y, scrollbar_w - 2.0, thumb_h, thumb_color);
         }
 
-        // === INPUT BAR (hidden on System tab) ===
-        if !is_system_tab {
+        // === INPUT BAR ===
+        {
             let input_y = panel_y + panel_h - FRAME_THICKNESS - input_bar_h;
             let send_btn_w = 60.0 * s;
             let input_w = panel_w - FRAME_THICKNESS * 2.0 - send_btn_w - 12.0;
