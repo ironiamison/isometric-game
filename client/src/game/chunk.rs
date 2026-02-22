@@ -213,6 +213,13 @@ pub struct ChunkManager {
     view_radius: i32,
     /// Interior mode - if Some, we're in an interior with (width, height)
     interior_size: Option<(u32, u32)>,
+    /// Cached overworld chunks while inside an interior
+    overworld_cache: Option<OverworldCache>,
+}
+
+struct OverworldCache {
+    chunks: HashMap<ChunkCoord, Chunk>,
+    current_chunk: ChunkCoord,
 }
 
 impl ChunkManager {
@@ -224,6 +231,7 @@ impl ChunkManager {
             // Keep one extra chunk ring loaded beyond the visible minimap edge.
             view_radius: WORLD_VIEW_RADIUS.max(MINIMAP_VISIBLE_RADIUS + MINIMAP_PRELOAD_RING),
             interior_size: None,
+            overworld_cache: None,
         }
     }
 
@@ -501,8 +509,15 @@ impl ChunkManager {
         objects: Vec<MapObject>,
         walls: Vec<Wall>,
     ) {
-        // Clear existing chunks
-        self.chunks.clear();
+        // Cache overworld chunks when entering an interior
+        if self.interior_size.is_none() {
+            self.overworld_cache = Some(OverworldCache {
+                chunks: std::mem::take(&mut self.chunks),
+                current_chunk: self.current_chunk,
+            });
+        } else {
+            self.chunks.clear();
+        }
         self.pending_requests.clear();
 
         // Set interior mode with dimensions
@@ -536,8 +551,13 @@ impl ChunkManager {
 
     /// Clear interior and prepare for overworld
     pub fn clear_interior(&mut self) {
-        self.chunks.clear();
-        self.pending_requests.clear();
         self.interior_size = None;
+        self.pending_requests.clear();
+        if let Some(cache) = self.overworld_cache.take() {
+            self.chunks = cache.chunks;
+            self.current_chunk = cache.current_chunk;
+        } else {
+            self.chunks.clear();
+        }
     }
 }

@@ -51,6 +51,8 @@ const STATE_SYNC_MIN_QUEUE_CAPACITY: usize = 8;
 // World spawn point (chunk 0,0) - where players respawn after death
 const WORLD_SPAWN_X: i32 = 15;
 const WORLD_SPAWN_Y: i32 = 4;
+// Preload a small ring of overworld chunks near spawn at startup and on transitions
+pub const SPAWN_PRELOAD_RADIUS: i32 = 3;
 
 // ============================================================================
 // NPC Speech Helper
@@ -817,6 +819,19 @@ impl GameRoom {
     ) -> Self {
         let (tx, _) = broadcast::channel(256);
         let world = Arc::new(World::new("maps/world_0"));
+        let (spawn_x, spawn_y) = world.get_spawn_position().await;
+        let spawn_chunk = ChunkCoord::from_world(spawn_x, spawn_y);
+        tracing::info!(
+            "Preloading overworld chunks around spawn ({}, {}) at chunk ({}, {}) radius {}",
+            spawn_x,
+            spawn_y,
+            spawn_chunk.x,
+            spawn_chunk.y,
+            SPAWN_PRELOAD_RADIUS
+        );
+        world
+            .preload_chunks(spawn_chunk, SPAWN_PRELOAD_RADIUS)
+            .await;
 
         // Create quest runner with the registry
         let quest_runner = Arc::new(QuestRunner::new(quest_registry.clone()));

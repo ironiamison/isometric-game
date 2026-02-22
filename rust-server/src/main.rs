@@ -2721,6 +2721,15 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                     room.set_player_position(player_id, spawn_x as i32, spawn_y as i32)
                         .await;
 
+                    // Preload chunks around the overworld spawn before transitioning
+                    let spawn_chunk = chunk::ChunkCoord::from_world(
+                        spawn_x.floor() as i32,
+                        spawn_y.floor() as i32,
+                    );
+                    room.world()
+                        .preload_chunks(spawn_chunk, game::SPAWN_PRELOAD_RADIUS)
+                        .await;
+
                     // Send transition back to overworld
                     room.send_to_player(
                         player_id,
@@ -3373,6 +3382,13 @@ async fn handle_client_message(
                         // Send map transition to overworld
                         let spawn_x = -30.0_f32;
                         let spawn_y = 19.0_f32;
+                        let spawn_chunk = chunk::ChunkCoord::from_world(
+                            spawn_x.floor() as i32,
+                            spawn_y.floor() as i32,
+                        );
+                        room.world()
+                            .preload_chunks(spawn_chunk, game::SPAWN_PRELOAD_RADIUS)
+                            .await;
                         room.send_to_player(
                             player_id,
                             ServerMessage::MapTransition {
