@@ -329,7 +329,7 @@ pub struct Renderer {
     /// Wall sprites by filename number (e.g., "101")
     wall_sprites: SpriteStore,
     /// NPC sprites by entity type (e.g., "pig" -> Texture2D)
-    npc_sprites: SpritesheetStore,
+    pub(crate) npc_sprites: SpritesheetStore,
     /// Multi-size pixel font for sharp text rendering at various sizes
     font: BitmapFont,
     /// Quest complete banner texture
@@ -8536,10 +8536,18 @@ impl Renderer {
             let globe_stats_y = preview.y + 20.0;
             self.render_xp_globes(&state.xp_globes, globe_anchor_x, globe_stats_y);
 
-            // XP Drop Feed (below gathering status or MP bar)
+            // Slayer task chip (below gathering/dash indicators)
             let has_dash_bar = state.dash_cooldown_end > current_time;
+            let slayer_chip_y = prayer_bar_y + bar_height + 4.0 * s
+                + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
+                + if has_dash_bar { 22.0 * s + 4.0 * s } else { 0.0 };
+            let has_slayer_chip = state.ui_state.slayer_current_task.is_some();
+            self.render_slayer_task_chip(state, bar_x, slayer_chip_y);
+
+            // XP Drop Feed (below gathering status or MP bar)
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 }
-                + if has_dash_bar { 22.0 + 4.0 } else { 0.0 };
+                + if has_dash_bar { 22.0 + 4.0 } else { 0.0 }
+                + if has_slayer_chip { 60.0 } else { 0.0 };
             let drop_start_y = mp_bar_y + bar_height + extra_offset + 145.0;
             self.render_xp_drop_feed(&state.xp_drop_feed, 10.0, drop_start_y);
         }

@@ -16,6 +16,74 @@ const TAB_NAMES: [&str; 3] = ["Potions", "Unlocks", "Blocks"];
 const TAB_CATEGORIES: [&str; 3] = ["potion", "unlock", "block"];
 
 impl Renderer {
+    /// Render a small HUD chip below the stat bars showing current slayer task
+    pub(crate) fn render_slayer_task_chip(&self, state: &GameState, x: f32, y: f32) {
+        let task = match &state.ui_state.slayer_current_task {
+            Some(t) => t,
+            None => return,
+        };
+
+        let s = state.ui_state.ui_scale;
+        let chip_w = 140.0 * s;
+        let sprite_area = 32.0 * s;
+        let text_h = 16.0 * s;
+        let padding = 4.0 * s;
+        let chip_h = padding + sprite_area + padding + text_h + padding;
+
+        // Semi-transparent dark background
+        draw_rectangle(x, y, chip_w, chip_h, Color::from_rgba(0, 0, 0, 180));
+        draw_rectangle_lines(x, y, chip_w, chip_h, 1.0, Color::from_rgba(80, 70, 55, 180));
+
+        // Draw NPC sprite (idle frame 0, down-facing)
+        let sprite_x = x + (chip_w - sprite_area) / 2.0;
+        let sprite_y = y + padding;
+
+        if let Some((npc_texture, npc_atlas_offset)) =
+            self.npc_sprites.get(&task.monster_id)
+        {
+            let (tex_w, tex_h): (f32, f32) = self
+                .npc_sprites
+                .get_dimensions(&task.monster_id)
+                .unwrap_or((npc_texture.width(), npc_texture.height()));
+            let frame_width = tex_w / 16.0;
+            let frame_height = tex_h;
+            let (atlas_x, atlas_y): (f32, f32) = npc_atlas_offset.unwrap_or((0.0, 0.0));
+
+            // Frame 0 = idle down-facing
+            let source = Rect::new(atlas_x, atlas_y, frame_width, frame_height);
+
+            // Scale to fit sprite_area while maintaining aspect ratio
+            let scale = (sprite_area / frame_width).min(sprite_area / frame_height);
+            let draw_w = frame_width * scale;
+            let draw_h = frame_height * scale;
+            let draw_x = sprite_x + (sprite_area - draw_w) / 2.0;
+            let draw_y = sprite_y + (sprite_area - draw_h) / 2.0;
+
+            draw_texture_ex(
+                npc_texture,
+                draw_x,
+                draw_y,
+                WHITE,
+                DrawTextureParams {
+                    source: Some(source),
+                    dest_size: Some(Vec2::new(draw_w, draw_h)),
+                    ..Default::default()
+                },
+            );
+        }
+
+        // Kill count text
+        let count_text = format!("{}/{}", task.kills_current, task.kills_required);
+        let count_dims = self.measure_text_sharp(&count_text, 16.0);
+        self.draw_text_sharp(
+            &count_text,
+            (x + (chip_w - count_dims.width) / 2.0).floor(),
+            (y + padding + sprite_area + padding + text_h * 0.78).floor(),
+            16.0,
+            TEXT_NORMAL,
+        );
+    }
+
     pub(crate) fn render_slayer_panel(
         &self,
         state: &GameState,
