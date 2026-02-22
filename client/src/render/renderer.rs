@@ -9150,8 +9150,9 @@ impl Renderer {
     /// Word-wrap text to fit within a given width (approximate, assumes ~8px per char at size 16)
     /// Prefers breaking on word boundaries, but will break long words if necessary
     pub(crate) fn wrap_text(&self, text: &str, max_width: f32, font_size: f32) -> Vec<String> {
+        let scaled_size = self.scaled_font_size(font_size);
         let width_key = (max_width * 100.0).round() as i32;
-        let font_key = (font_size * 100.0).round() as i32;
+        let font_key = (scaled_size * 100.0).round() as i32;
         let bucket_key = (width_key, font_key);
 
         if let Some(bucket) = self.text_wrap_cache.borrow().get(&bucket_key) {
@@ -9160,7 +9161,7 @@ impl Renderer {
             }
         }
 
-        let wrapped = Self::wrap_text_uncached(text, max_width, font_size);
+        let wrapped = Self::wrap_text_uncached(text, max_width, scaled_size);
         let mut cache = self.text_wrap_cache.borrow_mut();
         let bucket = cache.entry(bucket_key).or_default();
         if bucket.len() < TEXT_WRAP_CACHE_BUCKET_LIMIT {
