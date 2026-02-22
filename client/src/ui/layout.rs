@@ -194,6 +194,15 @@ pub enum UiElementId {
     AnvilScrollbar,
     AnvilTabMaterials,
     AnvilTabEquipment,
+
+    // Slayer Panel
+    SlayerCloseButton,
+    SlayerGetTaskButton,
+    SlayerCancelTaskButton,
+    SlayerRewardTab(usize),
+    SlayerBuyReward(usize),
+    SlayerRemoveBlock(usize),
+    SlayerScrollArea,
 }
 
 /// A single interactive UI element with its bounds

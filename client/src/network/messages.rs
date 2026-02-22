@@ -194,6 +194,22 @@ pub enum ClientMessage {
     #[serde(rename = "startCraftBatch")]
     StartCraftBatch { recipe_id: String, quantity: u32 },
 
+    // Slayer commands
+    #[serde(rename = "slayerGetTask")]
+    SlayerGetTask { master_id: String },
+
+    #[serde(rename = "slayerCancelTask")]
+    SlayerCancelTask,
+
+    #[serde(rename = "slayerBuyReward")]
+    SlayerBuyReward {
+        reward_id: String,
+        target_monster_id: Option<String>,
+    },
+
+    #[serde(rename = "slayerRemoveBlock")]
+    SlayerRemoveBlock { monster_id: String },
+
     // Ping for latency measurement
     #[serde(rename = "ping")]
     Ping { timestamp: f64 },
@@ -478,6 +494,28 @@ impl ClientMessage {
                 data.insert("recipe_id".into(), Value::String(recipe_id.clone().into()));
                 data.insert("quantity".into(), Value::from(*quantity as i64));
                 "startCraftBatch"
+            }
+            ClientMessage::SlayerGetTask { master_id } => {
+                data.insert("master_id".into(), Value::String(master_id.clone().into()));
+                "slayerGetTask"
+            }
+            ClientMessage::SlayerCancelTask => "slayerCancelTask",
+            ClientMessage::SlayerBuyReward {
+                reward_id,
+                target_monster_id,
+            } => {
+                data.insert("reward_id".into(), Value::String(reward_id.clone().into()));
+                if let Some(target) = target_monster_id {
+                    data.insert(
+                        "target_monster_id".into(),
+                        Value::String(target.clone().into()),
+                    );
+                }
+                "slayerBuyReward"
+            }
+            ClientMessage::SlayerRemoveBlock { monster_id } => {
+                data.insert("monster_id".into(), Value::String(monster_id.clone().into()));
+                "slayerRemoveBlock"
             }
             ClientMessage::Ping { timestamp } => {
                 data.insert("timestamp".into(), Value::F64(*timestamp));
