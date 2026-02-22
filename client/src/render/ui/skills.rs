@@ -1,5 +1,5 @@
 //! Skills panel rendering - compact 4x3 grid showing skill levels
-//! 10 active skills, 2 locked placeholder slots
+//! 11 active skills, 1 locked placeholder slot
 
 use super::super::Renderer;
 use super::common::*;
@@ -33,7 +33,7 @@ const UI_ICON_SIZE: f32 = 24.0;
 const UI_ICON_COLS: usize = 10;
 
 /// Active skills in display order
-const ACTIVE_SKILLS: [SkillType; 10] = [
+const ACTIVE_SKILLS: [SkillType; 11] = [
     SkillType::Hitpoints,
     SkillType::Combat,
     SkillType::Fishing,
@@ -44,6 +44,7 @@ const ACTIVE_SKILLS: [SkillType; 10] = [
     SkillType::Prayer,
     SkillType::Magic,
     SkillType::Alchemy,
+    SkillType::Slayer,
 ];
 
 impl Renderer {
