@@ -18,8 +18,8 @@ use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Scree
 
 use crate::game::tutorial::TutorialManager;
 
-pub const SERVER_URL: &str = "https://aeven.xyz:2567";
-pub const WS_URL: &str = "wss://aeven.xyz:2567";
+pub const SERVER_URL: &str = "https://aeven.xyz";
+pub const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds

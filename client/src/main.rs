@@ -26,8 +26,8 @@ use auth::AuthSession;
 #[cfg(not(target_arch = "wasm32"))]
 use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
-const SERVER_URL: &str = "https://aeven.xyz:2567";
-const WS_URL: &str = "wss://aeven.xyz:2567";
+const SERVER_URL: &str = "https://aeven.xyz";
+const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
