@@ -54,6 +54,21 @@ const WORLD_SPAWN_Y: i32 = 4;
 // Preload a small ring of overworld chunks near spawn at startup and on transitions
 pub const SPAWN_PRELOAD_RADIUS: i32 = 3;
 
+/// Compute a facing Direction from a delta (dx, dy) vector.
+fn direction_from_delta(dx: i32, dy: i32) -> Direction {
+    match (dx.signum(), dy.signum()) {
+        (0, -1) => Direction::Up,
+        (0, 1) => Direction::Down,
+        (-1, 0) => Direction::Left,
+        (1, 0) => Direction::Right,
+        (-1, -1) => Direction::UpLeft,
+        (1, -1) => Direction::UpRight,
+        (-1, 1) => Direction::DownLeft,
+        (1, 1) => Direction::DownRight,
+        _ => Direction::Down, // fallback
+    }
+}
+
 // ============================================================================
 // NPC Speech Helper
 // ============================================================================
@@ -12000,6 +12015,271 @@ impl GameRoom {
         for (id, x, y) in respawned_npcs {
             self.broadcast(ServerMessage::NpcRespawned { id, x, y })
                 .await;
+        }
+
+        // ====================================================================
+        // AUTO-ACTION PROCESSING
+        // ====================================================================
+        // Process auto-actions for all players (OSRS-style click-to-act).
+        // This runs after NPC combat so interruption-by-damage has already been applied.
+        {
+            // Collect players with active auto-actions
+            let auto_action_players: Vec<(String, AutoAction)> = {
+                let players = self.players.read().await;
+                players
+                    .iter()
+                    .filter_map(|(id, p)| {
+                        if p.active && !p.is_dead {
+                            p.auto_action.as_ref().map(|a| (id.clone(), a.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            };
+
+            for (pid, auto_action) in auto_action_players {
+                match (&auto_action.target, &auto_action.action) {
+                    (AutoActionTarget::Npc { npc_id }, AutoActionType::Attack) => {
+                        // Validate NPC target is still alive
+                        let npc_alive = {
+                            let npcs = self.npcs.read().await;
+                            npcs.get(npc_id).map_or(false, |n| n.is_alive())
+                        };
+                        if !npc_alive {
+                            self.clear_auto_action(&pid, "target_dead").await;
+                            continue;
+                        }
+
+                        // Check if in range and cooldown ready
+                        let (in_range, cooldown_ready) = {
+                            let players = self.players.read().await;
+                            let npcs = self.npcs.read().await;
+                            if let (Some(player), Some(npc)) =
+                                (players.get(&pid), npcs.get(npc_id))
+                            {
+                                let dx = (player.x - npc.x).abs();
+                                let dy = (player.y - npc.y).abs();
+                                // Get weapon range
+                                let weapon_range = if let Some(ref weapon_id) =
+                                    player.equipped_weapon
+                                {
+                                    if let Some(item_def) = self.item_registry.get(weapon_id) {
+                                        item_def
+                                            .equipment
+                                            .as_ref()
+                                            .map_or(1, |e| e.range)
+                                    } else {
+                                        1
+                                    }
+                                } else {
+                                    1
+                                };
+                                let in_range = dx <= weapon_range && dy <= weapon_range
+                                    && (dx > 0 || dy > 0);
+                                let cooldown_ready =
+                                    current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
+                                (in_range, cooldown_ready)
+                            } else {
+                                (false, false)
+                            }
+                        };
+
+                        if in_range && cooldown_ready {
+                            // Auto-face toward target before attacking
+                            {
+                                let npcs = self.npcs.read().await;
+                                if let Some(npc) = npcs.get(npc_id) {
+                                    let mut players = self.players.write().await;
+                                    if let Some(player) = players.get_mut(&pid) {
+                                        let dx = npc.x - player.x;
+                                        let dy = npc.y - player.y;
+                                        player.direction = direction_from_delta(dx, dy);
+                                        // Set target_id so handle_attack finds the right target
+                                        player.target_id = Some(npc_id.clone());
+                                    }
+                                }
+                            }
+                            // Reuse existing attack handler
+                            self.handle_attack(&pid).await;
+                        }
+                    }
+
+                    (AutoActionTarget::Player { player_id: target_pid }, AutoActionType::Attack) => {
+                        // Validate player target is still alive and connected
+                        let target_valid = {
+                            let players = self.players.read().await;
+                            players
+                                .get(target_pid.as_str())
+                                .map_or(false, |p| p.active && !p.is_dead)
+                        };
+                        if !target_valid {
+                            self.clear_auto_action(&pid, "target_dead").await;
+                            continue;
+                        }
+
+                        // Check same instance context
+                        let same_context = {
+                            let instances = self.player_instances.read().await;
+                            instances.get(pid.as_str()) == instances.get(target_pid.as_str())
+                        };
+                        if !same_context {
+                            self.clear_auto_action(&pid, "interrupted").await;
+                            continue;
+                        }
+
+                        // Check range and cooldown
+                        let (in_range, cooldown_ready) = {
+                            let players = self.players.read().await;
+                            if let (Some(attacker), Some(target)) =
+                                (players.get(&pid), players.get(target_pid.as_str()))
+                            {
+                                let dx = (attacker.x - target.x).abs();
+                                let dy = (attacker.y - target.y).abs();
+                                let weapon_range = if let Some(ref weapon_id) =
+                                    attacker.equipped_weapon
+                                {
+                                    if let Some(item_def) = self.item_registry.get(weapon_id) {
+                                        item_def
+                                            .equipment
+                                            .as_ref()
+                                            .map_or(1, |e| e.range)
+                                    } else {
+                                        1
+                                    }
+                                } else {
+                                    1
+                                };
+                                let in_range = dx <= weapon_range && dy <= weapon_range
+                                    && (dx > 0 || dy > 0);
+                                let cooldown_ready =
+                                    current_time - attacker.last_attack_time >= ATTACK_COOLDOWN_MS;
+                                (in_range, cooldown_ready)
+                            } else {
+                                (false, false)
+                            }
+                        };
+
+                        if in_range && cooldown_ready {
+                            // Auto-face toward target
+                            {
+                                let mut players = self.players.write().await;
+                                let target_pos = players
+                                    .get(target_pid.as_str())
+                                    .map(|p| (p.x, p.y));
+                                if let Some((tx, ty)) = target_pos {
+                                    if let Some(player) = players.get_mut(&pid) {
+                                        let dx = tx - player.x;
+                                        let dy = ty - player.y;
+                                        player.direction = direction_from_delta(dx, dy);
+                                        player.target_id = Some(target_pid.clone());
+                                    }
+                                }
+                            }
+                            self.handle_attack(&pid).await;
+                        }
+                    }
+
+                    (AutoActionTarget::Resource { x, y, gid }, AutoActionType::Mine) => {
+                        // Check if rock is depleted
+                        let is_depleted = {
+                            let mining = self.mining.read().await;
+                            mining.is_rock_depleted(*x, *y)
+                        };
+                        if is_depleted {
+                            self.clear_auto_action(&pid, "target_depleted").await;
+                            continue;
+                        }
+
+                        // Check adjacency and cooldown
+                        let (adjacent, cooldown_ready, inventory_full) = {
+                            let players = self.players.read().await;
+                            if let Some(player) = players.get(&pid) {
+                                let dx = (player.x - x).abs();
+                                let dy = (player.y - y).abs();
+                                let adjacent =
+                                    (dx <= 1 && dy <= 1) && (dx > 0 || dy > 0);
+                                let cooldown_ready =
+                                    current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
+                                let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
+                                (adjacent, cooldown_ready, inventory_full)
+                            } else {
+                                (false, false, false)
+                            }
+                        };
+
+                        if inventory_full {
+                            self.clear_auto_action(&pid, "inventory_full").await;
+                            continue;
+                        }
+
+                        if adjacent && cooldown_ready {
+                            // Auto-face toward resource
+                            {
+                                let mut players = self.players.write().await;
+                                if let Some(player) = players.get_mut(&pid) {
+                                    let ddx = x - player.x;
+                                    let ddy = y - player.y;
+                                    player.direction = direction_from_delta(ddx, ddy);
+                                }
+                            }
+                            self.handle_mine_rock(&pid, *x, *y, *gid).await;
+                        }
+                    }
+
+                    (AutoActionTarget::Resource { x, y, gid }, AutoActionType::Chop) => {
+                        // Check if tree is depleted
+                        let is_depleted = {
+                            let woodcutting = self.woodcutting.read().await;
+                            woodcutting.is_tree_depleted(*x, *y)
+                        };
+                        if is_depleted {
+                            self.clear_auto_action(&pid, "target_depleted").await;
+                            continue;
+                        }
+
+                        // Check adjacency and cooldown
+                        let (adjacent, cooldown_ready, inventory_full) = {
+                            let players = self.players.read().await;
+                            if let Some(player) = players.get(&pid) {
+                                let dx = (player.x - x).abs();
+                                let dy = (player.y - y).abs();
+                                let adjacent =
+                                    (dx <= 1 && dy <= 1) && (dx > 0 || dy > 0);
+                                let cooldown_ready =
+                                    current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
+                                let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
+                                (adjacent, cooldown_ready, inventory_full)
+                            } else {
+                                (false, false, false)
+                            }
+                        };
+
+                        if inventory_full {
+                            self.clear_auto_action(&pid, "inventory_full").await;
+                            continue;
+                        }
+
+                        if adjacent && cooldown_ready {
+                            // Auto-face toward resource
+                            {
+                                let mut players = self.players.write().await;
+                                if let Some(player) = players.get_mut(&pid) {
+                                    let ddx = x - player.x;
+                                    let ddy = y - player.y;
+                                    player.direction = direction_from_delta(ddx, ddy);
+                                }
+                            }
+                            self.handle_chop_tree(&pid, *x, *y, *gid).await;
+                        }
+                    }
+
+                    // Invalid combinations (e.g. Attack on Resource) — just clear
+                    _ => {
+                        self.clear_auto_action(&pid, "interrupted").await;
+                    }
+                }
+            }
         }
 
         // Check for expired items (60 second lifetime)
