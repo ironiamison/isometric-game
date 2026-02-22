@@ -232,6 +232,36 @@ impl Direction {
 }
 
 // ============================================================================
+// Auto-Action System (OSRS-style click-to-act)
+// ============================================================================
+
+/// What the player is auto-acting on
+#[derive(Debug, Clone)]
+pub enum AutoActionTarget {
+    Npc { npc_id: String },
+    Player { player_id: String },
+    Resource { x: i32, y: i32, gid: u32 },
+}
+
+/// What type of action to repeat
+#[derive(Debug, Clone, PartialEq)]
+pub enum AutoActionType {
+    Attack,
+    Mine,
+    Chop,
+}
+
+/// Server-authoritative auto-action state. When set, the tick loop
+/// automatically repeats the action whenever cooldown is ready and
+/// the player is in range of the target.
+#[derive(Debug, Clone)]
+pub struct AutoAction {
+    pub target: AutoActionTarget,
+    pub action: AutoActionType,
+    pub started_at: u64,
+}
+
+// ============================================================================
 // Player
 // ============================================================================
 
@@ -304,6 +334,8 @@ pub struct Player {
     pub last_dash_tick: u64,
     /// True during the tick the player dashed (for StateSync broadcast)
     pub is_dashing: bool,
+    /// Active auto-action (OSRS-style click-to-act). Processed each server tick.
+    pub auto_action: Option<AutoAction>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -377,6 +409,7 @@ impl Player {
             bank_max_slots: item::DEFAULT_BANK_SIZE as u32,
             last_dash_tick: 0,
             is_dashing: false,
+            auto_action: None,
         }
     }
 
