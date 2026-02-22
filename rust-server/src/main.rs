@@ -3620,7 +3620,7 @@ async fn main() {
                     let bulk_data = room.get_bulk_save_data(&player_ids).await;
 
                     for (character_id, character_name, player_id) in players {
-                        if let Some((mut save_data, quest_state, discovered_recipes)) =
+                        if let Some((mut save_data, quest_state, discovered_recipes, slayer_state)) =
                             bulk_data.get(player_id).cloned()
                         {
                             let played_time_delta = save_state
@@ -3650,6 +3650,7 @@ async fn main() {
                                 quest_state,
                                 played_time_delta,
                                 discovered_recipes,
+                                slayer_state,
                             ));
                         }
                     }
@@ -3672,6 +3673,7 @@ async fn main() {
                     quest_state,
                     played_time_delta,
                     discovered_recipes,
+                    slayer_state,
                 ) in snapshots
                 {
                     let db = save_state.db.clone();
@@ -3716,6 +3718,11 @@ async fn main() {
                         // Save discovered recipes
                         for recipe_id in &discovered_recipes {
                             let _ = db.save_discovered_recipe(character_id, recipe_id).await;
+                        }
+
+                        // Save slayer state
+                        if let Some(ref slayer) = slayer_state {
+                            let _ = db.save_character_slayer_state(character_id, slayer).await;
                         }
                     }));
                 }
@@ -3897,7 +3904,7 @@ async fn main() {
                 .collect();
 
             let bulk_data = room.get_bulk_save_data(&player_ids).await;
-            for (player_id, (save_data, quest_state, discovered_recipes)) in bulk_data {
+            for (player_id, (save_data, quest_state, discovered_recipes, slayer_state)) in bulk_data {
                 let character_id = match char_id_map.get(player_id.as_str()) {
                     Some(id) => *id,
                     None => continue,
@@ -3948,6 +3955,13 @@ async fn main() {
                     let _ = shutdown_state
                         .db
                         .save_discovered_recipe(character_id, recipe_id)
+                        .await;
+                }
+
+                if let Some(ref slayer) = slayer_state {
+                    let _ = shutdown_state
+                        .db
+                        .save_character_slayer_state(character_id, slayer)
                         .await;
                 }
             }
