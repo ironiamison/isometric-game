@@ -10496,6 +10496,159 @@ impl GameRoom {
         self.send_to_player(player_id, msg).await;
     }
 
+    // ========================================================================
+    // Auto-Action System
+    // ========================================================================
+
+    pub async fn handle_start_auto_action(
+        &self,
+        player_id: &str,
+        target_type: &str,
+        target_id: &str,
+        action: &str,
+    ) {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        // Parse action type
+        let action_type = match action {
+            "attack" => AutoActionType::Attack,
+            "mine" => AutoActionType::Mine,
+            "chop" => AutoActionType::Chop,
+            _ => {
+                tracing::warn!("Invalid auto-action type: {}", action);
+                return;
+            }
+        };
+
+        // Parse and validate target
+        let target = match target_type {
+            "npc" => {
+                let npcs = self.npcs.read().await;
+                if let Some(npc) = npcs.get(target_id) {
+                    if !npc.is_alive() {
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::AutoActionStopped {
+                                reason: "target_dead".to_string(),
+                            },
+                        )
+                        .await;
+                        return;
+                    }
+                    if action_type == AutoActionType::Attack && !npc.is_attackable() {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+                AutoActionTarget::Npc {
+                    npc_id: target_id.to_string(),
+                }
+            }
+            "player" => {
+                if target_id == player_id {
+                    return; // Can't target self
+                }
+                let players = self.players.read().await;
+                if let Some(target) = players.get(target_id) {
+                    if !target.active || target.is_dead {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+                AutoActionTarget::Player {
+                    player_id: target_id.to_string(),
+                }
+            }
+            "resource" => {
+                // target_id format: "x,y,gid"
+                let parts: Vec<&str> = target_id.split(',').collect();
+                if parts.len() != 3 {
+                    tracing::warn!("Invalid resource target_id format: {}", target_id);
+                    return;
+                }
+                let x = match parts[0].parse::<i32>() {
+                    Ok(v) => v,
+                    Err(_) => return,
+                };
+                let y = match parts[1].parse::<i32>() {
+                    Ok(v) => v,
+                    Err(_) => return,
+                };
+                let gid = match parts[2].parse::<u32>() {
+                    Ok(v) => v,
+                    Err(_) => return,
+                };
+                AutoActionTarget::Resource { x, y, gid }
+            }
+            _ => {
+                tracing::warn!("Invalid auto-action target_type: {}", target_type);
+                return;
+            }
+        };
+
+        // Set the auto-action on the player
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                if player.is_dead {
+                    return;
+                }
+                player.auto_action = Some(AutoAction {
+                    target,
+                    action: action_type,
+                    started_at: current_time,
+                });
+            }
+        }
+
+        // Confirm to client
+        self.send_to_player(
+            player_id,
+            ServerMessage::AutoActionStarted {
+                target_type: target_type.to_string(),
+                target_id: target_id.to_string(),
+                action: action.to_string(),
+            },
+        )
+        .await;
+
+        tracing::info!(
+            "Player {} started auto-action: {} on {} {}",
+            player_id,
+            action,
+            target_type,
+            target_id
+        );
+    }
+
+    pub async fn handle_cancel_auto_action(&self, player_id: &str) {
+        let had_action = {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                let had = player.auto_action.is_some();
+                player.auto_action = None;
+                had
+            } else {
+                false
+            }
+        };
+
+        if had_action {
+            self.send_to_player(
+                player_id,
+                ServerMessage::AutoActionStopped {
+                    reason: "cancelled".to_string(),
+                },
+            )
+            .await;
+        }
+    }
+
     pub async fn tick(&self) -> TickTelemetry {
         let mut tick_telemetry = TickTelemetry::default();
         let tick_start = std::time::Instant::now();

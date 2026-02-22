@@ -3546,6 +3546,12 @@ async fn handle_client_message(
         ClientMessage::SlayerRemoveBlock { monster_id } => {
             room.handle_slayer_remove_block(player_id, &monster_id).await;
         }
+        ClientMessage::StartAutoAction { target_type, target_id, action } => {
+            room.handle_start_auto_action(player_id, &target_type, &target_id, &action).await;
+        }
+        ClientMessage::CancelAutoAction => {
+            room.handle_cancel_auto_action(player_id).await;
+        }
     }
 
     let handler_duration = handler_start.elapsed();
