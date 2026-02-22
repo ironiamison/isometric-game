@@ -1,0 +1,140 @@
+# Slayer Masters - NPCs that assign slayer tasks to players
+
+# ============================================================================
+# Turael - Beginner Slayer Master
+# ============================================================================
+[slayer_master_turael]
+display_name = "Turael"
+sprite = "village_elder"
+animation_type = "humanoid"
+description = "A weathered slayer master who trains beginners in the art of monster hunting."
+
+[slayer_master_turael.stats]
+max_hp = 200
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 600
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[slayer_master_turael.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[slayer_master_turael.behaviors]
+hostile = false
+slayer_master = true
+wander_enabled = true
+wander_radius = 2
+wander_pause_min_ms = 6000
+wander_pause_max_ms = 12000
+
+[slayer_master_turael.speech]
+radius = 5
+interval_min_ms = 25000
+interval_max_ms = 45000
+messages = [
+    "Every great slayer started with humble tasks.",
+    "The creatures near town may seem weak, but they teach you the basics.",
+    "Come to me if you need a task. I'll find something suitable.",
+    "Patience and persistence - that's the slayer's way.",
+    "Don't underestimate the lowly monsters. They can still bite.",
+]
+
+[slayer_master_turael.dialogue]
+greeting = "Welcome, adventurer. Looking to take on a slayer task? I have work suited for those just starting out."
+
+# ============================================================================
+# Mazchna - Intermediate Slayer Master
+# ============================================================================
+[slayer_master_mazchna]
+display_name = "Mazchna"
+sprite = "wise_man"
+animation_type = "humanoid"
+description = "A stern slayer master who assigns tasks to seasoned hunters."
+
+[slayer_master_mazchna.stats]
+max_hp = 300
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 600
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[slayer_master_mazchna.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[slayer_master_mazchna.behaviors]
+hostile = false
+slayer_master = true
+wander_enabled = true
+wander_radius = 2
+wander_pause_min_ms = 5000
+wander_pause_max_ms = 10000
+
+[slayer_master_mazchna.speech]
+radius = 5
+interval_min_ms = 25000
+interval_max_ms = 45000
+messages = [
+    "The swamp breeds dangerous creatures. Perfect for slayer work.",
+    "You'll need more than a sharp blade to handle my tasks.",
+    "I don't assign tasks to the unprepared. Prove your worth first.",
+    "The wilds are crawling with monsters that need culling.",
+    "A true slayer knows when to fight and when to prepare.",
+]
+
+[slayer_master_mazchna.dialogue]
+greeting = "You seek a challenge? I assign tasks to those who have proven themselves in battle. Show me you are ready."
+
+# ============================================================================
+# Chaeldar - Advanced Slayer Master
+# ============================================================================
+[slayer_master_chaeldar]
+display_name = "Chaeldar"
+sprite = "priest"
+animation_type = "humanoid"
+description = "An enigmatic slayer master who commands the most dangerous assignments."
+
+[slayer_master_chaeldar.stats]
+max_hp = 400
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 600
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[slayer_master_chaeldar.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[slayer_master_chaeldar.behaviors]
+hostile = false
+slayer_master = true
+wander_enabled = false
+facing = "down"
+
+[slayer_master_chaeldar.speech]
+radius = 5
+interval_min_ms = 30000
+interval_max_ms = 50000
+messages = [
+    "Only the strongest survive my assignments.",
+    "The creatures I send you after will test every skill you have.",
+    "Rock golems, reapers, witches... my tasks are not for the faint-hearted.",
+    "Slayer points can unlock rare monsters. Spend them wisely.",
+    "Many adventurers seek my tasks. Few return unchanged.",
+]
+
+[slayer_master_chaeldar.dialogue]
+greeting = "So, you think yourself worthy of my tasks? Very well. The monsters I assign will push you to your limits."
