@@ -5174,6 +5174,20 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let quantity = extract_u32(msg_data, "quantity").unwrap_or(1);
             Ok(ClientMessage::StartCraftBatch { recipe_id, quantity })
         }
+        "slayerGetTask" => {
+            let master_id = extract_string(msg_data, "master_id").unwrap_or_default();
+            Ok(ClientMessage::SlayerGetTask { master_id })
+        }
+        "slayerCancelTask" => Ok(ClientMessage::SlayerCancelTask),
+        "slayerBuyReward" => {
+            let reward_id = extract_string(msg_data, "reward_id").unwrap_or_default();
+            let target_monster_id = extract_string(msg_data, "target_monster_id");
+            Ok(ClientMessage::SlayerBuyReward { reward_id, target_monster_id })
+        }
+        "slayerRemoveBlock" => {
+            let monster_id = extract_string(msg_data, "monster_id").unwrap_or_default();
+            Ok(ClientMessage::SlayerRemoveBlock { monster_id })
+        }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }

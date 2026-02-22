@@ -5,7 +5,7 @@
 # ============================================================================
 [slayer_master_turael]
 display_name = "Turael"
-sprite = "village_elder"
+sprite = "forgotten_monk"
 animation_type = "humanoid"
 description = "A weathered slayer master who trains beginners in the art of monster hunting."
 
