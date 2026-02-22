@@ -225,9 +225,15 @@ pub struct InventorySlotUpdate {
 // Bank Vault
 // ============================================================================
 
-pub const BANK_SIZE: usize = 48;
+pub const DEFAULT_BANK_SIZE: usize = 50;
 /// Bank stacks always go up to 99 regardless of the item's inventory max_stack
 pub const BANK_MAX_STACK: i32 = 99;
+/// Number of slots added per bank upgrade purchase
+pub const BANK_UPGRADE_SLOTS: usize = 10;
+/// Maximum bank size after all upgrades
+pub const BANK_MAX_SIZE: usize = 100;
+/// Gold cost per bank upgrade
+pub const BANK_UPGRADE_COST: i32 = 5_000;
 
 #[derive(Debug, Clone)]
 pub struct Bank {
@@ -238,9 +244,21 @@ pub struct Bank {
 impl Bank {
     pub fn new() -> Self {
         Self {
-            slots: vec![None; BANK_SIZE],
+            slots: vec![None; DEFAULT_BANK_SIZE],
             gold: 0,
         }
+    }
+
+    pub fn new_with_size(size: usize) -> Self {
+        Self {
+            slots: vec![None; size],
+            gold: 0,
+        }
+    }
+
+    /// Expand bank by appending additional empty slots
+    pub fn expand(&mut self, additional: usize) {
+        self.slots.extend(std::iter::repeat(None).take(additional));
     }
 
     /// Try to add an item to the bank. Returns the quantity that couldn't fit.

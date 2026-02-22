@@ -55,6 +55,7 @@ pub struct CharacterData {
     pub sitting_at_y: Option<i32>,   // Chair tile Y if sitting (NULL = not sitting)
     pub bank_json: String,           // JSON serialized bank vault contents
     pub bank_gold: i32,              // Gold stored in bank
+    pub bank_max_slots: u32,         // Current max bank slots (upgradeable)
 }
 
 // Available appearance options
@@ -276,6 +277,21 @@ impl Database {
                 .await
                 .ok();
             sqlx::query("ALTER TABLE characters ADD COLUMN bank_gold INTEGER DEFAULT 0")
+                .execute(pool)
+                .await
+                .ok();
+        }
+
+        // Migration: Add bank_max_slots column if it doesn't exist
+        let bank_max_slots_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'bank_max_slots'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !bank_max_slots_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN bank_max_slots INTEGER DEFAULT 50")
                 .execute(pool)
                 .await
                 .ok();
@@ -652,7 +668,7 @@ impl Database {
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
-                sitting_at_x, sitting_at_y, bank_json, bank_gold
+                sitting_at_x, sitting_at_y, bank_json, bank_gold, bank_max_slots
             FROM characters WHERE account_id = ? ORDER BY created_at DESC"#,
         )
         .bind(account_id)
@@ -746,6 +762,7 @@ impl Database {
                         .try_get::<String, _>("bank_json")
                         .unwrap_or_else(|_| "[]".to_string()),
                     bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
+                    bank_max_slots: r.try_get::<i32, _>("bank_max_slots").unwrap_or(50) as u32,
                 }
             })
             .collect())
@@ -870,7 +887,7 @@ impl Database {
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
-                sitting_at_x, sitting_at_y, bank_json, bank_gold
+                sitting_at_x, sitting_at_y, bank_json, bank_gold, bank_max_slots
             FROM characters WHERE id = ?"#,
         )
         .bind(character_id)
@@ -962,6 +979,7 @@ impl Database {
                     .try_get::<String, _>("bank_json")
                     .unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
+                bank_max_slots: r.try_get::<i32, _>("bank_max_slots").unwrap_or(50) as u32,
             }
         }))
     }
@@ -1043,6 +1061,7 @@ impl Database {
         sitting_at_y: Option<i32>,
         bank_json: &str,
         bank_gold: i32,
+        bank_max_slots: u32,
     ) -> Result<(), sqlx::Error> {
         // Serialize skills to JSON for the skills_json column
         let skills_json = serde_json::to_string(skills).unwrap_or_else(|_| "{}".to_string());
@@ -1063,7 +1082,8 @@ impl Database {
                 sitting_at_x = ?,
                 sitting_at_y = ?,
                 bank_json = ?,
-                bank_gold = ?
+                bank_gold = ?,
+                bank_max_slots = ?
             WHERE id = ?"#,
         )
         .bind(x)
@@ -1090,6 +1110,7 @@ impl Database {
         .bind(sitting_at_y)
         .bind(bank_json)
         .bind(bank_gold)
+        .bind(bank_max_slots as i32)
         .bind(character_id)
         .execute(&self.pool)
         .await?;
