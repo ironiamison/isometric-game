@@ -345,7 +345,7 @@ display_name = "Raw Shrimp"
 sprite = "raw_shrimp"
 description = "A tiny shrimp. Can be cooked for a small meal."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 3
 
 [raw_sardine]
@@ -353,7 +353,7 @@ display_name = "Raw Sardine"
 sprite = "raw_sardine"
 description = "A small oily fish. Better cooked than raw."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 5
 
 [raw_herring]
@@ -361,7 +361,7 @@ display_name = "Raw Herring"
 sprite = "raw_herring"
 description = "A silvery fish common in streams."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 8
 
 [raw_trout]
@@ -369,7 +369,7 @@ display_name = "Raw Trout"
 sprite = "trout"
 description = "A common freshwater fish. Good for cooking."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 12
 
 [raw_salmon]
@@ -377,7 +377,7 @@ display_name = "Raw Salmon"
 sprite = "raw_salmon"
 description = "A pink-fleshed fish that swims upstream. Nutritious when cooked."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 18
 
 [raw_lobster]
@@ -385,7 +385,7 @@ display_name = "Raw Lobster"
 sprite = "raw_lobster"
 description = "A large crustacean with meaty claws. A prized catch."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 30
 
 [raw_swordfish]
@@ -393,7 +393,7 @@ display_name = "Raw Swordfish"
 sprite = "raw_swordfish"
 description = "A powerful ocean fish with a sharp bill. Rare and valuable."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 50
 
 [trout]
@@ -401,7 +401,7 @@ display_name = "Trout"
 sprite = "trout"
 description = "A common freshwater fish. Good for cooking."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 8
 
 [shiny_trout]
@@ -409,7 +409,7 @@ display_name = "Shiny Trout"
 sprite = "shiny_trout"
 description = "A rare trout with iridescent scales. Highly prized."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 50
 
 [crab]
@@ -417,7 +417,7 @@ display_name = "Crab"
 sprite = "crab"
 description = "A feisty crustacean. Makes for a tasty meal."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 12
 
 [oyster]
@@ -425,7 +425,7 @@ display_name = "Oyster"
 sprite = "oyster"
 description = "A saltwater shellfish. Might contain a pearl."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 15
 
 # =============================================================================
@@ -530,7 +530,7 @@ display_name = "Oak Logs"
 sprite = "oak_log"
 description = "Logs cut from an oak tree. Useful for crafting and firemaking."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 10
 sellable = true
 
@@ -539,7 +539,7 @@ display_name = "Willow Logs"
 sprite = "willow_log"
 description = "Flexible willow logs. Good for bows and arrows."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 25
 sellable = true
 
@@ -548,7 +548,7 @@ display_name = "Maple Logs"
 sprite = "maple_log"
 description = "Strong maple logs. Popular with fletchers."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 50
 sellable = true
 
@@ -557,7 +557,7 @@ display_name = "Yew Logs"
 sprite = "yew_log"
 description = "Prized yew logs. Essential for the finest bows."
 category = "material"
-max_stack = 99
+max_stack = 5
 base_price = 100
 sellable = true
 
