@@ -1221,7 +1221,14 @@
     ]
   },
   "collision": "f/wfKAAFARH/AeE/EAAAAQBQAJIBABAAAAEAUAAAAQAQAAABAFAAAAEAEAAAAQAQAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "slayer_master_turael",
+      "x": 10,
+      "y": 8,
+      "facing": "down"
+    }
+  ],
   "mapObjects": [
     {
       "gid": 2946,

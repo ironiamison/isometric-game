@@ -3146,6 +3146,11 @@
       "x": 14,
       "y": 10,
       "level": 1
+    },
+    {
+      "entityId": "old_thomas",
+      "x": 1,
+      "y": 13
     }
   ],
   "mapObjects": [
