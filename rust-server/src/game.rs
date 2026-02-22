@@ -2181,6 +2181,15 @@ impl GameRoom {
     }
 
     pub async fn handle_move(&self, player_id: &str, dx: f32, dy: f32, seq: Option<u32>) {
+        // Auto-action interrupt: any manual movement cancels auto-action
+        let had_auto_action = {
+            let players = self.players.read().await;
+            players.get(player_id).map_or(false, |p| p.auto_action.is_some())
+        };
+        if had_auto_action {
+            self.clear_auto_action(player_id, "interrupted").await;
+        }
+
         let mut chair_to_free: Option<(i32, i32)> = None;
         {
             let mut players = self.players.write().await;
@@ -3843,6 +3852,9 @@ impl GameRoom {
                 };
                 self.broadcast(death_msg).await;
 
+                // Clear attacker's auto-action since target is dead
+                self.clear_auto_action(player_id, "target_dead").await;
+
                 // Persist monster kill count for stats leaderboards.
                 self.record_monster_kill(player_id).await;
 
@@ -4127,6 +4139,8 @@ impl GameRoom {
                         killer_id: player_id.to_string(),
                     };
                     self.broadcast(death_msg).await;
+
+                    self.clear_auto_action(&target_id, "player_died").await;
 
                     // Send prayer state update to dying player (prayers cleared on death)
                     let (points, max_points) = {
@@ -10649,6 +10663,30 @@ impl GameRoom {
         }
     }
 
+    /// Clear a player's auto-action and notify them.
+    async fn clear_auto_action(&self, player_id: &str, reason: &str) {
+        let had_action = {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                let had = player.auto_action.is_some();
+                player.auto_action = None;
+                had
+            } else {
+                false
+            }
+        };
+
+        if had_action {
+            self.send_to_player(
+                player_id,
+                ServerMessage::AutoActionStopped {
+                    reason: reason.to_string(),
+                },
+            )
+            .await;
+        }
+    }
+
     pub async fn tick(&self) -> TickTelemetry {
         let mut tick_telemetry = TickTelemetry::default();
         let tick_start = std::time::Instant::now();
@@ -11903,6 +11941,29 @@ impl GameRoom {
                 self.cancel_crafting(&target_id, "interrupted").await;
             }
 
+            // Interrupt auto-action if damage came from a different source
+            if damage > 0 {
+                let should_interrupt = {
+                    let players = self.players.read().await;
+                    if let Some(player) = players.get(&target_id) {
+                        match &player.auto_action {
+                            Some(auto_action) => match &auto_action.target {
+                                AutoActionTarget::Npc { npc_id: action_npc_id } => {
+                                    *action_npc_id != npc_id
+                                }
+                                _ => true,
+                            },
+                            None => false,
+                        }
+                    } else {
+                        false
+                    }
+                };
+                if should_interrupt {
+                    self.clear_auto_action(&target_id, "interrupted").await;
+                }
+            }
+
             // Handle player death
             if died {
                 tracing::info!("NPC {} killed player {}", npc_id, target_id);
@@ -11911,6 +11972,8 @@ impl GameRoom {
                     killer_id: npc_id.clone(),
                 })
                 .await;
+
+                self.clear_auto_action(&target_id, "player_died").await;
 
                 // Send prayer state update to dying player (prayers cleared on death)
                 let (points, max_points) = {
