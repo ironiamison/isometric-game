@@ -10,6 +10,10 @@
     "entrance": {
       "x": 8,
       "y": 15
+    },
+    "enter": {
+      "x": 15,
+      "y": 9
     }
   },
   "layers": {
@@ -157,23 +161,7 @@
       616,
       616,
       616,
-      616,
-      616,
-      616,
-      616,
-      616,
-      1159,
-      1167,
-      1167,
-      1167,
-      1167,
-      1167,
-      1164,
-      616,
-      616,
-      616,
-      616,
-      616,
+      26,
       616,
       616,
       616,
@@ -189,7 +177,23 @@
       616,
       616,
       616,
+      23,
       616,
+      616,
+      616,
+      616,
+      1159,
+      1167,
+      1167,
+      1167,
+      1167,
+      1167,
+      1164,
+      616,
+      616,
+      616,
+      616,
+      23,
       616,
       616,
       616,
@@ -205,7 +209,7 @@
       616,
       616,
       616,
-      616,
+      25,
       616,
       616,
       616,
@@ -1132,96 +1136,6 @@
       "edge": "down"
     },
     {
-      "gid": 470,
-      "x": 15,
-      "y": 1,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 2,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 3,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 4,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 5,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 6,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 8,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 7,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 9,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 10,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 11,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 12,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 13,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 15,
-      "edge": "right"
-    },
-    {
-      "gid": 470,
-      "x": 15,
-      "y": 14,
-      "edge": "right"
-    },
-    {
       "gid": 465,
       "x": 7,
       "y": 0,
@@ -1248,9 +1162,9 @@
   ],
   "portals": [
     {
-      "id": "exit_1771505773605_tq5rjty8x",
-      "x": 1,
-      "y": 15,
+      "id": "exit_1771595331129_85jokggf5",
+      "x": 15,
+      "y": 10,
       "width": 1,
       "height": 1,
       "target_map": "overworld",
@@ -1258,9 +1172,9 @@
       "target_y": 0
     },
     {
-      "id": "exit_1771505774086_7r1h6nf9o",
-      "x": 2,
-      "y": 15,
+      "id": "exit_1771595331898_wezb5t1eo",
+      "x": 15,
+      "y": 11,
       "width": 1,
       "height": 1,
       "target_map": "overworld",
@@ -1268,119 +1182,9 @@
       "target_y": 0
     },
     {
-      "id": "exit_1771505774449_y9ipxm6gr",
-      "x": 3,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505774723_4reno5yjr",
-      "x": 4,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505775287_yd93kxrya",
-      "x": 5,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505775633_cr04ggkg3",
-      "x": 6,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505775928_b2nbhvcvk",
-      "x": 7,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505776239_6w90xo6gt",
-      "x": 8,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505776607_z6iphmp9u",
-      "x": 9,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505776978_b1vratq5z",
-      "x": 10,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505777283_8wpakmn2y",
-      "x": 11,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505777589_uarn4iujl",
-      "x": 12,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505777917_cr2keaqek",
-      "x": 13,
-      "y": 15,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771505778234_9ngnnehpe",
-      "x": 14,
-      "y": 15,
+      "id": "exit_1771595333726_izuihtnfi",
+      "x": 15,
+      "y": 8,
       "width": 1,
       "height": 1,
       "target_map": "overworld",

@@ -7,9 +7,9 @@
     "height": 16
   },
   "spawn_points": {
-    "entrance": {
-      "x": 8,
-      "y": 15
+    "enter": {
+      "x": 15,
+      "y": 9
     }
   },
   "layers": {
@@ -112,30 +112,78 @@
       14,
       14,
       14,
-      29,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      26,
       30,
       30,
       30,
-      29,
       30,
       30,
-      29,
-      29,
       30,
-      29,
       30,
-      29,
+      30,
+      30,
+      30,
+      30,
+      30,
       28,
       14,
       14,
+      23,
+      29,
+      29,
+      29,
+      29,
+      29,
+      29,
+      29,
+      29,
+      29,
+      29,
+      29,
+      29,
+      24,
+      14,
+      14,
       25,
       32,
       32,
       32,
       32,
-      29,
-      29,
-      29,
+      32,
+      32,
+      32,
       32,
       32,
       32,
@@ -149,9 +197,6 @@
       14,
       14,
       14,
-      23,
-      29,
-      24,
       14,
       14,
       14,
@@ -165,9 +210,6 @@
       14,
       14,
       14,
-      23,
-      29,
-      24,
       14,
       14,
       14,
@@ -181,9 +223,6 @@
       14,
       14,
       14,
-      23,
-      29,
-      24,
       14,
       14,
       14,
@@ -197,9 +236,6 @@
       14,
       14,
       14,
-      23,
-      29,
-      24,
       14,
       14,
       14,
@@ -208,35 +244,9 @@
       14,
       14,
       14,
-      29,
-      30,
-      29,
-      30,
-      30,
-      29,
-      29,
-      29,
-      29,
-      30,
-      29,
-      30,
-      29,
       14,
       14,
       14,
-      25,
-      32,
-      32,
-      32,
-      32,
-      29,
-      29,
-      29,
-      32,
-      32,
-      32,
-      32,
-      27,
       14,
       14,
       14,
@@ -245,9 +255,6 @@
       14,
       14,
       14,
-      23,
-      29,
-      24,
       14,
       14,
       14,
@@ -257,13 +264,6 @@
       14,
       14,
       14,
-      14,
-      14,
-      14,
-      14,
-      25,
-      32,
-      27,
       14,
       14,
       14,
@@ -788,172 +788,52 @@
       0
     ]
   },
-  "collision": "AAAAAAAA//8AAAAAVFQAAAAAAAAAAAAAVFQAAAAAAAA=",
+  "collision": "AAAAAAAA//8DgAEARQQBAAEAAQABAAEARQQBAAMAAQ4=",
   "entities": [
-    {
-      "entityId": "banker",
-      "x": 2,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 4,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 6,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 10,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 12,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 14,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 14,
-      "y": 12,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 12,
-      "y": 12,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 10,
-      "y": 12,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 6,
-      "y": 12,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 4,
-      "y": 12,
-      "level": 1
-    },
-    {
-      "entityId": "banker",
-      "x": 2,
-      "y": 12,
-      "level": 1
-    },
     {
       "entityId": "banker",
       "x": 8,
       "y": 1,
       "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 10,
+      "y": 6,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 6,
+      "y": 6,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 2,
+      "y": 6,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 2,
+      "y": 12,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 6,
+      "y": 12,
+      "level": 1
+    },
+    {
+      "entityId": "bank_vault",
+      "x": 10,
+      "y": 12,
+      "level": 1
     }
   ],
   "mapObjects": [
-    {
-      "gid": 1543,
-      "x": 2,
-      "y": 12,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 4,
-      "y": 12,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 6,
-      "y": 12,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 10,
-      "y": 12,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 12,
-      "y": 12,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 14,
-      "y": 12,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 2,
-      "y": 6,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 4,
-      "y": 6,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 6,
-      "y": 6,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 10,
-      "y": 6,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 12,
-      "y": 6,
-      "width": 61,
-      "height": 64
-    },
-    {
-      "gid": 1543,
-      "x": 14,
-      "y": 6,
-      "width": 61,
-      "height": 64
-    },
     {
       "gid": 1549,
       "x": 1,
@@ -981,6 +861,90 @@
       "y": 1,
       "width": 18,
       "height": 66
+    },
+    {
+      "gid": 2869,
+      "x": 2,
+      "y": 12,
+      "width": 61,
+      "height": 64
+    },
+    {
+      "gid": 2869,
+      "x": 2,
+      "y": 6,
+      "width": 61,
+      "height": 64
+    },
+    {
+      "gid": 2869,
+      "x": 6,
+      "y": 12,
+      "width": 61,
+      "height": 64
+    },
+    {
+      "gid": 2869,
+      "x": 6,
+      "y": 6,
+      "width": 61,
+      "height": 64
+    },
+    {
+      "gid": 2869,
+      "x": 10,
+      "y": 12,
+      "width": 61,
+      "height": 64
+    },
+    {
+      "gid": 2869,
+      "x": 10,
+      "y": 6,
+      "width": 61,
+      "height": 64
+    },
+    {
+      "gid": 2895,
+      "x": 1,
+      "y": 4,
+      "width": 45,
+      "height": 25
+    },
+    {
+      "gid": 2899,
+      "x": 15,
+      "y": 4,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2898,
+      "x": 3,
+      "y": 1,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2898,
+      "x": 1,
+      "y": 14,
+      "width": 61,
+      "height": 44
+    },
+    {
+      "gid": 2897,
+      "x": 9,
+      "y": 15,
+      "width": 28,
+      "height": 21
+    },
+    {
+      "gid": 2898,
+      "x": 10,
+      "y": 15,
+      "width": 61,
+      "height": 44
     }
   ],
   "walls": [
@@ -1263,9 +1227,9 @@
   ],
   "portals": [
     {
-      "id": "exit_1771512519868_aerzylem6",
-      "x": 7,
-      "y": 15,
+      "id": "exit_1771591866362_lki5stzur",
+      "x": 15,
+      "y": 10,
       "width": 1,
       "height": 1,
       "target_map": "overworld",
@@ -1273,9 +1237,9 @@
       "target_y": 0
     },
     {
-      "id": "exit_1771512520273_e0au6t4q2",
-      "x": 8,
-      "y": 15,
+      "id": "exit_1771591867079_mvmgtrsxr",
+      "x": 15,
+      "y": 9,
       "width": 1,
       "height": 1,
       "target_map": "overworld",
@@ -1283,8 +1247,88 @@
       "target_y": 0
     },
     {
-      "id": "exit_1771512653321_kwmr2b7kk",
-      "x": 9,
+      "id": "exit_1771591869032_82smq5m4r",
+      "x": 15,
+      "y": 8,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771591870803_vp33su4o7",
+      "x": 15,
+      "y": 5,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771591871348_qnvz2pjn8",
+      "x": 15,
+      "y": 6,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771591872137_ghkw4vcux",
+      "x": 15,
+      "y": 7,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771591872916_uq4ju0nzr",
+      "x": 15,
+      "y": 11,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771591873438_yw1hx35zv",
+      "x": 15,
+      "y": 12,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771591873962_pyy5b86nc",
+      "x": 15,
+      "y": 13,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771591874526_r4hicgxb0",
+      "x": 15,
+      "y": 14,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1771591875091_om70qcdjt",
+      "x": 15,
       "y": 15,
       "width": 1,
       "height": 1,
