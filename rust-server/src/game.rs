@@ -2475,6 +2475,7 @@ impl GameRoom {
             "/give",
             "/setlevel",
             "/teleport",
+            "/tpto",
             "/spawn",
             "/heal",
             "/kill",
@@ -2669,7 +2670,7 @@ impl GameRoom {
             }
             "/help" => {
                 if is_admin {
-                    self.send_system_message(player_id, "Commands: /give <item> [qty], /setlevel [skill] <lvl>, /teleport <x> <y>, /spawn <npc> [x] [y], /heal [player], /kill <player>, /god, /announce <msg>, /items, /help").await;
+                    self.send_system_message(player_id, "Commands: /give <item> [qty], /setlevel [skill] <lvl>, /teleport <x> <y>, /tpto <player>, /spawn <npc> [x] [y], /heal [player], /kill <player>, /god, /announce <msg>, /items, /help").await;
                 } else {
                     self.send_system_message(player_id, "Commands: /items, /help")
                         .await;
@@ -2728,6 +2729,88 @@ impl GameRoom {
                         spell_id: "teleport".to_string(),
                         target_x: x,
                         target_y: y,
+                    },
+                )
+                .await;
+            }
+            "/tpto" => {
+                // /tpto <player_name>
+                if parts.len() < 2 {
+                    self.send_system_message(player_id, "Usage: /tpto <player_name>")
+                        .await;
+                    return;
+                }
+                let target_name = parts[1];
+
+                let target_info = {
+                    let players = self.players.read().await;
+                    players
+                        .values()
+                        .find(|p| p.name.eq_ignore_ascii_case(target_name))
+                        .map(|t| (t.id.clone(), t.name.clone(), t.x, t.y))
+                };
+
+                let (target_id, target_display, target_x, target_y) = match target_info {
+                    Some(info) => info,
+                    None => {
+                        self.send_system_message(player_id, "Player not found")
+                            .await;
+                        return;
+                    }
+                };
+
+                let target_instance = {
+                    let instances = self.player_instances.read().await;
+                    instances.get(&target_id).cloned()
+                };
+
+                let sender_instance = {
+                    let instances = self.player_instances.read().await;
+                    instances.get(player_id).cloned()
+                };
+
+                if sender_instance != target_instance {
+                    self.send_system_message(
+                        player_id,
+                        "Target is in a different instance. Use a portal to enter that interior.",
+                    )
+                    .await;
+                    return;
+                }
+
+                {
+                    let mut players = self.players.write().await;
+                    if let Some(player) = players.get_mut(player_id) {
+                        player.x = target_x;
+                        player.y = target_y;
+                        tracing::info!(
+                            "Player {} teleported to {} at ({}, {})",
+                            player_id,
+                            target_id,
+                            target_x,
+                            target_y
+                        );
+                    }
+                }
+
+                self.send_system_message(
+                    player_id,
+                    &format!(
+                        "Teleported to {} at ({}, {})",
+                        target_display, target_x, target_y
+                    ),
+                )
+                .await;
+
+                // Send teleport warp visual effect at the destination
+                self.broadcast_to_zone(
+                    player_id,
+                    ServerMessage::SpellEffect {
+                        caster_id: player_id.to_string(),
+                        target_id: None,
+                        spell_id: "teleport".to_string(),
+                        target_x: target_x,
+                        target_y: target_y,
                     },
                 )
                 .await;
