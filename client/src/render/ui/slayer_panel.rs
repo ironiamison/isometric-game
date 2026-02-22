@@ -24,20 +24,19 @@ impl Renderer {
         };
 
         let s = state.ui_state.ui_scale;
-        let chip_w = 140.0 * s;
-        let sprite_area = 32.0 * s;
-        let text_h = 16.0 * s;
-        let padding = 4.0 * s;
-        let chip_h = padding + sprite_area + padding + text_h + padding;
+        let sprite_area = 24.0 * s;
+        let font_sz = 14.0;
+        let padding = 3.0 * s;
+        let count_text = format!("{}/{}", task.kills_current, task.kills_required);
+        let count_dims = self.measure_text_sharp(&count_text, font_sz);
+        let chip_w = (sprite_area + padding * 2.0).max(count_dims.width + padding * 2.0);
+        let chip_h = padding + sprite_area + 2.0 * s + count_dims.height + padding;
 
         // Semi-transparent dark background
         draw_rectangle(x, y, chip_w, chip_h, Color::from_rgba(0, 0, 0, 180));
         draw_rectangle_lines(x, y, chip_w, chip_h, 1.0, Color::from_rgba(80, 70, 55, 180));
 
         // Draw NPC sprite (idle frame 0, down-facing)
-        let sprite_x = x + (chip_w - sprite_area) / 2.0;
-        let sprite_y = y + padding;
-
         if let Some((npc_texture, npc_atlas_offset)) =
             self.npc_sprites.get(&task.monster_id)
         {
@@ -49,15 +48,12 @@ impl Renderer {
             let frame_height = tex_h;
             let (atlas_x, atlas_y): (f32, f32) = npc_atlas_offset.unwrap_or((0.0, 0.0));
 
-            // Frame 0 = idle down-facing
             let source = Rect::new(atlas_x, atlas_y, frame_width, frame_height);
-
-            // Scale to fit sprite_area while maintaining aspect ratio
             let scale = (sprite_area / frame_width).min(sprite_area / frame_height);
             let draw_w = frame_width * scale;
             let draw_h = frame_height * scale;
-            let draw_x = sprite_x + (sprite_area - draw_w) / 2.0;
-            let draw_y = sprite_y + (sprite_area - draw_h) / 2.0;
+            let draw_x = x + (chip_w - draw_w) / 2.0;
+            let draw_y = y + padding + (sprite_area - draw_h) / 2.0;
 
             draw_texture_ex(
                 npc_texture,
@@ -72,16 +68,55 @@ impl Renderer {
             );
         }
 
-        // Kill count text
-        let count_text = format!("{}/{}", task.kills_current, task.kills_required);
-        let count_dims = self.measure_text_sharp(&count_text, 16.0);
+        // Kill count text centered below sprite
         self.draw_text_sharp(
             &count_text,
             (x + (chip_w - count_dims.width) / 2.0).floor(),
-            (y + padding + sprite_area + padding + text_h * 0.78).floor(),
-            16.0,
+            (y + padding + sprite_area + 2.0 * s + count_dims.height * 0.9).floor(),
+            font_sz,
             TEXT_NORMAL,
         );
+
+        // Hover tooltip
+        let (raw_mx, raw_my) = mouse_position();
+        let (vw, vh) = virtual_screen_size();
+        let mx = raw_mx * vw / screen_width();
+        let my = raw_my * vh / screen_height();
+
+        if mx >= x && mx <= x + chip_w && my >= y && my <= y + chip_h {
+            let tip_x = x + chip_w + 4.0 * s;
+            let tip_y = y;
+            let tip_font = 14.0;
+            let line_h = 16.0 * s;
+            let tip_pad = 6.0 * s;
+
+            let lines = [
+                (format!("Task: {}", task.display_name), TEXT_TITLE),
+                (format!("Progress: {}/{}", task.kills_current, task.kills_required), TEXT_NORMAL),
+                (format!("XP/kill: {}", task.xp_per_kill), TEXT_NORMAL),
+                (format!("Points on completion: {}", task.points_on_complete), TEXT_NORMAL),
+                (format!("Slayer Points: {}", state.ui_state.slayer_points), TEXT_GOLD),
+                (format!("Tasks completed: {}", state.ui_state.slayer_tasks_completed), TEXT_DIM),
+            ];
+
+            let tip_w = lines.iter()
+                .map(|(text, _)| self.measure_text_sharp(text, tip_font).width)
+                .fold(0.0f32, f32::max) + tip_pad * 2.0;
+            let tip_h = tip_pad + lines.len() as f32 * line_h + tip_pad;
+
+            draw_rectangle(tip_x, tip_y, tip_w, tip_h, Color::from_rgba(12, 12, 18, 240));
+            draw_rectangle_lines(tip_x, tip_y, tip_w, tip_h, 1.0, Color::from_rgba(80, 70, 55, 200));
+
+            for (i, (text, color)) in lines.iter().enumerate() {
+                self.draw_text_sharp(
+                    text,
+                    tip_x + tip_pad,
+                    (tip_y + tip_pad + (i as f32 + 0.8) * line_h).floor(),
+                    tip_font,
+                    *color,
+                );
+            }
+        }
     }
 
     pub(crate) fn render_slayer_panel(

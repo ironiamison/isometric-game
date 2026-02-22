@@ -8547,7 +8547,7 @@ impl Renderer {
             // XP Drop Feed (below gathering status or MP bar)
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 }
                 + if has_dash_bar { 22.0 + 4.0 } else { 0.0 }
-                + if has_slayer_chip { 60.0 } else { 0.0 };
+                + if has_slayer_chip { 46.0 } else { 0.0 };
             let drop_start_y = mp_bar_y + bar_height + extra_offset + 145.0;
             self.render_xp_drop_feed(&state.xp_drop_feed, 10.0, drop_start_y);
         }
@@ -8912,7 +8912,8 @@ impl Renderer {
                     let (bar_x, stats_y) =
                         self.minimap_stats_stack_position(state, bar_width_contract);
                     // Below 3 stat bars (HP + MP + Prayer, each 18*s + 4*s gap) + extra gap
-                    let contract_y = stats_y + 3.0 * (18.0 + 4.0) * s + 14.0 * s;
+                    let slayer_offset = if state.ui_state.slayer_current_task.is_some() { 46.0 * s } else { 0.0 };
+                    let contract_y = stats_y + 3.0 * (18.0 + 4.0) * s + 14.0 * s + slayer_offset;
                     self.render_farming_contract_tracker(state, bar_x, contract_y, 240.0);
                 }
             }
