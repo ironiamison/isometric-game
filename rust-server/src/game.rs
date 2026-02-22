@@ -613,6 +613,7 @@ impl Player {
         self.prayer_points = self.max_prayer_points(); // Restore prayer points on respawn
         self.mp = self.max_mp(); // Restore mana on respawn
         self.is_dead = false;
+        self.auto_action = None;
         self.death_time = 0;
         self.target_id = None;
         self.last_regen_time = 0;
@@ -1635,6 +1636,9 @@ impl GameRoom {
         }
 
         let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            player.auto_action = None;
+        }
         players.remove(player_id);
     }
 
