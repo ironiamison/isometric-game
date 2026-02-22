@@ -325,8 +325,8 @@ impl ClientMessage {
             ClientMessage::SlayerCancelTask => "slayerCancelTask",
             ClientMessage::SlayerBuyReward { .. } => "slayerBuyReward",
             ClientMessage::SlayerRemoveBlock { .. } => "slayerRemoveBlock",
-            ClientMessage::StartAutoAction { .. } => "StartAutoAction",
-            ClientMessage::CancelAutoAction => "CancelAutoAction",
+            ClientMessage::StartAutoAction { .. } => "startAutoAction",
+            ClientMessage::CancelAutoAction => "cancelAutoAction",
         }
     }
 }

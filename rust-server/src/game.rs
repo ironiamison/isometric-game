@@ -10559,6 +10559,10 @@ impl GameRoom {
         // Parse and validate target
         let target = match target_type {
             "npc" => {
+                // NPC targets are overworld-only
+                if self.player_instances.read().await.contains_key(player_id) {
+                    return;
+                }
                 let npcs = self.npcs.read().await;
                 if let Some(npc) = npcs.get(target_id) {
                     if !npc.is_alive() {
@@ -10598,6 +10602,10 @@ impl GameRoom {
                 }
             }
             "resource" => {
+                // Resource targets are overworld-only
+                if self.player_instances.read().await.contains_key(player_id) {
+                    return;
+                }
                 // target_id format: "x,y,gid"
                 let parts: Vec<&str> = target_id.split(',').collect();
                 if parts.len() != 3 {
@@ -12099,8 +12107,6 @@ impl GameRoom {
                                         let dx = npc.x - player.x;
                                         let dy = npc.y - player.y;
                                         player.direction = direction_from_delta(dx, dy);
-                                        // Set target_id so handle_attack finds the right target
-                                        player.target_id = Some(npc_id.clone());
                                     }
                                 }
                             }
@@ -12176,7 +12182,6 @@ impl GameRoom {
                                         let dx = tx - player.x;
                                         let dy = ty - player.y;
                                         player.direction = direction_from_delta(dx, dy);
-                                        player.target_id = Some(target_pid.clone());
                                     }
                                 }
                             }
