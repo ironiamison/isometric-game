@@ -20,6 +20,7 @@ pub mod quest;
 pub mod quick_slots;
 pub mod shop;
 pub mod skills;
+pub mod slayer_panel;
 pub mod social_panel;
 pub mod tooltip;
 pub mod xp_drops;

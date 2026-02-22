@@ -8932,6 +8932,11 @@ impl Renderer {
             self.render_altar_panel(panel, state, hovered, &mut layout);
         }
 
+        // Slayer panel (when open)
+        if state.ui_state.slayer_panel_open {
+            self.render_slayer_panel(state, hovered, &mut layout);
+        }
+
         // Quest completion notifications (on top of dialogue/panels)
         self.render_quest_completed(state);
 
