@@ -8193,20 +8193,20 @@ impl Renderer {
                 gl.quad_gl.scissor(None);
             }
 
-            // Draw scroll indicator (thin scrollbar on the right edge)
+            // Draw scrollbar on the right edge
             if max_scroll_px > 0.0 {
-                let scrollbar_w = 3.0 * scale;
-                let scrollbar_x = clip_x + clip_w - scrollbar_w - 2.0 * scale;
+                let scrollbar_w = 6.0 * scale;
+                let scrollbar_x = clip_x + clip_w - scrollbar_w;
                 let track_y = clip_y;
                 let track_h = clip_h;
 
-                // Track (subtle background)
+                // Track
                 draw_rectangle(
                     scrollbar_x,
                     track_y,
                     scrollbar_w,
                     track_h,
-                    Color::new(1.0, 1.0, 1.0, 0.08),
+                    Color::new(0.1, 0.09, 0.12, 0.6),
                 );
 
                 // Thumb - size proportional to visible area, position based on scroll
@@ -8216,12 +8216,18 @@ impl Renderer {
                 let scroll_ratio = scroll_px / max_scroll_px;
                 let thumb_y = track_y + (track_h - thumb_h) * (1.0 - scroll_ratio);
 
+                let is_dragging = state.ui_state.chat_scroll_drag.dragging;
+                let thumb_color = if is_dragging {
+                    Color::new(1.0, 1.0, 1.0, 0.6)
+                } else {
+                    Color::new(1.0, 1.0, 1.0, 0.35)
+                };
                 draw_rectangle(
-                    scrollbar_x,
+                    scrollbar_x + 1.0,
                     thumb_y,
-                    scrollbar_w,
+                    scrollbar_w - 2.0,
                     thumb_h,
-                    Color::new(1.0, 1.0, 1.0, 0.35),
+                    thumb_color,
                 );
             }
         }
@@ -8817,6 +8823,23 @@ impl Renderer {
                     tab_ids[i].clone(),
                     macroquad::prelude::Rect::new(tx, tab_bar_y, tab_w, tab_h),
                 );
+            }
+
+            // Register scrollbar for chat log drag interaction
+            // Compute max_scroll from cached line count
+            let total_lines = self.chat_lines_cache.borrow().lines.len();
+            let total_content_height = total_lines as f32 * line_height;
+            let max_scroll_px = (total_content_height - chat_area_h).max(0.0);
+            if max_scroll_px > 0.0 {
+                let scrollbar_w = 6.0 * scale;
+                let scrollbar_x = chat_x + max_chat_width + bg_padding * 2.0 - scrollbar_w;
+                let track_y = clip_y;
+                let track_h = clip_h;
+                layout.add_scrollbar(
+                    UiElementId::ChatLogScrollbar,
+                    macroquad::prelude::Rect::new(scrollbar_x, track_y, scrollbar_w, track_h),
+                );
+                layout.set_max_scroll(UiElementId::ChatLogScrollbar, max_scroll_px);
             }
         }
 

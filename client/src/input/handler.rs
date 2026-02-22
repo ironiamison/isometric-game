@@ -4562,10 +4562,33 @@ impl InputHandler {
             let (_wheel_x, wheel_y) = mouse_wheel();
             if wheel_y != 0.0 {
                 const SCROLL_SPEED: f32 = 40.0; // Pixels per scroll tick
+                let max_scroll = layout.get_max_scroll(&UiElementId::ChatPanelScrollbar).unwrap_or(0.0);
                 let delta = wheel_y * SCROLL_SPEED;
                 state.ui_state.chat_message_scroll =
-                    (state.ui_state.chat_message_scroll + delta).max(0.0);
+                    (state.ui_state.chat_message_scroll + delta).clamp(0.0, max_scroll);
             }
+
+            // Chat panel scrollbar drag handling
+            if let Some(track_bounds) = layout.get_bounds(&UiElementId::ChatPanelScrollbar) {
+                let cp_max = layout.get_max_scroll(&UiElementId::ChatPanelScrollbar).unwrap_or(0.0);
+                let cp_content_h = cp_max + track_bounds.h;
+                let clicked_on = matches!(clicked_element, Some(UiElementId::ChatPanelScrollbar));
+                crate::ui::scroll::handle_scrollbar_drag_ex(
+                    &mut state.ui_state.chat_scroll_drag,
+                    &mut state.ui_state.chat_message_scroll,
+                    cp_max,
+                    track_bounds,
+                    cp_content_h,
+                    my,
+                    is_mouse_button_down(MouseButton::Left),
+                    mouse_clicked,
+                    clicked_on,
+                    true, // inverted: thumb at bottom when scroll=0
+                );
+            } else if !is_mouse_button_down(MouseButton::Left) {
+                state.ui_state.chat_scroll_drag.dragging = false;
+            }
+
             return commands;
         }
 
@@ -5846,10 +5869,34 @@ impl InputHandler {
                     && vmy <= box_bottom;
                 if over_chat {
                     const SCROLL_SPEED: f32 = 40.0; // Pixels per scroll tick
+                    let max_scroll = layout.get_max_scroll(&UiElementId::ChatLogScrollbar).unwrap_or(0.0);
                     let delta = wheel_y * SCROLL_SPEED;
                     state.ui_state.chat_message_scroll =
-                        (state.ui_state.chat_message_scroll + delta).max(0.0);
+                        (state.ui_state.chat_message_scroll + delta).clamp(0.0, max_scroll);
                 }
+            }
+        }
+
+        // Chat log scrollbar drag handling
+        if state.ui_state.chat_log_visible {
+            if let Some(track_bounds) = layout.get_bounds(&UiElementId::ChatLogScrollbar) {
+                let chat_max = layout.get_max_scroll(&UiElementId::ChatLogScrollbar).unwrap_or(0.0);
+                let chat_content_h = chat_max + track_bounds.h;
+                let clicked_on = matches!(clicked_element, Some(UiElementId::ChatLogScrollbar));
+                crate::ui::scroll::handle_scrollbar_drag_ex(
+                    &mut state.ui_state.chat_scroll_drag,
+                    &mut state.ui_state.chat_message_scroll,
+                    chat_max,
+                    track_bounds,
+                    chat_content_h,
+                    my,
+                    is_mouse_button_down(MouseButton::Left),
+                    mouse_clicked,
+                    clicked_on,
+                    true, // inverted: thumb at bottom when scroll=0
+                );
+            } else if !is_mouse_button_down(MouseButton::Left) {
+                state.ui_state.chat_scroll_drag.dragging = false;
             }
         }
 

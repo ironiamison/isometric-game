@@ -131,11 +131,33 @@ pub fn handle_scrollbar_drag(
     mouse_clicked: bool,
     clicked_on_scrollbar: bool,
 ) -> bool {
+    handle_scrollbar_drag_ex(
+        drag, scroll_offset, max_scroll, track_bounds, content_height,
+        mouse_y, mouse_down, mouse_clicked, clicked_on_scrollbar, false,
+    )
+}
+
+/// Like `handle_scrollbar_drag` but with an `inverted` flag.
+/// When inverted, the thumb is at the bottom when scroll=0 and moves up as scroll increases
+/// (used for bottom-anchored scroll like chat logs).
+pub fn handle_scrollbar_drag_ex(
+    drag: &mut ScrollDragState,
+    scroll_offset: &mut f32,
+    max_scroll: f32,
+    track_bounds: Rect,
+    content_height: f32,
+    mouse_y: f32,
+    mouse_down: bool,
+    mouse_clicked: bool,
+    clicked_on_scrollbar: bool,
+    inverted: bool,
+) -> bool {
+    let dir = if inverted { -1.0 } else { 1.0 };
     if drag.dragging {
         if mouse_down {
             let dy = mouse_y - drag.last_y;
             let scale = content_height / track_bounds.h;
-            *scroll_offset = (*scroll_offset + dy * scale).clamp(0.0, max_scroll);
+            *scroll_offset = (*scroll_offset + dy * scale * dir).clamp(0.0, max_scroll);
             drag.last_y = mouse_y;
         } else {
             drag.dragging = false;
@@ -144,7 +166,8 @@ pub fn handle_scrollbar_drag(
     } else if mouse_clicked && clicked_on_scrollbar {
         // Click-to-position: jump scroll to the clicked location on the track
         let click_ratio = ((mouse_y - track_bounds.y) / track_bounds.h).clamp(0.0, 1.0);
-        *scroll_offset = (click_ratio * max_scroll).clamp(0.0, max_scroll);
+        let ratio = if inverted { 1.0 - click_ratio } else { click_ratio };
+        *scroll_offset = (ratio * max_scroll).clamp(0.0, max_scroll);
         drag.dragging = true;
         drag.last_y = mouse_y;
         return true;

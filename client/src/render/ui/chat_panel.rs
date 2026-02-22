@@ -232,6 +232,7 @@ impl Renderer {
         let total_content_height = total_lines as f32 * line_height;
         let max_scroll_px = (total_content_height - messages_h).max(0.0);
         let scroll_px = state.ui_state.chat_message_scroll.min(max_scroll_px);
+        layout.set_max_scroll(UiElementId::ChatPanelScrollbar, max_scroll_px);
 
         // Calculate which lines are visible and the sub-pixel offset
         let scroll_lines = scroll_px / line_height;
@@ -264,6 +265,36 @@ impl Renderer {
                 14.0,
                 TEXT_DIM,
             );
+        }
+
+        // Draw scrollbar
+        if max_scroll_px > 0.0 {
+            let scrollbar_w: f32 = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let track_x = messages_x + messages_w - scrollbar_w;
+            let track_y = messages_y;
+            let track_h = messages_h;
+
+            layout.add_scrollbar(
+                UiElementId::ChatPanelScrollbar,
+                Rect::new(track_x, track_y, scrollbar_w, track_h),
+            );
+
+            // Track
+            draw_rectangle(track_x, track_y, scrollbar_w, track_h, Color::new(0.1, 0.09, 0.12, 0.6));
+
+            // Thumb (inverted: bottom = scroll 0, top = max scroll)
+            let visible_ratio = (messages_h / total_content_height).min(1.0);
+            let thumb_h = (track_h * visible_ratio).max(16.0);
+            let scroll_ratio = if max_scroll_px > 0.0 { scroll_px / max_scroll_px } else { 0.0 };
+            let thumb_y = track_y + (track_h - thumb_h) * (1.0 - scroll_ratio);
+
+            let is_dragging = state.ui_state.chat_scroll_drag.dragging;
+            let thumb_color = if is_dragging {
+                Color::new(0.5, 0.45, 0.55, 0.9)
+            } else {
+                Color::new(0.35, 0.32, 0.40, 0.7)
+            };
+            draw_rectangle(track_x + 1.0, thumb_y, scrollbar_w - 2.0, thumb_h, thumb_color);
         }
 
         // === INPUT BAR (hidden on System tab) ===

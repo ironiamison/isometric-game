@@ -122,6 +122,8 @@ pub enum UiElementId {
     ChatPanelBackground,
     ChatMessageArea,
     ChatLogArea,
+    ChatLogScrollbar,
+    ChatPanelScrollbar,
 
     // Social Panel
     SocialTabNearby,
