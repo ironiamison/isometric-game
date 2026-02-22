@@ -4372,7 +4372,8 @@ impl GameRoom {
         let mut state = self.get_player_slayer_state(player_id).await;
 
         let task = match &mut state.current_task {
-            Some(t) if t.monster_id == prototype_id => t,
+            Some(t) if t.monster_id == prototype_id
+                || prototype_id.starts_with(&format!("{}_", t.monster_id)) => t,
             _ => return,
         };
 
