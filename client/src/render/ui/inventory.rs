@@ -479,7 +479,7 @@ impl Renderer {
             };
             let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
 
-            let thumb_color = if state.ui_state.inventory_scrollbar_dragging {
+            let thumb_color = if state.ui_state.inventory_scroll_drag.dragging {
                 FRAME_ACCENT
             } else if matches!(hovered, Some(UiElementId::InventoryScrollbar)) {
                 FRAME_MID

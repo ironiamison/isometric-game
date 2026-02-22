@@ -8895,7 +8895,7 @@ impl Renderer {
                 hovered,
                 &mut layout,
                 state.ui_state.dialogue_scroll_offset,
-                state.ui_state.dialogue_scrollbar_dragging,
+                state.ui_state.dialogue_scroll_drag.dragging,
             );
         }
 

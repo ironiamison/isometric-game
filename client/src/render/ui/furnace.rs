@@ -343,23 +343,62 @@ impl Renderer {
             self.draw_text_sharp(&ing_text, text_x, y + 36.0 * s, 16.0, ing_color);
 
             // Level, XP, time info
-            let mut info_parts: Vec<String> = Vec::new();
+            let mut info_x = text_x;
+            let info_y = y + 52.0 * s;
+
             if recipe.level_required > 1 {
-                info_parts.push(format!("Lv{}", recipe.level_required));
+                // Determine level color: green if met, red if not
+                let level_color = if let Some(player) = state.get_local_player() {
+                    if player.skills.smithing.level >= recipe.level_required {
+                        Color::new(0.392, 0.784, 0.392, 1.0)
+                    } else {
+                        Color::new(0.784, 0.314, 0.314, 1.0)
+                    }
+                } else {
+                    TEXT_DIM
+                };
+
+                // Draw small smithing icon from spritesheet
+                let icon_size = 14.0 * s;
+                if let Some(ref texture) = self.ui_icons {
+                    let src_x = 5.0 * 24.0; // Smithing = col 5
+                    let src_y = 6.0 * 24.0; // row 6
+                    draw_texture_ex(
+                        texture,
+                        info_x,
+                        info_y - icon_size + 2.0 * s,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(src_x, src_y, 24.0, 24.0)),
+                            dest_size: Some(Vec2::new(icon_size, icon_size)),
+                            ..Default::default()
+                        },
+                    );
+                    info_x += icon_size + 2.0 * s;
+                }
+
+                let lvl_text = format!("Lv{}", recipe.level_required);
+                self.draw_text_sharp(&lvl_text, info_x, info_y, 16.0, level_color);
+                info_x += self.measure_text_sharp(&lvl_text, 16.0).width;
             }
+
+            let mut extra_parts: Vec<String> = Vec::new();
             if recipe.xp > 0 {
-                info_parts.push(format!("{}xp", recipe.xp));
+                extra_parts.push(format!("{}xp", recipe.xp));
             }
             if recipe.craft_time_ms > 0 {
                 let secs = recipe.craft_time_ms as f32 / 1000.0;
                 if secs == secs.floor() {
-                    info_parts.push(format!("{}s", secs as u32));
+                    extra_parts.push(format!("{}s", secs as u32));
                 } else {
-                    info_parts.push(format!("{:.1}s", secs));
+                    extra_parts.push(format!("{:.1}s", secs));
                 }
             }
-            let info_text = info_parts.join(" · ");
-            self.draw_text_sharp(&info_text, text_x, y + 52.0 * s, 16.0, TEXT_DIM);
+            if !extra_parts.is_empty() {
+                let separator = if recipe.level_required > 1 { " · " } else { "" };
+                let extra_text = format!("{}{}", separator, extra_parts.join(" · "));
+                self.draw_text_sharp(&extra_text, info_x, info_y, 16.0, TEXT_DIM);
+            }
 
             // Level check - show warning if too low
             if recipe.level_required > 1 {
@@ -513,11 +552,12 @@ impl Renderer {
             let scrollbar_track_h = content_h - 4.0 * s;
             let scrollbar_x = content_x + content_w - 8.0 * s;
             let scrollbar_y = content_y + 2.0 * s;
+            let scrollbar_w = 4.0 * s;
 
             draw_rectangle(
                 scrollbar_x,
                 scrollbar_y,
-                4.0 * s,
+                scrollbar_w,
                 scrollbar_track_h,
                 Color::new(0.1, 0.08, 0.06, 1.0),
             );
@@ -526,7 +566,14 @@ impl Renderer {
             let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0 * s);
             let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
-            draw_rectangle(scrollbar_x, thumb_y, 4.0 * s, thumb_h, SLOT_BORDER);
+            let is_dragging = state.ui_state.furnace_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::FurnaceScrollbar));
+            let thumb_color = if is_dragging || is_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
+            draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
+            layout.add(
+                UiElementId::FurnaceScrollbar,
+                Rect::new(scrollbar_x, scrollbar_y, scrollbar_w, scrollbar_track_h),
+            );
         }
     }
 

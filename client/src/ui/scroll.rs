@@ -92,6 +92,63 @@ pub fn point_in_rect(x: f32, y: f32, rect: Rect) -> bool {
     x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h
 }
 
+/// Persistent state for scrollbar drag interactions
+#[derive(Debug, Clone)]
+pub struct ScrollDragState {
+    pub dragging: bool,
+    pub last_y: f32,
+}
+
+impl Default for ScrollDragState {
+    fn default() -> Self {
+        Self {
+            dragging: false,
+            last_y: 0.0,
+        }
+    }
+}
+
+/// Handle scrollbar drag interaction. Call each frame.
+/// - `drag`: persistent drag state for this scrollbar
+/// - `scroll_offset`: the current scroll offset (will be mutated)
+/// - `max_scroll`: maximum scroll value
+/// - `track_bounds`: the full scrollbar track rectangle
+/// - `content_height`: total scrollable content height
+/// - `mouse_y`: current mouse Y position
+/// - `mouse_down`: whether left mouse button is currently held
+/// - `mouse_clicked`: whether left mouse button was just pressed this frame
+/// - `clicked_on_scrollbar`: whether the click landed on this scrollbar element
+///
+/// Returns true if this scrollbar is currently being dragged (to consume input).
+pub fn handle_scrollbar_drag(
+    drag: &mut ScrollDragState,
+    scroll_offset: &mut f32,
+    max_scroll: f32,
+    track_bounds: Rect,
+    content_height: f32,
+    mouse_y: f32,
+    mouse_down: bool,
+    mouse_clicked: bool,
+    clicked_on_scrollbar: bool,
+) -> bool {
+    if drag.dragging {
+        if mouse_down {
+            let dy = mouse_y - drag.last_y;
+            let scale = content_height / track_bounds.h;
+            *scroll_offset = (*scroll_offset + dy * scale).clamp(0.0, max_scroll);
+            drag.last_y = mouse_y;
+        } else {
+            drag.dragging = false;
+        }
+        return true;
+    } else if mouse_clicked && clicked_on_scrollbar {
+        drag.dragging = true;
+        drag.last_y = mouse_y;
+        return true;
+    }
+    false
+}
+
 /// Draw a simple scrollbar
 pub fn draw_scrollbar(
     x: f32,

@@ -303,15 +303,29 @@ impl Renderer {
         // Scrollbar
         if scroll_state.show_scrollbar {
             let scrollbar_x = x + item_width + 2.0;
+            let scrollbar_track_w = scrollbar_w - 4.0;
+            let is_dragging = state.ui_state.shop_buy_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::ShopBuyScrollbar));
+            let thumb_color = if is_dragging {
+                Color::new(0.6, 0.6, 0.7, 1.0)
+            } else if is_hovered {
+                Color::new(0.5, 0.5, 0.6, 1.0)
+            } else {
+                Color::new(0.4, 0.4, 0.5, 1.0)
+            };
             draw_scrollbar(
                 scrollbar_x,
                 list_y,
-                scrollbar_w - 4.0,
+                scrollbar_track_w,
                 list_height,
                 scroll_state.scrollbar_position,
                 scroll_state.scrollbar_size,
                 Color::new(0.15, 0.15, 0.2, 1.0),
-                Color::new(0.4, 0.4, 0.5, 1.0),
+                thumb_color,
+            );
+            layout.add(
+                UiElementId::ShopBuyScrollbar,
+                Rect::new(scrollbar_x, list_y, scrollbar_track_w, list_height),
             );
         }
     }
@@ -491,15 +505,29 @@ impl Renderer {
         // Scrollbar
         if scroll_state.show_scrollbar {
             let scrollbar_x = x + item_width + 2.0;
+            let scrollbar_track_w = scrollbar_w - 4.0;
+            let is_dragging = state.ui_state.shop_sell_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::ShopSellScrollbar));
+            let thumb_color = if is_dragging {
+                Color::new(0.6, 0.6, 0.7, 1.0)
+            } else if is_hovered {
+                Color::new(0.5, 0.5, 0.6, 1.0)
+            } else {
+                Color::new(0.4, 0.4, 0.5, 1.0)
+            };
             draw_scrollbar(
                 scrollbar_x,
                 list_y,
-                scrollbar_w - 4.0,
+                scrollbar_track_w,
                 list_height,
                 scroll_state.scrollbar_position,
                 scroll_state.scrollbar_size,
                 Color::new(0.15, 0.15, 0.2, 1.0),
-                Color::new(0.4, 0.4, 0.5, 1.0),
+                thumb_color,
+            );
+            layout.add(
+                UiElementId::ShopSellScrollbar,
+                Rect::new(scrollbar_x, list_y, scrollbar_track_w, list_height),
             );
         }
     }

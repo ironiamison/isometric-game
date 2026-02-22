@@ -11,6 +11,7 @@ impl Renderer {
     /// Render tooltip for hovered inventory/quick slot items
     pub(crate) fn render_item_tooltip(&self, state: &GameState) {
         // Check if we're hovering over an inventory, quick slot, or equipment slot
+        let mut smithing_req: Option<i32> = None;
         let (item_id, quantity) = match &state.ui_state.hovered_element {
             Some(UiElementId::InventorySlot(idx)) if state.ui_state.inventory_open => {
                 if let Some(slot) = state.inventory.slots.get(*idx).and_then(|s| s.as_ref()) {
@@ -88,6 +89,9 @@ impl Renderer {
                     .collect();
                 furnace_recipes.sort_by_key(|r| r.level_required);
                 if let Some(recipe) = furnace_recipes.get(*idx) {
+                    if recipe.level_required > 1 {
+                        smithing_req = Some(recipe.level_required);
+                    }
                     if let Some(result) = recipe.results.first() {
                         (result.item_id.clone(), result.count)
                     } else {
@@ -108,6 +112,9 @@ impl Renderer {
                     .collect();
                 anvil_recipes.sort_by_key(|r| r.level_required);
                 if let Some(recipe) = anvil_recipes.get(*idx) {
+                    if recipe.level_required > 1 {
+                        smithing_req = Some(recipe.level_required);
+                    }
                     if let Some(result) = recipe.results.first() {
                         (result.item_id.clone(), result.count)
                     } else {
@@ -135,6 +142,10 @@ impl Renderer {
         let player_mining_level = state
             .get_local_player()
             .map(|p| p.skills.mining.level)
+            .unwrap_or(1);
+        let player_smithing_level = state
+            .get_local_player()
+            .map(|p| p.skills.smithing.level)
             .unwrap_or(1);
 
         // Get mouse position for tooltip placement
@@ -221,6 +232,11 @@ impl Renderer {
             }
         }
 
+        if let Some(req) = smithing_req {
+            let smithing_req_text = format!("Requires {} Smithing", req);
+            max_w = max_w.max(self.measure_text_sharp(&smithing_req_text, small_font_size).width);
+        }
+
         let tooltip_width = (max_w + padding * 2.0).ceil().min(max_tooltip_width);
 
         // Calculate tooltip height based on actual lines drawn
@@ -261,6 +277,10 @@ impl Renderer {
                     total_h += line_height;
                 }
             }
+        }
+        if smithing_req.is_some() {
+            total_h += 2.0; // Small gap
+            total_h += line_height;
         }
 
         let tooltip_height = total_h.ceil();
@@ -465,6 +485,23 @@ impl Renderer {
                 );
                 y += line_height;
             }
+        }
+
+        // Smithing level requirement (from recipe, for furnace/anvil tooltips)
+        if let Some(req) = smithing_req {
+            y += 2.0;
+            let stat_green = Color::new(0.392, 0.784, 0.392, 1.0);
+            let stat_red = Color::new(1.0, 0.392, 0.392, 1.0);
+            let meets_req = player_smithing_level >= req;
+            let req_color = if meets_req { stat_green } else { stat_red };
+            let req_text = format!("Requires {} Smithing", req);
+            self.draw_text_sharp(
+                &req_text,
+                tooltip_x + padding,
+                y,
+                small_font_size,
+                req_color,
+            );
         }
     }
 

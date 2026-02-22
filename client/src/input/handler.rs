@@ -2281,30 +2281,29 @@ impl InputHandler {
                 }
             }
 
-            // Handle mouse scrollbar dragging (relative/delta-based)
-            if state.ui_state.dialogue_scrollbar_dragging {
-                if is_mouse_button_down(MouseButton::Left) {
-                    let dy = my - state.ui_state.dialogue_scrollbar_drag_last_y;
-                    if let Some(track_bounds) = layout.get_bounds(&UiElementId::DialogueScrollbar) {
-                        let choice_spacing: f32 = if cfg!(target_os = "android") {
-                            38.0
-                        } else {
-                            32.0
-                        };
-                        let total_content = dialogue.choices.len() as f32 * choice_spacing;
-                        let scale = total_content / track_bounds.h;
-                        state.ui_state.dialogue_scroll_offset =
-                            (state.ui_state.dialogue_scroll_offset + dy * scale).max(0.0);
-                    }
-                    state.ui_state.dialogue_scrollbar_drag_last_y = my;
+            // Handle mouse scrollbar dragging (generic system)
+            if let Some(track_bounds) = layout.get_bounds(&UiElementId::DialogueScrollbar) {
+                let choice_spacing: f32 = if cfg!(target_os = "android") {
+                    38.0
                 } else {
-                    state.ui_state.dialogue_scrollbar_dragging = false;
-                }
-            } else if mouse_clicked {
-                if matches!(clicked_element, Some(UiElementId::DialogueScrollbar)) {
-                    state.ui_state.dialogue_scrollbar_dragging = true;
-                    state.ui_state.dialogue_scrollbar_drag_last_y = my;
-                }
+                    32.0
+                };
+                let total_content = dialogue.choices.len() as f32 * choice_spacing;
+                let max_scroll = (total_content - track_bounds.h).max(0.0);
+                let clicked_on = matches!(clicked_element, Some(UiElementId::DialogueScrollbar));
+                crate::ui::scroll::handle_scrollbar_drag(
+                    &mut state.ui_state.dialogue_scroll_drag,
+                    &mut state.ui_state.dialogue_scroll_offset,
+                    max_scroll,
+                    track_bounds,
+                    total_content,
+                    my,
+                    is_mouse_button_down(MouseButton::Left),
+                    mouse_clicked,
+                    clicked_on,
+                );
+            } else if !is_mouse_button_down(MouseButton::Left) {
+                state.ui_state.dialogue_scroll_drag.dragging = false;
             }
 
             // Handle mouse/touch clicks on dialogue elements
@@ -2314,7 +2313,7 @@ impl InputHandler {
             if was_touch_drag {
                 state.ui_state.dialogue_touch_dragged = false;
             }
-            let was_scrollbar = state.ui_state.dialogue_scrollbar_dragging;
+            let was_scrollbar = state.ui_state.dialogue_scroll_drag.dragging;
 
             if !was_touch_drag && !was_scrollbar && mouse_clicked {
                 if let Some(ref element) = clicked_element {
@@ -3447,6 +3446,52 @@ impl InputHandler {
                         - wheel_y * SCROLL_SPEED)
                         .clamp(0.0, max_scroll);
                 }
+
+                // Crafting scrollbar drag handling
+                if let Some(track_bounds) = layout.get_bounds(&UiElementId::CraftingScrollbar) {
+                    let s = state.ui_state.ui_scale;
+                    let line_height = if cfg!(target_os = "android") { 36.0 * s } else { 28.0 * s };
+                    let sel_idx = state.ui_state.crafting_selected_category
+                        .min(categories.len().saturating_sub(1));
+                    let cur_cat = categories.get(sel_idx).map(|sc| sc.as_str()).unwrap_or("supplies");
+                    let recipes_in_cat: Vec<&crate::game::RecipeDefinition> = filtered_recipes
+                        .iter()
+                        .filter(|r| {
+                            if cur_cat == "supplies" {
+                                r.category == "consumables" || r.category == "materials"
+                            } else {
+                                r.category == cur_cat
+                            }
+                        })
+                        .collect();
+                    let drag_total_visible = recipes_in_cat.len();
+                    let drag_num_sections = {
+                        let mut seen = std::collections::HashSet::new();
+                        for r in &recipes_in_cat {
+                            if let Some(ref sec) = r.section {
+                                if !sec.is_empty() { seen.insert(sec.as_str()); }
+                            }
+                        }
+                        seen.len()
+                    };
+                    let total_content = drag_total_visible as f32 * line_height
+                        + drag_num_sections as f32 * SECTION_HEADER_HEIGHT * s;
+                    let max_scroll = (total_content - track_bounds.h).max(0.0);
+                    let clicked_on = matches!(clicked_element, Some(UiElementId::CraftingScrollbar));
+                    crate::ui::scroll::handle_scrollbar_drag(
+                        &mut state.ui_state.crafting_scroll_drag,
+                        &mut state.ui_state.crafting_scroll_offset,
+                        max_scroll,
+                        track_bounds,
+                        total_content,
+                        my,
+                        is_mouse_button_down(MouseButton::Left),
+                        mouse_clicked,
+                        clicked_on,
+                    );
+                } else if !is_mouse_button_down(MouseButton::Left) {
+                    state.ui_state.crafting_scroll_drag.dragging = false;
+                }
             } else if state.ui_state.shop_main_tab == 1 {
                 // Shop tab - side-by-side Buy/Sell layout
                 // Mouse wheel scrolling based on which scroll area the mouse is hovering over
@@ -3478,6 +3523,50 @@ impl InputHandler {
                                 .clamp(0.0, max_scroll);
                         }
                         _ => {}
+                    }
+                }
+
+                // Scrollbar drag handling for shop buy/sell
+                {
+                    let item_height = 48.0 + 4.0;
+                    // Buy scrollbar
+                    if let Some(track_bounds) = layout.get_bounds(&UiElementId::ShopBuyScrollbar) {
+                        let max_scroll = state.ui_state.shop_data.as_ref()
+                            .map(|d| ((d.stock.len() as f32) * item_height - 200.0).max(0.0))
+                            .unwrap_or(0.0);
+                        let clicked_on = matches!(clicked_element, Some(UiElementId::ShopBuyScrollbar));
+                        crate::ui::scroll::handle_scrollbar_drag(
+                            &mut state.ui_state.shop_buy_scroll_drag,
+                            &mut state.ui_state.shop_buy_scroll,
+                            max_scroll,
+                            track_bounds,
+                            max_scroll + 200.0,
+                            my,
+                            is_mouse_button_down(MouseButton::Left),
+                            mouse_clicked,
+                            clicked_on,
+                        );
+                    } else if !is_mouse_button_down(MouseButton::Left) {
+                        state.ui_state.shop_buy_scroll_drag.dragging = false;
+                    }
+                    // Sell scrollbar
+                    if let Some(track_bounds) = layout.get_bounds(&UiElementId::ShopSellScrollbar) {
+                        let inventory_count = state.inventory.slots.iter().filter(|s| s.is_some()).count();
+                        let max_scroll = ((inventory_count as f32) * item_height - 200.0).max(0.0);
+                        let clicked_on = matches!(clicked_element, Some(UiElementId::ShopSellScrollbar));
+                        crate::ui::scroll::handle_scrollbar_drag(
+                            &mut state.ui_state.shop_sell_scroll_drag,
+                            &mut state.ui_state.shop_sell_scroll,
+                            max_scroll,
+                            track_bounds,
+                            max_scroll + 200.0,
+                            my,
+                            is_mouse_button_down(MouseButton::Left),
+                            mouse_clicked,
+                            clicked_on,
+                        );
+                    } else if !is_mouse_button_down(MouseButton::Left) {
+                        state.ui_state.shop_sell_scroll_drag.dragging = false;
                     }
                 }
 
@@ -3814,6 +3903,30 @@ impl InputHandler {
                         - wheel_y * SCROLL_SPEED)
                         .clamp(0.0, max_scroll);
                 }
+
+                // Scrollbar drag handling
+                if let Some(track_bounds) = layout.get_bounds(&UiElementId::FurnaceScrollbar) {
+                    let row_h = 72.0_f32;
+                    let total_content = recipe_count as f32 * row_h;
+                    let (_, sh) = crate::util::virtual_screen_size();
+                    let panel_h = (450.0_f32).min(sh - 16.0);
+                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                    let max_scroll = (total_content - content_h).max(0.0);
+                    let clicked_on = matches!(clicked_element, Some(UiElementId::FurnaceScrollbar));
+                    crate::ui::scroll::handle_scrollbar_drag(
+                        &mut state.ui_state.furnace_scroll_drag,
+                        &mut state.ui_state.furnace_scroll_offset,
+                        max_scroll,
+                        track_bounds,
+                        total_content,
+                        my,
+                        is_mouse_button_down(MouseButton::Left),
+                        mouse_clicked,
+                        clicked_on,
+                    );
+                } else if !is_mouse_button_down(MouseButton::Left) {
+                    state.ui_state.furnace_scroll_drag.dragging = false;
+                }
             }
 
             // Don't process other input while furnace is open
@@ -4034,6 +4147,32 @@ impl InputHandler {
                     state.ui_state.anvil_scroll_offset = (state.ui_state.anvil_scroll_offset
                         - wheel_y * SCROLL_SPEED)
                         .clamp(0.0, max_scroll);
+                }
+
+                // Scrollbar drag handling
+                if let Some(track_bounds) = layout.get_bounds(&UiElementId::AnvilScrollbar) {
+                    let cell_h = 90.0_f32;
+                    let gap = 6.0_f32;
+                    let rows = (recipe_count + columns - 1) / columns;
+                    let total_content = rows as f32 * (cell_h + gap);
+                    let (_, sh) = crate::util::virtual_screen_size();
+                    let panel_h = (480.0_f32).min(sh - 16.0);
+                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0 - 44.0;
+                    let max_scroll = (total_content - content_h).max(0.0);
+                    let clicked_on = matches!(clicked_element, Some(UiElementId::AnvilScrollbar));
+                    crate::ui::scroll::handle_scrollbar_drag(
+                        &mut state.ui_state.anvil_scroll_drag,
+                        &mut state.ui_state.anvil_scroll_offset,
+                        max_scroll,
+                        track_bounds,
+                        total_content,
+                        my,
+                        is_mouse_button_down(MouseButton::Left),
+                        mouse_clicked,
+                        clicked_on,
+                    );
+                } else if !is_mouse_button_down(MouseButton::Left) {
+                    state.ui_state.anvil_scroll_drag.dragging = false;
                 }
             }
 
@@ -5680,27 +5819,22 @@ impl InputHandler {
                 }
             }
 
-            // Mouse scrollbar dragging (relative/delta-based)
-            if state.ui_state.inventory_scrollbar_dragging {
-                if is_mouse_button_down(MouseButton::Left) {
-                    let dy = my - state.ui_state.inventory_scrollbar_drag_last_y;
-                    if let Some(track_bounds) = layout.get_bounds(&UiElementId::InventoryScrollbar)
-                    {
-                        // Scale: moving across the full track scrolls all content
-                        // Use a reasonable estimate for total content height
-                        let scale = 500.0 / track_bounds.h;
-                        state.ui_state.inventory_scroll_offset =
-                            (state.ui_state.inventory_scroll_offset + dy * scale).max(0.0);
-                    }
-                    state.ui_state.inventory_scrollbar_drag_last_y = my;
-                } else {
-                    state.ui_state.inventory_scrollbar_dragging = false;
-                }
-            } else if mouse_clicked {
-                if matches!(clicked_element, Some(UiElementId::InventoryScrollbar)) {
-                    state.ui_state.inventory_scrollbar_dragging = true;
-                    state.ui_state.inventory_scrollbar_drag_last_y = my;
-                }
+            // Mouse scrollbar dragging (generic system)
+            if let Some(track_bounds) = layout.get_bounds(&UiElementId::InventoryScrollbar) {
+                let clicked_on = matches!(clicked_element, Some(UiElementId::InventoryScrollbar));
+                crate::ui::scroll::handle_scrollbar_drag(
+                    &mut state.ui_state.inventory_scroll_drag,
+                    &mut state.ui_state.inventory_scroll_offset,
+                    500.0, // max_scroll estimate (clamped later in rendering)
+                    track_bounds,
+                    500.0, // content_height estimate
+                    my,
+                    is_mouse_button_down(MouseButton::Left),
+                    mouse_clicked,
+                    clicked_on,
+                );
+            } else if !is_mouse_button_down(MouseButton::Left) {
+                state.ui_state.inventory_scroll_drag.dragging = false;
             }
 
             // Touch drag scrolling for mobile
@@ -5747,7 +5881,7 @@ impl InputHandler {
         } else {
             // Reset tracking when inventory closes
             state.ui_state.inventory_touch_scroll_id = None;
-            state.ui_state.inventory_scrollbar_dragging = false;
+            state.ui_state.inventory_scroll_drag.dragging = false;
         }
 
         // Toggle character panel (C key) with mutual exclusivity
@@ -6029,6 +6163,28 @@ impl InputHandler {
                     (state.ui_state.quest_log_scroll - wheel_y * SCROLL_SPEED).max(0.0);
                 // max_scroll is clamped in the renderer
             }
+
+            // Scrollbar drag handling
+            if let Some(track_bounds) = layout.get_bounds(&UiElementId::QuestLogScrollbar) {
+                // Use a generous content height estimate; actual max_scroll is clamped in renderer
+                let content_height = 2000.0;
+                let clicked_on = matches!(clicked_element, Some(UiElementId::QuestLogScrollbar));
+                crate::ui::scroll::handle_scrollbar_drag(
+                    &mut state.ui_state.quest_log_scroll_drag,
+                    &mut state.ui_state.quest_log_scroll,
+                    content_height, // generous max, clamped in renderer
+                    track_bounds,
+                    content_height,
+                    my,
+                    is_mouse_button_down(MouseButton::Left),
+                    mouse_clicked,
+                    clicked_on,
+                );
+            } else if !is_mouse_button_down(MouseButton::Left) {
+                state.ui_state.quest_log_scroll_drag.dragging = false;
+            }
+        } else {
+            state.ui_state.quest_log_scroll_drag.dragging = false;
         }
 
         commands

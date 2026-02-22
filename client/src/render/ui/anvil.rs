@@ -442,14 +442,22 @@ impl Renderer {
             let scrollbar_track_h = content_h - 4.0 * s;
             let scrollbar_x = content_x + content_w - 8.0 * s;
             let scrollbar_y = content_y + 2.0 * s;
+            let scrollbar_w = 4.0 * s;
 
-            draw_rectangle(scrollbar_x, scrollbar_y, 4.0 * s, scrollbar_track_h, Color::new(0.1, 0.08, 0.06, 1.0));
+            draw_rectangle(scrollbar_x, scrollbar_y, scrollbar_w, scrollbar_track_h, Color::new(0.1, 0.08, 0.06, 1.0));
 
             let visible_ratio = (content_h / total_content).min(1.0);
             let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0 * s);
             let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
-            draw_rectangle(scrollbar_x, thumb_y, 4.0 * s, thumb_h, SLOT_BORDER);
+            let is_dragging = state.ui_state.anvil_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::AnvilScrollbar));
+            let thumb_color = if is_dragging || is_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
+            draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
+            layout.add(
+                UiElementId::AnvilScrollbar,
+                Rect::new(scrollbar_x, scrollbar_y, scrollbar_w, scrollbar_track_h),
+            );
         }
 
         // ===== CONTROLS (below grid) =====

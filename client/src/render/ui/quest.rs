@@ -347,6 +347,10 @@ impl Renderer {
                 };
                 let thumb_y = track_y + (track_h - thumb_h) * scroll_ratio;
 
+                let is_dragging = state.ui_state.quest_log_scroll_drag.dragging;
+                let is_hovered = matches!(hovered, Some(UiElementId::QuestLogScrollbar));
+                let thumb_alpha = if is_dragging { 0.5 } else if is_hovered { 0.4 } else { 0.3 };
+
                 // Track
                 draw_rectangle(
                     scrollbar_x,
@@ -361,7 +365,12 @@ impl Renderer {
                     thumb_y,
                     scrollbar_w,
                     thumb_h,
-                    Color::new(1.0, 1.0, 1.0, 0.3),
+                    Color::new(1.0, 1.0, 1.0, thumb_alpha),
+                );
+                // Register scrollbar bounds for drag interaction
+                layout.add(
+                    UiElementId::QuestLogScrollbar,
+                    Rect::new(scrollbar_x, track_y, scrollbar_w, track_h),
                 );
             }
         }
@@ -817,6 +826,10 @@ impl Renderer {
             };
             let thumb_y = track_y + (track_h - thumb_h) * scroll_ratio;
 
+            let is_dragging = state.ui_state.quest_log_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::QuestLogScrollbar));
+            let thumb_alpha = if is_dragging { 0.5 } else if is_hovered { 0.4 } else { 0.3 };
+
             // Track
             draw_rectangle(
                 scrollbar_x,
@@ -831,7 +844,12 @@ impl Renderer {
                 thumb_y,
                 scrollbar_w,
                 thumb_h,
-                Color::new(1.0, 1.0, 1.0, 0.3),
+                Color::new(1.0, 1.0, 1.0, thumb_alpha),
+            );
+            // Register scrollbar bounds for drag interaction
+            layout.add(
+                UiElementId::QuestLogScrollbar,
+                Rect::new(scrollbar_x, track_y, scrollbar_w, track_h),
             );
         }
     }

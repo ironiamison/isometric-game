@@ -14,6 +14,8 @@ pub enum UiElementId {
     // Crafting
     CraftingCategoryTab(usize),
     CraftingRecipeItem(usize),
+    CraftingScrollArea,
+    CraftingScrollbar,
     CraftingButton,
     CraftingCancelButton,
     MainTab(usize), // 0=Recipes, 1=Shop
@@ -28,6 +30,7 @@ pub enum UiElementId {
     // Quest Log
     QuestLogEntry(usize),
     QuestLogScrollArea,
+    QuestLogScrollbar,
     QuestDetailBack,
 
     // Context Menu
@@ -61,6 +64,8 @@ pub enum UiElementId {
     ShopSellItem(usize),
     ShopBuyScrollArea,
     ShopSellScrollArea,
+    ShopBuyScrollbar,
+    ShopSellScrollbar,
     ShopBuyQuantityMinus,
     ShopBuyQuantityPlus,
     ShopBuyConfirmButton,
@@ -169,6 +174,7 @@ pub enum UiElementId {
     FurnaceQuantityX,
     FurnaceQuantityAll,
     FurnaceScrollArea,
+    FurnaceScrollbar,
     FurnaceTabSmelting,
     FurnaceTabJewelry,
 
@@ -181,6 +187,7 @@ pub enum UiElementId {
     AnvilQuantityX,
     AnvilQuantityAll,
     AnvilScrollArea,
+    AnvilScrollbar,
     AnvilTabMaterials,
     AnvilTabEquipment,
 }

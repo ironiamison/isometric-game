@@ -816,7 +816,14 @@ impl Renderer {
                 0.0
             };
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
-            draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, FRAME_MID);
+            let is_dragging = state.ui_state.crafting_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::CraftingScrollbar));
+            let thumb_color = if is_dragging || is_hovered { FRAME_ACCENT } else { FRAME_MID };
+            draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
+            layout.add(
+                UiElementId::CraftingScrollbar,
+                Rect::new(scrollbar_x, scrollbar_y, scrollbar_w, scrollbar_track_h),
+            );
         }
 
         // Build the list of discovered (selectable) recipes for detail panel
