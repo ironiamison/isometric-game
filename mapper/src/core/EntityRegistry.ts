@@ -64,6 +64,7 @@ export class EntityRegistryLoader {
       `${basePath}/npcs/merchants.toml`,
       `${basePath}/npcs/quest_givers.toml`,
       `${basePath}/npcs/stations.toml`,
+      `${basePath}/npcs/slayer_masters.toml`,
       // Monsters
       `${basePath}/monsters/pig.toml`,
       `${basePath}/monsters/forest_creatures.toml`,
