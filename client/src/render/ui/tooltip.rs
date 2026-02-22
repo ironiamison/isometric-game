@@ -124,6 +124,27 @@ impl Renderer {
                     return;
                 }
             }
+            Some(UiElementId::ShopBuyItem(idx)) if state.ui_state.shop_data.is_some() => {
+                let shop_data = state.ui_state.shop_data.as_ref().unwrap();
+                if let Some(stock_item) = shop_data.stock.get(*idx) {
+                    (stock_item.item_id.clone(), 1)
+                } else {
+                    return;
+                }
+            }
+            Some(UiElementId::ShopSellItem(idx)) if state.ui_state.shop_data.is_some() => {
+                let inventory_items: Vec<&crate::game::InventorySlot> = state
+                    .inventory
+                    .slots
+                    .iter()
+                    .filter_map(|slot| slot.as_ref())
+                    .collect();
+                if let Some(inv_slot) = inventory_items.get(*idx) {
+                    (inv_slot.item_id.clone(), inv_slot.quantity)
+                } else {
+                    return;
+                }
+            }
             _ => return,
         };
 
