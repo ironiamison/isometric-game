@@ -53,6 +53,8 @@ pub struct CharacterData {
     pub current_map: Option<String>, // Interior map ID if player is in an instance (NULL = overworld)
     pub sitting_at_x: Option<i32>,   // Chair tile X if sitting (NULL = not sitting)
     pub sitting_at_y: Option<i32>,   // Chair tile Y if sitting (NULL = not sitting)
+    pub entrance_x: Option<f32>,     // Overworld X where player entered interior (for exit)
+    pub entrance_y: Option<f32>,     // Overworld Y where player entered interior (for exit)
     pub bank_json: String,           // JSON serialized bank vault contents
     pub bank_gold: i32,              // Gold stored in bank
     pub bank_max_slots: u32,         // Current max bank slots (upgradeable)
@@ -243,6 +245,25 @@ impl Database {
                 .await
                 .ok();
             sqlx::query("ALTER TABLE characters ADD COLUMN sitting_at_y INTEGER DEFAULT NULL")
+                .execute(pool)
+                .await
+                .ok();
+        }
+
+        // Migration: Add entrance position columns if they don't exist
+        let entrance_x_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'entrance_x'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !entrance_x_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN entrance_x REAL DEFAULT NULL")
+                .execute(pool)
+                .await
+                .ok();
+            sqlx::query("ALTER TABLE characters ADD COLUMN entrance_y REAL DEFAULT NULL")
                 .execute(pool)
                 .await
                 .ok();
@@ -668,7 +689,8 @@ impl Database {
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
-                sitting_at_x, sitting_at_y, bank_json, bank_gold, bank_max_slots
+                sitting_at_x, sitting_at_y, entrance_x, entrance_y,
+                bank_json, bank_gold, bank_max_slots
             FROM characters WHERE account_id = ? ORDER BY created_at DESC"#,
         )
         .bind(account_id)
@@ -758,6 +780,8 @@ impl Database {
                         .unwrap_or(None),
                     sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
                     sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
+                    entrance_x: r.try_get::<Option<f32>, _>("entrance_x").unwrap_or(None),
+                    entrance_y: r.try_get::<Option<f32>, _>("entrance_y").unwrap_or(None),
                     bank_json: r
                         .try_get::<String, _>("bank_json")
                         .unwrap_or_else(|_| "[]".to_string()),
@@ -887,7 +911,8 @@ impl Database {
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
-                sitting_at_x, sitting_at_y, bank_json, bank_gold, bank_max_slots
+                sitting_at_x, sitting_at_y, entrance_x, entrance_y,
+                bank_json, bank_gold, bank_max_slots
             FROM characters WHERE id = ?"#,
         )
         .bind(character_id)
@@ -975,6 +1000,8 @@ impl Database {
                     .unwrap_or(None),
                 sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
                 sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
+                entrance_x: r.try_get::<Option<f32>, _>("entrance_x").unwrap_or(None),
+                entrance_y: r.try_get::<Option<f32>, _>("entrance_y").unwrap_or(None),
                 bank_json: r
                     .try_get::<String, _>("bank_json")
                     .unwrap_or_else(|_| "[]".to_string()),
@@ -1059,6 +1086,8 @@ impl Database {
         current_map: Option<&str>,
         sitting_at_x: Option<i32>,
         sitting_at_y: Option<i32>,
+        entrance_x: Option<f32>,
+        entrance_y: Option<f32>,
         bank_json: &str,
         bank_gold: i32,
         bank_max_slots: u32,
@@ -1081,6 +1110,8 @@ impl Database {
                 current_map = ?,
                 sitting_at_x = ?,
                 sitting_at_y = ?,
+                entrance_x = ?,
+                entrance_y = ?,
                 bank_json = ?,
                 bank_gold = ?,
                 bank_max_slots = ?
@@ -1108,6 +1139,8 @@ impl Database {
         .bind(current_map)
         .bind(sitting_at_x)
         .bind(sitting_at_y)
+        .bind(entrance_x)
+        .bind(entrance_y)
         .bind(bank_json)
         .bind(bank_gold)
         .bind(bank_max_slots as i32)

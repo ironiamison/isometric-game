@@ -175,6 +175,8 @@ pub struct PlayerSaveData {
     pub current_map: Option<String>,
     pub sitting_at_x: Option<i32>,
     pub sitting_at_y: Option<i32>,
+    pub entrance_x: Option<f32>,
+    pub entrance_y: Option<f32>,
     pub bank_json: String,
     pub bank_gold: i32,
     pub bank_max_slots: u32,
@@ -1736,6 +1738,8 @@ impl GameRoom {
                 current_map: current_map.clone(),
                 sitting_at_x: p.sitting_at.map(|(x, _)| x),
                 sitting_at_y: p.sitting_at.map(|(_, y)| y),
+                entrance_x: None, // Filled in by caller from player_entrance_positions
+                entrance_y: None,
                 bank_json,
                 bank_gold: p.bank.gold,
                 bank_max_slots: p.bank_max_slots,
@@ -1884,6 +1888,8 @@ impl GameRoom {
                 current_map: map_ids.get(&pid).cloned(),
                 sitting_at_x: raw.sitting_at_x,
                 sitting_at_y: raw.sitting_at_y,
+                entrance_x: None, // Filled in by caller from player_entrance_positions
+                entrance_y: None,
                 bank_json: serde_json::to_string(&raw.bank_slots)
                     .unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: raw.bank_gold,

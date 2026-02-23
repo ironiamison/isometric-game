@@ -75,6 +75,8 @@ struct GameSession {
     account_id: i64,             // Database account ID
     auth_token: String,          // Token used for this session (for validation)
     current_map: Option<String>, // Interior map ID to auto-enter on connect (None = overworld)
+    entrance_x: Option<f32>,     // Overworld X where player entered interior
+    entrance_y: Option<f32>,     // Overworld Y where player entered interior
     is_new_character: bool,      // True if played_time == 0 (for tutorial)
 }
 
@@ -1203,6 +1205,8 @@ async fn matchmake_join_or_create(
             account_id,
             auth_token: auth_token.clone(),
             current_map: character_data.current_map.clone(),
+            entrance_x: character_data.entrance_x,
+            entrance_y: character_data.entrance_y,
             is_new_character: character_data.played_time == 0,
         },
     );
@@ -1761,6 +1765,8 @@ async fn ws_handler(
             let character_name = session.character_name.clone();
             let character_id = session.character_id;
             let current_map = session.current_map.clone();
+            let entrance_x = session.entrance_x;
+            let entrance_y = session.entrance_y;
             let is_new_character = session.is_new_character;
             ws.on_upgrade(move |socket| {
                 handle_socket(
@@ -1772,6 +1778,8 @@ async fn ws_handler(
                     character_name,
                     character_id,
                     current_map,
+                    entrance_x,
+                    entrance_y,
                     is_new_character,
                 )
             })
@@ -1792,6 +1800,8 @@ async fn handle_socket(
     character_name: String,
     character_id: i64,
     current_map: Option<String>, // Interior map to auto-enter on reconnect
+    entrance_x: Option<f32>,     // Overworld entrance X (for interior exit)
+    entrance_y: Option<f32>,     // Overworld entrance Y (for interior exit)
     is_new_character: bool,      // True if played_time == 0 (for tutorial)
 ) {
     let (mut sender, mut receiver) = socket.split();
@@ -2051,7 +2061,7 @@ async fn handle_socket(
             "Auto-re-entering instance '{}' for reconnecting player {}",
             map_id, player_id
         );
-        auto_enter_instance(&state, &room, &player_id, map_id).await;
+        auto_enter_instance(&state, &room, &player_id, map_id, entrance_x, entrance_y).await;
     }
 
     // Spawn task to forward messages to WebSocket
@@ -2159,7 +2169,15 @@ async fn handle_socket(
             .unwrap_or(0);
 
         // Save character state to database
-        if let Some(save_data) = room.get_player_save_data(&player_id).await {
+        if let Some(mut save_data) = room.get_player_save_data(&player_id).await {
+            // Populate entrance position from runtime HashMap
+            if save_data.current_map.is_some() {
+                let entrance_positions = state.player_entrance_positions.read().await;
+                if let Some(&(ex, ey)) = entrance_positions.get(&player_id) {
+                    save_data.entrance_x = Some(ex as f32);
+                    save_data.entrance_y = Some(ey as f32);
+                }
+            }
             if let Err(e) = state
                 .db
                 .save_character(
@@ -2184,6 +2202,8 @@ async fn handle_socket(
                     save_data.current_map.as_deref(),
                     save_data.sitting_at_x,
                     save_data.sitting_at_y,
+                    save_data.entrance_x,
+                    save_data.entrance_y,
                     &save_data.bank_json,
                     save_data.bank_gold,
                     save_data.bank_max_slots,
@@ -2358,7 +2378,7 @@ async fn handle_socket(
 }
 
 /// Auto-enter an instance on reconnect (when current_map was saved in DB)
-async fn auto_enter_instance(state: &AppState, room: &GameRoom, player_id: &str, map_id: &str) {
+async fn auto_enter_instance(state: &AppState, room: &GameRoom, player_id: &str, map_id: &str, entrance_x: Option<f32>, entrance_y: Option<f32>) {
     use crate::interior::InstanceType;
     use crate::protocol::{ChunkLayerData, ChunkPortalData};
     use base64::Engine;
@@ -2411,10 +2431,10 @@ async fn auto_enter_instance(state: &AppState, room: &GameRoom, player_id: &str,
             .await;
     }
 
-    // Store entrance position (current overworld position from DB)
-    if let Some((entrance_x, entrance_y)) = room.get_player_position(player_id).await {
+    // Restore entrance position from DB (for use when exiting the interior)
+    if let (Some(ex), Some(ey)) = (entrance_x, entrance_y) {
         let mut entrance_positions = state.player_entrance_positions.write().await;
-        entrance_positions.insert(player_id.to_string(), (entrance_x, entrance_y));
+        entrance_positions.insert(player_id.to_string(), (ex as i32, ey as i32));
     }
 
     // Track player's instance
@@ -2437,8 +2457,11 @@ async fn auto_enter_instance(state: &AppState, room: &GameRoom, player_id: &str,
     let other_players_in_instance: Vec<String> = instance.get_player_ids().await;
 
     instance.add_player(player_id).await;
-    room.set_player_position(player_id, spawn.x as i32, spawn.y as i32)
-        .await;
+    // Player position is already correct from DB — don't override with spawn point
+    let (player_x, player_y) = room
+        .get_player_position(player_id)
+        .await
+        .unwrap_or((spawn.x as i32, spawn.y as i32));
 
     // Notify instance players
     if !other_players_in_instance.is_empty() {
@@ -2458,8 +2481,8 @@ async fn auto_enter_instance(state: &AppState, room: &GameRoom, player_id: &str,
                 ServerMessage::PlayerJoined {
                     id: player_id.to_string(),
                     name: player_name.clone(),
-                    x: spawn.x as i32,
-                    y: spawn.y as i32,
+                    x: player_x,
+                    y: player_y,
                     gender: gender.clone(),
                     skin: skin.clone(),
                     hair_style,
@@ -2506,8 +2529,8 @@ async fn auto_enter_instance(state: &AppState, room: &GameRoom, player_id: &str,
         ServerMessage::MapTransition {
             map_type: "interior".to_string(),
             map_id: interior.id.clone(),
-            spawn_x: spawn.x,
-            spawn_y: spawn.y,
+            spawn_x: player_x as f32,
+            spawn_y: player_y as f32,
             instance_id: instance.id.clone(),
         },
     )
@@ -3726,6 +3749,18 @@ async fn main() {
                                 .play_time_anchors
                                 .insert(*character_id, std::time::Instant::now());
 
+                            // Populate entrance position from runtime HashMap
+                            if save_data.current_map.is_some() {
+                                let entrance_positions =
+                                    save_state.player_entrance_positions.read().await;
+                                if let Some(&(ex, ey)) =
+                                    entrance_positions.get(player_id)
+                                {
+                                    save_data.entrance_x = Some(ex as f32);
+                                    save_data.entrance_y = Some(ey as f32);
+                                }
+                            }
+
                             snapshots.push((
                                 *character_id,
                                 character_name.clone(),
@@ -3784,6 +3819,8 @@ async fn main() {
                                 save_data.current_map.as_deref(),
                                 save_data.sitting_at_x,
                                 save_data.sitting_at_y,
+                                save_data.entrance_x,
+                                save_data.entrance_y,
                                 &save_data.bank_json,
                                 save_data.bank_gold,
                                 save_data.bank_max_slots,
@@ -3988,11 +4025,20 @@ async fn main() {
                 .collect();
 
             let bulk_data = room.get_bulk_save_data(&player_ids).await;
-            for (player_id, (save_data, quest_state, discovered_recipes, slayer_state)) in bulk_data {
+            for (player_id, (mut save_data, quest_state, discovered_recipes, slayer_state)) in bulk_data {
                 let character_id = match char_id_map.get(player_id.as_str()) {
                     Some(id) => *id,
                     None => continue,
                 };
+
+                // Populate entrance position from runtime HashMap
+                if save_data.current_map.is_some() {
+                    let entrance_positions = shutdown_state.player_entrance_positions.read().await;
+                    if let Some(&(ex, ey)) = entrance_positions.get(&player_id) {
+                        save_data.entrance_x = Some(ex as f32);
+                        save_data.entrance_y = Some(ey as f32);
+                    }
+                }
 
                 if let Err(e) = shutdown_state
                     .db
@@ -4018,6 +4064,8 @@ async fn main() {
                         save_data.current_map.as_deref(),
                         save_data.sitting_at_x,
                         save_data.sitting_at_y,
+                        save_data.entrance_x,
+                        save_data.entrance_y,
                         &save_data.bank_json,
                         save_data.bank_gold,
                         save_data.bank_max_slots,
