@@ -83,6 +83,8 @@ pub struct Npc {
     pub is_slayer_master: bool,
     /// Station type (e.g. "furnace", "anvil") if this NPC is a crafting station
     pub station_type: Option<String>,
+    /// Delay before death animation starts (so killing blow attack animation is visible)
+    pub death_delay: Option<f32>,
 }
 
 impl Npc {
@@ -118,6 +120,7 @@ impl Npc {
             no_shadow: false,
             render_offset_y: 0.0,
             station_type: None,
+            death_delay: None,
         }
     }
 
@@ -149,11 +152,13 @@ impl Npc {
         self.state == NpcState::Dead && !self.is_death_animation_complete()
     }
 
-    /// Start the death sequence - NPC will finish moving to target then play death animation
+    /// Start the death sequence - NPC will finish moving to target then play death animation.
+    /// Includes a small delay so the killing blow attack animation is visible before death starts.
     pub fn start_death(&mut self) {
         self.state = NpcState::Dead;
         self.hp = 0;
         self.pending_death = true;
+        self.death_delay = Some(0.3); // 300ms delay so killing blow animation plays first
         // death_timer starts when NPC reaches target position (in update())
     }
 
@@ -210,6 +215,17 @@ impl Npc {
         if let Some(ref mut t) = self.death_timer {
             *t += delta;
             return; // Don't update position/animation while dying
+        }
+
+        // Tick death delay (lets killing blow animation play before death starts)
+        if let Some(ref mut delay) = self.death_delay {
+            *delay -= delta;
+            if *delay <= 0.0 {
+                self.death_delay = None;
+                // Delay done, now proceed with pending_death logic below
+            } else {
+                return; // Still waiting for delay
+            }
         }
 
         // If pending death but no timer yet, we need to finish moving first

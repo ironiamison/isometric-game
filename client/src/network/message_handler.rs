@@ -1066,8 +1066,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                     // Create floating XP event and system message for local player
                     if state.local_player_id.as_ref() == Some(&player_id) {
-                        // Add system chat message
-                        state.ui_state.chat_messages.push(ChatMessage::system(format!(
+                        // Add system chat message (system-only, no Local mirror — too spammy)
+                        state.ui_state.chat_messages.push_system_only(ChatMessage::system(format!(
                                 "+{} {} XP",
                                 xp_gained, skill_name
                             )));

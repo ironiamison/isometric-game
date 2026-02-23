@@ -250,6 +250,197 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
     occupied
 }
 
+/// Pathfind to adjacent tile of a player and set up attack, or attack immediately if adjacent.
+fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCommand>, target_id: &str) {
+    if let Some(local_id) = &state.local_player_id.clone() {
+        if let Some(local_player) = state.players.get(local_id) {
+            if let Some(target) = state.players.get(target_id) {
+                let px = local_player.x.round() as i32;
+                let py = local_player.y.round() as i32;
+                let tx = target.x.round() as i32;
+                let ty = target.y.round() as i32;
+                let cdx = (px - tx).abs();
+                let cdy = (py - ty).abs();
+                if (cdx + cdy) != 1 {
+                    let occupied = build_occupied_set(state);
+                    const MAX_PATH_DISTANCE: i32 = 32;
+                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                        (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                    ) {
+                        state.auto_path = Some(PathState {
+                            path, current_index: 0, destination: dest,
+                            pickup_target: None, interact_target: None,
+                        });
+                    }
+                } else {
+                    let dir = crate::game::Direction::from_velocity(tx as f32 - px as f32, ty as f32 - py as f32);
+                    commands.push(InputCommand::Face { direction: dir as u8 });
+                    commands.push(InputCommand::StartAutoAction {
+                        target_type: "player".to_string(),
+                        target_id: target_id.to_string(),
+                        action: "attack".to_string(),
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// Pathfind to adjacent tile of an NPC and set up attack, or attack immediately if adjacent.
+fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputCommand>, npc_id: &str) {
+    if let Some(local_id) = &state.local_player_id.clone() {
+        if let Some(player) = state.players.get(local_id) {
+            if let Some(npc) = state.npcs.get(npc_id) {
+                let px = player.x.round() as i32;
+                let py = player.y.round() as i32;
+                let nx = npc.x.round() as i32;
+                let ny = npc.y.round() as i32;
+                let cdx = (px - nx).abs();
+                let cdy = (py - ny).abs();
+                if (cdx + cdy) != 1 {
+                    let occupied = build_occupied_set(state);
+                    const MAX_PATH_DISTANCE: i32 = 32;
+                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                        (px, py), (nx, ny), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                    ) {
+                        state.auto_path = Some(PathState {
+                            path, current_index: 0, destination: dest,
+                            pickup_target: None, interact_target: None,
+                        });
+                    }
+                } else {
+                    let dir = crate::game::Direction::from_velocity(nx as f32 - px as f32, ny as f32 - py as f32);
+                    commands.push(InputCommand::Face { direction: dir as u8 });
+                    commands.push(InputCommand::StartAutoAction {
+                        target_type: "npc".to_string(),
+                        target_id: npc_id.to_string(),
+                        action: "attack".to_string(),
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// Pathfind to NPC and execute an action when in range, or do it immediately if close enough.
+fn pathfind_and_interact_npc(
+    state: &mut GameState,
+    commands: &mut Vec<InputCommand>,
+    npc_id: &str,
+    on_interact: impl FnOnce(&mut GameState, &mut Vec<InputCommand>, &str),
+) {
+    const INTERACT_RANGE: f32 = 2.5;
+    let should_interact = if let Some(local_id) = &state.local_player_id.clone() {
+        if let Some(player) = state.players.get(local_id) {
+            if let Some(npc) = state.npcs.get(npc_id) {
+                let dx = npc.x - player.x;
+                let dy = npc.y - player.y;
+                let dist = (dx * dx + dy * dy).sqrt();
+                Some(dist < INTERACT_RANGE)
+            } else { None }
+        } else { None }
+    } else { None };
+
+    match should_interact {
+        Some(true) => {
+            on_interact(state, commands, npc_id);
+        }
+        Some(false) => {
+            if let Some(local_id) = &state.local_player_id.clone() {
+                if let Some(player) = state.players.get(local_id) {
+                    if let Some(npc) = state.npcs.get(npc_id) {
+                        let px = player.x.round() as i32;
+                        let py = player.y.round() as i32;
+                        let nx = npc.x.round() as i32;
+                        let ny = npc.y.round() as i32;
+                        let occupied = build_occupied_set(state);
+                        const MAX_PATH_DISTANCE: i32 = 32;
+                        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                            (px, py), (nx, ny), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                        ) {
+                            let npc_id_owned = npc_id.to_string();
+                            state.auto_path = Some(PathState {
+                                path, current_index: 0, destination: dest,
+                                pickup_target: None,
+                                interact_target: Some(npc_id_owned),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        None => {}
+    }
+}
+
+/// Pathfind to adjacent tile of a resource and start auto-action, or do it immediately if adjacent.
+fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>, tile_x: i32, tile_y: i32, target_id: &str, action: &str) {
+    if let Some(player) = state.get_local_player() {
+        let px = player.x.round() as i32;
+        let py = player.y.round() as i32;
+        let cdx = (px - tile_x).abs();
+        let cdy = (py - tile_y).abs();
+        if (cdx + cdy) != 1 {
+            let occupied = build_occupied_set(state);
+            const MAX_PATH_DISTANCE: i32 = 32;
+            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                (px, py), (tile_x, tile_y), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+            ) {
+                state.auto_path = Some(PathState {
+                    path, current_index: 0, destination: dest,
+                    pickup_target: None, interact_target: None,
+                });
+            }
+        } else {
+            let dir = crate::game::Direction::from_velocity(tile_x as f32 - px as f32, tile_y as f32 - py as f32);
+            commands.push(InputCommand::Face { direction: dir as u8 });
+            commands.push(InputCommand::StartAutoAction {
+                target_type: "resource".to_string(),
+                target_id: target_id.to_string(),
+                action: action.to_string(),
+            });
+        }
+    }
+}
+
+/// Pathfind to a tile.
+fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, tile_x: i32, tile_y: i32) {
+    // Cancel any existing auto-action or follow
+    if state.auto_action_state.is_some() {
+        state.auto_action_state = None;
+        commands.push(InputCommand::CancelAutoAction);
+    }
+    state.follow_target = None;
+
+    const MAX_PATH_DISTANCE: i32 = 32;
+    if let Some(player) = state.get_local_player() {
+        let px = player.x.round() as i32;
+        let py = player.y.round() as i32;
+        let dist = (tile_x - px).abs().max((tile_y - py).abs());
+        if dist <= MAX_PATH_DISTANCE && state.chunk_manager.is_walkable(tile_x as f32, tile_y as f32) {
+            let occupied = build_occupied_set(state);
+            if let Some(path) = pathfinding::find_path(
+                (px, py), (tile_x, tile_y), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+            ) {
+                state.auto_path = Some(PathState {
+                    path, current_index: 0, destination: (tile_x, tile_y),
+                    pickup_target: None, interact_target: None,
+                });
+            }
+        }
+    }
+}
+
+/// Returns (combat_level_required, slayer_level_required) for a slayer master entity type.
+fn slayer_master_requirements(entity_type: &str) -> (i32, i32) {
+    match entity_type {
+        "slayer_master_turael" => (0, 1),
+        "slayer_master_mazchna" => (20, 30),
+        "slayer_master_chaeldar" => (40, 60),
+        _ => (0, 1), // Unknown master, let server validate
+    }
+}
+
 /// Input commands that can be sent to the server
 #[derive(Debug, Clone)]
 pub enum InputCommand {
@@ -1261,15 +1452,12 @@ impl InputHandler {
         // Handle context menu interactions first
         if let Some(ref menu) = state.ui_state.context_menu {
             // Auto-hide context menu when mouse leaves its bounds
-            let padding = 8.0;
-            let header_height = 24.0;
-            let option_height = 28.0;
-            let menu_width = 120.0;
-
-            // Calculate number of options (same logic as render_context_menu)
+            // Use generous estimates — exact size depends on text measurement in renderer,
+            // but we just need a rough bounding box to dismiss when mouse wanders far away.
+            let option_height = 20.0;
             let num_options = match &menu.target {
-                ContextMenuTarget::EquipmentSlot(_) => 1, // Unequip only
-                ContextMenuTarget::Gold => 1,             // Drop only
+                ContextMenuTarget::EquipmentSlot(_) => 1,
+                ContextMenuTarget::Gold => 1,
                 ContextMenuTarget::InventorySlot(slot_index) => {
                     let (is_equippable, is_bones) = state
                         .inventory
@@ -1283,30 +1471,44 @@ impl InputHandler {
                             (equippable, bones)
                         })
                         .unwrap_or((false, false));
-                    // [Equip?] [Bury?] Drop
                     1 + if is_equippable { 1 } else { 0 } + if is_bones { 1 } else { 0 }
                 }
+                ContextMenuTarget::Player { .. } => 4,
+                ContextMenuTarget::Npc { id } => {
+                    state.npcs.get(id).map(|npc| {
+                        if npc.is_attackable() { 2 }
+                        else if npc.is_altar { 3 }
+                        else if npc.is_merchant { 3 }
+                        else { 2 }
+                    }).unwrap_or(1)
+                }
+                ContextMenuTarget::Tree { .. } => 2,
+                ContextMenuTarget::Rock { .. } => 2,
+                ContextMenuTarget::GatheringSpot { .. } => 2,
+                ContextMenuTarget::GroundItem { .. } => 2,
+                ContextMenuTarget::FarmingPatch { patch_id } => {
+                    state.farming_patches.get(patch_id).map(|p| {
+                        if p.state == "harvestable" || p.state == "empty" { 2 } else { 1 }
+                    }).unwrap_or(1)
+                }
+                ContextMenuTarget::Tile { .. } => 1,
             };
 
-            let content_height = num_options as f32 * option_height + padding;
-            let menu_height = header_height + content_height + padding;
+            let menu_width = 140.0; // generous estimate
+            let menu_height = option_height + num_options as f32 * option_height + 4.0;
 
-            // Apply same screen clamping as render_context_menu
             let mut menu_x = menu.x.floor();
             let mut menu_y = menu.y.floor();
-
             let screen_w = screen_width();
             let screen_h = screen_height();
-
             if menu_x + menu_width > screen_w {
-                menu_x = (screen_w - menu_width - 5.0).floor();
+                menu_x = (screen_w - menu_width - 2.0).floor();
             }
             if menu_y + menu_height > screen_h {
-                menu_y = (screen_h - menu_height - 5.0).floor();
+                menu_y = (screen_h - menu_height - 2.0).floor();
             }
 
-            // Add some margin for easier interaction
-            let margin = 4.0;
+            let margin = 6.0;
             let is_mouse_inside = mx >= menu_x - margin
                 && mx <= menu_x + menu_width + margin
                 && my >= menu_y - margin
@@ -1403,6 +1605,459 @@ impl InputHandler {
                                                 target_y: None,
                                             });
                                         }
+                                    }
+                                }
+                                // === World context menu targets ===
+                                ContextMenuTarget::Player { id } => {
+                                    // Options: 0=Attack, 1=Follow, 2=Add Friend, 3=Examine
+                                    match option_idx {
+                                        0 => {
+                                            // Attack - reuse player attack logic
+                                            commands.push(InputCommand::Target { entity_id: id.clone() });
+                                            state.auto_action_state = Some(crate::game::AutoActionState {
+                                                target_type: "player".to_string(),
+                                                target_id: id.clone(),
+                                                action: "attack".to_string(),
+                                                confirmed: false,
+                                            });
+                                            pathfind_and_attack_player(state, &mut commands, id);
+                                        }
+                                        1 => {
+                                            // Follow - persistently follow this player
+                                            state.follow_target = Some(id.clone());
+                                            // Cancel any auto-action
+                                            if state.auto_action_state.is_some() {
+                                                state.auto_action_state = None;
+                                                commands.push(InputCommand::CancelAutoAction);
+                                            }
+                                            // Initial pathfind to adjacent
+                                            if let Some(local_id) = &state.local_player_id.clone() {
+                                                if let Some(player) = state.players.get(local_id) {
+                                                    if let Some(target) = state.players.get(id) {
+                                                        let px = player.x.round() as i32;
+                                                        let py = player.y.round() as i32;
+                                                        let tx = target.x.round() as i32;
+                                                        let ty = target.y.round() as i32;
+                                                        let mut occupied = build_occupied_set(state);
+                                                        occupied.remove(&(tx, ty));
+                                                        const MAX_PATH_DISTANCE: i32 = 32;
+                                                        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                                            (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                                                        ) {
+                                                            state.auto_path = Some(PathState {
+                                                                path, current_index: 0, destination: dest,
+                                                                pickup_target: None, interact_target: None,
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        2 => {
+                                            // Add Friend
+                                            if let Some(player) = state.players.get(id) {
+                                                commands.push(InputCommand::SendFriendRequest {
+                                                    target_name: player.name.clone(),
+                                                });
+                                            }
+                                        }
+                                        3 => {
+                                            // Examine
+                                            if let Some(player) = state.players.get(id) {
+                                                let msg = format!("{} (level {})", player.name, player.combat_level());
+                                                state.push_system_chat(msg);
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                ContextMenuTarget::Npc { id } => {
+                                    if let Some(npc) = state.npcs.get(id) {
+                                        let is_attackable = npc.is_attackable();
+                                        let is_altar = npc.is_altar;
+                                        let is_merchant = npc.is_merchant;
+                                        let is_banker = npc.is_banker;
+                                        let is_slayer_master = npc.is_slayer_master;
+                                        let has_station = npc.station_type.is_some();
+                                        let npc_name = npc.display_name.clone();
+                                        let npc_level = npc.level;
+                                        let npc_entity_type = npc.entity_type.clone();
+                                        let npc_id = id.clone();
+
+                                        if is_attackable {
+                                            // Options: 0=Attack, 1=Examine
+                                            match option_idx {
+                                                0 => {
+                                                    commands.push(InputCommand::Target { entity_id: npc_id.clone() });
+                                                    state.auto_action_state = Some(crate::game::AutoActionState {
+                                                        target_type: "npc".to_string(),
+                                                        target_id: npc_id.clone(),
+                                                        action: "attack".to_string(),
+                                                        confirmed: false,
+                                                    });
+                                                    pathfind_and_attack_npc(state, &mut commands, &npc_id);
+                                                }
+                                                1 => {
+                                                    let msg = format!("{} (level {})", npc_name, npc_level);
+                                                    state.push_system_chat(msg);
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if is_altar {
+                                            // Options: 0=Pray, 1=Offer Bones, 2=Examine
+                                            match option_idx {
+                                                0 => {
+                                                    // Pray at altar
+                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
+                                                        commands.push(InputCommand::PrayAtAltar { altar_id: npc_id.to_string() });
+                                                    });
+                                                }
+                                                1 => {
+                                                    // Offer Bones - open altar panel
+                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |state, _commands, npc_id| {
+                                                        if let Some(npc) = state.npcs.get(npc_id) {
+                                                            state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
+                                                                altar_npc_id: npc_id.to_string(),
+                                                                altar_name: npc.display_name.clone(),
+                                                            });
+                                                        }
+                                                    });
+                                                }
+                                                2 => {
+                                                    let msg = format!("An altar dedicated to the gods.");
+                                                    state.push_system_chat(msg);
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if has_station {
+                                            // Options: 0=Use, 1=Examine
+                                            match option_idx {
+                                                0 => {
+                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |state, _commands, npc_id| {
+                                                        if let Some(npc) = state.npcs.get(npc_id) {
+                                                            match npc.station_type.as_deref() {
+                                                                Some("furnace") => {
+                                                                    state.ui_state.furnace_open = true;
+                                                                    state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                                                    state.ui_state.furnace_selected_recipe = 0;
+                                                                    state.ui_state.furnace_scroll_offset = 0.0;
+                                                                    state.ui_state.furnace_quantity = 1;
+                                                                    state.ui_state.furnace_tab = 0;
+                                                                }
+                                                                Some("anvil") => {
+                                                                    state.ui_state.anvil_open = true;
+                                                                    state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                                                    state.ui_state.anvil_selected_recipe = 0;
+                                                                    state.ui_state.anvil_scroll_offset = 0.0;
+                                                                    state.ui_state.anvil_quantity = 1;
+                                                                    state.ui_state.anvil_tab = 0;
+                                                                }
+                                                                _ => {
+                                                                    _commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
+                                                                }
+                                                            }
+                                                        }
+                                                    });
+                                                }
+                                                1 => {
+                                                    let msg = npc_name;
+                                                    state.push_system_chat(msg);
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if is_merchant {
+                                            // Options: 0=Talk-to, 1=Trade, 2=Examine
+                                            match option_idx {
+                                                0 | 1 => {
+                                                    // Both Talk-to and Trade interact with merchant
+                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
+                                                        commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
+                                                    });
+                                                }
+                                                2 => {
+                                                    let msg = npc_name;
+                                                    state.push_system_chat(msg);
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if is_banker {
+                                            // Options: 0=Bank, 1=Examine
+                                            match option_idx {
+                                                0 => {
+                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
+                                                        commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
+                                                    });
+                                                }
+                                                1 => {
+                                                    let msg = npc_name;
+                                                    state.push_system_chat(msg);
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if is_slayer_master {
+                                            // Options: 0=Get Task, 1=Examine
+                                            match option_idx {
+                                                0 => {
+                                                    // Check requirements client-side for instant feedback
+                                                    let (combat_req, slayer_req) = slayer_master_requirements(&npc_entity_type);
+                                                    let player_combat = state.get_local_player().map(|p| p.combat_level()).unwrap_or(0);
+                                                    let player_slayer = state.get_local_player().map(|p| p.skills.slayer.level).unwrap_or(1);
+
+                                                    if player_combat < combat_req {
+                                                        state.push_system_chat(format!(
+                                                            "You need combat level {} to get tasks from {}. (You are level {})",
+                                                            combat_req, npc_name, player_combat
+                                                        ));
+                                                    } else if player_slayer < slayer_req {
+                                                        state.push_system_chat(format!(
+                                                            "You need slayer level {} to get tasks from {}. (You are level {})",
+                                                            slayer_req, npc_name, player_slayer
+                                                        ));
+                                                    } else {
+                                                        pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
+                                                            commands.push(InputCommand::SlayerGetTask { master_id: npc_id.to_string() });
+                                                        });
+                                                    }
+                                                }
+                                                1 => {
+                                                    let (combat_req, slayer_req) = slayer_master_requirements(&npc_entity_type);
+                                                    if combat_req > 0 || slayer_req > 1 {
+                                                        state.push_system_chat(format!(
+                                                            "{} - Requires combat level {}, slayer level {}.",
+                                                            npc_name, combat_req, slayer_req
+                                                        ));
+                                                    } else {
+                                                        state.push_system_chat(format!("{} - Beginner slayer master.", npc_name));
+                                                    }
+                                                }
+                                                _ => {}
+                                            }
+                                        } else {
+                                            // Generic friendly NPC: 0=Talk-to, 1=Examine
+                                            match option_idx {
+                                                0 => {
+                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
+                                                        commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
+                                                    });
+                                                }
+                                                1 => {
+                                                    state.push_system_chat(npc_name);
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+                                }
+                                ContextMenuTarget::Tree { tile_x, tile_y, gid } => {
+                                    // Options: 0=Chop, 1=Examine
+                                    match option_idx {
+                                        0 => {
+                                            let target_id = format!("{},{},{}", tile_x, tile_y, gid);
+                                            state.auto_action_state = Some(crate::game::AutoActionState {
+                                                target_type: "resource".to_string(),
+                                                target_id: target_id.clone(),
+                                                action: "chop".to_string(),
+                                                confirmed: false,
+                                            });
+                                            pathfind_and_resource(state, &mut commands, *tile_x, *tile_y, &target_id, "chop");
+                                        }
+                                        1 => {
+                                            let name = crate::game::tree_types::get_tree_info(*gid)
+                                                .map(|info| info.name)
+                                                .unwrap_or("Tree");
+                                            state.push_system_chat(format!("{} tree.", name));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                ContextMenuTarget::Rock { tile_x, tile_y, gid } => {
+                                    // Options: 0=Mine, 1=Examine
+                                    match option_idx {
+                                        0 => {
+                                            let target_id = format!("{},{},{}", tile_x, tile_y, gid);
+                                            state.auto_action_state = Some(crate::game::AutoActionState {
+                                                target_type: "resource".to_string(),
+                                                target_id: target_id.clone(),
+                                                action: "mine".to_string(),
+                                                confirmed: false,
+                                            });
+                                            pathfind_and_resource(state, &mut commands, *tile_x, *tile_y, &target_id, "mine");
+                                        }
+                                        1 => {
+                                            let name = crate::game::ore_types::get_ore_info(*gid)
+                                                .map(|info| info.name)
+                                                .unwrap_or("Rock");
+                                            state.push_system_chat(format!("A rock containing {} ore.", name.to_lowercase()));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                ContextMenuTarget::GatheringSpot { marker_index } => {
+                                    // Options: 0=Fish/Gather, 1=Examine
+                                    match option_idx {
+                                        0 => {
+                                            if let Some(marker) = state.gathering_markers.get(*marker_index) {
+                                                let marker_x = marker.x;
+                                                let marker_y = marker.y;
+                                                // Pathfind to marker and start gathering
+                                                if let Some(player) = state.get_local_player() {
+                                                    let px = player.x.round() as i32;
+                                                    let py = player.y.round() as i32;
+                                                    let dx = (px - marker_x).abs();
+                                                    let dy = (py - marker_y).abs();
+                                                    if dx <= 1 && dy <= 1 {
+                                                        commands.push(InputCommand::StartGathering {
+                                                            marker_x,
+                                                            marker_y,
+                                                        });
+                                                    } else {
+                                                        let occupied = build_occupied_set(state);
+                                                        const MAX_PATH_DISTANCE: i32 = 32;
+                                                        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                                            (px, py),
+                                                            (marker_x, marker_y),
+                                                            &state.chunk_manager,
+                                                            &occupied,
+                                                            MAX_PATH_DISTANCE,
+                                                        ) {
+                                                            state.auto_path = Some(PathState {
+                                                                path,
+                                                                current_index: 0,
+                                                                destination: dest,
+                                                                pickup_target: None,
+                                                                interact_target: None,
+                                                            });
+                                                            // Player will need to interact again when they arrive
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        1 => {
+                                            if let Some(marker) = state.gathering_markers.get(*marker_index) {
+                                                state.push_system_chat(format!("A {} spot.", marker.skill));
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                ContextMenuTarget::GroundItem { id } => {
+                                    // Options: 0=Pick up, 1=Examine
+                                    match option_idx {
+                                        0 => {
+                                            if let Some(item) = state.ground_items.get(id) {
+                                                let item_x = item.x.round() as i32;
+                                                let item_y = item.y.round() as i32;
+                                                let item_id = item.id.clone();
+                                                const PICKUP_RANGE: f32 = 2.0;
+                                                if let Some(player) = state.get_local_player() {
+                                                    let dx = item.x - player.x;
+                                                    let dy = item.y - player.y;
+                                                    let dist = (dx * dx + dy * dy).sqrt();
+                                                    if dist < PICKUP_RANGE {
+                                                        commands.push(InputCommand::Pickup { item_id });
+                                                    } else {
+                                                        // Pathfind to item
+                                                        let px = player.x.round() as i32;
+                                                        let py = player.y.round() as i32;
+                                                        let occupied = build_occupied_set(state);
+                                                        const MAX_PATH_DISTANCE: i32 = 32;
+                                                        if let Some(path) = pathfinding::find_path(
+                                                            (px, py),
+                                                            (item_x, item_y),
+                                                            &state.chunk_manager,
+                                                            &occupied,
+                                                            MAX_PATH_DISTANCE,
+                                                        ) {
+                                                            state.auto_path = Some(PathState {
+                                                                path,
+                                                                current_index: 0,
+                                                                destination: (item_x, item_y),
+                                                                pickup_target: Some(item_id),
+                                                                interact_target: None,
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        1 => {
+                                            if let Some(item) = state.ground_items.get(id) {
+                                                let item_def = state.item_registry.get_or_placeholder(&item.item_id);
+                                                state.push_system_chat(format!("{}: {}", item_def.display_name, item_def.description));
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                ContextMenuTarget::FarmingPatch { patch_id } => {
+                                    if let Some(patch) = state.farming_patches.get(patch_id) {
+                                        let patch_state = patch.state.clone();
+                                        let patch_x = patch.x;
+                                        let patch_y = patch.y;
+                                        let pid = patch_id.clone();
+                                        if patch_state == "harvestable" {
+                                            // Options: 0=Harvest, 1=Examine
+                                            match option_idx {
+                                                0 => {
+                                                    if let Some(player) = state.get_local_player() {
+                                                        let px = player.x.round() as i32;
+                                                        let py = player.y.round() as i32;
+                                                        let cdx = (px - patch_x).abs();
+                                                        let cdy = (py - patch_y).abs();
+                                                        if cdx <= 1 && cdy <= 1 {
+                                                            commands.push(InputCommand::HarvestCrop { patch_id: pid });
+                                                        } else {
+                                                            let occupied = build_occupied_set(state);
+                                                            const MAX_PATH_DISTANCE: i32 = 32;
+                                                            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                                                (px, py),
+                                                                (patch_x, patch_y),
+                                                                &state.chunk_manager,
+                                                                &occupied,
+                                                                MAX_PATH_DISTANCE,
+                                                            ) {
+                                                                state.auto_path = Some(PathState {
+                                                                    path,
+                                                                    current_index: 0,
+                                                                    destination: dest,
+                                                                    pickup_target: None,
+                                                                    interact_target: None,
+                                                                });
+                                                                state.pending_harvest_patch = Some(pid);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                1 => {
+                                                    state.push_system_chat("This crop is ready to harvest.".to_string());
+                                                }
+                                                _ => {}
+                                            }
+                                        } else if patch_state == "empty" {
+                                            // Options: 0=Plant, 1=Examine
+                                            match option_idx {
+                                                0 => {
+                                                    // TODO: Open seed selection UI or plant first seed
+                                                    state.push_system_chat("Use a seed on this patch to plant it.".to_string());
+                                                }
+                                                1 => {
+                                                    state.push_system_chat("An empty farming patch.".to_string());
+                                                }
+                                                _ => {}
+                                            }
+                                        } else {
+                                            // Growing state - only Examine
+                                            if *option_idx == 0 {
+                                                state.push_system_chat("A farming patch with something growing.".to_string());
+                                            }
+                                        }
+                                    }
+                                }
+                                ContextMenuTarget::Tile { x, y } => {
+                                    // Options: 0=Walk here
+                                    if *option_idx == 0 {
+                                        pathfind_to_tile(state, &mut commands, *x, *y);
                                     }
                                 }
                             }
@@ -5058,11 +5713,15 @@ impl InputHandler {
         // Just let the move command go through - server will stand up if direction matches
 
         if has_movement_input && !is_attacking {
-            // Cancel auto-action when player manually moves
+            // Cancel auto-action and follow when player manually moves
             if state.auto_action_state.is_some() {
                 state.auto_action_state = None;
                 state.auto_path = None;
                 commands.push(InputCommand::CancelAutoAction);
+            }
+            if state.follow_target.is_some() {
+                state.follow_target = None;
+                state.auto_path = None;
             }
 
             // Determine hold duration based on input source
@@ -5111,6 +5770,8 @@ impl InputHandler {
                         self.last_dy = dy;
                         self.last_send_time = current_time;
                         self.move_sent = true;
+                        // Close context menu when player starts moving
+                        state.ui_state.context_menu = None;
                         // Also track D-pad move sent
                         if has_dpad_input {
                             self.touch_controls.set_dpad_move_sent(true);
@@ -5275,6 +5936,62 @@ impl InputHandler {
             }
         }
 
+        // Follow target re-pathing — continuously follow another player
+        // Cancel follow if player started attacking or performing an auto-action
+        if state.follow_target.is_some() && state.auto_action_state.is_some() {
+            state.follow_target = None;
+        }
+        if let Some(ref follow_id) = state.follow_target.clone() {
+            if let Some(target) = state.players.get(follow_id) {
+                let tx = target.x.round() as i32;
+                let ty = target.y.round() as i32;
+
+                if let Some(player) = state.get_local_player() {
+                    let px = player.x.round() as i32;
+                    let py = player.y.round() as i32;
+                    let dist = (px - tx).abs() + (py - ty).abs();
+
+                    // Already adjacent — just stand still and face them
+                    if dist <= 1 {
+                        // no-op, we're close enough
+                    } else {
+                        // Check if we need to re-path (target moved away from our destination)
+                        let needs_repath = if let Some(ref path_state) = state.auto_path {
+                            let dest_dist = (path_state.destination.0 - tx).abs()
+                                + (path_state.destination.1 - ty).abs();
+                            dest_dist > 2
+                        } else {
+                            true
+                        };
+
+                        const REPATH_COOLDOWN: f64 = 0.3;
+                        let repath_allowed = current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
+
+                        if needs_repath && repath_allowed {
+                            let mut occupied = build_occupied_set(state);
+                            // Exclude the follow target so they don't block our path
+                            if let Some(p) = state.players.get(follow_id) {
+                                occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                            }
+                            const MAX_PATH_DISTANCE: i32 = 32;
+                            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                            ) {
+                                state.auto_path = Some(PathState {
+                                    path, current_index: 0, destination: dest,
+                                    pickup_target: None, interact_target: None,
+                                });
+                                state.last_chase_repath_time = current_time;
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Target player disconnected or left view — stop following
+                state.follow_target = None;
+            }
+        }
+
         // Path following - generate movement commands when auto-pathing
         // Only follow path if not manually moving and not attacking
         if dx == 0.0 && dy == 0.0 && !is_attacking {
@@ -5289,7 +6006,7 @@ impl InputHandler {
                     let (next_x, next_y) = path_state.path[path_state.current_index];
                     if player_x != next_x || player_y != next_y {
                         let mut occupied = build_occupied_set(state);
-                        // Exclude chase target from blocked check
+                        // Exclude chase/follow target from blocked check
                         if let Some(ref aa) = state.auto_action_state {
                             match aa.target_type.as_str() {
                                 "npc" => {
@@ -5305,6 +6022,11 @@ impl InputHandler {
                                 _ => {}
                             }
                         }
+                        if let Some(ref fid) = state.follow_target {
+                            if let Some(p) = state.players.get(fid) {
+                                occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                            }
+                        }
                         if occupied.contains(&(next_x, next_y)) {
                             path_blocked = true;
                         }
@@ -5313,13 +6035,13 @@ impl InputHandler {
             }
 
             if path_blocked {
-                if state.auto_action_state.is_none() {
+                if state.auto_action_state.is_some() || state.follow_target.is_some() {
+                    // Clear the blocked path — chase/follow re-path will recalculate next frame
+                    state.auto_path = None;
+                } else {
                     state.auto_path = None;
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                     return commands;
-                } else {
-                    // Clear the blocked path — chase re-path will recalculate next frame
-                    state.auto_path = None;
                 }
             }
 
@@ -6343,6 +7065,91 @@ impl InputHandler {
                     commands.push(InputCommand::ClearTarget);
                 }
             }
+        }
+
+        // Right-click world detection - open context menu for world entities
+        if mouse_right_clicked && clicked_element.is_none() {
+            let (raw_x, raw_y) = mouse_position();
+            let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
+            let (world_x, world_y) = screen_to_world(mouse_vx, mouse_vy, &state.camera);
+            let clicked_tile_x = world_x.round() as i32;
+            let clicked_tile_y = world_y.round() as i32;
+
+            // Determine what's under the cursor, same priority as left-click
+            let target = 'find_target: {
+                // Check NPCs
+                for (id, npc) in &state.npcs {
+                    if !npc.is_alive() {
+                        continue;
+                    }
+                    let npc_tile_x = npc.x.round() as i32;
+                    let npc_tile_y = npc.y.round() as i32;
+                    if npc_tile_x == clicked_tile_x && npc_tile_y == clicked_tile_y {
+                        break 'find_target ContextMenuTarget::Npc { id: id.clone() };
+                    }
+                }
+
+                // Check players (skip self)
+                for (id, player) in &state.players {
+                    if state.local_player_id.as_ref() == Some(id) {
+                        continue;
+                    }
+                    let player_tile_x = player.x.round() as i32;
+                    let player_tile_y = player.y.round() as i32;
+                    if player_tile_x == clicked_tile_x && player_tile_y == clicked_tile_y {
+                        break 'find_target ContextMenuTarget::Player { id: id.clone() };
+                    }
+                }
+
+                // Check ground items
+                for (_id, item) in &state.ground_items {
+                    let ix = item.x.round() as i32;
+                    let iy = item.y.round() as i32;
+                    if ix == clicked_tile_x && iy == clicked_tile_y {
+                        break 'find_target ContextMenuTarget::GroundItem { id: item.id.clone() };
+                    }
+                }
+
+                // Check map objects (trees/rocks)
+                if let Some(obj) = state.chunk_manager.get_object_at_exact(clicked_tile_x, clicked_tile_y) {
+                    let obj_gid = obj.gid;
+                    if crate::game::tree_types::is_tree_gid(obj_gid) {
+                        break 'find_target ContextMenuTarget::Tree {
+                            tile_x: clicked_tile_x,
+                            tile_y: clicked_tile_y,
+                            gid: obj_gid,
+                        };
+                    }
+                    if crate::game::ore_types::get_ore_info(obj_gid).is_some() {
+                        break 'find_target ContextMenuTarget::Rock {
+                            tile_x: clicked_tile_x,
+                            tile_y: clicked_tile_y,
+                            gid: obj_gid,
+                        };
+                    }
+                }
+
+                // Check gathering markers
+                for (i, marker) in state.gathering_markers.iter().enumerate() {
+                    if marker.x == clicked_tile_x && marker.y == clicked_tile_y {
+                        break 'find_target ContextMenuTarget::GatheringSpot { marker_index: i };
+                    }
+                }
+
+                // Check farming patches
+                if let Some(patch_id) = state.farming_patch_positions.get(&(clicked_tile_x, clicked_tile_y)).cloned() {
+                    break 'find_target ContextMenuTarget::FarmingPatch { patch_id };
+                }
+
+                // Default: empty tile
+                ContextMenuTarget::Tile { x: clicked_tile_x, y: clicked_tile_y }
+            };
+
+            state.ui_state.context_menu = Some(ContextMenu {
+                target,
+                x: mx,
+                y: my,
+            });
         }
 
         // Escape key - close any open panel first, then clear target, then open escape menu

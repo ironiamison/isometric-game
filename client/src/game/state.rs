@@ -328,6 +328,21 @@ impl ChatLog {
     }
 
     pub fn push(&mut self, message: ChatMessage) {
+        // Mirror system messages into Local tab too (so players see them in public chat).
+        // Keep the System channel on the copy so it renders with gold color.
+        if matches!(message.channel, ChatChannel::System) {
+            self.local.push(ChatMessage {
+                sender_name: message.sender_name.clone(),
+                text: message.text.clone(),
+                timestamp: message.timestamp,
+                channel: ChatChannel::System,
+            });
+            if self.local.len() > MAX_CHAT_LOG_MESSAGES {
+                let to_remove = self.local.len() - MAX_CHAT_LOG_MESSAGES;
+                self.local.drain(0..to_remove);
+            }
+        }
+
         let vec = match message.channel {
             ChatChannel::Local => &mut self.local,
             ChatChannel::Global => &mut self.global,
@@ -337,6 +352,16 @@ impl ChatLog {
         if vec.len() > MAX_CHAT_LOG_MESSAGES {
             let to_remove = vec.len() - MAX_CHAT_LOG_MESSAGES;
             vec.drain(0..to_remove);
+        }
+    }
+
+    /// Push a message to the System tab only (no Local mirror). Used for high-frequency
+    /// messages like XP gains that would spam the Local tab.
+    pub fn push_system_only(&mut self, message: ChatMessage) {
+        self.system.push(message);
+        if self.system.len() > MAX_CHAT_LOG_MESSAGES {
+            let to_remove = self.system.len() - MAX_CHAT_LOG_MESSAGES;
+            self.system.drain(0..to_remove);
         }
     }
 
@@ -956,9 +981,19 @@ pub struct GatheringBuff {
 /// Target for context menu - what was right-clicked
 #[derive(Debug, Clone)]
 pub enum ContextMenuTarget {
+    // UI targets
     InventorySlot(usize),
     EquipmentSlot(String),
     Gold,
+    // World targets
+    Player { id: String },
+    Npc { id: String },
+    Tree { tile_x: i32, tile_y: i32, gid: u32 },
+    Rock { tile_x: i32, tile_y: i32, gid: u32 },
+    GatheringSpot { marker_index: usize },
+    GroundItem { id: String },
+    FarmingPatch { patch_id: String },
+    Tile { x: i32, y: i32 },
 }
 
 /// Context menu for right-clicking items
@@ -1599,6 +1634,9 @@ pub struct GameState {
     /// Timestamp of last chase re-path to throttle re-pathing frequency
     pub last_chase_repath_time: f64,
 
+    /// Player ID we're following (right-click Follow)
+    pub follow_target: Option<String>,
+
     // Performance diagnostics (visible in debug mode)
     pub frame_timings: FrameTimings,
 
@@ -1724,6 +1762,7 @@ impl GameState {
             auto_path: None,
             auto_action_state: None,
             last_chase_repath_time: 0.0,
+            follow_target: None,
             frame_timings: FrameTimings::default(),
             map_transition: MapTransition::default(),
             current_interior: None,
