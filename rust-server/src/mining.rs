@@ -278,9 +278,9 @@ impl MiningSystem {
         // Capture values
         let ore_item_id = ore_config.ore_item_id.clone();
         let xp_gained = ore_config.xp_per_ore;
-        // Effective success = base + tool bonus + 0.5% per level above requirement (capped at 95%)
-        let level_bonus = (player_mining_level - ore_config.level_required).max(0) as f32 * 0.005;
-        let success_chance = (ore_config.success_chance + tool_success_bonus + level_bonus).min(0.95);
+        // Effective success = base + tool bonus + 0.3% per level above requirement (capped at 40%)
+        let level_bonus = (player_mining_level - ore_config.level_required).max(0) as f32 * 0.003;
+        let success_chance = (ore_config.success_chance + tool_success_bonus + level_bonus).min(0.40);
         let depletion_chance = ore_config.depletion_chance;
         let respawn_min = ore_config.respawn_time_min;
         let respawn_max = ore_config.respawn_time_max;

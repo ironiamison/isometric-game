@@ -1518,7 +1518,7 @@ chop_success_bonus = 0.0
 [iron_axe]
 display_name = "Iron Axe"
 sprite = "chopping_axe"
-description = "A sturdy iron axe. Chops faster than bronze."
+description = "A sturdy iron axe. More effective than bronze."
 category = "equipment"
 max_stack = 1
 base_price = 150
@@ -1529,8 +1529,8 @@ woodcutting_level_required = 6
 attack_bonus = 2
 strength_bonus = 2
 defence_bonus = 0
-chop_speed_multiplier = 1.2
-chop_success_bonus = 0.05
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.03
 
 [steel_axe]
 display_name = "Steel Axe"
@@ -1546,8 +1546,8 @@ woodcutting_level_required = 11
 attack_bonus = 3
 strength_bonus = 2
 defence_bonus = 0
-chop_speed_multiplier = 1.4
-chop_success_bonus = 0.10
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.06
 
 [mithril_axe]
 display_name = "Mithril Axe"
@@ -1563,8 +1563,8 @@ woodcutting_level_required = 21
 attack_bonus = 6
 strength_bonus = 4
 defence_bonus = 0
-chop_speed_multiplier = 1.6
-chop_success_bonus = 0.15
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.09
 
 [adamant_axe]
 display_name = "Adamant Axe"
@@ -1580,13 +1580,13 @@ woodcutting_level_required = 31
 attack_bonus = 8
 strength_bonus = 6
 defence_bonus = 0
-chop_speed_multiplier = 1.8
-chop_success_bonus = 0.20
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.12
 
 [rune_axe]
 display_name = "Rune Axe"
 sprite = "chopping_axe"
-description = "The finest axe money can buy. Incredibly fast."
+description = "The finest axe money can buy. Incredibly effective."
 category = "equipment"
 max_stack = 1
 base_price = 7500
@@ -1597,8 +1597,8 @@ woodcutting_level_required = 41
 attack_bonus = 10
 strength_bonus = 8
 defence_bonus = 0
-chop_speed_multiplier = 2.0
-chop_success_bonus = 0.25
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.16
 
 # =============================================================================
 # PICKAXES (Mining requirement)
@@ -1625,8 +1625,8 @@ base_price = 150
 [iron_pickaxe.equipment]
 slot_type = "weapon"
 mining_level_required = 6
-mine_speed_multiplier = 1.3
-mine_success_bonus = 0.08
+mine_speed_multiplier = 1.0
+mine_success_bonus = 0.04
 
 [steel_pickaxe]
 display_name = "Steel Pickaxe"
@@ -1637,8 +1637,8 @@ base_price = 500
 [steel_pickaxe.equipment]
 slot_type = "weapon"
 mining_level_required = 11
-mine_speed_multiplier = 1.6
-mine_success_bonus = 0.15
+mine_speed_multiplier = 1.0
+mine_success_bonus = 0.08
 
 [rune_pickaxe]
 display_name = "Rune Pickaxe"
@@ -1649,5 +1649,5 @@ base_price = 5000
 [rune_pickaxe.equipment]
 slot_type = "weapon"
 mining_level_required = 41
-mine_speed_multiplier = 2.0
-mine_success_bonus = 0.25
+mine_speed_multiplier = 1.0
+mine_success_bonus = 0.16
