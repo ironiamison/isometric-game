@@ -113,6 +113,10 @@ pub struct EquipmentStats {
     #[serde(default)]
     pub chop_speed_multiplier: f32,
 
+    /// Chop success bonus for axes (added to base success chance, 0.0 - 1.0)
+    #[serde(default)]
+    pub chop_success_bonus: f32,
+
     /// Mining level required to equip (for pickaxes)
     #[serde(default)]
     pub mining_level_required: i32,
@@ -120,6 +124,10 @@ pub struct EquipmentStats {
     /// Mine speed multiplier for pickaxes (1.0 = base speed, higher = faster)
     #[serde(default)]
     pub mine_speed_multiplier: f32,
+
+    /// Mine success bonus for pickaxes (added to base success chance, 0.0 - 1.0)
+    #[serde(default)]
+    pub mine_success_bonus: f32,
 }
 
 // ============================================================================

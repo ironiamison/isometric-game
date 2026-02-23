@@ -1513,6 +1513,7 @@ attack_bonus = 1
 strength_bonus = 1
 defence_bonus = 0
 chop_speed_multiplier = 1.0
+chop_success_bonus = 0.0
 
 [iron_axe]
 display_name = "Iron Axe"
@@ -1529,6 +1530,7 @@ attack_bonus = 2
 strength_bonus = 2
 defence_bonus = 0
 chop_speed_multiplier = 1.2
+chop_success_bonus = 0.05
 
 [steel_axe]
 display_name = "Steel Axe"
@@ -1545,6 +1547,7 @@ attack_bonus = 3
 strength_bonus = 2
 defence_bonus = 0
 chop_speed_multiplier = 1.4
+chop_success_bonus = 0.10
 
 [mithril_axe]
 display_name = "Mithril Axe"
@@ -1561,6 +1564,7 @@ attack_bonus = 6
 strength_bonus = 4
 defence_bonus = 0
 chop_speed_multiplier = 1.6
+chop_success_bonus = 0.15
 
 [adamant_axe]
 display_name = "Adamant Axe"
@@ -1577,6 +1581,7 @@ attack_bonus = 8
 strength_bonus = 6
 defence_bonus = 0
 chop_speed_multiplier = 1.8
+chop_success_bonus = 0.20
 
 [rune_axe]
 display_name = "Rune Axe"
@@ -1593,6 +1598,7 @@ attack_bonus = 10
 strength_bonus = 8
 defence_bonus = 0
 chop_speed_multiplier = 2.0
+chop_success_bonus = 0.25
 
 # =============================================================================
 # PICKAXES (Mining requirement)
@@ -1608,6 +1614,7 @@ base_price = 50
 slot_type = "weapon"
 mining_level_required = 1
 mine_speed_multiplier = 1.0
+mine_success_bonus = 0.0
 
 [iron_pickaxe]
 display_name = "Iron Pickaxe"
@@ -1619,6 +1626,7 @@ base_price = 150
 slot_type = "weapon"
 mining_level_required = 6
 mine_speed_multiplier = 1.3
+mine_success_bonus = 0.08
 
 [steel_pickaxe]
 display_name = "Steel Pickaxe"
@@ -1630,6 +1638,7 @@ base_price = 500
 slot_type = "weapon"
 mining_level_required = 11
 mine_speed_multiplier = 1.6
+mine_success_bonus = 0.15
 
 [rune_pickaxe]
 display_name = "Rune Pickaxe"
@@ -1641,3 +1650,4 @@ base_price = 5000
 slot_type = "weapon"
 mining_level_required = 41
 mine_speed_multiplier = 2.0
+mine_success_bonus = 0.25

@@ -238,6 +238,8 @@ impl WoodcuttingSystem {
         player_id: &str,
         current_time: u64,
         chop_speed_multiplier: f32,
+        chop_success_bonus: f32,
+        player_woodcutting_level: i32,
     ) -> Option<ChopResult> {
         let state = self.player_states.get(player_id)?;
         let tree_config = self.tree_types.get(&state.tree_type_id)?;
@@ -262,7 +264,9 @@ impl WoodcuttingSystem {
         let tree_type_id = state.tree_type_id.clone();
         let log_item_id = tree_config.log_item_id.clone();
         let xp_gained = tree_config.xp_per_log;
-        let success_chance = tree_config.success_chance;
+        // Effective success = base + tool bonus + 0.5% per level above requirement (capped at 95%)
+        let level_bonus = (player_woodcutting_level - tree_config.level_required).max(0) as f32 * 0.005;
+        let success_chance = (tree_config.success_chance + chop_success_bonus + level_bonus).min(0.95);
         let depletion_chance = tree_config.depletion_chance;
         let respawn_min = tree_config.respawn_time_min;
         let respawn_max = tree_config.respawn_time_max;
@@ -389,12 +393,15 @@ impl WoodcuttingSystem {
 
     /// Perform a single chop attempt on a tree (player-initiated)
     /// Returns Ok(ChopResult) on success, Err(message) on validation failure
+    ///
+    /// `tool_success_bonus` - bonus success chance from the equipped axe (0.0 for bronze, up to 0.25 for rune)
     pub fn chop_once(
         &mut self,
         tree_x: i32,
         tree_y: i32,
         tree_gid: u32,
         player_woodcutting_level: i32,
+        tool_success_bonus: f32,
         current_time: u64,
     ) -> Result<ChopResult, String> {
         // Check if tree is depleted
@@ -425,7 +432,9 @@ impl WoodcuttingSystem {
         // Capture values
         let log_item_id = tree_config.log_item_id.clone();
         let xp_gained = tree_config.xp_per_log;
-        let success_chance = tree_config.success_chance;
+        // Effective success = base + tool bonus + 0.5% per level above requirement (capped at 95%)
+        let level_bonus = (player_woodcutting_level - tree_config.level_required).max(0) as f32 * 0.005;
+        let success_chance = (tree_config.success_chance + tool_success_bonus + level_bonus).min(0.95);
         let depletion_chance = tree_config.depletion_chance;
         let respawn_min = tree_config.respawn_time_min;
         let respawn_max = tree_config.respawn_time_max;

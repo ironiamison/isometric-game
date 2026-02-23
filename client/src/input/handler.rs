@@ -5148,36 +5148,27 @@ impl InputHandler {
                 }
             }
 
-            // Chase re-pathfinding: if auto-action is active and targeting a moving entity,
-            // check if the target has moved and recalculate the path
+            // Chase / auto-action re-pathfinding: if auto-action is active,
+            // ensure we have a valid path or are adjacent to the target.
+            // Handles NPCs, players, AND resources (trees/rocks).
             if let (Some(ref aa), Some((player_x, player_y))) =
                 (&state.auto_action_state, player_pos)
             {
-                let mut new_target_pos: Option<(i32, i32)> = None;
+                let target_pos: Option<(i32, i32)> = auto_action_target_pos(aa, state)
+                    .map(|(x, y)| (x.round() as i32, y.round() as i32));
 
-                if aa.target_type == "npc" {
-                    if let Some(npc) = state.npcs.get(&aa.target_id) {
-                        new_target_pos =
-                            Some((npc.x.round() as i32, npc.y.round() as i32));
-                    } else {
-                        // NPC gone (dead/despawned) — clear auto-action
-                        state.auto_action_state = None;
-                        state.auto_path = None;
-                    }
-                } else if aa.target_type == "player" {
-                    if let Some(target_player) = state.players.get(&aa.target_id) {
-                        new_target_pos = Some((
-                            target_player.x.round() as i32,
-                            target_player.y.round() as i32,
-                        ));
-                    } else {
-                        // Player gone — clear auto-action
-                        state.auto_action_state = None;
-                        state.auto_path = None;
-                    }
+                // Check if target still exists (NPC/player could have died/disconnected)
+                let target_gone = match aa.target_type.as_str() {
+                    "npc" => !state.npcs.contains_key(&aa.target_id),
+                    "player" => !state.players.contains_key(&aa.target_id),
+                    _ => false, // resources don't disappear mid-chase (depletion handled by server)
+                };
+                if target_gone {
+                    state.auto_action_state = None;
+                    state.auto_path = None;
                 }
 
-                if let Some((tx, ty)) = new_target_pos {
+                if let Some((tx, ty)) = target_pos {
                     // Cardinal adjacency only (no diagonal)
                     let is_adjacent = ((player_x - tx).abs() + (player_y - ty).abs()) == 1;
 
@@ -5201,12 +5192,10 @@ impl InputHandler {
                         }
                     } else {
                         let needs_repath = if let Some(ref path_state) = state.auto_path {
-                            // Destination no longer adjacent to the target
-                            let (dx_dest, dy_dest) = (
-                                (path_state.destination.0 - tx).abs(),
-                                (path_state.destination.1 - ty).abs(),
-                            );
-                            dx_dest > 1 || dy_dest > 1
+                            // Destination no longer adjacent to the target (target moved)
+                            let dest_dist = (path_state.destination.0 - tx).abs()
+                                + (path_state.destination.1 - ty).abs();
+                            dest_dist > 1
                         } else {
                             // No path at all — need one
                             true

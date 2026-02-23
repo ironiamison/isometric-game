@@ -239,12 +239,15 @@ impl MiningSystem {
 
     /// Perform a single mine attempt on a rock (player-initiated)
     /// Returns Ok(MineResult) on success, Err(message) on validation failure
+    ///
+    /// `tool_success_bonus` - bonus success chance from the equipped pickaxe (0.0 for bronze, up to 0.25 for rune)
     pub fn mine_once(
         &mut self,
         rock_x: i32,
         rock_y: i32,
         rock_gid: u32,
         player_mining_level: i32,
+        tool_success_bonus: f32,
         current_time: u64,
     ) -> Result<MineResult, String> {
         // Check if rock is depleted
@@ -275,7 +278,9 @@ impl MiningSystem {
         // Capture values
         let ore_item_id = ore_config.ore_item_id.clone();
         let xp_gained = ore_config.xp_per_ore;
-        let success_chance = ore_config.success_chance;
+        // Effective success = base + tool bonus + 0.5% per level above requirement (capped at 95%)
+        let level_bonus = (player_mining_level - ore_config.level_required).max(0) as f32 * 0.005;
+        let success_chance = (ore_config.success_chance + tool_success_bonus + level_bonus).min(0.95);
         let depletion_chance = ore_config.depletion_chance;
         let respawn_min = ore_config.respawn_time_min;
         let respawn_max = ore_config.respawn_time_max;

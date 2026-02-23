@@ -8851,7 +8851,7 @@ impl GameRoom {
         }
 
         // Check if player has an axe equipped with sufficient level
-        let has_valid_axe = if let Some(ref weapon_id) = equipped_weapon {
+        let axe_success_bonus = if let Some(ref weapon_id) = equipped_weapon {
             if let Some(item_def) = self.item_registry.get(weapon_id) {
                 if let Some(ref equip) = item_def.equipment {
                     if equip.chop_speed_multiplier > 0.0 {
@@ -8869,21 +8869,21 @@ impl GameRoom {
                             .await;
                             return;
                         }
-                        true
+                        Some(equip.chop_success_bonus)
                     } else {
-                        false
+                        None
                     }
                 } else {
-                    false
+                    None
                 }
             } else {
-                false
+                None
             }
         } else {
-            false
+            None
         };
 
-        if !has_valid_axe {
+        if axe_success_bonus.is_none() {
             self.send_to_player(
                 player_id,
                 ServerMessage::Error {
@@ -8925,7 +8925,7 @@ impl GameRoom {
         // Perform the chop
         let mut woodcutting = self.woodcutting.write().await;
         let chop_result =
-            woodcutting.chop_once(tree_x, tree_y, tree_gid, woodcutting_level, current_time);
+            woodcutting.chop_once(tree_x, tree_y, tree_gid, woodcutting_level, axe_success_bonus.unwrap_or(0.0), current_time);
         drop(woodcutting);
 
         // Update last_attack_time so auto-action cooldown is enforced
@@ -9106,7 +9106,7 @@ impl GameRoom {
         }
 
         // Check if player has a pickaxe equipped with sufficient level
-        let has_valid_pickaxe = if let Some(ref weapon_id) = equipped_weapon {
+        let pickaxe_success_bonus = if let Some(ref weapon_id) = equipped_weapon {
             if let Some(item_def) = self.item_registry.get(weapon_id) {
                 if let Some(ref equip) = item_def.equipment {
                     if equip.mine_speed_multiplier > 0.0 {
@@ -9124,21 +9124,21 @@ impl GameRoom {
                             .await;
                             return;
                         }
-                        true
+                        Some(equip.mine_success_bonus)
                     } else {
-                        false
+                        None
                     }
                 } else {
-                    false
+                    None
                 }
             } else {
-                false
+                None
             }
         } else {
-            false
+            None
         };
 
-        if !has_valid_pickaxe {
+        if pickaxe_success_bonus.is_none() {
             self.send_to_player(
                 player_id,
                 ServerMessage::Error {
@@ -9179,7 +9179,7 @@ impl GameRoom {
 
         // Perform the mine
         let mut mining = self.mining.write().await;
-        let mine_result = mining.mine_once(rock_x, rock_y, rock_gid, mining_level, current_time);
+        let mine_result = mining.mine_once(rock_x, rock_y, rock_gid, mining_level, pickaxe_success_bonus.unwrap_or(0.0), current_time);
         drop(mining);
 
         // Update last_attack_time so auto-action cooldown is enforced
