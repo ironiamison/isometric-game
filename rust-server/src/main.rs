@@ -2916,6 +2916,28 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
         }
     };
 
+    // Check if this interior requires an active slayer task
+    if interior.requires_slayer_task {
+        let slayer_state = room.get_player_slayer_state(player_id).await;
+        if slayer_state.current_task.is_none() {
+            room.send_to_player(
+                player_id,
+                ServerMessage::ChatMessage {
+                    sender_id: "system".to_string(),
+                    sender_name: "[System]".to_string(),
+                    text: "You need an active slayer task to enter this cave.".to_string(),
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64,
+                    channel: "system".to_string(),
+                },
+            )
+            .await;
+            return;
+        }
+    }
+
     // Get spawn point - try exact name, then "entrance", then first available
     info!(
         "Looking up spawn point '{}' in interior '{}'",

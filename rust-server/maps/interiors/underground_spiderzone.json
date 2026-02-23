@@ -7525,50 +7525,42 @@
     {
       "entityId": "wolf_spider",
       "x": 6,
-      "y": 6,
-      "level": 1
+      "y": 6
     },
     {
       "entityId": "wolf_spider",
       "x": 22,
-      "y": 17,
-      "level": 1
+      "y": 17
     },
     {
       "entityId": "wolf_spider",
       "x": 31,
-      "y": 9,
-      "level": 1
+      "y": 9
     },
     {
       "entityId": "wolf_spider",
       "x": 34,
-      "y": 26,
-      "level": 1
+      "y": 26
     },
     {
       "entityId": "wolf_spider",
       "x": 7,
-      "y": 28,
-      "level": 1
+      "y": 28
     },
     {
       "entityId": "wolf_spider",
       "x": 21,
-      "y": 29,
-      "level": 1
+      "y": 29
     },
     {
       "entityId": "wolf_spider",
       "x": 8,
-      "y": 17,
-      "level": 1
+      "y": 17
     },
     {
       "entityId": "wolf_spider",
       "x": 17,
-      "y": 6,
-      "level": 1
+      "y": 6
     }
   ],
   "mapObjects": [

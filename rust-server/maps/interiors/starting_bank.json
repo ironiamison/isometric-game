@@ -793,56 +793,47 @@
     {
       "entityId": "banker",
       "x": 6,
-      "y": 2,
-      "level": 1
+      "y": 2
     },
     {
       "entityId": "bank_vault",
       "x": 2,
-      "y": 10,
-      "level": 1
+      "y": 10
     },
     {
       "entityId": "bank_vault",
       "x": 5,
-      "y": 10,
-      "level": 1
+      "y": 10
     },
     {
       "entityId": "bank_vault",
       "x": 2,
-      "y": 6,
-      "level": 1
+      "y": 6
     },
     {
       "entityId": "bank_vault",
       "x": 5,
-      "y": 6,
-      "level": 1
+      "y": 6
     },
     {
       "entityId": "bank_vault",
       "x": 9,
-      "y": 10,
-      "level": 1
+      "y": 10
     },
     {
       "entityId": "bank_vault",
       "x": 12,
-      "y": 10,
-      "level": 1
+      "y": 10
     },
     {
       "entityId": "bank_vault",
       "x": 12,
-      "y": 6,
-      "level": 1
+      "y": 6
     },
     {
       "entityId": "bank_vault",
       "x": 9,
-      "y": 6,
-      "level": 1
+      "y": 6
     }
   ],
   "mapObjects": [

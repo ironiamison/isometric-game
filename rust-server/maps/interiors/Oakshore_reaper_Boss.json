@@ -2725,8 +2725,7 @@
     {
       "entityId": "reaper",
       "x": 12,
-      "y": 6,
-      "level": 1
+      "y": 6
     }
   ],
   "mapObjects": [

@@ -821,29 +821,39 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let attack_type =
                     extract_string(value, "attack_type").unwrap_or_else(|| "melee".to_string());
 
-                // Trigger attack animation for remote players, or local player during auto-action
                 let is_local = state.local_player_id.as_ref() == Some(&player_id);
-                let is_auto_attack = is_local && state.auto_action_state.as_ref().map_or(false, |aa| aa.confirmed);
-                if !is_local || is_auto_attack {
-                    if let Some(player) = state.players.get_mut(&player_id) {
-                        match attack_type.as_str() {
-                            "ranged" => player.play_shoot_bow(),
-                            "spell" => player.play_cast(),
-                            _ => player.play_attack(),
-                        }
+
+                // Check if already in attack animation BEFORE calling play_attack.
+                // Manual attacks play animation+sound locally; auto-attacks rely on
+                // this server event. set_state is idempotent (no-op if already in
+                // same state), so always triggering the animation is safe.
+                let already_attacking = is_local && state.players.get(&player_id)
+                    .map_or(false, |p| matches!(p.animation.state,
+                        crate::render::animation::AnimationState::Attacking
+                        | crate::render::animation::AnimationState::ShootingBow
+                        | crate::render::animation::AnimationState::Casting));
+
+                if let Some(player) = state.players.get_mut(&player_id) {
+                    match attack_type.as_str() {
+                        "ranged" => player.play_shoot_bow(),
+                        "spell" => player.play_cast(),
+                        _ => player.play_attack(),
                     }
-                    // Also play attack sound for local auto-attacks
-                    if is_auto_attack {
-                        if let Some(player) = state.players.get(&player_id) {
-                            let sound_type = if attack_type == "ranged" {
-                                crate::game::state::AttackSoundType::Ranged
-                            } else if player.equipped_weapon.is_some() {
-                                crate::game::state::AttackSoundType::Melee
-                            } else {
-                                crate::game::state::AttackSoundType::Unarmed
-                            };
-                            state.pending_attack_sounds.push(sound_type);
-                        }
+                }
+
+                // Play attack sound for server-driven attacks (auto-attacks).
+                // Manual attacks already played the sound locally, so skip if the
+                // player was already mid-animation when this event arrived.
+                if is_local && !already_attacking {
+                    if let Some(player) = state.players.get(&player_id) {
+                        let sound_type = if attack_type == "ranged" {
+                            crate::game::state::AttackSoundType::Ranged
+                        } else if player.equipped_weapon.is_some() {
+                            crate::game::state::AttackSoundType::Melee
+                        } else {
+                            crate::game::state::AttackSoundType::Unarmed
+                        };
+                        state.pending_attack_sounds.push(sound_type);
                     }
                 }
             }

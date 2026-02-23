@@ -793,8 +793,7 @@
     {
       "entityId": "elder_villager",
       "x": 6,
-      "y": 6,
-      "level": 1
+      "y": 6
     }
   ],
   "mapObjects": [],

@@ -3550,6 +3550,7 @@ impl GameRoom {
         // Find target based on weapon range
         let mut target_id: Option<String> = None;
         let mut is_npc = false;
+        let mut is_instance_npc = false;
         let mut target_tile_x = attacker_x;
         let mut target_tile_y = attacker_y;
 
@@ -3586,8 +3587,9 @@ impl GameRoom {
                 break;
             }
 
-            // Check NPCs at this tile (overworld NPCs only - instance NPCs are separate)
+            // Check NPCs at this tile
             if attacker_instance.is_none() {
+                // Overworld NPCs
                 let npcs = self.npcs.read().await;
                 for (npc_id, npc) in npcs.iter() {
                     if npc.is_alive() && npc.is_attackable() && npc.x == check_x && npc.y == check_y
@@ -3605,6 +3607,29 @@ impl GameRoom {
                             dist
                         );
                         break;
+                    }
+                }
+            } else if let Some(ref inst_id) = attacker_instance {
+                // Instance NPCs
+                if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                    let npcs = instance.npcs.read().await;
+                    for (npc_id, npc) in npcs.iter() {
+                        if npc.is_alive() && npc.is_attackable() && npc.x == check_x && npc.y == check_y {
+                            target_id = Some(npc_id.clone());
+                            is_npc = true;
+                            is_instance_npc = true;
+                            target_tile_x = check_x;
+                            target_tile_y = check_y;
+                            tracing::info!(
+                                "{} found instance NPC target: {} at ({}, {}) range {}",
+                                attacker_name,
+                                npc.name(),
+                                check_x,
+                                check_y,
+                                dist
+                            );
+                            break;
+                        }
                     }
                 }
             }
@@ -3676,8 +3701,56 @@ impl GameRoom {
         // Apply damage to target using hit/miss mechanics
         // 1. Roll attack vs defence to determine if we hit
         // 2. If hit, calculate max hit from strength and roll damage
-        let (target_hp, target_name, target_died, actual_damage) = if is_npc {
-            // NPCs use their level as both attack and defence level (no equipment bonuses)
+        let (target_hp, target_name, target_died, actual_damage) = if is_npc && is_instance_npc {
+            // Instance NPC combat
+            let instance = self.instance_manager.get_by_instance_id(attacker_instance.as_ref().unwrap());
+            if let Some(inst) = instance {
+                let mut npcs = inst.npcs.write().await;
+                if let Some(npc) = npcs.get_mut(&target_id) {
+                    let npc_defence_level = npc.level;
+                    let npc_defence_bonus = npc.stats.defence_bonus;
+
+                    if !calculate_hit(
+                        combat_level,
+                        attack_bonus,
+                        npc_defence_level,
+                        npc_defence_bonus,
+                    ) {
+                        npc.take_damage(0, current_time, Some(player_id));
+                        let name = npc.name();
+                        tracing::info!(
+                            "{} misses instance NPC {} (atk {} + {} vs def {} + {})",
+                            attacker_name,
+                            name,
+                            combat_level,
+                            attack_bonus,
+                            npc_defence_level,
+                            npc_defence_bonus
+                        );
+                        (npc.hp, name, false, 0)
+                    } else {
+                        let max_hit = calculate_max_hit(combat_level, strength_bonus);
+                        let damage = roll_damage(max_hit);
+                        let died = npc.take_damage(damage, current_time, Some(player_id));
+                        let name = npc.name();
+                        tracing::info!(
+                            "{} hits instance NPC {} for {} damage (max: {}, HP: {})",
+                            attacker_name,
+                            name,
+                            damage,
+                            max_hit,
+                            npc.hp
+                        );
+                        (npc.hp, name, died, damage)
+                    }
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        } else if is_npc {
+            // Overworld NPC combat
             let mut npcs = self.npcs.write().await;
             if let Some(npc) = npcs.get_mut(&target_id) {
                 // NPC's defence = level, no equipment bonus
@@ -3884,19 +3957,29 @@ impl GameRoom {
             tracing::info!("{} killed {}", attacker_name, target_name);
             if is_npc {
                 // Get NPC info for exp and loot
-                let (prototype_id, npc_level) = {
+                let (prototype_id, npc_level) = if is_instance_npc {
+                    let inst = self.instance_manager.get_by_instance_id(attacker_instance.as_ref().unwrap());
+                    if let Some(inst) = inst {
+                        let npcs = inst.npcs.read().await;
+                        npcs.get(&target_id)
+                            .map(|n| (n.prototype_id.clone(), n.level))
+                            .unwrap_or(("unknown".to_string(), 1))
+                    } else {
+                        ("unknown".to_string(), 1)
+                    }
+                } else {
                     let npcs = self.npcs.read().await;
                     npcs.get(&target_id)
                         .map(|n| (n.prototype_id.clone(), n.level))
                         .unwrap_or(("unknown".to_string(), 1))
                 };
 
-                // Broadcast NPC death
+                // Broadcast NPC death (scoped to zone)
                 let death_msg = ServerMessage::NpcDied {
                     id: target_id.clone(),
                     killer_id: player_id.to_string(),
                 };
-                self.broadcast(death_msg).await;
+                self.broadcast_to_zone(player_id, death_msg).await;
 
                 // Clear attacker's auto-action since target is dead
                 self.clear_auto_action(player_id, "target_dead").await;
@@ -10669,27 +10752,51 @@ impl GameRoom {
         // Parse and validate target
         let target = match target_type {
             "npc" => {
-                // NPC targets are overworld-only
-                if self.player_instances.read().await.contains_key(player_id) {
-                    return;
-                }
-                let npcs = self.npcs.read().await;
-                if let Some(npc) = npcs.get(target_id) {
-                    if !npc.is_alive() {
-                        self.send_to_player(
-                            player_id,
-                            ServerMessage::AutoActionStopped {
-                                reason: "target_dead".to_string(),
-                            },
-                        )
-                        .await;
-                        return;
-                    }
-                    if action_type == AutoActionType::Attack && !npc.is_attackable() {
+                let player_inst = self.player_instances.read().await.get(player_id).cloned();
+                if let Some(ref inst_id) = player_inst {
+                    // Instance NPC validation
+                    if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                        let npcs = instance.npcs.read().await;
+                        if let Some(npc) = npcs.get(target_id) {
+                            if !npc.is_alive() {
+                                self.send_to_player(
+                                    player_id,
+                                    ServerMessage::AutoActionStopped {
+                                        reason: "target_dead".to_string(),
+                                    },
+                                )
+                                .await;
+                                return;
+                            }
+                            if action_type == AutoActionType::Attack && !npc.is_attackable() {
+                                return;
+                            }
+                        } else {
+                            return;
+                        }
+                    } else {
                         return;
                     }
                 } else {
-                    return;
+                    // Overworld NPC validation
+                    let npcs = self.npcs.read().await;
+                    if let Some(npc) = npcs.get(target_id) {
+                        if !npc.is_alive() {
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::AutoActionStopped {
+                                    reason: "target_dead".to_string(),
+                                },
+                            )
+                            .await;
+                            return;
+                        }
+                        if action_type == AutoActionType::Attack && !npc.is_attackable() {
+                            return;
+                        }
+                    } else {
+                        return;
+                    }
                 }
                 AutoActionTarget::Npc {
                     npc_id: target_id.to_string(),
@@ -12172,26 +12279,32 @@ impl GameRoom {
             for (pid, auto_action) in auto_action_players {
                 match (&auto_action.target, &auto_action.action) {
                     (AutoActionTarget::Npc { npc_id }, AutoActionType::Attack) => {
-                        // Validate NPC target is still alive
-                        let npc_alive = {
+                        let player_inst = self.player_instances.read().await.get(&pid).cloned();
+
+                        // Validate NPC target is still alive (check instance or overworld)
+                        let (npc_alive, npc_pos) = if let Some(ref inst_id) = player_inst {
+                            if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                                let npcs = instance.npcs.read().await;
+                                npcs.get(npc_id).map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y))))
+                            } else {
+                                (false, None)
+                            }
+                        } else {
                             let npcs = self.npcs.read().await;
-                            npcs.get(npc_id).map_or(false, |n| n.is_alive())
+                            npcs.get(npc_id).map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y))))
                         };
+
                         if !npc_alive {
                             self.clear_auto_action(&pid, "target_dead").await;
                             continue;
                         }
 
                         // Check if in range and cooldown ready
-                        let (in_range, cooldown_ready) = {
+                        let (in_range, cooldown_ready) = if let Some((npc_x, npc_y)) = npc_pos {
                             let players = self.players.read().await;
-                            let npcs = self.npcs.read().await;
-                            if let (Some(player), Some(npc)) =
-                                (players.get(&pid), npcs.get(npc_id))
-                            {
-                                let dx = (player.x - npc.x).abs();
-                                let dy = (player.y - npc.y).abs();
-                                // Get weapon range
+                            if let Some(player) = players.get(&pid) {
+                                let dx = (player.x - npc_x).abs();
+                                let dy = (player.y - npc_y).abs();
                                 let weapon_range = if let Some(ref weapon_id) =
                                     player.equipped_weapon
                                 {
@@ -12206,7 +12319,6 @@ impl GameRoom {
                                 } else {
                                     1
                                 };
-                                // Cardinal adjacency only for melee (dx+dy==range, no diagonal)
                                 let in_range = if weapon_range == 1 {
                                     (dx + dy) == 1
                                 } else {
@@ -12219,23 +12331,24 @@ impl GameRoom {
                             } else {
                                 (false, false)
                             }
+                        } else {
+                            (false, false)
                         };
 
                         if in_range && cooldown_ready {
                             // Compute facing direction toward NPC target
-                            let face_dir = {
-                                let npcs = self.npcs.read().await;
+                            let face_dir = if let Some((npc_x, npc_y)) = npc_pos {
                                 let players = self.players.read().await;
-                                match (npcs.get(npc_id), players.get(&pid)) {
-                                    (Some(npc), Some(player)) => {
-                                        let dx = npc.x - player.x;
-                                        let dy = npc.y - player.y;
-                                        Some(direction_from_delta(dx, dy))
-                                    }
-                                    _ => None,
+                                if let Some(player) = players.get(&pid) {
+                                    let dx = npc_x - player.x;
+                                    let dy = npc_y - player.y;
+                                    Some(direction_from_delta(dx, dy))
+                                } else {
+                                    None
                                 }
+                            } else {
+                                None
                             };
-                            // Direction override is applied atomically inside handle_attack
                             self.handle_attack(&pid, face_dir).await;
                         }
                     }

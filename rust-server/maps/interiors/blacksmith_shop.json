@@ -865,20 +865,17 @@
     {
       "entityId": "blacksmith",
       "x": 8,
-      "y": 2,
-      "level": 1
+      "y": 2
     },
     {
       "entityId": "furnace",
       "x": 12,
-      "y": 1,
-      "level": 1
+      "y": 1
     },
     {
       "entityId": "anvil",
       "x": 14,
-      "y": 4,
-      "level": 1
+      "y": 4
     }
   ],
   "mapObjects": [

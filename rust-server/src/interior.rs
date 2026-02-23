@@ -91,6 +91,8 @@ pub struct InteriorMapDef {
     pub map_objects: Vec<InteriorMapObject>,
     #[serde(default)]
     pub walls: Vec<InteriorWall>,
+    #[serde(default)]
+    pub requires_slayer_task: bool,
 }
 
 /// Layer data for interior maps

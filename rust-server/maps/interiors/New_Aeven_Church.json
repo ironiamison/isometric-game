@@ -1225,8 +1225,7 @@
     {
       "entityId": "altar",
       "x": 10,
-      "y": 2,
-      "level": 1
+      "y": 2
     }
   ],
   "mapObjects": [

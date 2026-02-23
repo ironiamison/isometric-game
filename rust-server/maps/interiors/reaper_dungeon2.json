@@ -7525,68 +7525,57 @@
     {
       "entityId": "skeleton_brute",
       "x": 23,
-      "y": 32,
-      "level": 1
+      "y": 32
     },
     {
       "entityId": "skeleton_brute",
       "x": 39,
-      "y": 45,
-      "level": 1
+      "y": 45
     },
     {
       "entityId": "skeleton_brute",
       "x": 35,
-      "y": 33,
-      "level": 1
+      "y": 33
     },
     {
       "entityId": "skeleton_brute",
       "x": 29,
-      "y": 43,
-      "level": 1
+      "y": 43
     },
     {
       "entityId": "skeleton_brute",
       "x": 3,
-      "y": 33,
-      "level": 1
+      "y": 33
     },
     {
       "entityId": "skeleton_brute",
       "x": 13,
-      "y": 43,
-      "level": 1
+      "y": 43
     },
     {
       "entityId": "skeleton_archer",
       "x": 2,
-      "y": 14,
-      "level": 1
+      "y": 14
     },
     {
       "entityId": "skeleton_archer",
       "x": 13,
-      "y": 12,
-      "level": 1
+      "y": 12
     },
     {
       "entityId": "skeleton_archer",
       "x": 5,
-      "y": 4,
-      "level": 1
+      "y": 4
     },
     {
       "entityId": "skeleton_archer",
       "x": 13,
-      "y": 3,
-      "level": 1
+      "y": 3
     },
     {
       "entityId": "skeleton_archer",
       "x": 31,
-      "y": 3,
-      "level": 1
+      "y": 3
     }
   ],
   "mapObjects": [
