@@ -5133,11 +5133,28 @@ impl InputHandler {
                 alchemy_recipes.sort_by_key(|r| r.level_required);
                 let recipe_count = alchemy_recipes.len();
 
+                // Count unique sections to include section header heights (must match renderer)
+                let row_h = 56.0_f32;
+                let section_header_h = 22.0_f32;
+                let section_count = {
+                    let mut sections = std::collections::HashSet::new();
+                    for r in &alchemy_recipes {
+                        sections.insert(r.section.as_deref().unwrap_or(""));
+                    }
+                    sections.len()
+                };
+                let total_content = recipe_count as f32 * row_h + section_count as f32 * section_header_h;
+
+                let (_, sh) = crate::util::virtual_screen_size();
+                let panel_h = (520.0_f32).min(sh - 16.0);
+                let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                let recipe_list_h = (content_h * 0.55).floor();
+                let max_scroll = (total_content - recipe_list_h).max(0.0);
+
                 // W/S or Up/Down to navigate recipes
                 if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
                     if state.ui_state.alchemy_station_selected_recipe > 0 {
                         state.ui_state.alchemy_station_selected_recipe -= 1;
-                        let row_h = 56.0_f32;
                         let item_top = state.ui_state.alchemy_station_selected_recipe as f32 * row_h;
                         if item_top < state.ui_state.alchemy_station_scroll_offset {
                             state.ui_state.alchemy_station_scroll_offset = item_top;
@@ -5147,13 +5164,8 @@ impl InputHandler {
                 if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
                     if state.ui_state.alchemy_station_selected_recipe < recipe_count.saturating_sub(1) {
                         state.ui_state.alchemy_station_selected_recipe += 1;
-                        let row_h = 56.0_f32;
                         let item_bottom =
                             (state.ui_state.alchemy_station_selected_recipe + 1) as f32 * row_h;
-                        let (_, sh) = crate::util::virtual_screen_size();
-                        let panel_h = (520.0_f32).min(sh - 16.0);
-                        let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
-                        let recipe_list_h = content_h * 0.55;
                         if item_bottom > state.ui_state.alchemy_station_scroll_offset + recipe_list_h {
                             state.ui_state.alchemy_station_scroll_offset = item_bottom - recipe_list_h;
                         }
@@ -5186,13 +5198,6 @@ impl InputHandler {
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
                     const SCROLL_SPEED: f32 = 30.0;
-                    let row_h = 56.0_f32;
-                    let total_content = recipe_count as f32 * row_h;
-                    let (_, sh) = crate::util::virtual_screen_size();
-                    let panel_h = (520.0_f32).min(sh - 16.0);
-                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
-                    let recipe_list_h = content_h * 0.55;
-                    let max_scroll = (total_content - recipe_list_h).max(0.0);
                     state.ui_state.alchemy_station_scroll_offset = (state.ui_state.alchemy_station_scroll_offset
                         - wheel_y * SCROLL_SPEED)
                         .clamp(0.0, max_scroll);
@@ -5200,13 +5205,6 @@ impl InputHandler {
 
                 // Scrollbar drag handling
                 if let Some(track_bounds) = layout.get_bounds(&UiElementId::AlchemyScrollbar) {
-                    let row_h = 56.0_f32;
-                    let total_content = recipe_count as f32 * row_h;
-                    let (_, sh) = crate::util::virtual_screen_size();
-                    let panel_h = (520.0_f32).min(sh - 16.0);
-                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
-                    let recipe_list_h = content_h * 0.55;
-                    let max_scroll = (total_content - recipe_list_h).max(0.0);
                     let clicked_on = matches!(clicked_element, Some(UiElementId::AlchemyScrollbar));
                     crate::ui::scroll::handle_scrollbar_drag(
                         &mut state.ui_state.alchemy_station_scroll_drag,

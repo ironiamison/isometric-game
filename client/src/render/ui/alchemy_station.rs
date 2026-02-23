@@ -729,16 +729,16 @@ impl Renderer {
             self.draw_text_sharp(&info_text, text_x, row1_y + 34.0 * s, 16.0, info_color);
         }
 
-        // ===== Row 2: Ingredient list (below icon row) =====
+        // ===== Row 2: Ingredient grid (2 columns, below icon row) =====
         let ing_y = row1_y + icon_size + 8.0 * s;
         let ing_x = x + 10.0 * s;
-        let ing_icon_size = 22.0 * s;
-        let ing_row_h = 22.0 * s;
+        let ing_icon_size = 24.0 * s;
+        let ing_row_h = 30.0 * s; // enough vertical space so sprites don't overlap
+        let col_w = (w - 20.0 * s) / 2.0; // two columns
 
         let mut can_craft = true;
-        let mut iy = ing_y;
 
-        for ing in &recipe.ingredients {
+        for (i, ing) in recipe.ingredients.iter().enumerate() {
             let have = state.inventory.count_item_by_id(&ing.item_id);
             let name = state.item_registry.get_display_name(&ing.item_id);
 
@@ -746,10 +746,15 @@ impl Renderer {
                 can_craft = false;
             }
 
-            // Small ingredient icon
+            let col = i % 2;
+            let row = i / 2;
+            let ix = ing_x + col as f32 * col_w;
+            let iy = ing_y + row as f32 * ing_row_h;
+
+            // Ingredient icon
             self.draw_item_icon(
                 &ing.item_id,
-                ing_x,
+                ix,
                 iy,
                 ing_icon_size,
                 ing_icon_size,
@@ -757,7 +762,7 @@ impl Renderer {
                 true,
             );
 
-            // "name  required/inventory"
+            // "name required/inventory"
             let req_text = format!("{} {}/{}", name, ing.count, have);
             let color = if have >= ing.count {
                 Color::new(0.392, 0.784, 0.392, 1.0)
@@ -767,13 +772,11 @@ impl Renderer {
 
             self.draw_text_sharp(
                 &req_text,
-                ing_x + ing_icon_size + 6.0 * s,
+                ix + ing_icon_size + 4.0 * s,
                 iy + ing_icon_size * 0.72,
                 16.0,
                 color,
             );
-
-            iy += ing_row_h + 2.0 * s;
         }
 
         // Level check
