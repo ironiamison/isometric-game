@@ -36,8 +36,7 @@ const STARTING_HP: i32 = 100;
 
 // Combat constants
 const ATTACK_RANGE: i32 = 1; // Maximum distance to attack (in tiles)
-const ATTACK_COOLDOWN_MS: u64 = 700; // Slightly shorter than client (800ms) to account for network latency
-const GATHER_COOLDOWN_MS: u64 = 1100; // Cooldown for mining/woodcutting swings (slightly under 1200ms swing interval)
+const ATTACK_COOLDOWN_MS: u64 = 700; // Universal cooldown for attacks and gathering
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
 const REGEN_INTERVAL_MS: u64 = 30000;
 
@@ -12289,7 +12288,7 @@ impl GameRoom {
                                 let dy = (player.y - y).abs();
                                 let adjacent = (dx + dy) == 1;
                                 let cooldown_ready =
-                                    current_time - player.last_attack_time >= GATHER_COOLDOWN_MS;
+                                    current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
                                 let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
                                 (adjacent, cooldown_ready, inventory_full)
                             } else {
@@ -12335,7 +12334,7 @@ impl GameRoom {
                                 let dy = (player.y - y).abs();
                                 let adjacent = (dx + dy) == 1;
                                 let cooldown_ready =
-                                    current_time - player.last_attack_time >= GATHER_COOLDOWN_MS;
+                                    current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
                                 let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
                                 (adjacent, cooldown_ready, inventory_full)
                             } else {

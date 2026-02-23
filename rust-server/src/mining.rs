@@ -58,7 +58,7 @@ pub struct PlayerMiningState {
 
 /// Swing interval in milliseconds (how often the player swings their pickaxe)
 /// Base swing interval - matches client attack cooldown (800ms)
-pub const SWING_INTERVAL_MS: u64 = 1200;
+pub const SWING_INTERVAL_MS: u64 = 700;
 
 #[derive(Debug, Clone)]
 pub struct MineResult {
