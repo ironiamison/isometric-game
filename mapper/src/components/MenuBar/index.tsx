@@ -14,6 +14,7 @@ export function MenuBar() {
   const [showResizeInteriorModal, setShowResizeInteriorModal] = useState(false);
   const [showDownloadChunkModal, setShowDownloadChunkModal] = useState(false);
   const [downloadChunkCoord, setDownloadChunkCoord] = useState('0, 0');
+  const [downloadInteriorId, setDownloadInteriorId] = useState('');
   const [newInteriorId, setNewInteriorId] = useState('');
   const [newInteriorName, setNewInteriorName] = useState('');
   const [newInteriorWidth, setNewInteriorWidth] = useState(16);
@@ -534,6 +535,28 @@ export function MenuBar() {
     setShowDownloadChunkModal(false);
   };
 
+  const handleDownloadInterior = () => {
+    const id = downloadInteriorId.trim();
+    if (!id) {
+      alert('Please enter an interior map ID');
+      return;
+    }
+    const interior = interiorStorage.getInterior(id);
+    if (!interior) {
+      alert(`Interior "${id}" not found. Make sure it's loaded in the editor.`);
+      return;
+    }
+    const json = interiorStorage.exportInteriorToJSON(interior);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowDownloadChunkModal(false);
+  };
+
   const handleImportChunk = () => {
     importChunkInputRef.current?.click();
   };
@@ -704,7 +727,7 @@ export function MenuBar() {
                   Import Chunk (JSON)
                 </button>
                 <button className={styles.dropdownItem} onClick={() => setShowDownloadChunkModal(true)}>
-                  Download Chunk (JSON)
+                  Download Map Data (JSON)
                 </button>
                 <div className={styles.separator} />
                 <button className={styles.dropdownItem} onClick={handleResetToServer}>
@@ -879,27 +902,47 @@ export function MenuBar() {
         </div>
       )}
 
-      {/* Download Chunk Modal */}
+      {/* Download Map Data Modal */}
       {showDownloadChunkModal && (
         <div className={styles.modalOverlay} onClick={() => setShowDownloadChunkModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3>Download Chunk</h3>
+            <h3>Download Map Data</h3>
             <div className={styles.modalField}>
               <label>Chunk Coordinate (cx, cy)</label>
-              <input
-                type="text"
-                value={downloadChunkCoord}
-                onChange={(e) => setDownloadChunkCoord(e.target.value)}
-                placeholder="0, 0"
-                autoFocus
-                onKeyDown={(e) => { if (e.key === 'Enter') handleDownloadChunk(); }}
-              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={downloadChunkCoord}
+                  onChange={(e) => setDownloadChunkCoord(e.target.value)}
+                  placeholder="0, 0"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleDownloadChunk(); }}
+                  style={{ flex: 1 }}
+                />
+                <button className={styles.primaryButton} onClick={handleDownloadChunk}>
+                  Download
+                </button>
+              </div>
+            </div>
+            <div className={styles.separator} />
+            <div className={styles.modalField}>
+              <label>Interior Map ID</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={downloadInteriorId}
+                  onChange={(e) => setDownloadInteriorId(e.target.value)}
+                  placeholder="e.g., blacksmith_shop"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleDownloadInterior(); }}
+                  style={{ flex: 1 }}
+                />
+                <button className={styles.primaryButton} onClick={handleDownloadInterior}>
+                  Download
+                </button>
+              </div>
             </div>
             <div className={styles.modalActions}>
-              <button onClick={() => setShowDownloadChunkModal(false)}>Cancel</button>
-              <button className={styles.primaryButton} onClick={handleDownloadChunk}>
-                Download
-              </button>
+              <button onClick={() => setShowDownloadChunkModal(false)}>Close</button>
             </div>
           </div>
         </div>
