@@ -124,6 +124,29 @@ impl Renderer {
                     return;
                 }
             }
+            Some(UiElementId::AlchemyRecipeItem(idx)) if state.ui_state.alchemy_station_open => {
+                let mut alchemy_recipes: Vec<_> = state
+                    .recipe_definitions
+                    .iter()
+                    .filter(|r| r.station.as_deref() == Some("alchemy_station"))
+                    .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+                    .collect();
+                alchemy_recipes.sort_by(|a, b| {
+                    let sa = a.section.as_deref().unwrap_or("");
+                    let sb = b.section.as_deref().unwrap_or("");
+                    crate::render::ui::crafting::section_sort_key(sa).cmp(&crate::render::ui::crafting::section_sort_key(sb))
+                        .then(a.level_required.cmp(&b.level_required))
+                });
+                if let Some(recipe) = alchemy_recipes.get(*idx) {
+                    if let Some(result) = recipe.results.first() {
+                        (result.item_id.clone(), result.count)
+                    } else {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
             Some(UiElementId::ShopBuyItem(idx)) if state.ui_state.shop_data.is_some() => {
                 let shop_data = state.ui_state.shop_data.as_ref().unwrap();
                 if let Some(stock_item) = shop_data.stock.get(*idx) {

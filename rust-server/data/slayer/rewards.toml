@@ -27,6 +27,15 @@ category = "unlock"
 target_id = "rock_golem"
 
 [[rewards]]
+id = "slayer_helmet"
+display_name = "Slayer Helmet"
+description = "A helmet that boosts damage by 15% against your slayer task."
+cost = 100
+category = "equipment"
+target_id = "slayer_helmet"
+quantity = 1
+
+[[rewards]]
 id = "block_slot"
 display_name = "Block Monster"
 description = "Block a monster from being assigned as a task"

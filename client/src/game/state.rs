@@ -1180,6 +1180,13 @@ pub struct UiState {
     pub anvil_scroll_offset: f32,
     pub anvil_quantity: u32,
     pub anvil_tab: u8, // 0=Materials, 1=Equipment
+    // Alchemy Station UI state
+    pub alchemy_station_open: bool,
+    pub alchemy_station_tile: Option<(i32, i32)>,
+    pub alchemy_station_selected_recipe: usize,
+    pub alchemy_station_scroll_offset: f32,
+    pub alchemy_station_quantity: u32,
+    pub alchemy_station_tab: u8,
     // Batch progress (shared between furnace and regular crafting)
     pub batch_completed: u32,
     pub batch_total: u32,
@@ -1287,6 +1294,7 @@ pub struct UiState {
     pub quest_log_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub furnace_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub anvil_scroll_drag: crate::ui::scroll::ScrollDragState,
+    pub alchemy_station_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub crafting_scroll_drag: crate::ui::scroll::ScrollDragState,
     /// Which settings slider is currently being dragged (if any)
     pub settings_slider_dragging: Option<crate::ui::UiElementId>,
@@ -1363,6 +1371,12 @@ impl Default for UiState {
             anvil_scroll_offset: 0.0,
             anvil_quantity: 1,
             anvil_tab: 0,
+            alchemy_station_open: false,
+            alchemy_station_tile: None,
+            alchemy_station_selected_recipe: 0,
+            alchemy_station_scroll_offset: 0.0,
+            alchemy_station_quantity: 1,
+            alchemy_station_tab: 0,
             batch_completed: 0,
             batch_total: 0,
             shop_data: None,
@@ -1450,6 +1464,7 @@ impl Default for UiState {
             quest_log_scroll_drag: Default::default(),
             furnace_scroll_drag: Default::default(),
             anvil_scroll_drag: Default::default(),
+            alchemy_station_scroll_drag: Default::default(),
             crafting_scroll_drag: Default::default(),
             settings_slider_dragging: None,
             classic_controls: false,
@@ -2064,6 +2079,22 @@ impl GameState {
                     if dx > 3 || dy > 3 {
                         self.ui_state.anvil_open = false;
                         self.ui_state.anvil_tile = None;
+                    }
+                }
+            }
+        }
+
+        // Auto-close alchemy station when player moves too far away
+        if self.ui_state.alchemy_station_open {
+            if let Some((ax, ay)) = self.ui_state.alchemy_station_tile {
+                if let Some(player) = self.get_local_player() {
+                    let px = player.x.round() as i32;
+                    let py = player.y.round() as i32;
+                    let dx = (px - ax).abs();
+                    let dy = (py - ay).abs();
+                    if dx > 3 || dy > 3 {
+                        self.ui_state.alchemy_station_open = false;
+                        self.ui_state.alchemy_station_tile = None;
                     }
                 }
             }

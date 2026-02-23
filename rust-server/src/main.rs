@@ -2159,17 +2159,7 @@ async fn handle_socket(
             .unwrap_or(0);
 
         // Save character state to database
-        if let Some(mut save_data) = room.get_player_save_data(&player_id).await {
-            // If player is in an instance, save their entrance position (overworld coords)
-            // so they respawn at the portal on reconnect, and save current_map for auto-re-entry
-            if save_data.current_map.is_some() {
-                let entrance_positions = state.player_entrance_positions.read().await;
-                if let Some(&(entrance_x, entrance_y)) = entrance_positions.get(&player_id) {
-                    save_data.x = entrance_x as f32;
-                    save_data.y = entrance_y as f32;
-                }
-            }
-
+        if let Some(save_data) = room.get_player_save_data(&player_id).await {
             if let Err(e) = state
                 .db
                 .save_character(
@@ -3735,17 +3725,6 @@ async fn main() {
                             save_state
                                 .play_time_anchors
                                 .insert(*character_id, std::time::Instant::now());
-
-                            if save_data.current_map.is_some() {
-                                let entrance_positions =
-                                    save_state.player_entrance_positions.read().await;
-                                if let Some(&(entrance_x, entrance_y)) =
-                                    entrance_positions.get(player_id)
-                                {
-                                    save_data.x = entrance_x as f32;
-                                    save_data.y = entrance_y as f32;
-                                }
-                            }
 
                             snapshots.push((
                                 *character_id,

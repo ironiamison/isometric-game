@@ -12,3 +12,8 @@ interaction_range = 2
 display_name = "Furnace"
 description = "A blazing furnace for smelting ore into bars and crafting jewelry."
 interaction_range = 2
+
+[alchemy_station]
+display_name = "Alchemy Station"
+description = "A bubbling cauldron for brewing potions and elixirs."
+interaction_range = 2

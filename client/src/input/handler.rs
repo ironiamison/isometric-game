@@ -616,6 +616,11 @@ pub enum InputCommand {
         recipe_id: String,
         quantity: u32,
     },
+    // Alchemy Station commands
+    AlchemyCraft {
+        recipe_id: String,
+        quantity: u32,
+    },
     // Slayer commands
     SlayerGetTask {
         master_id: String,
@@ -1757,6 +1762,14 @@ impl InputHandler {
                                                                     state.ui_state.anvil_scroll_offset = 0.0;
                                                                     state.ui_state.anvil_quantity = 1;
                                                                     state.ui_state.anvil_tab = 0;
+                                                                }
+                                                                Some("alchemy_station") => {
+                                                                    state.ui_state.alchemy_station_open = true;
+                                                                    state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                                                    state.ui_state.alchemy_station_selected_recipe = 0;
+                                                                    state.ui_state.alchemy_station_scroll_offset = 0.0;
+                                                                    state.ui_state.alchemy_station_quantity = 1;
+                                                                    state.ui_state.alchemy_station_tab = 0;
                                                                 }
                                                                 _ => {
                                                                     _commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
@@ -5011,6 +5024,210 @@ impl InputHandler {
             return commands;
         }
 
+        // Handle alchemy station mode
+        if state.ui_state.alchemy_station_open {
+            // Handle mouse clicks on alchemy station elements
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::AlchemyCloseButton => {
+                            state.ui_state.alchemy_station_open = false;
+                            state.ui_state.alchemy_station_tile = None;
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
+                        }
+                        UiElementId::AlchemyRecipeItem(idx) => {
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.alchemy_station_selected_recipe = *idx;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::AlchemyBrewButton => {
+                            if !state.ui_state.crafting_in_progress {
+                                let mut alchemy_recipes: Vec<_> = state
+                                    .recipe_definitions
+                                    .iter()
+                                    .filter(|r| r.station.as_deref() == Some("alchemy_station"))
+                                    .filter(|r| {
+                                        !r.requires_discovery
+                                            || state.discovered_recipes.contains(&r.id)
+                                    })
+                                    .collect();
+                                alchemy_recipes.sort_by_key(|r| r.level_required);
+                                if let Some(recipe) =
+                                    alchemy_recipes.get(state.ui_state.alchemy_station_selected_recipe)
+                                {
+                                    commands.push(InputCommand::AlchemyCraft {
+                                        recipe_id: recipe.id.clone(),
+                                        quantity: state.ui_state.alchemy_station_quantity,
+                                    });
+                                }
+                            }
+                            return commands;
+                        }
+                        UiElementId::AlchemyCancelButton => {
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            return commands;
+                        }
+                        UiElementId::AlchemyQuantityMinus => {
+                            if state.ui_state.alchemy_station_quantity > 1 {
+                                state.ui_state.alchemy_station_quantity -= 1;
+                            }
+                            return commands;
+                        }
+                        UiElementId::AlchemyQuantityPlus => {
+                            state.ui_state.alchemy_station_quantity = (state.ui_state.alchemy_station_quantity + 1).min(99);
+                            return commands;
+                        }
+                        UiElementId::AlchemyTab(idx) => {
+                            // Only tab 0 (Potions) is active for now
+                            if *idx == 0 && !state.ui_state.crafting_in_progress {
+                                state.ui_state.alchemy_station_tab = 0;
+                                state.ui_state.alchemy_station_selected_recipe = 0;
+                                state.ui_state.alchemy_station_scroll_offset = 0.0;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Escape: cancel if crafting, otherwise close
+            if is_key_pressed(KeyCode::Escape) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                    return commands;
+                }
+                state.ui_state.alchemy_station_open = false;
+                state.ui_state.alchemy_station_tile = None;
+                return commands;
+            }
+
+            // E key closes alchemy station
+            if is_key_pressed(KeyCode::E) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                }
+                state.ui_state.alchemy_station_open = false;
+                state.ui_state.alchemy_station_tile = None;
+                return commands;
+            }
+
+            if !state.ui_state.crafting_in_progress {
+                let mut alchemy_recipes: Vec<_> = state
+                    .recipe_definitions
+                    .iter()
+                    .filter(|r| r.station.as_deref() == Some("alchemy_station"))
+                    .filter(|r| {
+                        !r.requires_discovery || state.discovered_recipes.contains(&r.id)
+                    })
+                    .collect();
+                alchemy_recipes.sort_by_key(|r| r.level_required);
+                let recipe_count = alchemy_recipes.len();
+
+                // W/S or Up/Down to navigate recipes
+                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                    if state.ui_state.alchemy_station_selected_recipe > 0 {
+                        state.ui_state.alchemy_station_selected_recipe -= 1;
+                        let row_h = 56.0_f32;
+                        let item_top = state.ui_state.alchemy_station_selected_recipe as f32 * row_h;
+                        if item_top < state.ui_state.alchemy_station_scroll_offset {
+                            state.ui_state.alchemy_station_scroll_offset = item_top;
+                        }
+                    }
+                }
+                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                    if state.ui_state.alchemy_station_selected_recipe < recipe_count.saturating_sub(1) {
+                        state.ui_state.alchemy_station_selected_recipe += 1;
+                        let row_h = 56.0_f32;
+                        let item_bottom =
+                            (state.ui_state.alchemy_station_selected_recipe + 1) as f32 * row_h;
+                        let (_, sh) = crate::util::virtual_screen_size();
+                        let panel_h = (520.0_f32).min(sh - 16.0);
+                        let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                        let recipe_list_h = content_h * 0.55;
+                        if item_bottom > state.ui_state.alchemy_station_scroll_offset + recipe_list_h {
+                            state.ui_state.alchemy_station_scroll_offset = item_bottom - recipe_list_h;
+                        }
+                    }
+                }
+
+                // +/- to adjust quantity
+                if is_key_pressed(KeyCode::Equal) || is_key_pressed(KeyCode::KpAdd) {
+                    state.ui_state.alchemy_station_quantity = (state.ui_state.alchemy_station_quantity + 1).min(99);
+                }
+                if is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract) {
+                    if state.ui_state.alchemy_station_quantity > 1 {
+                        state.ui_state.alchemy_station_quantity -= 1;
+                    }
+                }
+
+                // Enter or C to brew
+                if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::C) {
+                    if let Some(recipe) =
+                        alchemy_recipes.get(state.ui_state.alchemy_station_selected_recipe)
+                    {
+                        commands.push(InputCommand::AlchemyCraft {
+                            recipe_id: recipe.id.clone(),
+                            quantity: state.ui_state.alchemy_station_quantity,
+                        });
+                    }
+                }
+
+                // Mouse wheel scrolling
+                let (_wheel_x, wheel_y) = mouse_wheel();
+                if wheel_y != 0.0 {
+                    const SCROLL_SPEED: f32 = 30.0;
+                    let row_h = 56.0_f32;
+                    let total_content = recipe_count as f32 * row_h;
+                    let (_, sh) = crate::util::virtual_screen_size();
+                    let panel_h = (520.0_f32).min(sh - 16.0);
+                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                    let recipe_list_h = content_h * 0.55;
+                    let max_scroll = (total_content - recipe_list_h).max(0.0);
+                    state.ui_state.alchemy_station_scroll_offset = (state.ui_state.alchemy_station_scroll_offset
+                        - wheel_y * SCROLL_SPEED)
+                        .clamp(0.0, max_scroll);
+                }
+
+                // Scrollbar drag handling
+                if let Some(track_bounds) = layout.get_bounds(&UiElementId::AlchemyScrollbar) {
+                    let row_h = 56.0_f32;
+                    let total_content = recipe_count as f32 * row_h;
+                    let (_, sh) = crate::util::virtual_screen_size();
+                    let panel_h = (520.0_f32).min(sh - 16.0);
+                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                    let recipe_list_h = content_h * 0.55;
+                    let max_scroll = (total_content - recipe_list_h).max(0.0);
+                    let clicked_on = matches!(clicked_element, Some(UiElementId::AlchemyScrollbar));
+                    crate::ui::scroll::handle_scrollbar_drag(
+                        &mut state.ui_state.alchemy_station_scroll_drag,
+                        &mut state.ui_state.alchemy_station_scroll_offset,
+                        max_scroll,
+                        track_bounds,
+                        total_content,
+                        my,
+                        is_mouse_button_down(MouseButton::Left),
+                        mouse_clicked,
+                        clicked_on,
+                    );
+                } else if !is_mouse_button_down(MouseButton::Left) {
+                    state.ui_state.alchemy_station_scroll_drag.dragging = false;
+                }
+            }
+
+            // Don't process other input while alchemy station is open
+            return commands;
+        }
+
         // Handle social panel touch scrolling
         if state.ui_state.social_open {
             let all_touches: Vec<Touch> = touches();
@@ -6192,6 +6409,13 @@ impl InputHandler {
                                 state.ui_state.anvil_scroll_offset = 0.0;
                                 state.ui_state.anvil_quantity = 1;
                                 state.ui_state.anvil_tab = 0;
+                            } else if npc.station_type.as_deref() == Some("alchemy_station") {
+                                state.ui_state.alchemy_station_open = true;
+                                state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                state.ui_state.alchemy_station_selected_recipe = 0;
+                                state.ui_state.alchemy_station_scroll_offset = 0.0;
+                                state.ui_state.alchemy_station_quantity = 1;
+                                state.ui_state.alchemy_station_tab = 0;
                             } else if npc.is_alive() {
                                 commands.push(InputCommand::Interact {
                                     npc_id: npc_id.clone(),
@@ -6774,6 +6998,13 @@ impl InputHandler {
                                         state.ui_state.anvil_scroll_offset = 0.0;
                                         state.ui_state.anvil_quantity = 1;
                                         state.ui_state.anvil_tab = 0;
+                                    } else if npc.station_type.as_deref() == Some("alchemy_station") {
+                                        state.ui_state.alchemy_station_open = true;
+                                        state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                        state.ui_state.alchemy_station_selected_recipe = 0;
+                                        state.ui_state.alchemy_station_scroll_offset = 0.0;
+                                        state.ui_state.alchemy_station_quantity = 1;
+                                        state.ui_state.alchemy_station_tab = 0;
                                     } else {
                                         commands.push(InputCommand::Interact { npc_id });
                                     }
@@ -7652,6 +7883,13 @@ impl InputHandler {
                                     state.ui_state.anvil_scroll_offset = 0.0;
                                     state.ui_state.anvil_quantity = 1;
                                     state.ui_state.anvil_tab = 0;
+                                } else if npc.station_type.as_deref() == Some("alchemy_station") {
+                                    state.ui_state.alchemy_station_open = true;
+                                    state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                    state.ui_state.alchemy_station_selected_recipe = 0;
+                                    state.ui_state.alchemy_station_scroll_offset = 0.0;
+                                    state.ui_state.alchemy_station_quantity = 1;
+                                    state.ui_state.alchemy_station_tab = 0;
                                 } else {
                                     commands.push(InputCommand::Interact { npc_id });
                                 }

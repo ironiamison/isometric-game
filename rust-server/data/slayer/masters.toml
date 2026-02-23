@@ -83,8 +83,8 @@ xp_per_kill = 10
 id = "mazchna"
 display_name = "Mazchna"
 entity_prototype = "slayer_master_mazchna"
-combat_level_required = 20
-slayer_level_required = 30
+combat_level_required = 35
+slayer_level_required = 20
 points_per_task = 5
 
 [[masters.tasks]]
@@ -104,14 +104,6 @@ weight = 10
 xp_per_kill = 28
 
 [[masters.tasks]]
-monster_id = "mad_mushroom"
-display_name = "Mad Mushrooms"
-count_min = 30
-count_max = 50
-weight = 10
-xp_per_kill = 22
-
-[[masters.tasks]]
 monster_id = "crow"
 display_name = "Crows"
 count_min = 30
@@ -128,14 +120,6 @@ weight = 10
 xp_per_kill = 24
 
 [[masters.tasks]]
-monster_id = "cactus"
-display_name = "Cacti"
-count_min = 30
-count_max = 50
-weight = 8
-xp_per_kill = 26
-
-[[masters.tasks]]
 monster_id = "shell_snail"
 display_name = "Shell Snails"
 count_min = 35
@@ -150,6 +134,39 @@ count_min = 30
 count_max = 55
 weight = 8
 xp_per_kill = 30
+
+[[masters.tasks]]
+monster_id = "skeleton"
+display_name = "Skeletons"
+count_min = 30
+count_max = 55
+weight = 8
+xp_per_kill = 26
+
+[[masters.tasks]]
+monster_id = "low_orc"
+display_name = "Orcs"
+count_min = 25
+count_max = 50
+weight = 8
+xp_per_kill = 24
+
+[[masters.tasks]]
+monster_id = "living_rock"
+display_name = "Living Rocks"
+count_min = 25
+count_max = 50
+weight = 6
+xp_per_kill = 30
+
+[[masters.tasks]]
+monster_id = "rock_golem"
+display_name = "Rock Golems"
+count_min = 20
+count_max = 45
+weight = 4
+requires_unlock = true
+xp_per_kill = 45
 
 # ============================================================================
 # Chaeldar - Advanced Slayer Master

@@ -3466,6 +3466,7 @@ impl GameRoom {
             combat_level,
             attack_bonus,
             strength_bonus,
+            equipped_head,
         ) = {
             let mut players = self.players.write().await;
             let player = match players.get_mut(player_id) {
@@ -3504,6 +3505,7 @@ impl GameRoom {
                 player.skills.combat.level,
                 atk_bonus,
                 str_bonus,
+                player.equipped_head.clone(),
             )
         };
 
@@ -3732,6 +3734,14 @@ impl GameRoom {
             }
         }
 
+        // Fetch slayer state for helmet damage boost check (only if wearing slayer helmet)
+        let slayer_task_monster = if equipped_head.as_deref() == Some("slayer_helmet") {
+            let slayer_state = self.get_player_slayer_state(player_id).await;
+            slayer_state.current_task.map(|t| t.monster_id)
+        } else {
+            None
+        };
+
         // Apply damage to target using hit/miss mechanics
         // 1. Roll attack vs defence to determine if we hit
         // 2. If hit, calculate max hit from strength and roll damage
@@ -3763,7 +3773,14 @@ impl GameRoom {
                         );
                         (npc.hp, name, false, 0)
                     } else {
-                        let max_hit = calculate_max_hit(combat_level, strength_bonus);
+                        let mut max_hit = calculate_max_hit(combat_level, strength_bonus);
+                        // Slayer helmet: 15% damage boost against current slayer task
+                        if let Some(ref task_monster) = slayer_task_monster {
+                            let proto = &npc.prototype_id;
+                            if proto == task_monster || proto.starts_with(&format!("{}_", task_monster)) {
+                                max_hit = ((max_hit as f32) * 1.15).floor() as i32;
+                            }
+                        }
                         let damage = roll_damage(max_hit);
                         let died = npc.take_damage(damage, current_time, Some(player_id));
                         let name = npc.name();
@@ -3814,7 +3831,14 @@ impl GameRoom {
                     (npc.hp, name, false, 0)
                 } else {
                     // Hit - calculate and apply damage
-                    let max_hit = calculate_max_hit(combat_level, strength_bonus);
+                    let mut max_hit = calculate_max_hit(combat_level, strength_bonus);
+                    // Slayer helmet: 15% damage boost against current slayer task
+                    if let Some(ref task_monster) = slayer_task_monster {
+                        let proto = &npc.prototype_id;
+                        if proto == task_monster || proto.starts_with(&format!("{}_", task_monster)) {
+                            max_hit = ((max_hit as f32) * 1.15).floor() as i32;
+                        }
+                    }
                     let damage = roll_damage(max_hit);
                     let died = npc.take_damage(damage, current_time, Some(player_id));
                     let name = npc.name();
@@ -4714,7 +4738,7 @@ impl GameRoom {
                 state.points -= reward.cost;
                 state.blocked_monsters.push(monster);
             }
-            "potion" => {
+            "potion" | "equipment" => {
                 state.points -= reward.cost;
                 // Grant items to player inventory
                 if let Some(ref item_id) = reward.target_id {

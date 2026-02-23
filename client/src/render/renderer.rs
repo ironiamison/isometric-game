@@ -8774,6 +8774,11 @@ impl Renderer {
             self.render_anvil(state, hovered, &mut layout);
         }
 
+        // Alchemy Station UI (when open)
+        if state.ui_state.alchemy_station_open {
+            self.render_alchemy_station(state, hovered, &mut layout);
+        }
+
         // Bank UI (when open)
         if state.ui_state.bank_open {
             self.render_bank(state, hovered, &mut layout);

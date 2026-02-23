@@ -196,6 +196,17 @@ pub enum UiElementId {
     AnvilTabMaterials,
     AnvilTabEquipment,
 
+    // Alchemy Station
+    AlchemyCloseButton,
+    AlchemyTab(usize),
+    AlchemyRecipeItem(usize),
+    AlchemyScrollArea,
+    AlchemyScrollbar,
+    AlchemyBrewButton,
+    AlchemyCancelButton,
+    AlchemyQuantityMinus,
+    AlchemyQuantityPlus,
+
     // Slayer Panel
     SlayerCloseButton,
     SlayerGetTaskButton,

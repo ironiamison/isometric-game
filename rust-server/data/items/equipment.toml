@@ -1034,6 +1034,18 @@ attack_bonus = 4
 strength_bonus = 6
 defence_bonus = 14
 
+[slayer_helmet]
+display_name = "Slayer Helmet"
+sprite = "slayer_helmet"
+description = "Provides a 15% damage boost against your current slayer task."
+category = "equipment"
+max_stack = 1
+base_price = 0
+sellable = false
+[slayer_helmet.equipment]
+slot_type = "head"
+defence_bonus = 6
+
 [shades]
 display_name = "Shades"
 sprite = "shades"
