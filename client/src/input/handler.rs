@@ -5305,6 +5305,32 @@ impl InputHandler {
                 while get_char_pressed().is_some() {}
             }
 
+            // Paste from clipboard (Ctrl+V / Cmd+V)
+            let ctrl_held = is_key_down(KeyCode::LeftControl)
+                || is_key_down(KeyCode::RightControl)
+                || is_key_down(KeyCode::LeftSuper)
+                || is_key_down(KeyCode::RightSuper);
+            if ctrl_held && is_key_pressed(KeyCode::V) {
+                if let Some(text) = macroquad::miniquad::window::clipboard_get() {
+                    for c in text.chars() {
+                        if state.ui_state.chat_input.chars().count() >= 200 {
+                            break;
+                        }
+                        if c.is_control() {
+                            continue;
+                        }
+                        let byte_idx = char_to_byte_index(
+                            &state.ui_state.chat_input,
+                            state.ui_state.chat_cursor,
+                        );
+                        state.ui_state.chat_input.insert(byte_idx, c);
+                        state.ui_state.chat_cursor += 1;
+                    }
+                }
+                // Drain char queue to prevent 'v' from leaking through
+                while get_char_pressed().is_some() {}
+            }
+
             // Backspace removes character before cursor
             if should_fire(KeyCode::Backspace, state, current_time) {
                 if state.ui_state.chat_cursor > 0 {
