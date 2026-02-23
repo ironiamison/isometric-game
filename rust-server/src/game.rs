@@ -878,6 +878,8 @@ pub struct GameRoom {
     slayer_registry: Arc<crate::slayer::SlayerRegistry>,
     /// Per-player slayer state (current task, points, blocked/unlocked)
     player_slayer_states: RwLock<HashMap<String, crate::slayer::PlayerSlayerState>>,
+    /// Interior registry for looking up map flags (e.g. requires_slayer_task)
+    interior_registry: Arc<crate::interior::InteriorRegistry>,
 }
 
 impl GameRoom {
@@ -891,6 +893,7 @@ impl GameRoom {
         player_instances: Arc<RwLock<HashMap<String, String>>>,
         instance_manager: Arc<crate::instance::InstanceManager>,
         db: Option<Arc<crate::db::Database>>,
+        interior_registry: Arc<crate::interior::InteriorRegistry>,
     ) -> Self {
         let (tx, _) = broadcast::channel(256);
         let world = Arc::new(World::new("maps/world_0"));
@@ -1241,6 +1244,7 @@ impl GameRoom {
             quest_locations,
             slayer_registry,
             player_slayer_states: RwLock::new(HashMap::new()),
+            interior_registry,
         }
     }
 
@@ -3687,6 +3691,36 @@ impl GameRoom {
                 return;
             }
         };
+
+        // In slayer-only areas, players can only attack NPCs matching their active slayer task
+        if is_npc {
+            if let Some(ref inst_id) = attacker_instance {
+                if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                    if let Some(interior) = self.interior_registry.get(&instance.map_id) {
+                        if interior.requires_slayer_task {
+                            let slayer_state = self.get_player_slayer_state(player_id).await;
+                            let npc_prototype = if is_instance_npc {
+                                let npcs = instance.npcs.read().await;
+                                npcs.get(&target_id).map(|n| n.prototype_id.clone())
+                            } else {
+                                None
+                            };
+                            if let Some(proto_id) = npc_prototype {
+                                let allowed = match &slayer_state.current_task {
+                                    Some(task) => proto_id == task.monster_id
+                                        || proto_id.starts_with(&format!("{}_", task.monster_id)),
+                                    None => false,
+                                };
+                                if !allowed {
+                                    self.send_system_message(player_id, "You can only attack your slayer task monster in this area.").await;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Update attacker's last attack time and stop movement
         {

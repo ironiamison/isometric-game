@@ -232,6 +232,7 @@ impl AppState {
                 self.player_instances.clone(),
                 self.instance_manager.clone(),
                 Some(self.db.clone()),
+                self.interior_registry.clone(),
             )
             .await,
         );
