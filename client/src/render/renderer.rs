@@ -3208,13 +3208,6 @@ impl Renderer {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&player.id);
                     let is_hovered = state.hovered_entity_id.as_ref() == Some(&player.id);
                     self.render_player(player, is_local, is_selected, is_hovered, &state.camera, &state.item_registry);
-                    if player.is_gathering {
-                        // Delay the line until the cast animation finishes
-                        let elapsed = macroquad::time::get_time() - player.gathering_started_at;
-                        if elapsed > 0.2 {
-                            self.render_fishing_line(player, &state.camera);
-                        }
-                    }
                 }
                 Renderable::Npc(npc) => {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&npc.id);
@@ -3277,6 +3270,16 @@ impl Renderer {
                 } => {
                     // Reuse tree timer rendering — same pie chart style
                     self.render_tree_timer(tile_x, tile_y, progress, &state.camera);
+                }
+            }
+        }
+
+        // Render fishing lines on top of all world objects (walls, piers, etc.)
+        for player in state.players.values() {
+            if player.is_gathering {
+                let elapsed = macroquad::time::get_time() - player.gathering_started_at;
+                if elapsed > 0.2 {
+                    self.render_fishing_line(player, &state.camera);
                 }
             }
         }
