@@ -76826,224 +76826,187 @@
     {
       "entityId": "rock_golem",
       "x": 61,
-      "y": 115,
-      "level": 1
+      "y": 115
     },
     {
       "entityId": "skeleton",
       "x": 72,
-      "y": 11,
-      "level": 1
+      "y": 11
     },
     {
       "entityId": "skeleton",
       "x": 72,
-      "y": 26,
-      "level": 1
+      "y": 26
     },
     {
       "entityId": "skeleton",
       "x": 78,
-      "y": 38,
-      "level": 1
+      "y": 38
     },
     {
       "entityId": "skeleton",
       "x": 87,
-      "y": 40,
-      "level": 1
+      "y": 40
     },
     {
       "entityId": "skeleton",
       "x": 81,
-      "y": 14,
-      "level": 1
+      "y": 14
     },
     {
       "entityId": "skeleton_archer",
       "x": 78,
-      "y": 28,
-      "level": 1
+      "y": 28
     },
     {
       "entityId": "skeleton_archer",
       "x": 69,
-      "y": 14,
-      "level": 1
+      "y": 14
     },
     {
       "entityId": "skeleton_brute",
       "x": 86,
-      "y": 17,
-      "level": 1
+      "y": 17
     },
     {
       "entityId": "skeleton_brute",
       "x": 86,
-      "y": 32,
-      "level": 1
+      "y": 32
     },
     {
       "entityId": "skeleton_archer",
       "x": 72,
-      "y": 17,
-      "level": 1
+      "y": 17
     },
     {
       "entityId": "skeleton_archer",
       "x": 77,
-      "y": 7,
-      "level": 1
+      "y": 7
     },
     {
       "entityId": "swamper",
       "x": 137,
-      "y": 51,
-      "level": 1
+      "y": 51
     },
     {
       "entityId": "swamper",
       "x": 134,
-      "y": 42,
-      "level": 1
+      "y": 42
     },
     {
       "entityId": "swamper",
       "x": 147,
-      "y": 32,
-      "level": 1
+      "y": 32
     },
     {
       "entityId": "swamper",
       "x": 133,
-      "y": 18,
-      "level": 1
+      "y": 18
     },
     {
       "entityId": "swamper",
       "x": 128,
-      "y": 9,
-      "level": 1
+      "y": 9
     },
     {
       "entityId": "swamper",
       "x": 145,
-      "y": 14,
-      "level": 1
+      "y": 14
     },
     {
       "entityId": "low_orc",
       "x": 95,
-      "y": 10,
-      "level": 1
+      "y": 10
     },
     {
       "entityId": "low_orc",
       "x": 105,
-      "y": 40,
-      "level": 1
+      "y": 40
     },
     {
       "entityId": "low_orc",
       "x": 100,
-      "y": 21,
-      "level": 1
+      "y": 21
     },
     {
       "entityId": "rock",
       "x": 56,
-      "y": 127,
-      "level": 1
+      "y": 127
     },
     {
       "entityId": "rock",
       "x": 72,
-      "y": 105,
-      "level": 1
+      "y": 105
     },
     {
       "entityId": "rock",
       "x": 70,
-      "y": 120,
-      "level": 1
+      "y": 120
     },
     {
       "entityId": "rock",
       "x": 52,
-      "y": 117,
-      "level": 1
+      "y": 117
     },
     {
       "entityId": "rock",
       "x": 80,
-      "y": 127,
-      "level": 1
+      "y": 127
     },
     {
       "entityId": "rock",
       "x": 106,
-      "y": 145,
-      "level": 1
+      "y": 145
     },
     {
       "entityId": "rock",
       "x": 134,
-      "y": 144,
-      "level": 1
+      "y": 144
     },
     {
       "entityId": "rock",
       "x": 115,
-      "y": 120,
-      "level": 1
+      "y": 120
     },
     {
       "entityId": "rock",
       "x": 94,
-      "y": 118,
-      "level": 1
+      "y": 118
     },
     {
       "entityId": "rock",
       "x": 82,
-      "y": 114,
-      "level": 1
+      "y": 114
     },
     {
       "entityId": "rock",
       "x": 93,
-      "y": 110,
-      "level": 1
+      "y": 110
     },
     {
       "entityId": "rock",
       "x": 98,
-      "y": 135,
-      "level": 1
+      "y": 135
     },
     {
       "entityId": "bone_monster",
       "x": 25,
-      "y": 33,
-      "level": 1
+      "y": 33
     },
     {
       "entityId": "skeleton_archer",
       "x": 23,
-      "y": 34,
-      "level": 1
+      "y": 34
     },
     {
       "entityId": "skeleton_brute",
       "x": 30,
-      "y": 33,
-      "level": 1
+      "y": 33
     },
     {
       "entityId": "skeleton_archer",
       "x": 24,
-      "y": 29,
-      "level": 1
+      "y": 29
     }
   ],
   "mapObjects": [
