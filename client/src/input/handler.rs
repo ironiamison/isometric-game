@@ -1476,7 +1476,7 @@ impl InputHandler {
                 ContextMenuTarget::Player { .. } => 4,
                 ContextMenuTarget::Npc { id } => {
                     state.npcs.get(id).map(|npc| {
-                        if npc.is_attackable() { 2 }
+                        if npc.is_attackable() { 3 }
                         else if npc.is_altar { 3 }
                         else if npc.is_merchant { 3 }
                         else { 2 }
@@ -1685,7 +1685,7 @@ impl InputHandler {
                                         let npc_id = id.clone();
 
                                         if is_attackable {
-                                            // Options: 0=Attack, 1=Examine
+                                            // Options: 0=Attack, 1=Target, 2=Examine
                                             match option_idx {
                                                 0 => {
                                                     commands.push(InputCommand::Target { entity_id: npc_id.clone() });
@@ -1698,6 +1698,10 @@ impl InputHandler {
                                                     pathfind_and_attack_npc(state, &mut commands, &npc_id);
                                                 }
                                                 1 => {
+                                                    // Target only — select without attacking or moving
+                                                    commands.push(InputCommand::Target { entity_id: npc_id.clone() });
+                                                }
+                                                2 => {
                                                     let msg = format!("{} (level {})", npc_name, npc_level);
                                                     state.push_system_chat(msg);
                                                 }

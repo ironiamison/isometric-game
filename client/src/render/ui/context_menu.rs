@@ -71,6 +71,7 @@ impl Renderer {
                     let name = npc.name();
                     if npc.is_attackable() {
                         push_option(&mut options, "Attack");
+                        push_option(&mut options, "Target");
                         push_option(&mut options, "Examine");
                     } else {
                         if npc.is_altar {
