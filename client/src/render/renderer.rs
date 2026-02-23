@@ -3045,13 +3045,18 @@ impl Renderer {
         let rock_shake_offsets = self.rock_shake_offsets.borrow();
 
         // Add map objects and walls from loaded chunks with chunk-level pre-culling
+        let interior_dims = state.chunk_manager.get_interior_size();
         let chunk_size = CHUNK_SIZE as f32;
         for (coord, chunk) in state.chunk_manager.chunks().iter() {
             // Chunk-level AABB check: skip entire chunk if outside visible area
-            let chunk_min_x = (coord.x * CHUNK_SIZE as i32) as f32;
-            let chunk_min_y = (coord.y * CHUNK_SIZE as i32) as f32;
-            let chunk_max_x = chunk_min_x + chunk_size;
-            let chunk_max_y = chunk_min_y + chunk_size;
+            // For interiors, the single chunk at (0,0) covers the full map dimensions
+            let (chunk_min_x, chunk_min_y, chunk_max_x, chunk_max_y) = if let Some((w, h)) = interior_dims {
+                (0.0, 0.0, w as f32, h as f32)
+            } else {
+                let min_x = (coord.x * CHUNK_SIZE as i32) as f32;
+                let min_y = (coord.y * CHUNK_SIZE as i32) as f32;
+                (min_x, min_y, min_x + chunk_size, min_y + chunk_size)
+            };
             if chunk_max_x < vis_min_x
                 || chunk_min_x > vis_max_x
                 || chunk_max_y < vis_min_y
