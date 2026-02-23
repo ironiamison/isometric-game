@@ -2200,17 +2200,10 @@ impl GameRoom {
     }
 
     pub async fn handle_move(&self, player_id: &str, dx: f32, dy: f32, seq: Option<u32>) {
-        // Auto-action interrupt: actual movement (non-zero) cancels auto-action
-        // Zero-velocity (stop commands) should not interrupt auto-action
-        if dx != 0.0 || dy != 0.0 {
-            let had_auto_action = {
-                let players = self.players.read().await;
-                players.get(player_id).map_or(false, |p| p.auto_action.is_some())
-            };
-            if had_auto_action {
-                self.clear_auto_action(player_id, "interrupted").await;
-            }
-        }
+        // NOTE: Movement does NOT cancel auto-action. The client sends an explicit
+        // CancelAutoAction message when the player manually moves (keyboard/dpad),
+        // manually attacks, or clicks empty ground. Chase-follow movements must NOT
+        // interrupt auto-action, otherwise the player can never catch a moving target.
 
         let mut chair_to_free: Option<(i32, i32)> = None;
         {
