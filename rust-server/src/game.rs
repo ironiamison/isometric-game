@@ -1445,8 +1445,14 @@ impl GameRoom {
         player.bank = item::Bank::new_with_size(bank_max_slots as usize);
 
         // Restore saved stats
-        player.hp = hp.min(skills.hitpoints.level); // Cap HP at max (hitpoints level)
         player.skills = skills;
+        player.hp = hp.min(player.max_hp()); // Cap HP at max (hitpoints level)
+        // If player disconnected while dead (hp=0), respawn them
+        if player.hp <= 0 {
+            player.hp = player.max_hp();
+            player.x = WORLD_SPAWN_X;
+            player.y = WORLD_SPAWN_Y;
+        }
         player.inventory.gold = gold;
         player.equipped_head = equipped_head;
         player.equipped_body = equipped_body;
