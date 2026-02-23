@@ -1159,6 +1159,8 @@ pub struct ClientItemDef {
     pub attack_bonus: Option<i32>,
     pub strength_bonus: Option<i32>,
     pub defence_bonus: Option<i32>,
+    pub magic_bonus: Option<i32>,
+    pub magic_level_required: Option<i32>,
     pub weapon_type: Option<String>,
     pub range: Option<i32>,
     pub chop_speed_multiplier: Option<f32>,
@@ -3004,6 +3006,18 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         imap.push((
                             Value::String("defence_bonus".into()),
                             Value::Integer((def as i64).into()),
+                        ));
+                    }
+                    if let Some(bonus) = i.magic_bonus {
+                        imap.push((
+                            Value::String("magic_bonus".into()),
+                            Value::Integer((bonus as i64).into()),
+                        ));
+                    }
+                    if let Some(level) = i.magic_level_required {
+                        imap.push((
+                            Value::String("magic_level_required".into()),
+                            Value::Integer((level as i64).into()),
                         ));
                     }
                     if let Some(ref wtype) = i.weapon_type {

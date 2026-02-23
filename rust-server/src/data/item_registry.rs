@@ -105,6 +105,8 @@ impl ItemRegistry {
                     attack_bonus,
                     strength_bonus,
                     defence_bonus,
+                    magic_bonus,
+                    magic_level_required,
                     chop_speed_multiplier,
                     mine_speed_multiplier,
                 ) = if let Some(ref equip) = item.equipment {
@@ -118,6 +120,8 @@ impl ItemRegistry {
                             Some(equip.attack_bonus),
                             Some(equip.strength_bonus),
                             Some(equip.defence_bonus),
+                            Some(equip.magic_bonus),
+                            Some(equip.magic_level_required),
                             if equip.chop_speed_multiplier > 0.0 {
                                 Some(equip.chop_speed_multiplier)
                             } else {
@@ -130,10 +134,10 @@ impl ItemRegistry {
                             },
                         )
                     } else {
-                        (None, None, None, None, None, None, None, None, None, None)
+                        (None, None, None, None, None, None, None, None, None, None, None, None)
                     }
                 } else {
-                    (None, None, None, None, None, None, None, None, None, None)
+                    (None, None, None, None, None, None, None, None, None, None, None, None)
                 };
 
                 ClientItemDef {
@@ -153,6 +157,8 @@ impl ItemRegistry {
                     attack_bonus,
                     strength_bonus,
                     defence_bonus,
+                    magic_bonus,
+                    magic_level_required,
                     weapon_type: item.equipment.as_ref().map(|e| match e.weapon_type {
                         WeaponType::Melee => "melee".to_string(),
                         WeaponType::Ranged => "ranged".to_string(),
