@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, type LeaderboardEntry, type LeaderboardSort } from '../api'
@@ -75,6 +75,7 @@ function rankStyle(rank: number) {
 }
 
 export function Leaderboards() {
+  useEffect(() => { document.title = 'Leaderboards — New Aeven World Statistics' }, [])
   const [activeSort, setActiveSort] = useState<LeaderboardSort>('total_level')
   const [search, setSearch] = useState('')
   const metric = METRICS.find(m => m.sort === activeSort) ?? METRICS[0]

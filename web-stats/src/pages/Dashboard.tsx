@@ -1,8 +1,10 @@
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, type LeaderboardEntry } from '../api'
 
 export function Dashboard() {
+  useEffect(() => { document.title = 'World Pulse — New Aeven World Statistics' }, [])
   const { data: overview, isLoading: loadingOverview } = useQuery({
     queryKey: ['overview'],
     queryFn: api.overview,

@@ -21,8 +21,8 @@ impl Renderer {
         layout: &mut UiLayout,
     ) {
         let padding = 4.0;
-        let option_height = 20.0;
-        let font_size = 15.0;
+        let option_height = 22.0;
+        let font_size = 16.0;
         let h_pad = 6.0; // horizontal padding inside menu
 
         // Determine which options to show and header title

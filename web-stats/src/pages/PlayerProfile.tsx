@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api, type LeaderboardEntry, type PlayerProfileRanks } from '../api'
@@ -46,6 +46,12 @@ export function PlayerProfile() {
   const playerName = params.name ?? ''
   const [copied, setCopied] = useState(false)
   const appBase = import.meta.env.BASE_URL
+
+  useEffect(() => {
+    document.title = playerName
+      ? `${playerName} — New Aeven Player Profile`
+      : 'Player Profile — New Aeven World Statistics'
+  }, [playerName])
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['player-profile', playerName],

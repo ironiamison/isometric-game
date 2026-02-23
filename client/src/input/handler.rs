@@ -5973,17 +5973,20 @@ impl InputHandler {
         }
         if let Some(ref follow_id) = state.follow_target.clone() {
             if let Some(target) = state.players.get(follow_id) {
-                let tx = target.x.round() as i32;
-                let ty = target.y.round() as i32;
+                let tx = target.server_x.round() as i32;
+                let ty = target.server_y.round() as i32;
 
                 if let Some(player) = state.get_local_player() {
-                    let px = player.x.round() as i32;
-                    let py = player.y.round() as i32;
+                    let px = player.server_x.round() as i32;
+                    let py = player.server_y.round() as i32;
                     let dist = (px - tx).abs() + (py - ty).abs();
 
                     // Already adjacent — just stand still and face them
                     if dist <= 1 {
-                        // no-op, we're close enough
+                        // Stop any active path so we don't overshoot
+                        if state.auto_path.is_some() {
+                            state.auto_path = None;
+                        }
                     } else {
                         // Check if we need to re-path (target moved away from our destination)
                         let needs_repath = if let Some(ref path_state) = state.auto_path {
@@ -5994,7 +5997,7 @@ impl InputHandler {
                             true
                         };
 
-                        const REPATH_COOLDOWN: f64 = 0.3;
+                        const REPATH_COOLDOWN: f64 = 0.6;
                         let repath_allowed = current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
 
                         if needs_repath && repath_allowed {

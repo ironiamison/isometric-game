@@ -118,9 +118,17 @@ export function Layout() {
         {/* Footer */}
         <div className="px-6 py-4">
           <div className="h-px w-full bg-[var(--panel-border)]" />
-          <p className="mt-3 text-[10px] tracking-[0.16em] text-[var(--muted)] uppercase" style={{ fontFamily: 'var(--font-display)' }}>
-            World records & rankings
-          </p>
+          <a
+            href="/"
+            className="mt-3 flex items-center gap-2 text-[10px] tracking-[0.16em] text-[var(--muted)] uppercase transition-colors hover:text-[var(--gold)]"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 7l5-5 5 5" />
+              <path d="M3 6.5V12h3V9.5h2V12h3V6.5" />
+            </svg>
+            Back to New Aeven
+          </a>
         </div>
       </aside>
 

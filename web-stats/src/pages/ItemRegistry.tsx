@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Item } from '../api'
 
@@ -23,6 +23,7 @@ function StatLine({ label, value }: { label: string; value: number }) {
 }
 
 export function ItemRegistry() {
+  useEffect(() => { document.title = 'Item Registry — New Aeven World Statistics' }, [])
   const { data, isLoading } = useQuery({
     queryKey: ['items'],
     queryFn: api.items,

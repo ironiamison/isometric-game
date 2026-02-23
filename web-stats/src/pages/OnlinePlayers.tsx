@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, type OnlinePlayer } from '../api'
@@ -7,6 +7,7 @@ type SortKey = keyof OnlinePlayer
 type SortDir = 'asc' | 'desc'
 
 export function OnlinePlayers() {
+  useEffect(() => { document.title = 'Online Players — New Aeven World Statistics' }, [])
   const { data, isLoading } = useQuery({
     queryKey: ['online'],
     queryFn: api.online,
