@@ -979,7 +979,7 @@ impl Renderer {
                     }
                 } else {
                     let mut sprites = HashMap::new();
-                    for name in &["dark_hand", "dark_eater", "self_heal", "bubbles_warp"] {
+                    for name in &["dark_hand", "lightning_bolt", "dark_eater", "rock_fall", "self_heal", "bubbles_warp"] {
                         let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                         if let Ok(tex) = load_texture(&path).await {
                             tex.set_filter(FilterMode::Nearest);
@@ -990,7 +990,7 @@ impl Renderer {
                 }
             } else {
                 let mut sprites = HashMap::new();
-                for name in &["dark_hand", "dark_eater", "self_heal", "bubbles_warp"] {
+                for name in &["dark_hand", "lightning_bolt", "dark_eater", "rock_fall", "self_heal", "bubbles_warp"] {
                     let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                     if let Ok(tex) = load_texture(&path).await {
                         tex.set_filter(FilterMode::Nearest);
@@ -1337,7 +1337,9 @@ impl Renderer {
             // spell_id -> icon_filename mapping (spell ids don't always match filenames)
             let spell_icon_mappings = [
                 ("dark_hand", "dark_hand"),
+                ("lightning_bolt", "lightning_bolt"),
                 ("dark_eater", "dark_eater"),
+                ("rock_fall", "rock_fall"),
                 ("heal", "heal"),
                 ("return_home", "return_home"),
             ];
@@ -4475,9 +4477,9 @@ impl Renderer {
             // Look up the effect sprite based on spell_id
             let sprite_name = match effect.spell_id.as_str() {
                 "dark_hand" => "dark_hand",
-                "lightning_bolt" => "dark_hand",
+                "lightning_bolt" => "lightning_bolt",
                 "dark_eater" => "dark_eater",
-                "rock_fall" => "dark_eater",
+                "rock_fall" => "rock_fall",
                 "heal" => "self_heal",
                 "teleport" | "return_home" => "bubbles_warp",
                 _ => continue,
