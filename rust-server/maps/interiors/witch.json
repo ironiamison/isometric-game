@@ -890,6 +890,11 @@
       "entityId": "witch_hazel",
       "x": 8,
       "y": 8
+    },
+    {
+      "entityId": "alchemy_station",
+      "x": 6,
+      "y": 3
     }
   ],
   "mapObjects": [
