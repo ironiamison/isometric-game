@@ -1605,6 +1605,7 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
     nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
     nmap.push((Value::String("is_slayer_master".into()), Value::Boolean(n.is_slayer_master)));
+    nmap.push((Value::String("is_friendly".into()), Value::Boolean(n.is_friendly)));
     if let Some(ref st) = n.station_type {
         nmap.push((Value::String("station_type".into()), Value::String(st.clone().into())));
     }
@@ -2059,6 +2060,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
                     nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
                     nmap.push((Value::String("is_slayer_master".into()), Value::Boolean(n.is_slayer_master)));
+                    nmap.push((Value::String("is_friendly".into()), Value::Boolean(n.is_friendly)));
                     if let Some(ref st) = n.station_type {
                         nmap.push((Value::String("station_type".into()), Value::String(st.clone().into())));
                     }

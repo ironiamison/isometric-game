@@ -647,6 +647,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
                         let is_banker = extract_bool(npc_value, "is_banker").unwrap_or(false);
                         let is_slayer_master = extract_bool(npc_value, "is_slayer_master").unwrap_or(false);
+                        let is_friendly = extract_bool(npc_value, "is_friendly").unwrap_or(false);
                         let station_type = extract_string(npc_value, "station_type");
                         let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
                         let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
@@ -689,6 +690,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.is_altar = is_altar;
                             npc.is_banker = is_banker;
                             npc.is_slayer_master = is_slayer_master;
+                            npc.is_friendly = is_friendly;
                             npc.station_type = station_type;
                             npc.move_speed = move_speed;
                             npc.no_shadow = no_shadow;
@@ -709,6 +711,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             npc.is_altar = is_altar;
                             npc.is_banker = is_banker;
                             npc.is_slayer_master = is_slayer_master;
+                            npc.is_friendly = is_friendly;
                             npc.station_type = station_type;
                             npc.move_speed = move_speed;
                             npc.no_shadow = no_shadow;

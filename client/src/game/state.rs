@@ -1636,6 +1636,10 @@ pub struct GameState {
 
     /// Player ID we're following (right-click Follow)
     pub follow_target: Option<String>,
+    /// Target's position when we arrived adjacent (waiting state)
+    pub follow_arrived_target_pos: Option<(i32, i32)>,
+    /// Timestamp when we first noticed the target moved from arrived position
+    pub follow_target_move_time: f64,
 
     // Performance diagnostics (visible in debug mode)
     pub frame_timings: FrameTimings,
@@ -1763,6 +1767,8 @@ impl GameState {
             auto_action_state: None,
             last_chase_repath_time: 0.0,
             follow_target: None,
+            follow_arrived_target_pos: None,
+            follow_target_move_time: 0.0,
             frame_timings: FrameTimings::default(),
             map_transition: MapTransition::default(),
             current_interior: None,

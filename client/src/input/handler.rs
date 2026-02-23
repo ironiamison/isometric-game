@@ -411,6 +411,8 @@ fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, til
         commands.push(InputCommand::CancelAutoAction);
     }
     state.follow_target = None;
+    state.follow_arrived_target_pos = None;
+    state.follow_target_move_time = 0.0;
 
     const MAX_PATH_DISTANCE: i32 = 32;
     if let Some(player) = state.get_local_player() {
@@ -5751,6 +5753,8 @@ impl InputHandler {
             }
             if state.follow_target.is_some() {
                 state.follow_target = None;
+                state.follow_arrived_target_pos = None;
+                state.follow_target_move_time = 0.0;
                 state.auto_path = None;
             }
 
@@ -5970,6 +5974,8 @@ impl InputHandler {
         // Cancel follow if player started attacking or performing an auto-action
         if state.follow_target.is_some() && state.auto_action_state.is_some() {
             state.follow_target = None;
+            state.follow_arrived_target_pos = None;
+            state.follow_target_move_time = 0.0;
         }
         if let Some(ref follow_id) = state.follow_target.clone() {
             if let Some(target) = state.players.get(follow_id) {
@@ -5981,14 +5987,50 @@ impl InputHandler {
                     let py = player.server_y.round() as i32;
                     let dist = (px - tx).abs() + (py - ty).abs();
 
-                    // Already adjacent — just stand still and face them
                     if dist <= 1 {
-                        // Stop any active path so we don't overshoot
+                        // Adjacent — stop and enter waiting state
                         if state.auto_path.is_some() {
                             state.auto_path = None;
                         }
+                        // Record target position so we know when they move
+                        if state.follow_arrived_target_pos.is_none() {
+                            state.follow_arrived_target_pos = Some((tx, ty));
+                            state.follow_target_move_time = 0.0;
+                        }
+                    } else if let Some((ax, ay)) = state.follow_arrived_target_pos {
+                        // We were adjacent but now dist > 1 — target moved away
+                        if (tx, ty) == (ax, ay) {
+                            // Target hasn't actually moved, we drifted — just re-path immediately
+                            state.follow_arrived_target_pos = None;
+                            state.follow_target_move_time = 0.0;
+                        } else {
+                            // Target moved — wait 500ms before following
+                            if state.follow_target_move_time == 0.0 {
+                                state.follow_target_move_time = current_time;
+                            }
+                            const FOLLOW_MOVE_DELAY: f64 = 0.5;
+                            if current_time - state.follow_target_move_time >= FOLLOW_MOVE_DELAY {
+                                // Delay elapsed — clear waiting state and path to target
+                                state.follow_arrived_target_pos = None;
+                                state.follow_target_move_time = 0.0;
+                                let mut occupied = build_occupied_set(state);
+                                if let Some(p) = state.players.get(follow_id) {
+                                    occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                                }
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                    (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                                ) {
+                                    state.auto_path = Some(PathState {
+                                        path, current_index: 0, destination: dest,
+                                        pickup_target: None, interact_target: None,
+                                    });
+                                    state.last_chase_repath_time = current_time;
+                                }
+                            }
+                        }
                     } else {
-                        // Check if we need to re-path (target moved away from our destination)
+                        // Not adjacent and not in waiting state — normal follow re-pathing
                         let needs_repath = if let Some(ref path_state) = state.auto_path {
                             let dest_dist = (path_state.destination.0 - tx).abs()
                                 + (path_state.destination.1 - ty).abs();
@@ -6002,7 +6044,6 @@ impl InputHandler {
 
                         if needs_repath && repath_allowed {
                             let mut occupied = build_occupied_set(state);
-                            // Exclude the follow target so they don't block our path
                             if let Some(p) = state.players.get(follow_id) {
                                 occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
                             }
@@ -6022,6 +6063,8 @@ impl InputHandler {
             } else {
                 // Target player disconnected or left view — stop following
                 state.follow_target = None;
+                state.follow_arrived_target_pos = None;
+                state.follow_target_move_time = 0.0;
             }
         }
 

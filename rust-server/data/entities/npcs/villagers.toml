@@ -306,6 +306,7 @@ gold_max = 0
 
 [master_farmer.behaviors]
 hostile = false
+friendly = true
 plot_seller = true
 wander_enabled = false
 

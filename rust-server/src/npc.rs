@@ -58,6 +58,7 @@ pub struct PrototypeStats {
     pub is_altar: bool,
     pub is_banker: bool,
     pub is_slayer_master: bool,
+    pub is_friendly: bool,
     pub wander_enabled: bool,
     pub wander_radius: i32,
     pub wander_pause_min_ms: u64,
@@ -142,6 +143,7 @@ impl Npc {
             is_altar: prototype.behaviors.altar,
             is_banker: prototype.behaviors.banker,
             is_slayer_master: prototype.behaviors.slayer_master,
+            is_friendly: prototype.behaviors.friendly,
             wander_enabled: prototype.behaviors.wander_enabled,
             wander_radius: prototype.behaviors.wander_radius,
             wander_pause_min_ms: prototype.behaviors.wander_pause_min_ms,
@@ -251,14 +253,18 @@ impl Npc {
         self.stats.is_slayer_master
     }
 
+    pub fn is_friendly(&self) -> bool {
+        self.stats.is_friendly
+    }
+
     pub fn station_type(&self) -> Option<&str> {
         self.stats.station_type.as_deref()
     }
 
     /// Returns true if this NPC can be attacked by players.
-    /// Quest givers, merchants, altars, bankers, and stations cannot be attacked.
+    /// Friendly NPCs, quest givers, merchants, altars, bankers, and stations cannot be attacked.
     pub fn is_attackable(&self) -> bool {
-        !self.stats.is_quest_giver && !self.stats.is_merchant && !self.stats.is_altar && !self.stats.is_banker && !self.stats.is_slayer_master && self.stats.station_type.is_none()
+        !self.stats.is_friendly && !self.stats.is_quest_giver && !self.stats.is_merchant && !self.stats.is_altar && !self.stats.is_banker && !self.stats.is_slayer_master && self.stats.station_type.is_none()
     }
 
     pub fn name(&self) -> String {
@@ -764,6 +770,8 @@ pub struct NpcUpdate {
     pub is_banker: bool,
     /// Whether this NPC is a slayer master
     pub is_slayer_master: bool,
+    /// Whether this NPC is friendly (non-attackable, no level shown)
+    pub is_friendly: bool,
     /// Movement speed in tiles per second (for client interpolation)
     pub move_speed: f32,
     /// True only on the tick when this NPC attacks (for animation sync)
@@ -805,6 +813,7 @@ impl From<&Npc> for NpcUpdate {
             is_altar: npc.is_altar(),
             is_banker: npc.is_banker(),
             is_slayer_master: npc.is_slayer_master(),
+            is_friendly: npc.is_friendly(),
             move_speed,
             just_attacked: npc.just_attacked,
             no_shadow: npc.stats.no_shadow,
