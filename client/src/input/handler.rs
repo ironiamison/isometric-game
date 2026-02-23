@@ -5109,48 +5109,16 @@ impl InputHandler {
             }
         }
 
-        // Path following - generate movement commands when auto-pathing
-        // Only follow path if not manually moving and not attacking
-        if dx == 0.0 && dy == 0.0 && !is_attacking {
-            // Get player position from SERVER state (not visual) to avoid getting ahead of server
-            let player_pos = state
-                .get_local_player()
-                .map(|p| (p.server_x.round() as i32, p.server_y.round() as i32));
+        // Get player position from SERVER state (not visual) to avoid getting ahead of server
+        let player_pos = state
+            .get_local_player()
+            .map(|p| (p.server_x.round() as i32, p.server_y.round() as i32));
 
-            // Check if next waypoint is blocked by an entity - if so, cancel path
-            let mut path_blocked = false;
-            if let (Some((player_x, player_y)), Some(ref path_state)) =
-                (player_pos, &state.auto_path)
-            {
-                if path_state.current_index < path_state.path.len() {
-                    let (next_x, next_y) = path_state.path[path_state.current_index];
-
-                    // Check if we need to move to reach the waypoint
-                    if player_x != next_x || player_y != next_y {
-                        let occupied = build_occupied_set(state);
-                        if occupied.contains(&(next_x, next_y)) {
-                            path_blocked = true;
-                        }
-                    }
-                }
-            }
-
-            // If path is blocked by entity, cancel it and stop
-            // (but don't cancel auto-action chase — we'll re-path below)
-            if path_blocked {
-                if state.auto_action_state.is_none() {
-                    state.auto_path = None;
-                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
-                    return commands;
-                } else {
-                    // Clear the blocked path so chase re-path can recalculate
-                    state.auto_path = None;
-                }
-            }
-
-            // Chase / auto-action re-pathfinding: if auto-action is active,
-            // ensure we have a valid path or are adjacent to the target.
-            // Handles NPCs, players, AND resources (trees/rocks).
+        // Chase / auto-action re-pathfinding: if auto-action is active,
+        // ensure we have a valid path or are adjacent to the target.
+        // Handles NPCs, players, AND resources (trees/rocks).
+        // This runs even during attack animations so chase can recover immediately.
+        if dx == 0.0 && dy == 0.0 {
             if let (Some(ref aa), Some((player_x, player_y))) =
                 (&state.auto_action_state, player_pos)
             {
@@ -5223,37 +5191,68 @@ impl InputHandler {
                     }
                 }
             }
+        }
+
+        // Path following - generate movement commands when auto-pathing
+        // Only follow path if not manually moving and not attacking
+        if dx == 0.0 && dy == 0.0 && !is_attacking {
+            // Check if next waypoint is blocked by an entity - if so, cancel path
+            let mut path_blocked = false;
+            if let (Some((player_x, player_y)), Some(ref path_state)) =
+                (player_pos, &state.auto_path)
+            {
+                if path_state.current_index < path_state.path.len() {
+                    let (next_x, next_y) = path_state.path[path_state.current_index];
+                    if player_x != next_x || player_y != next_y {
+                        let occupied = build_occupied_set(state);
+                        if occupied.contains(&(next_x, next_y)) {
+                            path_blocked = true;
+                        }
+                    }
+                }
+            }
+
+            if path_blocked {
+                if state.auto_action_state.is_none() {
+                    state.auto_path = None;
+                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                    return commands;
+                } else {
+                    // Clear the blocked path — chase re-path will recalculate next frame
+                    state.auto_path = None;
+                }
+            }
 
             if let (Some((player_x, player_y)), Some(ref mut path_state)) =
                 (player_pos, &mut state.auto_path)
             {
-                // Check if we've reached the current waypoint
-                if path_state.current_index < path_state.path.len() {
-                    let (target_x, target_y) = path_state.path[path_state.current_index];
-
-                    if player_x == target_x && player_y == target_y {
-                        // Move to next waypoint
+                // Skip past any waypoints the player has already reached
+                while path_state.current_index < path_state.path.len() {
+                    let (wx, wy) = path_state.path[path_state.current_index];
+                    if player_x == wx && player_y == wy {
                         path_state.current_index += 1;
+                    } else {
+                        break;
                     }
+                }
 
-                    // Generate movement toward current waypoint
-                    if path_state.current_index < path_state.path.len() {
-                        let (next_x, next_y) = path_state.path[path_state.current_index];
-                        let move_dx = (next_x - player_x).signum() as f32;
-                        let move_dy = (next_y - player_y).signum() as f32;
+                // Generate movement toward current waypoint
+                if path_state.current_index < path_state.path.len() {
+                    let (next_x, next_y) = path_state.path[path_state.current_index];
+                    let move_dx = (next_x - player_x).signum() as f32;
+                    let move_dy = (next_y - player_y).signum() as f32;
 
-                        // Only move in one direction at a time (grid-based movement)
-                        if move_dx != 0.0 {
-                            commands.push(InputCommand::Move {
-                                dx: move_dx,
-                                dy: 0.0,
-                            });
-                        } else if move_dy != 0.0 {
-                            commands.push(InputCommand::Move {
-                                dx: 0.0,
-                                dy: move_dy,
-                            });
-                        }
+                    // Only move in one direction at a time (grid-based movement)
+                    if move_dx != 0.0 {
+                        commands.push(InputCommand::Move {
+                            dx: move_dx,
+                            dy: 0.0,
+                        });
+                    } else if move_dy != 0.0 {
+                        commands.push(InputCommand::Move {
+                            dx: 0.0,
+                            dy: move_dy,
+                        });
                     }
                 }
             }

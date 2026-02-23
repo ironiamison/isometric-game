@@ -25,7 +25,7 @@ impl Renderer {
 
         let s = state.ui_state.ui_scale;
         let sprite_area = 24.0 * s;
-        let font_sz = 14.0;
+        let font_sz = 16.0;
         let padding = 3.0 * s;
         let count_text = format!("{}/{}", task.kills_current, task.kills_required);
         let count_dims = self.measure_text_sharp(&count_text, font_sz);
@@ -76,8 +76,24 @@ impl Renderer {
             font_sz,
             TEXT_NORMAL,
         );
+    }
 
-        // Hover tooltip
+    /// Render hover tooltip for slayer task chip (called after other overlapping UI)
+    pub(crate) fn render_slayer_task_chip_tooltip(&self, state: &GameState, x: f32, y: f32) {
+        let task = match &state.ui_state.slayer_current_task {
+            Some(t) => t,
+            None => return,
+        };
+
+        let s = state.ui_state.ui_scale;
+        let sprite_area = 24.0 * s;
+        let font_sz = 16.0;
+        let padding = 3.0 * s;
+        let count_text = format!("{}/{}", task.kills_current, task.kills_required);
+        let count_dims = self.measure_text_sharp(&count_text, font_sz);
+        let chip_w = (sprite_area + padding * 2.0).max(count_dims.width + padding * 2.0);
+        let chip_h = padding + sprite_area + 2.0 * s + count_dims.height + padding;
+
         let (raw_mx, raw_my) = mouse_position();
         let (vw, vh) = virtual_screen_size();
         let mx = raw_mx * vw / screen_width();
@@ -86,8 +102,8 @@ impl Renderer {
         if mx >= x && mx <= x + chip_w && my >= y && my <= y + chip_h {
             let tip_x = x + chip_w + 4.0 * s;
             let tip_y = y;
-            let tip_font = 14.0;
-            let line_h = 16.0 * s;
+            let tip_font = 16.0;
+            let line_h = 18.0 * s;
             let tip_pad = 6.0 * s;
 
             let lines = [

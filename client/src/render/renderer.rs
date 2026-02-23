@@ -8902,6 +8902,32 @@ impl Renderer {
             }
         }
 
+        // Slayer chip hover tooltip (rendered here so it draws on top of contract tracker)
+        if state.ui_state.slayer_current_task.is_some() {
+            if let Some(player) = state.get_local_player() {
+                let s = self.font_scale.get();
+                let font_size = 16.0;
+                let name = &player.name;
+                let level_text = format!(" Lv.{}", player.skills.total_level());
+                let name_w = self.measure_text_sharp(name, font_size).width;
+                let level_w = self.measure_text_sharp(&level_text, font_size).width;
+                let total_text_w = name_w + level_w;
+                let padding = 6.0;
+                let bar_width = (total_text_w + padding * 2.0).max(120.0 * s);
+                let bar_height = 18.0 * s;
+                let (bar_x, stats_y) = self.minimap_stats_stack_position(state, bar_width);
+                let mp_bar_y = stats_y + (bar_height + 4.0 * s);
+                let prayer_bar_y = mp_bar_y + bar_height + 4.0 * s;
+                let current_time = macroquad::time::get_time();
+                let is_skilling = state.is_gathering || state.is_woodcutting;
+                let has_dash_bar = state.dash_cooldown_end > current_time;
+                let chip_y = prayer_bar_y + bar_height + 4.0 * s
+                    + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
+                    + if has_dash_bar { 22.0 * s + 4.0 * s } else { 0.0 };
+                self.render_slayer_task_chip_tooltip(state, bar_x, chip_y);
+            }
+        }
+
         // Dialogue box (when active)
         if let Some(dialogue) = &state.ui_state.active_dialogue {
             self.render_dialogue(
