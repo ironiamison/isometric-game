@@ -660,103 +660,83 @@ impl Renderer {
         // Dark background for detail area
         draw_rectangle(x, y, w, h, Color::new(0.06, 0.08, 0.06, 0.5));
 
-        // ===== Progress bar showing craft time =====
-        let bar_y = y + 8.0 * s;
-        let bar_h = 18.0 * s;
-        let bar_x = x + 10.0 * s;
-        let bar_w = w - 20.0 * s;
-
-        draw_rectangle(bar_x, bar_y, bar_w, bar_h, SLOT_BORDER);
-        draw_rectangle(bar_x + 1.0, bar_y + 1.0, bar_w - 2.0, bar_h - 2.0, SLOT_BG_EMPTY);
-
-        // Show craft time text
-        let time_secs = recipe.craft_time_ms as f32 / 1000.0;
-        let time_text = if time_secs == time_secs.floor() {
-            format!("{} seconds", time_secs as u32)
-        } else {
-            format!("{:.1} seconds", time_secs)
-        };
-        let time_dims = self.measure_text_sharp(&time_text, 16.0);
-        self.draw_text_sharp(
-            &time_text,
-            bar_x + (bar_w - time_dims.width) / 2.0,
-            bar_y + bar_h * 0.73,
-            16.0,
-            TEXT_DIM,
-        );
-
-        // ===== Left: Large potion icon preview =====
-        let preview_size = 64.0 * s;
-        let preview_x = x + 20.0 * s;
-        let preview_y = bar_y + bar_h + 12.0 * s;
+        // ===== Row 1: Icon + Recipe name + Level/XP =====
+        let row1_y = y + 6.0 * s;
+        let icon_size = 40.0 * s;
+        let icon_x = x + 10.0 * s;
+        let icon_y = row1_y;
 
         if let Some(result) = recipe.results.first() {
-            // Background for icon
-            draw_rectangle(
-                preview_x - 4.0,
-                preview_y - 4.0,
-                preview_size + 8.0,
-                preview_size + 8.0,
-                SLOT_BORDER,
-            );
-            draw_rectangle(
-                preview_x - 3.0,
-                preview_y - 3.0,
-                preview_size + 6.0,
-                preview_size + 6.0,
-                SLOT_BG_EMPTY,
-            );
+            // Icon background
+            draw_rectangle(icon_x - 2.0, icon_y - 2.0, icon_size + 4.0, icon_size + 4.0, SLOT_BORDER);
+            draw_rectangle(icon_x - 1.0, icon_y - 1.0, icon_size + 2.0, icon_size + 2.0, SLOT_BG_EMPTY);
 
             self.draw_item_icon(
                 &result.item_id,
-                preview_x,
-                preview_y,
-                preview_size,
-                preview_size,
+                icon_x,
+                icon_y,
+                icon_size,
+                icon_size,
                 state,
                 true,
             );
-
-            // Recipe name below icon
-            let name_dims = self.measure_text_sharp(&recipe.display_name, 16.0);
-            let name_x = preview_x + (preview_size - name_dims.width) / 2.0;
-            self.draw_text_sharp(
-                &recipe.display_name,
-                name_x.max(preview_x - 4.0),
-                preview_y + preview_size + 16.0 * s,
-                16.0,
-                TEXT_TITLE,
-            );
-
-            // Level + XP info below name
-            let mut info_parts = Vec::new();
-            if recipe.level_required > 1 {
-                info_parts.push(format!("Lv{}", recipe.level_required));
-            }
-            if recipe.xp > 0 {
-                info_parts.push(format!("{}xp", recipe.xp));
-            }
-            if !info_parts.is_empty() {
-                let info_text = info_parts.join(" · ");
-                self.draw_text_sharp(
-                    &info_text,
-                    preview_x,
-                    preview_y + preview_size + 32.0 * s,
-                    16.0,
-                    TEXT_DIM,
-                );
-            }
         }
 
-        // ===== Right: Ingredient list =====
-        let ing_x = x + preview_size + 50.0 * s;
-        let ing_y = bar_y + bar_h + 12.0 * s;
-        let ing_w = w - (ing_x - x) - 10.0 * s;
+        // Recipe name to the right of icon
+        let text_x = icon_x + icon_size + 10.0 * s;
+        self.draw_text_sharp(
+            &recipe.display_name,
+            text_x,
+            row1_y + 16.0 * s,
+            16.0,
+            TEXT_TITLE,
+        );
 
-        self.draw_text_sharp("Ingredients:", ing_x, ing_y + 12.0 * s, 16.0, TEXT_NORMAL);
+        // Level + XP + time info on second line
+        let mut info_parts = Vec::new();
+        if recipe.level_required > 1 {
+            info_parts.push(format!("Lv{}", recipe.level_required));
+        }
+        if recipe.xp > 0 {
+            info_parts.push(format!("{}xp", recipe.xp));
+        }
+        if recipe.craft_time_ms > 0 {
+            let time_secs = recipe.craft_time_ms as f32 / 1000.0;
+            if time_secs == time_secs.floor() {
+                info_parts.push(format!("{}s", time_secs as u32));
+            } else {
+                info_parts.push(format!("{:.1}s", time_secs));
+            }
+        }
+        if !info_parts.is_empty() {
+            let info_text = info_parts.join(" · ");
+
+            // Level color
+            let info_color = if recipe.level_required > 1 {
+                if let Some(player) = state.get_local_player() {
+                    if player.skills.alchemy.level < recipe.level_required {
+                        Color::new(0.784, 0.314, 0.314, 1.0)
+                    } else {
+                        TEXT_DIM
+                    }
+                } else {
+                    TEXT_DIM
+                }
+            } else {
+                TEXT_DIM
+            };
+
+            self.draw_text_sharp(&info_text, text_x, row1_y + 34.0 * s, 16.0, info_color);
+        }
+
+        // ===== Row 2: Ingredient list (below icon row) =====
+        let ing_y = row1_y + icon_size + 8.0 * s;
+        let ing_x = x + 10.0 * s;
+        let ing_icon_size = 22.0 * s;
+        let ing_row_h = 22.0 * s;
 
         let mut can_craft = true;
-        let mut iy = ing_y + 28.0 * s;
+        let mut iy = ing_y;
 
         for ing in &recipe.ingredients {
             let have = state.inventory.count_item_by_id(&ing.item_id);
@@ -767,18 +747,17 @@ impl Renderer {
             }
 
             // Small ingredient icon
-            let ing_icon_size = 24.0 * s;
             self.draw_item_icon(
                 &ing.item_id,
                 ing_x,
-                iy - ing_icon_size * 0.6,
+                iy,
                 ing_icon_size,
                 ing_icon_size,
                 state,
                 true,
             );
 
-            // Ingredient text: "name  required/inventory"
+            // "name  required/inventory"
             let req_text = format!("{} {}/{}", name, ing.count, have);
             let color = if have >= ing.count {
                 Color::new(0.392, 0.784, 0.392, 1.0)
@@ -789,12 +768,12 @@ impl Renderer {
             self.draw_text_sharp(
                 &req_text,
                 ing_x + ing_icon_size + 6.0 * s,
-                iy,
+                iy + ing_icon_size * 0.72,
                 16.0,
                 color,
             );
 
-            iy += 24.0 * s;
+            iy += ing_row_h + 2.0 * s;
         }
 
         // Level check
@@ -802,22 +781,12 @@ impl Renderer {
             if let Some(player) = state.get_local_player() {
                 if player.skills.alchemy.level < recipe.level_required {
                     can_craft = false;
-
-                    // Show level requirement warning
-                    let warn_text = format!("Requires Alchemy level {}", recipe.level_required);
-                    self.draw_text_sharp(
-                        &warn_text,
-                        ing_x,
-                        iy + 4.0 * s,
-                        16.0,
-                        Color::new(0.784, 0.314, 0.314, 1.0),
-                    );
                 }
             }
         }
 
         // ===== Bottom: Quantity + Brew + Cancel buttons =====
-        let btn_y = y + h - 36.0 * s;
+        let btn_y = y + h - 32.0 * s;
         let btn_area_x = x + 10.0 * s;
 
         // Quantity: [-] [N] [+]

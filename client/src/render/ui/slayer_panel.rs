@@ -11,9 +11,9 @@ use macroquad::prelude::*;
 const REWARD_ROW_HEIGHT: f32 = 44.0;
 const REWARD_ROW_SPACING: f32 = 4.0;
 /// Tab names for reward shop categories
-const TAB_NAMES: [&str; 3] = ["Potions", "Unlocks", "Blocks"];
+const TAB_NAMES: [&str; 4] = ["Potions", "Unlocks", "Equipment", "Blocks"];
 /// Tab category keys matching server data
-const TAB_CATEGORIES: [&str; 3] = ["potion", "unlock", "block"];
+const TAB_CATEGORIES: [&str; 4] = ["potion", "unlock", "equipment", "block"];
 
 impl Renderer {
     /// Render a small HUD chip below the stat bars showing current slayer task

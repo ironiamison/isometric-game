@@ -2110,15 +2110,28 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .map(|r| r.display_name.clone())
                     .unwrap_or_else(|| recipe_id.clone());
 
+                let verb = state
+                    .recipe_definitions
+                    .iter()
+                    .find(|r| r.id == recipe_id)
+                    .and_then(|r| r.station.as_deref())
+                    .map(|st| match st {
+                        "furnace" => "Smelted",
+                        "alchemy_station" => "Brewed",
+                        _ => "Crafted",
+                    })
+                    .unwrap_or("Crafted");
+
                 if state.ui_state.batch_total > 1 {
                     state.push_system_chat(format!(
-                            "Smelted: {} ({}/{})",
+                            "{}: {} ({}/{})",
+                            verb,
                             display_name,
                             state.ui_state.batch_completed,
                             state.ui_state.batch_total
                         ));
                 } else {
-                    state.push_system_chat(format!("Crafted: {}", display_name));
+                    state.push_system_chat(format!("{}: {}", verb, display_name));
                 }
 
                 // Play furnace sound on successful smelt/craft
