@@ -3527,6 +3527,9 @@ async fn handle_client_message(
         ClientMessage::BankWithdrawGold { amount } => {
             room.handle_bank_withdraw_gold(player_id, amount).await;
         }
+        ClientMessage::BankDepositAll => {
+            room.handle_bank_deposit_all(player_id).await;
+        }
 
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
         ClientMessage::StartCraftBatch {

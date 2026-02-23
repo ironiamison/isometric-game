@@ -337,6 +337,7 @@ pub enum InputCommand {
     BankWithdrawGold {
         amount: i32,
     },
+    BankDepositAll,
     // Portal commands
     EnterPortal {
         portal_id: String,
@@ -1162,14 +1163,49 @@ impl InputHandler {
                                     return commands;
                                 }
 
-                                // Start drag from the inventory slot
-                                state.ui_state.drag_state = Some(DragState {
-                                    source: DragSource::Inventory(inv_idx),
-                                    item_id: slot.item_id.clone(),
-                                    quantity: slot.quantity,
-                                });
-                                audio.play_sfx("item_grab");
-                                return commands;
+                                // Check for double-click to equip/use
+                                let is_double_click = state
+                                    .ui_state
+                                    .double_click_state
+                                    .last_click_slot
+                                    == Some(inv_idx)
+                                    && current_time
+                                        - state.ui_state.double_click_state.last_click_time
+                                        < DOUBLE_CLICK_THRESHOLD;
+
+                                if is_double_click {
+                                    // Reset double-click state
+                                    state.ui_state.double_click_state.last_click_slot = None;
+                                    state.ui_state.double_click_state.last_click_time = 0.0;
+
+                                    let item_def =
+                                        state.item_registry.get_or_placeholder(&slot.item_id);
+                                    if item_def.equipment.is_some() {
+                                        commands.push(InputCommand::Equip {
+                                            slot_index: inv_idx as u8,
+                                        });
+                                    } else {
+                                        commands.push(InputCommand::UseItem {
+                                            slot_index: inv_idx as u8,
+                                        });
+                                    }
+                                    return commands;
+                                } else {
+                                    // First click - record for potential double-click
+                                    state.ui_state.double_click_state.last_click_slot =
+                                        Some(inv_idx);
+                                    state.ui_state.double_click_state.last_click_time =
+                                        current_time;
+
+                                    // Start drag from the inventory slot
+                                    state.ui_state.drag_state = Some(DragState {
+                                        source: DragSource::Inventory(inv_idx),
+                                        item_id: slot.item_id.clone(),
+                                        quantity: slot.quantity,
+                                    });
+                                    audio.play_sfx("item_grab");
+                                    return commands;
+                                }
                             }
                         }
                         // In spell mode, no drag from spell bar
@@ -2952,6 +2988,11 @@ impl InputHandler {
                                     state.pending_sfx.push("enter".to_string());
                                 }
                             }
+                            return commands;
+                        }
+                        UiElementId::BankDepositAllButton => {
+                            commands.push(InputCommand::BankDepositAll);
+                            state.pending_sfx.push("enter".to_string());
                             return commands;
                         }
                         _ => {}
@@ -5168,24 +5209,48 @@ impl InputHandler {
                         // back to us. Only re-path if the target is far away (fleeing,
                         // returning to spawn, etc.) or we haven't started combat yet.
                         let should_chase = if is_confirmed {
-                            distance > 2
+                            distance > 3
                         } else {
                             true // Initial approach — always chase
                         };
 
                         if should_chase {
                             let needs_repath = if let Some(ref path_state) = state.auto_path {
-                                // Destination no longer adjacent to the target (target moved)
+                                // Destination no longer adjacent to the target (target moved).
+                                // Use a tolerance of 2 so we don't re-path every time the
+                                // NPC moves a single tile — finish the current path first.
                                 let dest_dist = (path_state.destination.0 - tx).abs()
                                     + (path_state.destination.1 - ty).abs();
-                                dest_dist > 1
+                                dest_dist > 2
                             } else {
                                 // No path at all — need one
                                 true
                             };
 
-                            if needs_repath {
-                                let occupied = build_occupied_set(state);
+                            // Throttle re-pathing to at most once per 300ms to prevent
+                            // jerky direction changes when chasing moving targets.
+                            const REPATH_COOLDOWN: f64 = 0.3;
+                            let repath_allowed = current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
+
+                            if needs_repath && repath_allowed {
+                                // Exclude chase target from occupied set so the target
+                                // doesn't block our path when it moves onto our route.
+                                let mut occupied = build_occupied_set(state);
+                                if let Some(ref aa) = state.auto_action_state {
+                                    match aa.target_type.as_str() {
+                                        "npc" => {
+                                            if let Some(npc) = state.npcs.get(&aa.target_id) {
+                                                occupied.remove(&(npc.server_x.round() as i32, npc.server_y.round() as i32));
+                                            }
+                                        }
+                                        "player" => {
+                                            if let Some(p) = state.players.get(&aa.target_id) {
+                                                occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                     (player_x, player_y),
@@ -5201,6 +5266,7 @@ impl InputHandler {
                                         pickup_target: None,
                                         interact_target: None,
                                     });
+                                    state.last_chase_repath_time = current_time;
                                 }
                             }
                         }
@@ -5212,7 +5278,9 @@ impl InputHandler {
         // Path following - generate movement commands when auto-pathing
         // Only follow path if not manually moving and not attacking
         if dx == 0.0 && dy == 0.0 && !is_attacking {
-            // Check if next waypoint is blocked by an entity - if so, cancel path
+            // Check if next waypoint is blocked by an entity - if so, cancel path.
+            // When chasing a target, exclude that target from the blocked check so
+            // the target moving onto our path doesn't cause constant re-pathing.
             let mut path_blocked = false;
             if let (Some((player_x, player_y)), Some(ref path_state)) =
                 (player_pos, &state.auto_path)
@@ -5220,7 +5288,23 @@ impl InputHandler {
                 if path_state.current_index < path_state.path.len() {
                     let (next_x, next_y) = path_state.path[path_state.current_index];
                     if player_x != next_x || player_y != next_y {
-                        let occupied = build_occupied_set(state);
+                        let mut occupied = build_occupied_set(state);
+                        // Exclude chase target from blocked check
+                        if let Some(ref aa) = state.auto_action_state {
+                            match aa.target_type.as_str() {
+                                "npc" => {
+                                    if let Some(npc) = state.npcs.get(&aa.target_id) {
+                                        occupied.remove(&(npc.server_x.round() as i32, npc.server_y.round() as i32));
+                                    }
+                                }
+                                "player" => {
+                                    if let Some(p) = state.players.get(&aa.target_id) {
+                                        occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                         if occupied.contains(&(next_x, next_y)) {
                             path_blocked = true;
                         }

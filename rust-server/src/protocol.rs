@@ -227,6 +227,10 @@ pub enum ClientMessage {
     #[serde(rename = "bankWithdrawGold")]
     BankWithdrawGold { amount: i32 },
 
+    /// Deposit all inventory items into bank
+    #[serde(rename = "bankDepositAll")]
+    BankDepositAll,
+
     /// Player starts a batch craft (furnace smelting with quantity)
     #[serde(rename = "startCraftBatch")]
     StartCraftBatch { recipe_id: String, quantity: u32 },
@@ -319,6 +323,7 @@ impl ClientMessage {
             ClientMessage::BankWithdraw { .. } => "BankWithdraw",
             ClientMessage::BankDepositGold { .. } => "BankDepositGold",
             ClientMessage::BankWithdrawGold { .. } => "BankWithdrawGold",
+            ClientMessage::BankDepositAll => "BankDepositAll",
             ClientMessage::StartCraftBatch { .. } => "StartCraftBatch",
             ClientMessage::Ping { .. } => "Ping",
             ClientMessage::SlayerGetTask { .. } => "slayerGetTask",

@@ -685,6 +685,7 @@ fn run_game_frame(
             InputCommand::BankWithdrawGold { amount } => {
                 ClientMessage::BankWithdrawGold { amount: *amount }
             }
+            InputCommand::BankDepositAll => ClientMessage::BankDepositAll,
             // Portal commands
             InputCommand::EnterPortal { portal_id } => ClientMessage::EnterPortal {
                 portal_id: portal_id.clone(),

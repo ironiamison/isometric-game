@@ -210,10 +210,41 @@ impl Renderer {
         let hdr2_dims = self.measure_text_sharp(hdr2, 16.0);
         self.draw_text_sharp(
             hdr2,
-            right_x + (inv_grid_w - hdr2_dims.width) / 2.0,
+            right_x + 4.0 * s,
             content_y + col_header_h * 0.65,
             16.0,
             TEXT_TITLE,
+        );
+
+        // Deposit All button (right side of inventory header)
+        let da_text = "Deposit All";
+        let da_text_dims = self.measure_text_sharp(da_text, 16.0);
+        let da_btn_w = da_text_dims.width + 10.0 * s;
+        let da_btn_h = col_header_h - 6.0;
+        let da_btn_x = right_x + inv_grid_w - da_btn_w - 4.0 * s;
+        let da_btn_y = content_y + 3.0;
+        let da_rect = Rect::new(da_btn_x, da_btn_y, da_btn_w, da_btn_h);
+        layout.add(UiElementId::BankDepositAllButton, da_rect);
+        let da_hovered = matches!(hovered, Some(UiElementId::BankDepositAllButton));
+        let da_bg = if da_hovered {
+            Color::new(0.15, 0.25, 0.3, 1.0)
+        } else {
+            Color::new(0.1, 0.17, 0.2, 1.0)
+        };
+        draw_rectangle(da_btn_x, da_btn_y, da_btn_w, da_btn_h, SLOT_BORDER);
+        draw_rectangle(
+            da_btn_x + 1.0,
+            da_btn_y + 1.0,
+            da_btn_w - 2.0,
+            da_btn_h - 2.0,
+            da_bg,
+        );
+        self.draw_text_sharp(
+            da_text,
+            da_btn_x + (da_btn_w - da_text_dims.width) / 2.0,
+            da_btn_y + da_btn_h * 0.71,
+            16.0,
+            if da_hovered { TEXT_NORMAL } else { TEXT_DIM },
         );
 
         // Divider

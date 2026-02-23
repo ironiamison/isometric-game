@@ -58,7 +58,7 @@ pub struct PlayerWoodcuttingState {
 
 /// Swing interval in milliseconds (how often the player swings their axe)
 /// Base swing interval - matches client attack cooldown (800ms)
-pub const SWING_INTERVAL_MS: u64 = 800;
+pub const SWING_INTERVAL_MS: u64 = 1200;
 
 #[derive(Debug, Clone)]
 pub struct ChopResult {

@@ -1596,6 +1596,9 @@ pub struct GameState {
     /// Active auto-action state (OSRS-style click-to-act chase)
     pub auto_action_state: Option<AutoActionState>,
 
+    /// Timestamp of last chase re-path to throttle re-pathing frequency
+    pub last_chase_repath_time: f64,
+
     // Performance diagnostics (visible in debug mode)
     pub frame_timings: FrameTimings,
 
@@ -1720,6 +1723,7 @@ impl GameState {
             hovered_entity_id: None,
             auto_path: None,
             auto_action_state: None,
+            last_chase_repath_time: 0.0,
             frame_timings: FrameTimings::default(),
             map_transition: MapTransition::default(),
             current_interior: None,

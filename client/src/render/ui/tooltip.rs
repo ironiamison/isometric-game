@@ -145,6 +145,20 @@ impl Renderer {
                     return;
                 }
             }
+            Some(UiElementId::BankSlot(idx)) if state.ui_state.bank_open => {
+                if let Some(Some((item_id, quantity))) = state.ui_state.bank_slots.get(*idx) {
+                    (item_id.clone(), *quantity)
+                } else {
+                    return;
+                }
+            }
+            Some(UiElementId::BankInventorySlot(idx)) if state.ui_state.bank_open => {
+                if let Some(slot) = state.inventory.slots.get(*idx).and_then(|s| s.as_ref()) {
+                    (slot.item_id.clone(), slot.quantity)
+                } else {
+                    return;
+                }
+            }
             _ => return,
         };
 

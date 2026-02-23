@@ -37,6 +37,7 @@ const STARTING_HP: i32 = 100;
 // Combat constants
 const ATTACK_RANGE: i32 = 1; // Maximum distance to attack (in tiles)
 const ATTACK_COOLDOWN_MS: u64 = 700; // Slightly shorter than client (800ms) to account for network latency
+const GATHER_COOLDOWN_MS: u64 = 1100; // Cooldown for mining/woodcutting swings (slightly under 1200ms swing interval)
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
 const REGEN_INTERVAL_MS: u64 = 30000;
 
@@ -7380,6 +7381,51 @@ impl GameRoom {
         self.send_to_player(player_id, bank_msg).await;
     }
 
+    /// Deposit all inventory items into bank
+    pub async fn handle_bank_deposit_all(&self, player_id: &str) {
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        // Collect items to deposit (item_id, quantity pairs)
+        let items_to_deposit: Vec<(String, i32)> = player
+            .inventory
+            .slots
+            .iter()
+            .filter_map(|slot| {
+                slot.as_ref()
+                    .map(|s| (s.item_id.clone(), s.quantity))
+            })
+            .collect();
+
+        if items_to_deposit.is_empty() {
+            return;
+        }
+
+        // Deposit each item, skipping any that don't fit
+        for (item_id, quantity) in &items_to_deposit {
+            if player.bank.has_space_for(item_id, *quantity, &self.item_registry) {
+                player.inventory.remove_item(item_id, *quantity);
+                player.bank.add_item(item_id, *quantity, &self.item_registry);
+            }
+        }
+
+        let inv_msg = ServerMessage::InventoryUpdate {
+            player_id: player_id.to_string(),
+            slots: player.inventory.to_update(),
+            gold: player.inventory.gold,
+        };
+        let bank_msg = ServerMessage::BankUpdate {
+            slots: player.bank.to_update(),
+            gold: player.bank.gold,
+        };
+        drop(players);
+        self.send_to_player(player_id, inv_msg).await;
+        self.send_to_player(player_id, bank_msg).await;
+    }
+
     /// Handle shop buy transaction
     pub async fn handle_shop_buy(
         &self,
@@ -12243,7 +12289,7 @@ impl GameRoom {
                                 let dy = (player.y - y).abs();
                                 let adjacent = (dx + dy) == 1;
                                 let cooldown_ready =
-                                    current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
+                                    current_time - player.last_attack_time >= GATHER_COOLDOWN_MS;
                                 let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
                                 (adjacent, cooldown_ready, inventory_full)
                             } else {
@@ -12289,7 +12335,7 @@ impl GameRoom {
                                 let dy = (player.y - y).abs();
                                 let adjacent = (dx + dy) == 1;
                                 let cooldown_ready =
-                                    current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
+                                    current_time - player.last_attack_time >= GATHER_COOLDOWN_MS;
                                 let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
                                 (adjacent, cooldown_ready, inventory_full)
                             } else {
