@@ -2134,10 +2134,16 @@ impl Renderer {
                 true
             }
         };
+        let is_interior = state.chunk_manager.get_interior_size().is_some();
         let npc_in_loaded_chunk = |x: f32, y: f32| -> bool {
-            let chunk_x = (x.floor() as i32).div_euclid(CHUNK_SIZE as i32);
-            let chunk_y = (y.floor() as i32).div_euclid(CHUNK_SIZE as i32);
-            loaded_chunk_coords.contains(&(chunk_x, chunk_y))
+            if is_interior {
+                // In interiors, all data is in chunk (0,0) regardless of world position
+                loaded_chunk_coords.contains(&(0, 0))
+            } else {
+                let chunk_x = (x.floor() as i32).div_euclid(CHUNK_SIZE as i32);
+                let chunk_y = (y.floor() as i32).div_euclid(CHUNK_SIZE as i32);
+                loaded_chunk_coords.contains(&(chunk_x, chunk_y))
+            }
         };
 
         if let Some(player) = state.get_local_player() {
@@ -2150,14 +2156,18 @@ impl Renderer {
         }
 
         let mut teleport_markers: Vec<MinimapMarker> = Vec::new();
+        let interior_size = state.chunk_manager.get_interior_size();
         for (coord, chunk) in state.chunk_manager.chunks().iter() {
             let base_x = coord.x * CHUNK_SIZE as i32;
             let base_y = coord.y * CHUNK_SIZE as i32;
             if let Some(b) = bounds {
-                let chunk_min_x = base_x as f32;
-                let chunk_min_y = base_y as f32;
-                let chunk_max_x = chunk_min_x + CHUNK_SIZE as f32;
-                let chunk_max_y = chunk_min_y + CHUNK_SIZE as f32;
+                let (chunk_min_x, chunk_min_y, chunk_max_x, chunk_max_y) = if let Some((w, h)) = interior_size {
+                    (0.0f32, 0.0f32, w as f32, h as f32)
+                } else {
+                    let min_x = base_x as f32;
+                    let min_y = base_y as f32;
+                    (min_x, min_y, min_x + CHUNK_SIZE as f32, min_y + CHUNK_SIZE as f32)
+                };
                 if chunk_max_x < b.min_x - bounds_margin
                     || chunk_min_x > b.max_x + bounds_margin
                     || chunk_max_y < b.min_y - bounds_margin
