@@ -3417,7 +3417,7 @@ impl GameRoom {
         self.send_to_player(player_id, msg).await;
     }
 
-    pub async fn handle_attack(&self, player_id: &str) {
+    pub async fn handle_attack(&self, player_id: &str, direction_override: Option<Direction>) {
         // Determine attacker's instance context (None = overworld)
         let attacker_instance = self.player_instances.read().await.get(player_id).cloned();
 
@@ -3427,6 +3427,8 @@ impl GameRoom {
             .as_millis() as u64;
 
         // Get attacker info including combat stats
+        // When direction_override is provided (auto-action), atomically set and read the
+        // direction in the same lock to prevent race conditions with client Face commands.
         let (
             attacker_name,
             attacker_x,
@@ -3437,8 +3439,8 @@ impl GameRoom {
             attack_bonus,
             strength_bonus,
         ) = {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
                 Some(p) => p,
                 None => {
                     tracing::warn!("Attack failed: player {} not found", player_id);
@@ -3449,6 +3451,11 @@ impl GameRoom {
             // Dead players can't attack
             if player.is_dead {
                 return;
+            }
+
+            // Apply direction override atomically before reading direction
+            if let Some(dir) = direction_override {
+                player.direction = dir;
             }
 
             let base_atk_bonus = player.attack_bonus(&self.item_registry);
@@ -12115,20 +12122,21 @@ impl GameRoom {
                         };
 
                         if in_range && cooldown_ready {
-                            // Auto-face toward target before attacking
-                            {
+                            // Compute facing direction toward NPC target
+                            let face_dir = {
                                 let npcs = self.npcs.read().await;
-                                if let Some(npc) = npcs.get(npc_id) {
-                                    let mut players = self.players.write().await;
-                                    if let Some(player) = players.get_mut(&pid) {
+                                let players = self.players.read().await;
+                                match (npcs.get(npc_id), players.get(&pid)) {
+                                    (Some(npc), Some(player)) => {
                                         let dx = npc.x - player.x;
                                         let dy = npc.y - player.y;
-                                        player.direction = direction_from_delta(dx, dy);
+                                        Some(direction_from_delta(dx, dy))
                                     }
+                                    _ => None,
                                 }
-                            }
-                            // Reuse existing attack handler
-                            self.handle_attack(&pid).await;
+                            };
+                            // Direction override is applied atomically inside handle_attack
+                            self.handle_attack(&pid, face_dir).await;
                         }
                     }
 
@@ -12193,21 +12201,20 @@ impl GameRoom {
                         };
 
                         if in_range && cooldown_ready {
-                            // Auto-face toward target
-                            {
-                                let mut players = self.players.write().await;
-                                let target_pos = players
-                                    .get(target_pid.as_str())
-                                    .map(|p| (p.x, p.y));
-                                if let Some((tx, ty)) = target_pos {
-                                    if let Some(player) = players.get_mut(&pid) {
-                                        let dx = tx - player.x;
-                                        let dy = ty - player.y;
-                                        player.direction = direction_from_delta(dx, dy);
+                            // Compute facing direction toward player target
+                            let face_dir = {
+                                let players = self.players.read().await;
+                                match (players.get(&pid), players.get(target_pid.as_str())) {
+                                    (Some(attacker), Some(target)) => {
+                                        let dx = target.x - attacker.x;
+                                        let dy = target.y - attacker.y;
+                                        Some(direction_from_delta(dx, dy))
                                     }
+                                    _ => None,
                                 }
-                            }
-                            self.handle_attack(&pid).await;
+                            };
+                            // Direction override is applied atomically inside handle_attack
+                            self.handle_attack(&pid, face_dir).await;
                         }
                     }
 
