@@ -818,13 +818,28 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let attack_type =
                     extract_string(value, "attack_type").unwrap_or_else(|| "melee".to_string());
 
-                // Trigger attack animation for remote players (local player handles own animation)
-                if state.local_player_id.as_ref() != Some(&player_id) {
+                // Trigger attack animation for remote players, or local player during auto-action
+                let is_local = state.local_player_id.as_ref() == Some(&player_id);
+                let is_auto_attack = is_local && state.auto_action_state.as_ref().map_or(false, |aa| aa.confirmed);
+                if !is_local || is_auto_attack {
                     if let Some(player) = state.players.get_mut(&player_id) {
                         match attack_type.as_str() {
                             "ranged" => player.play_shoot_bow(),
                             "spell" => player.play_cast(),
                             _ => player.play_attack(),
+                        }
+                    }
+                    // Also play attack sound for local auto-attacks
+                    if is_auto_attack {
+                        if let Some(player) = state.players.get(&player_id) {
+                            let sound_type = if attack_type == "ranged" {
+                                crate::game::state::AttackSoundType::Ranged
+                            } else if player.equipped_weapon.is_some() {
+                                crate::game::state::AttackSoundType::Melee
+                            } else {
+                                crate::game::state::AttackSoundType::Unarmed
+                            };
+                            state.pending_attack_sounds.push(sound_type);
                         }
                     }
                 }
@@ -1052,13 +1067,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     // Create floating XP event and system message for local player
                     if state.local_player_id.as_ref() == Some(&player_id) {
                         // Add system chat message
-                        state
-                            .ui_state
-                            .chat_messages
-                            .push(ChatMessage::system(format!(
+                        state.ui_state.chat_messages.push(ChatMessage::system(format!(
                                 "+{} {} XP",
                                 xp_gained, skill_name
                             )));
+                        state.ui_state.chat_revision = state.ui_state.chat_revision.wrapping_add(1);
 
                         state.skill_xp_events.push(SkillXpEvent {
                             x: player.x,
@@ -1220,13 +1233,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                     // Create floating level up event and system message for local player
                     if state.local_player_id.as_ref() == Some(&player_id) {
-                        state
-                            .ui_state
-                            .chat_messages
-                            .push(ChatMessage::system(format!(
+                        state.ui_state.chat_messages.push(ChatMessage::system(format!(
                                 "{} leveled up to {}!",
                                 skill_name, new_level
                             )));
+                        state.ui_state.chat_revision = state.ui_state.chat_revision.wrapping_add(1);
                         state.pending_sfx.push("level_up".to_string());
                     }
 
@@ -1731,13 +1742,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 );
 
                 // Add system chat message
-                state
-                    .ui_state
-                    .chat_messages
-                    .push(ChatMessage::system(format!(
+                state.push_system_chat(format!(
                         "Quest '{}' complete!",
                         quest_name
-                    )));
+                    ));
 
                 // Remove from active quests
                 state.ui_state.active_quests.retain(|q| q.id != quest_id);
@@ -1979,10 +1987,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 } else {
                     log::warn!("Crafting failed: {} - {:?}", recipe_id, error);
                     if let Some(err) = error {
-                        state
-                            .ui_state
-                            .chat_messages
-                            .push(ChatMessage::system(format!("Crafting failed: {}", err)));
+                        state.push_system_chat(format!("Crafting failed: {}", err));
                     }
                 }
             }
@@ -2019,13 +2024,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .map(|r| r.display_name.clone())
                         .unwrap_or_else(|| recipe_id.clone());
 
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!(
+                    state.push_system_chat(format!(
                             "Recipe learned: {}",
                             display_name
-                        )));
+                        ));
                     log::info!("Recipe discovered: {}", recipe_id);
                 }
             }
@@ -2056,13 +2058,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.crafting_progress = 0.0;
 
                 if !reason.is_empty() {
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!(
+                    state.push_system_chat(format!(
                             "Crafting cancelled: {}",
                             reason
-                        )));
+                        ));
                 }
             }
         }
@@ -2092,20 +2091,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .unwrap_or_else(|| recipe_id.clone());
 
                 if state.ui_state.batch_total > 1 {
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!(
+                    state.push_system_chat(format!(
                             "Smelted: {} ({}/{})",
                             display_name,
                             state.ui_state.batch_completed,
                             state.ui_state.batch_total
-                        )));
+                        ));
                 } else {
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!("Crafted: {}", display_name)));
+                    state.push_system_chat(format!("Crafted: {}", display_name));
                 }
 
                 // Play furnace sound on successful smelt/craft
@@ -2265,10 +2258,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 if !success {
                     if let Some(err) = error {
-                        state
-                            .ui_state
-                            .chat_messages
-                            .push(ChatMessage::system(format!("Bank: {}", err)));
+                        state.push_system_chat(format!("Bank: {}", err));
                     }
                 }
             }
@@ -2389,17 +2379,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             gold_change.abs()
                         )
                     };
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(message));
+                    state.push_system_chat(message);
                 } else if let Some(err) = error {
                     log::warn!("Shop transaction failed: {}", err);
                     // Show error in system chat
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!("Transaction failed: {}", err)));
+                    state.push_system_chat(format!("Transaction failed: {}", err));
                 }
             }
         }
@@ -2730,10 +2714,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         });
                     }
                     // Add chat message about the catch
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!("You caught a {}!", item_name)));
+                    state.push_system_chat(format!("You caught a {}!", item_name));
                 }
             }
         }
@@ -2749,10 +2730,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.is_gathering = false;
                     if reason == "inventory_full" {
-                        state
-                            .ui_state
-                            .chat_messages
-                            .push(ChatMessage::system("Your inventory is full!".to_string()));
+                        state.push_system_chat("Your inventory is full!".to_string());
                         state.pending_sfx.push("error".to_string());
                     }
                 }
@@ -2902,13 +2880,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .unwrap_or(item_id.clone());
 
                     // Add chat message about the chop
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!(
+                    state.push_system_chat(format!(
                             "You chopped some {}!",
                             item_name
-                        )));
+                        ));
                 }
             }
         }
@@ -3021,10 +2996,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if state.local_player_id.as_deref() == Some(&player_id) {
                     state.is_mining = false;
                     if reason == "inventory_full" {
-                        state
-                            .ui_state
-                            .chat_messages
-                            .push(ChatMessage::system("Your inventory is full!".to_string()));
+                        state.push_system_chat("Your inventory is full!".to_string());
                         state.pending_sfx.push("error".to_string());
                     }
                 }
@@ -3096,13 +3068,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .unwrap_or(item_id.clone());
 
                     // Add chat message about the mine
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!(
+                    state.push_system_chat(format!(
                             "You mined some {}!",
                             item_name
-                        )));
+                        ));
                 }
             }
         }
@@ -3558,10 +3527,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     if let Some(reason) = &reason {
                         log::info!("Spell cast failed: {}", reason);
                         // Add system chat message for failure feedback
-                        state
-                            .ui_state
-                            .chat_messages
-                            .push(ChatMessage::system(format!("Spell failed: {}", reason)));
+                        state.push_system_chat(format!("Spell failed: {}", reason));
                     }
                 }
             }
@@ -3576,13 +3542,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.refresh_high_ping_movement_mode();
                 // Only show in chat if it was a manual /ping (not auto-ping)
                 if !state.debug_mode {
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(format!(
+                    state.push_system_chat(format!(
                             "Ping: {}ms",
                             latency_ms.round() as i32
-                        )));
+                        ));
                 }
             }
         }
@@ -3625,13 +3588,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.slayer_current_task = None;
                 state.ui_state.slayer_points = total_points;
                 // Add a system message about task completion
-                state
-                    .ui_state
-                    .chat_messages
-                    .push(ChatMessage::system(format!(
+                state.push_system_chat(format!(
                         "Slayer task complete! {} - earned {} points (total: {}).",
                         display_name, points_awarded, total_points
-                    )));
+                    ));
             }
         }
 
@@ -3647,10 +3607,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 }
                 // Show message in chat
                 if let Some(msg) = message {
-                    state
-                        .ui_state
-                        .chat_messages
-                        .push(ChatMessage::system(msg));
+                    state.push_system_chat(msg);
                 }
             }
         }
@@ -3665,14 +3622,33 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "autoActionStarted" => {
+            if let Some(value) = data {
+                let target_type = extract_string(value, "target_type").unwrap_or_default();
+                let target_id = extract_string(value, "target_id").unwrap_or_default();
+                let action = extract_string(value, "action").unwrap_or_default();
+                if let Some(ref mut aa) = state.auto_action_state {
+                    aa.confirmed = true;
+                }
+                log::debug!("Auto-action started: {} {} {}", action, target_type, target_id);
+            }
+        }
+
+        "autoActionStopped" => {
+            if let Some(value) = data {
+                let reason = extract_string(value, "reason").unwrap_or_default();
+                state.auto_action_state = None;
+                // Also clear auto-path if we were chasing
+                state.auto_path = None;
+                log::debug!("Auto-action stopped: {}", reason);
+            }
+        }
+
         "error" => {
             if let Some(value) = data {
                 let message = extract_string(value, "message").unwrap_or_default();
                 log::warn!("Server error: {}", message);
-                state
-                    .ui_state
-                    .chat_messages
-                    .push(ChatMessage::system(message));
+                state.push_system_chat(message);
                 state.pending_sfx.push("error".to_string());
             }
         }

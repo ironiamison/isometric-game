@@ -2200,13 +2200,16 @@ impl GameRoom {
     }
 
     pub async fn handle_move(&self, player_id: &str, dx: f32, dy: f32, seq: Option<u32>) {
-        // Auto-action interrupt: any manual movement cancels auto-action
-        let had_auto_action = {
-            let players = self.players.read().await;
-            players.get(player_id).map_or(false, |p| p.auto_action.is_some())
-        };
-        if had_auto_action {
-            self.clear_auto_action(player_id, "interrupted").await;
+        // Auto-action interrupt: actual movement (non-zero) cancels auto-action
+        // Zero-velocity (stop commands) should not interrupt auto-action
+        if dx != 0.0 || dy != 0.0 {
+            let had_auto_action = {
+                let players = self.players.read().await;
+                players.get(player_id).map_or(false, |p| p.auto_action.is_some())
+            };
+            if had_auto_action {
+                self.clear_auto_action(player_id, "interrupted").await;
+            }
         }
 
         let mut chair_to_free: Option<(i32, i32)> = None;
@@ -8925,6 +8928,14 @@ impl GameRoom {
             woodcutting.chop_once(tree_x, tree_y, tree_gid, woodcutting_level, current_time);
         drop(woodcutting);
 
+        // Update last_attack_time so auto-action cooldown is enforced
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.last_attack_time = current_time;
+            }
+        }
+
         match chop_result {
             Ok(result) => {
                 // Broadcast the swing animation to all players
@@ -9170,6 +9181,14 @@ impl GameRoom {
         let mut mining = self.mining.write().await;
         let mine_result = mining.mine_once(rock_x, rock_y, rock_gid, mining_level, current_time);
         drop(mining);
+
+        // Update last_attack_time so auto-action cooldown is enforced
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.last_attack_time = current_time;
+            }
+        }
 
         match mine_result {
             Ok(result) => {
@@ -12087,8 +12106,13 @@ impl GameRoom {
                                 } else {
                                     1
                                 };
-                                let in_range = dx <= weapon_range && dy <= weapon_range
-                                    && (dx > 0 || dy > 0);
+                                // Cardinal adjacency only for melee (dx+dy==range, no diagonal)
+                                let in_range = if weapon_range == 1 {
+                                    (dx + dy) == 1
+                                } else {
+                                    dx <= weapon_range && dy <= weapon_range
+                                        && (dx > 0 || dy > 0)
+                                };
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
                                 (in_range, cooldown_ready)
@@ -12160,8 +12184,13 @@ impl GameRoom {
                                 } else {
                                     1
                                 };
-                                let in_range = dx <= weapon_range && dy <= weapon_range
-                                    && (dx > 0 || dy > 0);
+                                // Cardinal adjacency only for melee (dx+dy==range, no diagonal)
+                                let in_range = if weapon_range == 1 {
+                                    (dx + dy) == 1
+                                } else {
+                                    dx <= weapon_range && dy <= weapon_range
+                                        && (dx > 0 || dy > 0)
+                                };
                                 let cooldown_ready =
                                     current_time - attacker.last_attack_time >= ATTACK_COOLDOWN_MS;
                                 (in_range, cooldown_ready)
@@ -12200,14 +12229,13 @@ impl GameRoom {
                             continue;
                         }
 
-                        // Check adjacency and cooldown
+                        // Check cardinal adjacency and cooldown
                         let (adjacent, cooldown_ready, inventory_full) = {
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
                                 let dx = (player.x - x).abs();
                                 let dy = (player.y - y).abs();
-                                let adjacent =
-                                    (dx <= 1 && dy <= 1) && (dx > 0 || dy > 0);
+                                let adjacent = (dx + dy) == 1;
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
                                 let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
@@ -12247,14 +12275,13 @@ impl GameRoom {
                             continue;
                         }
 
-                        // Check adjacency and cooldown
+                        // Check cardinal adjacency and cooldown
                         let (adjacent, cooldown_ready, inventory_full) = {
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
                                 let dx = (player.x - x).abs();
                                 let dy = (player.y - y).abs();
-                                let adjacent =
-                                    (dx <= 1 && dy <= 1) && (dx > 0 || dy > 0);
+                                let adjacent = (dx + dy) == 1;
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
                                 let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());

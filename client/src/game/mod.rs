@@ -29,13 +29,13 @@ pub use pathfinding::PathState;
 pub use shop::{ShopData, ShopStockItem, ShopSubTab};
 pub use skills::{Skill, SkillType, Skills};
 pub use state::{
-    ActiveDialogue, ActiveQuest, AltarPanelState, Announcement, BankQuantityAction,
-    BankQuantityDialog, BonusTile, Camera, ChatBubble, ChatChannel, ChatMessage, ConnectionStatus,
-    ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice, DoubleClickState, DragSource,
-    DragState, FarmingContractInfo, FarmingPatch, FrameTimings, FriendInfo, GameState,
-    GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent, MapTransition, OnlinePlayerInfo,
-    PendingRequestInfo, Projectile, CatalogObjective, QuestCatalogEntry, QuestCompletedEvent, QuestObjective,
-    SkillXpEvent, SocialState,
-    SocialTab, SpellEffect, TransitionState, UiState, XpDropFeed, quest_status_order,
+    ActiveDialogue, ActiveQuest, AltarPanelState, Announcement, AutoActionState,
+    BankQuantityAction, BankQuantityDialog, BonusTile, Camera, ChatBubble, ChatChannel,
+    ChatMessage, ConnectionStatus, ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice,
+    DoubleClickState, DragSource, DragState, FarmingContractInfo, FarmingPatch, FrameTimings,
+    FriendInfo, GameState, GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent,
+    MapTransition, OnlinePlayerInfo, PendingRequestInfo, Projectile, CatalogObjective,
+    QuestCatalogEntry, QuestCompletedEvent, QuestObjective, SkillXpEvent, SocialState, SocialTab,
+    SpellEffect, TransitionState, UiState, XpDropFeed, quest_status_order,
 };
 pub use tilemap::{LayerType, Tilemap, TilemapLayer};

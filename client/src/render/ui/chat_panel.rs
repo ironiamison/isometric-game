@@ -94,20 +94,9 @@ impl Renderer {
             (UiElementId::ChatTabGlobal, "Global", ChatChannel::Global),
             (UiElementId::ChatTabSystem, "System", ChatChannel::System),
         ];
-        let mut latest_local_ts = 0.0f64;
-        let mut latest_global_ts = 0.0f64;
-        let mut latest_system_ts = 0.0f64;
-        for msg in state.ui_state.chat_messages.iter().rev() {
-            match msg.channel {
-                ChatChannel::Local if latest_local_ts <= 0.0 => latest_local_ts = msg.timestamp,
-                ChatChannel::Global if latest_global_ts <= 0.0 => latest_global_ts = msg.timestamp,
-                ChatChannel::System if latest_system_ts <= 0.0 => latest_system_ts = msg.timestamp,
-                _ => {}
-            }
-            if latest_local_ts > 0.0 && latest_global_ts > 0.0 && latest_system_ts > 0.0 {
-                break;
-            }
-        }
+        let latest_local_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::Local);
+        let latest_global_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::Global);
+        let latest_system_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::System);
 
         for (i, (id, label, channel)) in tabs.iter().enumerate() {
             let tx = tab_x_start + i as f32 * tab_w;
@@ -199,11 +188,8 @@ impl Renderer {
         let filtered: Vec<_> = state
             .ui_state
             .chat_messages
+            .channel(&state.ui_state.chat_active_tab)
             .iter()
-            .filter(|m| {
-                std::mem::discriminant(&m.channel)
-                    == std::mem::discriminant(&state.ui_state.chat_active_tab)
-            })
             .collect();
 
         // Build all wrapped lines with their colors

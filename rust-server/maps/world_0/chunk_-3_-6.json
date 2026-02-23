@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "GABQAFAEAB4QBAAAUAQAABAEAAAQAAAAUP7/fxACCEgQAs5IEIJJRxD+eUBQAhFIEAIBQBACAEAQCgFwEOIBQFACAQAQAkEAUAIBABACAQAQAgEAUAIBcBD+AUAQSohIEAIAQBD+/38QAAEAUEDHAxBAAAAQQAAAUEAAABBAAAA=",
+  "collision": "GABQAFAEAB4QBAAAUAQAABAEAAAQAAAAUP7/fxACCEgQAs5IEIJJRxD+eUBQAhFIEAIBQBACAEAQCgFwEOIBQFACAQAQAkEAUAIBABACAQAQAgEAUAIBcBD+AUAQSohIEAIAQBD+/38QAAEAUEDHAxBAAAAQQAAAUEAAABBwAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3495,36 +3495,6 @@
       "gid": 208,
       "x": 4,
       "y": 31,
-      "edge": "down"
-    },
-    {
-      "gid": 454,
-      "x": 14,
-      "y": 31,
-      "edge": "down"
-    },
-    {
-      "gid": 455,
-      "x": 14,
-      "y": 30,
-      "edge": "down"
-    },
-    {
-      "gid": 456,
-      "x": 14,
-      "y": 29,
-      "edge": "down"
-    },
-    {
-      "gid": 457,
-      "x": 14,
-      "y": 28,
-      "edge": "down"
-    },
-    {
-      "gid": 458,
-      "x": 14,
-      "y": 27,
       "edge": "down"
     },
     {
@@ -4288,6 +4258,54 @@
       "x": 10,
       "y": 4,
       "edge": "down"
+    },
+    {
+      "gid": 452,
+      "x": 13,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 451,
+      "x": 12,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 453,
+      "x": 14,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 454,
+      "x": 14,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 456,
+      "x": 14,
+      "y": 29,
+      "edge": "right"
+    },
+    {
+      "gid": 457,
+      "x": 14,
+      "y": 28,
+      "edge": "right"
+    },
+    {
+      "gid": 458,
+      "x": 14,
+      "y": 27,
+      "edge": "right"
+    },
+    {
+      "gid": 455,
+      "x": 14,
+      "y": 30,
+      "edge": "right"
     }
   ],
   "portals": [
@@ -4306,6 +4324,14 @@
       "height": 1,
       "targetMap": "New_Aeven_tailor",
       "targetSpawn": ""
+    },
+    {
+      "x": 14,
+      "y": 29,
+      "width": 1,
+      "height": 1,
+      "targetMap": "mazchna_house",
+      "targetSpawn": "entrance"
     }
   ],
   "gatheringZones": []

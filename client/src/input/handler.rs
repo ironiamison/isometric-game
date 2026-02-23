@@ -39,14 +39,7 @@ fn screen_to_virtual_coords(x: f32, y: f32) -> (f32, f32) {
 }
 
 fn latest_chat_timestamp_for_channel(state: &GameState, channel: ChatChannel) -> f64 {
-    state
-        .ui_state
-        .chat_messages
-        .iter()
-        .rev()
-        .find(|m| m.channel == channel)
-        .map(|m| m.timestamp)
-        .unwrap_or(0.0)
+    state.ui_state.chat_messages.latest_timestamp(&channel)
 }
 
 fn mark_chat_channel_as_read(state: &mut GameState, channel: ChatChannel) {
@@ -198,6 +191,25 @@ fn sync_adventurer_guide_dialogue_target(state: &mut GameState) {
                 dialogue.text = "Select a tier to review progress. Talk to the guide to start or complete tiers.".to_string();
             }
         }
+    }
+}
+
+/// Get the world position of an auto-action target (for facing direction)
+fn auto_action_target_pos(aa: &crate::game::AutoActionState, state: &GameState) -> Option<(f32, f32)> {
+    match aa.target_type.as_str() {
+        "npc" => state.npcs.get(&aa.target_id).map(|n| (n.x, n.y)),
+        "player" => state.players.get(&aa.target_id).map(|p| (p.x, p.y)),
+        "resource" => {
+            // target_id format: "x,y,gid"
+            let parts: Vec<&str> = aa.target_id.split(',').collect();
+            if parts.len() >= 2 {
+                if let (Ok(x), Ok(y)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>()) {
+                    return Some((x as f32, y as f32));
+                }
+            }
+            None
+        }
+        _ => None,
     }
 }
 
@@ -421,6 +433,13 @@ pub enum InputCommand {
     SlayerRemoveBlock {
         monster_id: String,
     },
+    // Auto-action commands (click-to-act chase system)
+    StartAutoAction {
+        target_type: String,
+        target_id: String,
+        action: String,
+    },
+    CancelAutoAction,
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -4997,6 +5016,13 @@ impl InputHandler {
         // Just let the move command go through - server will stand up if direction matches
 
         if has_movement_input && !is_attacking {
+            // Cancel auto-action when player manually moves
+            if state.auto_action_state.is_some() {
+                state.auto_action_state = None;
+                state.auto_path = None;
+                commands.push(InputCommand::CancelAutoAction);
+            }
+
             // Determine hold duration based on input source
             let hold_duration = if has_dpad_input {
                 current_time - self.touch_controls.get_dpad_press_time()
@@ -5110,10 +5136,103 @@ impl InputHandler {
             }
 
             // If path is blocked by entity, cancel it and stop
+            // (but don't cancel auto-action chase — we'll re-path below)
             if path_blocked {
-                state.auto_path = None;
-                commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
-                return commands;
+                if state.auto_action_state.is_none() {
+                    state.auto_path = None;
+                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                    return commands;
+                } else {
+                    // Clear the blocked path so chase re-path can recalculate
+                    state.auto_path = None;
+                }
+            }
+
+            // Chase re-pathfinding: if auto-action is active and targeting a moving entity,
+            // check if the target has moved and recalculate the path
+            if let (Some(ref aa), Some((player_x, player_y))) =
+                (&state.auto_action_state, player_pos)
+            {
+                let mut new_target_pos: Option<(i32, i32)> = None;
+
+                if aa.target_type == "npc" {
+                    if let Some(npc) = state.npcs.get(&aa.target_id) {
+                        new_target_pos =
+                            Some((npc.x.round() as i32, npc.y.round() as i32));
+                    } else {
+                        // NPC gone (dead/despawned) — clear auto-action
+                        state.auto_action_state = None;
+                        state.auto_path = None;
+                    }
+                } else if aa.target_type == "player" {
+                    if let Some(target_player) = state.players.get(&aa.target_id) {
+                        new_target_pos = Some((
+                            target_player.x.round() as i32,
+                            target_player.y.round() as i32,
+                        ));
+                    } else {
+                        // Player gone — clear auto-action
+                        state.auto_action_state = None;
+                        state.auto_path = None;
+                    }
+                }
+
+                if let Some((tx, ty)) = new_target_pos {
+                    // Cardinal adjacency only (no diagonal)
+                    let is_adjacent = ((player_x - tx).abs() + (player_y - ty).abs()) == 1;
+
+                    // If already adjacent and auto-action not yet sent, send now
+                    if is_adjacent {
+                        if let Some(ref aa) = state.auto_action_state {
+                            if !aa.confirmed {
+                                // Face toward target
+                                let dir = crate::game::Direction::from_velocity(
+                                    tx as f32 - player_x as f32,
+                                    ty as f32 - player_y as f32,
+                                );
+                                commands.push(InputCommand::Face { direction: dir as u8 });
+                                commands.push(InputCommand::StartAutoAction {
+                                    target_type: aa.target_type.clone(),
+                                    target_id: aa.target_id.clone(),
+                                    action: aa.action.clone(),
+                                });
+                                state.auto_path = None;
+                            }
+                        }
+                    } else {
+                        let needs_repath = if let Some(ref path_state) = state.auto_path {
+                            // Destination no longer adjacent to the target
+                            let (dx_dest, dy_dest) = (
+                                (path_state.destination.0 - tx).abs(),
+                                (path_state.destination.1 - ty).abs(),
+                            );
+                            dx_dest > 1 || dy_dest > 1
+                        } else {
+                            // No path at all — need one
+                            true
+                        };
+
+                        if needs_repath {
+                            let occupied = build_occupied_set(state);
+                            const MAX_PATH_DISTANCE: i32 = 32;
+                            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                (player_x, player_y),
+                                (tx, ty),
+                                &state.chunk_manager,
+                                &occupied,
+                                MAX_PATH_DISTANCE,
+                            ) {
+                                state.auto_path = Some(PathState {
+                                    path,
+                                    current_index: 0,
+                                    destination: dest,
+                                    pickup_target: None,
+                                    interact_target: None,
+                                });
+                            }
+                        }
+                    }
+                }
             }
 
             if let (Some((player_x, player_y)), Some(ref mut path_state)) =
@@ -5210,10 +5329,35 @@ impl InputHandler {
                 if let Some(patch_id) = state.pending_harvest_patch.take() {
                     commands.push(InputCommand::HarvestCrop { patch_id });
                 }
+                // Handle auto-action: send StartAutoAction now that we've arrived
+                if let Some(ref aa) = state.auto_action_state {
+                    if !aa.confirmed {
+                        // Face toward the target before starting
+                        if let Some(local_id) = &state.local_player_id {
+                            let target_pos = auto_action_target_pos(aa, state);
+                            if let Some((tx, ty)) = target_pos {
+                                if let Some(player) = state.players.get(local_id) {
+                                    let dx = tx - player.x;
+                                    let dy = ty - player.y;
+                                    let dir = crate::game::Direction::from_velocity(dx, dy);
+                                    commands.push(InputCommand::Face { direction: dir as u8 });
+                                }
+                            }
+                        }
+                        commands.push(InputCommand::StartAutoAction {
+                            target_type: aa.target_type.clone(),
+                            target_id: aa.target_id.clone(),
+                            action: aa.action.clone(),
+                        });
+                    }
+                }
                 state.auto_path = None;
 
                 // Send stop command so we don't keep moving in the last direction
-                commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                // (but not during auto-action — that would interrupt it on the server)
+                if state.auto_action_state.is_none() {
+                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                }
             }
         }
 
@@ -5229,8 +5373,12 @@ impl InputHandler {
                 self.last_dx = 0.0;
                 self.last_dy = 0.0;
             }
-            // Cancel auto-path when attacking
+            // Cancel auto-path and auto-action when manually attacking
             state.clear_auto_path();
+            if state.auto_action_state.is_some() {
+                state.auto_action_state = None;
+                commands.push(InputCommand::CancelAutoAction);
+            }
 
             if current_time - self.last_attack_time >= self.attack_cooldown {
                 // Check if we should gather instead of attack
@@ -5652,8 +5800,62 @@ impl InputHandler {
                     .unwrap_or(true);
 
                 if is_attackable {
-                    // Attackable NPC (hostile or non-hostile) - target for combat
-                    commands.push(InputCommand::Target { entity_id: npc_id });
+                    // Attackable NPC - target it and set up auto-action chase
+                    commands.push(InputCommand::Target { entity_id: npc_id.clone() });
+                    state.auto_action_state =
+                        Some(crate::game::AutoActionState {
+                            target_type: "npc".to_string(),
+                            target_id: npc_id.clone(),
+                            action: "attack".to_string(),
+                            confirmed: false,
+                        });
+                    // Pathfind to adjacent tile, or send immediately if already adjacent
+                    if let Some(local_id) = &state.local_player_id {
+                        if let Some(player) = state.players.get(local_id) {
+                            if let Some(npc) = state.npcs.get(&npc_id) {
+                                let player_x = player.x.round() as i32;
+                                let player_y = player.y.round() as i32;
+                                let npc_x = npc.x.round() as i32;
+                                let npc_y = npc.y.round() as i32;
+                                let cdx = (player_x - npc_x).abs();
+                                let cdy = (player_y - npc_y).abs();
+                                // Cardinal adjacency only (no diagonal)
+                                if (cdx + cdy) != 1 {
+                                    let occupied = build_occupied_set(state);
+                                    const MAX_PATH_DISTANCE: i32 = 32;
+                                    if let Some((dest, path)) =
+                                        pathfinding::find_path_to_adjacent(
+                                            (player_x, player_y),
+                                            (npc_x, npc_y),
+                                            &state.chunk_manager,
+                                            &occupied,
+                                            MAX_PATH_DISTANCE,
+                                        )
+                                    {
+                                        state.auto_path = Some(PathState {
+                                            path,
+                                            current_index: 0,
+                                            destination: dest,
+                                            pickup_target: None,
+                                            interact_target: None,
+                                        });
+                                    }
+                                } else {
+                                    // Already cardinal-adjacent - face target and send immediately
+                                    let dir = crate::game::Direction::from_velocity(
+                                        npc_x as f32 - player_x as f32,
+                                        npc_y as f32 - player_y as f32,
+                                    );
+                                    commands.push(InputCommand::Face { direction: dir as u8 });
+                                    commands.push(InputCommand::StartAutoAction {
+                                        target_type: "npc".to_string(),
+                                        target_id: npc_id.clone(),
+                                        action: "attack".to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
                 } else {
                     // Friendly NPC - interact or pathfind-to-interact
                     const INTERACT_RANGE: f32 = 2.5;
@@ -5721,8 +5923,204 @@ impl InputHandler {
                     }
                 }
             } else if let Some(entity_id) = clicked_player {
-                // Player clicked - target them
-                commands.push(InputCommand::Target { entity_id });
+                // Player clicked - target it and set up auto-action chase
+                commands.push(InputCommand::Target { entity_id: entity_id.clone() });
+                state.auto_action_state =
+                    Some(crate::game::AutoActionState {
+                        target_type: "player".to_string(),
+                        target_id: entity_id.clone(),
+                        action: "attack".to_string(),
+                        confirmed: false,
+                    });
+                // Pathfind to adjacent tile, or send immediately if already adjacent
+                if let Some(local_id) = &state.local_player_id {
+                    if let Some(local_player) = state.players.get(local_id) {
+                        if let Some(target_player) = state.players.get(&entity_id) {
+                            let player_x = local_player.x.round() as i32;
+                            let player_y = local_player.y.round() as i32;
+                            let target_x = target_player.x.round() as i32;
+                            let target_y = target_player.y.round() as i32;
+                            let cdx = (player_x - target_x).abs();
+                            let cdy = (player_y - target_y).abs();
+                            // Cardinal adjacency only (no diagonal)
+                            if (cdx + cdy) != 1 {
+                                let occupied = build_occupied_set(state);
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) =
+                                    pathfinding::find_path_to_adjacent(
+                                        (player_x, player_y),
+                                        (target_x, target_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    )
+                                {
+                                    state.auto_path = Some(PathState {
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: None,
+                                        interact_target: None,
+                                    });
+                                }
+                            } else {
+                                // Already adjacent - face target and send to server immediately
+                                let dir = crate::game::Direction::from_velocity(
+                                    target_x as f32 - player_x as f32,
+                                    target_y as f32 - player_y as f32,
+                                );
+                                commands.push(InputCommand::Face { direction: dir as u8 });
+                                commands.push(InputCommand::StartAutoAction {
+                                    target_type: "player".to_string(),
+                                    target_id: entity_id.clone(),
+                                    action: "attack".to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+            } else if let Some(obj) = state
+                .chunk_manager
+                .get_object_at_exact(clicked_tile_x, clicked_tile_y)
+            {
+                // Check if clicked object is a tree or rock for auto-action
+                let obj_gid = obj.gid;
+                let is_tree = crate::game::tree_types::is_tree_gid(obj_gid);
+                let is_rock = crate::game::ore_types::get_ore_info(obj_gid).is_some();
+
+                if is_tree
+                    && !state
+                        .depleted_trees
+                        .contains_key(&(clicked_tile_x, clicked_tile_y))
+                {
+                    // Check if player has axe equipped
+                    let has_axe = state
+                        .get_local_player()
+                        .and_then(|p| p.equipped_weapon.as_ref())
+                        .and_then(|weapon_id| state.item_registry.get(weapon_id))
+                        .and_then(|item| item.equipment.as_ref())
+                        .map(|eq| eq.chop_speed_multiplier > 0.0)
+                        .unwrap_or(false);
+
+                    if has_axe {
+                        let target_id =
+                            format!("{},{},{}", clicked_tile_x, clicked_tile_y, obj_gid);
+                        state.auto_action_state =
+                            Some(crate::game::AutoActionState {
+                                target_type: "resource".to_string(),
+                                target_id: target_id.clone(),
+                                action: "chop".to_string(),
+                                confirmed: false,
+                            });
+                        // Pathfind to adjacent tile, or send immediately if already adjacent
+                        if let Some(player) = state.get_local_player() {
+                            let player_x = player.x.round() as i32;
+                            let player_y = player.y.round() as i32;
+                            let cdx = (player_x - clicked_tile_x).abs();
+                            let cdy = (player_y - clicked_tile_y).abs();
+                            // Cardinal adjacency only (no diagonal)
+                            if (cdx + cdy) != 1 {
+                                let occupied = build_occupied_set(state);
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) =
+                                    pathfinding::find_path_to_adjacent(
+                                        (player_x, player_y),
+                                        (clicked_tile_x, clicked_tile_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    )
+                                {
+                                    state.auto_path = Some(PathState {
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: None,
+                                        interact_target: None,
+                                    });
+                                }
+                            } else {
+                                // Already cardinal-adjacent - face target and send immediately
+                                let dir = crate::game::Direction::from_velocity(
+                                    clicked_tile_x as f32 - player_x as f32,
+                                    clicked_tile_y as f32 - player_y as f32,
+                                );
+                                commands.push(InputCommand::Face { direction: dir as u8 });
+                                commands.push(InputCommand::StartAutoAction {
+                                    target_type: "resource".to_string(),
+                                    target_id,
+                                    action: "chop".to_string(),
+                                });
+                            }
+                        }
+                    }
+                } else if is_rock
+                    && !state
+                        .depleted_rocks
+                        .contains_key(&(clicked_tile_x, clicked_tile_y))
+                {
+                    // Check if player has pickaxe equipped
+                    let has_pickaxe = state
+                        .get_local_player()
+                        .and_then(|p| p.equipped_weapon.as_ref())
+                        .and_then(|weapon_id| state.item_registry.get(weapon_id))
+                        .and_then(|item| item.equipment.as_ref())
+                        .map(|eq| eq.mine_speed_multiplier > 0.0)
+                        .unwrap_or(false);
+
+                    if has_pickaxe {
+                        let target_id =
+                            format!("{},{},{}", clicked_tile_x, clicked_tile_y, obj_gid);
+                        state.auto_action_state =
+                            Some(crate::game::AutoActionState {
+                                target_type: "resource".to_string(),
+                                target_id: target_id.clone(),
+                                action: "mine".to_string(),
+                                confirmed: false,
+                            });
+                        // Pathfind to adjacent tile, or send immediately if already adjacent
+                        if let Some(player) = state.get_local_player() {
+                            let player_x = player.x.round() as i32;
+                            let player_y = player.y.round() as i32;
+                            let cdx = (player_x - clicked_tile_x).abs();
+                            let cdy = (player_y - clicked_tile_y).abs();
+                            // Cardinal adjacency only (no diagonal)
+                            if (cdx + cdy) != 1 {
+                                let occupied = build_occupied_set(state);
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) =
+                                    pathfinding::find_path_to_adjacent(
+                                        (player_x, player_y),
+                                        (clicked_tile_x, clicked_tile_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    )
+                                {
+                                    state.auto_path = Some(PathState {
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: None,
+                                        interact_target: None,
+                                    });
+                                }
+                            } else {
+                                // Already cardinal-adjacent - face target and send immediately
+                                let dir = crate::game::Direction::from_velocity(
+                                    clicked_tile_x as f32 - player_x as f32,
+                                    clicked_tile_y as f32 - player_y as f32,
+                                );
+                                commands.push(InputCommand::Face { direction: dir as u8 });
+                                commands.push(InputCommand::StartAutoAction {
+                                    target_type: "resource".to_string(),
+                                    target_id,
+                                    action: "mine".to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
             } else if let Some(patch_id) = state
                 .farming_patch_positions
                 .get(&(clicked_tile_x, clicked_tile_y))
@@ -5808,7 +6206,12 @@ impl InputHandler {
                     }
                 }
             } else if state.ui_state.tap_to_pathfind {
-                // Clicked on empty space - try to path there (if tap-to-pathfind enabled)
+                // Clicked on empty space - cancel auto-action and path there
+                if state.auto_action_state.is_some() {
+                    state.auto_action_state = None;
+                    commands.push(InputCommand::CancelAutoAction);
+                }
+
                 let tile_x = world_x.round() as i32;
                 let tile_y = world_y.round() as i32;
 

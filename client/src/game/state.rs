@@ -244,6 +244,15 @@ impl PingStats {
     }
 }
 
+/// Tracks client-side auto-action chase state (OSRS-style click-to-act)
+#[derive(Debug, Clone)]
+pub struct AutoActionState {
+    pub target_type: String, // "npc", "player", "resource"
+    pub target_id: String,   // entity id or "x,y,gid"
+    pub action: String,      // "attack", "mine", "chop"
+    pub confirmed: bool,     // true after server sends AutoActionStarted
+}
+
 pub struct Camera {
     pub x: f32,
     pub y: f32,
@@ -299,6 +308,53 @@ impl ChatMessage {
             timestamp: macroquad::time::get_time(),
             channel: ChatChannel::System,
         }
+    }
+}
+
+/// Per-channel chat storage so that system message spam doesn't evict public/global messages.
+pub struct ChatLog {
+    local: Vec<ChatMessage>,
+    global: Vec<ChatMessage>,
+    system: Vec<ChatMessage>,
+}
+
+impl ChatLog {
+    pub fn new() -> Self {
+        Self {
+            local: Vec::new(),
+            global: Vec::new(),
+            system: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, message: ChatMessage) {
+        let vec = match message.channel {
+            ChatChannel::Local => &mut self.local,
+            ChatChannel::Global => &mut self.global,
+            ChatChannel::System => &mut self.system,
+        };
+        vec.push(message);
+        if vec.len() > MAX_CHAT_LOG_MESSAGES {
+            let to_remove = vec.len() - MAX_CHAT_LOG_MESSAGES;
+            vec.drain(0..to_remove);
+        }
+    }
+
+    /// Get messages for a specific channel.
+    pub fn channel(&self, channel: &ChatChannel) -> &[ChatMessage] {
+        match channel {
+            ChatChannel::Local => &self.local,
+            ChatChannel::Global => &self.global,
+            ChatChannel::System => &self.system,
+        }
+    }
+
+    /// Get the latest timestamp for a given channel, or 0.0 if empty.
+    pub fn latest_timestamp(&self, channel: &ChatChannel) -> f64 {
+        self.channel(channel)
+            .last()
+            .map(|m| m.timestamp)
+            .unwrap_or(0.0)
     }
 }
 
@@ -1047,7 +1103,7 @@ pub struct UiState {
     pub chat_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub chat_key_repeat_time: f64, // Last time a repeated key action fired
     pub chat_key_initial_delay: bool, // Whether we're still in initial delay
-    pub chat_messages: Vec<ChatMessage>,
+    pub chat_messages: ChatLog,
     pub chat_revision: u64, // Increments whenever chat content changes (for render cache invalidation)
     pub inventory_open: bool,
     // Quest UI state
@@ -1236,7 +1292,7 @@ impl Default for UiState {
             chat_scroll_drag: Default::default(),
             chat_key_repeat_time: 0.0,
             chat_key_initial_delay: true,
-            chat_messages: Vec::new(),
+            chat_messages: ChatLog::new(),
             chat_revision: 0,
             inventory_open: false,
             active_dialogue: None,
@@ -1537,6 +1593,9 @@ pub struct GameState {
     // Automated pathfinding state
     pub auto_path: Option<PathState>,
 
+    /// Active auto-action state (OSRS-style click-to-act chase)
+    pub auto_action_state: Option<AutoActionState>,
+
     // Performance diagnostics (visible in debug mode)
     pub frame_timings: FrameTimings,
 
@@ -1660,6 +1719,7 @@ impl GameState {
             hovered_tile: None,
             hovered_entity_id: None,
             auto_path: None,
+            auto_action_state: None,
             frame_timings: FrameTimings::default(),
             map_transition: MapTransition::default(),
             current_interior: None,
@@ -1769,6 +1829,11 @@ impl GameState {
         self.ui_state.chat_revision = self.ui_state.chat_revision.wrapping_add(1);
     }
 
+    /// Push a system chat message (convenience wrapper).
+    pub fn push_system_chat(&mut self, text: String) {
+        self.push_chat_message(ChatMessage::system(text));
+    }
+
     /// Update all players in a server-authoritative step model.
     pub fn update(&mut self, delta: f32) {
         self.refresh_high_ping_movement_mode();
@@ -1782,13 +1847,6 @@ impl GameState {
         // Tick down fade-in overlay
         if self.world_fade_in > 0.0 {
             self.world_fade_in = (self.world_fade_in - delta * 3.0).max(0.0); // ~0.33s fade
-        }
-
-        // Keep chat history bounded regardless of source channel.
-        if self.ui_state.chat_messages.len() > MAX_CHAT_LOG_MESSAGES {
-            let to_remove = self.ui_state.chat_messages.len() - MAX_CHAT_LOG_MESSAGES;
-            self.ui_state.chat_messages.drain(0..to_remove);
-            self.ui_state.chat_revision = self.ui_state.chat_revision.wrapping_add(1);
         }
 
         // Use smoothed delta for visual interpolation (reduces jitter from frame variance)

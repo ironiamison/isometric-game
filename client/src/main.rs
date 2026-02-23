@@ -26,8 +26,8 @@ use auth::AuthSession;
 #[cfg(not(target_arch = "wasm32"))]
 use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -821,6 +821,16 @@ fn run_game_frame(
             InputCommand::SlayerRemoveBlock { monster_id } => ClientMessage::SlayerRemoveBlock {
                 monster_id: monster_id.clone(),
             },
+            InputCommand::StartAutoAction {
+                target_type,
+                target_id,
+                action,
+            } => ClientMessage::StartAutoAction {
+                target_type: target_type.clone(),
+                target_id: target_id.clone(),
+                action: action.clone(),
+            },
+            InputCommand::CancelAutoAction => ClientMessage::CancelAutoAction,
         };
         network.send(&msg);
     }

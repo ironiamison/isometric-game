@@ -15,64 +15,64 @@ points_per_task = 2
 [[masters.tasks]]
 monster_id = "pig"
 display_name = "Pigs"
-count_min = 10
-count_max = 20
+count_min = 15
+count_max = 35
 weight = 10
 xp_per_kill = 10
 
 [[masters.tasks]]
 monster_id = "slime"
 display_name = "Slimes"
-count_min = 10
-count_max = 20
+count_min = 15
+count_max = 35
 weight = 10
 xp_per_kill = 12
 
 [[masters.tasks]]
 monster_id = "snail"
 display_name = "Snails"
-count_min = 10
-count_max = 25
+count_min = 15
+count_max = 40
 weight = 10
 xp_per_kill = 8
 
 [[masters.tasks]]
 monster_id = "mushroom"
 display_name = "Mushrooms"
-count_min = 10
-count_max = 20
+count_min = 15
+count_max = 35
 weight = 10
 xp_per_kill = 10
 
 [[masters.tasks]]
 monster_id = "cow"
 display_name = "Cows"
-count_min = 10
-count_max = 25
+count_min = 20
+count_max = 40
 weight = 10
 xp_per_kill = 12
 
 [[masters.tasks]]
 monster_id = "sheep"
 display_name = "Sheep"
-count_min = 10
-count_max = 20
+count_min = 15
+count_max = 35
 weight = 8
 xp_per_kill = 8
 
 [[masters.tasks]]
 monster_id = "worm"
 display_name = "Worms"
-count_min = 15
-count_max = 30
+count_min = 20
+count_max = 40
 weight = 8
 xp_per_kill = 6
 
 [[masters.tasks]]
 monster_id = "hedgehog"
 display_name = "Hedgehogs"
-count_min = 10
-count_max = 20
+count_min = 15
+count_max = 35
 weight = 8
 xp_per_kill = 10
 
@@ -90,64 +90,64 @@ points_per_task = 5
 [[masters.tasks]]
 monster_id = "wild_boar"
 display_name = "Wild Boars"
-count_min = 20
-count_max = 40
+count_min = 30
+count_max = 55
 weight = 10
 xp_per_kill = 25
 
 [[masters.tasks]]
 monster_id = "swamper"
 display_name = "Swampers"
-count_min = 20
-count_max = 35
+count_min = 30
+count_max = 55
 weight = 10
 xp_per_kill = 28
 
 [[masters.tasks]]
 monster_id = "mad_mushroom"
 display_name = "Mad Mushrooms"
-count_min = 20
-count_max = 35
+count_min = 30
+count_max = 50
 weight = 10
 xp_per_kill = 22
 
 [[masters.tasks]]
 monster_id = "crow"
 display_name = "Crows"
-count_min = 15
-count_max = 30
+count_min = 30
+count_max = 50
 weight = 8
 xp_per_kill = 20
 
 [[masters.tasks]]
 monster_id = "snake"
 display_name = "Snakes"
-count_min = 20
-count_max = 35
+count_min = 35
+count_max = 60
 weight = 10
 xp_per_kill = 24
 
 [[masters.tasks]]
 monster_id = "cactus"
 display_name = "Cacti"
-count_min = 15
-count_max = 30
+count_min = 30
+count_max = 50
 weight = 8
 xp_per_kill = 26
 
 [[masters.tasks]]
 monster_id = "shell_snail"
 display_name = "Shell Snails"
-count_min = 20
-count_max = 40
+count_min = 35
+count_max = 60
 weight = 10
 xp_per_kill = 22
 
 [[masters.tasks]]
 monster_id = "springs"
 display_name = "Springs"
-count_min = 15
-count_max = 30
+count_min = 30
+count_max = 55
 weight = 8
 xp_per_kill = 30
 
@@ -165,72 +165,72 @@ points_per_task = 10
 [[masters.tasks]]
 monster_id = "spider"
 display_name = "Spiders"
-count_min = 30
-count_max = 50
+count_min = 45
+count_max = 75
 weight = 10
 xp_per_kill = 45
 
 [[masters.tasks]]
 monster_id = "elf"
 display_name = "Elves"
-count_min = 25
-count_max = 45
+count_min = 40
+count_max = 70
 weight = 8
 xp_per_kill = 50
 
 [[masters.tasks]]
 monster_id = "skeleton"
 display_name = "Skeletons"
-count_min = 30
-count_max = 50
+count_min = 45
+count_max = 80
 weight = 10
 xp_per_kill = 42
 
 [[masters.tasks]]
 monster_id = "wolf_spider"
 display_name = "Wolf Spiders"
-count_min = 25
-count_max = 40
+count_min = 40
+count_max = 70
 weight = 8
 xp_per_kill = 55
 
 [[masters.tasks]]
 monster_id = "barbarian"
 display_name = "Barbarians"
-count_min = 25
-count_max = 45
+count_min = 45
+count_max = 75
 weight = 10
 xp_per_kill = 48
 
 [[masters.tasks]]
 monster_id = "reaper"
 display_name = "Reapers"
-count_min = 20
-count_max = 35
+count_min = 40
+count_max = 65
 weight = 6
 xp_per_kill = 65
 
 [[masters.tasks]]
 monster_id = "low_orc"
 display_name = "Orcs"
-count_min = 30
-count_max = 50
+count_min = 50
+count_max = 80
 weight = 10
 xp_per_kill = 40
 
 [[masters.tasks]]
 monster_id = "witch"
 display_name = "Witches"
-count_min = 20
-count_max = 35
+count_min = 40
+count_max = 65
 weight = 6
 xp_per_kill = 60
 
 [[masters.tasks]]
 monster_id = "rock_golem"
 display_name = "Rock Golems"
-count_min = 15
-count_max = 30
+count_min = 35
+count_max = 60
 weight = 4
 slayer_level_required = 50
 requires_unlock = true

@@ -210,6 +210,17 @@ pub enum ClientMessage {
     #[serde(rename = "slayerRemoveBlock")]
     SlayerRemoveBlock { monster_id: String },
 
+    // Auto-action commands (click-to-act chase system)
+    #[serde(rename = "startAutoAction")]
+    StartAutoAction {
+        target_type: String,
+        target_id: String,
+        action: String,
+    },
+
+    #[serde(rename = "cancelAutoAction")]
+    CancelAutoAction,
+
     // Ping for latency measurement
     #[serde(rename = "ping")]
     Ping { timestamp: f64 },
@@ -517,6 +528,23 @@ impl ClientMessage {
                 data.insert("monster_id".into(), Value::String(monster_id.clone().into()));
                 "slayerRemoveBlock"
             }
+            ClientMessage::StartAutoAction {
+                target_type,
+                target_id,
+                action,
+            } => {
+                data.insert(
+                    "target_type".into(),
+                    Value::String(target_type.clone().into()),
+                );
+                data.insert(
+                    "target_id".into(),
+                    Value::String(target_id.clone().into()),
+                );
+                data.insert("action".into(), Value::String(action.clone().into()));
+                "startAutoAction"
+            }
+            ClientMessage::CancelAutoAction => "cancelAutoAction",
             ClientMessage::Ping { timestamp } => {
                 data.insert("timestamp".into(), Value::F64(*timestamp));
                 "ping"
