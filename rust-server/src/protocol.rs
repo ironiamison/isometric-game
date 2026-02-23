@@ -5232,6 +5232,7 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let amount = extract_i32(msg_data, "amount").unwrap_or(0);
             Ok(ClientMessage::BankWithdrawGold { amount })
         }
+        "bankDepositAll" => Ok(ClientMessage::BankDepositAll),
         "startCraftBatch" => {
             let recipe_id = extract_string(msg_data, "recipe_id").unwrap_or_default();
             let quantity = extract_u32(msg_data, "quantity").unwrap_or(1);
