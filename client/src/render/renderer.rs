@@ -4475,7 +4475,9 @@ impl Renderer {
             // Look up the effect sprite based on spell_id
             let sprite_name = match effect.spell_id.as_str() {
                 "dark_hand" => "dark_hand",
+                "lightning_bolt" => "dark_hand",
                 "dark_eater" => "dark_eater",
+                "rock_fall" => "dark_eater",
                 "heal" => "self_heal",
                 "teleport" | "return_home" => "bubbles_warp",
                 _ => continue,

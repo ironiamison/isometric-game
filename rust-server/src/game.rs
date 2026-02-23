@@ -43,6 +43,9 @@ const REGEN_INTERVAL_MS: u64 = 30000;
 // Prayer drain interval (60 ticks = 3 seconds at 20 ticks/second)
 const PRAYER_DRAIN_INTERVAL_TICKS: u64 = 60;
 
+// Mana regen interval (30 ticks = 1.5 seconds at 20 ticks/second)
+const MANA_REGEN_INTERVAL_TICKS: u64 = 30;
+
 // View distance for StateSync culling (Chebyshev distance in tiles)
 const VIEW_DISTANCE: i32 = 40;
 // Keep some sender queue headroom so StateSync doesn't starve lower-frequency critical updates.
@@ -506,6 +509,21 @@ impl Player {
             }
         }
         bonus + self.buff_bonus("defence")
+    }
+
+    /// Calculate total magic bonus from equipped items
+    pub fn magic_bonus(&self, item_registry: &ItemRegistry) -> i32 {
+        let mut bonus = 0;
+        for equipped in self.all_equipped() {
+            if let Some(item_id) = equipped {
+                if let Some(def) = item_registry.get(item_id) {
+                    if let Some(equip) = &def.equipment {
+                        bonus += equip.magic_bonus;
+                    }
+                }
+            }
+        }
+        bonus + self.buff_bonus("magic")
     }
 
     /// Award combat XP based on damage dealt.
@@ -8024,6 +8042,7 @@ impl GameRoom {
                     slot.item_id.clone(),
                     player.skills.combat.level,
                     player.skills.woodcutting.level,
+                    player.skills.magic.level,
                     player.equipped_head.clone(),
                     player.equipped_body.clone(),
                     player.equipped_weapon.clone(),
@@ -8042,6 +8061,7 @@ impl GameRoom {
             item_id,
             combat_level,
             woodcutting_level,
+            magic_level,
             equipped_head,
             equipped_body,
             equipped_weapon,
@@ -8138,6 +8158,26 @@ impl GameRoom {
                     error: Some(format!(
                         "Requires Woodcutting level {}",
                         equip_stats.woodcutting_level_required
+                    )),
+                },
+            )
+            .await;
+            return;
+        }
+
+        // Check magic level requirement for staves/magic items
+        if equip_stats.magic_level_required > 0
+            && magic_level < equip_stats.magic_level_required
+        {
+            self.send_to_player(
+                player_id,
+                ServerMessage::EquipResult {
+                    success: false,
+                    slot_type: slot_type_str,
+                    item_id: None,
+                    error: Some(format!(
+                        "Requires Magic level {}",
+                        equip_stats.magic_level_required
                     )),
                 },
             )
@@ -11191,8 +11231,23 @@ impl GameRoom {
             }
         }
 
-        // Prayer drain + mana regen (every 60 ticks / 3 seconds)
-        // Combined into single players.write() to reduce lock contention
+        // Mana regen (every 30 ticks / 1.5 seconds), scales with magic level
+        if current_tick % MANA_REGEN_INTERVAL_TICKS == 0 {
+            let mut players = self.players.write().await;
+            for player in players.values_mut() {
+                if !player.active || player.is_dead {
+                    continue;
+                }
+                let max_mp = player.max_mp();
+                if player.mp < max_mp {
+                    let magic_level = player.skills.magic.level;
+                    let regen_amount = 1 + (magic_level / 20);
+                    player.mp = (player.mp + regen_amount).min(max_mp);
+                }
+            }
+        }
+
+        // Prayer drain (every 60 ticks / 3 seconds)
         if current_tick % PRAYER_DRAIN_INTERVAL_TICKS == 0 {
             let drain_start = std::time::Instant::now();
             struct PrayerDrainUpdate {
@@ -11210,12 +11265,6 @@ impl GameRoom {
                 for player in players.values_mut() {
                     if !player.active || player.is_dead {
                         continue;
-                    }
-
-                    // Mana regeneration
-                    let max_mp = player.max_mp();
-                    if player.mp < max_mp {
-                        player.mp = (player.mp + 1).min(max_mp);
                     }
 
                     // Prayer drain
@@ -14507,7 +14556,7 @@ impl GameRoom {
         current_time: u64,
     ) {
         // 1. Get attacker info and target
-        let (caster_name, caster_x, caster_y, target_id_opt, magic_level, combat_level) = {
+        let (caster_name, caster_x, caster_y, target_id_opt, magic_level, combat_level, magic_bonus) = {
             let players = self.players.read().await;
             let player = match players.get(player_id) {
                 Some(p) if !p.is_dead && p.active => p,
@@ -14520,6 +14569,7 @@ impl GameRoom {
                 player.target_id.clone(),
                 player.skills.magic.level,
                 player.skills.combat.level,
+                player.magic_bonus(&self.item_registry),
             )
         };
 
@@ -14635,7 +14685,7 @@ impl GameRoom {
         .await;
 
         // 6. Calculate hit/miss using blended combat+magic level
-        let attack_bonus = 0; // Spells don't use equipment attack bonus
+        let attack_bonus = magic_bonus; // Spells use magic bonus for accuracy
         let (target_hp, target_name, target_died, actual_damage) = if is_npc {
             let mut npcs = self.npcs.write().await;
             if let Some(npc) = npcs.get_mut(&target_id) {

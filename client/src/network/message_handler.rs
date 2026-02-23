@@ -1841,6 +1841,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                         .unwrap_or(0),
                                     defence_bonus: extract_i32(item_value, "defence_bonus")
                                         .unwrap_or(0),
+                                    magic_bonus: extract_i32(item_value, "magic_bonus")
+                                        .unwrap_or(0),
+                                    magic_level_required: extract_i32(
+                                        item_value,
+                                        "magic_level_required",
+                                    )
+                                    .unwrap_or(0),
                                     woodcutting_level_required: extract_i32(
                                         item_value,
                                         "woodcutting_level_required",

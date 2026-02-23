@@ -128,6 +128,14 @@ pub struct EquipmentStats {
     /// Mine success bonus for pickaxes (added to base success chance, 0.0 - 1.0)
     #[serde(default)]
     pub mine_success_bonus: f32,
+
+    /// Magic bonus - affects spell accuracy
+    #[serde(default)]
+    pub magic_bonus: i32,
+
+    /// Magic level required to equip (for staves/magic items)
+    #[serde(default)]
+    pub magic_level_required: i32,
 }
 
 // ============================================================================

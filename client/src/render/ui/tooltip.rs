@@ -178,6 +178,10 @@ impl Renderer {
             .get_local_player()
             .map(|p| p.skills.mining.level)
             .unwrap_or(1);
+        let player_magic_level = state
+            .get_local_player()
+            .map(|p| p.skills.magic.level)
+            .unwrap_or(1);
         let player_smithing_level = state
             .get_local_player()
             .map(|p| p.skills.smithing.level)
@@ -245,6 +249,17 @@ impl Renderer {
                         .width,
                 );
             }
+            if equip.magic_bonus != 0 {
+                let magic_text = if equip.magic_bonus > 0 {
+                    format!("+{} Magic", equip.magic_bonus)
+                } else {
+                    format!("{} Magic", equip.magic_bonus)
+                };
+                max_w = max_w.max(
+                    self.measure_text_sharp(&magic_text, small_font_size)
+                        .width,
+                );
+            }
             // Measure requirement text
             let is_weapon = equip.slot_type == "weapon";
             let req_text = if is_weapon && equip.attack_level_required > 1 {
@@ -264,6 +279,10 @@ impl Renderer {
             if equip.mining_level_required > 1 {
                 let mining_req_text = format!("Requires {} Mining", equip.mining_level_required);
                 max_w = max_w.max(self.measure_text_sharp(&mining_req_text, small_font_size).width);
+            }
+            if equip.magic_level_required > 0 {
+                let magic_req_text = format!("Requires {} Magic", equip.magic_level_required);
+                max_w = max_w.max(self.measure_text_sharp(&magic_req_text, small_font_size).width);
             }
         }
 
@@ -298,6 +317,9 @@ impl Renderer {
                 if equip.defence_bonus != 0 {
                     total_h += line_height;
                 }
+                if equip.magic_bonus != 0 {
+                    total_h += line_height;
+                }
                 // Level requirement lines (only if > 1)
                 let is_weapon = equip.slot_type == "weapon";
                 if (is_weapon && equip.attack_level_required > 1)
@@ -309,6 +331,9 @@ impl Renderer {
                     total_h += line_height;
                 }
                 if equip.mining_level_required > 1 {
+                    total_h += line_height;
+                }
+                if equip.magic_level_required > 0 {
                     total_h += line_height;
                 }
             }
@@ -473,6 +498,28 @@ impl Renderer {
                 y += line_height;
             }
 
+            // Magic bonus
+            if equip.magic_bonus != 0 {
+                let magic_text = if equip.magic_bonus > 0 {
+                    format!("+{} Magic", equip.magic_bonus)
+                } else {
+                    format!("{} Magic", equip.magic_bonus)
+                };
+                let magic_color = if equip.magic_bonus > 0 {
+                    stat_green
+                } else {
+                    stat_red
+                };
+                self.draw_text_sharp(
+                    &magic_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    magic_color,
+                );
+                y += line_height;
+            }
+
             // Level requirements - check highest requirement against combat level
             let level_required = equip
                 .attack_level_required
@@ -511,6 +558,21 @@ impl Renderer {
                 let meets_req = player_mining_level >= equip.mining_level_required;
                 let req_color = if meets_req { stat_green } else { stat_red };
                 let req_text = format!("Requires {} Mining", equip.mining_level_required);
+                self.draw_text_sharp(
+                    &req_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    req_color,
+                );
+                y += line_height;
+            }
+
+            // Magic level requirement
+            if equip.magic_level_required > 0 {
+                let meets_req = player_magic_level >= equip.magic_level_required;
+                let req_color = if meets_req { stat_green } else { stat_red };
+                let req_text = format!("Requires {} Magic", equip.magic_level_required);
                 self.draw_text_sharp(
                     &req_text,
                     tooltip_x + padding,

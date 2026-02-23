@@ -1651,3 +1651,39 @@ slot_type = "weapon"
 mining_level_required = 41
 mine_speed_multiplier = 1.0
 mine_success_bonus = 0.16
+
+# ============================================================================
+# Staves
+# ============================================================================
+
+[magic_staff]
+display_name = "Magic Staff"
+sprite = "magic_staff"
+description = "A staff imbued with magical energy. Enhances spell accuracy."
+category = "equipment"
+max_stack = 1
+base_price = 500
+sellable = true
+[magic_staff.equipment]
+slot_type = "weapon"
+magic_level_required = 1
+magic_bonus = 5
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 0
+
+[firewood_staff]
+display_name = "Firewood Staff"
+sprite = "firewood_staff"
+description = "A sturdy staff carved from enchanted firewood. Channels magic and packs a punch."
+category = "equipment"
+max_stack = 1
+base_price = 2000
+sellable = true
+[firewood_staff.equipment]
+slot_type = "weapon"
+magic_level_required = 15
+magic_bonus = 8
+attack_bonus = 6
+strength_bonus = 5
+defence_bonus = 0
