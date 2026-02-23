@@ -197,8 +197,9 @@ fn sync_adventurer_guide_dialogue_target(state: &mut GameState) {
 /// Get the world position of an auto-action target (for facing direction)
 fn auto_action_target_pos(aa: &crate::game::AutoActionState, state: &GameState) -> Option<(f32, f32)> {
     match aa.target_type.as_str() {
-        "npc" => state.npcs.get(&aa.target_id).map(|n| (n.x, n.y)),
-        "player" => state.players.get(&aa.target_id).map(|p| (p.x, p.y)),
+        // Use server-authoritative positions for chase logic to avoid interpolation mismatches
+        "npc" => state.npcs.get(&aa.target_id).map(|n| (n.server_x, n.server_y)),
+        "player" => state.players.get(&aa.target_id).map(|p| (p.server_x, p.server_y)),
         "resource" => {
             // target_id format: "x,y,gid"
             let parts: Vec<&str> = aa.target_id.split(',').collect();
@@ -5159,33 +5160,48 @@ impl InputHandler {
                             }
                         }
                     } else {
-                        let needs_repath = if let Some(ref path_state) = state.auto_path {
-                            // Destination no longer adjacent to the target (target moved)
-                            let dest_dist = (path_state.destination.0 - tx).abs()
-                                + (path_state.destination.1 - ty).abs();
-                            dest_dist > 1
+                        let distance = (player_x - tx).abs() + (player_y - ty).abs();
+                        let is_confirmed = state.auto_action_state.as_ref().map_or(false, |a| a.confirmed);
+
+                        // When in active combat (confirmed), stand your ground if the
+                        // target is nearby (≤2 tiles). The NPC is aggro'd and will walk
+                        // back to us. Only re-path if the target is far away (fleeing,
+                        // returning to spawn, etc.) or we haven't started combat yet.
+                        let should_chase = if is_confirmed {
+                            distance > 2
                         } else {
-                            // No path at all — need one
-                            true
+                            true // Initial approach — always chase
                         };
 
-                        if needs_repath {
-                            let occupied = build_occupied_set(state);
-                            const MAX_PATH_DISTANCE: i32 = 32;
-                            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                (player_x, player_y),
-                                (tx, ty),
-                                &state.chunk_manager,
-                                &occupied,
-                                MAX_PATH_DISTANCE,
-                            ) {
-                                state.auto_path = Some(PathState {
-                                    path,
-                                    current_index: 0,
-                                    destination: dest,
-                                    pickup_target: None,
-                                    interact_target: None,
-                                });
+                        if should_chase {
+                            let needs_repath = if let Some(ref path_state) = state.auto_path {
+                                // Destination no longer adjacent to the target (target moved)
+                                let dest_dist = (path_state.destination.0 - tx).abs()
+                                    + (path_state.destination.1 - ty).abs();
+                                dest_dist > 1
+                            } else {
+                                // No path at all — need one
+                                true
+                            };
+
+                            if needs_repath {
+                                let occupied = build_occupied_set(state);
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                    (player_x, player_y),
+                                    (tx, ty),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
+                                ) {
+                                    state.auto_path = Some(PathState {
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: None,
+                                        interact_target: None,
+                                    });
+                                }
                             }
                         }
                     }

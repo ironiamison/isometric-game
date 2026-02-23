@@ -456,7 +456,9 @@ impl GroundItem {
     /// Check if the item has expired (60 second lifetime)
     pub fn is_expired(&self, current_time: u64) -> bool {
         const ITEM_LIFETIME_MS: u64 = 60000; // 60 seconds
-        current_time - self.drop_time > ITEM_LIFETIME_MS
+        // Guard against underflow: items created in the same tick (via auto-action)
+        // can have drop_time slightly after the tick's current_time
+        current_time.saturating_sub(self.drop_time) > ITEM_LIFETIME_MS
     }
 
     /// Check if a player can pick up this item
