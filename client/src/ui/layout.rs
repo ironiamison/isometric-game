@@ -100,8 +100,6 @@ pub enum UiElementId {
     HotkeySettingsPresetTab(usize),
     HotkeySettingsSlot(usize),
     HotkeySettingsSlotClear(usize),
-    HotkeyAssignButton(usize),
-
     // Gold Display (inventory header)
     GoldDisplay,
 

@@ -1566,7 +1566,6 @@ impl InputHandler {
                 }
                 ContextMenuTarget::Tile { .. } => 1,
                 ContextMenuTarget::HotkeySlot(_) => 1, // "Clear Slot"
-                ContextMenuTarget::Spell { .. } => 0,  // Only inline hotkey buttons
             };
 
             let menu_width = 140.0; // generous estimate
@@ -2155,35 +2154,7 @@ impl InputHandler {
                                         save_current_ui_settings(state);
                                     }
                                 }
-                                ContextMenuTarget::Spell { .. } => {
-                                    // No regular options for spell context — handled by HotkeyAssignButton
-                                }
                             }
-                            return commands;
-                        }
-                        UiElementId::HotkeyAssignButton(slot_idx) => {
-                            // Assign the context menu target to hotkey slot
-                            let menu = state.ui_state.context_menu.take().unwrap();
-                            match &menu.target {
-                                ContextMenuTarget::InventorySlot(inv_idx) => {
-                                    if let Some(Some(slot)) = state.inventory.slots.get(*inv_idx) {
-                                        state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
-                                            crate::game::hotkey::HotkeySlotBinding::Item {
-                                                item_id: slot.item_id.clone(),
-                                            };
-                                        save_current_ui_settings(state);
-                                    }
-                                }
-                                ContextMenuTarget::Spell { spell_id } => {
-                                    state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
-                                        crate::game::hotkey::HotkeySlotBinding::Spell {
-                                            spell_id: spell_id.clone(),
-                                        };
-                                    save_current_ui_settings(state);
-                                }
-                                _ => {}
-                            }
-                            audio.play_sfx("item_put");
                             return commands;
                         }
                         _ => {
@@ -6910,22 +6881,6 @@ impl InputHandler {
                             x: mx,
                             y: my,
                         });
-                    }
-                    return commands;
-                }
-                UiElementId::SpellSlot(slot_idx) => {
-                    if mouse_right_clicked {
-                        // Right-click on spell slot opens context menu for hotkey assignment
-                        if *slot_idx < crate::game::spell::SPELLS.len() {
-                            let spell = &crate::game::spell::SPELLS[*slot_idx];
-                            state.ui_state.context_menu = Some(ContextMenu {
-                                target: ContextMenuTarget::Spell {
-                                    spell_id: spell.id.to_string(),
-                                },
-                                x: mx,
-                                y: my,
-                            });
-                        }
                     }
                     return commands;
                 }

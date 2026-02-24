@@ -996,7 +996,6 @@ pub enum ContextMenuTarget {
     FarmingPatch { patch_id: String },
     Tile { x: i32, y: i32 },
     HotkeySlot(usize),
-    Spell { spell_id: String },
 }
 
 /// Context menu for right-clicking items

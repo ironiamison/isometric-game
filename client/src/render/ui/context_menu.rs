@@ -167,24 +167,9 @@ impl Renderer {
                 push_option(&mut options, "Clear Slot");
                 "Hotkey Slot".to_string()
             }
-            ContextMenuTarget::Spell { spell_id } => {
-                // Spell context menu — title only, assign buttons rendered separately
-                let name = crate::game::spell::SPELLS
-                    .iter()
-                    .find(|s| s.id == spell_id)
-                    .map(|s| s.name.to_string())
-                    .unwrap_or_else(|| "Spell".to_string());
-                name
-            }
         };
 
-        // For contexts that support hotkey assignment, we'll render inline buttons
-        let show_hotkey_assign = matches!(
-            &menu.target,
-            ContextMenuTarget::InventorySlot(_) | ContextMenuTarget::Spell { .. }
-        );
-
-        if options.is_empty() && !show_hotkey_assign {
+        if options.is_empty() {
             return;
         }
 
@@ -196,13 +181,10 @@ impl Renderer {
                 max_text_w = w;
             }
         }
-        // Hotkey assign row needs space for "Hotkey: [1][2][3][4][5]"
-        let hotkey_row_width = if show_hotkey_assign { 160.0 } else { 0.0 };
-        let menu_width = (max_text_w + h_pad * 2.0 + 8.0).max(80.0).max(hotkey_row_width).floor();
+        let menu_width = (max_text_w + h_pad * 2.0 + 8.0).max(80.0).floor();
 
-        let header_height = option_height; // header is same height as an option row
-        let hotkey_row_height = if show_hotkey_assign { option_height + 2.0 } else { 0.0 };
-        let menu_height = header_height + options.len() as f32 * option_height + hotkey_row_height + padding;
+        let header_height = option_height;
+        let menu_height = header_height + options.len() as f32 * option_height + padding;
 
         // Position at cursor, clamped to screen
         let (sw, sh) = virtual_screen_size();
@@ -269,56 +251,5 @@ impl Renderer {
             y += option_height;
         }
 
-        // Render inline hotkey assign buttons: "Hotkey: [1][2][3][4][5]"
-        if show_hotkey_assign {
-            let (mouse_x, mouse_y) = mouse_position();
-            let assign_y = y + 2.0;
-            let label = "Hotkey:";
-            let label_color = Color::new(0.55, 0.55, 0.60, 1.0);
-            self.draw_text_sharp(
-                label,
-                (menu_x + h_pad).floor(),
-                (assign_y + font_size - 2.0).floor(),
-                font_size,
-                label_color,
-            );
-            let label_w = self.measure_text_sharp(label, font_size).width;
-            let btn_size = 20.0;
-            let btn_gap = 3.0;
-            let mut bx = menu_x + h_pad + label_w + 6.0;
-            for i in 0..5 {
-                let btn_rect = Rect::new(bx, assign_y, btn_size, btn_size);
-                layout.add(UiElementId::HotkeyAssignButton(i), btn_rect);
-
-                let is_btn_hovered = mouse_x >= btn_rect.x
-                    && mouse_x <= btn_rect.x + btn_rect.w
-                    && mouse_y >= btn_rect.y
-                    && mouse_y <= btn_rect.y + btn_rect.h;
-
-                let btn_bg = if is_btn_hovered {
-                    SLOT_HOVER_BG
-                } else {
-                    SLOT_BG_FILLED
-                };
-                let btn_border = if is_btn_hovered {
-                    SLOT_HOVER_BORDER
-                } else {
-                    SLOT_BORDER
-                };
-                draw_rectangle(bx, assign_y, btn_size, btn_size, btn_bg);
-                draw_rectangle_lines(bx, assign_y, btn_size, btn_size, 1.0, btn_border);
-
-                let num_text = (i + 1).to_string();
-                let num_w = self.measure_text_sharp(&num_text, font_size).width;
-                self.draw_text_sharp(
-                    &num_text,
-                    (bx + (btn_size - num_w) / 2.0).floor(),
-                    (assign_y + font_size - 2.0).floor(),
-                    font_size,
-                    if is_btn_hovered { TEXT_TITLE } else { TEXT_NORMAL },
-                );
-                bx += btn_size + btn_gap;
-            }
-        }
     }
 }
