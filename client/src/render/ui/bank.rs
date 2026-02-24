@@ -111,6 +111,45 @@ impl Renderer {
             help_text_color,
         );
 
+        // Sort button (between help and close)
+        let sort_size = 20.0 * s;
+        let sort_x = header_x + header_w - 20.0 * s - sort_size - 14.0 * s;
+        let sort_y = header_y + (header_h - sort_size) / 2.0;
+        let sort_rect = Rect::new(sort_x, sort_y, sort_size, sort_size);
+        layout.add(UiElementId::BankSortButton, sort_rect);
+        let sort_hovered = matches!(hovered, Some(UiElementId::BankSortButton));
+        let sort_bg = if sort_hovered {
+            Color::new(0.25, 0.22, 0.30, 1.0)
+        } else {
+            Color::new(0.15, 0.13, 0.18, 1.0)
+        };
+        let sort_border = if sort_hovered {
+            Color::new(0.6, 0.55, 0.7, 1.0)
+        } else {
+            Color::new(0.35, 0.32, 0.40, 1.0)
+        };
+        draw_rectangle(sort_x, sort_y, sort_size, sort_size, sort_border);
+        draw_rectangle(
+            sort_x + 1.0,
+            sort_y + 1.0,
+            sort_size - 2.0,
+            sort_size - 2.0,
+            sort_bg,
+        );
+        let sort_text_color = if sort_hovered {
+            TEXT_GOLD
+        } else {
+            Color::new(0.7, 0.65, 0.5, 1.0)
+        };
+        let s_dims = self.measure_text_sharp("S", 14.0);
+        self.draw_text_sharp(
+            "S",
+            sort_x + (sort_size - s_dims.width) / 2.0,
+            sort_y + sort_size * 0.71,
+            14.0,
+            sort_text_color,
+        );
+
         // Close button
         let close_size = 20.0 * s;
         let close_x = header_x + header_w - close_size - 6.0 * s;
