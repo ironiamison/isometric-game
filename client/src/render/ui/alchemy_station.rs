@@ -191,7 +191,7 @@ impl Renderer {
             self.render_alchemy_progress(state, hovered, layout, content_x, content_y, content_w, total_content_h);
         } else {
             // Split: recipe list (top ~55%) + crafting detail (bottom ~45%)
-            let recipe_list_h = (total_content_h * 0.55).floor();
+            let recipe_list_h = (total_content_h * 0.60).floor();
             let detail_h = total_content_h - recipe_list_h - 4.0 * s;
             let detail_y = content_y + recipe_list_h + 4.0 * s;
 
@@ -526,41 +526,29 @@ impl Renderer {
             };
             self.draw_text_sharp(&recipe.display_name, text_x, y + 20.0 * s, 16.0, name_color);
 
-            // Ingredient summary on right side of row
-            let mut ing_summary: Vec<String> = Vec::new();
-            let mut can_craft = true;
-            for ing in &recipe.ingredients {
+            // Draw each ingredient with individual green/red color
+            let max_ing_w = content_w - (text_x - content_x) - 8.0 * s;
+            let mut cursor_x = text_x;
+            let ing_y = y + 40.0 * s;
+            let green = Color::new(0.392, 0.784, 0.392, 0.7);
+            let red = Color::new(0.784, 0.314, 0.314, 0.7);
+            for (i, ing) in recipe.ingredients.iter().enumerate() {
                 let have = state.inventory.count_item_by_id(&ing.item_id);
                 let name = state.item_registry.get_display_name(&ing.item_id);
-                ing_summary.push(format!("{}x {}", ing.count, name));
-                if have < ing.count {
-                    can_craft = false;
+                let ing_color = if have >= ing.count { green } else { red };
+                let label = if i < recipe.ingredients.len() - 1 {
+                    format!("{}x {}, ", ing.count, name)
+                } else {
+                    format!("{}x {}", ing.count, name)
+                };
+                // Stop drawing if we'd exceed available width
+                let dims = self.measure_text_sharp(&label, 16.0);
+                if cursor_x + dims.width > text_x + max_ing_w {
+                    self.draw_text_sharp("...", cursor_x, ing_y, 16.0, ing_color);
+                    break;
                 }
-            }
-
-            // Level check
-            if recipe.level_required > 1 {
-                if let Some(player) = state.get_local_player() {
-                    if player.skills.alchemy.level < recipe.level_required {
-                        can_craft = false;
-                    }
-                }
-            }
-
-            let ing_text = ing_summary.join(", ");
-            let ing_color = if can_craft {
-                Color::new(0.392, 0.784, 0.392, 0.7)
-            } else {
-                Color::new(0.784, 0.314, 0.314, 0.7)
-            };
-            // Truncate if too long
-            let max_ing_w = content_w - (text_x - content_x) - 8.0 * s;
-            let ing_dims = self.measure_text_sharp(&ing_text, 16.0);
-            if ing_dims.width > max_ing_w {
-                let short = format!("{}...", &ing_text[..ing_text.len().min(30)]);
-                self.draw_text_sharp(&short, text_x, y + 40.0 * s, 16.0, ing_color);
-            } else {
-                self.draw_text_sharp(&ing_text, text_x, y + 40.0 * s, 16.0, ing_color);
+                self.draw_text_sharp(&label, cursor_x, ing_y, 16.0, ing_color);
+                cursor_x += dims.width;
             }
 
             // Separator line
@@ -731,10 +719,11 @@ impl Renderer {
 
         // ===== Row 2: Ingredient grid (2 columns, below icon row) =====
         let ing_y = row1_y + icon_size + 8.0 * s;
-        let ing_x = x + 10.0 * s;
+        let ing_x = icon_x + 6.0; // align with preview icon box
         let ing_icon_size = 24.0 * s;
-        let ing_row_h = 30.0 * s; // enough vertical space so sprites don't overlap
-        let col_w = (w - 20.0 * s) / 2.0; // two columns
+        let ing_text_offset = ing_icon_size + 16.0 * s; // extra gap so text clears sprite
+        let ing_row_h = 30.0 * s;
+        let col_w = (w - (ing_x - x) * 2.0) / 2.0; // two columns within ingredient area
 
         let mut can_craft = true;
 
@@ -772,7 +761,7 @@ impl Renderer {
 
             self.draw_text_sharp(
                 &req_text,
-                ix + ing_icon_size + 4.0 * s,
+                ix + ing_text_offset,
                 iy + ing_icon_size * 0.72,
                 16.0,
                 color,
@@ -905,45 +894,6 @@ impl Renderer {
             brew_text_color,
         );
 
-        // CANCEL button
-        let cancel_btn_w = 100.0 * s;
-        let cancel_btn_h = 28.0 * s;
-        let cancel_btn_x = x + w - cancel_btn_w - 10.0 * s;
-        let cancel_btn_y = btn_y - 1.0;
-
-        let cancel_bounds = Rect::new(cancel_btn_x, cancel_btn_y, cancel_btn_w, cancel_btn_h);
-        layout.add(UiElementId::AlchemyCancelButton, cancel_bounds);
-
-        let is_cancel_hovered = matches!(hovered, Some(UiElementId::AlchemyCancelButton));
-        let (cancel_bg, cancel_border) = if is_cancel_hovered {
-            (Color::new(0.45, 0.15, 0.15, 1.0), Color::new(0.6, 0.2, 0.2, 1.0))
-        } else {
-            (Color::new(0.25, 0.10, 0.10, 1.0), Color::new(0.4, 0.15, 0.15, 1.0))
-        };
-
-        draw_rectangle(cancel_btn_x, cancel_btn_y, cancel_btn_w, cancel_btn_h, cancel_border);
-        draw_rectangle(
-            cancel_btn_x + 1.0,
-            cancel_btn_y + 1.0,
-            cancel_btn_w - 2.0,
-            cancel_btn_h - 2.0,
-            cancel_bg,
-        );
-
-        let cancel_text = "[ CANCEL ]";
-        let cancel_text_w = self.measure_text_sharp(cancel_text, 16.0).width;
-        let cancel_text_color = if is_cancel_hovered {
-            WHITE
-        } else {
-            Color::new(0.85, 0.6, 0.6, 1.0)
-        };
-        self.draw_text_sharp(
-            cancel_text,
-            cancel_btn_x + (cancel_btn_w - cancel_text_w) / 2.0,
-            cancel_btn_y + cancel_btn_h * 0.69,
-            16.0,
-            cancel_text_color,
-        );
     }
 
     /// Render brewing progress overlay

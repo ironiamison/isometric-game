@@ -5147,8 +5147,9 @@ impl InputHandler {
 
                 let (_, sh) = crate::util::virtual_screen_size();
                 let panel_h = (520.0_f32).min(sh - 16.0);
-                let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
-                let recipe_list_h = (content_h * 0.55).floor();
+                // 8=frame, 40=header, 28=tabs, 24=skill bar, 30=footer, 16=padding, 6=skill bar gap
+                let content_h = panel_h - 8.0 - 40.0 - 28.0 - 24.0 - 30.0 - 16.0 - 6.0;
+                let recipe_list_h = (content_h * 0.60).floor();
                 let max_scroll = (total_content - recipe_list_h).max(0.0);
 
                 // W/S or Up/Down to navigate recipes
