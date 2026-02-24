@@ -1,4 +1,5 @@
 /// Settings persistence for control scheme (classic vs modern) and UI settings
+use crate::game::hotkey::HotkeyBarConfig;
 use serde::{Deserialize, Serialize};
 
 /// UI settings that should be persisted across sessions
@@ -14,6 +15,8 @@ pub struct UiSettings {
     pub graphics_low: bool,
     #[serde(default)]
     pub chat_log_background: bool,
+    #[serde(default)]
+    pub hotkey_bar: HotkeyBarConfig,
 }
 
 impl Default for UiSettings {
@@ -36,6 +39,7 @@ impl Default for UiSettings {
             #[cfg(not(target_os = "android"))]
             graphics_low: false,
             chat_log_background: true,
+            hotkey_bar: HotkeyBarConfig::default(),
         }
     }
 }

@@ -1,5 +1,6 @@
 use super::chunk::ChunkManager;
 use super::entities::Player;
+use super::hotkey::HotkeyBarConfig;
 use super::item::{GroundItem, Inventory, RecipeDefinition};
 use super::item_registry::ItemRegistry;
 use super::npc::Npc;
@@ -994,6 +995,8 @@ pub enum ContextMenuTarget {
     GroundItem { id: String },
     FarmingPatch { patch_id: String },
     Tile { x: i32, y: i32 },
+    HotkeySlot(usize),
+    Spell { spell_id: String },
 }
 
 /// Context menu for right-clicking items
@@ -1045,6 +1048,7 @@ pub struct BankDrag {
 pub enum DragSource {
     Inventory(usize),  // Inventory slot index
     Equipment(String), // Equipment slot type ("body", "feet")
+    Spell(String),     // Spell ID for drag-to-hotkey
 }
 
 /// Drag state for inventory/equipment rearrangement
@@ -1313,8 +1317,10 @@ pub struct UiState {
     pub classic_controls: bool,
     /// Active tab in the prayer/spell panel: 0 = Prayers, 1 = Spells
     pub prayer_spell_tab: usize,
-    /// Whether the spell bar is active (true) or item bar (false)
-    pub spell_bar_active: bool,
+    /// Unified hotkey bar configuration (presets + bindings)
+    pub hotkey_bar: HotkeyBarConfig,
+    /// Whether the hotkey settings popup is open
+    pub hotkey_settings_open: bool,
     /// Whether prayer help overlay is open
     pub prayer_help_open: bool,
     /// Whether spell help overlay is open
@@ -1481,7 +1487,8 @@ impl Default for UiState {
             settings_slider_dragging: None,
             classic_controls: false,
             prayer_spell_tab: 1,
-            spell_bar_active: false,
+            hotkey_bar: HotkeyBarConfig::default(),
+            hotkey_settings_open: false,
             prayer_help_open: false,
             spell_help_open: false,
             #[cfg(target_os = "android")]

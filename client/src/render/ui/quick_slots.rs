@@ -1,8 +1,9 @@
-//! Quick slots bar rendering - toggleable between items and spells
+//! Unified hotkey bar rendering — items + spells mixed in 5 slots with presets
 
 use super::super::isometric::world_to_screen;
 use super::super::Renderer;
 use super::common::*;
+use crate::game::hotkey::HotkeySlotBinding;
 use crate::game::spell::SPELLS;
 use crate::game::GameState;
 use crate::ui::{UiElementId, UiLayout};
@@ -16,294 +17,298 @@ impl Renderer {
         hovered: &Option<UiElementId>,
         layout: &mut UiLayout,
     ) {
-        if state.ui_state.spell_bar_active {
-            self.render_spell_bar(state, hovered, layout);
+        let scale = state.ui_state.ui_scale;
+        let slot_size = (QUICK_SLOT_SIZE * scale).max(MIN_SLOT_SIZE);
+        let spacing = QUICK_SLOT_SPACING * scale;
+        let total_slots_width = 5.0 * slot_size + 4.0 * spacing;
+
+        let (sw, sh) = virtual_screen_size();
+
+        // --- Compute positions for left controls ---
+        let cog_size = (22.0 * scale).max(20.0);
+        let arrow_w = (20.0 * scale).max(18.0);
+        let arrow_h = (14.0 * scale).max(12.0);
+        let preset_num_w = (18.0 * scale).max(16.0);
+        let preset_block_w = arrow_w.max(preset_num_w);
+        let preset_block_h = arrow_h * 2.0 + preset_num_w; // up + number + down
+        let left_controls_w = cog_size + spacing + preset_block_w + spacing;
+
+        // Center the whole assembly (left controls + slots)
+        let total_w = left_controls_w + total_slots_width;
+        let base_x = (sw - total_w) / 2.0;
+        let slots_start_x = base_x + left_controls_w;
+        let slots_start_y = sh - EXP_BAR_GAP * scale - slot_size;
+
+        // --- Settings Cog ---
+        let cog_x = base_x;
+        let cog_y = slots_start_y + (slot_size - cog_size) / 2.0;
+        let cog_bounds = Rect::new(cog_x, cog_y, cog_size, cog_size);
+        layout.add(UiElementId::HotkeySettingsCog, cog_bounds);
+        let cog_hovered = matches!(hovered, Some(UiElementId::HotkeySettingsCog));
+        let cog_bg = if cog_hovered || state.ui_state.hotkey_settings_open {
+            SLOT_HOVER_BG
         } else {
-            self.render_item_bar(state, hovered, layout);
-        }
-        // Render the toggle button
-        self.render_bar_toggle_button(state, hovered, layout);
-    }
+            SLOT_BG_FILLED
+        };
+        let cog_border = if cog_hovered || state.ui_state.hotkey_settings_open {
+            SLOT_HOVER_BORDER
+        } else {
+            SLOT_BORDER
+        };
+        draw_rectangle(cog_x, cog_y, cog_size, cog_size, cog_bg);
+        draw_rectangle_lines(cog_x, cog_y, cog_size, cog_size, 1.0, cog_border);
+        // Gear icon: draw a simple "gear" glyph
+        let gear_text = "\u{2699}"; // Unicode gear
+        let gear_fs = 16.0;
+        let gear_w = self.measure_text_sharp(gear_text, gear_fs).width;
+        self.draw_text_sharp(
+            gear_text,
+            (cog_x + (cog_size - gear_w) / 2.0).floor(),
+            (cog_y + (cog_size + gear_fs * 0.6) / 2.0).floor(),
+            gear_fs,
+            if cog_hovered { TEXT_TITLE } else { TEXT_DIM },
+        );
 
-    /// Render item bar: slots 0-4 of inventory directly
-    fn render_item_bar(
-        &self,
-        state: &GameState,
-        hovered: &Option<UiElementId>,
-        layout: &mut UiLayout,
-    ) {
-        let scale = state.ui_state.ui_scale;
-        let slot_size = (QUICK_SLOT_SIZE * scale).max(MIN_SLOT_SIZE);
-        let spacing = QUICK_SLOT_SPACING * scale;
-        let total_width = 5.0 * slot_size + 4.0 * spacing;
+        // --- Preset Selector (up arrow, number, down arrow) ---
+        let preset_x = base_x + cog_size + spacing;
+        let preset_center_y = slots_start_y + slot_size / 2.0;
 
-        let (sw, sh) = virtual_screen_size();
-        let start_x = (sw - total_width) / 2.0;
-        let start_y = sh - EXP_BAR_GAP * scale - slot_size;
+        // Up arrow
+        let up_x = preset_x + (preset_block_w - arrow_w) / 2.0;
+        let up_y = preset_center_y - preset_num_w / 2.0 - arrow_h;
+        let up_bounds = Rect::new(up_x, up_y, arrow_w, arrow_h);
+        layout.add(UiElementId::HotkeyPresetUp, up_bounds);
+        let up_hovered = matches!(hovered, Some(UiElementId::HotkeyPresetUp));
+        let up_bg = if up_hovered { SLOT_HOVER_BG } else { SLOT_BG_FILLED };
+        draw_rectangle(up_x, up_y, arrow_w, arrow_h, up_bg);
+        draw_rectangle_lines(up_x, up_y, arrow_w, arrow_h, 1.0, SLOT_BORDER);
+        let arrow_char = "\u{25B2}";
+        let aw = self.measure_text_sharp(arrow_char, 12.0).width;
+        self.draw_text_sharp(
+            arrow_char,
+            (up_x + (arrow_w - aw) / 2.0).floor(),
+            (up_y + arrow_h - 2.0).floor(),
+            12.0,
+            if up_hovered { TEXT_TITLE } else { TEXT_DIM },
+        );
 
-        for i in 0..5 {
-            let x = start_x + i as f32 * (slot_size + spacing);
-            let y = start_y;
+        // Preset number
+        let num_y = preset_center_y - preset_num_w / 2.0;
+        let preset_num = (state.ui_state.hotkey_bar.active_preset + 1).to_string();
+        let pn_w = self.measure_text_sharp(&preset_num, 16.0).width;
+        self.draw_text_sharp(
+            &preset_num,
+            (preset_x + (preset_block_w - pn_w) / 2.0).floor(),
+            (num_y + preset_num_w * 0.75).floor(),
+            16.0,
+            TEXT_TITLE,
+        );
 
-            // Register slot bounds for hit detection
-            let bounds = Rect::new(x, y, slot_size, slot_size);
-            layout.add(UiElementId::QuickSlot(i), bounds);
+        // Down arrow
+        let down_x = preset_x + (preset_block_w - arrow_w) / 2.0;
+        let down_y = preset_center_y + preset_num_w / 2.0;
+        let down_bounds = Rect::new(down_x, down_y, arrow_w, arrow_h);
+        layout.add(UiElementId::HotkeyPresetDown, down_bounds);
+        let down_hovered = matches!(hovered, Some(UiElementId::HotkeyPresetDown));
+        let down_bg = if down_hovered { SLOT_HOVER_BG } else { SLOT_BG_FILLED };
+        draw_rectangle(down_x, down_y, arrow_w, arrow_h, down_bg);
+        draw_rectangle_lines(down_x, down_y, arrow_w, arrow_h, 1.0, SLOT_BORDER);
+        let darrow_char = "\u{25BC}";
+        let daw = self.measure_text_sharp(darrow_char, 12.0).width;
+        self.draw_text_sharp(
+            darrow_char,
+            (down_x + (arrow_w - daw) / 2.0).floor(),
+            (down_y + arrow_h - 2.0).floor(),
+            12.0,
+            if down_hovered { TEXT_TITLE } else { TEXT_DIM },
+        );
 
-            let is_hovered = matches!(hovered, Some(UiElementId::QuickSlot(idx)) if *idx == i);
-
-            // Check if this inventory slot is being dragged
-            let is_dragging = matches!(
-                &state.ui_state.drag_state,
-                Some(drag) if matches!(&drag.source, crate::game::DragSource::Inventory(idx) if *idx == i)
-            );
-
-            let slot_state = if is_dragging {
-                SlotState::Dragging
-            } else if is_hovered {
-                SlotState::Hovered
-            } else {
-                SlotState::Normal
-            };
-
-            let has_item = state
-                .inventory
-                .slots
-                .get(i)
-                .map(|s| s.is_some())
-                .unwrap_or(false);
-            self.draw_inventory_slot(x, y, slot_size, has_item, slot_state);
-
-            // Draw item if present (hide if being dragged)
-            if let Some(Some(slot)) = state.inventory.slots.get(i) {
-                if !is_dragging {
-                    self.draw_item_icon(&slot.item_id, x, y, slot_size, slot_size, state, false);
-
-                    // Quantity badge (bottom-left with shadow)
-                    if slot.quantity > 1 {
-                        let qty_text = slot.quantity.to_string();
-                        self.draw_text_sharp(
-                            &qty_text,
-                            x + 3.0 * scale,
-                            y + slot_size - 4.0,
-                            16.0,
-                            Color::new(0.0, 0.0, 0.0, 0.8),
-                        );
-                        self.draw_text_sharp(
-                            &qty_text,
-                            x + 2.0 * scale,
-                            y + slot_size - 5.0,
-                            16.0,
-                            TEXT_NORMAL,
-                        );
-                    }
-                }
-            }
-
-            // Shift-drop indicator overlay
-            let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
-            if shift_held && state.ui_state.shift_drop_enabled && has_item && is_hovered {
-                draw_rectangle(
-                    x + 2.0,
-                    y + 2.0,
-                    slot_size - 4.0,
-                    slot_size - 4.0,
-                    Color::new(0.8, 0.2, 0.2, 0.35),
-                );
-                draw_rectangle_lines(
-                    x + 1.0,
-                    y + 1.0,
-                    slot_size - 2.0,
-                    slot_size - 2.0,
-                    2.0,
-                    Color::new(0.9, 0.3, 0.3, 0.9),
-                );
-            }
-
-            // Slot number badge (top-right)
-            let num_text = (i + 1).to_string();
-            let text_w = self.measure_text_sharp(&num_text, 16.0).width;
-            let badge_w = text_w + 2.0;
-            let badge_h = 13.0;
-            let num_x = x + slot_size - badge_w - 1.0;
-            let num_y = y + 1.0;
-            draw_rectangle(
-                num_x,
-                num_y,
-                badge_w,
-                badge_h,
-                Color::new(0.0, 0.0, 0.0, 0.5),
-            );
-            self.draw_text_sharp(&num_text, num_x + 1.0, num_y + 11.0, 16.0, TEXT_NORMAL);
-        }
-    }
-
-    /// Render spell bar: unlocked spells in up to 5 slots
-    fn render_spell_bar(
-        &self,
-        state: &GameState,
-        hovered: &Option<UiElementId>,
-        layout: &mut UiLayout,
-    ) {
-        let scale = state.ui_state.ui_scale;
-        let slot_size = (QUICK_SLOT_SIZE * scale).max(MIN_SLOT_SIZE);
-        let spacing = QUICK_SLOT_SPACING * scale;
-        let total_width = 5.0 * slot_size + 4.0 * spacing;
-
-        let (sw, sh) = virtual_screen_size();
-        let start_x = (sw - total_width) / 2.0;
-        let start_y = sh - EXP_BAR_GAP * scale - slot_size;
-
-        // Get player magic level
-        let magic_level = state
-            .get_local_player()
-            .map(|p| p.skills.magic.level)
-            .unwrap_or(1);
-
-        // Collect unlocked spells
-        let unlocked_spells: Vec<_> = SPELLS
-            .iter()
-            .filter(|s| magic_level >= s.magic_level_req)
-            .collect();
-
+        // --- 5 Unified Slots ---
+        let active_preset = state.ui_state.hotkey_bar.active();
         let now = macroquad::time::get_time();
         let player_mp = state.get_local_player().map(|p| p.mp).unwrap_or(0);
 
         for i in 0..5 {
-            let x = start_x + i as f32 * (slot_size + spacing);
-            let y = start_y;
+            let x = slots_start_x + i as f32 * (slot_size + spacing);
+            let y = slots_start_y;
 
-            // Register slot bounds for hit detection
             let bounds = Rect::new(x, y, slot_size, slot_size);
             layout.add(UiElementId::QuickSlot(i), bounds);
 
             let is_hovered = matches!(hovered, Some(UiElementId::QuickSlot(idx)) if *idx == i);
-
             let slot_state = if is_hovered {
                 SlotState::Hovered
             } else {
                 SlotState::Normal
             };
 
-            if let Some(spell_def) = unlocked_spells.get(i) {
-                // Draw slot background (has content)
-                self.draw_inventory_slot(x, y, slot_size, true, slot_state);
-
-                // Try to draw spell icon texture, fallback to colored rect with letter
-                if let Some((texture, source_rect)) = self.spell_icons.get(spell_def.id) {
-                    // Draw icon centered in slot
-                    let icon_size = slot_size - 8.0;
-                    let icon_x = (x + (slot_size - icon_size) / 2.0).floor();
-                    let icon_y = (y + (slot_size - icon_size) / 2.0).floor();
-                    draw_texture_ex(
-                        texture,
-                        icon_x,
-                        icon_y,
-                        WHITE,
-                        DrawTextureParams {
-                            source: source_rect,
-                            dest_size: Some(Vec2::new(icon_size, icon_size)),
-                            ..Default::default()
-                        },
-                    );
-                } else {
-                    // Fallback: colored rectangle with spell's first letter
-                    let color = match spell_def.spell_type {
-                        crate::game::spell::SpellType::Damage => Color::new(0.6, 0.15, 0.15, 0.9),
-                        crate::game::spell::SpellType::Heal => Color::new(0.15, 0.5, 0.15, 0.9),
-                        crate::game::spell::SpellType::Teleport => Color::new(0.2, 0.3, 0.6, 0.9),
-                    };
-                    let pad = 4.0;
-                    draw_rectangle(
-                        x + pad,
-                        y + pad,
-                        slot_size - pad * 2.0,
-                        slot_size - pad * 2.0,
-                        color,
-                    );
-
-                    // Draw spell first letter centered
-                    let letter = &spell_def.name[..1];
-                    let letter_size = 22.0;
-                    let letter_w = self.measure_text_sharp(letter, letter_size).width;
-                    self.draw_text_sharp(
-                        letter,
-                        x + (slot_size - letter_w) / 2.0,
-                        y + (slot_size + letter_size * 0.6) / 2.0,
-                        letter_size,
-                        WHITE,
-                    );
+            match &active_preset.slots[i] {
+                HotkeySlotBinding::Empty => {
+                    self.draw_inventory_slot(x, y, slot_size, false, slot_state);
                 }
+                HotkeySlotBinding::Item { item_id } => {
+                    // Look up item in inventory
+                    let inv_slot = state.inventory.find_slot_by_item_id(item_id);
+                    let quantity = inv_slot.and_then(|idx| {
+                        state.inventory.slots.get(idx).and_then(|s| s.as_ref()).map(|s| s.quantity)
+                    });
+                    let has_item = quantity.is_some();
+                    let is_ghost = !has_item; // Depleted — show at 30% opacity
 
-                // Mana cost badge (bottom-left with shadow)
-                let mana_text = spell_def.mana_cost.to_string();
-                self.draw_text_sharp(
-                    &mana_text,
-                    x + 3.0 * scale,
-                    y + slot_size - 4.0,
-                    16.0,
-                    Color::new(0.0, 0.0, 0.0, 0.8),
-                );
-                self.draw_text_sharp(
-                    &mana_text,
-                    x + 2.0 * scale,
-                    y + slot_size - 5.0,
-                    16.0,
-                    Color::new(0.4, 0.6, 1.0, 1.0),
-                );
+                    self.draw_inventory_slot(x, y, slot_size, has_item || is_ghost, slot_state);
 
-                // Check cooldown
-                let on_cooldown = state
-                    .spell_cooldowns
-                    .get(spell_def.id)
-                    .map_or(false, |&t| now < t);
-                let insufficient_mana = player_mp < spell_def.mana_cost;
-
-                if on_cooldown {
-                    // Dark semi-transparent overlay for cooldown
-                    draw_rectangle(
-                        x + 2.0,
-                        y + 2.0,
-                        slot_size - 4.0,
-                        slot_size - 4.0,
-                        Color::new(0.0, 0.0, 0.0, 0.55),
-                    );
-
-                    // Show remaining cooldown time
-                    let remaining = state
-                        .spell_cooldowns
-                        .get(spell_def.id)
-                        .map_or(0.0, |&t| (t - now).max(0.0));
-                    let cd_text = if remaining >= 60.0 {
-                        let mins = (remaining / 60.0).floor() as u32;
-                        let secs = (remaining % 60.0).floor() as u32;
-                        format!("{}:{:02}", mins, secs)
+                    // Draw item icon (ghost = 30% opacity via tint)
+                    if is_ghost {
+                        // Ghost: draw with reduced alpha
+                        let tint = Color::new(1.0, 1.0, 1.0, 0.3);
+                        self.draw_item_icon_tinted(item_id, x, y, slot_size, slot_size, state, tint);
                     } else {
-                        format!("{:.1}", remaining)
-                    };
-                    let cd_w = self.measure_text_sharp(&cd_text, 16.0).width;
-                    self.draw_text_sharp(
-                        &cd_text,
-                        x + (slot_size - cd_w) / 2.0,
-                        y + slot_size / 2.0 + 4.0,
-                        16.0,
-                        WHITE,
-                    );
-                } else if insufficient_mana {
-                    // Red-tinted overlay for insufficient mana
-                    draw_rectangle(
-                        x + 2.0,
-                        y + 2.0,
-                        slot_size - 4.0,
-                        slot_size - 4.0,
-                        Color::new(0.6, 0.1, 0.1, 0.45),
-                    );
+                        self.draw_item_icon(item_id, x, y, slot_size, slot_size, state, false);
+                    }
+
+                    // Quantity badge
+                    if let Some(qty) = quantity {
+                        if qty > 1 {
+                            let qty_text = qty.to_string();
+                            self.draw_text_sharp(
+                                &qty_text,
+                                x + 3.0 * scale,
+                                y + slot_size - 4.0,
+                                16.0,
+                                Color::new(0.0, 0.0, 0.0, 0.8),
+                            );
+                            self.draw_text_sharp(
+                                &qty_text,
+                                x + 2.0 * scale,
+                                y + slot_size - 5.0,
+                                16.0,
+                                TEXT_NORMAL,
+                            );
+                        }
+                    }
                 }
-            } else {
-                // Empty spell slot (no unlocked spell at this index)
-                self.draw_inventory_slot(x, y, slot_size, false, slot_state);
+                HotkeySlotBinding::Spell { spell_id } => {
+                    let spell_def = SPELLS.iter().find(|s| s.id == spell_id);
+                    if let Some(spell_def) = spell_def {
+                        self.draw_inventory_slot(x, y, slot_size, true, slot_state);
+
+                        // Spell icon
+                        if let Some((texture, source_rect)) = self.spell_icons.get(spell_def.id) {
+                            let icon_size = slot_size - 8.0;
+                            let icon_x = (x + (slot_size - icon_size) / 2.0).floor();
+                            let icon_y = (y + (slot_size - icon_size) / 2.0).floor();
+                            draw_texture_ex(
+                                texture,
+                                icon_x,
+                                icon_y,
+                                WHITE,
+                                DrawTextureParams {
+                                    source: source_rect,
+                                    dest_size: Some(Vec2::new(icon_size, icon_size)),
+                                    ..Default::default()
+                                },
+                            );
+                        } else {
+                            // Fallback: colored rectangle with spell's first letter
+                            let color = match spell_def.spell_type {
+                                crate::game::spell::SpellType::Damage => {
+                                    Color::new(0.6, 0.15, 0.15, 0.9)
+                                }
+                                crate::game::spell::SpellType::Heal => {
+                                    Color::new(0.15, 0.5, 0.15, 0.9)
+                                }
+                                crate::game::spell::SpellType::Teleport => {
+                                    Color::new(0.2, 0.3, 0.6, 0.9)
+                                }
+                            };
+                            let pad = 4.0;
+                            draw_rectangle(
+                                x + pad,
+                                y + pad,
+                                slot_size - pad * 2.0,
+                                slot_size - pad * 2.0,
+                                color,
+                            );
+                            let letter = &spell_def.name[..1];
+                            let letter_size = 22.0;
+                            let letter_w = self.measure_text_sharp(letter, letter_size).width;
+                            self.draw_text_sharp(
+                                letter,
+                                x + (slot_size - letter_w) / 2.0,
+                                y + (slot_size + letter_size * 0.6) / 2.0,
+                                letter_size,
+                                WHITE,
+                            );
+                        }
+
+                        // Mana cost badge (bottom-left)
+                        let mana_text = spell_def.mana_cost.to_string();
+                        self.draw_text_sharp(
+                            &mana_text,
+                            x + 3.0 * scale,
+                            y + slot_size - 4.0,
+                            16.0,
+                            Color::new(0.0, 0.0, 0.0, 0.8),
+                        );
+                        self.draw_text_sharp(
+                            &mana_text,
+                            x + 2.0 * scale,
+                            y + slot_size - 5.0,
+                            16.0,
+                            Color::new(0.4, 0.6, 1.0, 1.0),
+                        );
+
+                        // Cooldown overlay
+                        let on_cooldown = state
+                            .spell_cooldowns
+                            .get(spell_def.id)
+                            .map_or(false, |&t| now < t);
+                        let insufficient_mana = player_mp < spell_def.mana_cost;
+
+                        if on_cooldown {
+                            draw_rectangle(
+                                x + 2.0,
+                                y + 2.0,
+                                slot_size - 4.0,
+                                slot_size - 4.0,
+                                Color::new(0.0, 0.0, 0.0, 0.55),
+                            );
+                            let remaining = state
+                                .spell_cooldowns
+                                .get(spell_def.id)
+                                .map_or(0.0, |&t| (t - now).max(0.0));
+                            let cd_text = if remaining >= 60.0 {
+                                let mins = (remaining / 60.0).floor() as u32;
+                                let secs = (remaining % 60.0).floor() as u32;
+                                format!("{}:{:02}", mins, secs)
+                            } else {
+                                format!("{:.1}", remaining)
+                            };
+                            let cd_w = self.measure_text_sharp(&cd_text, 16.0).width;
+                            self.draw_text_sharp(
+                                &cd_text,
+                                x + (slot_size - cd_w) / 2.0,
+                                y + slot_size / 2.0 + 4.0,
+                                16.0,
+                                WHITE,
+                            );
+                        } else if insufficient_mana {
+                            draw_rectangle(
+                                x + 2.0,
+                                y + 2.0,
+                                slot_size - 4.0,
+                                slot_size - 4.0,
+                                Color::new(0.6, 0.1, 0.1, 0.45),
+                            );
+                        }
+                    } else {
+                        // Unknown spell — draw as empty
+                        self.draw_inventory_slot(x, y, slot_size, false, slot_state);
+                    }
+                }
             }
 
-            // Slot number badge (top-right)
+            // Slot number badge (top-right) — always drawn
             let num_text = (i + 1).to_string();
             let text_w = self.measure_text_sharp(&num_text, 16.0).width;
             let badge_w = text_w + 2.0;
@@ -319,125 +324,225 @@ impl Renderer {
             );
             self.draw_text_sharp(&num_text, num_x + 1.0, num_y + 11.0, 16.0, TEXT_NORMAL);
         }
+
+        // --- Settings Popup ---
+        if state.ui_state.hotkey_settings_open {
+            self.render_hotkey_settings_popup(state, hovered, layout, slots_start_x, slots_start_y, slot_size, spacing);
+        }
     }
 
-    /// Render the toggle button between items and spells bar
-    fn render_bar_toggle_button(
+    /// Render the hotkey settings popup above the bar
+    fn render_hotkey_settings_popup(
         &self,
         state: &GameState,
         hovered: &Option<UiElementId>,
         layout: &mut UiLayout,
+        slots_x: f32,
+        slots_y: f32,
+        slot_size: f32,
+        spacing: f32,
     ) {
         let scale = state.ui_state.ui_scale;
-        let slot_size = (QUICK_SLOT_SIZE * scale).max(MIN_SLOT_SIZE);
-        let spacing = QUICK_SLOT_SPACING * scale;
-        let total_width = 5.0 * slot_size + 4.0 * spacing;
+        let total_slots_w = 5.0 * slot_size + 4.0 * spacing;
+        let popup_w = total_slots_w + 16.0;
+        let popup_h = (100.0 * scale).max(90.0);
+        let popup_x = slots_x - 8.0;
+        let popup_y = slots_y - popup_h - 6.0;
 
-        let (sw, sh) = virtual_screen_size();
-        let start_x = (sw - total_width) / 2.0;
-        let start_y = sh - EXP_BAR_GAP * scale - slot_size;
-
-        // Position the toggle button to the left of the quick slots bar
-        let btn_w = (40.0 * scale).max(34.0);
-        let btn_h = slot_size;
-        let btn_x = start_x - btn_w - spacing;
-        let btn_y = start_y;
-
-        let bounds = Rect::new(btn_x, btn_y, btn_w, btn_h);
-        layout.add(UiElementId::SpellBarToggle, bounds);
-
-        let is_hovered = matches!(hovered, Some(UiElementId::SpellBarToggle));
-
-        // Button background
-        let bg_color = if is_hovered {
-            SLOT_HOVER_BG
-        } else {
-            SLOT_BG_FILLED
-        };
-        let border_color = if is_hovered {
-            SLOT_HOVER_BORDER
-        } else {
-            SLOT_BORDER
-        };
-
-        // Draw beveled slot background
-        draw_rectangle(btn_x, btn_y, btn_w, btn_h, bg_color);
-        draw_rectangle_lines(btn_x, btn_y, btn_w, btn_h, 1.0, border_color);
-
-        // Draw icon/label based on current mode
-        let label = if state.ui_state.spell_bar_active {
-            "Sp"
-        } else {
-            "It"
-        };
-        let label_color = if state.ui_state.spell_bar_active {
-            Color::new(0.5, 0.4, 0.9, 1.0) // Purple for spells
-        } else {
-            Color::new(0.7, 0.6, 0.4, 1.0) // Gold/brown for items
-        };
-
-        let font_size = 16.0;
-        let text_w = self.measure_text_sharp(label, font_size).width;
-        self.draw_text_sharp(
-            label,
-            btn_x + (btn_w - text_w) / 2.0,
-            btn_y + (btn_h + font_size * 0.6) / 2.0,
-            font_size,
-            label_color,
+        // Background
+        draw_rectangle(
+            popup_x - 1.0,
+            popup_y - 1.0,
+            popup_w + 2.0,
+            popup_h + 2.0,
+            SLOT_BORDER,
         );
+        draw_rectangle(popup_x, popup_y, popup_w, popup_h, PANEL_BG_DARK);
 
-        // Pulsing highlight when spell help overlay is open
-        if state.ui_state.spell_help_open {
-            let pulse = 0.5 + 0.5 * (get_time() as f32 * 3.0).sin();
-            let glow_color = Color::new(0.6, 0.4, 0.9, 0.3 + 0.4 * pulse);
-            let border_glow = Color::new(0.7, 0.5, 1.0, 0.6 + 0.4 * pulse);
-            // Outer glow
-            draw_rectangle(
-                btn_x - 3.0,
-                btn_y - 3.0,
-                btn_w + 6.0,
-                btn_h + 6.0,
-                glow_color,
-            );
-            // Pulsing border
-            draw_rectangle_lines(
-                btn_x - 2.0,
-                btn_y - 2.0,
-                btn_w + 4.0,
-                btn_h + 4.0,
-                2.0,
-                border_glow,
+        // Preset tabs row at the top
+        let tab_w = (popup_w - 16.0) / 5.0;
+        let tab_h = 22.0;
+        let tab_y = popup_y + 6.0;
+        for i in 0..5 {
+            let tx = popup_x + 8.0 + i as f32 * tab_w;
+            let tab_bounds = Rect::new(tx, tab_y, tab_w - 2.0, tab_h);
+            layout.add(UiElementId::HotkeySettingsPresetTab(i), tab_bounds);
+
+            let is_active = state.ui_state.hotkey_bar.active_preset == i;
+            let is_tab_hovered =
+                matches!(hovered, Some(UiElementId::HotkeySettingsPresetTab(idx)) if *idx == i);
+
+            let bg = if is_active {
+                SLOT_HOVER_BG
+            } else if is_tab_hovered {
+                SLOT_BG_FILLED
+            } else {
+                PANEL_BG_MID
+            };
+            let border = if is_active {
+                SLOT_HOVER_BORDER
+            } else {
+                SLOT_BORDER
+            };
+            draw_rectangle(tx, tab_y, tab_w - 2.0, tab_h, bg);
+            draw_rectangle_lines(tx, tab_y, tab_w - 2.0, tab_h, 1.0, border);
+
+            let label = (i + 1).to_string();
+            let lw = self.measure_text_sharp(&label, 16.0).width;
+            let text_color = if is_active { TEXT_TITLE } else { TEXT_DIM };
+            self.draw_text_sharp(
+                &label,
+                (tx + (tab_w - 2.0 - lw) / 2.0).floor(),
+                (tab_y + 16.0).floor(),
+                16.0,
+                text_color,
             );
         }
 
-        // Tooltip on hover
-        if is_hovered {
-            let tooltip_text = if state.ui_state.spell_bar_active {
-                "Spell Bar (click to switch to Items)"
-            } else {
-                "Item Bar (click to switch to Spells)"
-            };
-            let padding = 6.0;
-            let tip_dims = self.measure_text_sharp(tooltip_text, 16.0);
-            let tip_w = (tip_dims.width + padding * 2.0).floor();
-            let tip_h = (18.0 + padding * 2.0).floor();
-            let tip_x = (btn_x + btn_w / 2.0 - tip_w / 2.0).floor();
-            let tip_y = (btn_y - tip_h - 4.0).floor();
+        // Slot preview row
+        let preview_slot_size = (36.0 * scale).max(32.0);
+        let preview_spacing = (popup_w - 16.0 - 5.0 * preview_slot_size) / 4.0;
+        let preview_y = tab_y + tab_h + 8.0;
+        let active_preset = state.ui_state.hotkey_bar.active();
+        let now = macroquad::time::get_time();
 
-            draw_rectangle(
-                tip_x - 1.0,
-                tip_y - 1.0,
-                tip_w + 2.0,
-                tip_h + 2.0,
-                SLOT_BORDER,
+        for i in 0..5 {
+            let px = popup_x + 8.0 + i as f32 * (preview_slot_size + preview_spacing);
+            let py = preview_y;
+
+            let slot_bounds = Rect::new(px, py, preview_slot_size, preview_slot_size);
+            layout.add(UiElementId::HotkeySettingsSlot(i), slot_bounds);
+
+            let is_slot_hovered =
+                matches!(hovered, Some(UiElementId::HotkeySettingsSlot(idx)) if *idx == i);
+            let s_state = if is_slot_hovered {
+                SlotState::Hovered
+            } else {
+                SlotState::Normal
+            };
+
+            match &active_preset.slots[i] {
+                HotkeySlotBinding::Empty => {
+                    self.draw_inventory_slot(px, py, preview_slot_size, false, s_state);
+                }
+                HotkeySlotBinding::Item { item_id } => {
+                    self.draw_inventory_slot(px, py, preview_slot_size, true, s_state);
+                    self.draw_item_icon(
+                        item_id,
+                        px,
+                        py,
+                        preview_slot_size,
+                        preview_slot_size,
+                        state,
+                        false,
+                    );
+                }
+                HotkeySlotBinding::Spell { spell_id } => {
+                    self.draw_inventory_slot(px, py, preview_slot_size, true, s_state);
+                    if let Some((texture, source_rect)) = self.spell_icons.get(spell_id.as_str()) {
+                        let icon_size = preview_slot_size - 6.0;
+                        let icon_x = (px + (preview_slot_size - icon_size) / 2.0).floor();
+                        let icon_y = (py + (preview_slot_size - icon_size) / 2.0).floor();
+                        draw_texture_ex(
+                            texture,
+                            icon_x,
+                            icon_y,
+                            WHITE,
+                            DrawTextureParams {
+                                source: source_rect,
+                                dest_size: Some(Vec2::new(icon_size, icon_size)),
+                                ..Default::default()
+                            },
+                        );
+                    } else if let Some(spell_def) = SPELLS.iter().find(|s| s.id == spell_id) {
+                        let letter = &spell_def.name[..1];
+                        let lw = self.measure_text_sharp(letter, 16.0).width;
+                        self.draw_text_sharp(
+                            letter,
+                            px + (preview_slot_size - lw) / 2.0,
+                            py + preview_slot_size * 0.65,
+                            16.0,
+                            Color::new(0.5, 0.4, 0.9, 1.0),
+                        );
+                    }
+                }
+            }
+
+            // X (clear) button — small button at top-right of each preview slot
+            if !matches!(&active_preset.slots[i], HotkeySlotBinding::Empty) {
+                let clear_size = 14.0;
+                let cx = px + preview_slot_size - clear_size - 1.0;
+                let cy = py + 1.0;
+                let clear_bounds = Rect::new(cx, cy, clear_size, clear_size);
+                layout.add(UiElementId::HotkeySettingsSlotClear(i), clear_bounds);
+
+                let clear_hovered = matches!(
+                    hovered,
+                    Some(UiElementId::HotkeySettingsSlotClear(idx)) if *idx == i
+                );
+                let clear_bg = if clear_hovered {
+                    Color::new(0.6, 0.15, 0.15, 0.9)
+                } else {
+                    Color::new(0.3, 0.1, 0.1, 0.7)
+                };
+                draw_rectangle(cx, cy, clear_size, clear_size, clear_bg);
+                let x_w = self.measure_text_sharp("x", 12.0).width;
+                self.draw_text_sharp(
+                    "x",
+                    (cx + (clear_size - x_w) / 2.0).floor(),
+                    (cy + 11.0).floor(),
+                    12.0,
+                    WHITE,
+                );
+            }
+        }
+    }
+
+    /// Draw item icon with a custom tint (for ghost/depleted items)
+    fn draw_item_icon_tinted(
+        &self,
+        item_id: &str,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        state: &GameState,
+        tint: Color,
+    ) {
+        let sprite_key = state.item_registry.get_sprite_key(item_id);
+        if let Some((texture, source_rect)) = self.item_sprites.get(sprite_key) {
+            let (icon_width, icon_height) = if let Some(r) = source_rect {
+                (r.w, r.h)
+            } else {
+                (texture.width(), texture.height())
+            };
+            let offset_x = (w - icon_width) / 2.0;
+            let offset_y = (h - icon_height) / 2.0;
+            draw_texture_ex(
+                texture,
+                x + offset_x,
+                y + offset_y,
+                tint,
+                DrawTextureParams {
+                    source: source_rect,
+                    ..Default::default()
+                },
             );
-            draw_rectangle(tip_x, tip_y, tip_w, tip_h, SLOT_BG_FILLED);
+        } else {
+            // Fallback: draw the item id text dimly
+            let item_def = state.item_registry.get_or_placeholder(item_id);
+            let letter = if item_def.display_name.is_empty() {
+                "?"
+            } else {
+                &item_def.display_name[..1]
+            };
+            let lw = self.measure_text_sharp(letter, 16.0).width;
             self.draw_text_sharp(
-                tooltip_text,
-                (tip_x + padding).floor(),
-                (tip_y + padding + 14.0).floor(),
+                letter,
+                x + (w - lw) / 2.0,
+                y + h * 0.65,
                 16.0,
-                TEXT_NORMAL,
+                tint,
             );
         }
     }

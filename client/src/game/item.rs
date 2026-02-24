@@ -172,6 +172,13 @@ impl Inventory {
             .sum()
     }
 
+    /// Find the first inventory slot index containing the given item_id
+    pub fn find_slot_by_item_id(&self, item_id: &str) -> Option<usize> {
+        self.slots
+            .iter()
+            .position(|slot| slot.as_ref().map_or(false, |s| s.item_id == item_id))
+    }
+
     /// Swap two inventory slots (for optimistic UI updates)
     pub fn swap_slots(&mut self, from_slot: usize, to_slot: usize) {
         if from_slot < INVENTORY_SIZE && to_slot < INVENTORY_SIZE {

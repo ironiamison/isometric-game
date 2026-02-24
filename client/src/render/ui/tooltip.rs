@@ -21,26 +21,36 @@ impl Renderer {
                 }
             }
             Some(UiElementId::QuickSlot(idx)) => {
-                if state.ui_state.spell_bar_active {
-                    // Show spell tooltip
-                    let magic_level = state
-                        .get_local_player()
-                        .map(|p| p.skills.magic.level)
-                        .unwrap_or(1);
-                    let unlocked: Vec<_> = crate::game::spell::SPELLS
-                        .iter()
-                        .filter(|s| magic_level >= s.magic_level_req)
-                        .collect();
-                    if let Some(spell_def) = unlocked.get(*idx) {
-                        self.render_quick_slot_spell_tooltip(spell_def, state);
+                // Unified hotkey bar: tooltip based on binding type
+                let binding = &state.ui_state.hotkey_bar.active().slots[*idx];
+                match binding {
+                    crate::game::hotkey::HotkeySlotBinding::Spell { spell_id } => {
+                        if let Some(spell_def) =
+                            crate::game::spell::SPELLS.iter().find(|s| s.id == spell_id)
+                        {
+                            self.render_quick_slot_spell_tooltip(spell_def, state);
+                        }
+                        return;
                     }
-                    return;
-                }
-                // Item mode: tooltip from inventory slot
-                if let Some(slot) = state.inventory.slots.get(*idx).and_then(|s| s.as_ref()) {
-                    (slot.item_id.clone(), slot.quantity)
-                } else {
-                    return;
+                    crate::game::hotkey::HotkeySlotBinding::Item { item_id } => {
+                        // Find quantity from inventory
+                        let qty = state
+                            .inventory
+                            .find_slot_by_item_id(item_id)
+                            .and_then(|slot_idx| {
+                                state
+                                    .inventory
+                                    .slots
+                                    .get(slot_idx)
+                                    .and_then(|s| s.as_ref())
+                                    .map(|s| s.quantity)
+                            })
+                            .unwrap_or(0);
+                        (item_id.clone(), qty.max(1))
+                    }
+                    crate::game::hotkey::HotkeySlotBinding::Empty => {
+                        return;
+                    }
                 }
             }
             Some(UiElementId::EquipmentSlot(slot_type)) if state.ui_state.inventory_open => {

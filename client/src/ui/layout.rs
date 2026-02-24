@@ -93,8 +93,14 @@ pub enum UiElementId {
     SpellSlot(usize),
     PrayerSpellTab(usize), // 0 = Prayers tab, 1 = Spells tab
 
-    // Spell/Item bar toggle button
-    SpellBarToggle,
+    // Unified Hotkey Bar
+    HotkeyPresetUp,
+    HotkeyPresetDown,
+    HotkeySettingsCog,
+    HotkeySettingsPresetTab(usize),
+    HotkeySettingsSlot(usize),
+    HotkeySettingsSlotClear(usize),
+    HotkeyAssignButton(usize),
 
     // Gold Display (inventory header)
     GoldDisplay,

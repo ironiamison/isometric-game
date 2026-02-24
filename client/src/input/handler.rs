@@ -26,6 +26,7 @@ fn save_current_ui_settings(state: &GameState) {
         use_joystick: state.ui_state.use_joystick,
         graphics_low: state.ui_state.graphics_low,
         chat_log_background: state.ui_state.chat_log_background,
+        hotkey_bar: state.ui_state.hotkey_bar.clone(),
     };
     save_ui_settings(&settings);
 }
@@ -53,6 +54,59 @@ fn mark_chat_channel_as_read(state: &mut GameState, channel: ChatChannel) {
         }
         ChatChannel::System => {
             state.ui_state.chat_last_seen_system = state.ui_state.chat_last_seen_system.max(latest);
+        }
+    }
+}
+
+/// Activate a hotkey slot binding — returns InputCommand(s) to execute
+fn activate_hotkey_slot(
+    state: &mut GameState,
+    slot_idx: usize,
+) -> Vec<InputCommand> {
+    use crate::game::hotkey::HotkeySlotBinding;
+
+    let binding = state.ui_state.hotkey_bar.active().slots[slot_idx].clone();
+    match binding {
+        HotkeySlotBinding::Empty => vec![],
+        HotkeySlotBinding::Item { ref item_id } => {
+            if let Some(inv_idx) = state.inventory.find_slot_by_item_id(item_id) {
+                let item_def = state.item_registry.get_or_placeholder(item_id);
+                if item_def.equipment.is_some() {
+                    vec![InputCommand::Equip {
+                        slot_index: inv_idx as u8,
+                    }]
+                } else {
+                    vec![InputCommand::UseItem {
+                        slot_index: inv_idx as u8,
+                    }]
+                }
+            } else {
+                // Item not in inventory (ghost state) — no-op
+                vec![]
+            }
+        }
+        HotkeySlotBinding::Spell { ref spell_id } => {
+            let now = macroquad::time::get_time();
+            let on_cooldown = state
+                .spell_cooldowns
+                .get(spell_id.as_str())
+                .map_or(false, |&t| now < t);
+            if !on_cooldown {
+                // Look up spell def for cooldown duration
+                if let Some(spell_def) =
+                    crate::game::spell::SPELLS.iter().find(|s| s.id == spell_id)
+                {
+                    let cooldown_end = now + (spell_def.cooldown_ms as f64 / 1000.0);
+                    state
+                        .spell_cooldowns
+                        .insert(spell_id.clone(), cooldown_end);
+                }
+                vec![InputCommand::CastSpell {
+                    spell_id: spell_id.clone(),
+                }]
+            } else {
+                vec![]
+            }
         }
     }
 }
@@ -1065,11 +1119,62 @@ impl InputHandler {
                                         target_slot: Some(*to_idx as u8),
                                     });
                                 }
+                                DragSource::Spell(_) => {
+                                    // Can't drop spells onto inventory slots
+                                }
                             }
                         }
-                        UiElementId::QuickSlot(_slot_idx) => {
-                            // Quick slots are now fixed to inventory positions or spell bar;
-                            // no drag-drop assignment needed.
+                        UiElementId::QuickSlot(slot_idx) => {
+                            // Drop onto hotkey slot — bind item or spell
+                            match &drag.source {
+                                DragSource::Inventory(inv_idx) => {
+                                    if let Some(Some(slot)) = state.inventory.slots.get(*inv_idx) {
+                                        state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                            crate::game::hotkey::HotkeySlotBinding::Item {
+                                                item_id: slot.item_id.clone(),
+                                            };
+                                        save_current_ui_settings(state);
+                                        audio.play_sfx("item_put");
+                                    }
+                                }
+                                DragSource::Spell(spell_id) => {
+                                    state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                        crate::game::hotkey::HotkeySlotBinding::Spell {
+                                            spell_id: spell_id.clone(),
+                                        };
+                                    save_current_ui_settings(state);
+                                    audio.play_sfx("item_put");
+                                }
+                                DragSource::Equipment(_) => {
+                                    // Can't bind equipment directly to hotkey bar
+                                }
+                            }
+                        }
+                        UiElementId::HotkeySettingsSlot(slot_idx) => {
+                            // Drop onto settings popup slot — same as QuickSlot
+                            match &drag.source {
+                                DragSource::Inventory(inv_idx) => {
+                                    if let Some(Some(slot)) = state.inventory.slots.get(*inv_idx) {
+                                        state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                            crate::game::hotkey::HotkeySlotBinding::Item {
+                                                item_id: slot.item_id.clone(),
+                                            };
+                                        save_current_ui_settings(state);
+                                        audio.play_sfx("item_put");
+                                    }
+                                }
+                                DragSource::Spell(spell_id) => {
+                                    state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                        crate::game::hotkey::HotkeySlotBinding::Spell {
+                                            spell_id: spell_id.clone(),
+                                        };
+                                    save_current_ui_settings(state);
+                                    audio.play_sfx("item_put");
+                                }
+                                DragSource::Equipment(_) => {
+                                    // Can't bind equipment directly to hotkey bar
+                                }
+                            }
                         }
                         UiElementId::EquipmentSlot(target_slot_type) => {
                             match &drag.source {
@@ -1155,6 +1260,9 @@ impl InputHandler {
                                         // Can't swap different equipment slot types directly
                                         // Would need unequip + equip, which isn't supported
                                     }
+                                }
+                                DragSource::Spell(_) => {
+                                    // Can't drop spells onto equipment slots
                                 }
                             }
                         }
@@ -1348,70 +1456,23 @@ impl InputHandler {
                         }
                     }
                     UiElementId::QuickSlot(idx) => {
-                        // In item mode, quick slots map directly to inventory slots 0-4
-                        if !state.ui_state.spell_bar_active {
-                            let inv_idx = *idx;
-                            if let Some(Some(slot)) = state.inventory.slots.get(inv_idx) {
-                                // Check for shift+click to drop (if enabled)
-                                let shift_held = is_key_down(KeyCode::LeftShift)
-                                    || is_key_down(KeyCode::RightShift);
-                                if shift_held && state.ui_state.shift_drop_enabled {
-                                    commands.push(InputCommand::DropItem {
-                                        slot_index: inv_idx as u8,
-                                        quantity: slot.quantity as u32,
-                                        target_x: None,
-                                        target_y: None,
-                                    });
-                                    audio.play_sfx("item_put");
-                                    return commands;
-                                }
-
-                                // Check for double-click to equip/use
-                                let is_double_click = state
-                                    .ui_state
-                                    .double_click_state
-                                    .last_click_slot
-                                    == Some(inv_idx)
-                                    && current_time
-                                        - state.ui_state.double_click_state.last_click_time
-                                        < DOUBLE_CLICK_THRESHOLD;
-
-                                if is_double_click {
-                                    // Reset double-click state
-                                    state.ui_state.double_click_state.last_click_slot = None;
-                                    state.ui_state.double_click_state.last_click_time = 0.0;
-
-                                    let item_def =
-                                        state.item_registry.get_or_placeholder(&slot.item_id);
-                                    if item_def.equipment.is_some() {
-                                        commands.push(InputCommand::Equip {
-                                            slot_index: inv_idx as u8,
-                                        });
-                                    } else {
-                                        commands.push(InputCommand::UseItem {
-                                            slot_index: inv_idx as u8,
-                                        });
-                                    }
-                                    return commands;
-                                } else {
-                                    // First click - record for potential double-click
-                                    state.ui_state.double_click_state.last_click_slot =
-                                        Some(inv_idx);
-                                    state.ui_state.double_click_state.last_click_time =
-                                        current_time;
-
-                                    // Start drag from the inventory slot
-                                    state.ui_state.drag_state = Some(DragState {
-                                        source: DragSource::Inventory(inv_idx),
-                                        item_id: slot.item_id.clone(),
-                                        quantity: slot.quantity,
-                                    });
-                                    audio.play_sfx("item_grab");
-                                    return commands;
-                                }
-                            }
+                        // Unified hotkey bar: activate on click
+                        let cmds = activate_hotkey_slot(state, *idx);
+                        commands.extend(cmds);
+                        return commands;
+                    }
+                    UiElementId::SpellSlot(slot_idx) => {
+                        // Start drag from spell panel
+                        if *slot_idx < crate::game::spell::SPELLS.len() {
+                            let spell = &crate::game::spell::SPELLS[*slot_idx];
+                            state.ui_state.drag_state = Some(DragState {
+                                source: DragSource::Spell(spell.id.to_string()),
+                                item_id: spell.id.to_string(),
+                                quantity: 0,
+                            });
+                            audio.play_sfx("item_grab");
+                            return commands;
                         }
-                        // In spell mode, no drag from spell bar
                     }
                     UiElementId::EquipmentSlot(slot_type) => {
                         // Check if equipment slot has an item
@@ -1504,6 +1565,8 @@ impl InputHandler {
                     }).unwrap_or(1)
                 }
                 ContextMenuTarget::Tile { .. } => 1,
+                ContextMenuTarget::HotkeySlot(_) => 1, // "Clear Slot"
+                ContextMenuTarget::Spell { .. } => 0,  // Only inline hotkey buttons
             };
 
             let menu_width = 140.0; // generous estimate
@@ -2084,7 +2147,43 @@ impl InputHandler {
                                         pathfind_to_tile(state, &mut commands, *x, *y);
                                     }
                                 }
+                                ContextMenuTarget::HotkeySlot(slot_idx) => {
+                                    // Options: 0=Clear Slot
+                                    if *option_idx == 0 {
+                                        state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                            crate::game::hotkey::HotkeySlotBinding::Empty;
+                                        save_current_ui_settings(state);
+                                    }
+                                }
+                                ContextMenuTarget::Spell { .. } => {
+                                    // No regular options for spell context — handled by HotkeyAssignButton
+                                }
                             }
+                            return commands;
+                        }
+                        UiElementId::HotkeyAssignButton(slot_idx) => {
+                            // Assign the context menu target to hotkey slot
+                            let menu = state.ui_state.context_menu.take().unwrap();
+                            match &menu.target {
+                                ContextMenuTarget::InventorySlot(inv_idx) => {
+                                    if let Some(Some(slot)) = state.inventory.slots.get(*inv_idx) {
+                                        state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                            crate::game::hotkey::HotkeySlotBinding::Item {
+                                                item_id: slot.item_id.clone(),
+                                            };
+                                        save_current_ui_settings(state);
+                                    }
+                                }
+                                ContextMenuTarget::Spell { spell_id } => {
+                                    state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                        crate::game::hotkey::HotkeySlotBinding::Spell {
+                                            spell_id: spell_id.clone(),
+                                        };
+                                    save_current_ui_settings(state);
+                                }
+                                _ => {}
+                            }
+                            audio.play_sfx("item_put");
                             return commands;
                         }
                         _ => {
@@ -2482,14 +2581,35 @@ impl InputHandler {
                         state.ui_state.prayer_help_open = false;
                         state.ui_state.spell_help_open = false;
                     }
-                    // Spell slot handlers (spell panel — info only, no drag)
+                    // Spell slot handlers (spell panel — click to assign)
                     UiElementId::SpellSlot(_slot_idx) => {
                         audio.play_sfx("enter");
                     }
-                    // Spell/Item bar toggle button
-                    UiElementId::SpellBarToggle => {
+                    // Hotkey bar preset cycling and settings
+                    UiElementId::HotkeyPresetUp => {
                         audio.play_sfx("enter");
-                        state.ui_state.spell_bar_active = !state.ui_state.spell_bar_active;
+                        state.ui_state.hotkey_bar.cycle_up();
+                        save_current_ui_settings(state);
+                    }
+                    UiElementId::HotkeyPresetDown => {
+                        audio.play_sfx("enter");
+                        state.ui_state.hotkey_bar.cycle_down();
+                        save_current_ui_settings(state);
+                    }
+                    UiElementId::HotkeySettingsCog => {
+                        audio.play_sfx("enter");
+                        state.ui_state.hotkey_settings_open = !state.ui_state.hotkey_settings_open;
+                    }
+                    UiElementId::HotkeySettingsPresetTab(tab_idx) => {
+                        audio.play_sfx("enter");
+                        state.ui_state.hotkey_bar.active_preset = *tab_idx;
+                        save_current_ui_settings(state);
+                    }
+                    UiElementId::HotkeySettingsSlotClear(slot_idx) => {
+                        audio.play_sfx("enter");
+                        state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                            crate::game::hotkey::HotkeySlotBinding::Empty;
+                        save_current_ui_settings(state);
                     }
                     // Prayer panel handlers
                     UiElementId::PrayerSlot(slot_idx) => {
@@ -6780,67 +6900,31 @@ impl InputHandler {
             match element {
                 UiElementId::QuickSlot(idx) => {
                     if mouse_clicked {
-                        if state.ui_state.spell_bar_active {
-                            // Spell mode: cast the spell at this index
-                            let magic_level = state
-                                .get_local_player()
-                                .map(|p| p.skills.magic.level)
-                                .unwrap_or(1);
-                            let unlocked_spells: Vec<_> = crate::game::spell::SPELLS
-                                .iter()
-                                .filter(|s| magic_level >= s.magic_level_req)
-                                .collect();
-                            if let Some(spell_def) = unlocked_spells.get(*idx) {
-                                let now = macroquad::time::get_time();
-                                let on_cooldown = state
-                                    .spell_cooldowns
-                                    .get(spell_def.id)
-                                    .map_or(false, |&t| now < t);
-                                if !on_cooldown {
-                                    commands.push(InputCommand::CastSpell {
-                                        spell_id: spell_def.id.to_string(),
-                                    });
-                                    let cooldown_end = now
-                                        + (spell_def.cooldown_ms as f64 / 1000.0);
-                                    state
-                                        .spell_cooldowns
-                                        .insert(spell_def.id.to_string(), cooldown_end);
-                                }
-                            }
-                        } else {
-                            // Item mode: use/equip item at inventory slot idx
-                            let slot_idx = *idx;
-                            if let Some(Some(slot)) = state.inventory.slots.get(slot_idx) {
-                                let item_def =
-                                    state.item_registry.get_or_placeholder(&slot.item_id);
-                                if item_def.equipment.is_some() {
-                                    commands.push(InputCommand::Equip {
-                                        slot_index: slot_idx as u8,
-                                    });
-                                } else {
-                                    commands.push(InputCommand::UseItem {
-                                        slot_index: slot_idx as u8,
-                                    });
-                                }
-                            }
-                        }
+                        // Unified hotkey bar: activate the binding
+                        let cmds = activate_hotkey_slot(state, *idx);
+                        commands.extend(cmds);
                     } else if mouse_right_clicked {
-                        // Right-click on quick slot opens context menu (item mode only)
-                        if !state.ui_state.spell_bar_active {
-                            let inv_idx = *idx;
-                            if state
-                                .inventory
-                                .slots
-                                .get(inv_idx)
-                                .and_then(|s| s.as_ref())
-                                .is_some()
-                            {
-                                state.ui_state.context_menu = Some(ContextMenu {
-                                    target: ContextMenuTarget::InventorySlot(inv_idx),
-                                    x: mx,
-                                    y: my,
-                                });
-                            }
+                        // Right-click opens context menu for hotkey slot
+                        state.ui_state.context_menu = Some(ContextMenu {
+                            target: ContextMenuTarget::HotkeySlot(*idx),
+                            x: mx,
+                            y: my,
+                        });
+                    }
+                    return commands;
+                }
+                UiElementId::SpellSlot(slot_idx) => {
+                    if mouse_right_clicked {
+                        // Right-click on spell slot opens context menu for hotkey assignment
+                        if *slot_idx < crate::game::spell::SPELLS.len() {
+                            let spell = &crate::game::spell::SPELLS[*slot_idx];
+                            state.ui_state.context_menu = Some(ContextMenu {
+                                target: ContextMenuTarget::Spell {
+                                    spell_id: spell.id.to_string(),
+                                },
+                                x: mx,
+                                y: my,
+                            });
                         }
                     }
                     return commands;
@@ -7588,6 +7672,11 @@ impl InputHandler {
 
         // Escape key - close any open panel first, then clear target, then open escape menu
         if is_key_pressed(KeyCode::Escape) {
+            // Close hotkey settings popup first
+            if state.ui_state.hotkey_settings_open {
+                audio.play_sfx("enter");
+                state.ui_state.hotkey_settings_open = false;
+            } else
             // Check if any panel is open and close it
             if state.ui_state.inventory_open
                 || state.ui_state.character_panel_open
@@ -7840,7 +7929,7 @@ impl InputHandler {
             return commands;
         }
 
-        // Use/equip items or cast spells (1-5 keys for quick slots, disabled in classic mode)
+        // Use/equip items or cast spells via unified hotkey bar (1-5 keys, disabled in classic mode)
         let quick_slot_keys = [
             (KeyCode::Key1, 0usize),
             (KeyCode::Key2, 1usize),
@@ -7850,48 +7939,8 @@ impl InputHandler {
         ];
         for (key, slot_idx) in quick_slot_keys {
             if !classic && is_key_pressed(key) {
-                if state.ui_state.spell_bar_active {
-                    // Spell mode: cast the spell at this index
-                    let magic_level = state
-                        .get_local_player()
-                        .map(|p| p.skills.magic.level)
-                        .unwrap_or(1);
-                    let unlocked_spells: Vec<_> = crate::game::spell::SPELLS
-                        .iter()
-                        .filter(|s| magic_level >= s.magic_level_req)
-                        .collect();
-                    if let Some(spell_def) = unlocked_spells.get(slot_idx) {
-                        let now = macroquad::time::get_time();
-                        let on_cooldown = state
-                            .spell_cooldowns
-                            .get(spell_def.id)
-                            .map_or(false, |&t| now < t);
-                        if !on_cooldown {
-                            commands.push(InputCommand::CastSpell {
-                                spell_id: spell_def.id.to_string(),
-                            });
-                            let cooldown_end =
-                                now + (spell_def.cooldown_ms as f64 / 1000.0);
-                            state
-                                .spell_cooldowns
-                                .insert(spell_def.id.to_string(), cooldown_end);
-                        }
-                    }
-                } else {
-                    // Item mode: use/equip from inventory slot directly
-                    if let Some(Some(slot)) = state.inventory.slots.get(slot_idx) {
-                        let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
-                        if item_def.equipment.is_some() {
-                            commands.push(InputCommand::Equip {
-                                slot_index: slot_idx as u8,
-                            });
-                        } else {
-                            commands.push(InputCommand::UseItem {
-                                slot_index: slot_idx as u8,
-                            });
-                        }
-                    }
-                }
+                let cmds = activate_hotkey_slot(state, slot_idx);
+                commands.extend(cmds);
             }
         }
 

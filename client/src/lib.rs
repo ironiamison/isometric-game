@@ -137,6 +137,7 @@ async fn async_main() {
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
                             game_state.ui_state.chat_log_background =
                                 ui_settings.chat_log_background;
+                            game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
                             if game_state.ui_state.classic_controls {
                                 game_state.ui_state.chat_open = true;
                             }
@@ -185,6 +186,7 @@ async fn async_main() {
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
                             game_state.ui_state.chat_log_background =
                                 ui_settings.chat_log_background;
+                            game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
                             if game_state.ui_state.classic_controls {
                                 game_state.ui_state.chat_open = true;
                             }
@@ -374,6 +376,7 @@ async fn async_main() {
                             game_state.ui_state.use_joystick = ui_settings.use_joystick;
                             game_state.ui_state.chat_log_background =
                                 ui_settings.chat_log_background;
+                            game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
                             if game_state.ui_state.classic_controls {
                                 game_state.ui_state.chat_open = true;
                             }
@@ -492,6 +495,7 @@ async fn async_main() {
                                 game_state.ui_state.use_joystick = ui_settings.use_joystick;
                                 game_state.ui_state.chat_log_background =
                                     ui_settings.chat_log_background;
+                                game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
                                 if game_state.ui_state.classic_controls {
                                     game_state.ui_state.chat_open = true;
                                 }

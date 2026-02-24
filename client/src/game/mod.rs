@@ -1,5 +1,6 @@
 pub mod chunk;
 mod entities;
+pub mod hotkey;
 pub mod item;
 pub mod item_registry;
 pub mod npc;
