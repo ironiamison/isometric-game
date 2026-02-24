@@ -723,6 +723,33 @@ item_id = "shell_pendant"
 count = 1
 
 # =============================================================================
+# Weapons (Level 1)
+# =============================================================================
+
+[spine_blade]
+display_name = "Spine Blade"
+description = "Bind blade shards together into a crude spine blade."
+category = "smithing"
+section = "equipment"
+level_required = 1
+station = "workbench"
+craft_time_ms = 3000
+xp = 25
+requires_discovery = true
+
+[[spine_blade.ingredients]]
+item_id = "blade_shard"
+count = 2
+
+[[spine_blade.ingredients]]
+item_id = "crude_binding"
+count = 1
+
+[[spine_blade.results]]
+item_id = "spine_blade"
+count = 1
+
+# =============================================================================
 # Weapons (Level 5)
 # =============================================================================
 
