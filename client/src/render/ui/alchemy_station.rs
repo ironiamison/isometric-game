@@ -190,9 +190,37 @@ impl Renderer {
         if state.ui_state.crafting_in_progress {
             self.render_alchemy_progress(state, hovered, layout, content_x, content_y, content_w, total_content_h);
         } else {
-            // Split: recipe list (top ~55%) + crafting detail (bottom ~45%)
-            let recipe_list_h = (total_content_h * 0.60).floor();
-            let detail_h = total_content_h - recipe_list_h - 4.0 * s;
+            // Compute detail panel height dynamically based on ingredient count
+            // Header (icon+name+info) + separator + ingredient rows + gap + action bar
+            let ingredient_count = {
+                let mut recipes: Vec<_> = state
+                    .recipe_definitions
+                    .iter()
+                    .filter(|r| r.station.as_deref() == Some("alchemy_station"))
+                    .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+                    .collect();
+                recipes.sort_by(|a, b| {
+                    let sa = a.section.as_deref().unwrap_or("");
+                    let sb = b.section.as_deref().unwrap_or("");
+                    section_sort_key(sa).cmp(&section_sort_key(sb))
+                        .then(a.level_required.cmp(&b.level_required))
+                });
+                recipes
+                    .get(state.ui_state.alchemy_station_selected_recipe)
+                    .map(|r| r.ingredients.len())
+                    .unwrap_or(1)
+            };
+            let top_pad = 8.0 * s;           // header_y = y + 8*s
+            let icon_h = 40.0 * s;           // icon_size
+            let sep_gap = 8.0 * s;           // gap below icon to separator
+            let ing_top = 6.0 * s;           // separator to first ingredient
+            let ing_rows = ingredient_count as f32 * 28.0 * s;
+            let ing_bottom_gap = 10.0 * s;   // breathing room before buttons
+            let btn_h = 26.0 * s;            // button height
+            let bottom_pad = 6.0 * s;        // btn_y = y + h - btn_h - 6*s
+            let detail_h = (top_pad + icon_h + sep_gap + ing_top + ing_rows + ing_bottom_gap + btn_h + bottom_pad)
+                .min(total_content_h * 0.65);
+            let recipe_list_h = total_content_h - detail_h - 4.0 * s;
             let detail_y = content_y + recipe_list_h + 4.0 * s;
 
             self.render_alchemy_recipe_list(state, hovered, layout, content_x, content_y, content_w, recipe_list_h);
@@ -713,6 +741,7 @@ impl Renderer {
         );
 
         // ===== INGREDIENT ROWS (full-width, right-aligned counts) =====
+        let ing_left = icon_x + 8.0;
         let ing_start_y = sep_y + 6.0 * s;
         let ing_icon_size = 24.0 * s;
         let ing_row_h = 28.0 * s;
@@ -737,13 +766,13 @@ impl Renderer {
             let icon_y_centered = row_y + (ing_row_h - ing_icon_size) / 2.0;
             self.draw_item_icon(
                 &ing.item_id,
-                x + pad, icon_y_centered,
+                ing_left, icon_y_centered,
                 ing_icon_size, ing_icon_size,
-                state, true,
+                state, false,
             );
 
-            // Ingredient name (left-aligned after icon)
-            let name_x = x + pad + ing_icon_size + 8.0 * s;
+            // Ingredient name (left-aligned after icon with gap)
+            let name_x = ing_left + ing_icon_size + 18.0;
             self.draw_text_sharp(
                 name,
                 name_x,
@@ -778,8 +807,8 @@ impl Renderer {
         let btn_y = y + h - btn_h - 6.0 * s;
         let qty_btn_size = btn_h;
 
-        // Minus button
-        let minus_x = x + pad;
+        // Minus button (aligned with ingredient icons)
+        let minus_x = ing_left;
         let minus_bounds = Rect::new(minus_x, btn_y, qty_btn_size, qty_btn_size);
         layout.add(UiElementId::AlchemyQuantityMinus, minus_bounds);
         let is_minus_hovered = matches!(hovered, Some(UiElementId::AlchemyQuantityMinus));
