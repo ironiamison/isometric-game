@@ -159,10 +159,15 @@ impl Renderer {
                 push_option(&mut options, "Examine");
                 "Farming Patch".to_string()
             }
-            ContextMenuTarget::MapObject { .. } => {
-                push_option(&mut options, "Interact");
+            ContextMenuTarget::MapObject { gid, .. } => {
+                let name = crate::input::handler::get_map_object_name(*gid);
+                if crate::input::handler::is_obelisk_gid(*gid) {
+                    push_option(&mut options, "Teleport");
+                } else {
+                    push_option(&mut options, "Interact");
+                }
                 push_option(&mut options, "Examine");
-                "Object".to_string()
+                name.unwrap_or("Object").to_string()
             }
             ContextMenuTarget::Tile { .. } => {
                 push_option(&mut options, "Walk here");

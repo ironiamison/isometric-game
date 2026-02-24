@@ -1983,6 +1983,14 @@ async fn handle_socket(
                 }
             }
         }
+
+        // Send existing overworld ground items to this client
+        let ground_items = room.get_ground_items_in_instance(None).await;
+        for item_msg in ground_items {
+            if let Ok(bytes) = protocol::encode_server_message(&item_msg) {
+                let _ = sender.send(Message::Binary(bytes)).await;
+            }
+        }
     }
 
     // Notify others about this player joining
@@ -2897,6 +2905,11 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                         .await;
                     room.send_to_player(player_id, room.get_gathering_markers_message().await)
                         .await;
+
+                    // Send overworld ground items
+                    for item_msg in room.get_ground_items_in_instance(None).await {
+                        room.send_to_player(player_id, item_msg).await;
+                    }
 
                     // Notify overworld players that this player has returned
                     {

@@ -1,4 +1,4 @@
-mod handler;
+pub mod handler;
 pub mod touch;
 
 pub use handler::{InputCommand, InputHandler};

@@ -3445,6 +3445,7 @@ impl Renderer {
         self.render_name_tags(state);
         self.render_tree_name_tag(state);
         self.render_ore_name_tag(state);
+        self.render_map_object_name_tag(state);
         self.render_farming_patch_labels(state);
 
         // 5. Render floating damage numbers
@@ -4019,6 +4020,62 @@ impl Renderer {
 
         let text_x = screen_x - text_dims.width / 2.0;
         self.draw_text_sharp(&text, text_x, tag_y, font_size, level_color);
+    }
+
+    /// Render name tag for hovered map objects (obelisks, etc.)
+    fn render_map_object_name_tag(&self, state: &GameState) {
+        let Some((tile_x, tile_y)) = state.hovered_tile else {
+            return;
+        };
+
+        let Some(obj) = state.chunk_manager.get_object_at_exact(tile_x, tile_y) else {
+            return;
+        };
+
+        // Skip trees and rocks (they have their own name tags)
+        if get_tree_info(obj.gid).is_some() || get_ore_info(obj.gid).is_some() {
+            return;
+        }
+
+        let Some(name) = crate::input::handler::get_map_object_name(obj.gid) else {
+            return;
+        };
+
+        let (screen_x, screen_y) =
+            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, &state.camera);
+        let zoom = state.camera.zoom;
+
+        let sprite_height = if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
+            let tex_height = if let Some(r) = source_rect {
+                r.h
+            } else {
+                texture.height()
+            };
+            tex_height * zoom
+        } else {
+            40.0 * zoom
+        };
+
+        let tag_y = screen_y - sprite_height - 5.0 * zoom;
+        let font_size = 16.0 * zoom;
+        let text_dims = self.measure_text_sharp(name, font_size);
+        let label_color = Color::from_rgba(255, 215, 0, 255); // Gold color
+
+        let padding = 4.0 * zoom;
+        let bar_height = 18.0 * zoom;
+        let bar_x = screen_x - text_dims.width / 2.0 - padding;
+        let bar_y = tag_y - 14.0 * zoom;
+
+        draw_rectangle(
+            bar_x,
+            bar_y,
+            text_dims.width + padding * 2.0,
+            bar_height,
+            Color::from_rgba(0, 0, 0, 180),
+        );
+
+        let text_x = screen_x - text_dims.width / 2.0;
+        self.draw_text_sharp(name, text_x, tag_y, font_size, label_color);
     }
 
     /// Render chat bubbles above players' heads

@@ -6153,20 +6153,27 @@ impl GameRoom {
 
     /// Handle player interacting with a world map object (obelisk, etc.)
     pub async fn handle_interact_object(&self, player_id: &str, x: i32, y: i32) {
-        // Check waystones
+        tracing::debug!("handle_interact_object: player={} x={} y={}", player_id, x, y);
+
+        // Check for active quest interactions first (takes priority over waystone teleport)
+        if self.handle_obelisk_quest_interaction(player_id, x, y).await {
+            tracing::debug!("handle_interact_object: handled by quest interaction");
+            return;
+        }
+
+        // Check waystones (post-quest teleportation)
         let waystone = {
             let wsm = self.waystone_manager.read().await;
             wsm.get_at(x, y).cloned()
         };
 
-        if let Some(ws) = waystone {
-            self.handle_waystone_interaction(player_id, &ws).await;
+        if let Some(ref ws) = waystone {
+            tracing::debug!("handle_interact_object: found waystone '{}' at ({},{})", ws.id, ws.x, ws.y);
+            self.handle_waystone_interaction(player_id, ws).await;
             return;
         }
 
-        // Check for quest-specific obelisk interactions (during quest, before completion)
-        self.handle_obelisk_quest_interaction(player_id, x, y)
-            .await;
+        tracing::debug!("handle_interact_object: no waystone or quest interaction found at ({},{})", x, y);
     }
 
     /// Handle interaction with a waystone (show teleport dialogue or lore text)
@@ -6178,10 +6185,16 @@ impl GameRoom {
         // Check if player has completed the required quest
         let quest_completed = {
             let quest_states = self.player_quest_states.read().await;
-            quest_states
+            let has_state = quest_states.get(player_id).is_some();
+            let completed = quest_states
                 .get(player_id)
                 .map(|qs| qs.is_quest_completed(&waystone.quest_required))
-                .unwrap_or(false)
+                .unwrap_or(false);
+            tracing::debug!(
+                "handle_waystone_interaction: waystone='{}' quest_required='{}' has_quest_state={} quest_completed={}",
+                waystone.id, waystone.quest_required, has_state, completed
+            );
+            completed
         };
 
         if quest_completed {
@@ -6228,15 +6241,16 @@ impl GameRoom {
         }
     }
 
-    /// Handle clicking the northern obelisk during the quest (before waystone is unlocked)
-    async fn handle_obelisk_quest_interaction(&self, player_id: &str, x: i32, y: i32) {
+    /// Handle clicking the northern obelisk during the quest (before waystone is unlocked).
+    /// Returns true if an active quest interaction was handled, false to fall through to waystone.
+    async fn handle_obelisk_quest_interaction(&self, player_id: &str, x: i32, y: i32) -> bool {
         // Only the northern obelisk at (92, -163) has quest interaction
         let north_obelisk = (92, -163);
         if (x - north_obelisk.0).abs() > 2 || (y - north_obelisk.1).abs() > 2 {
-            return; // Not near the northern obelisk
+            return false; // Not near the northern obelisk
         }
 
-        // Check quest state
+        // Check quest state — only handle if quest is actively in progress
         let quest_info = {
             let quest_states = self.player_quest_states.read().await;
             if let Some(qs) = quest_states.get(player_id) {
@@ -6253,7 +6267,7 @@ impl GameRoom {
                         .unwrap_or(false);
                     Some((reach_done, kill_done))
                 } else {
-                    None
+                    None // Quest not active — fall through to waystone
                 }
             } else {
                 None
@@ -6273,6 +6287,7 @@ impl GameRoom {
                         choices: vec![],
                     },
                 ).await;
+                true
             }
             Some((true, true)) => {
                 // Hedgehog killed - restore connection, advance quest
@@ -6282,21 +6297,29 @@ impl GameRoom {
                         quest_id: String::new(),
                         npc_id: String::new(),
                         speaker: "Ancient Obelisk".to_string(),
-                        text: "The stone pulses with renewed energy. You feel the connection snap into place, reaching far to the south. The waystone is restored!".to_string(),
+                        text: "The stone pulses with renewed energy. You feel the connection snap into place, reaching far to the south. The waystone is restored! Return to Researcher Orin with the good news.".to_string(),
                         choices: vec![],
                     },
                 ).await;
-
-                // TODO: Advance quest objective - the return_to_orin talk_to objective
-                // This might happen automatically when they talk to Orin
+                true
             }
-            _ => {
-                // Not on quest or haven't reached yet
-                self.send_system_message(
+            Some((false, _)) => {
+                // Quest active but haven't reached yet — show hint
+                self.send_to_player(
                     player_id,
-                    "An ancient stone covered in faded runes. It seems dormant.",
-                )
-                .await;
+                    ServerMessage::ShowDialogue {
+                        quest_id: String::new(),
+                        npc_id: String::new(),
+                        speaker: "Ancient Obelisk".to_string(),
+                        text: "The ancient stone thrums with dormant power. You sense it's waiting for something...".to_string(),
+                        choices: vec![],
+                    },
+                ).await;
+                true
+            }
+            None => {
+                // No active quest — fall through to waystone handler
+                false
             }
         }
     }

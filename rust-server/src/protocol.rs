@@ -5398,6 +5398,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::StartAutoAction { target_type, target_id, action })
         }
         "cancelAutoAction" => Ok(ClientMessage::CancelAutoAction),
+        "interactObject" => {
+            let x = extract_i32(msg_data, "x").unwrap_or(0);
+            let y = extract_i32(msg_data, "y").unwrap_or(0);
+            Ok(ClientMessage::InteractObject { x, y })
+        }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }

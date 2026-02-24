@@ -15,6 +15,22 @@ use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 use std::collections::HashSet;
 
+/// GID for obelisk map objects (objects tileset firstgid 1162 + sprite 796)
+const OBELISK_GID: u32 = 1958;
+
+/// Check if a GID is an obelisk (interactable map object)
+pub fn is_obelisk_gid(gid: u32) -> bool {
+    gid == OBELISK_GID
+}
+
+/// Get the display name for an interactable map object by GID
+pub fn get_map_object_name(gid: u32) -> Option<&'static str> {
+    match gid {
+        OBELISK_GID => Some("Ancient Obelisk"),
+        _ => None,
+    }
+}
+
 /// Save current UI settings to persistent storage
 fn save_current_ui_settings(state: &GameState) {
     let settings = UiSettings {
@@ -332,7 +348,7 @@ fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCom
                     ) {
                         state.auto_path = Some(PathState {
                             path, current_index: 0, destination: dest,
-                            pickup_target: None, interact_target: None,
+                            pickup_target: None, interact_target: None, interact_object_target: None,
                         });
                     }
                 } else {
@@ -368,7 +384,7 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                     ) {
                         state.auto_path = Some(PathState {
                             path, current_index: 0, destination: dest,
-                            pickup_target: None, interact_target: None,
+                            pickup_target: None, interact_target: None, interact_object_target: None,
                         });
                     }
                 } else {
@@ -425,7 +441,7 @@ fn pathfind_and_interact_npc(
                             state.auto_path = Some(PathState {
                                 path, current_index: 0, destination: dest,
                                 pickup_target: None,
-                                interact_target: Some(npc_id_owned),
+                                interact_target: Some(npc_id_owned), interact_object_target: None,
                             });
                         }
                     }
@@ -451,7 +467,7 @@ fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>
             ) {
                 state.auto_path = Some(PathState {
                     path, current_index: 0, destination: dest,
-                    pickup_target: None, interact_target: None,
+                    pickup_target: None, interact_target: None, interact_object_target: None,
                 });
             }
         } else {
@@ -489,7 +505,7 @@ fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, til
             ) {
                 state.auto_path = Some(PathState {
                     path, current_index: 0, destination: (tile_x, tile_y),
-                    pickup_target: None, interact_target: None,
+                    pickup_target: None, interact_target: None, interact_object_target: None,
                 });
             }
         }
@@ -1752,7 +1768,7 @@ impl InputHandler {
                                                         ) {
                                                             state.auto_path = Some(PathState {
                                                                 path, current_index: 0, destination: dest,
-                                                                pickup_target: None, interact_target: None,
+                                                                pickup_target: None, interact_target: None, interact_object_target: None,
                                                             });
                                                         }
                                                     }
@@ -2056,7 +2072,7 @@ impl InputHandler {
                                                                 current_index: 0,
                                                                 destination: dest,
                                                                 pickup_target: None,
-                                                                interact_target: None,
+                                                                interact_target: None, interact_object_target: None,
                                                             });
                                                             // Player will need to interact again when they arrive
                                                         }
@@ -2105,7 +2121,7 @@ impl InputHandler {
                                                                 current_index: 0,
                                                                 destination: (item_x, item_y),
                                                                 pickup_target: Some(item_id),
-                                                                interact_target: None,
+                                                                interact_target: None, interact_object_target: None,
                                                             });
                                                         }
                                                     }
@@ -2153,7 +2169,7 @@ impl InputHandler {
                                                                     current_index: 0,
                                                                     destination: dest,
                                                                     pickup_target: None,
-                                                                    interact_target: None,
+                                                                    interact_target: None, interact_object_target: None,
                                                                 });
                                                                 state.pending_harvest_patch = Some(pid);
                                                             }
@@ -6439,7 +6455,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None,
+                                        interact_target: None, interact_object_target: None,
                                     });
                                     state.last_chase_repath_time = current_time;
                                 }
@@ -6503,7 +6519,7 @@ impl InputHandler {
                                 ) {
                                     state.auto_path = Some(PathState {
                                         path, current_index: 0, destination: dest,
-                                        pickup_target: None, interact_target: None,
+                                        pickup_target: None, interact_target: None, interact_object_target: None,
                                     });
                                     state.last_chase_repath_time = current_time;
                                 }
@@ -6533,7 +6549,7 @@ impl InputHandler {
                             ) {
                                 state.auto_path = Some(PathState {
                                     path, current_index: 0, destination: dest,
-                                    pickup_target: None, interact_target: None,
+                                    pickup_target: None, interact_target: None, interact_object_target: None,
                                 });
                                 state.last_chase_repath_time = current_time;
                             }
@@ -6689,6 +6705,10 @@ impl InputHandler {
                                 npc_id: npc_id.clone(),
                             });
                         }
+                    }
+                    // Handle interact object target (map objects like obelisks)
+                    if let Some((obj_x, obj_y)) = path_state.interact_object_target {
+                        commands.push(InputCommand::InteractObject { x: obj_x, y: obj_y });
                     }
                 }
                 // Handle chair sit target
@@ -7051,7 +7071,7 @@ impl InputHandler {
                                                 current_index: 0,
                                                 destination: dest,
                                                 pickup_target: Some(item_id.clone()),
-                                                interact_target: None,
+                                                interact_target: None, interact_object_target: None,
                                             });
                                         }
                                     }
@@ -7158,7 +7178,7 @@ impl InputHandler {
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: None,
+                                            interact_target: None, interact_object_target: None,
                                         });
                                     }
                                 } else {
@@ -7242,7 +7262,7 @@ impl InputHandler {
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: Some(npc_id),
+                                            interact_target: Some(npc_id), interact_object_target: None,
                                         });
                                     }
                                 }
@@ -7288,7 +7308,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None,
+                                        interact_target: None, interact_object_target: None,
                                     });
                                 }
                             } else {
@@ -7364,7 +7384,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None,
+                                        interact_target: None, interact_object_target: None,
                                     });
                                 }
                             } else {
@@ -7430,7 +7450,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None,
+                                        interact_target: None, interact_object_target: None,
                                     });
                                 }
                             } else {
@@ -7444,6 +7464,40 @@ impl InputHandler {
                                     target_type: "resource".to_string(),
                                     target_id,
                                     action: "mine".to_string(),
+                                });
+                            }
+                        }
+                    }
+                } else if is_obelisk_gid(obj_gid) {
+                    // Clicked on an obelisk — walk to it and interact
+                    if let Some(player) = state.get_local_player() {
+                        let player_x = player.x.round() as i32;
+                        let player_y = player.y.round() as i32;
+                        let cdx = (player_x - clicked_tile_x).abs();
+                        let cdy = (player_y - clicked_tile_y).abs();
+                        if cdx <= 1 && cdy <= 1 {
+                            // Already adjacent — interact immediately
+                            commands.push(InputCommand::InteractObject { x: clicked_tile_x, y: clicked_tile_y });
+                        } else {
+                            // Pathfind to adjacent tile, then interact
+                            let occupied = build_occupied_set(state);
+                            const MAX_PATH_DISTANCE: i32 = 32;
+                            if let Some((dest, path)) =
+                                pathfinding::find_path_to_adjacent(
+                                    (player_x, player_y),
+                                    (clicked_tile_x, clicked_tile_y),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
+                                )
+                            {
+                                state.auto_path = Some(PathState {
+                                    path,
+                                    current_index: 0,
+                                    destination: dest,
+                                    pickup_target: None,
+                                    interact_target: None,
+                                    interact_object_target: Some((clicked_tile_x, clicked_tile_y)),
                                 });
                             }
                         }
@@ -7481,7 +7535,7 @@ impl InputHandler {
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: None,
+                                            interact_target: None, interact_object_target: None,
                                         });
                                         state.pending_harvest_patch = Some(patch_id);
                                     }
@@ -7524,7 +7578,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None,
+                                        interact_target: None, interact_object_target: None,
                                     });
                                     state.pending_chair_sit =
                                         Some((clicked_tile_x, clicked_tile_y));
@@ -7572,7 +7626,7 @@ impl InputHandler {
                                 current_index: 0,
                                 destination: (tile_x, tile_y),
                                 pickup_target: None,
-                                interact_target: None,
+                                interact_target: None, interact_object_target: None,
                             });
                         }
                     }
