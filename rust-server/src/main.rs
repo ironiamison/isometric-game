@@ -50,6 +50,7 @@ mod slayer;
 mod scroll_spell;
 mod spell;
 mod tilemap;
+mod waystone;
 mod woodcutting;
 mod world;
 

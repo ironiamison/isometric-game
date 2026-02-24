@@ -906,6 +906,8 @@ pub struct GameRoom {
     ground_spawn_manager: RwLock<crate::ground_spawn::GroundSpawnManager>,
     /// Dig site manager for shovel-triggered quest events
     dig_site_manager: RwLock<crate::dig_site::DigSiteManager>,
+    /// Waystone fast-travel manager (loaded from TOML)
+    waystone_manager: RwLock<crate::waystone::WaystoneManager>,
 }
 
 impl GameRoom {
@@ -1310,6 +1312,7 @@ impl GameRoom {
             scroll_spell_registry: Arc::new(scroll_spell_registry),
             ground_spawn_manager: RwLock::new(ground_spawn_manager),
             dig_site_manager: RwLock::new(crate::dig_site::DigSiteManager::load(std::path::Path::new("data"))),
+            waystone_manager: RwLock::new(crate::waystone::WaystoneManager::load(std::path::Path::new("data"))),
         }
     }
 
@@ -6150,8 +6153,177 @@ impl GameRoom {
 
     /// Handle player interacting with a world map object (obelisk, etc.)
     pub async fn handle_interact_object(&self, player_id: &str, x: i32, y: i32) {
-        // Will be implemented in waystone task - for now just log
-        tracing::debug!("Player {} interacting with object at ({}, {})", player_id, x, y);
+        // Check waystones
+        let waystone = {
+            let wsm = self.waystone_manager.read().await;
+            wsm.get_at(x, y).cloned()
+        };
+
+        if let Some(ws) = waystone {
+            self.handle_waystone_interaction(player_id, &ws).await;
+            return;
+        }
+
+        // Check for quest-specific obelisk interactions (during quest, before completion)
+        self.handle_obelisk_quest_interaction(player_id, x, y)
+            .await;
+    }
+
+    /// Handle interaction with a waystone (show teleport dialogue or lore text)
+    async fn handle_waystone_interaction(
+        &self,
+        player_id: &str,
+        waystone: &crate::waystone::WaystoneDef,
+    ) {
+        // Check if player has completed the required quest
+        let quest_completed = {
+            let quest_states = self.player_quest_states.read().await;
+            quest_states
+                .get(player_id)
+                .map(|qs| qs.is_quest_completed(&waystone.quest_required))
+                .unwrap_or(false)
+        };
+
+        if quest_completed {
+            // Get destination name
+            let dest_name = {
+                let wsm = self.waystone_manager.read().await;
+                wsm.get_destination(&waystone.id)
+                    .map(|d| d.name.clone())
+                    .unwrap_or_else(|| "unknown".to_string())
+            };
+
+            // Show teleport confirmation dialogue
+            // Use "waystone:{waystone_id}" prefix for routing in handle_dialogue_choice
+            self.send_to_player(
+                player_id,
+                ServerMessage::ShowDialogue {
+                    quest_id: format!("waystone:{}", waystone.id),
+                    npc_id: String::new(),
+                    speaker: waystone.name.clone(),
+                    text: format!(
+                        "The waystone hums with energy. Travel to the {}?",
+                        dest_name
+                    ),
+                    choices: vec![
+                        crate::protocol::DialogueChoice {
+                            id: "teleport".to_string(),
+                            text: "Yes, teleport me.".to_string(),
+                        },
+                        crate::protocol::DialogueChoice {
+                            id: "cancel".to_string(),
+                            text: "Not now.".to_string(),
+                        },
+                    ],
+                },
+            )
+            .await;
+        } else {
+            // Quest not completed - show lore text
+            self.send_system_message(
+                player_id,
+                "The ancient stone stands silent. Perhaps someone nearby knows more about it.",
+            )
+            .await;
+        }
+    }
+
+    /// Handle clicking the northern obelisk during the quest (before waystone is unlocked)
+    async fn handle_obelisk_quest_interaction(&self, player_id: &str, x: i32, y: i32) {
+        // Only the northern obelisk at (92, -163) has quest interaction
+        let north_obelisk = (92, -163);
+        if (x - north_obelisk.0).abs() > 2 || (y - north_obelisk.1).abs() > 2 {
+            return; // Not near the northern obelisk
+        }
+
+        // Check quest state
+        let quest_info = {
+            let quest_states = self.player_quest_states.read().await;
+            if let Some(qs) = quest_states.get(player_id) {
+                if let Some(progress) = qs.active_quests.get("obelisk_connection") {
+                    let reach_done = progress
+                        .objectives
+                        .get("reach_north_obelisk")
+                        .map(|o| o.completed)
+                        .unwrap_or(false);
+                    let kill_done = progress
+                        .objectives
+                        .get("kill_hedgehog")
+                        .map(|o| o.completed)
+                        .unwrap_or(false);
+                    Some((reach_done, kill_done))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        match quest_info {
+            Some((true, false)) => {
+                // Reached obelisk, hasn't dug up hedgehog yet
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::ShowDialogue {
+                        quest_id: String::new(),
+                        npc_id: String::new(),
+                        speaker: "Ancient Obelisk".to_string(),
+                        text: "The stone hums faintly... something buried beneath is disrupting the flow of energy. You'll need to dig it out. Perhaps there's a tool lying nearby...".to_string(),
+                        choices: vec![],
+                    },
+                ).await;
+            }
+            Some((true, true)) => {
+                // Hedgehog killed - restore connection, advance quest
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::ShowDialogue {
+                        quest_id: String::new(),
+                        npc_id: String::new(),
+                        speaker: "Ancient Obelisk".to_string(),
+                        text: "The stone pulses with renewed energy. You feel the connection snap into place, reaching far to the south. The waystone is restored!".to_string(),
+                        choices: vec![],
+                    },
+                ).await;
+
+                // TODO: Advance quest objective - the return_to_orin talk_to objective
+                // This might happen automatically when they talk to Orin
+            }
+            _ => {
+                // Not on quest or haven't reached yet
+                self.send_system_message(
+                    player_id,
+                    "An ancient stone covered in faded runes. It seems dormant.",
+                )
+                .await;
+            }
+        }
+    }
+
+    /// Teleport a player to the destination of a waystone
+    async fn teleport_to_waystone(&self, player_id: &str, waystone_id: &str) {
+        let destination = {
+            let wsm = self.waystone_manager.read().await;
+            wsm.get_destination(waystone_id).cloned()
+        };
+
+        if let Some(dest) = destination {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.x = dest.x;
+                player.y = dest.y;
+                player.move_dx = 0;
+                player.move_dy = 0;
+                tracing::info!(
+                    "Player {} teleported to waystone {} at ({}, {})",
+                    player_id,
+                    dest.name,
+                    dest.x,
+                    dest.y
+                );
+            }
+        }
     }
 
     /// Handle dialogue choice from player
@@ -6220,6 +6392,16 @@ impl GameRoom {
                 self.handle_bank_upgrade(player_id, npc_id).await;
             } else {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+            }
+            return;
+        }
+
+        // Handle waystone dialogue choices (format: "waystone:{waystone_id}")
+        if let Some(waystone_id) = quest_id.strip_prefix("waystone:") {
+            self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                .await;
+            if choice_id == "teleport" {
+                self.teleport_to_waystone(player_id, waystone_id).await;
             }
             return;
         }
