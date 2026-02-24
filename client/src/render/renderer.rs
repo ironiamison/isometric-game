@@ -279,6 +279,7 @@ enum MinimapMarkerKind {
     Enemy,
     Tree,
     Quest,
+    Station,
 }
 
 #[derive(Clone, Debug)]
@@ -1931,6 +1932,7 @@ impl Renderer {
             MinimapMarkerKind::Enemy => (Color::new(0.95, 0.35, 0.35, 1.0), 2.7),
             MinimapMarkerKind::Tree => (Color::new(0.35, 0.85, 0.45, 1.0), 2.4),
             MinimapMarkerKind::Quest => (Color::new(1.0, 0.82, 0.35, 1.0), 3.1),
+            MinimapMarkerKind::Station => (Color::new(1.0, 0.7, 0.4, 1.0), 3.0),
         }
     }
 
@@ -2210,7 +2212,14 @@ impl Renderer {
             if !in_bounds(npc.x, npc.y) {
                 continue;
             }
-            if npc.is_quest_giver {
+            if npc.station_type.is_some() {
+                markers.push(MinimapMarker {
+                    kind: MinimapMarkerKind::Station,
+                    x: npc.x,
+                    y: npc.y,
+                    label: format!("Station, {}", npc.display_name),
+                });
+            } else if npc.is_quest_giver {
                 quest_markers.push(MinimapMarker {
                     kind: MinimapMarkerKind::Quest,
                     x: npc.x,
@@ -2728,6 +2737,7 @@ impl Renderer {
                 (MinimapMarkerKind::Enemy, "Enemy"),
                 (MinimapMarkerKind::Tree, "Tree"),
                 (MinimapMarkerKind::Quest, "Quest"),
+                (MinimapMarkerKind::Station, "Station"),
             ];
             let slot_width = footer_width / legend_items.len() as f32;
             let icon_radius = 3.0;

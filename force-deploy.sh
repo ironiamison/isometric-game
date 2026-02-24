@@ -3,8 +3,8 @@ set -e
 source "$HOME/.cargo/env" 2>/dev/null || true
 
 REPO_DIR="/root/isometric-game"
-WEB_STATS_BASE_PATH="${WEB_STATS_BASE_PATH:-/players/}"
-WEB_STATS_DEPLOY_DIR="${WEB_STATS_DEPLOY_DIR:-/var/www/aeven/players}"
+WEB_STATS_BASE_PATH="${WEB_STATS_BASE_PATH:-/world/}"
+WEB_STATS_DEPLOY_DIR="${WEB_STATS_DEPLOY_DIR:-/var/www/aeven/world}"
 cd "$REPO_DIR"
 
 # Build client WASM
