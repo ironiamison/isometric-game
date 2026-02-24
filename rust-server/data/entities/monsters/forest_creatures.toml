@@ -568,6 +568,12 @@ drop_chance = 0.25
 quantity_min = 1
 quantity_max = 2
 
+[[cow.loot]]
+item_id = "big_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
 [cow.behaviors]
 hostile = true
 wander_enabled = true
