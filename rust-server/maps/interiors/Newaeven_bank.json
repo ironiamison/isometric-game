@@ -1842,5 +1842,8 @@
       "target_x": 0,
       "target_y": 0
     }
+  ],
+  "chests": [
+    { "chestId": "town_storage_chest", "x": 3, "y": 13 }
   ]
 }

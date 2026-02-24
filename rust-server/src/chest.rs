@@ -303,11 +303,13 @@ impl ChestManager {
         self.chests.get(&key)
     }
 
-    /// Tick spawn timers: check if any spawn items should respawn
-    pub fn tick_spawns(&mut self, registry: &ChestRegistry) {
+    /// Tick spawn timers: check if any spawn items should respawn.
+    /// Returns the keys of chests that had items respawn during this tick.
+    pub fn tick_spawns(&mut self, registry: &ChestRegistry) -> Vec<String> {
         let now = Instant::now();
+        let mut respawned_keys = Vec::new();
 
-        for chest in self.chests.values_mut() {
+        for (key, chest) in self.chests.iter_mut() {
             if chest.spawn_timers.is_empty() {
                 continue;
             }
@@ -328,6 +330,10 @@ impl ChestManager {
                 }
             }
 
+            if !to_respawn.is_empty() {
+                respawned_keys.push(key.clone());
+            }
+
             for (slot, item_id, quantity) in to_respawn {
                 chest.spawn_timers.remove(&slot);
                 if (slot as usize) < chest.slots.len() && chest.slots[slot as usize].is_none() {
@@ -336,6 +342,8 @@ impl ChestManager {
                 }
             }
         }
+
+        respawned_keys
     }
 
     /// Load saved chest data from the database

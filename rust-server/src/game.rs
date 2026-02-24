@@ -6217,6 +6217,12 @@ impl GameRoom {
             return;
         }
 
+        // Check for chests at this position
+        if self.try_open_chest(player_id, x, y).await {
+            tracing::debug!("handle_interact_object: handled by chest");
+            return;
+        }
+
         // Check waystones (post-quest teleportation)
         let waystone = {
             let wsm = self.waystone_manager.read().await;
@@ -13616,6 +13622,36 @@ impl GameRoom {
             }
         }
 
+        // Tick chest spawn timers (every tick is fine — the check is cheap)
+        {
+            let respawned_chests = {
+                let mut cm = self.chest_manager.write().await;
+                cm.tick_spawns(&self.chest_registry)
+            };
+
+            // Send ChestUpdate to viewers of any chest that had items respawn
+            if !respawned_chests.is_empty() {
+                let cm = self.chest_manager.read().await;
+                for chest_key in &respawned_chests {
+                    if let Some(chest) = cm.get(chest_key) {
+                        if !chest.viewers.is_empty() {
+                            let slots = Self::chest_slot_updates(chest, &self.item_registry);
+                            let total_value = chest.total_value(&self.item_registry);
+                            let viewer_ids: Vec<String> = chest.viewers.iter().cloned().collect();
+                            let msg = crate::protocol::ServerMessage::ChestUpdate {
+                                chest_id: chest_key.clone(),
+                                slots,
+                                total_value,
+                            };
+                            for viewer_id in &viewer_ids {
+                                self.send_to_player(viewer_id, msg.clone()).await;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let npc_world_ms = npc_world_start.elapsed().as_millis();
 
         // Send state sync to each player, filtering by instance and view distance
@@ -16966,6 +17002,39 @@ impl GameRoom {
                 }
             })
         }).collect()
+    }
+
+    /// Check if a chest exists at the given position and open it if so.
+    /// Returns true if a chest was found (and opened), false otherwise.
+    async fn try_open_chest(&self, player_id: &str, x: i32, y: i32) -> bool {
+        // Determine chest key based on whether player is in instance or overworld
+        let instance_id = {
+            let pi = self.player_instances.read().await;
+            pi.get(player_id).cloned()
+        };
+
+        let chest_key = if let Some(ref inst_id) = instance_id {
+            if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                crate::chest::ChestManager::interior_key(&instance.map_id, x, y)
+            } else {
+                return false;
+            }
+        } else {
+            crate::chest::ChestManager::overworld_key(x, y)
+        };
+
+        // Check if a chest exists at this key (read lock, released before handle_open_chest)
+        let exists = {
+            let cm = self.chest_manager.read().await;
+            cm.get(&chest_key).is_some()
+        };
+
+        if exists {
+            self.handle_open_chest(player_id, x, y).await;
+            true
+        } else {
+            false
+        }
     }
 
     pub async fn handle_open_chest(&self, player_id: &str, x: i32, y: i32) {
