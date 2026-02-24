@@ -704,7 +704,6 @@ shop_id = "witch"
 buy_multiplier = 0.4
 sell_multiplier = 1.2
 restock_interval_minutes = 5
-crafting_categories = ["alchemy"]
 required_quest = "the_magic_broom"
 
 [witch_hazel.quest_giver]
@@ -910,7 +909,6 @@ shop_id = "magic_shop"
 buy_multiplier = 0.4
 sell_multiplier = 1.1
 restock_interval_minutes = 5
-crafting_categories = ["alchemy"]
 
 [arcane_scholar.speech]
 radius = 5

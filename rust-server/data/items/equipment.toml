@@ -905,7 +905,7 @@ sellable = true
 [worn_belt.equipment]
 slot_type = "belt"
 defence_level_required = 5
-attack_bonus = 0
+attack_bonus = 2
 strength_bonus = 0
 defence_bonus = 2
 

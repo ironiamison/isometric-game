@@ -323,7 +323,7 @@ gold_min = 6
 gold_max = 16
 
 [[skeleton.loot]]
-item_id = "regular_bones"
+item_id = "big_bones"
 drop_chance = 1.0
 quantity_min = 1
 quantity_max = 2
@@ -370,7 +370,7 @@ gold_min = 12
 gold_max = 28
 
 [[skeleton_brute.loot]]
-item_id = "regular_bones"
+item_id = "big_bones"
 drop_chance = 1.0
 quantity_min = 2
 quantity_max = 3
@@ -482,7 +482,7 @@ quantity_min = 1
 quantity_max = 2
 
 [[wolf_spider.loot]]
-item_id = "regular_bones"
+item_id = "big_bones"
 drop_chance = 1.0
 quantity_min = 1
 quantity_max = 1
@@ -523,7 +523,7 @@ gold_min = 8
 gold_max = 20
 
 [[low_orc.loot]]
-item_id = "regular_bones"
+item_id = "big_bones"
 drop_chance = 1.0
 quantity_min = 1
 quantity_max = 1
@@ -648,20 +648,20 @@ description = "A chieftain of the barbarian clan."
 [barbarian_leader.stats]
 level = 19
 max_hp = 72
-damage = 10
+damage = 12
 attack_bonus = 8
 defence_bonus = 3
 attack_range = 1
 aggro_range = 7
 chase_range = 10
-move_cooldown_ms = 350
+move_cooldown_ms = 650
 attack_cooldown_ms = 1300
 respawn_time_ms = 30000
 
 [barbarian_leader.rewards]
 exp_base = 85
 gold_min = 18
-gold_max = 42
+gold_max = 25
 
 [[barbarian_leader.loot]]
 item_id = "scrap_leather"
@@ -670,8 +670,14 @@ quantity_min = 1
 quantity_max = 3
 
 [[barbarian_leader.loot]]
-item_id = "regular_bones"
+item_id = "big_bones"
 drop_chance = 1.0
+quantity_min = 2
+quantity_max = 2
+
+[[barbarian_leader.loot]]
+item_id = "runic_belt"
+drop_chance = 0.005
 quantity_min = 2
 quantity_max = 2
 
@@ -693,7 +699,7 @@ animation_type = "standard"
 description = "A heap of bones animated by dark magic."
 
 [bone_monster.stats]
-level = 13
+level = 20
 max_hp = 45
 damage = 6
 attack_bonus = 5
@@ -701,7 +707,7 @@ defence_bonus = 2
 attack_range = 1
 aggro_range = 6
 chase_range = 8
-move_cooldown_ms = 430
+move_cooldown_ms = 550
 attack_cooldown_ms = 1600
 respawn_time_ms = 16000
 
@@ -711,10 +717,16 @@ gold_min = 10
 gold_max = 24
 
 [[bone_monster.loot]]
-item_id = "regular_bones"
+item_id = "big_bones"
 drop_chance = 1.0
 quantity_min = 2
 quantity_max = 4
+
+[[bone_monster.loot]]
+item_id = "twin_blade"
+drop_chance = 0.005
+quantity_min = 1
+quantity_max = 1
 
 [[bone_monster.loot]]
 item_id = "bone_fragment"
@@ -744,7 +756,7 @@ level = 12
 max_hp = 30
 damage = 5
 attack_bonus = 6
-defence_bonus = -2
+defence_bonus = 0
 attack_range = 5
 aggro_range = 8
 chase_range = 10
@@ -758,7 +770,7 @@ gold_min = 7
 gold_max = 18
 
 [[skeleton_archer.loot]]
-item_id = "regular_bones"
+item_id = "big_bones"
 drop_chance = 1.0
 quantity_min = 1
 quantity_max = 2
@@ -993,8 +1005,14 @@ quantity_min = 1
 quantity_max = 2
 
 [[rock_golem.loot]]
-item_id = "regular_bones"
+item_id = "big_bones"
 drop_chance = 0.5
+quantity_min = 1
+quantity_max = 1
+
+[[rock_golem.loot]]
+item_id = "worn_belt"
+drop_chance = 0.05
 quantity_min = 1
 quantity_max = 1
 

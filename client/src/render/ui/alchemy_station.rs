@@ -440,7 +440,7 @@ impl Renderer {
                         y + 1.0,
                         content_w - 4.0,
                         section_header_h - 2.0,
-                        Color::new(0.10, 0.14, 0.10, 1.0),
+                        Color::new(0.12, 0.13, 0.14, 1.0),
                     );
                     let section_name = alchemy_section_name(section);
                     self.draw_text_sharp(
@@ -648,39 +648,29 @@ impl Renderer {
         // Dark background for detail area
         draw_rectangle(x, y, w, h, Color::new(0.06, 0.08, 0.06, 0.5));
 
-        // ===== Row 1: Icon + Recipe name + Level/XP =====
-        let row1_y = y + 6.0 * s;
+        let pad = 12.0 * s;
+        let right_edge = x + w - pad;
+
+        // ===== HEADER: Icon + Recipe name + Level/XP/Time =====
+        let header_y = y + 8.0 * s;
         let icon_size = 40.0 * s;
-        let icon_x = x + 10.0 * s;
-        let icon_y = row1_y;
+        let icon_x = x + pad;
 
         if let Some(result) = recipe.results.first() {
-            // Icon background
-            draw_rectangle(icon_x - 2.0, icon_y - 2.0, icon_size + 4.0, icon_size + 4.0, SLOT_BORDER);
-            draw_rectangle(icon_x - 1.0, icon_y - 1.0, icon_size + 2.0, icon_size + 2.0, SLOT_BG_EMPTY);
-
+            draw_rectangle(icon_x - 2.0, header_y - 2.0, icon_size + 4.0, icon_size + 4.0, SLOT_BORDER);
+            draw_rectangle(icon_x - 1.0, header_y - 1.0, icon_size + 2.0, icon_size + 2.0, SLOT_BG_EMPTY);
             self.draw_item_icon(
                 &result.item_id,
-                icon_x,
-                icon_y,
-                icon_size,
-                icon_size,
-                state,
-                true,
+                icon_x, header_y,
+                icon_size, icon_size,
+                state, true,
             );
         }
 
-        // Recipe name to the right of icon
         let text_x = icon_x + icon_size + 10.0 * s;
-        self.draw_text_sharp(
-            &recipe.display_name,
-            text_x,
-            row1_y + 16.0 * s,
-            16.0,
-            TEXT_TITLE,
-        );
+        self.draw_text_sharp(&recipe.display_name, text_x, header_y + 16.0 * s, 16.0, TEXT_TITLE);
 
-        // Level + XP + time info on second line
+        // Info line: Lv · XP · time
         let mut info_parts = Vec::new();
         if recipe.level_required > 1 {
             info_parts.push(format!("Lv{}", recipe.level_required));
@@ -689,17 +679,15 @@ impl Renderer {
             info_parts.push(format!("{}xp", recipe.xp));
         }
         if recipe.craft_time_ms > 0 {
-            let time_secs = recipe.craft_time_ms as f32 / 1000.0;
-            if time_secs == time_secs.floor() {
-                info_parts.push(format!("{}s", time_secs as u32));
+            let t = recipe.craft_time_ms as f32 / 1000.0;
+            if t == t.floor() {
+                info_parts.push(format!("{}s", t as u32));
             } else {
-                info_parts.push(format!("{:.1}s", time_secs));
+                info_parts.push(format!("{:.1}s", t));
             }
         }
         if !info_parts.is_empty() {
-            let info_text = info_parts.join(" · ");
-
-            // Level color
+            let info_text = info_parts.join(" \u{00b7} ");
             let info_color = if recipe.level_required > 1 {
                 if let Some(player) = state.get_local_player() {
                     if player.skills.alchemy.level < recipe.level_required {
@@ -713,56 +701,64 @@ impl Renderer {
             } else {
                 TEXT_DIM
             };
-
-            self.draw_text_sharp(&info_text, text_x, row1_y + 34.0 * s, 16.0, info_color);
+            self.draw_text_sharp(&info_text, text_x, header_y + 34.0 * s, 16.0, info_color);
         }
 
-        // ===== Row 2: Ingredient grid (2 columns, below icon row) =====
-        let ing_y = row1_y + icon_size + 8.0 * s;
-        let ing_x = icon_x + 6.0; // align with preview icon box
+        // ===== SEPARATOR =====
+        let sep_y = header_y + icon_size + 8.0 * s;
+        draw_line(
+            x + pad, sep_y,
+            right_edge, sep_y,
+            1.0, HEADER_BORDER,
+        );
+
+        // ===== INGREDIENT ROWS (full-width, right-aligned counts) =====
+        let ing_start_y = sep_y + 6.0 * s;
         let ing_icon_size = 24.0 * s;
-        let ing_text_offset = ing_icon_size + 16.0 * s; // extra gap so text clears sprite
-        let ing_row_h = 30.0 * s;
-        let col_w = (w - (ing_x - x) * 2.0) / 2.0; // two columns within ingredient area
+        let ing_row_h = 28.0 * s;
+        let green = Color::new(0.392, 0.784, 0.392, 1.0);
+        let red = Color::new(0.784, 0.314, 0.314, 1.0);
 
         let mut can_craft = true;
 
         for (i, ing) in recipe.ingredients.iter().enumerate() {
             let have = state.inventory.count_item_by_id(&ing.item_id);
             let name = state.item_registry.get_display_name(&ing.item_id);
+            let has_enough = have >= ing.count;
 
-            if have < ing.count {
+            if !has_enough {
                 can_craft = false;
             }
 
-            let col = i % 2;
-            let row = i / 2;
-            let ix = ing_x + col as f32 * col_w;
-            let iy = ing_y + row as f32 * ing_row_h;
+            let row_y = ing_start_y + i as f32 * ing_row_h;
+            let color = if has_enough { green } else { red };
 
             // Ingredient icon
+            let icon_y_centered = row_y + (ing_row_h - ing_icon_size) / 2.0;
             self.draw_item_icon(
                 &ing.item_id,
-                ix,
-                iy,
-                ing_icon_size,
-                ing_icon_size,
-                state,
-                true,
+                x + pad, icon_y_centered,
+                ing_icon_size, ing_icon_size,
+                state, true,
             );
 
-            // "name required/inventory"
-            let req_text = format!("{} {}/{}", name, ing.count, have);
-            let color = if have >= ing.count {
-                Color::new(0.392, 0.784, 0.392, 1.0)
-            } else {
-                Color::new(0.784, 0.314, 0.314, 1.0)
-            };
-
+            // Ingredient name (left-aligned after icon)
+            let name_x = x + pad + ing_icon_size + 8.0 * s;
             self.draw_text_sharp(
-                &req_text,
-                ix + ing_text_offset,
-                iy + ing_icon_size * 0.72,
+                name,
+                name_x,
+                row_y + ing_row_h * 0.68,
+                16.0,
+                color,
+            );
+
+            // Have/need count (right-aligned)
+            let count_text = format!("{} / {}", have, ing.count);
+            let count_w = self.measure_text_sharp(&count_text, 16.0).width;
+            self.draw_text_sharp(
+                &count_text,
+                right_edge - count_w,
+                row_y + ing_row_h * 0.68,
                 16.0,
                 color,
             );
@@ -777,15 +773,14 @@ impl Renderer {
             }
         }
 
-        // ===== Bottom: Quantity + Brew + Cancel buttons =====
-        let btn_y = y + h - 32.0 * s;
-        let btn_area_x = x + 10.0 * s;
-
-        // Quantity: [-] [N] [+]
-        let qty_btn_size = 26.0 * s;
+        // ===== BOTTOM ACTION BAR: Quantity (left) + Brew button (right) =====
+        let btn_h = 26.0 * s;
+        let btn_y = y + h - btn_h - 6.0 * s;
+        let qty_btn_size = btn_h;
 
         // Minus button
-        let minus_bounds = Rect::new(btn_area_x, btn_y, qty_btn_size, qty_btn_size);
+        let minus_x = x + pad;
+        let minus_bounds = Rect::new(minus_x, btn_y, qty_btn_size, qty_btn_size);
         layout.add(UiElementId::AlchemyQuantityMinus, minus_bounds);
         let is_minus_hovered = matches!(hovered, Some(UiElementId::AlchemyQuantityMinus));
         let (minus_bg, minus_border) = if is_minus_hovered {
@@ -793,12 +788,12 @@ impl Renderer {
         } else {
             (SLOT_BG_EMPTY, SLOT_BORDER)
         };
-        draw_rectangle(btn_area_x, btn_y, qty_btn_size, qty_btn_size, minus_border);
-        draw_rectangle(btn_area_x + 1.0, btn_y + 1.0, qty_btn_size - 2.0, qty_btn_size - 2.0, minus_bg);
+        draw_rectangle(minus_x, btn_y, qty_btn_size, qty_btn_size, minus_border);
+        draw_rectangle(minus_x + 1.0, btn_y + 1.0, qty_btn_size - 2.0, qty_btn_size - 2.0, minus_bg);
         let minus_dims = self.measure_text_sharp("-", 16.0);
         self.draw_text_sharp(
             "-",
-            btn_area_x + (qty_btn_size - minus_dims.width) / 2.0,
+            minus_x + (qty_btn_size - minus_dims.width) / 2.0,
             btn_y + qty_btn_size * 0.73,
             16.0,
             if is_minus_hovered { TEXT_TITLE } else { TEXT_NORMAL },
@@ -807,17 +802,18 @@ impl Renderer {
         // Quantity display
         let qty_text = format!("{}", state.ui_state.alchemy_station_quantity);
         let qty_dims = self.measure_text_sharp(&qty_text, 16.0);
-        let qty_display_x = btn_area_x + qty_btn_size + 8.0 * s;
+        let qty_display_x = minus_x + qty_btn_size + 4.0 * s;
+        let qty_display_w = 24.0 * s;
         self.draw_text_sharp(
             &qty_text,
-            qty_display_x + (20.0 * s - qty_dims.width) / 2.0,
+            qty_display_x + (qty_display_w - qty_dims.width) / 2.0,
             btn_y + qty_btn_size * 0.73,
             16.0,
             TEXT_TITLE,
         );
 
         // Plus button
-        let plus_x = qty_display_x + 20.0 * s + 4.0 * s;
+        let plus_x = qty_display_x + qty_display_w + 4.0 * s;
         let plus_bounds = Rect::new(plus_x, btn_y, qty_btn_size, qty_btn_size);
         layout.add(UiElementId::AlchemyQuantityPlus, plus_bounds);
         let is_plus_hovered = matches!(hovered, Some(UiElementId::AlchemyQuantityPlus));
@@ -837,11 +833,11 @@ impl Renderer {
             if is_plus_hovered { TEXT_TITLE } else { TEXT_NORMAL },
         );
 
-        // BREW button
+        // BREW button (right-aligned)
         let brew_btn_w = 120.0 * s;
-        let brew_btn_h = 28.0 * s;
-        let brew_btn_x = x + w - brew_btn_w - 140.0 * s;
-        let brew_btn_y = btn_y - 1.0;
+        let brew_btn_h = btn_h;
+        let brew_btn_x = right_edge - brew_btn_w;
+        let brew_btn_y = btn_y;
 
         if can_craft {
             let bounds = Rect::new(brew_btn_x, brew_btn_y, brew_btn_w, brew_btn_h);
@@ -893,7 +889,6 @@ impl Renderer {
             16.0,
             brew_text_color,
         );
-
     }
 
     /// Render brewing progress overlay
