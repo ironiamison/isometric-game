@@ -6381,6 +6381,12 @@ impl GameRoom {
                             self.handle_use_spell_scroll(player_id, slot_index).await;
                             return;
                         }
+                        // Check if this is a dig tool (non-consumable)
+                        if matches!(&def.use_effect, Some(crate::data::UseEffect::Dig)) {
+                            drop(players);
+                            self.handle_dig(player_id, slot_index).await;
+                            return;
+                        }
                     }
                 }
             }
@@ -6446,6 +6452,10 @@ impl GameRoom {
                             }
                             Some(UseEffect::LearnSpell { .. }) => {
                                 // Handled separately in handle_use_spell_scroll
+                                "none".to_string()
+                            }
+                            Some(UseEffect::Dig) => {
+                                // Handled separately in handle_dig (non-consumable)
                                 "none".to_string()
                             }
                             None => "none".to_string(),
@@ -6589,6 +6599,12 @@ impl GameRoom {
             },
         )
         .await;
+    }
+
+    /// Handle using a dig tool (shovel) - checks dig sites near player
+    async fn handle_dig(&self, player_id: &str, _slot_index: u8) {
+        self.send_system_message(player_id, "There's nothing to dig here.")
+            .await;
     }
 
     /// Handle using a spell scroll item to permanently learn a scroll-exclusive spell
