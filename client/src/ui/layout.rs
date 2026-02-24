@@ -212,6 +212,11 @@ pub enum UiElementId {
     AlchemyQuantityMinus,
     AlchemyQuantityPlus,
 
+    // Chest Panel
+    ChestSlot(u8),
+    ChestClose,
+    ChestScrollArea,
+
     // Slayer Panel
     SlayerCloseButton,
     SlayerGetTaskButton,

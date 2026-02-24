@@ -1235,6 +1235,12 @@ pub struct UiState {
     pub bank_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub bank_inv_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub bank_drag: Option<BankDrag>,
+    // Chest UI state
+    pub chest_open: bool,
+    pub chest_id: String,
+    pub chest_slots: Vec<Option<(String, i32, i32)>>, // (item_id, quantity, value) per slot
+    pub chest_total_value: i32,
+    pub chest_scroll: f32,
     // Escape menu state
     pub escape_menu_open: bool,
     // Audio settings (synced with AudioManager)
@@ -1423,6 +1429,11 @@ impl Default for UiState {
             bank_scroll_drag: Default::default(),
             bank_inv_scroll_drag: Default::default(),
             bank_drag: None,
+            chest_open: false,
+            chest_id: String::new(),
+            chest_slots: Vec::new(),
+            chest_total_value: 0,
+            chest_scroll: 0.0,
             escape_menu_open: false,
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,

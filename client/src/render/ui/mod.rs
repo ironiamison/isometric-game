@@ -6,6 +6,7 @@ pub mod anvil;
 pub mod area_banner;
 pub mod bank;
 pub mod bottom_bar;
+pub mod chest_panel;
 pub mod character;
 pub mod chat_panel;
 pub mod common;

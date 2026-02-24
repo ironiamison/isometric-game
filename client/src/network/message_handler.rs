@@ -2297,6 +2297,66 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "chestOpen" => {
+            if let Some(value) = data {
+                let chest_id = extract_string(value, "chest_id").unwrap_or_default();
+                let total_value = extract_i32(value, "total_value").unwrap_or(0);
+                let mut slots = Vec::new();
+                if let Some(slots_arr) = extract_array(value, "slots") {
+                    for slot_value in slots_arr {
+                        let slot = extract_i32(slot_value, "slot").unwrap_or(0) as u8;
+                        let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
+                        let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
+                        let value = extract_i32(slot_value, "value").unwrap_or(0);
+                        if !item_id.is_empty() && quantity > 0 {
+                            slots.push((slot, item_id, quantity, value));
+                        }
+                    }
+                }
+
+                log::info!("Chest opened: '{}', {} items, total value {}g", chest_id, slots.len(), total_value);
+
+                // Determine slot count from the max slot index
+                let max_slot = slots.iter().map(|(s, _, _, _)| *s as usize).max().unwrap_or(0);
+                let num_slots = (max_slot + 1).max(10);
+
+                state.ui_state.chest_open = true;
+                state.ui_state.chest_id = chest_id;
+                state.ui_state.chest_slots = vec![None; num_slots];
+                for (slot, item_id, quantity, value) in slots {
+                    if (slot as usize) < state.ui_state.chest_slots.len() {
+                        state.ui_state.chest_slots[slot as usize] = Some((item_id, quantity, value));
+                    }
+                }
+                state.ui_state.chest_total_value = total_value;
+                state.ui_state.chest_scroll = 0.0;
+                state.pending_sfx.push("ui_open".to_string());
+            }
+        }
+
+        "chestUpdate" => {
+            if let Some(value) = data {
+                let chest_id = extract_string(value, "chest_id").unwrap_or_default();
+                if chest_id == state.ui_state.chest_id {
+                    let total_value = extract_i32(value, "total_value").unwrap_or(0);
+                    let mut new_slots = vec![None; state.ui_state.chest_slots.len()];
+                    if let Some(slots_arr) = extract_array(value, "slots") {
+                        for slot_value in slots_arr {
+                            let slot = extract_i32(slot_value, "slot").unwrap_or(0) as u8;
+                            let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
+                            let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
+                            let value = extract_i32(slot_value, "value").unwrap_or(0);
+                            if !item_id.is_empty() && quantity > 0 && (slot as usize) < new_slots.len() {
+                                new_slots[slot as usize] = Some((item_id, quantity, value));
+                            }
+                        }
+                    }
+                    state.ui_state.chest_slots = new_slots;
+                    state.ui_state.chest_total_value = total_value;
+                }
+            }
+        }
+
         "shopData" => {
             if let Some(value) = data {
                 // Extract npcId from top level (camelCase from server)

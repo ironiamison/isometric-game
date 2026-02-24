@@ -18,8 +18,8 @@ use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Scree
 
 use crate::game::tutorial::TutorialManager;
 
-pub const SERVER_URL: &str = "https://aeven.xyz";
-pub const WS_URL: &str = "wss://aeven.xyz";
+pub const SERVER_URL: &str = "http://localhost:2567";
+pub const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -618,6 +618,15 @@ pub fn run_game_frame(
             InputCommand::SlayerRemoveBlock { monster_id } => ClientMessage::SlayerRemoveBlock {
                 monster_id: monster_id.clone(),
             },
+            // Chest commands
+            InputCommand::ChestTake { chest_id, slot } => ClientMessage::ChestTake {
+                chest_id: chest_id.clone(),
+                slot: *slot,
+            },
+            InputCommand::ChestDeposit { chest_id, inventory_slot } => ClientMessage::ChestDeposit {
+                chest_id: chest_id.clone(),
+                inventory_slot: *inventory_slot,
+            },
             InputCommand::StartAutoAction {
                 target_type,
                 target_id,
@@ -629,6 +638,10 @@ pub fn run_game_frame(
             },
             InputCommand::CancelAutoAction => ClientMessage::CancelAutoAction,
             InputCommand::InteractObject { x, y } => ClientMessage::InteractObject {
+                x: *x,
+                y: *y,
+            },
+            InputCommand::UseWaystone { x, y } => ClientMessage::UseWaystone {
                 x: *x,
                 y: *y,
             },

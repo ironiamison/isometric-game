@@ -50,6 +50,10 @@ pub enum ClientMessage {
     #[serde(rename = "interactObject")]
     InteractObject { x: i32, y: i32 },
 
+    /// Direct waystone teleport (no dialogue)
+    #[serde(rename = "useWaystone")]
+    UseWaystone { x: i32, y: i32 },
+
     #[serde(rename = "dialogueChoice")]
     DialogueChoice { quest_id: String, choice_id: String },
 
@@ -224,6 +228,16 @@ pub enum ClientMessage {
     SlayerRemoveBlock { monster_id: String },
 
     // Auto-action commands (click-to-act chase system)
+    // Chest commands
+    #[serde(rename = "openChest")]
+    OpenChest { x: i32, y: i32 },
+
+    #[serde(rename = "chestTake")]
+    ChestTake { chest_id: String, slot: u8 },
+
+    #[serde(rename = "chestDeposit")]
+    ChestDeposit { chest_id: String, inventory_slot: u8 },
+
     #[serde(rename = "startAutoAction")]
     StartAutoAction {
         target_type: String,
@@ -310,6 +324,11 @@ impl ClientMessage {
                 data.insert("x".into(), Value::Integer((*x as i64).into()));
                 data.insert("y".into(), Value::Integer((*y as i64).into()));
                 "interactObject"
+            }
+            ClientMessage::UseWaystone { x, y } => {
+                data.insert("x".into(), Value::Integer((*x as i64).into()));
+                data.insert("y".into(), Value::Integer((*y as i64).into()));
+                "useWaystone"
             }
             ClientMessage::DialogueChoice {
                 quest_id,
@@ -552,6 +571,21 @@ impl ClientMessage {
             ClientMessage::SlayerRemoveBlock { monster_id } => {
                 data.insert("monster_id".into(), Value::String(monster_id.clone().into()));
                 "slayerRemoveBlock"
+            }
+            ClientMessage::OpenChest { x, y } => {
+                data.insert("x".into(), Value::Integer((*x as i64).into()));
+                data.insert("y".into(), Value::Integer((*y as i64).into()));
+                "openChest"
+            }
+            ClientMessage::ChestTake { chest_id, slot } => {
+                data.insert("chest_id".into(), Value::String(chest_id.clone().into()));
+                data.insert("slot".into(), Value::Integer((*slot as i64).into()));
+                "chestTake"
+            }
+            ClientMessage::ChestDeposit { chest_id, inventory_slot } => {
+                data.insert("chest_id".into(), Value::String(chest_id.clone().into()));
+                data.insert("inventory_slot".into(), Value::Integer((*inventory_slot as i64).into()));
+                "chestDeposit"
             }
             ClientMessage::StartAutoAction {
                 target_type,

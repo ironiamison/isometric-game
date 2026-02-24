@@ -348,7 +348,7 @@ fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCom
                     ) {
                         state.auto_path = Some(PathState {
                             path, current_index: 0, destination: dest,
-                            pickup_target: None, interact_target: None, interact_object_target: None,
+                            pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
                         });
                     }
                 } else {
@@ -384,7 +384,7 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                     ) {
                         state.auto_path = Some(PathState {
                             path, current_index: 0, destination: dest,
-                            pickup_target: None, interact_target: None, interact_object_target: None,
+                            pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
                         });
                     }
                 } else {
@@ -441,7 +441,7 @@ fn pathfind_and_interact_npc(
                             state.auto_path = Some(PathState {
                                 path, current_index: 0, destination: dest,
                                 pickup_target: None,
-                                interact_target: Some(npc_id_owned), interact_object_target: None,
+                                interact_target: Some(npc_id_owned), interact_object_target: None, waystone_target: None,
                             });
                         }
                     }
@@ -467,7 +467,7 @@ fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>
             ) {
                 state.auto_path = Some(PathState {
                     path, current_index: 0, destination: dest,
-                    pickup_target: None, interact_target: None, interact_object_target: None,
+                    pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
                 });
             }
         } else {
@@ -505,7 +505,7 @@ fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, til
             ) {
                 state.auto_path = Some(PathState {
                     path, current_index: 0, destination: (tile_x, tile_y),
-                    pickup_target: None, interact_target: None, interact_object_target: None,
+                    pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
                 });
             }
         }
@@ -717,6 +717,15 @@ pub enum InputCommand {
     SlayerRemoveBlock {
         monster_id: String,
     },
+    // Chest commands
+    ChestTake {
+        chest_id: String,
+        slot: u8,
+    },
+    ChestDeposit {
+        chest_id: String,
+        inventory_slot: u8,
+    },
     // Auto-action commands (click-to-act chase system)
     StartAutoAction {
         target_type: String,
@@ -726,6 +735,11 @@ pub enum InputCommand {
     CancelAutoAction,
     // Map object interaction commands
     InteractObject {
+        x: i32,
+        y: i32,
+    },
+    // Direct waystone teleport (no dialogue)
+    UseWaystone {
         x: i32,
         y: i32,
     },
@@ -994,6 +1008,7 @@ impl InputHandler {
             || state.ui_state.anvil_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
+            || state.ui_state.chest_open
             || state.ui_state.social_open
             || state.ui_state.chat_panel_open
             || state.ui_state.slayer_panel_open
@@ -1005,6 +1020,7 @@ impl InputHandler {
             || state.ui_state.anvil_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
+            || state.ui_state.chest_open
             || state.ui_state.minimap_panel_open
             || in_dialogue;
         self.touch_controls.update(
@@ -1768,7 +1784,7 @@ impl InputHandler {
                                                         ) {
                                                             state.auto_path = Some(PathState {
                                                                 path, current_index: 0, destination: dest,
-                                                                pickup_target: None, interact_target: None, interact_object_target: None,
+                                                                pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
                                                             });
                                                         }
                                                     }
@@ -2026,12 +2042,47 @@ impl InputHandler {
                                         _ => {}
                                     }
                                 }
-                                ContextMenuTarget::MapObject { tile_x, tile_y, .. } => {
-                                    // Options: 0=Interact, 1=Examine
+                                ContextMenuTarget::MapObject { tile_x, tile_y, gid } => {
+                                    // Obelisks: 0=Teleport, 1=Examine
+                                    // Other objects: 0=Interact, 1=Examine
                                     match option_idx {
                                         0 => {
-                                            // Send interact object message
-                                            commands.push(InputCommand::InteractObject { x: *tile_x, y: *tile_y });
+                                            let tx = *tile_x;
+                                            let ty = *tile_y;
+                                            if is_obelisk_gid(*gid) {
+                                                // Walk to obelisk, then teleport directly
+                                                if let Some(player) = state.get_local_player() {
+                                                    let px = player.x.round() as i32;
+                                                    let py = player.y.round() as i32;
+                                                    let cdx = (px - tx).abs();
+                                                    let cdy = (py - ty).abs();
+                                                    if cdx <= 1 && cdy <= 1 {
+                                                        commands.push(InputCommand::UseWaystone { x: tx, y: ty });
+                                                    } else {
+                                                        let occupied = build_occupied_set(state);
+                                                        const MAX_PATH_DISTANCE: i32 = 32;
+                                                        if let Some((dest, path)) =
+                                                            pathfinding::find_path_to_adjacent(
+                                                                (px, py),
+                                                                (tx, ty),
+                                                                &state.chunk_manager,
+                                                                &occupied,
+                                                                MAX_PATH_DISTANCE,
+                                                            )
+                                                        {
+                                                            state.auto_path = Some(PathState {
+                                                                path,
+                                                                current_index: 0,
+                                                                destination: dest,
+                                                                pickup_target: None,
+                                                                interact_target: None, interact_object_target: None, waystone_target: Some((tx, ty)),
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                commands.push(InputCommand::InteractObject { x: tx, y: ty });
+                                            }
                                         }
                                         1 => {
                                             state.push_system_chat("An ancient stone object.".to_string());
@@ -2072,7 +2123,7 @@ impl InputHandler {
                                                                 current_index: 0,
                                                                 destination: dest,
                                                                 pickup_target: None,
-                                                                interact_target: None, interact_object_target: None,
+                                                                interact_target: None, interact_object_target: None, waystone_target: None,
                                                             });
                                                             // Player will need to interact again when they arrive
                                                         }
@@ -2121,7 +2172,7 @@ impl InputHandler {
                                                                 current_index: 0,
                                                                 destination: (item_x, item_y),
                                                                 pickup_target: Some(item_id),
-                                                                interact_target: None, interact_object_target: None,
+                                                                interact_target: None, interact_object_target: None, waystone_target: None,
                                                             });
                                                         }
                                                     }
@@ -2169,7 +2220,7 @@ impl InputHandler {
                                                                     current_index: 0,
                                                                     destination: dest,
                                                                     pickup_target: None,
-                                                                    interact_target: None, interact_object_target: None,
+                                                                    interact_target: None, interact_object_target: None, waystone_target: None,
                                                                 });
                                                                 state.pending_harvest_patch = Some(pid);
                                                             }
@@ -3040,6 +3091,59 @@ impl InputHandler {
             while get_char_pressed().is_some() {}
 
             // Don't process other input while gold drop dialog is open
+            return commands;
+        }
+
+        // Handle chest panel input
+        if state.ui_state.chest_open {
+            // Mouse wheel scroll
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                if let Some(UiElementId::ChestScrollArea) = &state.ui_state.hovered_element {
+                    let max_scroll = layout
+                        .get_max_scroll(&UiElementId::ChestScrollArea)
+                        .unwrap_or(0.0);
+                    state.ui_state.chest_scroll =
+                        (state.ui_state.chest_scroll - wheel_y * 30.0).clamp(0.0, max_scroll);
+                }
+            }
+
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::ChestClose => {
+                            state.ui_state.chest_open = false;
+                            state.pending_sfx.push("enter".to_string());
+                        }
+                        UiElementId::ChestSlot(idx) => {
+                            // Take item from chest slot
+                            if (*idx as usize) < state.ui_state.chest_slots.len() {
+                                if state.ui_state.chest_slots[*idx as usize].is_some() {
+                                    commands.push(InputCommand::ChestTake {
+                                        chest_id: state.ui_state.chest_id.clone(),
+                                        slot: *idx,
+                                    });
+                                }
+                            }
+                        }
+                        UiElementId::InventorySlot(inv_idx) => {
+                            // Deposit item from inventory into chest
+                            commands.push(InputCommand::ChestDeposit {
+                                chest_id: state.ui_state.chest_id.clone(),
+                                inventory_slot: *inv_idx as u8,
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Escape to close
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.chest_open = false;
+                return commands;
+            }
+
             return commands;
         }
 
@@ -6455,7 +6559,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None,
+                                        interact_target: None, interact_object_target: None, waystone_target: None,
                                     });
                                     state.last_chase_repath_time = current_time;
                                 }
@@ -6519,7 +6623,7 @@ impl InputHandler {
                                 ) {
                                     state.auto_path = Some(PathState {
                                         path, current_index: 0, destination: dest,
-                                        pickup_target: None, interact_target: None, interact_object_target: None,
+                                        pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
                                     });
                                     state.last_chase_repath_time = current_time;
                                 }
@@ -6549,7 +6653,7 @@ impl InputHandler {
                             ) {
                                 state.auto_path = Some(PathState {
                                     path, current_index: 0, destination: dest,
-                                    pickup_target: None, interact_target: None, interact_object_target: None,
+                                    pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
                                 });
                                 state.last_chase_repath_time = current_time;
                             }
@@ -6709,6 +6813,10 @@ impl InputHandler {
                     // Handle interact object target (map objects like obelisks)
                     if let Some((obj_x, obj_y)) = path_state.interact_object_target {
                         commands.push(InputCommand::InteractObject { x: obj_x, y: obj_y });
+                    }
+                    // Handle direct waystone teleport (right-click Teleport)
+                    if let Some((ws_x, ws_y)) = path_state.waystone_target {
+                        commands.push(InputCommand::UseWaystone { x: ws_x, y: ws_y });
                     }
                 }
                 // Handle chair sit target
@@ -7071,7 +7179,7 @@ impl InputHandler {
                                                 current_index: 0,
                                                 destination: dest,
                                                 pickup_target: Some(item_id.clone()),
-                                                interact_target: None, interact_object_target: None,
+                                                interact_target: None, interact_object_target: None, waystone_target: None,
                                             });
                                         }
                                     }
@@ -7178,7 +7286,7 @@ impl InputHandler {
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: None, interact_object_target: None,
+                                            interact_target: None, interact_object_target: None, waystone_target: None,
                                         });
                                     }
                                 } else {
@@ -7262,7 +7370,7 @@ impl InputHandler {
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: Some(npc_id), interact_object_target: None,
+                                            interact_target: Some(npc_id), interact_object_target: None, waystone_target: None,
                                         });
                                     }
                                 }
@@ -7308,7 +7416,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None,
+                                        interact_target: None, interact_object_target: None, waystone_target: None,
                                     });
                                 }
                             } else {
@@ -7384,7 +7492,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None,
+                                        interact_target: None, interact_object_target: None, waystone_target: None,
                                     });
                                 }
                             } else {
@@ -7450,7 +7558,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None,
+                                        interact_target: None, interact_object_target: None, waystone_target: None,
                                     });
                                 }
                             } else {
@@ -7498,6 +7606,7 @@ impl InputHandler {
                                     pickup_target: None,
                                     interact_target: None,
                                     interact_object_target: Some((clicked_tile_x, clicked_tile_y)),
+                                    waystone_target: None,
                                 });
                             }
                         }
@@ -7535,7 +7644,7 @@ impl InputHandler {
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: None, interact_object_target: None,
+                                            interact_target: None, interact_object_target: None, waystone_target: None,
                                         });
                                         state.pending_harvest_patch = Some(patch_id);
                                     }
@@ -7578,7 +7687,7 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None,
+                                        interact_target: None, interact_object_target: None, waystone_target: None,
                                     });
                                     state.pending_chair_sit =
                                         Some((clicked_tile_x, clicked_tile_y));
@@ -7626,7 +7735,7 @@ impl InputHandler {
                                 current_index: 0,
                                 destination: (tile_x, tile_y),
                                 pickup_target: None,
-                                interact_target: None, interact_object_target: None,
+                                interact_target: None, interact_object_target: None, waystone_target: None,
                             });
                         }
                     }
