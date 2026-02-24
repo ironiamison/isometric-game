@@ -29,6 +29,7 @@ const METRIC_GROUPS: { title: string; metrics: Metric[] }[] = [
       { label: 'Hitpoints', sort: 'hitpoints_level', field: 'hitpoints_level', hint: 'HP level' },
       { label: 'Prayer', sort: 'prayer_level', field: 'prayer_level', hint: 'Prayer level' },
       { label: 'Magic', sort: 'magic_level', field: 'magic_level', hint: 'Magic level' },
+      { label: 'Slayer', sort: 'slayer_level', field: 'slayer_level', hint: 'Slayer level' },
     ],
   },
   {
