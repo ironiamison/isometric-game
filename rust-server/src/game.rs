@@ -902,6 +902,8 @@ pub struct GameRoom {
     interior_registry: Arc<crate::interior::InteriorRegistry>,
     /// Scroll-exclusive spell definitions (loaded from TOML)
     scroll_spell_registry: Arc<crate::scroll_spell::ScrollSpellRegistry>,
+    /// Persistent ground item spawn manager (respawning world items)
+    ground_spawn_manager: RwLock<crate::ground_spawn::GroundSpawnManager>,
 }
 
 impl GameRoom {
@@ -1238,12 +1240,39 @@ impl GameRoom {
             }
         }
 
+        // Load persistent ground spawn definitions and create initial ground items
+        let mut ground_spawn_manager =
+            crate::ground_spawn::GroundSpawnManager::load(std::path::Path::new("data"));
+        let mut ground_items = HashMap::new();
+        {
+            let current_time = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+
+            let initial_spawns = ground_spawn_manager.get_initial_spawns();
+            for (spawn_id, item_id, x, y, quantity) in initial_spawns {
+                let ground_item_id = format!("persistent_{}", spawn_id);
+                let ground_item = crate::item::GroundItem::new(
+                    &ground_item_id, &item_id, x, y, quantity, None, current_time,
+                );
+                ground_spawn_manager.set_active_ground_item(&spawn_id, ground_item_id.clone());
+                ground_items.insert(ground_item_id, ground_item);
+            }
+            if !ground_items.is_empty() {
+                tracing::info!(
+                    "Created {} persistent ground items from spawns",
+                    ground_items.len()
+                );
+            }
+        }
+
         Self {
             id: Uuid::new_v4().to_string(),
             name: name.to_string(),
             players: RwLock::new(HashMap::new()),
             npcs: RwLock::new(npcs),
-            ground_items: RwLock::new(HashMap::new()),
+            ground_items: RwLock::new(ground_items),
             world,
             entity_registry,
             quest_registry,
@@ -1277,6 +1306,7 @@ impl GameRoom {
             player_slayer_states: RwLock::new(HashMap::new()),
             interior_registry,
             scroll_spell_registry: Arc::new(scroll_spell_registry),
+            ground_spawn_manager: RwLock::new(ground_spawn_manager),
         }
     }
 
@@ -5320,6 +5350,12 @@ impl GameRoom {
             };
 
             if removed {
+                // Check if this was a persistent ground spawn
+                {
+                    let mut gsm = self.ground_spawn_manager.write().await;
+                    gsm.mark_picked_up(item_id);
+                }
+
                 // Get display name from registry for logging
                 let display_name = self
                     .item_registry
@@ -12920,12 +12956,12 @@ impl GameRoom {
             }
         }
 
-        // Check for expired items (60 second lifetime)
+        // Check for expired items (60 second lifetime), skip persistent spawns
         let expired_items: Vec<String> = {
             let items = self.ground_items.read().await;
             items
                 .iter()
-                .filter(|(_, item)| item.is_expired(current_time))
+                .filter(|(id, item)| !id.starts_with("persistent_") && item.is_expired(current_time))
                 .map(|(id, _)| id.clone())
                 .collect()
         };
@@ -12937,6 +12973,37 @@ impl GameRoom {
                 drop(items);
                 self.broadcast(ServerMessage::ItemDespawned { item_id })
                     .await;
+            }
+        }
+
+        // Respawn persistent ground items whose timers have elapsed
+        {
+            let respawns = {
+                let mut gsm = self.ground_spawn_manager.write().await;
+                gsm.check_respawns()
+            };
+
+            if !respawns.is_empty() {
+                let current_time = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+
+                for (spawn_id, item_id, x, y, quantity) in respawns {
+                    let ground_item_id = format!("persistent_{}", spawn_id);
+                    let ground_item = crate::item::GroundItem::new(
+                        &ground_item_id, &item_id, x, y, quantity, None, current_time,
+                    );
+                    {
+                        let mut items = self.ground_items.write().await;
+                        items.insert(ground_item_id.clone(), ground_item);
+                    }
+                    {
+                        let mut gsm = self.ground_spawn_manager.write().await;
+                        gsm.set_active_ground_item(&spawn_id, ground_item_id);
+                    }
+                    tracing::debug!("Respawned persistent ground item: {}", spawn_id);
+                }
             }
         }
 

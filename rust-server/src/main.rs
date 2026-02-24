@@ -31,6 +31,7 @@ mod entity;
 mod farming;
 mod game;
 mod gathering;
+mod ground_spawn;
 mod instance;
 mod interior;
 mod interior_registry;
