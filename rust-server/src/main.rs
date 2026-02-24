@@ -246,6 +246,7 @@ impl AppState {
                 self.instance_manager.clone(),
                 Some(self.db.clone()),
                 self.interior_registry.clone(),
+                self.chest_registry.clone(),
             )
             .await,
         );
@@ -3360,6 +3361,9 @@ async fn handle_client_message(
         ClientMessage::InteractObject { x, y } => {
             room.handle_interact_object(player_id, x, y).await;
         }
+        ClientMessage::UseWaystone { x, y } => {
+            room.handle_use_waystone(player_id, x, y).await;
+        }
         ClientMessage::DialogueChoiceMsg {
             quest_id,
             choice_id,
@@ -3691,6 +3695,16 @@ async fn handle_client_message(
         ClientMessage::CancelAutoAction => {
             room.handle_cancel_auto_action(player_id).await;
         }
+        // ===== Chest System Messages =====
+        ClientMessage::OpenChest { x, y } => {
+            room.handle_open_chest(player_id, x, y).await;
+        }
+        ClientMessage::ChestTake { chest_id, slot } => {
+            room.handle_chest_take(player_id, &chest_id, slot).await;
+        }
+        ClientMessage::ChestDeposit { chest_id, inventory_slot } => {
+            room.handle_chest_deposit(player_id, &chest_id, inventory_slot).await;
+        }
     }
 
     let handler_duration = handler_start.elapsed();
@@ -3964,6 +3978,15 @@ async fn main() {
                     write_phase_ms,
                     cycle_start.elapsed().as_millis()
                 );
+            }
+
+            // Save chest data for all rooms
+            for room_entry in save_state.rooms.iter() {
+                let room = room_entry.value().clone();
+                let save_data = room.get_chest_save_data().await;
+                if let Err(e) = save_state.db.save_all_chests(&save_data).await {
+                    tracing::warn!("Failed to save chest data: {}", e);
+                }
             }
 
             let cycle_ms = cycle_start.elapsed().as_millis();

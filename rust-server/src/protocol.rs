@@ -56,6 +56,10 @@ pub enum ClientMessage {
     #[serde(rename = "interactObject")]
     InteractObject { x: i32, y: i32 },
 
+    /// Direct waystone teleport (no dialogue)
+    #[serde(rename = "useWaystone")]
+    UseWaystone { x: i32, y: i32 },
+
     /// Player selected a dialogue choice
     #[serde(rename = "dialogueChoice")]
     DialogueChoiceMsg { quest_id: String, choice_id: String },
@@ -281,6 +285,19 @@ pub enum ClientMessage {
     /// Cancel current auto-action
     #[serde(rename = "cancelAutoAction")]
     CancelAutoAction,
+
+    // ===== Chest System Messages =====
+    /// Open a chest at position
+    #[serde(rename = "openChest")]
+    OpenChest { x: i32, y: i32 },
+
+    /// Take item from a chest slot
+    #[serde(rename = "chestTake")]
+    ChestTake { chest_id: String, slot: u8 },
+
+    /// Deposit item from inventory into chest
+    #[serde(rename = "chestDeposit")]
+    ChestDeposit { chest_id: String, inventory_slot: u8 },
 }
 
 impl ClientMessage {
@@ -299,6 +316,7 @@ impl ClientMessage {
             ClientMessage::RequestChunk { .. } => "RequestChunk",
             ClientMessage::Interact { .. } => "Interact",
             ClientMessage::InteractObject { .. } => "InteractObject",
+            ClientMessage::UseWaystone { .. } => "UseWaystone",
             ClientMessage::DialogueChoiceMsg { .. } => "DialogueChoice",
             ClientMessage::AcceptQuest { .. } => "AcceptQuest",
             ClientMessage::AbandonQuest { .. } => "AbandonQuest",
@@ -347,8 +365,23 @@ impl ClientMessage {
             ClientMessage::SlayerRemoveBlock { .. } => "slayerRemoveBlock",
             ClientMessage::StartAutoAction { .. } => "startAutoAction",
             ClientMessage::CancelAutoAction => "cancelAutoAction",
+            ClientMessage::OpenChest { .. } => "OpenChest",
+            ClientMessage::ChestTake { .. } => "ChestTake",
+            ClientMessage::ChestDeposit { .. } => "ChestDeposit",
         }
     }
+}
+
+// ============================================================================
+// Chest Data Structs
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ChestSlotUpdate {
+    pub slot: u8,
+    pub item_id: String,
+    pub quantity: i32,
+    pub value: i32,
 }
 
 // ============================================================================
@@ -1050,6 +1083,20 @@ pub enum ServerMessage {
         wall_slam: bool,
         bonus_damage: i32,
     },
+
+    // ===== Chest System Messages =====
+    /// Full chest state sent when opening
+    ChestOpen {
+        chest_id: String,
+        slots: Vec<ChestSlotUpdate>,
+        total_value: i32,
+    },
+    /// Chest state update (item taken/deposited/respawned)
+    ChestUpdate {
+        chest_id: String,
+        slots: Vec<ChestSlotUpdate>,
+        total_value: i32,
+    },
 }
 
 /// Scroll spell definition sent to clients
@@ -1429,6 +1476,9 @@ impl ServerMessage {
             ServerMessage::UnlockedSpellsSync { .. } => "unlockedSpellsSync",
             ServerMessage::SpellUnlocked { .. } => "spellUnlocked",
             ServerMessage::Pushback { .. } => "pushback",
+            // Chest system messages
+            ServerMessage::ChestOpen { .. } => "chestOpen",
+            ServerMessage::ChestUpdate { .. } => "chestUpdate",
         }
     }
 }
@@ -5045,6 +5095,40 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("bonus_damage".into()), Value::Integer((*bonus_damage as i64).into())));
             Value::Map(map)
         }
+        ServerMessage::ChestOpen { chest_id, slots, total_value } => {
+            let mut map = Vec::new();
+            map.push((Value::String("chest_id".into()), Value::String(chest_id.clone().into())));
+
+            let slot_values: Vec<Value> = slots.iter().map(|s| {
+                let mut smap = Vec::new();
+                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
+                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
+                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
+                smap.push((Value::String("value".into()), Value::Integer((s.value as i64).into())));
+                Value::Map(smap)
+            }).collect();
+
+            map.push((Value::String("slots".into()), Value::Array(slot_values)));
+            map.push((Value::String("total_value".into()), Value::Integer((*total_value as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::ChestUpdate { chest_id, slots, total_value } => {
+            let mut map = Vec::new();
+            map.push((Value::String("chest_id".into()), Value::String(chest_id.clone().into())));
+
+            let slot_values: Vec<Value> = slots.iter().map(|s| {
+                let mut smap = Vec::new();
+                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
+                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
+                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
+                smap.push((Value::String("value".into()), Value::Integer((s.value as i64).into())));
+                Value::Map(smap)
+            }).collect();
+
+            map.push((Value::String("slots".into()), Value::Array(slot_values)));
+            map.push((Value::String("total_value".into()), Value::Integer((*total_value as i64).into())));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -5402,6 +5486,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let x = extract_i32(msg_data, "x").unwrap_or(0);
             let y = extract_i32(msg_data, "y").unwrap_or(0);
             Ok(ClientMessage::InteractObject { x, y })
+        }
+        "useWaystone" => {
+            let x = extract_i32(msg_data, "x").unwrap_or(0);
+            let y = extract_i32(msg_data, "y").unwrap_or(0);
+            Ok(ClientMessage::UseWaystone { x, y })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }

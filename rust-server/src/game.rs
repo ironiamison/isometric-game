@@ -908,6 +908,12 @@ pub struct GameRoom {
     dig_site_manager: RwLock<crate::dig_site::DigSiteManager>,
     /// Waystone fast-travel manager (loaded from TOML)
     waystone_manager: RwLock<crate::waystone::WaystoneManager>,
+    /// Chest definition registry (loaded from TOML)
+    chest_registry: Arc<crate::chest::ChestRegistry>,
+    /// Chest runtime state manager
+    chest_manager: RwLock<crate::chest::ChestManager>,
+    /// Tracks which chest each player has open (player_id -> chest_key)
+    player_open_chests: RwLock<HashMap<String, String>>,
 }
 
 impl GameRoom {
@@ -922,6 +928,7 @@ impl GameRoom {
         instance_manager: Arc<crate::instance::InstanceManager>,
         db: Option<Arc<crate::db::Database>>,
         interior_registry: Arc<crate::interior::InteriorRegistry>,
+        chest_registry: Arc<crate::chest::ChestRegistry>,
     ) -> Self {
         let (tx, _) = broadcast::channel(256);
         let world = Arc::new(World::new("maps/world_0"));
@@ -1271,6 +1278,46 @@ impl GameRoom {
             }
         }
 
+        // Load overworld chest spawns from TOML
+        let overworld_chest_spawns = {
+            let spawns_path = std::path::Path::new("data/chest_spawns.toml");
+            if spawns_path.exists() {
+                let content = std::fs::read_to_string(spawns_path).unwrap_or_default();
+                let file: crate::chest::ChestSpawnsFile = toml::from_str(&content).unwrap_or_else(|e| {
+                    tracing::warn!("Failed to parse chest_spawns.toml: {}", e);
+                    crate::chest::ChestSpawnsFile { chests: Vec::new() }
+                });
+                file.chests
+            } else {
+                Vec::new()
+            }
+        };
+
+        // Collect interior chest placements from interior_registry
+        let mut interior_chests = Vec::new();
+        for id in interior_registry.list_ids() {
+            if let Some(interior) = interior_registry.get(id) {
+                for chest_spawn in &interior.chests {
+                    interior_chests.push((id.clone(), chest_spawn.chest_id.clone(), chest_spawn.x, chest_spawn.y));
+                }
+            }
+        }
+
+        // Create ChestManager and load saved data
+        let mut chest_manager = crate::chest::ChestManager::new();
+        chest_manager.init_from_registry(
+            &chest_registry, &overworld_chest_spawns, &interior_chests,
+        );
+        if let Some(ref db) = db {
+            match db.load_all_chests().await {
+                Ok(saved) => {
+                    chest_manager.load_saved_data(&saved);
+                    tracing::info!("Loaded {} saved chest states", saved.len());
+                }
+                Err(e) => tracing::warn!("Failed to load chest data: {}", e),
+            }
+        }
+
         Self {
             id: Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -1313,6 +1360,9 @@ impl GameRoom {
             ground_spawn_manager: RwLock::new(ground_spawn_manager),
             dig_site_manager: RwLock::new(crate::dig_site::DigSiteManager::load(std::path::Path::new("data"))),
             waystone_manager: RwLock::new(crate::waystone::WaystoneManager::load(std::path::Path::new("data"))),
+            chest_registry,
+            chest_manager: RwLock::new(chest_manager),
+            player_open_chests: RwLock::new(HashMap::new()),
         }
     }
 
@@ -1708,6 +1758,9 @@ impl GameRoom {
                 }
             }
         }
+
+        // Close any open chest
+        self.close_player_chest(player_id).await;
 
         // Stop any active gathering/woodcutting
         {
@@ -2453,6 +2506,9 @@ impl GameRoom {
                 }
             }
         }
+
+        // Close chest if player moved
+        self.close_player_chest(player_id).await;
     }
 
     /// Handle dash - slide up to DASH_DISTANCE tiles in current facing direction
@@ -6346,6 +6402,29 @@ impl GameRoom {
                     dest.y
                 );
             }
+        }
+    }
+
+    /// Handle direct waystone teleport (right-click Teleport, no dialogue)
+    pub async fn handle_use_waystone(&self, player_id: &str, x: i32, y: i32) {
+        let waystone = {
+            let wsm = self.waystone_manager.read().await;
+            wsm.get_at(x, y).cloned()
+        };
+
+        let Some(ws) = waystone else { return };
+
+        // Check if player has completed the required quest
+        let quest_completed = {
+            let quest_states = self.player_quest_states.read().await;
+            quest_states
+                .get(player_id)
+                .map(|qs| qs.is_quest_completed(&ws.quest_required))
+                .unwrap_or(false)
+        };
+
+        if quest_completed {
+            self.teleport_to_waystone(player_id, &ws.id).await;
         }
     }
 
@@ -16870,6 +16949,260 @@ impl GameRoom {
             .await;
 
             self.process_quest_progression_snapshot(player_id).await;
+        }
+    }
+
+    // ===== Chest System Handlers =====
+
+    fn chest_slot_updates(chest: &crate::chest::ChestInstance, item_registry: &crate::data::ItemRegistry) -> Vec<crate::protocol::ChestSlotUpdate> {
+        chest.slots.iter().enumerate().filter_map(|(i, slot)| {
+            slot.as_ref().map(|s| {
+                let base_price = item_registry.get(&s.item_id).map(|d| d.base_price).unwrap_or(0);
+                crate::protocol::ChestSlotUpdate {
+                    slot: i as u8,
+                    item_id: s.item_id.clone(),
+                    quantity: s.quantity,
+                    value: base_price * s.quantity,
+                }
+            })
+        }).collect()
+    }
+
+    pub async fn handle_open_chest(&self, player_id: &str, x: i32, y: i32) {
+        // Determine if player is in overworld or instance
+        let instance_id = {
+            let pi = self.player_instances.read().await;
+            pi.get(player_id).cloned()
+        };
+
+        let chest_key = if let Some(ref inst_id) = instance_id {
+            // Player is in an instance — find the interior map_id
+            if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                crate::chest::ChestManager::interior_key(&instance.map_id, x, y)
+            } else {
+                return;
+            }
+        } else {
+            crate::chest::ChestManager::overworld_key(x, y)
+        };
+
+        let mut cm = self.chest_manager.write().await;
+        if let Some(chest) = cm.get_mut(&chest_key) {
+            chest.viewers.insert(player_id.to_string());
+            let slots = Self::chest_slot_updates(chest, &self.item_registry);
+            let total_value = chest.total_value(&self.item_registry);
+
+            let msg = crate::protocol::ServerMessage::ChestOpen {
+                chest_id: chest_key.clone(),
+                slots,
+                total_value,
+            };
+            drop(cm);
+            self.send_to_player(player_id, msg).await;
+
+            // Track which chest this player has open
+            self.player_open_chests.write().await.insert(player_id.to_string(), chest_key);
+        }
+    }
+
+    pub async fn handle_chest_take(&self, player_id: &str, chest_id: &str, slot: u8) {
+        // Take item from chest (hold chest lock briefly)
+        let taken_item = {
+            let mut cm = self.chest_manager.write().await;
+            let chest = match cm.get_mut(chest_id) {
+                Some(c) => c,
+                None => return,
+            };
+
+            // Verify player is viewing this chest
+            if !chest.viewers.contains(player_id) {
+                return;
+            }
+
+            let slot_idx = slot as usize;
+            if slot_idx >= chest.slots.len() {
+                return;
+            }
+
+            match chest.slots[slot_idx].take() {
+                Some(item) => item,
+                None => return,
+            }
+        };
+
+        // Try to add to player inventory (hold players lock)
+        let add_success = {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                if !player.inventory.has_space_for(&taken_item.item_id, taken_item.quantity, &self.item_registry) {
+                    false
+                } else {
+                    player.inventory.add_item(&taken_item.item_id, taken_item.quantity, &self.item_registry);
+
+                    // Send inventory update
+                    let inv_update = crate::protocol::ServerMessage::InventoryUpdate {
+                        player_id: player_id.to_string(),
+                        slots: player.inventory.to_update(),
+                        gold: player.inventory.gold,
+                    };
+                    drop(players);
+                    self.send_to_player(player_id, inv_update).await;
+                    true
+                }
+            } else {
+                false
+            }
+        };
+
+        let mut cm = self.chest_manager.write().await;
+        let chest = match cm.get_mut(chest_id) {
+            Some(c) => c,
+            None => return,
+        };
+
+        if !add_success {
+            // Put item back
+            let slot_idx = slot as usize;
+            if slot_idx < chest.slots.len() {
+                chest.slots[slot_idx] = Some(taken_item);
+            }
+            return;
+        }
+
+        // Start spawn timer if this was a spawn-configured slot
+        if let Some(def) = self.chest_registry.get(&chest.chest_def_id) {
+            if def.spawn_items.iter().any(|s| s.slot == slot) {
+                chest.spawn_timers.insert(slot, std::time::Instant::now());
+            }
+        }
+
+        // Send ChestUpdate to all viewers
+        let slots = Self::chest_slot_updates(chest, &self.item_registry);
+        let total_value = chest.total_value(&self.item_registry);
+        let viewer_ids: Vec<String> = chest.viewers.iter().cloned().collect();
+        let msg = crate::protocol::ServerMessage::ChestUpdate {
+            chest_id: chest_id.to_string(),
+            slots,
+            total_value,
+        };
+        drop(cm);
+        for viewer_id in &viewer_ids {
+            self.send_to_player(viewer_id, msg.clone()).await;
+        }
+    }
+
+    pub async fn handle_chest_deposit(&self, player_id: &str, chest_id: &str, inventory_slot: u8) {
+        // Take item from player inventory first (hold players lock briefly)
+        let taken_item = {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+
+            let inv_idx = inventory_slot as usize;
+            if inv_idx >= player.inventory.slots.len() {
+                return;
+            }
+
+            match player.inventory.slots[inv_idx].take() {
+                Some(item) => item,
+                None => return,
+            }
+        };
+
+        // Try to put item in chest
+        let deposit_success = {
+            let mut cm = self.chest_manager.write().await;
+            let chest = match cm.get_mut(chest_id) {
+                Some(c) => c,
+                None => return,
+            };
+
+            if !chest.viewers.contains(player_id) {
+                // Put item back in inventory
+                drop(cm);
+                let mut players = self.players.write().await;
+                if let Some(player) = players.get_mut(player_id) {
+                    let inv_idx = inventory_slot as usize;
+                    if inv_idx < player.inventory.slots.len() {
+                        player.inventory.slots[inv_idx] = Some(taken_item);
+                    }
+                }
+                return;
+            }
+
+            // Find first empty slot in chest
+            let empty_slot = chest.slots.iter().position(|s| s.is_none());
+            match empty_slot {
+                Some(idx) => {
+                    chest.slots[idx] = Some(crate::item::InventorySlot::new(
+                        taken_item.item_id.clone(),
+                        taken_item.quantity,
+                    ));
+                    true
+                }
+                None => false, // Chest is full
+            }
+        };
+
+        if !deposit_success {
+            // Put item back in inventory
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                let inv_idx = inventory_slot as usize;
+                if inv_idx < player.inventory.slots.len() {
+                    player.inventory.slots[inv_idx] = Some(taken_item);
+                }
+            }
+            return;
+        }
+
+        // Send inventory update to player
+        {
+            let players = self.players.read().await;
+            if let Some(player) = players.get(player_id) {
+                let inv_update = crate::protocol::ServerMessage::InventoryUpdate {
+                    player_id: player_id.to_string(),
+                    slots: player.inventory.to_update(),
+                    gold: player.inventory.gold,
+                };
+                drop(players);
+                self.send_to_player(player_id, inv_update).await;
+            }
+        }
+
+        // Send ChestUpdate to all viewers
+        let cm = self.chest_manager.read().await;
+        if let Some(chest) = cm.get(chest_id) {
+            let slots = Self::chest_slot_updates(chest, &self.item_registry);
+            let total_value = chest.total_value(&self.item_registry);
+            let viewer_ids: Vec<String> = chest.viewers.iter().cloned().collect();
+            let msg = crate::protocol::ServerMessage::ChestUpdate {
+                chest_id: chest_id.to_string(),
+                slots,
+                total_value,
+            };
+            drop(cm);
+            for viewer_id in &viewer_ids {
+                self.send_to_player(viewer_id, msg.clone()).await;
+            }
+        }
+    }
+
+    /// Get chest save data for persistence
+    pub async fn get_chest_save_data(&self) -> HashMap<String, String> {
+        self.chest_manager.read().await.get_save_data()
+    }
+
+    /// Close any open chest for a player (called on move or disconnect)
+    pub async fn close_player_chest(&self, player_id: &str) {
+        let chest_key = self.player_open_chests.write().await.remove(player_id);
+        if let Some(key) = chest_key {
+            let mut cm = self.chest_manager.write().await;
+            if let Some(chest) = cm.get_mut(&key) {
+                chest.viewers.remove(player_id);
+            }
         }
     }
 }
