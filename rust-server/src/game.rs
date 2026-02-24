@@ -7590,6 +7590,99 @@ impl GameRoom {
         self.send_to_player(player_id, bank_msg).await;
     }
 
+    /// Swap two bank slots. If both contain the same item, merge stacks (up to 99).
+    pub async fn handle_bank_swap_slots(&self, player_id: &str, slot_a: u32, slot_b: u32) {
+        if slot_a == slot_b {
+            return;
+        }
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        let len = player.bank.slots.len();
+        let a = slot_a as usize;
+        let b = slot_b as usize;
+        if a >= len || b >= len {
+            return;
+        }
+
+        // Check if both slots have the same item (merge case)
+        let should_merge = match (&player.bank.slots[a], &player.bank.slots[b]) {
+            (Some(sa), Some(sb)) => sa.item_id == sb.item_id,
+            _ => false,
+        };
+
+        if should_merge {
+            // Merge: move quantity from slot_a into slot_b, up to BANK_MAX_STACK
+            let src_qty = player.bank.slots[a].as_ref().unwrap().quantity;
+            let dst_qty = player.bank.slots[b].as_ref().unwrap().quantity;
+            let can_add = item::BANK_MAX_STACK - dst_qty;
+            let transfer = src_qty.min(can_add);
+
+            player.bank.slots[b].as_mut().unwrap().quantity += transfer;
+            let remaining = src_qty - transfer;
+            if remaining <= 0 {
+                player.bank.slots[a] = None;
+            } else {
+                player.bank.slots[a].as_mut().unwrap().quantity = remaining;
+            }
+        } else {
+            // Swap
+            player.bank.slots.swap(a, b);
+        }
+
+        let bank_msg = ServerMessage::BankUpdate {
+            slots: player.bank.to_update(),
+            gold: player.bank.gold,
+        };
+        drop(players);
+        self.send_to_player(player_id, bank_msg).await;
+    }
+
+    /// Sort bank by item category then alphabetically by display name.
+    pub async fn handle_bank_sort(&self, player_id: &str) {
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        // Collect non-empty slots
+        let mut items: Vec<item::InventorySlot> = player
+            .bank
+            .slots
+            .iter()
+            .filter_map(|s| s.clone())
+            .collect();
+
+        // Sort by (category_priority, display_name)
+        let registry = &self.item_registry;
+        items.sort_by(|a, b| {
+            let def_a = registry.get(&a.item_id);
+            let def_b = registry.get(&b.item_id);
+            let cat_a = def_a.map(|d| d.category.sort_priority()).unwrap_or(255);
+            let cat_b = def_b.map(|d| d.category.sort_priority()).unwrap_or(255);
+            let name_a = def_a.map(|d| d.display_name.as_str()).unwrap_or(&a.item_id);
+            let name_b = def_b.map(|d| d.display_name.as_str()).unwrap_or(&b.item_id);
+            cat_a.cmp(&cat_b).then_with(|| name_a.cmp(name_b))
+        });
+
+        // Rebuild slots: items packed to front, None for the rest
+        let total = player.bank.slots.len();
+        player.bank.slots = items.into_iter().map(Some).collect();
+        player.bank.slots.resize(total, None);
+
+        let bank_msg = ServerMessage::BankUpdate {
+            slots: player.bank.to_update(),
+            gold: player.bank.gold,
+        };
+        drop(players);
+        self.send_to_player(player_id, bank_msg).await;
+    }
+
     /// Handle shop buy transaction
     pub async fn handle_shop_buy(
         &self,

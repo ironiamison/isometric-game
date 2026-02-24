@@ -3571,6 +3571,12 @@ async fn handle_client_message(
         ClientMessage::BankDepositAll => {
             room.handle_bank_deposit_all(player_id).await;
         }
+        ClientMessage::BankSwapSlots { slot_a, slot_b } => {
+            room.handle_bank_swap_slots(player_id, slot_a, slot_b).await;
+        }
+        ClientMessage::BankSort => {
+            room.handle_bank_sort(player_id).await;
+        }
 
         ClientMessage::Auth { .. } | ClientMessage::Register { .. } => {}
         ClientMessage::StartCraftBatch {
