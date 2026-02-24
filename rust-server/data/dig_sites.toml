@@ -1,0 +1,11 @@
+# Dig sites - locations where using a shovel triggers quest events
+
+[[sites]]
+id = "obelisk_blockage"
+x = 94
+y = -160
+radius = 1
+quest_id = "obelisk_connection"
+quest_objective_id = "kill_hedgehog"
+spawn_entity = "hedgehog"
+spawn_level = 6

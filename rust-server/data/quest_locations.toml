@@ -5,3 +5,8 @@
 x = 185
 y = -6
 radius = 2
+
+[north_obelisk]
+x = 92
+y = -163
+radius = 3

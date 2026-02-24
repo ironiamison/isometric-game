@@ -1,0 +1,17 @@
+# Waystone teleport network
+
+[[waystones]]
+id = "south_obelisk"
+name = "Southern Obelisk"
+x = 88
+y = 34
+linked_to = "north_obelisk"
+quest_required = "obelisk_connection"
+
+[[waystones]]
+id = "north_obelisk"
+name = "Northern Obelisk"
+x = 92
+y = -163
+linked_to = "south_obelisk"
+quest_required = "obelisk_connection"

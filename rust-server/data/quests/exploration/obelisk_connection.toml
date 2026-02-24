@@ -1,0 +1,40 @@
+[quest]
+id = "obelisk_connection"
+name = "The Obelisk Connection"
+description = "Researcher Orin has discovered that two ancient obelisks share a magical link, but the connection is broken. Travel north to find the second obelisk and restore it."
+giver_npc = "researcher_orin"
+level_required = 1
+repeatable = false
+lua_script = "exploration/obelisk_connection.lua"
+
+[[quest.objectives]]
+id = "reach_north_obelisk"
+type = "reach_location"
+target = "north_obelisk"
+count = 1
+description = "Find the northern obelisk"
+
+[[quest.objectives]]
+id = "kill_hedgehog"
+type = "kill_monster"
+target = "hedgehog"
+count = 1
+description = "Defeat the creature blocking the connection"
+sequential = true
+
+[[quest.objectives]]
+id = "return_to_orin"
+type = "talk_to"
+target = "researcher_orin"
+description = "Return to Researcher Orin"
+sequential = true
+
+[quest.rewards]
+exp = 500
+gold = 75
+
+[quest.dialogue]
+offer = "Ah, a traveler! You see this obelisk? It's no ordinary stone. I've been studying it for weeks. It resonates with magical energy - and I believe there's another one just like it, far to the north. They were once connected, but something has severed the link. I can't leave my research here, but perhaps you could find the other obelisk and try to restore the connection?"
+accept = "Wonderful! Head north - far north. The second obelisk should be out in the wilderness. When you find it, try interacting with it. The stones have a will of their own. Good luck, traveler!"
+progress = "Still searching for the northern obelisk? It's a long journey, but I believe in you. Head north and keep your eyes open."
+complete = "You did it! I can feel the resonance already - the connection between the stones is alive again! As a reward, both obelisks should now respond to your touch. You can use them to travel between the two locations instantly. Remarkable work, truly remarkable!"

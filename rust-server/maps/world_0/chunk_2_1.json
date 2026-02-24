@@ -3104,6 +3104,13 @@
       "x": 28,
       "y": 13,
       "level": 1
+    },
+    {
+      "entityId": "researcher_orin",
+      "x": 25,
+      "y": 2,
+      "facing": "left",
+      "uniqueId": "researcher_orin"
     }
   ],
   "mapObjects": [

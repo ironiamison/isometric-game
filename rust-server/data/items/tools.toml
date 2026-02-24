@@ -1,0 +1,11 @@
+[shovel]
+display_name = "Old Shovel"
+sprite = "shovel"
+description = "A worn but sturdy shovel. Useful for digging into soft ground."
+category = "quest"
+max_stack = 1
+base_price = 5
+sellable = false
+
+[shovel.use_effect]
+type = "dig"

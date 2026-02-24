@@ -1,0 +1,10 @@
+# Persistent ground item spawns
+# Items that always exist at a location and respawn after pickup
+
+[[spawns]]
+id = "obelisk_shovel"
+item_id = "shovel"
+x = 93.0
+y = -162.0
+quantity = 1
+respawn_seconds = 30
