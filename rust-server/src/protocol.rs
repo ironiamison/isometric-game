@@ -231,6 +231,14 @@ pub enum ClientMessage {
     #[serde(rename = "bankDepositAll")]
     BankDepositAll,
 
+    /// Swap (or merge) two bank slots
+    #[serde(rename = "bankSwapSlots")]
+    BankSwapSlots { slot_a: u32, slot_b: u32 },
+
+    /// Auto-sort entire bank by category then alphabetically
+    #[serde(rename = "bankSort")]
+    BankSort,
+
     /// Player starts a batch craft (furnace smelting with quantity)
     #[serde(rename = "startCraftBatch")]
     StartCraftBatch { recipe_id: String, quantity: u32 },
@@ -324,6 +332,8 @@ impl ClientMessage {
             ClientMessage::BankDepositGold { .. } => "BankDepositGold",
             ClientMessage::BankWithdrawGold { .. } => "BankWithdrawGold",
             ClientMessage::BankDepositAll => "BankDepositAll",
+            ClientMessage::BankSwapSlots { .. } => "BankSwapSlots",
+            ClientMessage::BankSort => "BankSort",
             ClientMessage::StartCraftBatch { .. } => "StartCraftBatch",
             ClientMessage::Ping { .. } => "Ping",
             ClientMessage::SlayerGetTask { .. } => "slayerGetTask",
@@ -5249,6 +5259,12 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::BankWithdrawGold { amount })
         }
         "bankDepositAll" => Ok(ClientMessage::BankDepositAll),
+        "bankSwapSlots" => {
+            let slot_a = extract_u32(msg_data, "slot_a").unwrap_or(0);
+            let slot_b = extract_u32(msg_data, "slot_b").unwrap_or(0);
+            Ok(ClientMessage::BankSwapSlots { slot_a, slot_b })
+        }
+        "bankSort" => Ok(ClientMessage::BankSort),
         "startCraftBatch" => {
             let recipe_id = extract_string(msg_data, "recipe_id").unwrap_or_default();
             let quantity = extract_u32(msg_data, "quantity").unwrap_or(1);
