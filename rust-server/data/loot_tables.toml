@@ -63,18 +63,10 @@ items = [
     { id = "raw_lobster", level = 40, weight = 10, xp_bonus = 15 },
 ]
 
-[fish_advanced.tiers.uncommon]
-base_weight = 35
-level_scaling = 0.2
-items = [
-    { id = "raw_swordfish", level = 50, weight = 10, xp_bonus = 35 },
-]
-
 [fish_advanced.tiers.rare]
 base_weight = 15
 level_scaling = 0.1
 items = [
-    { id = "raw_swordfish", level = 50, weight = 5, xp_bonus = 60 },
     { id = "oyster", level = 60, weight = 5, xp_bonus = 80 },
 ]
 

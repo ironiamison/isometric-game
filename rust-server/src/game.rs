@@ -6335,7 +6335,7 @@ impl GameRoom {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 player.x = dest.x;
-                player.y = dest.y;
+                player.y = dest.y + 1;
                 player.move_dx = 0;
                 player.move_dy = 0;
                 tracing::info!(
