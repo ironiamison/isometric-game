@@ -159,6 +159,11 @@ impl Renderer {
                 push_option(&mut options, "Examine");
                 "Farming Patch".to_string()
             }
+            ContextMenuTarget::MapObject { .. } => {
+                push_option(&mut options, "Interact");
+                push_option(&mut options, "Examine");
+                "Object".to_string()
+            }
             ContextMenuTarget::Tile { .. } => {
                 push_option(&mut options, "Walk here");
                 "Tile".to_string()

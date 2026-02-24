@@ -991,6 +991,7 @@ pub enum ContextMenuTarget {
     Npc { id: String },
     Tree { tile_x: i32, tile_y: i32, gid: u32 },
     Rock { tile_x: i32, tile_y: i32, gid: u32 },
+    MapObject { tile_x: i32, tile_y: i32, gid: u32 },
     GatheringSpot { marker_index: usize },
     GroundItem { id: String },
     FarmingPatch { patch_id: String },

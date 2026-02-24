@@ -708,6 +708,11 @@ pub enum InputCommand {
         action: String,
     },
     CancelAutoAction,
+    // Map object interaction commands
+    InteractObject {
+        x: i32,
+        y: i32,
+    },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -1583,6 +1588,7 @@ impl InputHandler {
                 }
                 ContextMenuTarget::Tree { .. } => 2,
                 ContextMenuTarget::Rock { .. } => 2,
+                ContextMenuTarget::MapObject { .. } => 2,
                 ContextMenuTarget::GatheringSpot { .. } => 2,
                 ContextMenuTarget::GroundItem { .. } => 2,
                 ContextMenuTarget::FarmingPatch { patch_id } => {
@@ -2000,6 +2006,19 @@ impl InputHandler {
                                                 .map(|info| info.name)
                                                 .unwrap_or("Rock");
                                             state.push_system_chat(format!("A rock containing {} ore.", name.to_lowercase()));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                ContextMenuTarget::MapObject { tile_x, tile_y, .. } => {
+                                    // Options: 0=Interact, 1=Examine
+                                    match option_idx {
+                                        0 => {
+                                            // Send interact object message
+                                            commands.push(InputCommand::InteractObject { x: *tile_x, y: *tile_y });
+                                        }
+                                        1 => {
+                                            state.push_system_chat("An ancient stone object.".to_string());
                                         }
                                         _ => {}
                                     }
@@ -7626,6 +7645,12 @@ impl InputHandler {
                             gid: obj_gid,
                         };
                     }
+                    // Generic map object (obelisks, waystones, etc.)
+                    break 'find_target ContextMenuTarget::MapObject {
+                        tile_x: clicked_tile_x,
+                        tile_y: clicked_tile_y,
+                        gid: obj_gid,
+                    };
                 }
 
                 // Check gathering markers

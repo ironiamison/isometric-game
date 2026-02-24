@@ -628,6 +628,10 @@ pub fn run_game_frame(
                 action: action.clone(),
             },
             InputCommand::CancelAutoAction => ClientMessage::CancelAutoAction,
+            InputCommand::InteractObject { x, y } => ClientMessage::InteractObject {
+                x: *x,
+                y: *y,
+            },
         };
         network.send(&msg);
     }
