@@ -52,6 +52,10 @@ pub enum ClientMessage {
     #[serde(rename = "interact")]
     Interact { npc_id: String },
 
+    /// Interact with a world map object (obelisk, etc.)
+    #[serde(rename = "interactObject")]
+    InteractObject { x: i32, y: i32 },
+
     /// Player selected a dialogue choice
     #[serde(rename = "dialogueChoice")]
     DialogueChoiceMsg { quest_id: String, choice_id: String },
@@ -294,6 +298,7 @@ impl ClientMessage {
             ClientMessage::Register { .. } => "Register",
             ClientMessage::RequestChunk { .. } => "RequestChunk",
             ClientMessage::Interact { .. } => "Interact",
+            ClientMessage::InteractObject { .. } => "InteractObject",
             ClientMessage::DialogueChoiceMsg { .. } => "DialogueChoice",
             ClientMessage::AcceptQuest { .. } => "AcceptQuest",
             ClientMessage::AbandonQuest { .. } => "AbandonQuest",

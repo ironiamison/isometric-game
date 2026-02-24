@@ -6148,6 +6148,12 @@ impl GameRoom {
         }
     }
 
+    /// Handle player interacting with a world map object (obelisk, etc.)
+    pub async fn handle_interact_object(&self, player_id: &str, x: i32, y: i32) {
+        // Will be implemented in waystone task - for now just log
+        tracing::debug!("Player {} interacting with object at ({}, {})", player_id, x, y);
+    }
+
     /// Handle dialogue choice from player
     pub async fn handle_dialogue_choice(&self, player_id: &str, quest_id: &str, choice_id: &str) {
         // Non-quest dialogues (e.g. leaderboard) just close

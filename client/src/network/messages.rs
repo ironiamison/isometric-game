@@ -46,6 +46,10 @@ pub enum ClientMessage {
     #[serde(rename = "interact")]
     Interact { npc_id: String },
 
+    /// Interact with a world map object (obelisk, etc.)
+    #[serde(rename = "interactObject")]
+    InteractObject { x: i32, y: i32 },
+
     #[serde(rename = "dialogueChoice")]
     DialogueChoice { quest_id: String, choice_id: String },
 
@@ -301,6 +305,11 @@ impl ClientMessage {
             ClientMessage::Interact { npc_id } => {
                 data.insert("npc_id".into(), Value::String(npc_id.clone().into()));
                 "interact"
+            }
+            ClientMessage::InteractObject { x, y } => {
+                data.insert("x".into(), Value::Integer((*x as i64).into()));
+                data.insert("y".into(), Value::Integer((*y as i64).into()));
+                "interactObject"
             }
             ClientMessage::DialogueChoice {
                 quest_id,

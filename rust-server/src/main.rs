@@ -3336,6 +3336,9 @@ async fn handle_client_message(
         ClientMessage::Interact { npc_id } => {
             room.handle_npc_interact(player_id, &npc_id).await;
         }
+        ClientMessage::InteractObject { x, y } => {
+            room.handle_interact_object(player_id, x, y).await;
+        }
         ClientMessage::DialogueChoiceMsg {
             quest_id,
             choice_id,
