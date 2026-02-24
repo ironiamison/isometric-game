@@ -288,6 +288,78 @@ impl Renderer {
             bank_grid_w,
             inv_grid_w,
         );
+
+        // Render floating dragged item (on top of everything)
+        if let Some(drag) = &state.ui_state.bank_drag {
+            if drag.active {
+                if let Some(Some((item_id, quantity))) =
+                    state.ui_state.bank_slots.get(drag.from_slot)
+                {
+                    let (mx, my) = mouse_position();
+                    let drag_slot_size = slot_size;
+
+                    // Draw the item icon centered on cursor at 80% opacity
+                    let sprite_key = state.item_registry.get_sprite_key(item_id);
+                    if let Some((texture, source_rect)) = self.item_sprites.get(sprite_key) {
+                        let (icon_width, icon_height) = if let Some(r) = source_rect {
+                            (r.w, r.h)
+                        } else {
+                            (texture.width(), texture.height())
+                        };
+                        let ix = mx - icon_width / 2.0;
+                        let iy = my - icon_height / 2.0;
+
+                        draw_texture_ex(
+                            texture,
+                            ix,
+                            iy,
+                            Color::new(1.0, 1.0, 1.0, 0.8),
+                            DrawTextureParams {
+                                source: source_rect,
+                                ..Default::default()
+                            },
+                        );
+                    } else {
+                        // Fallback: colored rectangle
+                        let item_def = state.item_registry.get_or_placeholder(item_id);
+                        let mut color = item_def.category_color();
+                        color.a = 0.8;
+                        let icon_size = 32.0;
+                        draw_rectangle(
+                            mx - icon_size / 2.0,
+                            my - icon_size / 2.0,
+                            icon_size,
+                            icon_size,
+                            color,
+                        );
+                    }
+
+                    // Draw quantity below cursor if > 1
+                    if *quantity > 1 {
+                        let qty_text = quantity.to_string();
+                        self.draw_text_sharp(
+                            &qty_text,
+                            mx - drag_slot_size / 2.0 + 3.0 * s,
+                            my + drag_slot_size / 2.0 - 4.0 * s,
+                            16.0,
+                            Color::new(0.0, 0.0, 0.0, 0.6),
+                        );
+                        self.draw_text_sharp(
+                            &qty_text,
+                            mx - drag_slot_size / 2.0 + 2.0 * s,
+                            my + drag_slot_size / 2.0 - 5.0 * s,
+                            16.0,
+                            Color::new(
+                                TEXT_NORMAL.r,
+                                TEXT_NORMAL.g,
+                                TEXT_NORMAL.b,
+                                0.8,
+                            ),
+                        );
+                    }
+                }
+            }
+        }
     }
 
     fn render_bank_grid(
@@ -348,6 +420,23 @@ impl Renderer {
                 .map(|s| s.is_some())
                 .unwrap_or(false);
 
+            // Check if this slot is the drag source
+            let is_drag_source = state
+                .ui_state
+                .bank_drag
+                .as_ref()
+                .map(|d| d.active && d.from_slot == i)
+                .unwrap_or(false);
+
+            // Check if this slot is the drag target (hovered during active drag)
+            let is_drag_target = is_hovered
+                && state
+                    .ui_state
+                    .bank_drag
+                    .as_ref()
+                    .map(|d| d.active && d.from_slot != i)
+                    .unwrap_or(false);
+
             let slot_state = if is_hovered {
                 SlotState::Hovered
             } else {
@@ -356,24 +445,75 @@ impl Renderer {
             self.draw_inventory_slot(sx, sy, slot_size, has_item, slot_state);
 
             if let Some(Some((item_id, quantity))) = state.ui_state.bank_slots.get(i) {
-                self.draw_item_icon(item_id, sx, sy, slot_size, slot_size, state, false);
+                if is_drag_source {
+                    // Dim the source slot: draw item at reduced opacity
+                    self.draw_item_icon(item_id, sx, sy, slot_size, slot_size, state, false);
+                    // Overlay a dark rectangle to dim to ~30% visibility
+                    draw_rectangle(
+                        sx + 1.0,
+                        sy + 1.0,
+                        slot_size - 2.0,
+                        slot_size - 2.0,
+                        Color::new(0.08, 0.08, 0.11, 0.7),
+                    );
+                } else {
+                    self.draw_item_icon(item_id, sx, sy, slot_size, slot_size, state, false);
+                }
 
                 if *quantity > 1 {
                     let qty_text = quantity.to_string();
+                    let qty_alpha = if is_drag_source { 0.3 } else { 1.0 };
                     self.draw_text_sharp(
                         &qty_text,
                         sx + 3.0 * s,
                         sy + slot_size - 4.0 * s,
                         16.0,
-                        Color::new(0.0, 0.0, 0.0, 0.8),
+                        Color::new(0.0, 0.0, 0.0, 0.8 * qty_alpha),
                     );
                     self.draw_text_sharp(
                         &qty_text,
                         sx + 2.0 * s,
                         sy + slot_size - 5.0 * s,
                         16.0,
-                        TEXT_NORMAL,
+                        Color::new(
+                            TEXT_NORMAL.r,
+                            TEXT_NORMAL.g,
+                            TEXT_NORMAL.b,
+                            TEXT_NORMAL.a * qty_alpha,
+                        ),
                     );
+                }
+            }
+
+            // Gold highlight border on drag target
+            if is_drag_target {
+                let border_color = TEXT_GOLD;
+                // Draw 2px gold border
+                draw_rectangle(sx, sy, slot_size, 2.0, border_color);
+                draw_rectangle(sx, sy + slot_size - 2.0, slot_size, 2.0, border_color);
+                draw_rectangle(sx, sy, 2.0, slot_size, border_color);
+                draw_rectangle(sx + slot_size - 2.0, sy, 2.0, slot_size, border_color);
+
+                // If target slot has the same item as source, show merge hint "+"
+                if let Some(drag) = &state.ui_state.bank_drag {
+                    if let Some(Some((target_item_id, _))) =
+                        state.ui_state.bank_slots.get(i)
+                    {
+                        if let Some(Some((source_item_id, _))) =
+                            state.ui_state.bank_slots.get(drag.from_slot)
+                        {
+                            if target_item_id == source_item_id {
+                                let plus_dims = self.measure_text_sharp("+", 16.0);
+                                self.draw_text_sharp(
+                                    "+",
+                                    sx + slot_size - plus_dims.width - 2.0 * s,
+                                    sy + 12.0 * s,
+                                    16.0,
+                                    TEXT_GOLD,
+                                );
+                            }
+                        }
+                    }
                 }
             }
         }

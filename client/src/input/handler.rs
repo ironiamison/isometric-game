@@ -1,7 +1,7 @@
 use super::touch::TouchControls;
 use crate::audio::AudioManager;
 use crate::game::{
-    pathfinding, BankQuantityAction, BankQuantityDialog, ChatChannel, ContextMenu,
+    pathfinding, BankDrag, BankQuantityAction, BankQuantityDialog, ChatChannel, ContextMenu,
     ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState,
     QuestCatalogEntry, quest_status_order, CHUNK_SIZE,
 };
@@ -3460,6 +3460,7 @@ impl InputHandler {
                         state.ui_state.bank_slots.clear();
                         state.ui_state.bank_quantity_dialog = None;
                         state.ui_state.bank_help_open = false;
+                        state.ui_state.bank_drag = None;
                         return commands;
                     }
                 }
@@ -3528,6 +3529,121 @@ impl InputHandler {
                 state.ui_state.bank_inv_scroll_drag.dragging = false;
             }
 
+            // === Bank drag state machine ===
+            let (cur_mx, cur_my) = mouse_position();
+            if state.ui_state.bank_drag.is_some() {
+                let drag = state.ui_state.bank_drag.as_ref().unwrap();
+                let from_slot = drag.from_slot;
+                let active = drag.active;
+
+                // Cancel on right-click or Escape
+                if is_mouse_button_pressed(MouseButton::Right)
+                    || is_key_pressed(KeyCode::Escape)
+                {
+                    state.ui_state.bank_drag = None;
+                    return commands;
+                }
+
+                if active {
+                    // Active drag: check for drop on mouse release
+                    if mouse_released {
+                        if let Some(UiElementId::BankSlot(target_idx)) =
+                            &state.ui_state.hovered_element
+                        {
+                            let target = *target_idx;
+                            if target != from_slot {
+                                commands.push(InputCommand::BankSwapSlots {
+                                    slot_a: from_slot as u32,
+                                    slot_b: target as u32,
+                                });
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                        }
+                        state.ui_state.bank_drag = None;
+                        return commands;
+                    }
+                    // Active drag consumes input - don't process clicks below
+                    // (fall through to click handling is blocked by the else-if below)
+                } else {
+                    // Pending drag: check dead zone or release
+                    if mouse_released {
+                        // Mouse released within dead zone => treat as normal click
+                        state.ui_state.bank_drag = None;
+                        // Process as withdraw click
+                        if let Some(Some((item_id, qty))) =
+                            state.ui_state.bank_slots.get(from_slot)
+                        {
+                            let ctrl_held = is_key_down(KeyCode::LeftControl)
+                                || is_key_down(KeyCode::RightControl);
+                            let shift_held = is_key_down(KeyCode::LeftShift)
+                                || is_key_down(KeyCode::RightShift);
+                            if shift_held {
+                                commands.push(InputCommand::BankWithdraw {
+                                    item_id: item_id.clone(),
+                                    quantity: *qty,
+                                });
+                                state.pending_sfx.push("enter".to_string());
+                            } else if ctrl_held && *qty > 1 {
+                                state.ui_state.bank_quantity_dialog =
+                                    Some(BankQuantityDialog {
+                                        input: String::new(),
+                                        cursor: 0,
+                                        action: BankQuantityAction::WithdrawItem,
+                                        item_id: Some(item_id.clone()),
+                                        max_quantity: *qty,
+                                    });
+                            } else {
+                                commands.push(InputCommand::BankWithdraw {
+                                    item_id: item_id.clone(),
+                                    quantity: 1,
+                                });
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                        }
+                        return commands;
+                    }
+
+                    // Check dead zone (4px = squared distance > 16.0)
+                    let dx = cur_mx - drag.mouse_start_x;
+                    let dy = cur_my - drag.mouse_start_y;
+                    if dx * dx + dy * dy > 16.0 {
+                        // Promote to active drag
+                        state.ui_state.bank_drag.as_mut().unwrap().active = true;
+                    }
+                }
+
+                // If we have an active drag, consume input and skip click handling
+                if state
+                    .ui_state
+                    .bank_drag
+                    .as_ref()
+                    .map(|d| d.active)
+                    .unwrap_or(false)
+                {
+                    return commands;
+                }
+            }
+
+            // Initiate bank drag on mouse_clicked over a BankSlot with an item
+            if mouse_clicked {
+                if let Some(UiElementId::BankSlot(idx)) = &clicked_element {
+                    let idx = *idx;
+                    if let Some(Some(_)) = state.ui_state.bank_slots.get(idx) {
+                        // Start a pending drag
+                        state.ui_state.bank_drag = Some(BankDrag {
+                            from_slot: idx,
+                            mouse_start_x: cur_mx,
+                            mouse_start_y: cur_my,
+                            offset_x: 0.0,
+                            offset_y: 0.0,
+                            active: false,
+                        });
+                        // Don't fall through to the normal BankSlot click handler
+                        return commands;
+                    }
+                }
+            }
+
             // Click handling
             if mouse_clicked {
                 if let Some(ref element) = clicked_element {
@@ -3541,6 +3657,7 @@ impl InputHandler {
                             state.ui_state.bank_slots.clear();
                             state.ui_state.bank_quantity_dialog = None;
                             state.ui_state.bank_help_open = false;
+                            state.ui_state.bank_drag = None;
                             state.pending_sfx.push("enter".to_string());
                             return commands;
                         }
@@ -3690,6 +3807,7 @@ impl InputHandler {
                 state.ui_state.bank_slots.clear();
                 state.ui_state.bank_quantity_dialog = None;
                 state.ui_state.bank_help_open = false;
+                state.ui_state.bank_drag = None;
                 return commands;
             }
 

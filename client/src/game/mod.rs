@@ -30,7 +30,7 @@ pub use shop::{ShopData, ShopStockItem, ShopSubTab};
 pub use skills::{Skill, SkillType, Skills};
 pub use state::{
     ActiveDialogue, ActiveQuest, AltarPanelState, Announcement, AutoActionState,
-    BankQuantityAction, BankQuantityDialog, BonusTile, Camera, ChatBubble, ChatChannel,
+    BankDrag, BankQuantityAction, BankQuantityDialog, BonusTile, Camera, ChatBubble, ChatChannel,
     ChatMessage, ConnectionStatus, ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice,
     DoubleClickState, DragSource, DragState, FarmingContractInfo, FarmingPatch, FrameTimings,
     FriendInfo, GameState, GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent,
