@@ -47,14 +47,15 @@ function show_offer_dialogue(ctx)
 end
 
 function show_progress_dialogue(ctx)
-    local objectives = ctx:get_objectives()
+    local reach = ctx:get_objective_progress("reach_north_obelisk")
+    local kill = ctx:get_objective_progress("kill_hedgehog")
 
-    if not objectives.reach_north_obelisk.completed then
+    if reach.current < reach.target then
         ctx:show_dialogue({
             speaker = "Researcher Orin",
             text = "Still here? The northern obelisk is a long journey from here. Head north and keep your eyes open - you'll know it when you see it."
         })
-    elseif not objectives.kill_hedgehog.completed then
+    elseif kill.current < kill.target then
         ctx:show_dialogue({
             speaker = "Researcher Orin",
             text = "You found it? But there's something blocking the connection? Hmm... the old texts mention that sometimes creatures nest near sources of magical energy. You may need to clear whatever is disrupting it."
