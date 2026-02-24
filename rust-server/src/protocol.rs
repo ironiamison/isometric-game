@@ -1021,6 +1021,45 @@ pub enum ServerMessage {
     AutoActionStopped {
         reason: String,
     },
+
+    // ===== Scroll Spell System Messages =====
+    /// Sent on connect: all scroll spell definitions
+    ScrollSpellDefinitions {
+        spells: Vec<ScrollSpellDefData>,
+    },
+    /// Sent on connect: player's unlocked scroll spell IDs
+    UnlockedSpellsSync {
+        spell_ids: Vec<String>,
+    },
+    /// Notification when a scroll teaches a spell
+    SpellUnlocked {
+        spell_id: String,
+    },
+    /// Pushback effect on a target (from Tornado etc.)
+    Pushback {
+        target_id: String,
+        from_x: i32,
+        from_y: i32,
+        to_x: i32,
+        to_y: i32,
+        wall_slam: bool,
+        bonus_damage: i32,
+    },
+}
+
+/// Scroll spell definition sent to clients
+#[derive(Debug, Clone, Serialize)]
+pub struct ScrollSpellDefData {
+    pub id: String,
+    pub name: String,
+    pub spell_type: String,
+    pub mana_cost: i32,
+    pub cooldown_ms: u64,
+    pub base_power: i32,
+    pub effect_sprite: String,
+    pub pushback_distance: i32,
+    pub wall_slam_damage_per_tile: i32,
+    pub description: String,
 }
 
 /// Ground tile override for farming plots (locked vs unlocked appearance)
@@ -1380,6 +1419,11 @@ impl ServerMessage {
             // Auto-action system messages
             ServerMessage::AutoActionStarted { .. } => "autoActionStarted",
             ServerMessage::AutoActionStopped { .. } => "autoActionStopped",
+            // Scroll spell system messages
+            ServerMessage::ScrollSpellDefinitions { .. } => "scrollSpellDefinitions",
+            ServerMessage::UnlockedSpellsSync { .. } => "unlockedSpellsSync",
+            ServerMessage::SpellUnlocked { .. } => "spellUnlocked",
+            ServerMessage::Pushback { .. } => "pushback",
         }
     }
 }
@@ -4936,6 +4980,64 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::String("reason".into()),
                 Value::String(reason.clone().into()),
             ));
+            Value::Map(map)
+        }
+        ServerMessage::ScrollSpellDefinitions { spells } => {
+            let mut map = Vec::new();
+            let spell_values: Vec<Value> = spells
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((Value::String("id".into()), Value::String(s.id.clone().into())));
+                    smap.push((Value::String("name".into()), Value::String(s.name.clone().into())));
+                    smap.push((Value::String("spell_type".into()), Value::String(s.spell_type.clone().into())));
+                    smap.push((Value::String("mana_cost".into()), Value::Integer((s.mana_cost as i64).into())));
+                    smap.push((Value::String("cooldown_ms".into()), Value::Integer((s.cooldown_ms as i64).into())));
+                    smap.push((Value::String("base_power".into()), Value::Integer((s.base_power as i64).into())));
+                    smap.push((Value::String("effect_sprite".into()), Value::String(s.effect_sprite.clone().into())));
+                    smap.push((Value::String("pushback_distance".into()), Value::Integer((s.pushback_distance as i64).into())));
+                    smap.push((Value::String("wall_slam_damage_per_tile".into()), Value::Integer((s.wall_slam_damage_per_tile as i64).into())));
+                    smap.push((Value::String("description".into()), Value::String(s.description.clone().into())));
+                    Value::Map(smap)
+                })
+                .collect();
+            map.push((Value::String("spells".into()), Value::Array(spell_values)));
+            Value::Map(map)
+        }
+        ServerMessage::UnlockedSpellsSync { spell_ids } => {
+            let mut map = Vec::new();
+            let ids: Vec<Value> = spell_ids
+                .iter()
+                .map(|s| Value::String(s.clone().into()))
+                .collect();
+            map.push((Value::String("spell_ids".into()), Value::Array(ids)));
+            Value::Map(map)
+        }
+        ServerMessage::SpellUnlocked { spell_id } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("spell_id".into()),
+                Value::String(spell_id.clone().into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::Pushback {
+            target_id,
+            from_x,
+            from_y,
+            to_x,
+            to_y,
+            wall_slam,
+            bonus_damage,
+        } => {
+            let mut map = Vec::new();
+            map.push((Value::String("target_id".into()), Value::String(target_id.clone().into())));
+            map.push((Value::String("from_x".into()), Value::Integer((*from_x as i64).into())));
+            map.push((Value::String("from_y".into()), Value::Integer((*from_y as i64).into())));
+            map.push((Value::String("to_x".into()), Value::Integer((*to_x as i64).into())));
+            map.push((Value::String("to_y".into()), Value::Integer((*to_y as i64).into())));
+            map.push((Value::String("wall_slam".into()), Value::Boolean(*wall_slam)));
+            map.push((Value::String("bonus_damage".into()), Value::Integer((*bonus_damage as i64).into())));
             Value::Map(map)
         }
     };

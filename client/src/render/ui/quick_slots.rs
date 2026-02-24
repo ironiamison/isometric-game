@@ -57,17 +57,29 @@ impl Renderer {
         };
         draw_rectangle(cog_x, cog_y, cog_size, cog_size, cog_bg);
         draw_rectangle_lines(cog_x, cog_y, cog_size, cog_size, 1.0, cog_border);
-        // Gear icon: draw a simple "gear" glyph
-        let gear_text = "\u{2699}"; // Unicode gear
-        let gear_fs = 16.0;
-        let gear_w = self.measure_text_sharp(gear_text, gear_fs).width;
-        self.draw_text_sharp(
-            gear_text,
-            (cog_x + (cog_size - gear_w) / 2.0).floor(),
-            (cog_y + (cog_size + gear_fs * 0.6) / 2.0).floor(),
-            gear_fs,
-            if cog_hovered { TEXT_TITLE } else { TEXT_DIM },
-        );
+        // Draw a small gear icon with primitives
+        {
+            let cx = cog_x + cog_size / 2.0;
+            let cy = cog_y + cog_size / 2.0;
+            let color = if cog_hovered || state.ui_state.hotkey_settings_open {
+                TEXT_TITLE
+            } else {
+                TEXT_DIM
+            };
+            let inner_r = cog_size * 0.1;
+            let outer_r = cog_size * 0.28;
+            // 6 teeth radiating from center
+            for i in 0..6 {
+                let angle = std::f32::consts::PI / 3.0 * i as f32;
+                let x1 = cx + inner_r * angle.cos();
+                let y1 = cy + inner_r * angle.sin();
+                let x2 = cx + outer_r * angle.cos();
+                let y2 = cy + outer_r * angle.sin();
+                draw_line(x1, y1, x2, y2, 1.5, color);
+            }
+            // Center dot
+            draw_circle(cx, cy, inner_r, color);
+        }
 
         // --- Preset Selector (up arrow, number, down arrow) ---
         let preset_x = base_x + cog_size + spacing;

@@ -45,6 +45,7 @@ mod quest;
 mod shop;
 mod skills;
 mod slayer;
+mod scroll_spell;
 mod spell;
 mod tilemap;
 mod woodcutting;
@@ -1306,6 +1307,29 @@ async fn matchmake_join_or_create(
         }
     }
 
+    // Load unlocked spells from database
+    match state.db.load_unlocked_spells(character_id).await {
+        Ok(spells) => {
+            let count = spells.len();
+            let spell_set: std::collections::HashSet<String> = spells.into_iter().collect();
+            room.set_player_unlocked_spells(&player_id, spell_set)
+                .await;
+            if count > 0 {
+                info!(
+                    "Loaded {} unlocked spells for {}",
+                    count, character_data.name
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load unlocked spells for character {}: {}",
+                character_id,
+                e
+            );
+        }
+    }
+
     // Load slayer state from database
     let slayer_state = state.db.load_character_slayer_state(character_id).await.unwrap_or_default();
     room.set_player_slayer_state(&player_id, slayer_state.clone()).await;
@@ -1866,6 +1890,21 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send scroll spell definitions
+    let scroll_spell_defs_msg = room.get_scroll_spell_definitions_message();
+    if let Ok(bytes) = protocol::encode_server_message(&scroll_spell_defs_msg) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
+    // Send unlocked spells
+    let unlocked = room.get_player_unlocked_spells(&player_id).await;
+    let unlocked_msg = ServerMessage::UnlockedSpellsSync {
+        spell_ids: unlocked.into_iter().collect(),
+    };
+    if let Ok(bytes) = protocol::encode_server_message(&unlocked_msg) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Send gathering marker positions
     let gathering_markers = room.get_gathering_markers_message().await;
     if let Ok(bytes) = protocol::encode_server_message(&gathering_markers) {
@@ -2273,6 +2312,23 @@ async fn handle_socket(
                     discovered.len(),
                     character_name
                 );
+            }
+        }
+
+        // Save unlocked spells to database
+        if character_id > 0 {
+            let unlocked = room.get_player_unlocked_spells(&player_id).await;
+            for spell_id in &unlocked {
+                if let Err(e) = state
+                    .db
+                    .save_unlocked_spell(character_id, spell_id)
+                    .await
+                {
+                    error!(
+                        "Failed to save unlocked spell {} for {}: {}",
+                        spell_id, character_name, e
+                    );
+                }
             }
         }
 
@@ -3748,7 +3804,7 @@ async fn main() {
                     let bulk_data = room.get_bulk_save_data(&player_ids).await;
 
                     for (character_id, character_name, player_id) in players {
-                        if let Some((mut save_data, quest_state, discovered_recipes, slayer_state)) =
+                        if let Some((mut save_data, quest_state, discovered_recipes, slayer_state, unlocked_spells)) =
                             bulk_data.get(player_id).cloned()
                         {
                             let played_time_delta = save_state
@@ -3780,6 +3836,7 @@ async fn main() {
                                 played_time_delta,
                                 discovered_recipes,
                                 slayer_state,
+                                unlocked_spells,
                             ));
                         }
                     }
@@ -3803,6 +3860,7 @@ async fn main() {
                     played_time_delta,
                     discovered_recipes,
                     slayer_state,
+                    unlocked_spells,
                 ) in snapshots
                 {
                     let db = save_state.db.clone();
@@ -3855,6 +3913,11 @@ async fn main() {
                         // Save slayer state
                         if let Some(ref slayer) = slayer_state {
                             let _ = db.save_character_slayer_state(character_id, slayer).await;
+                        }
+
+                        // Save unlocked spells
+                        for spell_id in &unlocked_spells {
+                            let _ = db.save_unlocked_spell(character_id, spell_id).await;
                         }
                     }));
                 }
@@ -4036,7 +4099,7 @@ async fn main() {
                 .collect();
 
             let bulk_data = room.get_bulk_save_data(&player_ids).await;
-            for (player_id, (mut save_data, quest_state, discovered_recipes, slayer_state)) in bulk_data {
+            for (player_id, (mut save_data, quest_state, discovered_recipes, slayer_state, unlocked_spells)) in bulk_data {
                 let character_id = match char_id_map.get(player_id.as_str()) {
                     Some(id) => *id,
                     None => continue,
@@ -4106,6 +4169,13 @@ async fn main() {
                     let _ = shutdown_state
                         .db
                         .save_character_slayer_state(character_id, slayer)
+                        .await;
+                }
+
+                for spell_id in &unlocked_spells {
+                    let _ = shutdown_state
+                        .db
+                        .save_unlocked_spell(character_id, spell_id)
                         .await;
                 }
             }

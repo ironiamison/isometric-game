@@ -6,7 +6,7 @@
 use super::super::Renderer;
 use super::common::*;
 use crate::game::prayer::{PrayerCategory, PrayerDef, PRAYERS};
-use crate::game::spell::{SpellDef, SPELLS};
+use crate::game::spell::SPELLS;
 use crate::game::GameState;
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
@@ -328,6 +328,7 @@ impl Renderer {
         layout: &mut UiLayout,
         scale: f32,
     ) {
+        // Draw static spell slots
         for (i, spell) in SPELLS.iter().enumerate() {
             let row = i / PRAYER_GRID_COLS;
             let col = i % PRAYER_GRID_COLS;
@@ -341,13 +342,40 @@ impl Renderer {
             let is_locked = magic_level < spell.magic_level_req;
 
             self.draw_spell_slot(
-                slot_x, slot_y, slot_size, spell, is_locked, is_hovered, scale,
+                slot_x, slot_y, slot_size, spell.id, spell.name,
+                spell.mana_cost, spell.magic_level_req,
+                is_locked, is_hovered, scale,
+            );
+        }
+
+        // Draw scroll spell slots after static spells
+        let scroll_start = SPELLS.len();
+        for (j, scroll_spell) in state.scroll_spell_definitions.iter().enumerate() {
+            let i = scroll_start + j;
+            if i >= PRAYER_GRID_COLS * PRAYER_GRID_ROWS {
+                break;
+            }
+            let row = i / PRAYER_GRID_COLS;
+            let col = i % PRAYER_GRID_COLS;
+            let slot_x = grid_x + col as f32 * (slot_size + slot_spacing);
+            let slot_y = grid_y + row as f32 * (slot_size + slot_spacing);
+
+            let bounds = Rect::new(slot_x, slot_y, slot_size, slot_size);
+            layout.add(UiElementId::SpellSlot(i), bounds);
+
+            let is_hovered = matches!(hovered, Some(UiElementId::SpellSlot(idx)) if *idx == i);
+            let is_locked = !state.unlocked_spells.contains(&scroll_spell.id);
+
+            self.draw_spell_slot(
+                slot_x, slot_y, slot_size, &scroll_spell.id, &scroll_spell.name,
+                scroll_spell.mana_cost, 0,
+                is_locked, is_hovered, scale,
             );
         }
 
         // Fill remaining empty slots in the grid for visual consistency
-        let _total_slots = PRAYER_GRID_COLS * PRAYER_GRID_ROWS;
-        for i in SPELLS.len()..(PRAYER_GRID_COLS * PRAYER_GRID_ROWS) {
+        let total_spell_count = scroll_start + state.scroll_spell_definitions.len();
+        for i in total_spell_count..(PRAYER_GRID_COLS * PRAYER_GRID_ROWS) {
             let row = i / PRAYER_GRID_COLS;
             let col = i % PRAYER_GRID_COLS;
             let slot_x = grid_x + col as f32 * (slot_size + slot_spacing);
@@ -387,13 +415,16 @@ impl Renderer {
         }
     }
 
-    /// Draw a single spell slot
+    /// Draw a single spell slot (works for both static and scroll spells)
     fn draw_spell_slot(
         &self,
         x: f32,
         y: f32,
         size: f32,
-        spell: &SpellDef,
+        spell_id: &str,
+        spell_name: &str,
+        mana_cost: i32,
+        magic_level_req: i32,
         is_locked: bool,
         is_hovered: bool,
         scale: f32,
@@ -453,7 +484,7 @@ impl Renderer {
         };
 
         // Draw spell icon from texture atlas or fallback to initials
-        if let Some((texture, source_rect)) = self.spell_icons.get(spell.id) {
+        if let Some((texture, source_rect)) = self.spell_icons.get(spell_id) {
             draw_texture_ex(
                 texture,
                 icon_x,
@@ -467,8 +498,7 @@ impl Renderer {
             );
         } else {
             // Fallback: draw initials if texture not found
-            let initials: String = spell
-                .name
+            let initials: String = spell_name
                 .split_whitespace()
                 .map(|w| w.chars().next().unwrap_or('?'))
                 .collect();
@@ -479,7 +509,7 @@ impl Renderer {
         }
 
         // Mana cost in bottom-right corner
-        let cost_text = format!("{}", spell.mana_cost);
+        let cost_text = format!("{}", mana_cost);
         let cost_color = Color::new(0.4, 0.5, 0.9, 1.0);
         let cost_dims = self.measure_text_sharp(&cost_text, 16.0);
         let cost_x = x + size - cost_dims.width - 2.0;
@@ -496,8 +526,8 @@ impl Renderer {
         self.draw_text_sharp(&cost_text, cost_x, cost_y, 16.0, cost_color);
 
         // Level requirement in top-left corner (if locked)
-        if is_locked {
-            let level_text = format!("{}", spell.magic_level_req);
+        if is_locked && magic_level_req > 0 {
+            let level_text = format!("{}", magic_level_req);
             let level_dims = self.measure_text_sharp(&level_text, 16.0);
             let level_x = x + size - level_dims.width - 2.0;
             let level_y = y + 14.0;
@@ -799,6 +829,12 @@ impl Renderer {
             if *i < SPELLS.len() {
                 self.render_spell_tooltip(state, *i);
                 return;
+            } else {
+                let scroll_idx = *i - SPELLS.len();
+                if scroll_idx < state.scroll_spell_definitions.len() {
+                    self.render_scroll_spell_tooltip(state, scroll_idx);
+                    return;
+                }
             }
         }
     }
@@ -1206,6 +1242,137 @@ impl Renderer {
             text_y,
             font_size,
             level_color,
+        );
+        text_y += line_height;
+
+        // Mana cost
+        let mana_color = Color::new(0.4, 0.5, 0.9, 1.0);
+        self.draw_text_sharp(
+            &mana_text,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            mana_color,
+        );
+        text_y += line_height;
+
+        // Cooldown
+        self.draw_text_sharp(
+            &cooldown_text,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
+        text_y += line_height;
+
+        // Description
+        self.draw_text_sharp(
+            desc,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            TEXT_NORMAL,
+        );
+    }
+
+    /// Render tooltip for a scroll spell slot
+    fn render_scroll_spell_tooltip(&self, state: &GameState, scroll_idx: usize) {
+        let scroll_spell = &state.scroll_spell_definitions[scroll_idx];
+        let is_locked = !state.unlocked_spells.contains(&scroll_spell.id);
+
+        let (mouse_x, mouse_y) = mouse_position();
+
+        // Tooltip content
+        let name = &scroll_spell.name;
+        let mana_text = format!("Mana Cost: {}", scroll_spell.mana_cost);
+        let cooldown_secs = scroll_spell.cooldown_ms as f64 / 1000.0;
+        let cooldown_text = if cooldown_secs >= 60.0 {
+            let mins = (cooldown_secs / 60.0).floor() as u32;
+            let secs = (cooldown_secs % 60.0).floor() as u32;
+            if secs > 0 {
+                format!("Cooldown: {}m {}s", mins, secs)
+            } else {
+                format!("Cooldown: {}m", mins)
+            }
+        } else {
+            format!("Cooldown: {:.1}s", cooldown_secs)
+        };
+        let status_text = if is_locked {
+            "Locked - craft scroll to unlock"
+        } else {
+            "Unlocked"
+        };
+        let desc = &scroll_spell.description;
+
+        // Calculate tooltip size
+        let padding = 8.0;
+        let line_height = 20.0;
+        let font_size = 16.0;
+
+        let name_dims = self.measure_text_sharp(name, font_size);
+        let mana_dims = self.measure_text_sharp(&mana_text, font_size);
+        let cooldown_dims = self.measure_text_sharp(&cooldown_text, font_size);
+        let status_dims = self.measure_text_sharp(status_text, font_size);
+        let desc_dims = self.measure_text_sharp(desc, font_size);
+
+        let max_width = name_dims
+            .width
+            .max(mana_dims.width)
+            .max(cooldown_dims.width)
+            .max(status_dims.width)
+            .max(desc_dims.width);
+
+        let tooltip_width = (max_width + padding * 2.0).floor();
+        let tooltip_height = (padding * 2.0 + line_height * 5.0).floor();
+
+        // Position tooltip
+        let (sw, sh) = virtual_screen_size();
+        let tooltip_x = (mouse_x + 16.0).min(sw - tooltip_width - 8.0).floor();
+        let tooltip_y = (mouse_y + 16.0).min(sh - tooltip_height - 8.0).floor();
+
+        // Draw tooltip background
+        draw_rectangle(
+            tooltip_x - 1.0,
+            tooltip_y - 1.0,
+            tooltip_width + 2.0,
+            tooltip_height + 2.0,
+            TOOLTIP_FRAME,
+        );
+        draw_rectangle(
+            tooltip_x,
+            tooltip_y,
+            tooltip_width,
+            tooltip_height,
+            TOOLTIP_BG,
+        );
+
+        // Draw text
+        let mut text_y = (tooltip_y + padding + 14.0).floor();
+
+        // Spell name
+        let name_color = if is_locked { TEXT_DIM } else { SPELL_COLOR };
+        self.draw_text_sharp(
+            name,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            name_color,
+        );
+        text_y += line_height;
+
+        // Status (unlocked via scroll)
+        let status_color = if is_locked {
+            Color::new(0.8, 0.3, 0.3, 1.0)
+        } else {
+            Color::new(0.3, 0.8, 0.3, 1.0)
+        };
+        self.draw_text_sharp(
+            status_text,
+            (tooltip_x + padding).floor(),
+            text_y,
+            font_size,
+            status_color,
         );
         text_y += line_height;
 

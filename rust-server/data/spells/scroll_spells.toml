@@ -1,0 +1,25 @@
+# =============================================================================
+# Scroll-Exclusive Spells
+# These spells can only be learned by using the corresponding scroll item.
+# They are NOT gated by magic level - access is controlled by the unlocked_spells set.
+# =============================================================================
+
+[greater_heal]
+name = "Greater Heal"
+spell_type = "heal"
+mana_cost = 20
+cooldown_ms = 8000
+base_power = 45
+effect_sprite = "self_heal"
+description = "A powerful healing spell that restores a large amount of HP."
+
+[tornado]
+name = "Tornado"
+spell_type = "damage"
+mana_cost = 15
+cooldown_ms = 5000
+base_power = 18
+effect_sprite = "tornado"
+pushback_distance = 3
+wall_slam_damage_per_tile = 3
+description = "Summons a fierce tornado that damages and pushes back the target."

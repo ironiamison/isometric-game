@@ -395,3 +395,85 @@ count = 1
 [[super_defence_potion.results]]
 item_id = "super_defence_potion"
 count = 1
+
+# =============================================================================
+# Alchemy Recipes - Scrolls
+# =============================================================================
+
+[scroll_greater_healing_recipe]
+display_name = "Scroll of Greater Healing"
+description = "Inscribe a powerful healing spell onto parchment."
+category = "alchemy"
+section = "scrolls"
+level_required = 25
+xp = 70
+station = "alchemy_station"
+craft_time_ms = 3000
+
+[[scroll_greater_healing_recipe.ingredients]]
+item_id = "parchment"
+count = 1
+
+[[scroll_greater_healing_recipe.ingredients]]
+item_id = "ashveil"
+count = 2
+
+[[scroll_greater_healing_recipe.ingredients]]
+item_id = "slime_core"
+count = 1
+
+[[scroll_greater_healing_recipe.results]]
+item_id = "scroll_greater_healing"
+count = 1
+
+[scroll_aeven_teleport_recipe]
+display_name = "Scroll of Aeven Teleport"
+description = "Inscribe a teleportation spell onto parchment."
+category = "alchemy"
+section = "scrolls"
+level_required = 30
+xp = 55
+station = "alchemy_station"
+craft_time_ms = 2500
+
+[[scroll_aeven_teleport_recipe.ingredients]]
+item_id = "parchment"
+count = 1
+
+[[scroll_aeven_teleport_recipe.ingredients]]
+item_id = "marshbloom"
+count = 1
+
+[[scroll_aeven_teleport_recipe.ingredients]]
+item_id = "vial_of_water"
+count = 1
+
+[[scroll_aeven_teleport_recipe.results]]
+item_id = "scroll_aeven_teleport"
+count = 1
+
+[scroll_tornado_recipe]
+display_name = "Scroll of Tornado"
+description = "Inscribe a devastating wind spell onto parchment."
+category = "alchemy"
+section = "scrolls"
+level_required = 40
+xp = 90
+station = "alchemy_station"
+craft_time_ms = 4000
+
+[[scroll_tornado_recipe.ingredients]]
+item_id = "parchment"
+count = 1
+
+[[scroll_tornado_recipe.ingredients]]
+item_id = "nightthorn"
+count = 2
+
+[[scroll_tornado_recipe.ingredients]]
+item_id = "spider_fang"
+count = 2
+
+[[scroll_tornado_recipe.results]]
+item_id = "scroll_tornado"
+count = 1

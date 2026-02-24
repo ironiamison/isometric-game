@@ -334,6 +334,8 @@ pub struct Player {
     pub sitting_at: Option<(i32, i32)>,
     /// Recipes this player has discovered (for requires_discovery recipes)
     pub discovered_recipes: HashSet<String>,
+    /// Spells this player has unlocked via scroll items
+    pub unlocked_spells: HashSet<String>,
     /// Active timed crafting operation (None if not crafting)
     pub crafting_state: Option<CraftingState>,
     /// Current prayer points (drained by active prayers)
@@ -356,6 +358,21 @@ pub struct Player {
     pub is_dashing: bool,
     /// Active auto-action (OSRS-style click-to-act). Processed each server tick.
     pub auto_action: Option<AutoAction>,
+}
+
+/// Unified spell representation for both static (const) and scroll-based spells.
+/// Used at cast time to avoid duplicating casting logic.
+struct ResolvedSpell {
+    id: String,
+    spell_type: crate::spell::SpellType,
+    magic_level_req: Option<i32>, // None for scroll spells (gated by unlocked_spells)
+    mana_cost: i32,
+    cooldown_ms: u64,
+    base_power: i32,
+    effect_sprite: String,
+    pushback_distance: i32,
+    wall_slam_damage_per_tile: i32,
+    is_scroll_spell: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -421,6 +438,7 @@ impl Player {
             last_regen_time: 0,
             sitting_at: None,
             discovered_recipes: HashSet::new(),
+            unlocked_spells: HashSet::new(),
             crafting_state: None,
             active_prayers: HashSet::new(),
             spell_cooldowns: HashMap::new(),
@@ -882,6 +900,8 @@ pub struct GameRoom {
     player_slayer_states: RwLock<HashMap<String, crate::slayer::PlayerSlayerState>>,
     /// Interior registry for looking up map flags (e.g. requires_slayer_task)
     interior_registry: Arc<crate::interior::InteriorRegistry>,
+    /// Scroll-exclusive spell definitions (loaded from TOML)
+    scroll_spell_registry: Arc<crate::scroll_spell::ScrollSpellRegistry>,
 }
 
 impl GameRoom {
@@ -1209,6 +1229,15 @@ impl GameRoom {
             tracing::info!("Found {} chairs on the map", chairs.len());
         }
 
+        // Load scroll spell registry
+        let mut scroll_spell_registry = crate::scroll_spell::ScrollSpellRegistry::new();
+        let scroll_spells_path = std::path::Path::new("data/spells/scroll_spells.toml");
+        if scroll_spells_path.exists() {
+            if let Err(e) = scroll_spell_registry.load_from_file(scroll_spells_path) {
+                tracing::error!("Failed to load scroll spell registry: {}", e);
+            }
+        }
+
         Self {
             id: Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -1247,6 +1276,7 @@ impl GameRoom {
             slayer_registry,
             player_slayer_states: RwLock::new(HashMap::new()),
             interior_registry,
+            scroll_spell_registry: Arc::new(scroll_spell_registry),
         }
     }
 
@@ -1752,7 +1782,7 @@ impl GameRoom {
     pub async fn get_bulk_save_data(
         &self,
         player_ids: &[String],
-    ) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>, Option<crate::slayer::PlayerSlayerState>)> {
+    ) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>, Option<crate::slayer::PlayerSlayerState>, HashSet<String>)> {
         struct RawPlayerSnapshot {
             x: i32,
             y: i32,
@@ -1775,6 +1805,7 @@ impl GameRoom {
             sitting_at_x: Option<i32>,
             sitting_at_y: Option<i32>,
             recipes: HashSet<String>,
+            unlocked_spells: HashSet<String>,
             bank_slots: Vec<(usize, String, i32)>,
             bank_gold: i32,
             bank_max_slots: u32,
@@ -1842,6 +1873,7 @@ impl GameRoom {
                             sitting_at_x: p.sitting_at.map(|(x, _)| x),
                             sitting_at_y: p.sitting_at.map(|(_, y)| y),
                             recipes: p.discovered_recipes.clone(),
+                            unlocked_spells: p.unlocked_spells.clone(),
                             bank_slots: p
                                 .bank
                                 .slots
@@ -1895,7 +1927,7 @@ impl GameRoom {
                 bank_gold: raw.bank_gold,
                 bank_max_slots: raw.bank_max_slots,
             };
-            result.insert(pid, (save_data, None, raw.recipes, None));
+            result.insert(pid, (save_data, None, raw.recipes, None, raw.unlocked_spells));
         }
 
         // Single lock on quest states
@@ -1968,6 +2000,49 @@ impl GameRoom {
         } else {
             false
         }
+    }
+
+    /// Set unlocked spells for a player (called on connect after loading from DB)
+    pub async fn set_player_unlocked_spells(&self, player_id: &str, spells: HashSet<String>) {
+        let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            player.unlocked_spells = spells;
+        }
+    }
+
+    /// Get unlocked spells for a player (for saving to DB)
+    pub async fn get_player_unlocked_spells(&self, player_id: &str) -> HashSet<String> {
+        let players = self.players.read().await;
+        players
+            .get(player_id)
+            .map(|p| p.unlocked_spells.clone())
+            .unwrap_or_default()
+    }
+
+    /// Build ScrollSpellDefinitions message for sending to clients on connect
+    pub fn get_scroll_spell_definitions_message(&self) -> ServerMessage {
+        let spells: Vec<crate::protocol::ScrollSpellDefData> = self
+            .scroll_spell_registry
+            .all()
+            .iter()
+            .map(|(id, def)| crate::protocol::ScrollSpellDefData {
+                id: id.clone(),
+                name: def.name.clone(),
+                spell_type: match def.spell_type {
+                    crate::spell::SpellType::Damage => "damage".to_string(),
+                    crate::spell::SpellType::Heal => "heal".to_string(),
+                    crate::spell::SpellType::Teleport => "teleport".to_string(),
+                },
+                mana_cost: def.mana_cost,
+                cooldown_ms: def.cooldown_ms,
+                base_power: def.base_power,
+                effect_sprite: def.effect_sprite.clone(),
+                pushback_distance: def.pushback_distance,
+                wall_slam_damage_per_tile: def.wall_slam_damage_per_tile,
+                description: def.description.clone(),
+            })
+            .collect();
+        ServerMessage::ScrollSpellDefinitions { spells }
     }
 
     /// Get QuestAccepted messages for all active quests (for syncing on login)
@@ -6299,6 +6374,14 @@ impl GameRoom {
                         self.handle_use_recipe_scroll(player_id, slot_index).await;
                         return;
                     }
+                    // Check if this is a spell scroll (LearnSpell use effect)
+                    if let Some(def) = self.item_registry.get(&slot.item_id) {
+                        if matches!(&def.use_effect, Some(crate::data::UseEffect::LearnSpell { .. })) {
+                            drop(players);
+                            self.handle_use_spell_scroll(player_id, slot_index).await;
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -6354,8 +6437,16 @@ impl GameRoom {
                                 format!("buff:{}:{}:{}", stat, amount, duration_ms)
                             }
                             Some(UseEffect::Teleport { destination }) => {
-                                // Teleport not implemented yet
+                                // Teleport to the world spawn point
+                                player.x = WORLD_SPAWN_X;
+                                player.y = WORLD_SPAWN_Y;
+                                player.move_dx = 0;
+                                player.move_dy = 0;
                                 format!("teleport:{}", destination)
+                            }
+                            Some(UseEffect::LearnSpell { .. }) => {
+                                // Handled separately in handle_use_spell_scroll
+                                "none".to_string()
                             }
                             None => "none".to_string(),
                         }
@@ -6485,6 +6576,117 @@ impl GameRoom {
             ServerMessage::RecipeDiscovered {
                 recipe_id: recipe_id.clone(),
             },
+        )
+        .await;
+
+        // Send inventory update
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold,
+            },
+        )
+        .await;
+    }
+
+    /// Handle using a spell scroll item to permanently learn a scroll-exclusive spell
+    async fn handle_use_spell_scroll(&self, player_id: &str, slot_index: u8) {
+        let (item_id, spell_id, inventory_update, gold) = {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) if p.active && !p.is_dead => p,
+                _ => return,
+            };
+
+            // Get item from slot
+            let item_id = match player
+                .inventory
+                .slots
+                .get(slot_index as usize)
+                .and_then(|s| s.as_ref())
+            {
+                Some(slot) => slot.item_id.clone(),
+                None => return,
+            };
+
+            // Get the spell_id from the LearnSpell use effect
+            let spell_id = match self.item_registry.get(&item_id) {
+                Some(def) => match &def.use_effect {
+                    Some(crate::data::UseEffect::LearnSpell { spell_id }) => spell_id.clone(),
+                    _ => return,
+                },
+                None => return,
+            };
+
+            // Verify the scroll spell exists in registry
+            if self.scroll_spell_registry.get(&spell_id).is_none() {
+                drop(players);
+                self.send_system_message(player_id, "This scroll contains an unknown spell.")
+                    .await;
+                return;
+            }
+
+            // Check if already unlocked
+            if player.unlocked_spells.contains(&spell_id) {
+                drop(players);
+                self.send_system_message(player_id, "You already know this spell.")
+                    .await;
+                return;
+            }
+
+            // Consume the scroll
+            if let Some(ref mut slot) = player.inventory.slots[slot_index as usize] {
+                slot.quantity -= 1;
+                if slot.quantity <= 0 {
+                    player.inventory.slots[slot_index as usize] = None;
+                }
+            }
+
+            // Add to unlocked spells
+            player.unlocked_spells.insert(spell_id.clone());
+
+            let update = player.inventory.to_update();
+            let gold = player.inventory.gold;
+            (item_id, spell_id, update, gold)
+        };
+
+        let spell_name = self
+            .scroll_spell_registry
+            .get(&spell_id)
+            .map(|d| d.name.clone())
+            .unwrap_or_else(|| spell_id.clone());
+        tracing::info!(
+            "Player {} used spell scroll {} -> unlocked spell {} ({})",
+            player_id,
+            item_id,
+            spell_id,
+            spell_name
+        );
+
+        // Save to database
+        if let Some(ref db) = self.db {
+            if let Some(character_id) = Self::parse_character_id(player_id) {
+                if let Err(e) = db.save_unlocked_spell(character_id, &spell_id).await {
+                    tracing::warn!("Failed to save unlocked spell to DB: {}", e);
+                }
+            }
+        }
+
+        // Send SpellUnlocked message
+        self.send_to_player(
+            player_id,
+            ServerMessage::SpellUnlocked {
+                spell_id: spell_id.clone(),
+            },
+        )
+        .await;
+
+        // Send system message
+        self.send_system_message(
+            player_id,
+            &format!("You have learned {}!", spell_name),
         )
         .await;
 
@@ -14746,20 +14948,43 @@ impl GameRoom {
 
     /// Handle casting a spell
     pub async fn handle_cast_spell(&self, player_id: &str, spell_id: &str) {
-        // 1. Look up spell definition
-        let spell_def = match crate::spell::get_spell(spell_id) {
-            Some(s) => s,
-            None => {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::SpellResult {
-                        success: false,
-                        reason: Some("Unknown spell".to_string()),
-                    },
-                )
-                .await;
-                return;
+        // 1. Resolve spell: check static spells first, then scroll spell registry
+        let resolved = if let Some(s) = crate::spell::get_spell(spell_id) {
+            ResolvedSpell {
+                id: s.id.to_string(),
+                spell_type: s.spell_type,
+                magic_level_req: Some(s.magic_level_req),
+                mana_cost: s.mana_cost,
+                cooldown_ms: s.cooldown_ms,
+                base_power: s.base_power,
+                effect_sprite: s.effect_sprite.to_string(),
+                pushback_distance: 0,
+                wall_slam_damage_per_tile: 0,
+                is_scroll_spell: false,
             }
+        } else if let Some(s) = self.scroll_spell_registry.get(spell_id) {
+            ResolvedSpell {
+                id: s.id.clone(),
+                spell_type: s.spell_type,
+                magic_level_req: None, // Scroll spells skip magic level checks
+                mana_cost: s.mana_cost,
+                cooldown_ms: s.cooldown_ms,
+                base_power: s.base_power,
+                effect_sprite: s.effect_sprite.clone(),
+                pushback_distance: s.pushback_distance,
+                wall_slam_damage_per_tile: s.wall_slam_damage_per_tile,
+                is_scroll_spell: true,
+            }
+        } else {
+            self.send_to_player(
+                player_id,
+                ServerMessage::SpellResult {
+                    success: false,
+                    reason: Some("Unknown spell".to_string()),
+                },
+            )
+            .await;
+            return;
         };
 
         let current_time = std::time::SystemTime::now()
@@ -14775,20 +15000,35 @@ impl GameRoom {
                 _ => return,
             };
 
-            // Check magic level
-            if player.skills.magic.level < spell_def.magic_level_req {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::SpellResult {
-                        success: false,
-                        reason: Some("Magic level too low".to_string()),
-                    },
-                )
-                .await;
-                return;
+            // Scroll spells require unlock instead of magic level
+            if resolved.is_scroll_spell {
+                if !player.unlocked_spells.contains(&resolved.id) {
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::SpellResult {
+                            success: false,
+                            reason: Some("You haven't learned this spell".to_string()),
+                        },
+                    )
+                    .await;
+                    return;
+                }
+            } else if let Some(req) = resolved.magic_level_req {
+                // Check magic level for static spells
+                if player.skills.magic.level < req {
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::SpellResult {
+                            success: false,
+                            reason: Some("Magic level too low".to_string()),
+                        },
+                    )
+                    .await;
+                    return;
+                }
             }
             // Check mana
-            if player.mp < spell_def.mana_cost {
+            if player.mp < resolved.mana_cost {
                 self.send_to_player(
                     player_id,
                     ServerMessage::SpellResult {
@@ -14800,8 +15040,8 @@ impl GameRoom {
                 return;
             }
             // Check cooldown
-            if let Some(&last_cast) = player.spell_cooldowns.get(spell_def.id) {
-                if current_time < last_cast + spell_def.cooldown_ms {
+            if let Some(&last_cast) = player.spell_cooldowns.get(&resolved.id) {
+                if current_time < last_cast + resolved.cooldown_ms {
                     self.send_to_player(
                         player_id,
                         ServerMessage::SpellResult {
@@ -14816,27 +15056,30 @@ impl GameRoom {
         }
 
         // 3. Dispatch based on spell type
-        match spell_def.spell_type {
+        match resolved.spell_type {
             crate::spell::SpellType::Damage => {
-                self.cast_damage_spell(player_id, spell_def, current_time)
+                self.cast_damage_spell_resolved(player_id, &resolved, current_time)
                     .await
             }
             crate::spell::SpellType::Heal => {
-                self.cast_heal_spell(player_id, spell_def, current_time)
+                self.cast_heal_spell_resolved(player_id, &resolved, current_time)
                     .await
             }
             crate::spell::SpellType::Teleport => {
-                self.cast_return_home_spell(player_id, spell_def, current_time)
-                    .await;
+                // For static teleport spells (Return Home), delegate to existing handler
+                if let Some(spell_def) = crate::spell::get_spell(spell_id) {
+                    self.cast_return_home_spell(player_id, spell_def, current_time)
+                        .await;
+                }
             }
         }
     }
 
-    /// Cast a damage spell on the player's current target
-    async fn cast_damage_spell(
+    /// Cast a damage spell using a ResolvedSpell (supports both static and scroll spells)
+    async fn cast_damage_spell_resolved(
         &self,
         player_id: &str,
-        spell_def: &crate::spell::SpellDef,
+        spell_def: &ResolvedSpell,
         current_time: u64,
     ) {
         // 1. Get attacker info and target
@@ -15109,6 +15352,109 @@ impl GameRoom {
         };
         self.broadcast_to_zone(player_id, damage_msg).await;
 
+        // 8b. Apply pushback if the spell has it and the target was hit
+        if spell_def.pushback_distance > 0 && actual_damage > 0 && !target_died {
+            let dx = target_x - caster_x;
+            let dy = target_y - caster_y;
+            // Normalize direction (sign only)
+            let dir_x = if dx != 0 { dx.signum() } else { 0 };
+            let dir_y = if dy != 0 { dy.signum() } else { 0 };
+            // If caster and target are on the same tile, push down as fallback
+            let (dir_x, dir_y) = if dir_x == 0 && dir_y == 0 {
+                (0, 1)
+            } else {
+                (dir_x, dir_y)
+            };
+
+            let mut final_x = target_x;
+            let mut final_y = target_y;
+            let mut blocked_tiles = 0;
+            let mut wall_slam = false;
+
+            for i in 1..=spell_def.pushback_distance {
+                let next_x = target_x + dir_x * i;
+                let next_y = target_y + dir_y * i;
+
+                if !self.world.is_tile_walkable(next_x, next_y).await {
+                    // Hit a wall - wall slam!
+                    wall_slam = true;
+                    blocked_tiles = spell_def.pushback_distance - (i - 1);
+                    break;
+                }
+                final_x = next_x;
+                final_y = next_y;
+            }
+
+            // Apply wall slam bonus damage
+            let wall_slam_bonus = if wall_slam {
+                blocked_tiles * spell_def.wall_slam_damage_per_tile
+            } else {
+                0
+            };
+
+            // Move the target to the final position
+            if is_npc {
+                let mut npcs = self.npcs.write().await;
+                if let Some(npc) = npcs.get_mut(&target_id) {
+                    npc.x = final_x;
+                    npc.y = final_y;
+                    if wall_slam_bonus > 0 {
+                        npc.take_damage(wall_slam_bonus, current_time, Some(player_id));
+                    }
+                }
+            } else {
+                let mut players = self.players.write().await;
+                if let Some(target) = players.get_mut(&target_id) {
+                    target.x = final_x;
+                    target.y = final_y;
+                    target.move_dx = 0;
+                    target.move_dy = 0;
+                    if wall_slam_bonus > 0 {
+                        target.hp = (target.hp - wall_slam_bonus).max(0);
+                    }
+                }
+            }
+
+            // Send Pushback message
+            self.broadcast_to_zone(
+                player_id,
+                ServerMessage::Pushback {
+                    target_id: target_id.clone(),
+                    from_x: target_x,
+                    from_y: target_y,
+                    to_x: final_x,
+                    to_y: final_y,
+                    wall_slam,
+                    bonus_damage: wall_slam_bonus,
+                },
+            )
+            .await;
+
+            // Send DamageEvent for wall slam bonus
+            if wall_slam_bonus > 0 {
+                let slam_hp = if is_npc {
+                    let npcs = self.npcs.read().await;
+                    npcs.get(&target_id).map(|n| n.hp).unwrap_or(0)
+                } else {
+                    let players = self.players.read().await;
+                    players.get(&target_id).map(|p| p.hp).unwrap_or(0)
+                };
+                self.broadcast_to_zone(
+                    player_id,
+                    ServerMessage::DamageEvent {
+                        source_id: player_id.to_string(),
+                        target_id: target_id.clone(),
+                        damage: wall_slam_bonus,
+                        target_hp: slam_hp,
+                        target_x: final_x as f32,
+                        target_y: final_y as f32,
+                        projectile: None,
+                    },
+                )
+                .await;
+            }
+        }
+
         // 9. Award Magic XP and Hitpoints XP
         if actual_damage > 0 {
             let xp_results = {
@@ -15201,7 +15547,7 @@ impl GameRoom {
                 "{} killed {} with spell {}",
                 caster_name,
                 target_name,
-                spell_def.name
+                spell_def.id
             );
             if is_npc {
                 // Get NPC info for exp and loot
@@ -15512,10 +15858,11 @@ impl GameRoom {
     }
 
     /// Cast a heal spell on self
-    async fn cast_heal_spell(
+    /// Cast a heal spell using a ResolvedSpell (supports both static and scroll spells)
+    async fn cast_heal_spell_resolved(
         &self,
         player_id: &str,
-        spell_def: &crate::spell::SpellDef,
+        spell_def: &ResolvedSpell,
         current_time: u64,
     ) {
         // Get caster info
@@ -15635,7 +15982,7 @@ impl GameRoom {
             "Player {} healed for {} HP with spell {}",
             player_id,
             actual_heal,
-            spell_def.name
+            spell_def.id
         );
     }
 

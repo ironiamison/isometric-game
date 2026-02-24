@@ -92,11 +92,20 @@ fn activate_hotkey_slot(
                 .get(spell_id.as_str())
                 .map_or(false, |&t| now < t);
             if !on_cooldown {
-                // Look up spell def for cooldown duration
-                if let Some(spell_def) =
-                    crate::game::spell::SPELLS.iter().find(|s| s.id == spell_id)
-                {
-                    let cooldown_end = now + (spell_def.cooldown_ms as f64 / 1000.0);
+                // Look up spell def for cooldown duration (check static spells, then scroll spells)
+                let cooldown_ms = crate::game::spell::SPELLS
+                    .iter()
+                    .find(|s| s.id == spell_id)
+                    .map(|s| s.cooldown_ms)
+                    .or_else(|| {
+                        state
+                            .scroll_spell_definitions
+                            .iter()
+                            .find(|s| s.id == *spell_id)
+                            .map(|s| s.cooldown_ms)
+                    });
+                if let Some(cd_ms) = cooldown_ms {
+                    let cooldown_end = now + (cd_ms as f64 / 1000.0);
                     state
                         .spell_cooldowns
                         .insert(spell_id.clone(), cooldown_end);
@@ -1472,6 +1481,23 @@ impl InputHandler {
                             });
                             audio.play_sfx("item_grab");
                             return commands;
+                        } else {
+                            // Scroll spell slot - only allow drag if unlocked
+                            let scroll_idx = *slot_idx - crate::game::spell::SPELLS.len();
+                            if let Some(scroll_spell) =
+                                state.scroll_spell_definitions.get(scroll_idx)
+                            {
+                                if state.unlocked_spells.contains(&scroll_spell.id) {
+                                    let id = scroll_spell.id.clone();
+                                    state.ui_state.drag_state = Some(DragState {
+                                        source: DragSource::Spell(id.clone()),
+                                        item_id: id,
+                                        quantity: 0,
+                                    });
+                                    audio.play_sfx("item_grab");
+                                    return commands;
+                                }
+                            }
                         }
                     }
                     UiElementId::EquipmentSlot(slot_type) => {

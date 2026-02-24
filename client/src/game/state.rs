@@ -1702,6 +1702,10 @@ pub struct GameState {
     pub spell_effects: Vec<SpellEffect>,
     /// Spell cooldowns tracked on client for UI feedback
     pub spell_cooldowns: std::collections::HashMap<String, f64>, // spell_id -> time when cooldown expires
+    /// Scroll spell definitions received from server
+    pub scroll_spell_definitions: Vec<crate::game::spell::ScrollSpellDef>,
+    /// Set of spell IDs the player has unlocked via scroll items
+    pub unlocked_spells: std::collections::HashSet<String>,
 
     // Prayer system state
     /// Current prayer points
@@ -1813,6 +1817,8 @@ impl GameState {
             social_state: SocialState::default(),
             spell_effects: Vec::new(),
             spell_cooldowns: std::collections::HashMap::new(),
+            scroll_spell_definitions: Vec::new(),
+            unlocked_spells: std::collections::HashSet::new(),
             prayer_points: 0,
             max_prayer_points: 1,
             active_prayers: Vec::new(),

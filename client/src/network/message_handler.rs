@@ -3566,6 +3566,78 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "scrollSpellDefinitions" => {
+            if let Some(value) = data {
+                if let Some(spells_arr) = extract_array(value, "spells") {
+                    state.scroll_spell_definitions.clear();
+                    for spell_val in spells_arr {
+                        let id = extract_string(spell_val, "id").unwrap_or_default();
+                        let name = extract_string(spell_val, "name").unwrap_or_default();
+                        let spell_type_str = extract_string(spell_val, "spell_type").unwrap_or_default();
+                        let spell_type = match spell_type_str.as_str() {
+                            "damage" => crate::game::spell::SpellType::Damage,
+                            "heal" => crate::game::spell::SpellType::Heal,
+                            "teleport" => crate::game::spell::SpellType::Teleport,
+                            _ => crate::game::spell::SpellType::Damage,
+                        };
+                        state.scroll_spell_definitions.push(crate::game::spell::ScrollSpellDef {
+                            id,
+                            name,
+                            spell_type,
+                            mana_cost: extract_i32(spell_val, "mana_cost").unwrap_or(0),
+                            cooldown_ms: extract_i32(spell_val, "cooldown_ms").unwrap_or(0) as u64,
+                            base_power: extract_i32(spell_val, "base_power").unwrap_or(0),
+                            effect_sprite: extract_string(spell_val, "effect_sprite").unwrap_or_default(),
+                            pushback_distance: extract_i32(spell_val, "pushback_distance").unwrap_or(0),
+                            wall_slam_damage_per_tile: extract_i32(spell_val, "wall_slam_damage_per_tile").unwrap_or(0),
+                            description: extract_string(spell_val, "description").unwrap_or_default(),
+                        });
+                    }
+                    log::info!("Received {} scroll spell definitions", state.scroll_spell_definitions.len());
+                }
+            }
+        }
+
+        "unlockedSpellsSync" => {
+            if let Some(value) = data {
+                if let Some(ids_arr) = extract_array(value, "spell_ids") {
+                    state.unlocked_spells.clear();
+                    for id_val in ids_arr {
+                        if let Some(id) = id_val.as_str() {
+                            state.unlocked_spells.insert(id.to_string());
+                        }
+                    }
+                    log::info!("Synced {} unlocked spells", state.unlocked_spells.len());
+                }
+            }
+        }
+
+        "spellUnlocked" => {
+            if let Some(value) = data {
+                if let Some(spell_id) = extract_string(value, "spell_id") {
+                    state.unlocked_spells.insert(spell_id.clone());
+                    log::info!("Spell unlocked: {}", spell_id);
+                }
+            }
+        }
+
+        "pushback" => {
+            if let Some(value) = data {
+                let target_id = extract_string(value, "target_id").unwrap_or_default();
+                let to_x = extract_i32(value, "to_x").unwrap_or(0);
+                let to_y = extract_i32(value, "to_y").unwrap_or(0);
+
+                // Update entity position to final pushback position with smooth slide
+                if let Some(player) = state.players.get_mut(&target_id) {
+                    player.server_x = to_x as f32;
+                    player.server_y = to_y as f32;
+                    player.target_x = to_x as f32;
+                    player.target_y = to_y as f32;
+                    player.is_dashing = true; // Reuse dash slide for fast pushback interpolation
+                }
+            }
+        }
+
         "pong" => {
             // Handle ping response - calculate and display latency
             if let Some(sent_at) = state.ping_sent_at.take() {

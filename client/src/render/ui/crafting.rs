@@ -22,6 +22,7 @@ pub fn section_sort_key(section: &str) -> usize {
         "restoration" => 0,
         "stat_buffs" => 1,
         "utility" => 2,
+        "scrolls" => 3,
         "cooking" => 0,
         _ => 99,
     }
@@ -37,6 +38,7 @@ fn section_display_name(section: &str) -> &str {
         "restoration" => "Restoration",
         "stat_buffs" => "Stat Buffs",
         "utility" => "Utility",
+        "scrolls" => "Scrolls",
         "cooking" => "Cooking",
         _ => section,
     }

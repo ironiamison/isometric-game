@@ -1674,7 +1674,7 @@ sprite = "magic_staff"
 description = "A staff imbued with magical energy. Enhances spell accuracy."
 category = "equipment"
 max_stack = 1
-base_price = 500
+base_price = 5000
 sellable = true
 [magic_staff.equipment]
 slot_type = "weapon"

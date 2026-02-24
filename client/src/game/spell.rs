@@ -20,6 +20,21 @@ pub struct SpellDef {
     pub effect_sprite: &'static str,
 }
 
+/// Scroll-exclusive spell definition (loaded from server at runtime)
+#[derive(Clone, Debug)]
+pub struct ScrollSpellDef {
+    pub id: String,
+    pub name: String,
+    pub spell_type: SpellType,
+    pub mana_cost: i32,
+    pub cooldown_ms: u64,
+    pub base_power: i32,
+    pub effect_sprite: String,
+    pub pushback_distance: i32,
+    pub wall_slam_damage_per_tile: i32,
+    pub description: String,
+}
+
 /// All spells in display order
 pub const SPELLS: [SpellDef; 6] = [
     SpellDef {

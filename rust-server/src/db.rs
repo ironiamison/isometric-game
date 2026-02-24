@@ -476,6 +476,21 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Unlocked spells table - tracks which scroll spells a player has learned
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS character_unlocked_spells (
+                character_id INTEGER NOT NULL,
+                spell_id TEXT NOT NULL,
+                unlocked_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (character_id, spell_id),
+                FOREIGN KEY (character_id) REFERENCES characters(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         // Slayer state table - JSON blob per character
         sqlx::query(
             r#"
@@ -1043,6 +1058,10 @@ impl Database {
             .bind(character_id)
             .execute(&self.pool)
             .await?;
+        sqlx::query("DELETE FROM character_unlocked_spells WHERE character_id = ?")
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
 
         // Delete the character (only if owned by this account)
         let result = sqlx::query("DELETE FROM characters WHERE id = ? AND account_id = ?")
@@ -1565,6 +1584,43 @@ impl Database {
         )
         .bind(character_id)
         .bind(recipe_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    // =========================================================================
+    // Unlocked Spells Functions
+    // =========================================================================
+
+    /// Load unlocked spells for a character
+    pub async fn load_unlocked_spells(
+        &self,
+        character_id: i64,
+    ) -> Result<Vec<String>, sqlx::Error> {
+        let rows =
+            sqlx::query("SELECT spell_id FROM character_unlocked_spells WHERE character_id = ?")
+                .bind(character_id)
+                .fetch_all(&self.pool)
+                .await?;
+
+        Ok(rows.iter().map(|row| row.get("spell_id")).collect())
+    }
+
+    /// Save a newly unlocked spell for a character
+    pub async fn save_unlocked_spell(
+        &self,
+        character_id: i64,
+        spell_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO character_unlocked_spells (character_id, spell_id)
+            VALUES (?, ?)
+            "#,
+        )
+        .bind(character_id)
+        .bind(spell_id)
         .execute(&self.pool)
         .await?;
         Ok(())

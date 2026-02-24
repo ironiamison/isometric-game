@@ -290,3 +290,46 @@ sellable = true
 [antidote.use_effect]
 type = "heal"
 amount = 0
+
+# ============================================================================
+# Spell Scrolls
+# ============================================================================
+
+[scroll_greater_healing]
+display_name = "Scroll of Greater Healing"
+sprite = "scroll_greater_healing"
+description = "A magical scroll inscribed with a powerful healing spell. Use to permanently learn Greater Heal."
+category = "consumable"
+max_stack = 1
+base_price = 200
+sellable = true
+
+[scroll_greater_healing.use_effect]
+type = "learn_spell"
+spell_id = "greater_heal"
+
+[scroll_aeven_teleport]
+display_name = "Scroll of Aeven Teleport"
+sprite = "scroll_aeven_teleport"
+description = "A scroll inscribed with a teleportation spell. Transports you to New Aeven. Single use."
+category = "consumable"
+max_stack = 5
+base_price = 150
+sellable = true
+
+[scroll_aeven_teleport.use_effect]
+type = "teleport"
+destination = "new_aeven"
+
+[scroll_tornado]
+display_name = "Scroll of Tornado"
+sprite = "scroll_tornado"
+description = "A scroll crackling with wind magic. Use to permanently learn the Tornado spell."
+category = "consumable"
+max_stack = 1
+base_price = 350
+sellable = true
+
+[scroll_tornado.use_effect]
+type = "learn_spell"
+spell_id = "tornado"

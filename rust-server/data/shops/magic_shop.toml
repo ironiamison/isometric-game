@@ -15,3 +15,8 @@ restock_rate = 8
 item_id = "tangleroots"
 max_quantity = 15
 restock_rate = 3
+
+[[stock]]
+item_id = "magic_staff"
+max_quantity = 5
+restock_rate = 1

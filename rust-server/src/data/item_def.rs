@@ -174,6 +174,9 @@ pub enum UseEffect {
     Teleport {
         destination: String,
     },
+    LearnSpell {
+        spell_id: String,
+    },
 }
 
 // ============================================================================

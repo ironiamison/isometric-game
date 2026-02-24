@@ -334,6 +334,12 @@ drop_chance = 0.25
 quantity_min = 1
 quantity_max = 2
 
+[[skeleton.loot]]
+item_id = "parchment"
+drop_chance = 0.08
+quantity_min = 1
+quantity_max = 1
+
 [skeleton.behaviors]
 hostile = true
 wander_enabled = true
@@ -387,6 +393,12 @@ drop_chance = 0.15
 quantity_min = 1
 quantity_max = 1
 
+[[skeleton_brute.loot]]
+item_id = "parchment"
+drop_chance = 0.10
+quantity_min = 1
+quantity_max = 2
+
 [skeleton_brute.behaviors]
 hostile = true
 wander_enabled = true
@@ -427,6 +439,12 @@ item_id = "regular_bones"
 drop_chance = 1.0
 quantity_min = 1
 quantity_max = 1
+
+[[forgotten_monk.loot]]
+item_id = "parchment"
+drop_chance = 0.12
+quantity_min = 1
+quantity_max = 2
 
 [[forgotten_monk.loot]]
 item_id = "dark_essence"
@@ -781,6 +799,12 @@ drop_chance = 0.20
 quantity_min = 1
 quantity_max = 3
 
+[[skeleton_archer.loot]]
+item_id = "parchment"
+drop_chance = 0.08
+quantity_min = 1
+quantity_max = 1
+
 [skeleton_archer.behaviors]
 hostile = true
 wander_enabled = true
@@ -862,6 +886,12 @@ item_id = "dark_essence"
 drop_chance = 0.20
 quantity_min = 1
 quantity_max = 2
+
+[[witch.loot]]
+item_id = "parchment"
+drop_chance = 0.10
+quantity_min = 1
+quantity_max = 1
 
 [[witch.loot]]
 item_id = "recipe_scavenger_bow"
