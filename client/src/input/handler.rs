@@ -531,6 +531,11 @@ pub enum InputCommand {
         amount: i32,
     },
     BankDepositAll,
+    BankSwapSlots {
+        slot_a: u32,
+        slot_b: u32,
+    },
+    BankSort,
     // Portal commands
     EnterPortal {
         portal_id: String,
@@ -3666,6 +3671,11 @@ impl InputHandler {
                         }
                         UiElementId::BankDepositAllButton => {
                             commands.push(InputCommand::BankDepositAll);
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
+                        }
+                        UiElementId::BankSortButton => {
+                            commands.push(InputCommand::BankSort);
                             state.pending_sfx.push("enter".to_string());
                             return commands;
                         }

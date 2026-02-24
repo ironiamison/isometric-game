@@ -470,6 +470,11 @@ pub fn run_game_frame(
                 ClientMessage::BankWithdrawGold { amount: *amount }
             }
             InputCommand::BankDepositAll => ClientMessage::BankDepositAll,
+            InputCommand::BankSwapSlots { slot_a, slot_b } => ClientMessage::BankSwapSlots {
+                slot_a: *slot_a,
+                slot_b: *slot_b,
+            },
+            InputCommand::BankSort => ClientMessage::BankSort,
             InputCommand::EnterPortal { portal_id } => ClientMessage::EnterPortal {
                 portal_id: portal_id.clone(),
             },

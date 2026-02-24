@@ -117,6 +117,12 @@ pub enum ClientMessage {
     #[serde(rename = "bankDepositAll")]
     BankDepositAll,
 
+    #[serde(rename = "bankSwapSlots")]
+    BankSwapSlots { slot_a: u32, slot_b: u32 },
+
+    #[serde(rename = "bankSort")]
+    BankSort,
+
     #[serde(rename = "enterPortal")]
     EnterPortal { portal_id: String },
 
@@ -408,6 +414,12 @@ impl ClientMessage {
                 "bankWithdrawGold"
             }
             ClientMessage::BankDepositAll => "bankDepositAll",
+            ClientMessage::BankSwapSlots { slot_a, slot_b } => {
+                data.insert("slot_a".into(), Value::Integer((*slot_a as i64).into()));
+                data.insert("slot_b".into(), Value::Integer((*slot_b as i64).into()));
+                "bankSwapSlots"
+            }
+            ClientMessage::BankSort => "bankSort",
             ClientMessage::EnterPortal { portal_id } => {
                 data.insert("portalId".into(), Value::String(portal_id.clone().into()));
                 "enterPortal"
