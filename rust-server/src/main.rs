@@ -27,6 +27,7 @@ mod chunk;
 mod crafting;
 mod data;
 mod db;
+mod dig_site;
 mod entity;
 mod farming;
 mod game;

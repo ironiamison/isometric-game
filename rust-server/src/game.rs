@@ -904,6 +904,8 @@ pub struct GameRoom {
     scroll_spell_registry: Arc<crate::scroll_spell::ScrollSpellRegistry>,
     /// Persistent ground item spawn manager (respawning world items)
     ground_spawn_manager: RwLock<crate::ground_spawn::GroundSpawnManager>,
+    /// Dig site manager for shovel-triggered quest events
+    dig_site_manager: RwLock<crate::dig_site::DigSiteManager>,
 }
 
 impl GameRoom {
@@ -1307,6 +1309,7 @@ impl GameRoom {
             interior_registry,
             scroll_spell_registry: Arc::new(scroll_spell_registry),
             ground_spawn_manager: RwLock::new(ground_spawn_manager),
+            dig_site_manager: RwLock::new(crate::dig_site::DigSiteManager::load(std::path::Path::new("data"))),
         }
     }
 
@@ -6639,8 +6642,89 @@ impl GameRoom {
 
     /// Handle using a dig tool (shovel) - checks dig sites near player
     async fn handle_dig(&self, player_id: &str, _slot_index: u8) {
-        self.send_system_message(player_id, "There's nothing to dig here.")
+        // 1. Get player position from the players RwLock
+        let (px, py) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => (p.x, p.y),
+                _ => return,
+            }
+        };
+
+        // 2. Get quest state from player_quest_states RwLock
+        let quest_state = {
+            let quest_states = self.player_quest_states.read().await;
+            quest_states.get(player_id).cloned()
+        };
+
+        // 3. Find a matching dig site
+        let site_match = {
+            let dsm = self.dig_site_manager.read().await;
+            let mut found = None;
+            for site in &dsm.sites {
+                // Check proximity (Chebyshev distance)
+                let dx = (px - site.x).abs();
+                let dy = (py - site.y).abs();
+                if dx > site.radius || dy > site.radius {
+                    continue;
+                }
+                // Check not already triggered for this player
+                if dsm
+                    .triggered
+                    .contains(&(player_id.to_string(), site.id.clone()))
+                {
+                    continue;
+                }
+                // Check quest state: quest must be active with objective not yet completed
+                if let Some(ref qs) = quest_state {
+                    if let Some(progress) = qs.active_quests.get(&site.quest_id) {
+                        if progress.status == crate::quest::QuestStatus::Active {
+                            if let Some(obj) = progress.objectives.get(&site.quest_objective_id) {
+                                if !obj.completed {
+                                    found = Some(site.clone());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            found
+        };
+
+        if let Some(site) = site_match {
+            // Mark as triggered
+            {
+                let mut dsm = self.dig_site_manager.write().await;
+                dsm.mark_triggered(player_id, &site.id);
+            }
+
+            // Send message
+            self.send_system_message(
+                player_id,
+                "You dig into the ground... something is stirring beneath!",
+            )
             .await;
+
+            // Spawn the entity
+            if let Some(prototype) = self.entity_registry.get(&site.spawn_entity) {
+                let npc_id = format!("dig_{}_{}", site.id, player_id);
+                let npc = crate::npc::Npc::from_prototype(
+                    &npc_id,
+                    &site.spawn_entity,
+                    prototype,
+                    site.x,
+                    site.y,
+                    site.spawn_level,
+                    None,
+                );
+                let mut npcs = self.npcs.write().await;
+                npcs.insert(npc_id, npc);
+            }
+        } else {
+            self.send_system_message(player_id, "There's nothing to dig here.")
+                .await;
+        }
     }
 
     /// Handle using a spell scroll item to permanently learn a scroll-exclusive spell
