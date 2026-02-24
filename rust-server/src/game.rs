@@ -12506,8 +12506,11 @@ impl GameRoom {
                             continue;
                         }
 
-                        // Check cardinal adjacency and cooldown
+                        // Check cardinal adjacency, cooldown, and inventory space
                         let (adjacent, cooldown_ready, inventory_full) = {
+                            let mining = self.mining.read().await;
+                            let ore_item_id = mining.get_ore_type(*gid)
+                                .map(|c| c.ore_item_id.clone());
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
                                 let dx = (player.x - x).abs();
@@ -12515,7 +12518,11 @@ impl GameRoom {
                                 let adjacent = (dx + dy) == 1;
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
-                                let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
+                                let inventory_full = if let Some(ref item_id) = ore_item_id {
+                                    !player.inventory.has_space_for(item_id, 1, &self.item_registry)
+                                } else {
+                                    false
+                                };
                                 (adjacent, cooldown_ready, inventory_full)
                             } else {
                                 (false, false, false)
@@ -12552,8 +12559,11 @@ impl GameRoom {
                             continue;
                         }
 
-                        // Check cardinal adjacency and cooldown
+                        // Check cardinal adjacency, cooldown, and inventory space
                         let (adjacent, cooldown_ready, inventory_full) = {
+                            let woodcutting = self.woodcutting.read().await;
+                            let log_item_id = woodcutting.get_tree_type(*gid)
+                                .map(|c| c.log_item_id.clone());
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
                                 let dx = (player.x - x).abs();
@@ -12561,7 +12571,11 @@ impl GameRoom {
                                 let adjacent = (dx + dy) == 1;
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
-                                let inventory_full = player.inventory.slots.iter().all(|s| s.is_some());
+                                let inventory_full = if let Some(ref item_id) = log_item_id {
+                                    !player.inventory.has_space_for(item_id, 1, &self.item_registry)
+                                } else {
+                                    false
+                                };
                                 (adjacent, cooldown_ready, inventory_full)
                             } else {
                                 (false, false, false)
