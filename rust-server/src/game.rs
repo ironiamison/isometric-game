@@ -5304,9 +5304,27 @@ impl GameRoom {
                 if is_player {
                     true
                 } else {
-                    // Check if target is an NPC
+                    // Check if target is an NPC (overworld first, then instance)
                     let npcs = self.npcs.read().await;
-                    npcs.get(target_id).map(|n| n.is_alive()).unwrap_or(false)
+                    let is_overworld_npc = npcs.get(target_id).map(|n| n.is_alive()).unwrap_or(false);
+                    drop(npcs);
+
+                    if is_overworld_npc {
+                        true
+                    } else {
+                        // Check instance NPCs
+                        let player_inst = self.player_instances.read().await.get(player_id).cloned();
+                        if let Some(inst_id) = player_inst {
+                            if let Some(instance) = self.instance_manager.get_by_instance_id(&inst_id) {
+                                let inst_npcs = instance.npcs.read().await;
+                                inst_npcs.get(target_id).map(|n| n.is_alive()).unwrap_or(false)
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    }
                 }
             }
         };
