@@ -3109,7 +3109,7 @@
       "entityId": "researcher_orin",
       "x": 21,
       "y": 3,
-      "facing": "left",
+      "facing": "right",
       "uniqueId": "researcher_orin"
     }
   ],
