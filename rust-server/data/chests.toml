@@ -1,0 +1,11 @@
+[dungeon_shovel_chest]
+slots = 5
+
+[[dungeon_shovel_chest.spawn_items]]
+item_id = "shovel"
+quantity = 1
+slot = 0
+respawn_secs = 30
+
+[town_storage_chest]
+slots = 10

@@ -503,6 +503,18 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Chests table - shared world chests with persisted slot contents
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS chests (
+                chest_key TEXT PRIMARY KEY,
+                slots_json TEXT NOT NULL DEFAULT '[]'
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -1878,6 +1890,46 @@ impl Database {
             .await
             .map_err(|e| format!("Failed to save slayer state: {}", e))?;
 
+        Ok(())
+    }
+
+    // =========================================================================
+    // Chest Persistence
+    // =========================================================================
+
+    /// Save a single chest's slot data
+    pub async fn save_chest(&self, chest_key: &str, slots_json: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"INSERT INTO chests (chest_key, slots_json) VALUES (?, ?)
+               ON CONFLICT(chest_key) DO UPDATE SET slots_json = excluded.slots_json"#,
+        )
+        .bind(chest_key)
+        .bind(slots_json)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Load all saved chest data from the database
+    pub async fn load_all_chests(&self) -> Result<HashMap<String, String>, sqlx::Error> {
+        let rows = sqlx::query("SELECT chest_key, slots_json FROM chests")
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut result = HashMap::new();
+        for row in rows {
+            let key: String = row.get("chest_key");
+            let json: String = row.get("slots_json");
+            result.insert(key, json);
+        }
+        Ok(result)
+    }
+
+    /// Bulk save all chest data
+    pub async fn save_all_chests(&self, chests: &HashMap<String, String>) -> Result<(), sqlx::Error> {
+        for (key, json) in chests {
+            self.save_chest(key, json).await?;
+        }
         Ok(())
     }
 }

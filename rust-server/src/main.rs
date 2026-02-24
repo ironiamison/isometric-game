@@ -23,6 +23,7 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 mod arena;
+mod chest;
 mod chunk;
 mod crafting;
 mod data;
@@ -102,6 +103,7 @@ struct AppState {
     prayer_registry: Arc<PrayerRegistry>,
     quest_registry: Arc<QuestRegistry>,
     crafting_registry: Arc<CraftingRegistry>,
+    chest_registry: Arc<crate::chest::ChestRegistry>,
     interior_registry: Arc<InteriorRegistry>,
     instance_manager: Arc<InstanceManager>,
     /// Tracks which instance each player is currently in (None = overworld)
@@ -156,6 +158,10 @@ impl AppState {
             error!("Failed to load crafting registry: {}", e);
         }
 
+        // Load chest registry from TOML file
+        let mut chest_registry = crate::chest::ChestRegistry::new();
+        chest_registry.load_from_file(&data_dir.join("chests.toml"));
+
         // Load interior registry from JSON files
         let interior_registry = Arc::new(
             InteriorRegistry::load_from_directory("maps/interiors")
@@ -207,6 +213,7 @@ impl AppState {
             prayer_registry: Arc::new(prayer_registry),
             quest_registry,
             crafting_registry: Arc::new(crafting_registry),
+            chest_registry: Arc::new(chest_registry),
             interior_registry,
             instance_manager,
             player_instances: Arc::new(RwLock::new(HashMap::new())),

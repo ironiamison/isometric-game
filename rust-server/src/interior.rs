@@ -71,6 +71,15 @@ fn default_true() -> bool {
     true
 }
 
+/// A chest spawn point inside an interior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteriorChestSpawn {
+    pub chest_id: String,
+    pub x: i32,
+    pub y: i32,
+}
+
 /// Definition of an interior map (loaded from JSON)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InteriorMapDef {
@@ -93,6 +102,8 @@ pub struct InteriorMapDef {
     pub walls: Vec<InteriorWall>,
     #[serde(default)]
     pub requires_slayer_task: bool,
+    #[serde(default)]
+    pub chests: Vec<InteriorChestSpawn>,
 }
 
 /// Layer data for interior maps
