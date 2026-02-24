@@ -19,6 +19,18 @@ impl Default for ItemCategory {
     }
 }
 
+impl ItemCategory {
+    /// Priority for bank sorting: lower = sorted first
+    pub fn sort_priority(self) -> u8 {
+        match self {
+            ItemCategory::Equipment => 0,
+            ItemCategory::Consumable => 1,
+            ItemCategory::Material => 2,
+            ItemCategory::Quest => 3,
+        }
+    }
+}
+
 // ============================================================================
 // Equipment Slots
 // ============================================================================
