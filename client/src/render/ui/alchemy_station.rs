@@ -18,7 +18,17 @@ fn alchemy_section_name(section: &str) -> &str {
         "restoration" => "Restoration",
         "stat_buffs" => "Stat Buffs",
         "utility" => "Utility",
+        "scrolls" => "Scrolls",
         _ => section,
+    }
+}
+
+/// Returns which recipe sections belong to each alchemy tab.
+fn sections_for_tab(tab: u8) -> &'static [&'static str] {
+    match tab {
+        0 => &["restoration", "stat_buffs", "utility"],
+        1 => &["scrolls"],
+        _ => &[],
     }
 }
 
@@ -131,13 +141,16 @@ impl Renderer {
 
         for (idx, label) in tab_labels.iter().enumerate() {
             let tx = header_x + idx as f32 * tab_w;
-            let is_active = idx == 0; // Only Potions tab is active
+            let is_active = idx as u8 == state.ui_state.alchemy_station_tab;
+            let has_content = !sections_for_tab(idx as u8).is_empty();
 
             let bounds = Rect::new(tx, tab_y, tab_w, tab_h);
             layout.add(UiElementId::AlchemyTab(idx), bounds);
 
             let (tab_bg, tab_text_color) = if is_active {
                 (PANEL_BG_MID, TEXT_TITLE)
+            } else if has_content {
+                (SLOT_BG_EMPTY, Color::new(0.50, 0.50, 0.55, 0.8))
             } else {
                 (SLOT_BG_EMPTY, Color::new(0.35, 0.35, 0.40, 0.6))
             };
@@ -193,11 +206,13 @@ impl Renderer {
             // Compute detail panel height dynamically based on ingredient count
             // Header (icon+name+info) + separator + ingredient rows + gap + action bar
             let ingredient_count = {
+                let tab_sections = sections_for_tab(state.ui_state.alchemy_station_tab);
                 let mut recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
                     .filter(|r| r.station.as_deref() == Some("alchemy_station"))
                     .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
                     .collect();
                 recipes.sort_by(|a, b| {
                     let sa = a.section.as_deref().unwrap_or("");
@@ -385,12 +400,14 @@ impl Renderer {
     ) {
         let s = self.font_scale.get();
 
-        // Get all alchemy recipes
+        // Get alchemy recipes filtered by active tab
+        let tab_sections = sections_for_tab(state.ui_state.alchemy_station_tab);
         let mut alchemy_recipes: Vec<_> = state
             .recipe_definitions
             .iter()
             .filter(|r| r.station.as_deref() == Some("alchemy_station"))
             .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+            .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
             .collect();
 
         // Sort by section then level
@@ -403,7 +420,7 @@ impl Renderer {
 
         if alchemy_recipes.is_empty() {
             self.draw_text_sharp(
-                "No alchemy recipes available",
+                "No recipes available",
                 content_x + 20.0 * s,
                 content_y + 40.0 * s,
                 16.0,
@@ -643,12 +660,14 @@ impl Renderer {
     ) {
         let s = self.font_scale.get();
 
-        // Get all alchemy recipes
+        // Get alchemy recipes filtered by active tab
+        let tab_sections = sections_for_tab(state.ui_state.alchemy_station_tab);
         let mut alchemy_recipes: Vec<_> = state
             .recipe_definitions
             .iter()
             .filter(|r| r.station.as_deref() == Some("alchemy_station"))
             .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+            .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
             .collect();
 
         alchemy_recipes.sort_by(|a, b| {

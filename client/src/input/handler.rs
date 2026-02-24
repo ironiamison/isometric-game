@@ -5331,9 +5331,9 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::AlchemyTab(idx) => {
-                            // Only tab 0 (Potions) is active for now
-                            if *idx == 0 && !state.ui_state.crafting_in_progress {
-                                state.ui_state.alchemy_station_tab = 0;
+                            // Allow switching to tabs that have content (0=Potions, 1=Scrolls)
+                            if (*idx == 0 || *idx == 1) && !state.ui_state.crafting_in_progress {
+                                state.ui_state.alchemy_station_tab = *idx as u8;
                                 state.ui_state.alchemy_station_selected_recipe = 0;
                                 state.ui_state.alchemy_station_scroll_offset = 0.0;
                                 state.pending_sfx.push("enter".to_string());

@@ -297,7 +297,7 @@ amount = 0
 
 [scroll_greater_healing]
 display_name = "Scroll of Greater Healing"
-sprite = "scroll_greater_healing"
+sprite = "parchment"
 description = "A magical scroll inscribed with a powerful healing spell. Use to permanently learn Greater Heal."
 category = "consumable"
 max_stack = 1
@@ -310,7 +310,7 @@ spell_id = "greater_heal"
 
 [scroll_aeven_teleport]
 display_name = "Scroll of Aeven Teleport"
-sprite = "scroll_aeven_teleport"
+sprite = "parchment"
 description = "A scroll inscribed with a teleportation spell. Transports you to New Aeven. Single use."
 category = "consumable"
 max_stack = 5
@@ -323,7 +323,7 @@ destination = "new_aeven"
 
 [scroll_tornado]
 display_name = "Scroll of Tornado"
-sprite = "scroll_tornado"
+sprite = "parchment"
 description = "A scroll crackling with wind magic. Use to permanently learn the Tornado spell."
 category = "consumable"
 max_stack = 1
