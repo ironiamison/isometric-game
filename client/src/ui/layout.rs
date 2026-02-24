@@ -152,6 +152,7 @@ pub enum UiElementId {
     BankHelpButton,
     BankHelpClose,
     BankDepositAllButton,
+    BankSortButton,
 
     // Altar Panel
     AltarOfferAll(usize),

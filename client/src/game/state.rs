@@ -1030,6 +1030,16 @@ pub struct BankQuantityDialog {
     pub max_quantity: i32,
 }
 
+/// Tracks an active drag operation within the bank grid
+pub struct BankDrag {
+    pub from_slot: usize,
+    pub mouse_start_x: f32,
+    pub mouse_start_y: f32,
+    pub offset_x: f32,
+    pub offset_y: f32,
+    pub active: bool,
+}
+
 /// Source of a drag operation
 #[derive(Debug, Clone, PartialEq)]
 pub enum DragSource {
@@ -1220,6 +1230,7 @@ pub struct UiState {
     pub bank_inv_scroll: f32,
     pub bank_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub bank_inv_scroll_drag: crate::ui::scroll::ScrollDragState,
+    pub bank_drag: Option<BankDrag>,
     // Escape menu state
     pub escape_menu_open: bool,
     // Audio settings (synced with AudioManager)
@@ -1405,6 +1416,7 @@ impl Default for UiState {
             bank_inv_scroll: 0.0,
             bank_scroll_drag: Default::default(),
             bank_inv_scroll_drag: Default::default(),
+            bank_drag: None,
             escape_menu_open: false,
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,
