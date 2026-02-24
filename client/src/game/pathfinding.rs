@@ -11,6 +11,7 @@ pub struct PathState {
     pub pickup_target: Option<String>,   // Item ID to pick up when path completes
     pub interact_target: Option<String>, // NPC ID to interact with on path completion
     pub interact_object_target: Option<(i32, i32)>, // Map object (x,y) to interact with on path completion
+    pub waystone_target: Option<(i32, i32)>, // Waystone (x,y) to teleport directly on path completion
 }
 
 /// Node for A* priority queue

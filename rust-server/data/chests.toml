@@ -1,4 +1,5 @@
 [dungeon_shovel_chest]
+name = "Old Chest"
 slots = 5
 
 [[dungeon_shovel_chest.spawn_items]]
@@ -8,4 +9,21 @@ slot = 0
 respawn_secs = 30
 
 [town_storage_chest]
+name = "Storage Chest"
 slots = 10
+
+[wilderness_cabin_chest]
+name = "Dusty Chest"
+slots = 5
+
+[[wilderness_cabin_chest.spawn_items]]
+item_id = "shovel"
+quantity = 1
+slot = 0
+respawn_secs = 30
+
+[[wilderness_cabin_chest.spawn_items]]
+item_id = "health_potion"
+quantity = 1
+slot = 1
+respawn_secs = 60

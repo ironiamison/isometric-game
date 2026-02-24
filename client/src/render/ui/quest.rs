@@ -871,13 +871,25 @@ impl Renderer {
         let objective_line_height = line_height - 2.0;
         let title_wrap_width = (tracker_width + 58.0).max(140.0);
         let detail_wrap_width = (tracker_width + 42.0).max(132.0);
-        let right_edge = tracker_x + tracker_width;
+        let inner_pad = 8.0;
+        let right_edge = tracker_x + tracker_width - inner_pad;
         let draw_right = |renderer: &Renderer, text: &str, y: f32, color: Color| {
             let text_width = renderer.measure_text_sharp(text, 16.0).width;
             renderer.draw_text_sharp(text, (right_edge - text_width).floor(), y, 16.0, color);
         };
 
-        let mut y = tracker_y;
+        // Semi-transparent background with rounded feel
+        let total_h = self.quest_tracker_height(state, tracker_width);
+        let bg_pad = 6.0;
+        draw_rectangle(
+            tracker_x - bg_pad,
+            tracker_y - bg_pad,
+            tracker_width + bg_pad * 2.0,
+            total_h + bg_pad * 2.0 + inner_pad * 2.0,
+            Color::new(0.0, 0.0, 0.0, 0.45),
+        );
+
+        let mut y = tracker_y + inner_pad;
 
         // Header
         draw_right(self, "QUESTS", y, Color::from_rgba(255, 220, 100, 255));
@@ -888,6 +900,17 @@ impl Renderer {
             let title_lines = self.wrap_text(&quest.name, title_wrap_width, 16.0);
             for line in title_lines.iter().take(2) {
                 draw_right(self, line, y, WHITE);
+                // Underline the quest title
+                let text_width = self.measure_text_sharp(line, 16.0).width;
+                let underline_y = y + 3.0;
+                draw_line(
+                    (right_edge - text_width).floor(),
+                    underline_y,
+                    right_edge,
+                    underline_y,
+                    1.0,
+                    Color::new(1.0, 1.0, 1.0, 0.4),
+                );
                 y += line_height;
             }
 

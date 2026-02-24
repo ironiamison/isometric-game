@@ -30,10 +30,16 @@ pub struct ChestSpawnItem {
 /// Definition of a chest type (loaded from data/chests.toml)
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChestDef {
+    #[serde(default = "default_name")]
+    pub name: String,
     #[serde(default = "default_slots")]
     pub slots: usize,
     #[serde(default)]
     pub spawn_items: Vec<ChestSpawnItem>,
+}
+
+fn default_name() -> String {
+    "Chest".to_string()
 }
 
 fn default_slots() -> usize {

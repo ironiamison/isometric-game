@@ -135,11 +135,13 @@ impl Renderer {
                 }
             }
             Some(UiElementId::AlchemyRecipeItem(idx)) if state.ui_state.alchemy_station_open => {
+                let tab_sections = super::alchemy_station::sections_for_tab(state.ui_state.alchemy_station_tab);
                 let mut alchemy_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
                     .filter(|r| r.station.as_deref() == Some("alchemy_station"))
                     .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
                     .collect();
                 alchemy_recipes.sort_by(|a, b| {
                     let sa = a.section.as_deref().unwrap_or("");

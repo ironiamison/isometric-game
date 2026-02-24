@@ -17060,9 +17060,13 @@ impl GameRoom {
             chest.viewers.insert(player_id.to_string());
             let slots = Self::chest_slot_updates(chest, &self.item_registry);
             let total_value = chest.total_value(&self.item_registry);
+            let name = self.chest_registry.get(&chest.chest_def_id)
+                .map(|d| d.name.clone())
+                .unwrap_or_else(|| "Chest".to_string());
 
             let msg = crate::protocol::ServerMessage::ChestOpen {
                 chest_id: chest_key.clone(),
+                name,
                 slots,
                 total_value,
             };

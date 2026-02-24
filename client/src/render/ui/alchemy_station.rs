@@ -24,7 +24,7 @@ fn alchemy_section_name(section: &str) -> &str {
 }
 
 /// Returns which recipe sections belong to each alchemy tab.
-fn sections_for_tab(tab: u8) -> &'static [&'static str] {
+pub fn sections_for_tab(tab: u8) -> &'static [&'static str] {
     match tab {
         0 => &["restoration", "stat_buffs", "utility"],
         1 => &["scrolls"],

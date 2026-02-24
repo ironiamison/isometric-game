@@ -825,11 +825,11 @@
       2,
       2,
       2,
-      14,
-      14,
-      14,
-      14,
-      14,
+      367,
+      367,
+      367,
+      367,
+      367,
       2,
       2,
       2,
@@ -857,12 +857,11 @@
       2,
       2,
       2,
-      14,
-      14,
-      14,
-      14,
-      14,
-      14,
+      367,
+      367,
+      367,
+      367,
+      367,
       2,
       2,
       2,
@@ -889,12 +888,12 @@
       2,
       2,
       2,
-      14,
-      14,
-      14,
-      14,
-      14,
       2,
+      367,
+      367,
+      367,
+      367,
+      367,
       2,
       2,
       2,
@@ -922,10 +921,11 @@
       2,
       2,
       2,
-      2,
-      2,
-      2,
-      2,
+      367,
+      367,
+      367,
+      367,
+      367,
       2,
       2,
       2,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAQAAAEAAgAQwAAAAAAAAAQAAFAACEgAAAAIgBAAAAPACAAgAEAAAAMAAgAQAIAIAAgAAgAAECAAAAAAAAAAAAAAAAAgABEQACAAAAABAACBAAAAAgAAgAAAAdAAAACAAAgAAEAAAAAAABAQAAAAAAAAAQAQAAUAAAABAIAYgM=",
+  "collision": "AAAQAAAEAAgAQwAAAAAAAAAQAAFAACEgAAAAIgBAAAAPACAAgAEAAAAMAAgAQAIAIAAgAAgAAECAAAAAAAAAAAAAAAAAgABEQACAAAAABAACBAAAAAgAAgAAAAdAAAACAAAgAAEAAAAAAABAQAAAAAAA4AMAQOATAADgAwIA4gM=",
   "entities": [
     {
       "entityId": "snake",
@@ -3670,49 +3670,55 @@
       "gid": 1156,
       "x": 21,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
       "gid": 1158,
       "x": 22,
       "y": 31,
-      "edge": "right"
-    },
-    {
-      "gid": 1152,
-      "x": 23,
-      "y": 31,
-      "edge": "right"
-    },
-    {
-      "gid": 1158,
-      "x": 24,
-      "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
       "gid": 1159,
       "x": 25,
       "y": 31,
-      "edge": "right"
+      "edge": "down"
     },
     {
-      "gid": 1160,
-      "x": 26,
-      "y": 30,
+      "gid": 1157,
+      "x": 24,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1152,
+      "x": 23,
+      "y": 31,
       "edge": "down"
     },
     {
       "gid": 1163,
-      "x": 26,
+      "x": 25,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 1163,
+      "x": 25,
+      "y": 30,
+      "edge": "right"
+    },
+    {
+      "gid": 1162,
+      "x": 25,
       "y": 28,
-      "edge": "down"
+      "edge": "right"
     },
     {
       "gid": 1161,
-      "x": 26,
+      "x": 25,
       "y": 29,
-      "edge": "down"
+      "edge": "right"
     }
   ],
   "portals": [

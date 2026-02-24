@@ -1238,6 +1238,7 @@ pub struct UiState {
     // Chest UI state
     pub chest_open: bool,
     pub chest_id: String,
+    pub chest_name: String,
     pub chest_slots: Vec<Option<(String, i32, i32)>>, // (item_id, quantity, value) per slot
     pub chest_total_value: i32,
     pub chest_scroll: f32,
@@ -1431,6 +1432,7 @@ impl Default for UiState {
             bank_drag: None,
             chest_open: false,
             chest_id: String::new(),
+            chest_name: String::new(),
             chest_slots: Vec::new(),
             chest_total_value: 0,
             chest_scroll: 0.0,

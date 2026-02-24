@@ -53,7 +53,7 @@ impl Renderer {
         );
 
         // Title
-        let title = "CHEST";
+        let title = &state.ui_state.chest_name.to_uppercase();
         let title_dims = self.measure_text_sharp(title, 16.0);
         self.draw_text_sharp(
             title,

@@ -2300,6 +2300,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "chestOpen" => {
             if let Some(value) = data {
                 let chest_id = extract_string(value, "chest_id").unwrap_or_default();
+                let chest_name = extract_string(value, "name").unwrap_or_else(|| "Chest".to_string());
                 let total_value = extract_i32(value, "total_value").unwrap_or(0);
                 let mut slots = Vec::new();
                 if let Some(slots_arr) = extract_array(value, "slots") {
@@ -2322,6 +2323,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 state.ui_state.chest_open = true;
                 state.ui_state.chest_id = chest_id;
+                state.ui_state.chest_name = chest_name;
                 state.ui_state.chest_slots = vec![None; num_slots];
                 for (slot, item_id, quantity, value) in slots {
                     if (slot as usize) < state.ui_state.chest_slots.len() {

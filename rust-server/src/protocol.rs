@@ -1088,6 +1088,7 @@ pub enum ServerMessage {
     /// Full chest state sent when opening
     ChestOpen {
         chest_id: String,
+        name: String,
         slots: Vec<ChestSlotUpdate>,
         total_value: i32,
     },
@@ -5095,9 +5096,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("bonus_damage".into()), Value::Integer((*bonus_damage as i64).into())));
             Value::Map(map)
         }
-        ServerMessage::ChestOpen { chest_id, slots, total_value } => {
+        ServerMessage::ChestOpen { chest_id, name, slots, total_value } => {
             let mut map = Vec::new();
             map.push((Value::String("chest_id".into()), Value::String(chest_id.clone().into())));
+            map.push((Value::String("name".into()), Value::String(name.clone().into())));
 
             let slot_values: Vec<Value> = slots.iter().map(|s| {
                 let mut smap = Vec::new();
