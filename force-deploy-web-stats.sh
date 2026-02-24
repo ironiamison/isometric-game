@@ -2,8 +2,8 @@
 set -e
 
 REPO_DIR="/root/isometric-game"
-WEB_STATS_BASE_PATH="${WEB_STATS_BASE_PATH:-/players/}"
-WEB_STATS_DEPLOY_DIR="${WEB_STATS_DEPLOY_DIR:-/var/www/aeven/players}"
+WEB_STATS_BASE_PATH="${WEB_STATS_BASE_PATH:-/world/}"
+WEB_STATS_DEPLOY_DIR="${WEB_STATS_DEPLOY_DIR:-/var/www/aeven/world}"
 
 echo "Force building and deploying web-stats..."
 
