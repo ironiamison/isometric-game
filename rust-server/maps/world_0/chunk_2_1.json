@@ -3107,10 +3107,9 @@
     },
     {
       "entityId": "researcher_orin",
-      "x": 21,
+      "x": 22,
       "y": 3,
-      "facing": "right",
-      "uniqueId": "researcher_orin"
+      "level": 1
     }
   ],
   "mapObjects": [

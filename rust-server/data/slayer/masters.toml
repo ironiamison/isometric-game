@@ -104,14 +104,6 @@ weight = 10
 xp_per_kill = 28
 
 [[masters.tasks]]
-monster_id = "crow"
-display_name = "Crows"
-count_min = 30
-count_max = 50
-weight = 8
-xp_per_kill = 20
-
-[[masters.tasks]]
 monster_id = "snake"
 display_name = "Snakes"
 count_min = 35
