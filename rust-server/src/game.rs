@@ -2064,7 +2064,16 @@ impl GameRoom {
 
     /// Get slayer state for a player (returns default if none stored)
     pub async fn get_player_slayer_state(&self, player_id: &str) -> crate::slayer::PlayerSlayerState {
-        self.player_slayer_states.read().await.get(player_id).cloned().unwrap_or_default()
+        let mut state = self.player_slayer_states.read().await.get(player_id).cloned().unwrap_or_default();
+        // Migration: fix old "living_rock" task IDs -> "rock"
+        if let Some(ref mut task) = state.current_task {
+            if task.monster_id == "living_rock" {
+                task.monster_id = "rock".to_string();
+                // Persist the fix
+                self.player_slayer_states.write().await.insert(player_id.to_string(), state.clone());
+            }
+        }
+        state
     }
 
     /// Set discovered recipes for a player (called on connect after loading from DB)
