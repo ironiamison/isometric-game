@@ -66,7 +66,8 @@ python3 tools/package_client.py \
   --platform macos-arm64 \
   --client-dir client \
   --out dist/client/macos-arm64 \
-  --include-db
+  --include-db \
+  --atlas-only
 ```
 
 Then build the manifest:

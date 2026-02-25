@@ -512,7 +512,29 @@ impl Renderer {
         };
 
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        let player_sprites: SpritesheetStore = {
+        let player_sprites: SpritesheetStore = if let Some(ref atlas_info) = manifest.players_atlas
+        {
+            if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                SpritesheetStore::Atlas {
+                    texture: tex,
+                    rects,
+                }
+            } else {
+                let mut sprites = HashMap::new();
+                for gender in GENDERS {
+                    for skin in SKINS {
+                        let key = format!("{}_{}", gender, skin);
+                        let path =
+                            format!("assets/sprites/players/player_{}_{}.png", gender, skin);
+                        if let Ok(tex) = load_texture(&path).await {
+                            tex.set_filter(FilterMode::Nearest);
+                            sprites.insert(key, tex);
+                        }
+                    }
+                }
+                SpritesheetStore::Individual(sprites)
+            }
+        } else {
             let mut sprites = HashMap::new();
             for gender in GENDERS {
                 for skin in SKINS {
@@ -572,7 +594,29 @@ impl Renderer {
         };
 
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        let hair_sprites: SpritesheetStore = {
+        let hair_sprites: SpritesheetStore = if let Some(ref atlas_info) = manifest.hair_atlas {
+            if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                SpritesheetStore::Atlas {
+                    texture: tex,
+                    rects,
+                }
+            } else {
+                let mut sprites = HashMap::new();
+                for style in 0..6 {
+                    let path = format!("assets/sprites/hair/hair_{}.png", style);
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(format!("male_{}", style), tex);
+                    }
+                    let path = format!("assets/sprites/hair/hair_female_{}.png", style);
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        sprites.insert(format!("female_{}", style), tex);
+                    }
+                }
+                SpritesheetStore::Individual(sprites)
+            }
+        } else {
             let mut sprites = HashMap::new();
             for style in 0..6 {
                 let path = format!("assets/sprites/hair/hair_{}.png", style);
@@ -689,7 +733,7 @@ impl Renderer {
         }
 
         // On WASM/Android, load sprite categories - use atlases when available.
-        // On desktop, use the fast directory-scanning loader.
+        // On desktop, prefer atlases when available and fall back to directory scanning.
         #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         let (
             equipment_sprites,
@@ -1020,61 +1064,194 @@ impl Renderer {
         ) = {
             use crate::util::load_sprites_from_dir_or_manifest;
 
-            let equipment = SpritesheetStore::Individual(
-                load_sprites_from_dir_or_manifest(
-                    "assets/sprites/equipment",
-                    &manifest.equipment,
-                    "assets/sprites",
+            let equipment = if let Some(ref atlas_info) = manifest.equipment_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
+                } else {
+                    SpritesheetStore::Individual(
+                        load_sprites_from_dir_or_manifest(
+                            "assets/sprites/equipment",
+                            &manifest.equipment,
+                            "assets/sprites",
+                        )
+                        .await,
+                    )
+                }
+            } else {
+                SpritesheetStore::Individual(
+                    load_sprites_from_dir_or_manifest(
+                        "assets/sprites/equipment",
+                        &manifest.equipment,
+                        "assets/sprites",
+                    )
+                    .await,
                 )
-                .await,
-            );
-            let weapons = SpritesheetStore::Individual(
-                load_sprites_from_dir_or_manifest(
-                    "assets/sprites/weapons",
-                    &manifest.weapons,
-                    "assets/sprites/weapons",
+            };
+
+            let weapons = if let Some(ref atlas_info) = manifest.weapons_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
+                } else {
+                    SpritesheetStore::Individual(
+                        load_sprites_from_dir_or_manifest(
+                            "assets/sprites/weapons",
+                            &manifest.weapons,
+                            "assets/sprites/weapons",
+                        )
+                        .await,
+                    )
+                }
+            } else {
+                SpritesheetStore::Individual(
+                    load_sprites_from_dir_or_manifest(
+                        "assets/sprites/weapons",
+                        &manifest.weapons,
+                        "assets/sprites/weapons",
+                    )
+                    .await,
                 )
-                .await,
-            );
+            };
             // Build weapon frame sizes map
             let wf_sizes: HashMap<String, (f32, f32)> = manifest
                 .weapon_frame_sizes
                 .iter()
                 .map(|(k, v)| (k.clone(), (v[0], v[1])))
                 .collect();
-            let items = SpriteStore::Individual(
-                load_sprites_from_dir_or_manifest(
-                    "assets/sprites/inventory",
-                    &manifest.inventory,
-                    "assets/sprites/inventory",
+
+            let items = if let Some(ref atlas_info) = manifest.inventory_atlas {
+                if let Some(atlas) = load_atlas(atlas_info).await {
+                    SpriteStore::Atlas(atlas)
+                } else {
+                    SpriteStore::Individual(
+                        load_sprites_from_dir_or_manifest(
+                            "assets/sprites/inventory",
+                            &manifest.inventory,
+                            "assets/sprites/inventory",
+                        )
+                        .await,
+                    )
+                }
+            } else {
+                SpriteStore::Individual(
+                    load_sprites_from_dir_or_manifest(
+                        "assets/sprites/inventory",
+                        &manifest.inventory,
+                        "assets/sprites/inventory",
+                    )
+                    .await,
                 )
-                .await,
-            );
-            let objects = SpriteStore::Individual(
-                load_sprites_from_dir_or_manifest(
-                    "assets/sprites/objects",
-                    &manifest.objects,
-                    "assets/sprites/objects",
+            };
+
+            let objects = if let Some(ref atlas_info) = manifest.objects_atlas {
+                if let Some(atlas) = load_atlas(atlas_info).await {
+                    SpriteStore::Atlas(atlas)
+                } else {
+                    SpriteStore::Individual(
+                        load_sprites_from_dir_or_manifest(
+                            "assets/sprites/objects",
+                            &manifest.objects,
+                            "assets/sprites/objects",
+                        )
+                        .await,
+                    )
+                }
+            } else {
+                SpriteStore::Individual(
+                    load_sprites_from_dir_or_manifest(
+                        "assets/sprites/objects",
+                        &manifest.objects,
+                        "assets/sprites/objects",
+                    )
+                    .await,
                 )
-                .await,
-            );
-            let walls = SpriteStore::Individual(
-                load_sprites_from_dir_or_manifest(
-                    "assets/sprites/walls",
-                    &manifest.walls,
-                    "assets/sprites/walls",
+            };
+
+            let walls = if let Some(ref atlas_info) = manifest.walls_atlas {
+                if let Some(atlas) = load_atlas(atlas_info).await {
+                    SpriteStore::Atlas(atlas)
+                } else {
+                    SpriteStore::Individual(
+                        load_sprites_from_dir_or_manifest(
+                            "assets/sprites/walls",
+                            &manifest.walls,
+                            "assets/sprites/walls",
+                        )
+                        .await,
+                    )
+                }
+            } else {
+                SpriteStore::Individual(
+                    load_sprites_from_dir_or_manifest(
+                        "assets/sprites/walls",
+                        &manifest.walls,
+                        "assets/sprites/walls",
+                    )
+                    .await,
                 )
-                .await,
-            );
-            let npcs = SpritesheetStore::Individual(
-                load_sprites_from_dir_or_manifest(
-                    "assets/sprites/enemies",
-                    &manifest.enemies,
-                    "assets/sprites/enemies",
+            };
+
+            let npcs = if let Some(ref atlas_info) = manifest.enemies_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
+                } else {
+                    SpritesheetStore::Individual(
+                        load_sprites_from_dir_or_manifest(
+                            "assets/sprites/enemies",
+                            &manifest.enemies,
+                            "assets/sprites/enemies",
+                        )
+                        .await,
+                    )
+                }
+            } else {
+                SpritesheetStore::Individual(
+                    load_sprites_from_dir_or_manifest(
+                        "assets/sprites/enemies",
+                        &manifest.enemies,
+                        "assets/sprites/enemies",
+                    )
+                    .await,
                 )
-                .await,
-            );
-            let farming = {
+            };
+
+            let farming = if let Some(ref atlas_info) = manifest.farming_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
+                } else {
+                    let crop_names = [
+                        "potato",
+                        "onion",
+                        "tomato",
+                        "cabbage",
+                        "strawberry",
+                        "sweetcorn",
+                        "wheat",
+                        "carrot",
+                        "spinach",
+                    ];
+                    let mut sprites = HashMap::new();
+                    for crop in &crop_names {
+                        let path = format!("assets/sprites/farming/farming_{}.png", crop);
+                        if let Ok(tex) = load_texture(&path).await {
+                            tex.set_filter(FilterMode::Nearest);
+                            sprites.insert(crop.to_string(), tex);
+                        }
+                    }
+                    SpritesheetStore::Individual(sprites)
+                }
+            } else {
                 let crop_names = [
                     "potato",
                     "onion",
@@ -1096,14 +1273,34 @@ impl Renderer {
                 }
                 SpritesheetStore::Individual(sprites)
             };
-            let effects = SpritesheetStore::Individual(
-                load_sprites_from_dir_or_manifest(
-                    "assets/sprites/effects",
-                    &[],
-                    "assets/sprites/effects",
+
+            let effects = if let Some(ref atlas_info) = manifest.effects_atlas {
+                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                    SpritesheetStore::Atlas {
+                        texture: tex,
+                        rects,
+                    }
+                } else {
+                    SpritesheetStore::Individual(
+                        load_sprites_from_dir_or_manifest(
+                            "assets/sprites/effects",
+                            &[],
+                            "assets/sprites/effects",
+                        )
+                        .await,
+                    )
+                }
+            } else {
+                SpritesheetStore::Individual(
+                    load_sprites_from_dir_or_manifest(
+                        "assets/sprites/effects",
+                        &[],
+                        "assets/sprites/effects",
+                    )
+                    .await,
                 )
-                .await,
-            );
+            };
+
             (
                 equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects,
             )

@@ -1,6 +1,6 @@
 # Base URL that hosts manifest.json and platform files.
 # Example: https://download.example.com/isometric
-base_url = "https://dl.aeven.xyz/game"
+base_url = "https://dl.aeven.xyz/isometric"
 
 # Relative path from base_url to the manifest.
 manifest_path = "manifest.json"

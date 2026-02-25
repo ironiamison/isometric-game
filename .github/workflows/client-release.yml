@@ -61,7 +61,8 @@ jobs:
             --client-dir client \
             --out "dist/client/${{ matrix.platform }}" \
             --bin "${{ matrix.bin }}" \
-            --include-db
+            --include-db \
+            --atlas-only
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

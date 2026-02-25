@@ -28,6 +28,11 @@ def main() -> None:
     parser.add_argument("--bin", default=None, help="Path to client binary")
     parser.add_argument("--assets", default="assets", help="Assets directory inside client dir")
     parser.add_argument("--include-db", action="store_true", help="Include game.db if present")
+    parser.add_argument(
+        "--atlas-only",
+        action="store_true",
+        help="Remove per-sprite directories for atlas-backed categories (smaller downloads).",
+    )
     args = parser.parse_args()
 
     client_dir = Path(args.client_dir).resolve()
@@ -53,6 +58,35 @@ def main() -> None:
         copy_tree(assets_dir, out_dir / "assets")
     else:
         print(f"Warning: assets directory not found: {assets_dir}")
+
+    if args.atlas_only:
+        sprites_root = out_dir / "assets" / "sprites"
+        atlas_dirs = [
+            "players",
+            "hair",
+            "equipment",
+            "weapons",
+            "inventory",
+            "objects",
+            "walls",
+            "enemies",
+            "farming",
+            "effects",
+        ]
+        missing_atlases = []
+        for name in atlas_dirs:
+            atlas_png = sprites_root / f"{name}_atlas.png"
+            if not atlas_png.exists():
+                missing_atlases.append(atlas_png)
+        if missing_atlases:
+            raise SystemExit(
+                "Atlas-only packaging requested, but missing atlases:\n"
+                + "\n".join(str(p) for p in missing_atlases)
+            )
+        for name in atlas_dirs:
+            dir_path = sprites_root / name
+            if dir_path.exists():
+                shutil.rmtree(dir_path)
 
     if args.include_db:
         db_path = client_dir / "game.db"

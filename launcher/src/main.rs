@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use directories::ProjectDirs;
 use eframe::egui;
+use eframe::icon_data;
 use egui_extras::RetainedImage;
 use serde::Deserialize;
 use sha2::Digest;
@@ -50,7 +51,7 @@ impl LauncherConfig {
         LauncherConfig {
             base_url: env::var("LAUNCHER_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string()),
             manifest_path: Some(DEFAULT_MANIFEST_PATH.to_string()),
-            app_name: Some("Isometric".to_string()),
+            app_name: Some("New Aeven".to_string()),
         }
     }
 
@@ -181,10 +182,10 @@ impl eframe::App for LauncherApp {
             ui.vertical_centered(|ui| {
                 ui.add_space(10.0);
                 if let Some(logo) = &self.logo {
-                    logo.show_size(ui, egui::vec2(180.0, 180.0));
+                    logo.show(ui);
                     ui.add_space(8.0);
                 } else {
-                    ui.heading("Isometric");
+                    ui.heading("New Aeven");
                     ui.add_space(8.0);
                 }
 
@@ -398,8 +399,8 @@ fn platform_key() -> String {
 }
 
 fn client_install_dir(config: &LauncherConfig) -> Result<PathBuf, String> {
-    let app_name = config.app_name.as_deref().unwrap_or("Isometric");
-    let dirs = ProjectDirs::from("com", "Isometric", app_name)
+    let app_name = config.app_name.as_deref().unwrap_or("New Aeven");
+    let dirs = ProjectDirs::from("com", "New Aeven", app_name)
         .ok_or_else(|| "Failed to resolve data directory".to_string())?;
     Ok(dirs.data_dir().join("client"))
 }
@@ -417,15 +418,7 @@ fn bytes_to_mb(bytes: u64) -> String {
 }
 
 fn load_logo() -> Option<RetainedImage> {
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Ok(exe_path) = env::current_exe() {
-        if let Some(dir) = exe_path.parent() {
-            candidates.push(dir.join("assets").join("logo.png"));
-        }
-    }
-    candidates.push(PathBuf::from("assets").join("logo.png"));
-
-    for path in candidates {
+    for path in asset_candidates("logo.png") {
         if let Ok(bytes) = fs::read(&path) {
             if let Ok(image) = RetainedImage::from_image_bytes("logo", &bytes) {
                 return Some(image);
@@ -433,6 +426,28 @@ fn load_logo() -> Option<RetainedImage> {
         }
     }
     None
+}
+
+fn load_icon_data() -> Option<egui::IconData> {
+    for path in asset_candidates("logo.png") {
+        if let Ok(bytes) = fs::read(&path) {
+            if let Ok(icon) = icon_data::from_png_bytes(&bytes) {
+                return Some(icon);
+            }
+        }
+    }
+    None
+}
+
+fn asset_candidates(file_name: &str) -> Vec<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(exe_path) = env::current_exe() {
+        if let Some(dir) = exe_path.parent() {
+            candidates.push(dir.join("assets").join(file_name));
+        }
+    }
+    candidates.push(PathBuf::from("assets").join(file_name));
+    candidates
 }
 
 #[cfg(unix)]
@@ -451,14 +466,18 @@ fn set_executable(_path: &Path) -> Result<(), String> {
 }
 
 fn main() -> eframe::Result<()> {
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size([420.0, 380.0])
+        .with_resizable(false);
+    if let Some(icon) = load_icon_data() {
+        viewport = viewport.with_icon(icon);
+    }
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([420.0, 380.0])
-            .with_resizable(false),
+        viewport,
         ..Default::default()
     };
     eframe::run_native(
-        "Isometric Launcher",
+        "New Aeven Launcher",
         options,
         Box::new(|_cc| Box::new(LauncherApp::new())),
     )
