@@ -35,6 +35,9 @@ Thumbs.db
 # Worktrees
 .worktrees/
 
+# Local release output
+dist/
+
 # Android build artifacts
 client/android/.gradle/
 client/android/build/

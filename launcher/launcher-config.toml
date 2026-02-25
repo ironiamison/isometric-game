@@ -1,0 +1,9 @@
+# Base URL that hosts manifest.json and platform files.
+# Example: https://download.example.com/isometric
+base_url = "https://dl.aeven.xyz/game"
+
+# Relative path from base_url to the manifest.
+manifest_path = "manifest.json"
+
+# Used only for the launcher data directory name.
+app_name = "new_aeven"
