@@ -3489,6 +3489,21 @@ impl GameRoom {
                     text: message.clone(),
                 })
                 .await;
+
+                // Also send as a system chat message so it appears in public chat
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                self.broadcast(ServerMessage::ChatMessage {
+                    sender_id: "system".to_string(),
+                    sender_name: "[Announcement]".to_string(),
+                    text: message.clone(),
+                    timestamp,
+                    channel: "public".to_string(),
+                })
+                .await;
+
                 tracing::info!("Admin {} announced: {}", player_id, message);
             }
             "/arena" => {
