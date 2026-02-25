@@ -54,6 +54,7 @@ jobs:
         run: cargo build --release --manifest-path client/Cargo.toml
 
       - name: Package client
+        shell: bash
         run: |
           python tools/package_client.py \
             --platform "${{ matrix.platform }}" \
