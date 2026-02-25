@@ -704,8 +704,6 @@ impl Renderer {
         let icon_x = x + pad;
 
         if let Some(result) = recipe.results.first() {
-            draw_rectangle(icon_x - 2.0, header_y - 2.0, icon_size + 4.0, icon_size + 4.0, SLOT_BORDER);
-            draw_rectangle(icon_x - 1.0, header_y - 1.0, icon_size + 2.0, icon_size + 2.0, SLOT_BG_EMPTY);
             self.draw_item_icon(
                 &result.item_id,
                 icon_x, header_y,

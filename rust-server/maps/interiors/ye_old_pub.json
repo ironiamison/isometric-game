@@ -1749,16 +1749,6 @@
   ],
   "portals": [
     {
-      "id": "exit_1771586610849_7v0xgsqsx",
-      "x": 15,
-      "y": 19,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
       "id": "exit_1771586611739_u8ctdcuh9",
       "x": 15,
       "y": 18,
@@ -1842,16 +1832,6 @@
       "id": "exit_1771586616055_bxraea3em",
       "x": 15,
       "y": 9,
-      "width": 1,
-      "height": 1,
-      "target_map": "overworld",
-      "target_x": 0,
-      "target_y": 0
-    },
-    {
-      "id": "exit_1771586616637_e9r68c7fm",
-      "x": 15,
-      "y": 8,
       "width": 1,
       "height": 1,
       "target_map": "overworld",
