@@ -4037,7 +4037,11 @@ impl Renderer {
             return;
         }
 
-        let Some(name) = crate::input::handler::get_map_object_name(obj.gid) else {
+        let name: String = if let Some(n) = crate::input::handler::get_map_object_name(obj.gid) {
+            n.to_string()
+        } else if state.chest_positions.contains(&(tile_x, tile_y)) {
+            "Chest".to_string()
+        } else {
             return;
         };
 
@@ -4058,7 +4062,7 @@ impl Renderer {
 
         let tag_y = screen_y - sprite_height - 5.0 * zoom;
         let font_size = 16.0 * zoom;
-        let text_dims = self.measure_text_sharp(name, font_size);
+        let text_dims = self.measure_text_sharp(&name, font_size);
         let label_color = Color::from_rgba(255, 215, 0, 255); // Gold color
 
         let padding = 4.0 * zoom;
@@ -4075,7 +4079,7 @@ impl Renderer {
         );
 
         let text_x = screen_x - text_dims.width / 2.0;
-        self.draw_text_sharp(name, text_x, tag_y, font_size, label_color);
+        self.draw_text_sharp(&name, text_x, tag_y, font_size, label_color);
     }
 
     /// Render chat bubbles above players' heads

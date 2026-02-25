@@ -201,7 +201,7 @@ duration_ms = 60000
 
 [strength_potion]
 display_name = "Strength Potion"
-sprite = "attack_potion"
+sprite = "strength_potion"
 description = "Temporarily boosts strength bonus by 5 for 60 seconds."
 category = "consumable"
 max_stack = 10
@@ -246,7 +246,7 @@ duration_ms = 90000
 
 [super_strength_potion]
 display_name = "Super Strength Potion"
-sprite = "super_attack_potion"
+sprite = "super_strength_potion"
 description = "Greatly boosts strength bonus by 10 for 90 seconds."
 category = "consumable"
 max_stack = 10
@@ -280,7 +280,7 @@ duration_ms = 90000
 
 [antidote]
 display_name = "Antidote"
-sprite = "defence_potion"
+sprite = "antidote"
 description = "Cures poison and grants brief immunity. A wise precaution in dangerous lands."
 category = "consumable"
 max_stack = 10

@@ -1297,11 +1297,14 @@ impl GameRoom {
         let mut interior_chests = Vec::new();
         for id in interior_registry.list_ids() {
             if let Some(interior) = interior_registry.get(id) {
+                tracing::debug!("Interior '{}' has {} chests defined", id, interior.chests.len());
                 for chest_spawn in &interior.chests {
+                    tracing::info!("Interior '{}' chest: {} at ({}, {})", id, chest_spawn.chest_id, chest_spawn.x, chest_spawn.y);
                     interior_chests.push((id.clone(), chest_spawn.chest_id.clone(), chest_spawn.x, chest_spawn.y));
                 }
             }
         }
+        tracing::info!("Collected {} interior chest placements", interior_chests.len());
 
         // Create ChestManager and load saved data
         let mut chest_manager = crate::chest::ChestManager::new();
@@ -10358,6 +10361,35 @@ impl GameRoom {
     // Chair System
     // ========================================================================
 
+    /// Get chest positions for a given context (overworld or specific interior)
+    pub async fn get_chest_positions_message(&self, interior_id: Option<&str>) -> ServerMessage {
+        let cm = self.chest_manager.read().await;
+        let prefix = match interior_id {
+            Some(id) => format!("int_{}_", id),
+            None => "ow_".to_string(),
+        };
+        let all_keys: Vec<&String> = cm.chests.keys().collect();
+        tracing::debug!("get_chest_positions_message: prefix='{}', all keys={:?}", prefix, all_keys);
+        let positions: Vec<(i32, i32)> = cm
+            .chests
+            .keys()
+            .filter_map(|key| {
+                if key.starts_with(&prefix) {
+                    let rest = &key[prefix.len()..];
+                    let parts: Vec<&str> = rest.splitn(2, '_').collect();
+                    if parts.len() == 2 {
+                        if let (Ok(x), Ok(y)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>()) {
+                            return Some((x, y));
+                        }
+                    }
+                }
+                None
+            })
+            .collect();
+        tracing::info!("Chest positions for {:?}: {:?}", interior_id, positions);
+        ServerMessage::ChestPositions { positions }
+    }
+
     pub async fn get_chair_positions_message(&self) -> ServerMessage {
         let chairs = self.chairs.read().await;
         let positions: Vec<(i32, i32)> = chairs.keys().cloned().collect();
@@ -17097,6 +17129,7 @@ impl GameRoom {
     }
 
     pub async fn handle_chest_take(&self, player_id: &str, chest_id: &str, slot: u8) {
+        tracing::info!("handle_chest_take: player={}, chest={}, slot={}", player_id, chest_id, slot);
         // Take item from chest (hold chest lock briefly)
         let taken_item = {
             let mut cm = self.chest_manager.write().await;
@@ -17183,6 +17216,7 @@ impl GameRoom {
     }
 
     pub async fn handle_chest_deposit(&self, player_id: &str, chest_id: &str, inventory_slot: u8) {
+        tracing::info!("handle_chest_deposit: player={}, chest={}, slot={}", player_id, chest_id, inventory_slot);
         // Take item from player inventory first (hold players lock briefly)
         let taken_item = {
             let mut players = self.players.write().await;

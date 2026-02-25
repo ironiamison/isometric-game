@@ -776,6 +776,9 @@ pub enum ServerMessage {
     ChairPositions {
         positions: Vec<(i32, i32)>,
     },
+    ChestPositions {
+        positions: Vec<(i32, i32)>,
+    },
     SitResult {
         success: bool,
         tile_x: i32,
@@ -1417,6 +1420,7 @@ impl ServerMessage {
             ServerMessage::BuffApplied { .. } => "buffApplied",
             ServerMessage::BuffExpired { .. } => "buffExpired",
             ServerMessage::ChairPositions { .. } => "chairPositions",
+            ServerMessage::ChestPositions { .. } => "chestPositions",
             ServerMessage::SitResult { .. } => "sitResult",
             ServerMessage::FarmingPatchStates { .. } => "farmingPatchStates",
             ServerMessage::PatchStateUpdate { .. } => "patchStateUpdate",
@@ -4108,6 +4112,26 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("positions".into()), Value::Array(pos_values)));
             Value::Map(map)
         }
+        ServerMessage::ChestPositions { positions } => {
+            let mut map = Vec::new();
+            let pos_values: Vec<Value> = positions
+                .iter()
+                .map(|(x, y)| {
+                    let mut pmap = Vec::new();
+                    pmap.push((
+                        Value::String("x".into()),
+                        Value::Integer((*x as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("y".into()),
+                        Value::Integer((*y as i64).into()),
+                    ));
+                    Value::Map(pmap)
+                })
+                .collect();
+            map.push((Value::String("positions".into()), Value::Array(pos_values)));
+            Value::Map(map)
+        }
         ServerMessage::SitResult {
             success,
             tile_x,
@@ -5493,6 +5517,21 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let x = extract_i32(msg_data, "x").unwrap_or(0);
             let y = extract_i32(msg_data, "y").unwrap_or(0);
             Ok(ClientMessage::UseWaystone { x, y })
+        }
+        "openChest" => {
+            let x = extract_i32(msg_data, "x").unwrap_or(0);
+            let y = extract_i32(msg_data, "y").unwrap_or(0);
+            Ok(ClientMessage::OpenChest { x, y })
+        }
+        "chestTake" => {
+            let chest_id = extract_string(msg_data, "chest_id").unwrap_or_default();
+            let slot = extract_i32(msg_data, "slot").unwrap_or(0) as u8;
+            Ok(ClientMessage::ChestTake { chest_id, slot })
+        }
+        "chestDeposit" => {
+            let chest_id = extract_string(msg_data, "chest_id").unwrap_or_default();
+            let inventory_slot = extract_i32(msg_data, "inventory_slot").unwrap_or(0) as u8;
+            Ok(ClientMessage::ChestDeposit { chest_id, inventory_slot })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }

@@ -1940,6 +1940,12 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send overworld chest positions
+    let chest_positions = room.get_chest_positions_message(None).await;
+    if let Ok(bytes) = protocol::encode_server_message(&chest_positions) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Send prayer state
     if let Some(prayer_state) = room.get_player_prayer_state(&player_id).await {
         if let Ok(bytes) = protocol::encode_server_message(&prayer_state) {
@@ -2913,6 +2919,8 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                         .await;
                     room.send_to_player(player_id, room.get_gathering_markers_message().await)
                         .await;
+                    room.send_to_player(player_id, room.get_chest_positions_message(None).await)
+                        .await;
 
                     // Send overworld ground items
                     for item_msg in room.get_ground_items_in_instance(None).await {
@@ -3313,6 +3321,13 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
     for item_msg in ground_items {
         room.send_to_player(player_id, item_msg).await;
     }
+
+    // Send chest positions for this interior
+    let chest_msg = room.get_chest_positions_message(Some(&interior.id)).await;
+    if let protocol::ServerMessage::ChestPositions { ref positions } = chest_msg {
+        info!("Sending {} chest positions for interior '{}' to player {}", positions.len(), interior.id, player_id);
+    }
+    room.send_to_player(player_id, chest_msg).await;
 }
 
 async fn handle_client_message(
@@ -3603,6 +3618,8 @@ async fn handle_client_message(
                         room.send_to_player(player_id, room.get_chair_positions_message().await)
                             .await;
                         room.send_to_player(player_id, room.get_gathering_markers_message().await)
+                            .await;
+                        room.send_to_player(player_id, room.get_chest_positions_message(None).await)
                             .await;
 
                         // Notify overworld players

@@ -1512,7 +1512,7 @@ defence_bonus = 0
 
 [bronze_axe]
 display_name = "Bronze Axe"
-sprite = "chopping_axe"
+sprite = "bronze_axe"
 description = "A basic bronze axe for chopping trees."
 category = "equipment"
 max_stack = 1
@@ -1529,7 +1529,7 @@ chop_success_bonus = 0.0
 
 [iron_axe]
 display_name = "Iron Axe"
-sprite = "chopping_axe"
+sprite = "iron_axe"
 description = "A sturdy iron axe. More effective than bronze."
 category = "equipment"
 max_stack = 1
@@ -1546,7 +1546,7 @@ chop_success_bonus = 0.03
 
 [steel_axe]
 display_name = "Steel Axe"
-sprite = "chopping_axe"
+sprite = "steel_axe"
 description = "A sharp steel axe. Efficient for most trees."
 category = "equipment"
 max_stack = 1
@@ -1563,7 +1563,7 @@ chop_success_bonus = 0.06
 
 [mithril_axe]
 display_name = "Mithril Axe"
-sprite = "chopping_axe"
+sprite = "mithril_axe"
 description = "A lightweight mithril axe. Swings with ease."
 category = "equipment"
 max_stack = 1
@@ -1580,7 +1580,7 @@ chop_success_bonus = 0.09
 
 [adamant_axe]
 display_name = "Adamant Axe"
-sprite = "chopping_axe"
+sprite = "adamant_axe"
 description = "A powerful adamant axe. Cuts through hardwood."
 category = "equipment"
 max_stack = 1
@@ -1597,7 +1597,7 @@ chop_success_bonus = 0.12
 
 [rune_axe]
 display_name = "Rune Axe"
-sprite = "chopping_axe"
+sprite = "rune_axe"
 description = "The finest axe money can buy. Incredibly effective."
 category = "equipment"
 max_stack = 1

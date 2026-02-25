@@ -50,7 +50,7 @@ sellable = true
 
 [coal_ore]
 display_name = "Coal Ore"
-sprite = "iron_ore"
+sprite = "coal_ore"
 description = "A chunk of coal. Combine with iron ore to smelt steel bars."
 category = "material"
 max_stack = 5

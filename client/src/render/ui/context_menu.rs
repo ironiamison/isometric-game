@@ -50,6 +50,9 @@ impl Renderer {
                     if slot.item_id.contains("bones") {
                         push_option(&mut options, "Bury");
                     }
+                    if state.ui_state.chest_open {
+                        push_option(&mut options, "Deposit");
+                    }
                 }
                 push_option(&mut options, "Drop");
                 "Item".to_string()
@@ -159,15 +162,22 @@ impl Renderer {
                 push_option(&mut options, "Examine");
                 "Farming Patch".to_string()
             }
-            ContextMenuTarget::MapObject { gid, .. } => {
+            ContextMenuTarget::MapObject { tile_x, tile_y, gid } => {
+                let is_chest = state.chest_positions.contains(&(*tile_x, *tile_y));
                 let name = crate::input::handler::get_map_object_name(*gid);
                 if crate::input::handler::is_obelisk_gid(*gid) {
                     push_option(&mut options, "Teleport");
+                } else if is_chest {
+                    push_option(&mut options, "Open");
                 } else {
                     push_option(&mut options, "Interact");
                 }
                 push_option(&mut options, "Examine");
-                name.unwrap_or("Object").to_string()
+                if is_chest {
+                    "Chest".to_string()
+                } else {
+                    name.unwrap_or("Object").to_string()
+                }
             }
             ContextMenuTarget::Tile { .. } => {
                 push_option(&mut options, "Walk here");

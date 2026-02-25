@@ -1312,6 +1312,18 @@ impl InputHandler {
                                 }
                             }
                         }
+                        UiElementId::ChestSlot(_) | UiElementId::ChestScrollArea => {
+                            // Dropped on a chest slot or chest panel — deposit from inventory
+                            if state.ui_state.chest_open {
+                                if let DragSource::Inventory(from_idx) = &drag.source {
+                                    commands.push(InputCommand::ChestDeposit {
+                                        chest_id: state.ui_state.chest_id.clone(),
+                                        inventory_slot: *from_idx as u8,
+                                    });
+                                    audio.play_sfx("item_put");
+                                }
+                            }
+                        }
                         _ => {
                             // Dropped on non-inventory UI element, cancel drag
                         }
@@ -1607,7 +1619,8 @@ impl InputHandler {
                             (equippable, bones)
                         })
                         .unwrap_or((false, false));
-                    1 + if is_equippable { 1 } else { 0 } + if is_bones { 1 } else { 0 }
+                    let has_deposit = state.ui_state.chest_open;
+                    1 + if is_equippable { 1 } else { 0 } + if is_bones { 1 } else { 0 } + if has_deposit { 1 } else { 0 }
                 }
                 ContextMenuTarget::Player { .. } => 4,
                 ContextMenuTarget::Npc { id } => {
@@ -1688,7 +1701,7 @@ impl InputHandler {
                                 ContextMenuTarget::InventorySlot(slot_index) => {
                                     // Inventory slot context menu
                                     // Determine menu options based on item type
-                                    let (is_equippable, is_bones) = state
+                                    let (is_equippable, is_bones, has_item) = state
                                         .inventory
                                         .slots
                                         .get(*slot_index)
@@ -1699,11 +1712,12 @@ impl InputHandler {
                                                 .get_or_placeholder(&slot.item_id);
                                             let equippable = item_def.equipment.is_some();
                                             let bones = slot.item_id.contains("bones");
-                                            (equippable, bones)
+                                            (equippable, bones, true)
                                         })
-                                        .unwrap_or((false, false));
+                                        .unwrap_or((false, false, false));
+                                    let chest_open = state.ui_state.chest_open && has_item;
 
-                                    // Build option index mapping: [Equip?] [Bury?] Drop
+                                    // Build option index mapping: [Equip?] [Bury?] [Deposit?] Drop
                                     let mut current_idx = 0usize;
                                     let equip_idx = if is_equippable {
                                         let idx = current_idx;
@@ -1719,6 +1733,13 @@ impl InputHandler {
                                     } else {
                                         None
                                     };
+                                    let deposit_idx = if chest_open {
+                                        let idx = current_idx;
+                                        current_idx += 1;
+                                        Some(idx)
+                                    } else {
+                                        None
+                                    };
                                     let drop_idx = current_idx;
 
                                     if Some(*option_idx) == equip_idx {
@@ -1728,6 +1749,11 @@ impl InputHandler {
                                     } else if Some(*option_idx) == bury_idx {
                                         commands.push(InputCommand::BuryBones {
                                             slot: *slot_index as u8,
+                                        });
+                                    } else if Some(*option_idx) == deposit_idx {
+                                        commands.push(InputCommand::ChestDeposit {
+                                            chest_id: state.ui_state.chest_id.clone(),
+                                            inventory_slot: *slot_index as u8,
                                         });
                                     } else if *option_idx == drop_idx {
                                         if let Some(slot) = state
@@ -2044,11 +2070,13 @@ impl InputHandler {
                                 }
                                 ContextMenuTarget::MapObject { tile_x, tile_y, gid } => {
                                     // Obelisks: 0=Teleport, 1=Examine
+                                    // Chests: 0=Open, 1=Examine
                                     // Other objects: 0=Interact, 1=Examine
+                                    let tx = *tile_x;
+                                    let ty = *tile_y;
+                                    let is_chest = state.chest_positions.contains(&(tx, ty));
                                     match option_idx {
                                         0 => {
-                                            let tx = *tile_x;
-                                            let ty = *tile_y;
                                             if is_obelisk_gid(*gid) {
                                                 // Walk to obelisk, then teleport directly
                                                 if let Some(player) = state.get_local_player() {
@@ -2080,12 +2108,47 @@ impl InputHandler {
                                                         }
                                                     }
                                                 }
+                                            } else if is_chest {
+                                                // Walk to chest and open it
+                                                if let Some(player) = state.get_local_player() {
+                                                    let px = player.x.round() as i32;
+                                                    let py = player.y.round() as i32;
+                                                    let cdx = (px - tx).abs();
+                                                    let cdy = (py - ty).abs();
+                                                    if cdx <= 1 && cdy <= 1 {
+                                                        commands.push(InputCommand::InteractObject { x: tx, y: ty });
+                                                    } else {
+                                                        let occupied = build_occupied_set(state);
+                                                        const MAX_PATH_DISTANCE: i32 = 32;
+                                                        if let Some((dest, path)) =
+                                                            pathfinding::find_path_to_adjacent(
+                                                                (px, py),
+                                                                (tx, ty),
+                                                                &state.chunk_manager,
+                                                                &occupied,
+                                                                MAX_PATH_DISTANCE,
+                                                            )
+                                                        {
+                                                            state.auto_path = Some(PathState {
+                                                                path,
+                                                                current_index: 0,
+                                                                destination: dest,
+                                                                pickup_target: None,
+                                                                interact_target: None, interact_object_target: Some((tx, ty)), waystone_target: None,
+                                                            });
+                                                        }
+                                                    }
+                                                }
                                             } else {
                                                 commands.push(InputCommand::InteractObject { x: tx, y: ty });
                                             }
                                         }
                                         1 => {
-                                            state.push_system_chat("An ancient stone object.".to_string());
+                                            if is_chest {
+                                                state.push_system_chat("A wooden storage chest.".to_string());
+                                            } else {
+                                                state.push_system_chat("An ancient stone object.".to_string());
+                                            }
                                         }
                                         _ => {}
                                     }
@@ -3094,7 +3157,7 @@ impl InputHandler {
             return commands;
         }
 
-        // Handle chest panel input
+        // Handle chest panel input (does NOT return early — allows inventory right-click etc.)
         if state.ui_state.chest_open {
             // Mouse wheel scroll
             let (_wheel_x, wheel_y) = mouse_wheel();
@@ -3108,12 +3171,14 @@ impl InputHandler {
                 }
             }
 
+            let mut chest_handled = false;
             if mouse_clicked {
                 if let Some(ref element) = clicked_element {
                     match element {
                         UiElementId::ChestClose => {
                             state.ui_state.chest_open = false;
                             state.pending_sfx.push("enter".to_string());
+                            chest_handled = true;
                         }
                         UiElementId::ChestSlot(idx) => {
                             // Take item from chest slot
@@ -3125,13 +3190,7 @@ impl InputHandler {
                                     });
                                 }
                             }
-                        }
-                        UiElementId::InventorySlot(inv_idx) => {
-                            // Deposit item from inventory into chest
-                            commands.push(InputCommand::ChestDeposit {
-                                chest_id: state.ui_state.chest_id.clone(),
-                                inventory_slot: *inv_idx as u8,
-                            });
+                            chest_handled = true;
                         }
                         _ => {}
                     }
@@ -3144,7 +3203,9 @@ impl InputHandler {
                 return commands;
             }
 
-            return commands;
+            if chest_handled {
+                return commands;
+            }
         }
 
         // Handle slayer panel input
@@ -7576,8 +7637,8 @@ impl InputHandler {
                             }
                         }
                     }
-                } else if is_obelisk_gid(obj_gid) {
-                    // Clicked on an obelisk — walk to it and interact
+                } else if is_obelisk_gid(obj_gid) || state.chest_positions.contains(&(clicked_tile_x, clicked_tile_y)) {
+                    // Clicked on an obelisk or chest — walk to it and interact
                     if let Some(player) = state.get_local_player() {
                         let player_x = player.x.round() as i32;
                         let player_y = player.y.round() as i32;
@@ -7693,6 +7754,44 @@ impl InputHandler {
                                         Some((clicked_tile_x, clicked_tile_y));
                                 }
                             }
+                        }
+                    }
+                }
+            } else if state
+                .chest_positions
+                .contains(&(clicked_tile_x, clicked_tile_y))
+            {
+                // Clicked on a chest - walk to it and interact
+                if let Some(player) = state.get_local_player() {
+                    let px = player.x.round() as i32;
+                    let py = player.y.round() as i32;
+                    let cdx = (px - clicked_tile_x).abs();
+                    let cdy = (py - clicked_tile_y).abs();
+                    if cdx <= 1 && cdy <= 1 {
+                        // Already adjacent — interact immediately
+                        commands.push(InputCommand::InteractObject { x: clicked_tile_x, y: clicked_tile_y });
+                    } else {
+                        // Pathfind to adjacent tile, then interact
+                        let occupied = build_occupied_set(state);
+                        const MAX_PATH_DISTANCE: i32 = 32;
+                        if let Some((dest, path)) =
+                            pathfinding::find_path_to_adjacent(
+                                (px, py),
+                                (clicked_tile_x, clicked_tile_y),
+                                &state.chunk_manager,
+                                &occupied,
+                                MAX_PATH_DISTANCE,
+                            )
+                        {
+                            state.auto_path = Some(PathState {
+                                path,
+                                current_index: 0,
+                                destination: dest,
+                                pickup_target: None,
+                                interact_target: None,
+                                interact_object_target: Some((clicked_tile_x, clicked_tile_y)),
+                                waystone_target: None,
+                            });
                         }
                     }
                 }

@@ -1583,6 +1583,8 @@ pub struct GameState {
     pub is_sitting: bool,
     /// Chair positions on the map (received from server)
     pub chair_positions: Vec<(i32, i32)>,
+    /// Chest positions on the map (received from server)
+    pub chest_positions: Vec<(i32, i32)>,
     /// Pending chair to sit on after pathfinding completes
     pub pending_chair_sit: Option<(i32, i32)>,
     pub pending_harvest_patch: Option<String>,
@@ -1772,6 +1774,7 @@ impl GameState {
             is_gathering: false,
             is_sitting: false,
             chair_positions: Vec::new(),
+            chest_positions: Vec::new(),
             pending_chair_sit: None,
             pending_harvest_patch: None,
             gathering_started_at: 0.0,

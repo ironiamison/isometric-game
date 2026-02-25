@@ -859,7 +859,7 @@ impl Renderer {
     pub(crate) fn render_quest_tracker(
         &self,
         state: &GameState,
-        tracker_x: f32,
+        _tracker_x: f32,
         tracker_y: f32,
         tracker_width: f32,
     ) {
@@ -869,50 +869,40 @@ impl Renderer {
 
         let line_height = 18.0;
         let objective_line_height = line_height - 2.0;
-        let title_wrap_width = (tracker_width + 58.0).max(140.0);
-        let detail_wrap_width = (tracker_width + 42.0).max(132.0);
-        let inner_pad = 8.0;
-        let right_edge = tracker_x + tracker_width - inner_pad;
-        let draw_right = |renderer: &Renderer, text: &str, y: f32, color: Color| {
-            let text_width = renderer.measure_text_sharp(text, 16.0).width;
-            renderer.draw_text_sharp(text, (right_edge - text_width).floor(), y, 16.0, color);
-        };
+        let inner_pad = 12.0;
+        let font_size = 16.0;
 
-        // Semi-transparent background with rounded feel
-        let total_h = self.quest_tracker_height(state, tracker_width);
-        let bg_pad = 6.0;
-        draw_rectangle(
-            tracker_x - bg_pad,
-            tracker_y - bg_pad,
-            tracker_width + bg_pad * 2.0,
-            total_h + bg_pad * 2.0 + inner_pad * 2.0,
-            Color::new(0.0, 0.0, 0.0, 0.45),
-        );
+        // First pass: collect all rendered lines and measure the widest one
+        struct TrackerLine {
+            text: String,
+            color: Color,
+            height: f32,
+            underline: bool,
+        }
 
-        let mut y = tracker_y + inner_pad;
+        let mut lines: Vec<TrackerLine> = Vec::new();
+        let mut max_text_width: f32 = 0.0;
 
         // Header
-        draw_right(self, "QUESTS", y, Color::from_rgba(255, 220, 100, 255));
-        y += line_height;
+        let header = "QUESTS";
+        max_text_width = max_text_width.max(self.measure_text_sharp(header, font_size).width);
+        lines.push(TrackerLine {
+            text: header.to_string(),
+            color: Color::from_rgba(255, 220, 100, 255),
+            height: line_height,
+            underline: false,
+        });
 
-        // Only show first 2 active quests
+        // Quest content (no wrapping — measure actual widths)
         for quest in state.ui_state.active_quests.iter().take(2) {
-            let title_lines = self.wrap_text(&quest.name, title_wrap_width, 16.0);
-            for line in title_lines.iter().take(2) {
-                draw_right(self, line, y, WHITE);
-                // Underline the quest title
-                let text_width = self.measure_text_sharp(line, 16.0).width;
-                let underline_y = y + 3.0;
-                draw_line(
-                    (right_edge - text_width).floor(),
-                    underline_y,
-                    right_edge,
-                    underline_y,
-                    1.0,
-                    Color::new(1.0, 1.0, 1.0, 0.4),
-                );
-                y += line_height;
-            }
+            let w = self.measure_text_sharp(&quest.name, font_size).width;
+            max_text_width = max_text_width.max(w);
+            lines.push(TrackerLine {
+                text: quest.name.clone(),
+                color: WHITE,
+                height: line_height,
+                underline: true,
+            });
 
             for obj in &quest.objectives {
                 let status_color = if obj.completed {
@@ -920,22 +910,30 @@ impl Renderer {
                 } else {
                     Color::from_rgba(200, 200, 200, 255)
                 };
-
                 let check = if obj.completed { "[x]" } else { "[ ]" };
-                let obj_text = format!("{} ({}/{})", obj.description, obj.current, obj.target);
-                let wrapped = self.wrap_text(&obj_text, detail_wrap_width, 16.0);
-                for (idx, line) in wrapped.iter().enumerate() {
-                    let render_line = if idx == 0 {
-                        format!("{} {}", check, line)
-                    } else {
-                        format!("    {}", line)
-                    };
-                    draw_right(self, &render_line, y, status_color);
-                    y += objective_line_height;
-                }
+                let obj_text = format!("{} {} ({}/{})", check, obj.description, obj.current, obj.target);
+                let w = self.measure_text_sharp(&obj_text, font_size).width;
+                max_text_width = max_text_width.max(w);
+                lines.push(TrackerLine {
+                    text: obj_text,
+                    color: status_color,
+                    height: objective_line_height,
+                    underline: false,
+                });
             }
 
-            y += 8.0;
+            // Spacing between quests (empty line)
+            lines.push(TrackerLine {
+                text: String::new(),
+                color: WHITE,
+                height: 8.0,
+                underline: false,
+            });
+        }
+
+        // Remove trailing spacer
+        if lines.last().map(|l| l.text.is_empty()).unwrap_or(false) {
+            lines.pop();
         }
 
         if state.ui_state.active_quests.len() > 2 {
@@ -943,10 +941,41 @@ impl Renderer {
                 "...and {} more (Q to view)",
                 state.ui_state.active_quests.len() - 2
             );
-            for line in self.wrap_text(&more, title_wrap_width, 16.0).iter().take(2) {
-                draw_right(self, line, y, LIGHTGRAY);
-                y += line_height;
+            let w = self.measure_text_sharp(&more, font_size).width;
+            max_text_width = max_text_width.max(w);
+            lines.push(TrackerLine {
+                text: more,
+                color: LIGHTGRAY,
+                height: line_height,
+                underline: false,
+            });
+        }
+
+        // Position: right-aligned to the caller's right edge
+        let right_anchor = _tracker_x + tracker_width;
+        let right_edge = right_anchor;
+
+        // Draw all lines right-aligned (no background)
+        let mut y = tracker_y;
+        for line in &lines {
+            if !line.text.is_empty() {
+                let text_width = self.measure_text_sharp(&line.text, font_size).width;
+                let text_x = (right_edge - text_width).floor();
+                self.draw_text_sharp(&line.text, text_x, y, font_size, line.color);
+
+                if line.underline {
+                    let underline_y = y + 3.0;
+                    draw_line(
+                        text_x,
+                        underline_y,
+                        right_edge,
+                        underline_y,
+                        2.0,
+                        Color::new(1.0, 1.0, 1.0, 0.75),
+                    );
+                }
             }
+            y += line.height;
         }
     }
 

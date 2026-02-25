@@ -2322,6 +2322,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let num_slots = (max_slot + 1).max(10);
 
                 state.ui_state.chest_open = true;
+                state.ui_state.inventory_open = true;
                 state.ui_state.chest_id = chest_id;
                 state.ui_state.chest_name = chest_name;
                 state.ui_state.chest_slots = vec![None; num_slots];
@@ -2644,6 +2645,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.npcs.clear();
                 state.ground_items.clear();
                 state.chair_positions.clear();
+                state.chest_positions.clear();
                 state.gathering_markers.clear();
                 state.pending_chair_sit = None;
 
@@ -2709,6 +2711,21 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                     log::info!("Received {} chair positions", positions.len());
                     state.chair_positions = positions;
+                }
+            }
+        }
+
+        "chestPositions" => {
+            if let Some(value) = data {
+                if let Some(positions_arr) = extract_array(value, "positions") {
+                    let mut positions = Vec::new();
+                    for p in positions_arr {
+                        let x = extract_i32(p, "x").unwrap_or(0);
+                        let y = extract_i32(p, "y").unwrap_or(0);
+                        positions.push((x, y));
+                    }
+                    log::info!("Received {} chest positions", positions.len());
+                    state.chest_positions = positions;
                 }
             }
         }
