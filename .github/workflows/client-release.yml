@@ -127,14 +127,7 @@ jobs:
           name: client-manifest
           path: dist/manifest.json
 
-      - name: Install AWS CLI
-        if: ${{ secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && secrets.R2_ACCOUNT_ID != '' && secrets.R2_BUCKET != '' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
-
-      - name: Upload to R2
-        if: ${{ secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && secrets.R2_ACCOUNT_ID != '' && secrets.R2_BUCKET != '' }}
+      - name: Upload to R2 (optional)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -144,6 +137,15 @@ jobs:
           R2_PREFIX: ${{ vars.R2_PREFIX }}
         run: |
           set -euo pipefail
+
+          if [ -z "${R2_ACCOUNT_ID:-}" ] || [ -z "${R2_BUCKET:-}" ] || [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+            echo "R2 secrets not set; skipping upload."
+            exit 0
+          fi
+
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
           PREFIX="${R2_PREFIX:-isometric}"
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
