@@ -293,6 +293,29 @@ fn auto_action_target_pos(aa: &crate::game::AutoActionState, state: &GameState) 
     }
 }
 
+fn sync_path_index(path_state: &mut PathState, player_pos: (i32, i32)) {
+    while path_state.current_index < path_state.path.len() {
+        let (wx, wy) = path_state.path[path_state.current_index];
+        if (wx, wy) == player_pos {
+            path_state.current_index += 1;
+        } else {
+            break;
+        }
+    }
+
+    if path_state.current_index < path_state.path.len() {
+        if let Some(found_idx) = path_state
+            .path
+            .iter()
+            .enumerate()
+            .skip(path_state.current_index)
+            .find_map(|(i, &(wx, wy))| if (wx, wy) == player_pos { Some(i) } else { None })
+        {
+            path_state.current_index = found_idx + 1;
+        }
+    }
+}
+
 /// Build set of tiles occupied by entities (other players + NPCs) for pathfinding
 fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
     let mut occupied = HashSet::new();
@@ -6758,6 +6781,12 @@ impl InputHandler {
         // Path following - generate movement commands when auto-pathing
         // Only follow path if not manually moving and not attacking
         if dx == 0.0 && dy == 0.0 && !is_attacking {
+            if let (Some((player_x, player_y)), Some(ref mut path_state)) =
+                (player_pos, &mut state.auto_path)
+            {
+                sync_path_index(path_state, (player_x, player_y));
+            }
+
             // Check if next waypoint is blocked by an entity - if so, cancel path.
             // When chasing a target, exclude that target from the blocked check so
             // the target moving onto our path doesn't cause constant re-pathing.
@@ -6811,16 +6840,6 @@ impl InputHandler {
             if let (Some((player_x, player_y)), Some(ref mut path_state)) =
                 (player_pos, &mut state.auto_path)
             {
-                // Skip past any waypoints the player has already reached
-                while path_state.current_index < path_state.path.len() {
-                    let (wx, wy) = path_state.path[path_state.current_index];
-                    if player_x == wx && player_y == wy {
-                        path_state.current_index += 1;
-                    } else {
-                        break;
-                    }
-                }
-
                 // Generate movement toward current waypoint
                 if path_state.current_index < path_state.path.len() {
                     let (next_x, next_y) = path_state.path[path_state.current_index];
