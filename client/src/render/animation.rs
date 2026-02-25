@@ -229,20 +229,12 @@ impl PlayerAnimation {
                 }
             }
             AnimationState::SittingChair => {
-                // Row 2, frame 4 = front (down/right), frame 5 = back (up/left)
-                if use_up_left_anim {
-                    (2, 5)
-                } else {
-                    (2, 4)
-                }
+                // Row 2, frames 4-5
+                (2, 4 + frame_index)
             }
             AnimationState::SittingGround => {
-                // Row 3, frame 0 = front (down/right), frame 1 = back (up/left)
-                if use_up_left_anim {
-                    (3, 1)
-                } else {
-                    (3, 0)
-                }
+                // Row 3, frames 0-1
+                (3, frame_index)
             }
             AnimationState::Casting => {
                 // Row 1, frames 4-5
