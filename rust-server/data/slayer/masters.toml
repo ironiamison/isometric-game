@@ -144,7 +144,7 @@ weight = 8
 xp_per_kill = 24
 
 [[masters.tasks]]
-monster_id = "living_rock"
+monster_id = "rock"
 display_name = "Living Rocks"
 count_min = 25
 count_max = 50
