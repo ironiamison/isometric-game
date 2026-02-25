@@ -15669,12 +15669,26 @@ impl GameRoom {
 
         // 2. Resolve target: check NPCs first, then players (same pattern as handle_attack)
         let mut is_npc = false;
+        let mut is_instance_npc = false;
         let mut target_x: i32 = 0;
         let mut target_y: i32 = 0;
         let mut target_exists = false;
 
-        // Check NPCs (overworld NPCs only targetable by overworld casters)
-        if caster_instance.is_none() {
+        // Check NPCs - instance NPCs if in instance, overworld NPCs if in overworld
+        if let Some(ref inst_id) = caster_instance {
+            if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                let npcs = instance.npcs.read().await;
+                if let Some(npc) = npcs.get(&target_id) {
+                    if npc.is_alive() && npc.is_attackable() {
+                        is_npc = true;
+                        is_instance_npc = true;
+                        target_x = npc.x;
+                        target_y = npc.y;
+                        target_exists = true;
+                    }
+                }
+            }
+        } else {
             let npcs = self.npcs.read().await;
             if let Some(npc) = npcs.get(&target_id) {
                 if npc.is_alive() && npc.is_attackable() {
@@ -15758,11 +15772,12 @@ impl GameRoom {
 
         // 6. Calculate hit/miss using blended combat+magic level
         let attack_bonus = magic_bonus; // Spells use magic bonus for accuracy
-        let (target_hp, target_name, target_died, actual_damage) = if is_npc {
-            let mut npcs = self.npcs.write().await;
-            if let Some(npc) = npcs.get_mut(&target_id) {
-                let npc_defence_level = npc.level;
-                let npc_defence_bonus = npc.stats.defence_bonus;
+
+        // Helper closure-like macro for NPC spell damage (used for both overworld and instance NPCs)
+        macro_rules! apply_spell_to_npc {
+            ($npc:expr) => {{
+                let npc_defence_level = $npc.level;
+                let npc_defence_bonus = $npc.stats.defence_bonus;
 
                 if !crate::skills::calculate_hit(
                     effective_level,
@@ -15771,9 +15786,8 @@ impl GameRoom {
                     npc_defence_bonus,
                 ) {
                     // Miss
-                    // Still register aggro so attack attempts interrupt wandering/pathing.
-                    npc.take_damage(0, current_time, Some(player_id));
-                    let name = npc.name();
+                    $npc.take_damage(0, current_time, Some(player_id));
+                    let name = $npc.name();
                     tracing::info!(
                         "{} spell misses {} (eff {} [cmb{}+mag{}] vs def {})",
                         caster_name,
@@ -15783,26 +15797,47 @@ impl GameRoom {
                         magic_level,
                         npc_defence_level
                     );
-                    (npc.hp, name, false, 0)
+                    ($npc.hp, name, false, 0)
                 } else {
                     // Hit
                     let max_hit =
                         crate::spell::calculate_spell_max_hit(magic_level, spell_def.base_power);
                     let damage = crate::spell::roll_spell_damage(max_hit);
-                    let died = npc.take_damage(damage, current_time, Some(player_id));
-                    let name = npc.name();
+                    let died = $npc.take_damage(damage, current_time, Some(player_id));
+                    let name = $npc.name();
                     tracing::info!(
                         "{} spell hits {} for {} damage (max: {}, HP: {})",
                         caster_name,
                         name,
                         damage,
                         max_hit,
-                        npc.hp
+                        $npc.hp
                     );
-                    (npc.hp, name, died, damage)
+                    ($npc.hp, name, died, damage)
+                }
+            }};
+        }
+
+        let (target_hp, target_name, target_died, actual_damage) = if is_npc {
+            if is_instance_npc {
+                let inst_id = caster_instance.as_ref().unwrap();
+                if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                    let mut npcs = instance.npcs.write().await;
+                    if let Some(npc) = npcs.get_mut(&target_id) {
+                        apply_spell_to_npc!(npc)
+                    } else {
+                        return;
+                    }
+                } else {
+                    return;
                 }
             } else {
-                return;
+                let mut npcs = self.npcs.write().await;
+                if let Some(npc) = npcs.get_mut(&target_id) {
+                    apply_spell_to_npc!(npc)
+                } else {
+                    return;
+                }
             }
         } else {
             let mut players = self.players.write().await;
@@ -15939,12 +15974,26 @@ impl GameRoom {
 
             // Move the target to the final position
             if is_npc {
-                let mut npcs = self.npcs.write().await;
-                if let Some(npc) = npcs.get_mut(&target_id) {
-                    npc.x = final_x;
-                    npc.y = final_y;
-                    if wall_slam_bonus > 0 {
-                        npc.take_damage(wall_slam_bonus, current_time, Some(player_id));
+                if is_instance_npc {
+                    let inst_id = caster_instance.as_ref().unwrap();
+                    if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                        let mut npcs = instance.npcs.write().await;
+                        if let Some(npc) = npcs.get_mut(&target_id) {
+                            npc.x = final_x;
+                            npc.y = final_y;
+                            if wall_slam_bonus > 0 {
+                                npc.take_damage(wall_slam_bonus, current_time, Some(player_id));
+                            }
+                        }
+                    }
+                } else {
+                    let mut npcs = self.npcs.write().await;
+                    if let Some(npc) = npcs.get_mut(&target_id) {
+                        npc.x = final_x;
+                        npc.y = final_y;
+                        if wall_slam_bonus > 0 {
+                            npc.take_damage(wall_slam_bonus, current_time, Some(player_id));
+                        }
                     }
                 }
             } else {
@@ -15978,8 +16027,18 @@ impl GameRoom {
             // Send DamageEvent for wall slam bonus
             if wall_slam_bonus > 0 {
                 let slam_hp = if is_npc {
-                    let npcs = self.npcs.read().await;
-                    npcs.get(&target_id).map(|n| n.hp).unwrap_or(0)
+                    if is_instance_npc {
+                        let inst_id = caster_instance.as_ref().unwrap();
+                        if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                            let npcs = instance.npcs.read().await;
+                            npcs.get(&target_id).map(|n| n.hp).unwrap_or(0)
+                        } else {
+                            0
+                        }
+                    } else {
+                        let npcs = self.npcs.read().await;
+                        npcs.get(&target_id).map(|n| n.hp).unwrap_or(0)
+                    }
                 } else {
                     let players = self.players.read().await;
                     players.get(&target_id).map(|p| p.hp).unwrap_or(0)
@@ -16096,7 +16155,17 @@ impl GameRoom {
             );
             if is_npc {
                 // Get NPC info for exp and loot
-                let (prototype_id, npc_level) = {
+                let (prototype_id, npc_level) = if is_instance_npc {
+                    let inst_id = caster_instance.as_ref().unwrap();
+                    if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                        let npcs = instance.npcs.read().await;
+                        npcs.get(&target_id)
+                            .map(|n| (n.prototype_id.clone(), n.level))
+                            .unwrap_or(("unknown".to_string(), 1))
+                    } else {
+                        ("unknown".to_string(), 1)
+                    }
+                } else {
                     let npcs = self.npcs.read().await;
                     npcs.get(&target_id)
                         .map(|n| (n.prototype_id.clone(), n.level))
