@@ -515,6 +515,79 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Migration: Consolidate bank stacks (one slot per item type, unlimited quantity)
+        let bank_consolidated_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'bank_stacks_consolidated'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !bank_consolidated_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN bank_stacks_consolidated INTEGER DEFAULT 0")
+                .execute(pool)
+                .await
+                .ok();
+
+            // Load all characters' bank_json and consolidate duplicate stacks
+            let rows: Vec<(i64, String)> = sqlx::query_as(
+                "SELECT id, bank_json FROM characters WHERE bank_json IS NOT NULL AND bank_json != '[]'"
+            )
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+            let mut migrated = 0u32;
+            for (char_id, bank_json) in &rows {
+                if let Ok(slots) = serde_json::from_str::<Vec<(usize, String, i32)>>(bank_json) {
+                    // Group by item_id and sum quantities using i64 to avoid overflow
+                    let mut merged: HashMap<String, i64> = HashMap::new();
+                    for (_slot_idx, item_id, qty) in &slots {
+                        *merged.entry(item_id.clone()).or_insert(0) += *qty as i64;
+                    }
+
+                    // Only rewrite if there were duplicates
+                    if merged.len() < slots.len() {
+                        let consolidated: Vec<(usize, String, i32)> = merged
+                            .into_iter()
+                            .enumerate()
+                            .map(|(idx, (item_id, qty))| {
+                                let clamped = qty.min(i32::MAX as i64) as i32;
+                                if qty > i32::MAX as i64 {
+                                    tracing::warn!(
+                                        "Character {} item {} quantity overflow: {} clamped to {}",
+                                        char_id, item_id, qty, clamped
+                                    );
+                                }
+                                (idx, item_id, clamped)
+                            })
+                            .collect();
+
+                        let new_json = serde_json::to_string(&consolidated).unwrap_or_else(|_| "[]".to_string());
+                        tracing::info!(
+                            "Bank migration: character {} consolidated {} slots -> {} slots",
+                            char_id, slots.len(), consolidated.len()
+                        );
+
+                        sqlx::query("UPDATE characters SET bank_json = ? WHERE id = ?")
+                            .bind(&new_json)
+                            .bind(char_id)
+                            .execute(pool)
+                            .await
+                            .ok();
+
+                        migrated += 1;
+                    }
+                }
+            }
+
+            if migrated > 0 {
+                tracing::info!("Bank stack consolidation migration: updated {} characters", migrated);
+            } else {
+                tracing::info!("Bank stack consolidation migration: no duplicate stacks found");
+            }
+        }
+
         tracing::info!("Database migrations complete");
         Ok(())
     }

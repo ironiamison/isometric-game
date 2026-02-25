@@ -13,6 +13,37 @@ const GOLD_BAR_HEIGHT: f32 = 36.0;
 const BANK_COLS: usize = 6;
 const INV_COLS: usize = 4;
 
+/// Format large quantities with K/M/B abbreviations for bank slot display.
+fn format_bank_quantity(qty: i32) -> String {
+    if qty < 100_000 {
+        qty.to_string()
+    } else if qty < 10_000_000 {
+        let k = qty / 1000;
+        let remainder = (qty % 1000) / 100;
+        if remainder > 0 {
+            format!("{}.{}K", k, remainder)
+        } else {
+            format!("{}K", k)
+        }
+    } else if qty < 1_000_000_000 {
+        let m = qty / 1_000_000;
+        let remainder = (qty % 1_000_000) / 100_000;
+        if remainder > 0 {
+            format!("{}.{}M", m, remainder)
+        } else {
+            format!("{}M", m)
+        }
+    } else {
+        let b = qty / 1_000_000_000;
+        let remainder = (qty % 1_000_000_000) / 100_000_000;
+        if remainder > 0 {
+            format!("{}.{}B", b, remainder)
+        } else {
+            format!("{}B", b)
+        }
+    }
+}
+
 impl Renderer {
     pub(crate) fn render_bank(
         &self,
@@ -336,7 +367,7 @@ impl Renderer {
 
                     // Draw quantity below cursor if > 1
                     if *quantity > 1 {
-                        let qty_text = quantity.to_string();
+                        let qty_text = format_bank_quantity(*quantity);
                         self.draw_text_sharp(
                             &qty_text,
                             mx - drag_slot_size / 2.0 + 3.0 * s,
@@ -461,7 +492,7 @@ impl Renderer {
                 }
 
                 if *quantity > 1 {
-                    let qty_text = quantity.to_string();
+                    let qty_text = format_bank_quantity(*quantity);
                     let qty_alpha = if is_drag_source { 0.3 } else { 1.0 };
                     self.draw_text_sharp(
                         &qty_text,
@@ -621,7 +652,7 @@ impl Renderer {
                 );
 
                 if inv_slot.quantity > 1 {
-                    let qty_text = inv_slot.quantity.to_string();
+                    let qty_text = format_bank_quantity(inv_slot.quantity);
                     self.draw_text_sharp(
                         &qty_text,
                         sx + 3.0 * s,

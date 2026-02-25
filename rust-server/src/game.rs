@@ -8276,19 +8276,11 @@ impl GameRoom {
         };
 
         if should_merge {
-            // Merge: move quantity from slot_a into slot_b, up to BANK_MAX_STACK
+            // Merge: move all quantity from slot_a into slot_b (unlimited stacking)
             let src_qty = player.bank.slots[a].as_ref().unwrap().quantity;
-            let dst_qty = player.bank.slots[b].as_ref().unwrap().quantity;
-            let can_add = item::BANK_MAX_STACK - dst_qty;
-            let transfer = src_qty.min(can_add);
-
-            player.bank.slots[b].as_mut().unwrap().quantity += transfer;
-            let remaining = src_qty - transfer;
-            if remaining <= 0 {
-                player.bank.slots[a] = None;
-            } else {
-                player.bank.slots[a].as_mut().unwrap().quantity = remaining;
-            }
+            player.bank.slots[b].as_mut().unwrap().quantity =
+                player.bank.slots[b].as_ref().unwrap().quantity.saturating_add(src_qty);
+            player.bank.slots[a] = None;
         } else {
             // Swap
             player.bank.slots.swap(a, b);
@@ -8310,12 +8302,17 @@ impl GameRoom {
             _ => return,
         };
 
-        // Collect non-empty slots
-        let mut items: Vec<item::InventorySlot> = player
-            .bank
-            .slots
-            .iter()
-            .filter_map(|s| s.clone())
+        // Consolidate: merge duplicate item_ids into single slots
+        let mut merged: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        for slot in player.bank.slots.iter().flatten() {
+            *merged.entry(slot.item_id.clone()).or_insert(0) += slot.quantity as i64;
+        }
+        let mut items: Vec<item::InventorySlot> = merged
+            .into_iter()
+            .map(|(item_id, qty)| {
+                let clamped = qty.min(i32::MAX as i64) as i32;
+                item::InventorySlot::new(item_id, clamped)
+            })
             .collect();
 
         // Sort by (category_priority, display_name)

@@ -226,8 +226,7 @@ pub struct InventorySlotUpdate {
 // ============================================================================
 
 pub const DEFAULT_BANK_SIZE: usize = 50;
-/// Bank stacks always go up to 99 regardless of the item's inventory max_stack
-pub const BANK_MAX_STACK: i32 = 99;
+/// Bank uses unlimited stacking: one slot per item type, quantity up to i32::MAX
 /// Number of slots added per bank upgrade purchase
 pub const BANK_UPGRADE_SLOTS: usize = 10;
 /// Maximum bank size after all upgrades
@@ -262,44 +261,32 @@ impl Bank {
     }
 
     /// Try to add an item to the bank. Returns the quantity that couldn't fit.
-    pub fn add_item(&mut self, item_id: &str, mut quantity: i32, _registry: &ItemRegistry) -> i32 {
+    /// Each item type occupies exactly one slot with unlimited stacking.
+    pub fn add_item(&mut self, item_id: &str, quantity: i32, _registry: &ItemRegistry) -> i32 {
         if item_id == GOLD_ITEM_ID {
             self.gold += quantity;
             return 0;
         }
 
-        // Bank always uses 99 max stack regardless of item definition
-        let max_stack = BANK_MAX_STACK;
-
-        // First, try to stack with existing items
+        // Find existing slot with this item and add to it
         for slot in &mut self.slots {
-            if quantity <= 0 {
-                break;
-            }
             if let Some(inv_slot) = slot {
                 if inv_slot.item_id == item_id {
-                    let can_add = max_stack - inv_slot.quantity;
-                    if can_add > 0 {
-                        let add = quantity.min(can_add);
-                        inv_slot.quantity += add;
-                        quantity -= add;
-                    }
+                    inv_slot.quantity = inv_slot.quantity.saturating_add(quantity);
+                    return 0;
                 }
             }
         }
 
-        // Then, try to find empty slots
+        // No existing slot — place in first empty slot
         for slot in &mut self.slots {
-            if quantity <= 0 {
-                break;
-            }
             if slot.is_none() {
-                let add = quantity.min(max_stack);
-                *slot = Some(InventorySlot::new(item_id.to_string(), add));
-                quantity -= add;
+                *slot = Some(InventorySlot::new(item_id.to_string(), quantity));
+                return 0;
             }
         }
 
+        // No space at all
         quantity
     }
 
@@ -344,35 +331,24 @@ impl Bank {
             .sum()
     }
 
-    /// Check if bank has space for additional items
-    pub fn has_space_for(&self, item_id: &str, count: i32, _registry: &ItemRegistry) -> bool {
+    /// Check if bank has space for additional items.
+    /// With unlimited stacking, space exists if the item already has a slot or there's an empty slot.
+    pub fn has_space_for(&self, item_id: &str, _count: i32, _registry: &ItemRegistry) -> bool {
         if item_id == GOLD_ITEM_ID {
             return true;
         }
 
-        // Bank always uses 99 max stack regardless of item definition
-        let max_stack = BANK_MAX_STACK;
-        let mut remaining = count;
-
+        // If this item already exists in the bank, it stacks into that slot
         for slot in &self.slots {
-            if remaining <= 0 {
-                return true;
-            }
             if let Some(inv_slot) = slot {
                 if inv_slot.item_id == item_id {
-                    let can_add = max_stack - inv_slot.quantity;
-                    remaining -= can_add;
+                    return true;
                 }
             }
         }
 
-        if remaining <= 0 {
-            return true;
-        }
-
-        let empty_slots = self.slots.iter().filter(|s| s.is_none()).count();
-        let slots_needed = ((remaining + max_stack - 1) / max_stack).max(0) as usize;
-        empty_slots >= slots_needed
+        // Otherwise, need at least one empty slot
+        self.slots.iter().any(|s| s.is_none())
     }
 
     /// Get bank contents as a serializable update
