@@ -9,3 +9,16 @@ sellable = false
 
 [shovel.use_effect]
 type = "dig"
+
+# =============================================================================
+# The Awakening - Quest Items
+# =============================================================================
+
+[resonance_lens]
+display_name = "Resonance Lens"
+sprite = "resonance_lens"
+description = "A magical lens crafted from refined quartz and construct cores. Reveals hidden Aetheri inscriptions."
+category = "quest"
+max_stack = 1
+base_price = 0
+sellable = false

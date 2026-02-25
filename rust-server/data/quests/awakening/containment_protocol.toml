@@ -1,0 +1,36 @@
+[quest]
+id = "containment_protocol"
+name = "Containment Protocol"
+description = "Destroy the animated constructs terrorizing the market district and collect their dampening crystals for Archmage Yenara."
+giver_npc = "archmage_yenara"
+level_required = 22
+repeatable = false
+lua_script = "awakening/containment_protocol.lua"
+
+[quest.chain]
+previous = "city_of_sparks"
+next = "the_old_foundation"
+
+[[quest.objectives]]
+id = "kill_constructs"
+type = "kill_monster"
+target = "animated_construct"
+count = 12
+description = "Destroy 12 Animated Constructs"
+
+[[quest.objectives]]
+id = "collect_crystals"
+type = "collect_item"
+target = "dampening_crystal"
+count = 8
+description = "Collect 8 Dampening Crystals"
+
+[quest.rewards]
+exp = 350
+gold = 250
+
+[quest.dialogue]
+offer = "The magical disturbances have animated objects throughout the market - suits of armor, crates, even brooms are attacking people. I need you to put them down and bring me the dampening crystals they contain. I can use them to stabilize the area."
+accept = "Destroy as many animated constructs as you can and collect their dampening crystals. Be careful - they're stronger than they look."
+progress = "How goes the containment? I need those dampening crystals to stabilize the ward matrix."
+complete = "Excellent work. These crystals will help, but they're only a stopgap. The source of these disturbances is something far deeper."

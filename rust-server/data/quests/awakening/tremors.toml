@@ -1,0 +1,44 @@
+[quest]
+id = "tremors"
+name = "Tremors"
+description = "Defend New Aeven from Sand Wraiths pouring through a breach in the city wall, then investigate the aftermath."
+giver_npc = "archmage_yenara"
+level_required = 27
+repeatable = false
+lua_script = "awakening/tremors.lua"
+
+[quest.chain]
+previous = "words_of_the_sealed"
+
+[[quest.objectives]]
+id = "kill_sand_wraiths"
+type = "kill_monster"
+target = "sand_wraith"
+count = 15
+description = "Destroy 15 Sand Wraiths at the breach"
+
+[[quest.objectives]]
+id = "inspect_breach"
+type = "reach_location"
+target = "na_wall_breach"
+count = 1
+description = "Inspect the breach after the battle"
+sequential = true
+dialogue = "The wraiths came from underground, drawn along a ley line from the desert. The seal in the cistern has cracked further. Time is running out."
+
+[[quest.objectives]]
+id = "report_breach"
+type = "talk_to"
+target = "archmage_yenara"
+description = "Report to Archmage Yenara"
+sequential = true
+
+[quest.rewards]
+exp = 600
+gold = 400
+
+[quest.dialogue]
+offer = "An earthquake just hit the city! The eastern wall has collapsed and creatures made of sand and shadow are pouring through the breach. We need you on the front line NOW!"
+accept = "Get to the eastern wall breach and destroy those Sand Wraiths! Then inspect the damage - I need to know how they got here."
+progress = "Is the breach secure? We can't afford to let more of those things into the city."
+complete = "A ley line connecting the desert to the seal beneath us... that explains the disturbances. Whatever is sealed down there, its influence stretches far further than I imagined. We must find a way to stop this at its source - in the desert itself."

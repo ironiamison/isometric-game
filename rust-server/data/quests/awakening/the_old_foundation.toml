@@ -1,0 +1,45 @@
+[quest]
+id = "the_old_foundation"
+name = "The Old Foundation"
+description = "Explore the ancient cisterns beneath New Aeven, fight through the Seal Wraiths, and find the source of the disturbances."
+giver_npc = "archmage_yenara"
+level_required = 24
+repeatable = false
+lua_script = "awakening/the_old_foundation.lua"
+
+[quest.chain]
+previous = "containment_protocol"
+next = "words_of_the_sealed"
+
+[[quest.objectives]]
+id = "kill_seal_wraiths"
+type = "kill_monster"
+target = "seal_wraith"
+count = 8
+description = "Destroy 8 Seal Wraiths"
+
+[[quest.objectives]]
+id = "find_seal"
+type = "reach_location"
+target = "na_cistern_seal"
+count = 1
+description = "Find the source of the disturbance"
+sequential = true
+dialogue = "Before you stands a massive stone seal, cracked and pulsing with energy. Ancient symbols cover its surface - a language you've never seen. This is the source."
+
+[[quest.objectives]]
+id = "report_to_yenara_cisterns"
+type = "talk_to"
+target = "archmage_yenara"
+description = "Report the discovery to Archmage Yenara"
+sequential = true
+
+[quest.rewards]
+exp = 500
+gold = 350
+
+[quest.dialogue]
+offer = "My research suggests New Aeven was built on top of something ancient. Beneath the city, past the water cisterns, there should be older stonework. I need you to go down there and find what's causing these disturbances."
+accept = "Enter the cisterns beneath the city. Fight through whatever's lurking down there and find the source. Be careful - the magical energy is concentrated underground."
+progress = "What did you find in the cisterns? Was there something down there?"
+complete = "A sealed wall with unknown symbols? And wraiths drawn to it? This is far more serious than I feared. Those symbols... I need to study them."

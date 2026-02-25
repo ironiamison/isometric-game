@@ -1,0 +1,95 @@
+# ============================================================
+# The Awakening Questline - New Aeven NPC Definitions
+# ============================================================
+
+# --- Guard Captain Aldric ---
+# First point of contact in New Aeven, gives Quest 1
+
+[guard_captain]
+display_name = "Guard Captain Aldric"
+sprite = "guard_captain"
+animation_type = "humanoid"
+description = "The captain of New Aeven's city guard. A practical man overwhelmed by the magical chaos gripping his city."
+
+[guard_captain.stats]
+level = 1
+max_hp = 100
+damage = 0
+attack_bonus = 0
+defence_bonus = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+respawn_time_ms = 0
+
+[guard_captain.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[guard_captain.behaviors]
+quest_giver = true
+friendly = true
+facing = "down"
+
+[guard_captain.quest_giver]
+available_quests = ["city_of_sparks"]
+
+[guard_captain.dialogue]
+greeting = "Another explosion in the market district... I don't have enough guards for this."
+
+[guard_captain.speech]
+radius = 5
+interval_min_ms = 30000
+interval_max_ms = 60000
+messages = [
+    "Stay alert. The enchantments are unstable today.",
+    "If you see any animated objects, keep your distance.",
+    "We've had three incidents this morning alone...",
+]
+
+# --- Archmage Yenara ---
+# Main quest giver for the New Aeven chain (Quests 2-5)
+
+[archmage_yenara]
+display_name = "Archmage Yenara"
+sprite = "archmage_yenara"
+animation_type = "humanoid"
+description = "Head of New Aeven's mage college. Scholarly and determined, she's racing to understand the magical disturbances plaguing the city."
+
+[archmage_yenara.stats]
+level = 1
+max_hp = 100
+damage = 0
+attack_bonus = 0
+defence_bonus = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+respawn_time_ms = 0
+
+[archmage_yenara.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[archmage_yenara.behaviors]
+quest_giver = true
+friendly = true
+facing = "down"
+
+[archmage_yenara.quest_giver]
+available_quests = ["containment_protocol", "the_old_foundation", "words_of_the_sealed", "tremors"]
+
+[archmage_yenara.dialogue]
+greeting = "The magical resonance is getting worse. I fear this is only the beginning."
+
+[archmage_yenara.speech]
+radius = 5
+interval_min_ms = 30000
+interval_max_ms = 60000
+messages = [
+    "These readings are unlike anything in our archives...",
+    "The ley lines beneath the city are overloaded.",
+    "If we don't find the source soon, the entire ward system could collapse.",
+]

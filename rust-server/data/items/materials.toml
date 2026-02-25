@@ -613,3 +613,31 @@ category = "material"
 max_stack = 99
 base_price = 250
 sellable = true
+
+# =============================================================================
+# The Awakening - Quest Materials
+# =============================================================================
+
+[dampening_crystal]
+display_name = "Dampening Crystal"
+sprite = "dampening_crystal"
+description = "A crystal that absorbs chaotic magical energy. Used to stabilize areas of magical disturbance."
+category = "material"
+max_stack = 99
+base_price = 15
+
+[refined_quartz]
+display_name = "Refined Quartz"
+sprite = "refined_quartz"
+description = "Purified quartz with unusual refractive properties. A key component in magical optics."
+category = "material"
+max_stack = 99
+base_price = 25
+
+[construct_core]
+display_name = "Construct Core"
+sprite = "construct_core"
+description = "The magical core that once animated a construct. Still hums with residual energy."
+category = "material"
+max_stack = 99
+base_price = 40

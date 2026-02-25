@@ -1,0 +1,118 @@
+# ============================================================
+# The Awakening Questline - New Aeven Monster Definitions
+# Level range: 22-28
+# ============================================================
+
+# --- Animated Construct ---
+# Enchanted objects brought to life by chaotic magic in the market district
+# Drops Dampening Crystals and rare Construct Cores
+
+[animated_construct]
+display_name = "Animated Construct"
+sprite = "animated_construct"
+animation_type = "standard"
+description = "Enchanted armor brought to life by chaotic magic. Clanks menacingly as it lurches forward."
+
+[animated_construct.stats]
+level = 23
+max_hp = 45
+damage = 6
+attack_bonus = 5
+defence_bonus = 10
+aggro_range = 4
+chase_range = 6
+move_cooldown_ms = 700
+attack_cooldown_ms = 1800
+respawn_time_ms = 15000
+
+[animated_construct.rewards]
+exp_base = 30
+gold_min = 8
+gold_max = 20
+
+[[animated_construct.loot]]
+item_id = "dampening_crystal"
+drop_chance = 0.65
+quantity_min = 1
+quantity_max = 1
+
+[[animated_construct.loot]]
+item_id = "construct_core"
+drop_chance = 0.12
+quantity_min = 1
+quantity_max = 1
+
+[animated_construct.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 3
+
+# --- Seal Wraith ---
+# Spectral entities in the cisterns beneath New Aeven, drawn to the broken seal
+
+[seal_wraith]
+display_name = "Seal Wraith"
+sprite = "seal_wraith"
+animation_type = "standard"
+description = "A spectral entity drawn to the broken magic seeping from the ancient seal."
+
+[seal_wraith.stats]
+level = 25
+max_hp = 40
+damage = 7
+attack_bonus = 12
+defence_bonus = 3
+aggro_range = 5
+chase_range = 7
+move_cooldown_ms = 500
+attack_cooldown_ms = 1600
+respawn_time_ms = 20000
+
+[seal_wraith.rewards]
+exp_base = 35
+gold_min = 10
+gold_max = 22
+
+[[seal_wraith.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+
+[seal_wraith.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+
+# --- Sand Wraith ---
+# Desert creatures that breach the city wall during the earthquake
+
+[sand_wraith]
+display_name = "Sand Wraith"
+sprite = "sand_wraith"
+animation_type = "standard"
+description = "A creature of swirling sand and dark energy. Should not exist this far from the desert."
+
+[sand_wraith.stats]
+level = 27
+max_hp = 55
+damage = 8
+attack_bonus = 10
+defence_bonus = 6
+aggro_range = 5
+chase_range = 8
+move_cooldown_ms = 500
+attack_cooldown_ms = 1500
+respawn_time_ms = 20000
+
+[sand_wraith.rewards]
+exp_base = 40
+gold_min = 12
+gold_max = 28
+
+[[sand_wraith.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+
+[sand_wraith.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 5

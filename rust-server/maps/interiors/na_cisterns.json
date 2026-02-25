@@ -1,0 +1,44 @@
+{
+  "id": "na_cisterns",
+  "name": "New Aeven Cisterns",
+  "instance_type": "private",
+  "size": {
+    "width": 16,
+    "height": 16
+  },
+  "spawn_points": {
+    "entrance": { "x": 8, "y": 15 }
+  },
+  "layers": {
+    "ground": [],
+    "objects": [],
+    "overhead": []
+  },
+  "collision": "",
+  "entities": [
+    { "entityId": "seal_wraith", "x": 4, "y": 10 },
+    { "entityId": "seal_wraith", "x": 12, "y": 10 },
+    { "entityId": "seal_wraith", "x": 6, "y": 7 },
+    { "entityId": "seal_wraith", "x": 10, "y": 7 },
+    { "entityId": "seal_wraith", "x": 3, "y": 5 },
+    { "entityId": "seal_wraith", "x": 13, "y": 5 },
+    { "entityId": "seal_wraith", "x": 7, "y": 3 },
+    { "entityId": "seal_wraith", "x": 9, "y": 3 }
+  ],
+  "mapObjects": [],
+  "walls": [],
+  "portals": [
+    {
+      "id": "na_cisterns_exit",
+      "x": 8,
+      "y": 15,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0.0,
+      "target_y": 0.0,
+      "target_spawn": null
+    }
+  ],
+  "chests": []
+}

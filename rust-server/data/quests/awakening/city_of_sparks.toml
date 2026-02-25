@@ -1,0 +1,52 @@
+[quest]
+id = "city_of_sparks"
+name = "City of Sparks"
+description = "Investigate three sites of magical disturbance throughout New Aeven and report your findings to the Archmage."
+giver_npc = "guard_captain"
+level_required = 20
+repeatable = false
+lua_script = "awakening/city_of_sparks.lua"
+
+[quest.chain]
+next = "containment_protocol"
+
+[[quest.objectives]]
+id = "investigate_market"
+type = "reach_location"
+target = "na_market_disturbance"
+count = 1
+description = "Investigate the market district disturbance"
+dialogue = "The cobblestones hum beneath your feet. You can feel a deep resonance pulsing from somewhere underground."
+
+[[quest.objectives]]
+id = "investigate_college"
+type = "reach_location"
+target = "na_college_disturbance"
+count = 1
+description = "Investigate the mage college courtyard disturbance"
+dialogue = "The air crackles with stray sparks of magical energy. The resonance is even stronger here."
+
+[[quest.objectives]]
+id = "investigate_gate"
+type = "reach_location"
+target = "na_gate_disturbance"
+count = 1
+description = "Investigate the city gate disturbance"
+dialogue = "A low rumble echoes from deep below. Whatever is causing this, it's beneath the entire city."
+
+[[quest.objectives]]
+id = "report_to_yenara"
+type = "talk_to"
+target = "archmage_yenara"
+description = "Report your findings to Archmage Yenara"
+sequential = true
+
+[quest.rewards]
+exp = 200
+gold = 150
+
+[quest.dialogue]
+offer = "Adventurer! We've got a crisis on our hands. Magic is going haywire all over the city - enchanted lanterns exploding, objects coming to life. I need someone to investigate three disturbance sites and figure out what's causing this."
+accept = "Check the market district, the mage college courtyard, and the city gate. Report anything unusual to Archmage Yenara at the college. She'll know what to make of it."
+progress = "Have you investigated all three sites? Archmage Yenara is waiting for your report."
+complete = "Good work. Whatever you found, Archmage Yenara will want to hear about it immediately."

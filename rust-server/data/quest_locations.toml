@@ -10,3 +10,33 @@ radius = 2
 x = 92
 y = -163
 radius = 3
+
+# =============================================================================
+# The Awakening - New Aeven Locations
+# =============================================================================
+# NOTE: Coordinates are placeholders - update when New Aeven is built in mapper
+
+[na_market_disturbance]
+x = 200
+y = 50
+radius = 3
+
+[na_college_disturbance]
+x = 210
+y = 40
+radius = 3
+
+[na_gate_disturbance]
+x = 190
+y = 60
+radius = 3
+
+[na_cistern_seal]
+x = 8
+y = 12
+radius = 2
+
+[na_wall_breach]
+x = 195
+y = 65
+radius = 3

@@ -1,0 +1,46 @@
+[quest]
+id = "words_of_the_sealed"
+name = "Words of the Sealed"
+description = "Gather materials for a Resonance Lens so Archmage Yenara can decipher the ancient inscriptions beneath the city."
+giver_npc = "archmage_yenara"
+level_required = 25
+repeatable = false
+lua_script = "awakening/words_of_the_sealed.lua"
+
+[quest.chain]
+previous = "the_old_foundation"
+next = "tremors"
+
+[[quest.objectives]]
+id = "collect_quartz"
+type = "collect_item"
+target = "refined_quartz"
+count = 5
+description = "Collect 5 Refined Quartz"
+
+[[quest.objectives]]
+id = "collect_cores"
+type = "collect_item"
+target = "construct_core"
+count = 3
+description = "Collect 3 Construct Cores"
+
+[[quest.objectives]]
+id = "return_to_yenara"
+type = "talk_to"
+target = "archmage_yenara"
+description = "Bring the materials to Archmage Yenara"
+sequential = true
+
+[quest.rewards]
+exp = 400
+gold = 300
+items = [
+    { id = "resonance_lens", count = 1 },
+]
+
+[quest.dialogue]
+offer = "I've partially translated the cistern symbols. They read: 'What sleeps beneath the sand must never wake. The seals hold. The seals must hold.' The writing belongs to a lost civilization called the Aetheri. I need a Resonance Lens to read the rest - but it requires special materials."
+accept = "I need 5 Refined Quartz - you can find it while mining - and 3 Construct Cores from those animated constructs. Bring them to me and I'll craft the lens."
+progress = "Have you gathered the materials? Every moment we delay, the inscriptions fade further."
+complete = "Perfect. Let me assemble the lens... there. The Resonance Lens is complete. Now we can read what the Aetheri were trying to tell us."
