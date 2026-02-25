@@ -2594,6 +2594,43 @@ impl GameRoom {
             (overworld, npc_pos, chair_pos)
         };
 
+        // Snapshot instance collision data if player is in an instance
+        let (inst_collision, inst_width, inst_height, inst_npc_pos, inst_player_pos) =
+            if let Some(ref inst_id) = player_inst {
+                if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                    let collision = instance.collision.read().await.clone();
+                    let width = instance.map_width;
+                    let height = instance.map_height;
+
+                    let npcs = instance.npcs.read().await;
+                    let npc_pos: std::collections::HashSet<(i32, i32)> = npcs
+                        .values()
+                        .filter(|n| n.is_alive())
+                        .map(|n| (n.x, n.y))
+                        .collect();
+
+                    let players = self.players.read().await;
+                    let instances = self.player_instances.read().await;
+                    let player_pos: std::collections::HashSet<(i32, i32)> = players
+                        .values()
+                        .filter(|p| {
+                            p.active
+                                && !p.is_dead
+                                && p.id != player_id
+                                && instances.get(&p.id).map(|i| i.as_str())
+                                    == Some(inst_id.as_str())
+                        })
+                        .map(|p| (p.x, p.y))
+                        .collect();
+
+                    (Some(collision), width, height, Some(npc_pos), Some(player_pos))
+                } else {
+                    (None, 0, 0, None, None)
+                }
+            } else {
+                (None, 0, 0, None, None)
+            };
+
         // Walk up to DASH_DISTANCE tiles, stopping at first collision
         let chunks_guard = self.world.chunks_read().await;
         let mut final_x = px;
@@ -2624,6 +2661,33 @@ impl GameRoom {
                 }
                 if chair_positions.contains(&(check_x, check_y)) {
                     break;
+                }
+            } else {
+                // Instance collision checks
+                if let Some(ref collision) = inst_collision {
+                    if check_x < 0
+                        || check_y < 0
+                        || check_x >= inst_width as i32
+                        || check_y >= inst_height as i32
+                    {
+                        break;
+                    }
+                    let idx = (check_y as u32 * inst_width + check_x as u32) as usize;
+                    if collision.get(idx).copied().unwrap_or(true) {
+                        break;
+                    }
+                } else {
+                    break; // Instance not found - stop dash for safety
+                }
+                if let Some(ref player_pos) = inst_player_pos {
+                    if player_pos.contains(&(check_x, check_y)) {
+                        break;
+                    }
+                }
+                if let Some(ref npc_pos) = inst_npc_pos {
+                    if npc_pos.contains(&(check_x, check_y)) {
+                        break;
+                    }
                 }
             }
 
@@ -11980,6 +12044,36 @@ impl GameRoom {
                 .collect()
         };
 
+        // Snapshot instance collision data and NPC positions for instances with pending moves
+        let mut instance_collision_snapshots: HashMap<String, (Vec<bool>, u32, u32)> =
+            HashMap::new();
+        let mut instance_npc_positions: HashMap<String, std::collections::HashSet<(i32, i32)>> =
+            HashMap::new();
+        {
+            let needed_instances: std::collections::HashSet<&String> = pending_moves
+                .iter()
+                .filter_map(|(id, _, _, _, _, _)| player_instance_map.get(id))
+                .collect();
+
+            for inst_id in needed_instances {
+                if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                    let collision = instance.collision.read().await;
+                    instance_collision_snapshots.insert(
+                        inst_id.clone(),
+                        (collision.clone(), instance.map_width, instance.map_height),
+                    );
+
+                    let npcs = instance.npcs.read().await;
+                    let npc_pos: std::collections::HashSet<(i32, i32)> = npcs
+                        .values()
+                        .filter(|n| n.is_alive())
+                        .map(|n| (n.x, n.y))
+                        .collect();
+                    instance_npc_positions.insert(inst_id.clone(), npc_pos);
+                }
+            }
+        }
+
         // Check walkability and entity collision for each pending move
         // Grab chunks lock once for all walkability checks (avoids per-move lock acquisition)
         let chunks_guard = self.world.chunks_read().await;
@@ -11989,17 +12083,35 @@ impl GameRoom {
             let player_inst = player_instance_map.get(&id);
             let is_overworld = player_inst.is_none();
             let move_dir = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
-            // Skip world collision check for players in interiors
-            // Interior collision is handled client-side for now
-            // TODO: Add server-side interior collision checking
+            // Check static tile collision (overworld uses chunk data, instances use instance collision)
             if is_overworld {
-                // Check static tile collision (only for overworld players)
                 let coord = crate::chunk::ChunkCoord::from_world(target_x, target_y);
                 let walkable = if let Some(chunk) = chunks_guard.get(&coord) {
                     let (lx, ly) = crate::chunk::world_to_local(target_x, target_y);
                     chunk.is_walkable_local(lx, ly)
                 } else {
                     false
+                };
+                if !walkable {
+                    tick_telemetry.rejected_tile_blocked += 1;
+                    continue;
+                }
+            } else if let Some(inst_id) = player_inst.as_ref() {
+                let walkable = if let Some((collision, map_width, map_height)) =
+                    instance_collision_snapshots.get(*inst_id)
+                {
+                    if target_x < 0
+                        || target_y < 0
+                        || target_x >= *map_width as i32
+                        || target_y >= *map_height as i32
+                    {
+                        false
+                    } else {
+                        let idx = (target_y as u32 * map_width + target_x as u32) as usize;
+                        !collision.get(idx).copied().unwrap_or(true)
+                    }
+                } else {
+                    false // Instance not found - reject for safety
                 };
                 if !walkable {
                     tick_telemetry.rejected_tile_blocked += 1;
@@ -12018,8 +12130,17 @@ impl GameRoom {
                 tick_telemetry.rejected_player_blocked += 1;
                 continue;
             }
-            // Check if an NPC is on the target tile (overworld only - instance NPCs checked client-side)
-            if is_overworld && npc_positions.contains(&(target_x, target_y)) {
+            // Check if an NPC is on the target tile
+            let npc_blocked = if is_overworld {
+                npc_positions.contains(&(target_x, target_y))
+            } else if let Some(inst_id) = player_inst.as_ref() {
+                instance_npc_positions
+                    .get(*inst_id)
+                    .map_or(false, |positions| positions.contains(&(target_x, target_y)))
+            } else {
+                false
+            };
+            if npc_blocked {
                 tick_telemetry.rejected_npc_blocked += 1;
                 continue;
             }

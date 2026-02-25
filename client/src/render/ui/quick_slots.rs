@@ -200,12 +200,22 @@ impl Renderer {
                     }
                 }
                 HotkeySlotBinding::Spell { spell_id } => {
-                    let spell_def = SPELLS.iter().find(|s| s.id == spell_id);
-                    if let Some(spell_def) = spell_def {
+                    // Look up spell from static spells or scroll spell definitions
+                    let spell_info: Option<(&str, &str, crate::game::spell::SpellType, i32)> =
+                        SPELLS.iter()
+                            .find(|s| s.id == spell_id)
+                            .map(|s| (s.id, s.name, s.spell_type, s.mana_cost))
+                            .or_else(|| {
+                                state.scroll_spell_definitions.iter()
+                                    .find(|s| s.id == *spell_id)
+                                    .map(|s| (s.id.as_str(), s.name.as_str(), s.spell_type, s.mana_cost))
+                            });
+
+                    if let Some((id, name, spell_type, mana_cost)) = spell_info {
                         self.draw_inventory_slot(x, y, slot_size, true, slot_state);
 
                         // Spell icon
-                        if let Some((texture, source_rect)) = self.spell_icons.get(spell_def.id) {
+                        if let Some((texture, source_rect)) = self.spell_icons.get(id) {
                             let icon_size = slot_size - 8.0;
                             let icon_x = (x + (slot_size - icon_size) / 2.0).floor();
                             let icon_y = (y + (slot_size - icon_size) / 2.0).floor();
@@ -222,7 +232,7 @@ impl Renderer {
                             );
                         } else {
                             // Fallback: colored rectangle with spell's first letter
-                            let color = match spell_def.spell_type {
+                            let color = match spell_type {
                                 crate::game::spell::SpellType::Damage => {
                                     Color::new(0.6, 0.15, 0.15, 0.9)
                                 }
@@ -241,7 +251,7 @@ impl Renderer {
                                 slot_size - pad * 2.0,
                                 color,
                             );
-                            let letter = &spell_def.name[..1];
+                            let letter = &name[..1];
                             let letter_size = 22.0;
                             let letter_w = self.measure_text_sharp(letter, letter_size).width;
                             self.draw_text_sharp(
@@ -254,7 +264,7 @@ impl Renderer {
                         }
 
                         // Mana cost badge (bottom-left)
-                        let mana_text = spell_def.mana_cost.to_string();
+                        let mana_text = mana_cost.to_string();
                         self.draw_text_sharp(
                             &mana_text,
                             x + 3.0 * scale,
@@ -273,9 +283,9 @@ impl Renderer {
                         // Cooldown overlay
                         let on_cooldown = state
                             .spell_cooldowns
-                            .get(spell_def.id)
+                            .get(id)
                             .map_or(false, |&t| now < t);
-                        let insufficient_mana = player_mp < spell_def.mana_cost;
+                        let insufficient_mana = player_mp < mana_cost;
 
                         if on_cooldown {
                             draw_rectangle(
@@ -287,7 +297,7 @@ impl Renderer {
                             );
                             let remaining = state
                                 .spell_cooldowns
-                                .get(spell_def.id)
+                                .get(id)
                                 .map_or(0.0, |&t| (t - now).max(0.0));
                             let cd_text = if remaining >= 60.0 {
                                 let mins = (remaining / 60.0).floor() as u32;
@@ -466,16 +476,20 @@ impl Renderer {
                                 ..Default::default()
                             },
                         );
-                    } else if let Some(spell_def) = SPELLS.iter().find(|s| s.id == spell_id) {
-                        let letter = &spell_def.name[..1];
-                        let lw = self.measure_text_sharp(letter, 16.0).width;
-                        self.draw_text_sharp(
-                            letter,
-                            px + (preview_slot_size - lw) / 2.0,
-                            py + preview_slot_size * 0.65,
-                            16.0,
-                            Color::new(0.5, 0.4, 0.9, 1.0),
-                        );
+                    } else {
+                        let name = SPELLS.iter().find(|s| s.id == spell_id).map(|s| s.name.to_string())
+                            .or_else(|| state.scroll_spell_definitions.iter().find(|s| s.id == *spell_id).map(|s| s.name.clone()));
+                        if let Some(name) = name {
+                            let letter = &name[..1];
+                            let lw = self.measure_text_sharp(letter, 16.0).width;
+                            self.draw_text_sharp(
+                                letter,
+                                px + (preview_slot_size - lw) / 2.0,
+                                py + preview_slot_size * 0.65,
+                                16.0,
+                                Color::new(0.5, 0.4, 0.9, 1.0),
+                            );
+                        }
                     }
                 }
             }

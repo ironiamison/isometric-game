@@ -349,6 +349,12 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
         }
     }
 
+    // Add chair positions so pathfinding routes around them.
+    // The server rejects movement onto chair tiles, so the client must avoid them too.
+    for &(cx, cy) in &state.chair_positions {
+        occupied.insert((cx, cy));
+    }
+
     occupied
 }
 
