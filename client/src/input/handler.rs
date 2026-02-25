@@ -1701,7 +1701,7 @@ impl InputHandler {
                                 ContextMenuTarget::InventorySlot(slot_index) => {
                                     // Inventory slot context menu
                                     // Determine menu options based on item type
-                                    let (is_equippable, is_bones, has_item) = state
+                                    let (is_equippable, is_bones, is_dig, has_item) = state
                                         .inventory
                                         .slots
                                         .get(*slot_index)
@@ -1712,12 +1712,13 @@ impl InputHandler {
                                                 .get_or_placeholder(&slot.item_id);
                                             let equippable = item_def.equipment.is_some();
                                             let bones = slot.item_id.contains("bones");
-                                            (equippable, bones, true)
+                                            let dig = item_def.use_effect.as_deref() == Some("dig");
+                                            (equippable, bones, dig, true)
                                         })
-                                        .unwrap_or((false, false, false));
+                                        .unwrap_or((false, false, false, false));
                                     let chest_open = state.ui_state.chest_open && has_item;
 
-                                    // Build option index mapping: [Equip?] [Bury?] [Deposit?] Drop
+                                    // Build option index mapping: [Equip?] [Bury?] [Dig?] [Deposit?] Drop
                                     let mut current_idx = 0usize;
                                     let equip_idx = if is_equippable {
                                         let idx = current_idx;
@@ -1727,6 +1728,13 @@ impl InputHandler {
                                         None
                                     };
                                     let bury_idx = if is_bones {
+                                        let idx = current_idx;
+                                        current_idx += 1;
+                                        Some(idx)
+                                    } else {
+                                        None
+                                    };
+                                    let dig_idx = if is_dig {
                                         let idx = current_idx;
                                         current_idx += 1;
                                         Some(idx)
@@ -1749,6 +1757,10 @@ impl InputHandler {
                                     } else if Some(*option_idx) == bury_idx {
                                         commands.push(InputCommand::BuryBones {
                                             slot: *slot_index as u8,
+                                        });
+                                    } else if Some(*option_idx) == dig_idx {
+                                        commands.push(InputCommand::UseItem {
+                                            slot_index: *slot_index as u8,
                                         });
                                     } else if Some(*option_idx) == deposit_idx {
                                         commands.push(InputCommand::ChestDeposit {

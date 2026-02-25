@@ -1271,6 +1271,8 @@ pub struct ClientItemDef {
     pub chop_speed_multiplier: Option<f32>,
     pub mine_speed_multiplier: Option<f32>,
     pub prayer_xp: i32,
+    /// Use effect type string (e.g. "dig", "heal") - lets client show context menu actions
+    pub use_effect_type: Option<String>,
 }
 
 /// A dialogue choice for branching dialogue
@@ -3176,6 +3178,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         imap.push((
                             Value::String("mine_speed_multiplier".into()),
                             Value::F32(speed),
+                        ));
+                    }
+                    if let Some(ref effect) = i.use_effect_type {
+                        imap.push((
+                            Value::String("use_effect_type".into()),
+                            Value::String(effect.clone().into()),
                         ));
                     }
                     Value::Map(imap)

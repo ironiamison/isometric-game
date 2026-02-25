@@ -613,7 +613,7 @@ impl Renderer {
             }
 
             // For Blocks tab, also show currently blocked monsters with Remove buttons
-            if active_tab == 2 {
+            if active_tab == 3 {
                 // Separator if there are rewards above
                 if !filtered_rewards.is_empty() {
                     let sep_y = content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;

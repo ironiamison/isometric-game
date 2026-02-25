@@ -1890,6 +1890,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             weapon_type,
                             range,
                             prayer_xp: extract_i32(item_value, "prayer_xp").unwrap_or(0),
+                            use_effect: extract_string(item_value, "use_effect_type"),
                         });
                     }
                 }

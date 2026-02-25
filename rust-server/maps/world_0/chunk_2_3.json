@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AABAEAAAgEAAAICAAAAAAQAAAAIAAAACAAAABAAAAIgAAAAQAAAAIAAAAEAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AABAEAAAgEAAAICAAAAAAQAAAAIAAAACAAAAhAAAAAgAAAAQAAAAIAAAAEAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [
     {
       "entityId": "crow",
@@ -3095,13 +3095,6 @@
     }
   ],
   "mapObjects": [
-    {
-      "gid": 1263,
-      "x": 31,
-      "y": 7,
-      "width": 108,
-      "height": 161
-    },
     {
       "gid": 1263,
       "x": 28,
@@ -3115,6 +3108,13 @@
       "y": 1,
       "width": 51,
       "height": 95
+    },
+    {
+      "gid": 2148,
+      "x": 31,
+      "y": 6,
+      "width": 183,
+      "height": 254
     }
   ],
   "walls": [],

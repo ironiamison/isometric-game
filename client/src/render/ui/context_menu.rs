@@ -50,6 +50,9 @@ impl Renderer {
                     if slot.item_id.contains("bones") {
                         push_option(&mut options, "Bury");
                     }
+                    if item_def.use_effect.as_deref() == Some("dig") {
+                        push_option(&mut options, "Dig");
+                    }
                     if state.ui_state.chest_open {
                         push_option(&mut options, "Deposit");
                     }

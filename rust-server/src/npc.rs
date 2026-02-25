@@ -309,12 +309,16 @@ impl Npc {
         }
     }
 
-    /// Check if ready to respawn
+    /// Check if ready to respawn (respawn_time_ms == 0 means no respawn)
     pub fn ready_to_respawn(&self, current_time: u64) -> bool {
         if self.state != NpcState::Dead {
             return false;
         }
-        current_time - self.death_time >= self.get_respawn_time_ms()
+        let respawn_ms = self.get_respawn_time_ms();
+        if respawn_ms == 0 {
+            return false;
+        }
+        current_time - self.death_time >= respawn_ms
     }
 
     /// Respawn the NPC at its spawn point

@@ -7023,10 +7023,10 @@ impl GameRoom {
             )
             .await;
 
-            // Spawn the entity
+            // Spawn the entity (no respawn - dig-spawned NPCs are one-time)
             if let Some(prototype) = self.entity_registry.get(&site.spawn_entity) {
                 let npc_id = format!("dig_{}_{}", site.id, player_id);
-                let npc = crate::npc::Npc::from_prototype(
+                let mut npc = crate::npc::Npc::from_prototype(
                     &npc_id,
                     &site.spawn_entity,
                     prototype,
@@ -7035,6 +7035,7 @@ impl GameRoom {
                     site.spawn_level,
                     None,
                 );
+                npc.stats.respawn_time_ms = 0;
                 let mut npcs = self.npcs.write().await;
                 npcs.insert(npc_id, npc);
             }

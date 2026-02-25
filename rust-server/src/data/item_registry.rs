@@ -167,6 +167,15 @@ impl ItemRegistry {
                     chop_speed_multiplier,
                     mine_speed_multiplier,
                     prayer_xp: item.prayer_xp,
+                    use_effect_type: item.use_effect.as_ref().map(|e| match e {
+                        super::UseEffect::Heal { .. } => "heal".to_string(),
+                        super::UseEffect::RestoreMana { .. } => "restore_mana".to_string(),
+                        super::UseEffect::RestorePrayer { .. } => "restore_prayer".to_string(),
+                        super::UseEffect::Buff { .. } => "buff".to_string(),
+                        super::UseEffect::Teleport { .. } => "teleport".to_string(),
+                        super::UseEffect::LearnSpell { .. } => "learn_spell".to_string(),
+                        super::UseEffect::Dig => "dig".to_string(),
+                    }),
                 }
             })
             .collect();
