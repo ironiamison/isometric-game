@@ -980,7 +980,7 @@ impl Renderer {
                     }
                 } else {
                     let mut sprites = HashMap::new();
-                    for name in &["dark_hand", "lightning_bolt", "dark_eater", "rock_fall", "self_heal", "bubbles_warp"] {
+                    for name in &["dark_hand", "lightning_bolt", "dark_eater", "rock_fall", "self_heal", "bubbles_warp", "tornado"] {
                         let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                         if let Ok(tex) = load_texture(&path).await {
                             tex.set_filter(FilterMode::Nearest);
@@ -991,7 +991,7 @@ impl Renderer {
                 }
             } else {
                 let mut sprites = HashMap::new();
-                for name in &["dark_hand", "lightning_bolt", "dark_eater", "rock_fall", "self_heal", "bubbles_warp"] {
+                for name in &["dark_hand", "lightning_bolt", "dark_eater", "rock_fall", "self_heal", "bubbles_warp", "tornado"] {
                     let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                     if let Ok(tex) = load_texture(&path).await {
                         tex.set_filter(FilterMode::Nearest);
@@ -4570,6 +4570,7 @@ impl Renderer {
                 "rock_fall" => "rock_fall",
                 "heal" => "self_heal",
                 "teleport" | "return_home" => "bubbles_warp",
+                "tornado" => "tornado",
                 _ => continue,
             };
 
