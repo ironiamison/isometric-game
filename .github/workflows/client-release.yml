@@ -143,8 +143,8 @@ jobs:
             exit 0
           fi
 
-          sudo apt-get update
-          sudo apt-get install -y awscli
+          python -m pip install --upgrade --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
           PREFIX="${R2_PREFIX:-isometric}"
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"

@@ -452,8 +452,9 @@ fn set_executable(_path: &Path) -> Result<(), String> {
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(420.0, 380.0)),
-        resizable: false,
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([420.0, 380.0])
+            .with_resizable(false),
         ..Default::default()
     };
     eframe::run_native(
