@@ -20,10 +20,10 @@ By default the launcher looks for `launcher-config.toml` next to the executable 
   "version": "2.17.1",
   "platforms": {
     "macos-arm64": {
-      "entrypoint": "isometric-client",
+      "entrypoint": "new-aeven",
       "files": [
         {
-          "path": "isometric-client",
+          "path": "new-aeven",
           "sha256": "...",
           "size": 123456,
           "executable": true
@@ -76,7 +76,7 @@ Then build the manifest:
 python3 tools/launcher_manifest.py \
   --platform macos-arm64 \
   --input /path/to/dist/macos-arm64 \
-  --entrypoint isometric-client \
+  --entrypoint new-aeven \
   --version 2.17.1 \
   --out /path/to/dist/manifest.json
 ```
@@ -87,7 +87,7 @@ Run it again with `--merge` for other platforms:
 python3 tools/launcher_manifest.py \
   --platform windows-x86_64 \
   --input /path/to/dist/windows-x86_64 \
-  --entrypoint isometric-client.exe \
+  --entrypoint new-aeven.exe \
   --version 2.17.1 \
   --out /path/to/dist/manifest.json \
   --merge

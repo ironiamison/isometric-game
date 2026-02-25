@@ -1,5 +1,5 @@
 [package]
-name = "isometric-launcher"
+name = "new-aeven-launcher"
 version = "0.1.0"
 edition = "2021"
 description = "Desktop launcher for Isometric MMORPG"

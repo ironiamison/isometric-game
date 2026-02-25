@@ -1,0 +1,118 @@
+name: Launcher Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'launcher/**'
+      - 'tools/**'
+      - '.github/workflows/launcher-release.yml'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win64
+            bin: launcher/target/release/new-aeven-launcher.exe
+            archive: new-aeven-launcher-win64.zip
+            format: zip
+          - os: macos-latest
+            platform: macos
+            bin: launcher/target/release/new-aeven-launcher
+            archive: new-aeven-launcher-macos.zip
+            format: zip
+          - os: ubuntu-latest
+            platform: linux
+            bin: launcher/target/release/new-aeven-launcher
+            archive: new-aeven-launcher-linux.tar.gz
+            format: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev \
+            libudev-dev libxcursor-dev libxrandr-dev libxinerama-dev
+
+      - name: Build launcher
+        run: cargo build --release --manifest-path launcher/Cargo.toml
+
+      - name: Package launcher
+        shell: bash
+        run: |
+          python tools/package_launcher.py \
+            --platform "${{ matrix.platform }}" \
+            --bin "${{ matrix.bin }}" \
+            --config launcher/launcher-config.toml \
+            --logo launcher/assets/logo.png \
+            --format "${{ matrix.format }}" \
+            --out "dist/launcher/${{ matrix.archive }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: dist/launcher/${{ matrix.archive }}
+
+  upload:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/launcher
+
+      - name: Upload to R2 (optional)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PREFIX: ${{ vars.R2_LAUNCHER_PREFIX }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${R2_ACCOUNT_ID:-}" ] || [ -z "${R2_BUCKET:-}" ] || [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+            echo "R2 secrets not set; skipping upload."
+            exit 0
+          fi
+
+          python -m pip install --upgrade --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+          PREFIX="${R2_PREFIX:-launcher}"
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          aws s3 sync dist/launcher "s3://${R2_BUCKET}/${PREFIX}" \
+            --endpoint-url "$ENDPOINT" \
+            --cache-control "no-cache" \
+            --no-progress

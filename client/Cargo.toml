@@ -1,5 +1,5 @@
 [package]
-name = "isometric-client"
+name = "new-aeven-client"
 version = "2.17.1"
 edition = "2021"
 description = "Isometric MMORPG client"
@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [[bin]]
-name = "isometric-client"
+name = "new-aeven"
 path = "src/main.rs"
 
 [dependencies]
@@ -44,6 +44,7 @@ ewebsock = { version = "0.6", features = ["tls"] }
 # Desktop-only dependencies (not Android, not WASM)
 [target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))'.dependencies]
 dirs = "5.0"
+image = { version = "0.24", default-features = false, features = ["png"] }
 
 # WASM dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]

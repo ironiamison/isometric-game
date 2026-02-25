@@ -87,7 +87,6 @@ async fn load_player_sprites() -> SpritesheetStore {
 }
 
 /// Load a spritesheet atlas texture and return the texture + rect mappings
-#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 async fn load_spritesheet_atlas(
     atlas_info: &crate::util::SpriteAtlasInfo,
 ) -> Option<(Texture2D, HashMap<String, Rect>)> {
@@ -482,20 +481,15 @@ impl LoginScreen {
         }
     }
 
-    /// Use pre-loaded font from the renderer (avoids duplicate loading on WASM/Android)
-    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+    /// Use pre-loaded font from the renderer (avoids duplicate loading)
     pub fn use_renderer_font(&mut self, font: BitmapFont) {
         self.font = font;
     }
 
     /// Load font and logo asynchronously - call this after creating the screen
     pub async fn load_font(&mut self) {
-        // On WASM/Android, font should be set via use_renderer_font() before this call
-        // Only load the font if not already set (check if fonts map is empty)
-        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        // Font may already be set via use_renderer_font()
         let font_already_loaded = !self.font.is_empty();
-        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        let font_already_loaded = false;
 
         if !font_already_loaded {
             self.font =
@@ -1299,8 +1293,7 @@ impl CharacterSelectScreen {
         }
     }
 
-    /// Use pre-loaded assets from the renderer (avoids duplicate loading on WASM/Android)
-    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+    /// Use pre-loaded assets from the renderer (avoids duplicate loading)
     pub fn use_renderer_assets(
         &mut self,
         font: BitmapFont,
@@ -1316,63 +1309,45 @@ impl CharacterSelectScreen {
 
     /// Load font and sprites asynchronously - call this after creating the screen
     pub async fn load_font(&mut self) {
-        // On WASM/Android, font and sprites should be set via use_renderer_assets() before this call
-        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-        {
-            if self.player_sprites.len() > 0 {
-                // Assets already set from renderer, skip loading entirely
-                return;
-            }
+        // If assets were pre-loaded via use_renderer_assets(), skip loading
+        if self.player_sprites.len() > 0 {
+            return;
         }
 
         self.font =
             BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
 
-        // On WASM/Android, sprites should be set via use_renderer_sprites() before this call
-        // to avoid duplicate network requests. Skip loading if already set.
-        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-        {
-            if self.player_sprites.len() > 0 {
-                // Sprites already set from renderer, skip loading
-                return;
-            }
+        // Load sprites from atlas or individually
+        let manifest = SpriteManifest::load().await;
 
-            // Fallback: load from atlas if not set
-            let manifest = SpriteManifest::load().await;
-            if let Some(ref atlas_info) = manifest.players_atlas {
-                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.player_sprites = SpritesheetStore::Atlas {
-                        texture: tex,
-                        rects,
-                    };
-                }
+        if let Some(ref atlas_info) = manifest.players_atlas {
+            if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                self.player_sprites = SpritesheetStore::Atlas {
+                    texture: tex,
+                    rects,
+                };
             }
-            if let Some(ref atlas_info) = manifest.hair_atlas {
-                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.hair_sprites = SpritesheetStore::Atlas {
-                        texture: tex,
-                        rects,
-                    };
-                }
-            }
-            self.load_equipment_sprites(&manifest).await;
+        }
+        if self.player_sprites.len() == 0 {
+            self.player_sprites = load_player_sprites().await;
         }
 
-        // Desktop: always load individually
-        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        {
-            let manifest = SpriteManifest::load().await;
-            self.player_sprites = load_player_sprites().await;
-
+        if let Some(ref atlas_info) = manifest.hair_atlas {
+            if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                self.hair_sprites = SpritesheetStore::Atlas {
+                    texture: tex,
+                    rects,
+                };
+            }
+        }
+        if self.hair_sprites.len() == 0 {
             let mut hair_map = HashMap::new();
             for style in 0..6i32 {
-                // Male hair sprites
                 let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
                 if let Ok(tex) = load_texture(&path).await {
                     tex.set_filter(FilterMode::Nearest);
                     hair_map.insert(format!("male_{}", style), tex);
                 }
-                // Female hair sprites
                 let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
                 if let Ok(tex) = load_texture(&path).await {
                     tex.set_filter(FilterMode::Nearest);
@@ -1380,68 +1355,60 @@ impl CharacterSelectScreen {
                 }
             }
             self.hair_sprites = SpritesheetStore::Individual(hair_map);
-
-            // Load equipment sprites for characters' equipped items
-            self.load_equipment_sprites(&manifest).await;
         }
+
+        self.load_equipment_sprites(&manifest).await;
     }
 
     async fn load_equipment_sprites(&mut self, manifest: &SpriteManifest) {
-        // On WASM/Android, load from atlas
-        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-        {
-            if let Some(ref atlas_info) = manifest.equipment_atlas {
-                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.equipment_sprites = SpritesheetStore::Atlas {
-                        texture: tex,
-                        rects,
-                    };
-                    return;
-                }
-            }
-        }
-
-        // Desktop fallback: load individual equipment sprites
-        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        {
-            let mut sprite_keys: Vec<String> = Vec::new();
-            for c in &self.characters {
-                for slot in [
-                    &c.sprite_head,
-                    &c.sprite_body,
-                    &c.sprite_weapon,
-                    &c.sprite_back,
-                    &c.sprite_feet,
-                ] {
-                    if let Some(key) = slot {
-                        if !sprite_keys.contains(key) && !self.equipment_sprites.contains(key) {
-                            sprite_keys.push(key.clone());
-                        }
-                    }
-                }
-            }
-
-            if sprite_keys.is_empty() {
+        // Try atlas first
+        if let Some(ref atlas_info) = manifest.equipment_atlas {
+            if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                self.equipment_sprites = SpritesheetStore::Atlas {
+                    texture: tex,
+                    rects,
+                };
                 return;
             }
+        }
 
-            let mut equip_map = HashMap::new();
-            for sprite_key in &sprite_keys {
-                // Find the matching manifest entry (e.g. "equipment/head/iron_helm")
-                for entry in &manifest.equipment {
-                    let key = entry.rsplit('/').next().unwrap_or(entry);
-                    if key == sprite_key {
-                        let path = asset_path(&format!("assets/sprites/{}.png", entry));
-                        if let Ok(tex) = load_texture(&path).await {
-                            tex.set_filter(FilterMode::Nearest);
-                            equip_map.insert(sprite_key.clone(), tex);
-                        }
-                        break;
+        // Fallback: load individual equipment sprites
+        let mut sprite_keys: Vec<String> = Vec::new();
+        for c in &self.characters {
+            for slot in [
+                &c.sprite_head,
+                &c.sprite_body,
+                &c.sprite_weapon,
+                &c.sprite_back,
+                &c.sprite_feet,
+            ] {
+                if let Some(key) = slot {
+                    if !sprite_keys.contains(key) && !self.equipment_sprites.contains(key) {
+                        sprite_keys.push(key.clone());
                     }
                 }
             }
-            self.equipment_sprites = SpritesheetStore::Individual(equip_map);
         }
+
+        if sprite_keys.is_empty() {
+            return;
+        }
+
+        let mut equip_map = HashMap::new();
+        for sprite_key in &sprite_keys {
+            for entry in &manifest.equipment {
+                let key = entry.rsplit('/').next().unwrap_or(entry);
+                if key == sprite_key {
+                    let path = asset_path(&format!("assets/sprites/{}.png", entry));
+                    if let Ok(tex) = load_texture(&path).await {
+                        tex.set_filter(FilterMode::Nearest);
+                        equip_map.insert(sprite_key.clone(), tex);
+                    }
+                    break;
+                }
+            }
+        }
+        self.equipment_sprites = SpritesheetStore::Individual(equip_map);
     }
 
     /// Load equipment sprites if characters have been loaded (WASM only)
@@ -2212,8 +2179,7 @@ impl CharacterCreateScreen {
         }
     }
 
-    /// Use pre-loaded assets from the renderer (avoids duplicate loading on WASM/Android)
-    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+    /// Use pre-loaded assets from the renderer (avoids duplicate loading)
     pub fn use_renderer_assets(
         &mut self,
         font: BitmapFont,
@@ -2226,36 +2192,11 @@ impl CharacterCreateScreen {
     }
 
     pub async fn load_font(&mut self) {
-        // On WASM/Android, font and sprites should be set via use_renderer_assets() before this call
-        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
-        {
-            if self.player_sprites.len() > 0 {
-                // Assets already set from renderer, skip loading entirely
-                return;
-            }
-
-            // Fallback: load from atlas if not set
-            let manifest = SpriteManifest::load().await;
-            if let Some(ref atlas_info) = manifest.players_atlas {
-                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.player_sprites = SpritesheetStore::Atlas {
-                        texture: tex,
-                        rects,
-                    };
-                }
-            }
-            if let Some(ref atlas_info) = manifest.hair_atlas {
-                if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    self.hair_sprites = SpritesheetStore::Atlas {
-                        texture: tex,
-                        rects,
-                    };
-                }
-            }
+        // If assets were pre-loaded via use_renderer_assets(), skip loading
+        if self.player_sprites.len() > 0 {
+            return;
         }
 
-        // Desktop: always load individually
-        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         {
             self.font =
                 BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf")

@@ -125,16 +125,54 @@ pub fn update_tutorial(game_state: &mut GameState) {
 }
 
 pub fn window_conf() -> Conf {
+    let icon = load_icon().map(|icon| Some(icon)).unwrap_or(None);
     Conf {
         window_title: "New Aeven".to_string(),
         window_width: 1280,
         window_height: 720,
         fullscreen: false,
+        icon,
         platform: miniquad::conf::Platform {
             swap_interval: Some(0),
             ..Default::default()
         },
         ..Default::default()
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+fn load_icon() -> Option<miniquad::conf::Icon> {
+    let candidates = [
+        "assets/logo.png",
+        "assets/ui/logo.png",
+        "assets/favicon.png",
+    ];
+    for path in candidates {
+        if let Ok(bytes) = std::fs::read(path) {
+            if let Ok(image) = image::load_from_memory(&bytes) {
+                return Some(icon_from_image(image));
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "android")]
+fn load_icon() -> Option<miniquad::conf::Icon> {
+    None
+}
+
+#[cfg(not(target_os = "android"))]
+fn icon_from_image(image: image::DynamicImage) -> miniquad::conf::Icon {
+    let img = image.to_rgba8();
+    let icon16 = image::imageops::resize(&img, 16, 16, image::imageops::FilterType::Lanczos3);
+    let icon32 = image::imageops::resize(&img, 32, 32, image::imageops::FilterType::Lanczos3);
+    let icon64 = image::imageops::resize(&img, 64, 64, image::imageops::FilterType::Lanczos3);
+
+    miniquad::conf::Icon {
+        small: icon16.into_raw().try_into().unwrap_or([0; 16 * 16 * 4]),
+        medium: icon32.into_raw().try_into().unwrap_or([0; 32 * 32 * 4]),
+        big: icon64.into_raw().try_into().unwrap_or([0; 64 * 64 * 4]),
     }
 }
 

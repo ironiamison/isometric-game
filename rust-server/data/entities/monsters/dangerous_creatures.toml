@@ -837,14 +837,8 @@ respawn_time_ms = 10000
 
 [snake.rewards]
 exp_base = 32
-gold_min = 5
-gold_max = 14
-
-[[snake.loot]]
-item_id = "regular_bones"
-drop_chance = 1.0
-quantity_min = 1
-quantity_max = 1
+gold_min = 2
+gold_max = 6
 
 [snake.behaviors]
 hostile = true

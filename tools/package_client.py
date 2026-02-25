@@ -17,7 +17,7 @@ def copy_file(src: Path, dst: Path) -> None:
 
 
 def default_binary_name() -> str:
-    return "isometric-client.exe" if os.name == "nt" else "isometric-client"
+    return "new-aeven.exe" if os.name == "nt" else "new-aeven"
 
 
 def main() -> None:

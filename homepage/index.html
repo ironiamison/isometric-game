@@ -494,6 +494,35 @@
         line-height: 1.6;
         margin-bottom: 1.2rem;
       }
+      .platform-hint {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.7rem;
+        color: var(--ink-light);
+        margin-top: 0.75rem;
+      }
+      .platform-links {
+        margin-top: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.75rem;
+      }
+      .platform-links a {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.7rem;
+        color: var(--ink);
+        text-decoration: none;
+        border-bottom: 2px dotted var(--ink-light);
+        padding-bottom: 2px;
+      }
+      .platform-links a:hover {
+        color: var(--moss);
+        border-color: var(--moss);
+      }
+      .platform-links a.active {
+        color: var(--moss);
+        border-color: var(--moss);
+      }
       .media-section {
         background: repeating-linear-gradient(
             0deg,
@@ -749,12 +778,39 @@
               Download for Windows, macOS, or Linux for the best experience.
             </p>
             <a
-              href="https://discord.gg/DEUEhkrAms"
+              href="https://dl.aeven.xyz/launcher/new-aeven-launcher-win64.zip"
               class="pixel-btn btn-primary desktop-download-btn"
               style="position: relative"
+              data-win="https://dl.aeven.xyz/launcher/new-aeven-launcher-win64.zip"
+              data-mac="https://dl.aeven.xyz/launcher/new-aeven-launcher-macos.zip"
+              data-linux="https://dl.aeven.xyz/launcher/new-aeven-launcher-linux.tar.gz"
             >
               Download
             </a>
+            <div class="platform-hint">
+              Detected: <span class="platform-label">your platform</span>. Not
+              right? Choose below.
+            </div>
+            <div class="platform-links">
+              <a
+                class="platform-link"
+                data-platform="windows"
+                href="https://dl.aeven.xyz/launcher/new-aeven-launcher-win64.zip"
+                >Windows</a
+              >
+              <a
+                class="platform-link"
+                data-platform="mac"
+                href="https://dl.aeven.xyz/launcher/new-aeven-launcher-macos.zip"
+                >macOS</a
+              >
+              <a
+                class="platform-link"
+                data-platform="linux"
+                href="https://dl.aeven.xyz/launcher/new-aeven-launcher-linux.tar.gz"
+                >Linux</a
+              >
+            </div>
           </div>
 
           <div class="card pixel-box fade-up">
@@ -768,31 +824,47 @@
             >
           </div>
           <script>
-            // Pixel tooltip logic for desktop download button
+            // Smart desktop download selection
             document.addEventListener("DOMContentLoaded", function () {
               var btn = document.querySelector(".desktop-download-btn");
-              var tooltip = btn ? btn.querySelector(".pixel-tooltip") : null;
-              if (btn && tooltip) {
-                btn.addEventListener("mouseenter", function () {
-                  tooltip.style.display = "block";
-                  tooltip.style.opacity = "1";
+              if (!btn) return;
+
+              var label = document.querySelector(".platform-label");
+              var links = document.querySelectorAll(".platform-link");
+
+              var downloads = {
+                windows: btn.getAttribute("data-win"),
+                mac: btn.getAttribute("data-mac"),
+                linux: btn.getAttribute("data-linux"),
+              };
+
+              function detectPlatform() {
+                var platform = navigator.platform || "";
+                var ua = navigator.userAgent || "";
+                if (/Win/i.test(platform) || /Windows/i.test(ua)) return "windows";
+                if (/Mac/i.test(platform) || /Macintosh/i.test(ua)) return "mac";
+                if (/Linux/i.test(platform) || /X11/i.test(ua)) return "linux";
+                return null;
+              }
+
+              var detected = detectPlatform();
+              var names = {
+                windows: "Windows",
+                mac: "macOS",
+                linux: "Linux",
+              };
+
+              if (detected && downloads[detected]) {
+                btn.href = downloads[detected];
+                btn.textContent = "Download (" + names[detected] + ")";
+                if (label) label.textContent = names[detected];
+                links.forEach(function (link) {
+                  if (link.getAttribute("data-platform") === detected) {
+                    link.classList.add("active");
+                  }
                 });
-                btn.addEventListener("mouseleave", function () {
-                  tooltip.style.opacity = "0";
-                  setTimeout(function () {
-                    tooltip.style.display = "none";
-                  }, 140);
-                });
-                btn.addEventListener("focus", function () {
-                  tooltip.style.display = "block";
-                  tooltip.style.opacity = "1";
-                });
-                btn.addEventListener("blur", function () {
-                  tooltip.style.opacity = "0";
-                  setTimeout(function () {
-                    tooltip.style.display = "none";
-                  }, 140);
-                });
+              } else {
+                if (label) label.textContent = "your platform";
               }
             });
           </script>
