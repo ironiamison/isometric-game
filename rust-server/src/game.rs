@@ -38,13 +38,13 @@ const STARTING_HP: i32 = 100;
 const ATTACK_RANGE: i32 = 1; // Maximum distance to attack (in tiles)
 const ATTACK_COOLDOWN_MS: u64 = 800; // Universal cooldown for attacks and gathering (matches client)
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
-const REGEN_INTERVAL_MS: u64 = 30000;
+const REGEN_INTERVAL_MS: u64 = 15000;
 
 // Prayer drain interval (60 ticks = 3 seconds at 20 ticks/second)
 const PRAYER_DRAIN_INTERVAL_TICKS: u64 = 60;
 
-// Mana regen interval (30 ticks = 1.5 seconds at 20 ticks/second)
-const MANA_REGEN_INTERVAL_TICKS: u64 = 30;
+// Mana regen interval (60 ticks = 3 seconds at 20 ticks/second)
+const MANA_REGEN_INTERVAL_TICKS: u64 = 60;
 
 // View distance for StateSync culling (Chebyshev distance in tiles)
 const VIEW_DISTANCE: i32 = 40;
@@ -6798,10 +6798,9 @@ impl GameRoom {
                                 player.apply_buff(stat.clone(), *amount, *duration_ms, now);
                                 format!("buff:{}:{}:{}", stat, amount, duration_ms)
                             }
-                            Some(UseEffect::Teleport { destination }) => {
-                                // Teleport to the world spawn point
-                                player.x = WORLD_SPAWN_X;
-                                player.y = WORLD_SPAWN_Y;
+                            Some(UseEffect::Teleport { destination, x, y }) => {
+                                player.x = *x;
+                                player.y = *y;
                                 player.move_dx = 0;
                                 player.move_dy = 0;
                                 format!("teleport:{}", destination)
@@ -12195,7 +12194,7 @@ impl GameRoom {
                 let max_mp = player.max_mp();
                 if player.mp < max_mp {
                     let magic_level = player.skills.magic.level;
-                    let regen_amount = 1 + (magic_level / 20);
+                    let regen_amount = 1 + (magic_level / 30);
                     player.mp = (player.mp + regen_amount).min(max_mp);
                 }
             }

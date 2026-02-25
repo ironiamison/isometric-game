@@ -320,6 +320,8 @@ sellable = true
 [scroll_aeven_teleport.use_effect]
 type = "teleport"
 destination = "new_aeven"
+x = -48
+y = -169
 
 [scroll_tornado]
 display_name = "Scroll of Tornado"
