@@ -15,6 +15,14 @@ count = 1
 description = "Find the northern obelisk"
 
 [[quest.objectives]]
+id = "dig_at_blockage"
+type = "reach_location"
+target = "obelisk_blockage_dig"
+count = 1
+description = "Dig at the disturbed ground near the obelisk"
+sequential = true
+
+[[quest.objectives]]
 id = "kill_hedgehog"
 type = "kill_monster"
 target = "hedgehog"

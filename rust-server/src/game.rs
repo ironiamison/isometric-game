@@ -7023,6 +7023,11 @@ impl GameRoom {
             )
             .await;
 
+            // Complete the dig objective via location reached event
+            let dig_location_id = format!("{}_dig", site.id);
+            self.process_quest_location_reached(player_id, &dig_location_id, site.x, site.y)
+                .await;
+
             // Spawn the entity (no respawn - dig-spawned NPCs are one-time)
             if let Some(prototype) = self.entity_registry.get(&site.spawn_entity) {
                 let npc_id = format!("dig_{}_{}", site.id, player_id);

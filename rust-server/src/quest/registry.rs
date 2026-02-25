@@ -338,6 +338,33 @@ impl QuestRegistry {
         results
     }
 
+    /// Check if a sequential objective's prerequisites are met.
+    /// For a sequential objective, all objectives defined BEFORE it must be complete.
+    fn is_objective_available(
+        quest: &Quest,
+        objective: &super::definition::Objective,
+        progress: &QuestProgress,
+    ) -> bool {
+        if !objective.sequential {
+            return true;
+        }
+        // Check all preceding objectives are complete
+        for prior in &quest.objectives {
+            if prior.id == objective.id {
+                break; // Stop at the current objective
+            }
+            if !progress
+                .objectives
+                .get(&prior.id)
+                .map(|p| p.completed)
+                .unwrap_or(false)
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Update kill objectives for active quests
     async fn update_kill_objectives(
         &self,
@@ -356,6 +383,12 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::KillMonster
                         && objective.target == entity_type
                     {
+                        // Check sequential prerequisites
+                        if let Some(progress) = player_state.get_quest(&quest_id) {
+                            if !Self::is_objective_available(quest, objective, progress) {
+                                continue;
+                            }
+                        }
                         if let Some(result) =
                             self.update_single_objective(player_state, &quest_id, &objective.id, 1)
                         {
@@ -461,6 +494,12 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::CollectItem
                         && objective.target == item_id
                     {
+                        // Check sequential prerequisites
+                        if let Some(progress) = player_state.get_quest(&quest_id) {
+                            if !Self::is_objective_available(quest, objective, progress) {
+                                continue;
+                            }
+                        }
                         if let Some(result) = self.update_single_objective(
                             player_state,
                             &quest_id,
@@ -494,25 +533,10 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::TalkTo
                         && objective.target == npc_id
                     {
-                        // Check if this is a sequential objective (must complete others first)
-                        if objective.sequential {
-                            // Get all other objectives and check if they're complete
-                            if let Some(progress) = player_state.get_quest(&quest_id) {
-                                let others_complete = quest
-                                    .objectives
-                                    .iter()
-                                    .filter(|o| o.id != objective.id)
-                                    .all(|o| {
-                                        progress
-                                            .objectives
-                                            .get(&o.id)
-                                            .map(|p| p.completed)
-                                            .unwrap_or(false)
-                                    });
-                                if !others_complete {
-                                    // Can't complete this objective yet
-                                    continue;
-                                }
+                        // Check sequential prerequisites
+                        if let Some(progress) = player_state.get_quest(&quest_id) {
+                            if !Self::is_objective_available(quest, objective, progress) {
+                                continue;
                             }
                         }
 
@@ -582,6 +606,12 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::ReachLocation
                         && objective.target == location_id
                     {
+                        // Check sequential prerequisites
+                        if let Some(progress) = player_state.get_quest(&quest_id) {
+                            if !Self::is_objective_available(quest, objective, progress) {
+                                continue;
+                            }
+                        }
                         if let Some(result) =
                             self.force_complete_objective(player_state, &quest_id, &objective.id)
                         {
@@ -620,6 +650,12 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::DepleteTree
                         && objective.target == tree_type
                     {
+                        // Check sequential prerequisites
+                        if let Some(progress) = player_state.get_quest(&quest_id) {
+                            if !Self::is_objective_available(quest, objective, progress) {
+                                continue;
+                            }
+                        }
                         info!("Match found! Updating objective '{}'", objective.id);
                         if let Some(result) =
                             self.update_single_objective(player_state, &quest_id, &objective.id, 1)
@@ -659,6 +695,12 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::DepleteRock
                         && objective.target == rock_type
                     {
+                        // Check sequential prerequisites
+                        if let Some(progress) = player_state.get_quest(&quest_id) {
+                            if !Self::is_objective_available(quest, objective, progress) {
+                                continue;
+                            }
+                        }
                         info!("Match found! Updating objective '{}'", objective.id);
                         if let Some(result) =
                             self.update_single_objective(player_state, &quest_id, &objective.id, 1)
@@ -690,6 +732,12 @@ impl QuestRegistry {
                     if objective.objective_type == ObjectiveType::ReachLevel
                         && objective.target.eq_ignore_ascii_case(skill)
                     {
+                        // Check sequential prerequisites
+                        if let Some(progress) = player_state.get_quest(&quest_id) {
+                            if !Self::is_objective_available(quest, objective, progress) {
+                                continue;
+                            }
+                        }
                         if let Some(result) = self.set_objective_progress(
                             player_state,
                             &quest_id,
@@ -720,6 +768,12 @@ impl QuestRegistry {
             if let Some(quest) = quests.get(&quest_id) {
                 for objective in &quest.objectives {
                     if objective.objective_type == ObjectiveType::ReachGold {
+                        // Check sequential prerequisites
+                        if let Some(progress) = player_state.get_quest(&quest_id) {
+                            if !Self::is_objective_available(quest, objective, progress) {
+                                continue;
+                            }
+                        }
                         if let Some(result) = self.set_objective_progress(
                             player_state,
                             &quest_id,

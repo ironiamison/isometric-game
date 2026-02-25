@@ -6,6 +6,6 @@ x = 94
 y = -160
 radius = 1
 quest_id = "obelisk_connection"
-quest_objective_id = "kill_hedgehog"
+quest_objective_id = "dig_at_blockage"
 spawn_entity = "hedgehog"
 spawn_level = 6

@@ -48,12 +48,18 @@ end
 
 function show_progress_dialogue(ctx)
     local reach = ctx:get_objective_progress("reach_north_obelisk")
+    local dig = ctx:get_objective_progress("dig_at_blockage")
     local kill = ctx:get_objective_progress("kill_hedgehog")
 
     if reach.current < reach.target then
         ctx:show_dialogue({
             speaker = "Researcher Orin",
             text = "Still here? The northern obelisk is a long journey from here. Head north and keep your eyes open - you'll know it when you see it."
+        })
+    elseif dig.current < dig.target then
+        ctx:show_dialogue({
+            speaker = "Researcher Orin",
+            text = "You found the obelisk? Excellent! I've heard there's some disturbed ground nearby - try using a shovel to dig around the area. Something may be lurking beneath the surface that's disrupting the connection."
         })
     elseif kill.current < kill.target then
         ctx:show_dialogue({
