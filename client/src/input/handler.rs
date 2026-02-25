@@ -8,7 +8,7 @@ use crate::game::{
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
 use crate::render::isometric::screen_to_world;
-use crate::render::{section_sort_key, SECTION_HEADER_HEIGHT};
+use crate::render::{section_sort_key, sections_for_tab, SECTION_HEADER_HEIGHT};
 use crate::settings::{save_ui_settings, UiSettings};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
@@ -5505,6 +5505,7 @@ impl InputHandler {
                         }
                         UiElementId::AlchemyBrewButton => {
                             if !state.ui_state.crafting_in_progress {
+                                let tab_sections = sections_for_tab(state.ui_state.alchemy_station_tab);
                                 let mut alchemy_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
@@ -5513,8 +5514,14 @@ impl InputHandler {
                                         !r.requires_discovery
                                             || state.discovered_recipes.contains(&r.id)
                                     })
+                                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
                                     .collect();
-                                alchemy_recipes.sort_by_key(|r| r.level_required);
+                                alchemy_recipes.sort_by(|a, b| {
+                                    let sa = a.section.as_deref().unwrap_or("");
+                                    let sb = b.section.as_deref().unwrap_or("");
+                                    section_sort_key(sa).cmp(&section_sort_key(sb))
+                                        .then(a.level_required.cmp(&b.level_required))
+                                });
                                 if let Some(recipe) =
                                     alchemy_recipes.get(state.ui_state.alchemy_station_selected_recipe)
                                 {
@@ -5579,6 +5586,7 @@ impl InputHandler {
             }
 
             if !state.ui_state.crafting_in_progress {
+                let tab_sections = sections_for_tab(state.ui_state.alchemy_station_tab);
                 let mut alchemy_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
@@ -5586,8 +5594,14 @@ impl InputHandler {
                     .filter(|r| {
                         !r.requires_discovery || state.discovered_recipes.contains(&r.id)
                     })
+                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
                     .collect();
-                alchemy_recipes.sort_by_key(|r| r.level_required);
+                alchemy_recipes.sort_by(|a, b| {
+                    let sa = a.section.as_deref().unwrap_or("");
+                    let sb = b.section.as_deref().unwrap_or("");
+                    section_sort_key(sa).cmp(&section_sort_key(sb))
+                        .then(a.level_required.cmp(&b.level_required))
+                });
                 let recipe_count = alchemy_recipes.len();
 
                 // Count unique sections to include section header heights (must match renderer)
