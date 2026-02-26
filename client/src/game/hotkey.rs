@@ -40,8 +40,18 @@ pub struct HotkeyBarConfig {
 
 impl Default for HotkeyBarConfig {
     fn default() -> Self {
+        let mut first_preset = HotkeyPreset::default();
+        first_preset.slots[0] = HotkeySlotBinding::Spell {
+            spell_id: "return_home".to_string(),
+        };
         Self {
-            presets: Default::default(),
+            presets: [
+                first_preset,
+                HotkeyPreset::default(),
+                HotkeyPreset::default(),
+                HotkeyPreset::default(),
+                HotkeyPreset::default(),
+            ],
             active_preset: 0,
         }
     }
