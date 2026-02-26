@@ -49,6 +49,7 @@ enum ConnectionState {
 }
 
 const MAX_RECONNECT_ATTEMPTS: u32 = 3;
+const MAX_STATE_SYNCS_PER_FRAME: usize = 4;
 
 pub struct NetworkClient {
     sender: Option<WsSender>,
@@ -329,9 +330,10 @@ impl NetworkClient {
 
         let mut should_disconnect = false;
 
-        // Collect decoded messages and keep only the latest stateSync to avoid stale rewinds.
+        // Collect decoded messages and keep recent stateSyncs to avoid stale rewinds
+        // while still allowing smooth multi-step interpolation on low-latency links.
         let mut other_messages: Vec<DecodedMessage> = Vec::new();
-        let mut latest_state_sync: Option<(u64, DecodedMessage)> = None; // (tick, message)
+        let mut state_syncs: Vec<(u64, DecodedMessage)> = Vec::new(); // (tick, message)
 
         for event in events {
             match event {
@@ -355,15 +357,7 @@ impl NetworkClient {
                         }
 
                         if let Some(tick) = Self::extract_state_sync_tick(&decoded) {
-                            // Keep only the stateSync with the highest tick.
-                            match &latest_state_sync {
-                                Some((existing_tick, _)) if tick <= *existing_tick => {
-                                    // Skip older or same tick.
-                                }
-                                _ => {
-                                    latest_state_sync = Some((tick, decoded));
-                                }
-                            }
+                            state_syncs.push((tick, decoded));
                         } else {
                             other_messages.push(decoded);
                         }
@@ -399,17 +393,31 @@ impl NetworkClient {
             self.handle_decoded_message(decoded, state);
         }
 
-        // Process only the latest stateSync (if any)
-        if let Some((tick, decoded)) = latest_state_sync {
-            // Log if we skipped stale syncs (useful for debugging lag)
-            if tick > state.server_tick + 1 {
-                log::debug!(
-                    "Catching up: jumping from tick {} to {}",
-                    state.server_tick,
-                    tick
-                );
+        // Process recent stateSyncs in tick order (if any).
+        if !state_syncs.is_empty() {
+            state_syncs.sort_by_key(|(tick, _)| *tick);
+            // Drop stale ticks we already processed.
+            state_syncs.retain(|(tick, _)| *tick > state.server_tick);
+            if let Some((latest_tick, _)) = state_syncs.last() {
+                state.state_sync_catchup_ticks = latest_tick.saturating_sub(state.server_tick);
+            } else {
+                state.state_sync_catchup_ticks = 0;
             }
-            self.handle_decoded_message(decoded, state);
+            if state_syncs.len() > MAX_STATE_SYNCS_PER_FRAME {
+                let drain_count = state_syncs.len() - MAX_STATE_SYNCS_PER_FRAME;
+                state_syncs.drain(0..drain_count);
+            }
+            let mut last_tick = state.server_tick;
+            for (tick, decoded) in state_syncs {
+                if tick > last_tick + 1 {
+                    log::debug!("Catching up: jumping from tick {} to {}", last_tick, tick);
+                }
+                last_tick = tick;
+                self.handle_decoded_message(decoded, state);
+            }
+            state.state_sync_catchup_ticks = 0;
+        } else {
+            state.state_sync_catchup_ticks = 0;
         }
 
         if should_disconnect {

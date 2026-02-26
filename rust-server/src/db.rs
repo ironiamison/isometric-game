@@ -34,6 +34,7 @@ pub struct CharacterData {
     pub y: f32,
     pub hp: i32,
     pub prayer_points: i32,
+    pub mp: i32,
     pub skills: Skills, // Combat skills (Hitpoints, Attack, Strength, Defence)
     pub gold: i32,
     pub inventory_json: String, // JSON serialized inventory
@@ -279,6 +280,21 @@ impl Database {
 
         if !prayer_points_exists {
             sqlx::query("ALTER TABLE characters ADD COLUMN prayer_points INTEGER DEFAULT NULL")
+                .execute(pool)
+                .await
+                .ok();
+        }
+
+        // Migration: Add mp (mana points) column if it doesn't exist
+        let mp_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'mp'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !mp_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN mp INTEGER DEFAULT NULL")
                 .execute(pool)
                 .await
                 .ok();
@@ -785,7 +801,7 @@ impl Database {
         account_id: i64,
     ) -> Result<Vec<CharacterData>, sqlx::Error> {
         let rows = sqlx::query(
-            r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, prayer_points, gold,
+            r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, prayer_points, mp, gold,
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
@@ -833,6 +849,10 @@ impl Database {
                         .try_get::<Option<i32>, _>("prayer_points")
                         .unwrap_or(None)
                         .unwrap_or(10 + skills.prayer.level),
+                    mp: r
+                        .try_get::<Option<i32>, _>("mp")
+                        .unwrap_or(None)
+                        .unwrap_or(10 + skills.magic.level * 2),
                     skills,
                     gold: r.get("gold"),
                     equipped_head: r
@@ -1007,7 +1027,7 @@ impl Database {
         character_id: i64,
     ) -> Result<Option<CharacterData>, sqlx::Error> {
         let row = sqlx::query(
-            r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, prayer_points, gold,
+            r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, prayer_points, mp, gold,
                 equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
@@ -1053,6 +1073,10 @@ impl Database {
                     .try_get::<Option<i32>, _>("prayer_points")
                     .unwrap_or(None)
                     .unwrap_or(10 + skills.prayer.level),
+                mp: r
+                    .try_get::<Option<i32>, _>("mp")
+                    .unwrap_or(None)
+                    .unwrap_or(10 + skills.magic.level * 2),
                 skills,
                 gold: r.get("gold"),
                 equipped_head: r
@@ -1174,6 +1198,7 @@ impl Database {
         y: f32,
         hp: i32,
         prayer_points: i32,
+        mp: i32,
         skills: &Skills,
         gold: i32,
         inventory_json: &str,
@@ -1205,7 +1230,7 @@ impl Database {
 
         sqlx::query(
             r#"UPDATE characters SET
-                x = ?, y = ?, hp = ?, prayer_points = ?, max_hp = ?, level = ?,
+                x = ?, y = ?, hp = ?, prayer_points = ?, mp = ?, max_hp = ?, level = ?,
                 gold = ?, inventory_json = ?, skills_json = ?,
                 equipped_head = ?, equipped_body = ?, equipped_weapon = ?,
                 equipped_back = ?, equipped_feet = ?, equipped_ring = ?,
@@ -1225,6 +1250,7 @@ impl Database {
         .bind(y)
         .bind(hp)
         .bind(prayer_points)
+        .bind(mp)
         .bind(max_hp)
         .bind(level)
         .bind(gold)

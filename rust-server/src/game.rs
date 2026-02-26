@@ -158,6 +158,7 @@ pub struct PlayerSaveData {
     pub y: f32,
     pub hp: i32,
     pub prayer_points: i32,
+    pub mp: i32,
     pub skills: Skills,
     pub gold: i32,
     pub inventory_json: String,
@@ -1560,6 +1561,8 @@ impl GameRoom {
         x: i32,
         y: i32,
         hp: i32,
+        prayer_points: i32,
+        mp: i32,
         skills: Skills,
         gold: i32,
         inventory_json: &str,
@@ -1590,6 +1593,8 @@ impl GameRoom {
         // Restore saved stats
         player.skills = skills;
         player.hp = hp.min(player.max_hp()); // Cap HP at max (hitpoints level)
+        player.prayer_points = prayer_points.min(player.max_prayer_points());
+        player.mp = mp.min(player.max_mp());
         // If player disconnected while dead (hp=0), respawn them
         if player.hp <= 0 {
             player.hp = player.max_hp();
@@ -1843,6 +1848,7 @@ impl GameRoom {
                 y: p.y as f32,
                 hp: p.hp,
                 prayer_points: p.prayer_points,
+                mp: p.mp,
                 skills: p.skills.clone(),
                 gold: p.inventory.gold,
                 inventory_json,
@@ -1880,6 +1886,7 @@ impl GameRoom {
             y: i32,
             hp: i32,
             prayer_points: i32,
+            mp: i32,
             skills: Skills,
             gold: i32,
             inventory_slots: Vec<(usize, String, i32)>,
@@ -1948,6 +1955,7 @@ impl GameRoom {
                             y: p.y,
                             hp: p.hp,
                             prayer_points: p.prayer_points,
+                            mp: p.mp,
                             skills: p.skills.clone(),
                             gold: p.inventory.gold,
                             inventory_slots,
@@ -1995,6 +2003,7 @@ impl GameRoom {
                 y: raw.y as f32,
                 hp: raw.hp,
                 prayer_points: raw.prayer_points,
+                mp: raw.mp,
                 skills: raw.skills,
                 gold: raw.gold,
                 inventory_json,
