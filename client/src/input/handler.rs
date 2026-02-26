@@ -2214,8 +2214,13 @@ impl InputHandler {
                                         1 => {
                                             if is_chest {
                                                 state.push_system_chat("A wooden storage chest.".to_string());
+                                            } else if is_obelisk_gid(*gid) {
+                                                state.push_system_chat("An ancient obelisk humming with magical energy.".to_string());
                                             } else {
-                                                state.push_system_chat("An ancient stone object.".to_string());
+                                                match get_map_object_name(*gid) {
+                                                    Some(name) => state.push_system_chat(format!("A {}.", name.to_lowercase())),
+                                                    None => state.push_system_chat("Nothing interesting.".to_string()),
+                                                }
                                             }
                                         }
                                         _ => {}
