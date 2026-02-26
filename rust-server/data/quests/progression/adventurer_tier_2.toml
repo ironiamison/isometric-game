@@ -62,13 +62,6 @@ target = "gold"
 count = 1200
 description = "Accumulate 1,200 gold"
 
-[[quest.objectives]]
-id = "return_to_guide"
-type = "talk_to"
-target = "adventurer_guide"
-description = "Return to the Adventurer Guide"
-sequential = true
-
 [quest.rewards]
 exp = 900
 gold = 2200
