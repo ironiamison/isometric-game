@@ -9,6 +9,7 @@ pub mod prayer;
 pub mod shop;
 pub mod skills;
 pub mod slayer;
+pub mod spectator_camera;
 pub mod spell;
 pub mod state;
 pub mod tilemap;
@@ -39,4 +40,5 @@ pub use state::{
     QuestCatalogEntry, QuestCompletedEvent, QuestObjective, SkillXpEvent, SocialState, SocialTab,
     SpellEffect, TransitionState, UiState, XpDropFeed, quest_status_order,
 };
+pub use spectator_camera::SpectatorCamera;
 pub use tilemap::{LayerType, Tilemap, TilemapLayer};
