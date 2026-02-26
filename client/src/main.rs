@@ -55,7 +55,7 @@ fn window_conf() -> Conf {
     }
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 fn load_icon() -> Option<miniquad::conf::Icon> {
     let candidates = [
         "assets/app-icon.png",
@@ -73,12 +73,12 @@ fn load_icon() -> Option<miniquad::conf::Icon> {
     None
 }
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 fn load_icon() -> Option<miniquad::conf::Icon> {
     None
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 fn icon_from_image(image: image::DynamicImage) -> miniquad::conf::Icon {
     let img = image.to_rgba8();
     let icon16 = image::imageops::resize(&img, 16, 16, image::imageops::FilterType::Lanczos3);

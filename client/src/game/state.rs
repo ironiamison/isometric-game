@@ -1926,21 +1926,28 @@ impl GameState {
     }
 
     pub fn local_prediction_lead_scale(&self) -> f32 {
-        if !self.ping_stats.has_data() {
-            return 1.0;
+        let mut scale = if !self.ping_stats.has_data() {
+            1.0
+        } else {
+            let avg = self.ping_stats.avg_ms as f32;
+            if avg < 40.0 {
+                let t = (avg / 40.0).clamp(0.0, 1.0);
+                0.75 + t * 0.25
+            } else if !self.high_ping_movement_mode {
+                1.0
+            } else {
+                let t = ((avg - 120.0) / 100.0).clamp(0.0, 1.0);
+                1.0 - t * 0.55
+            }
+        };
+
+        // During auto-actions, keep visual lead under half a tile to avoid
+        // "attacking from too far" when the server is authoritative.
+        if self.auto_action_state.is_some() {
+            scale = scale.min(0.55);
         }
 
-        let avg = self.ping_stats.avg_ms as f32;
-        if avg < 40.0 {
-            let t = (avg / 40.0).clamp(0.0, 1.0);
-            return 0.75 + t * 0.25;
-        }
-        if !self.high_ping_movement_mode {
-            return 1.0;
-        }
-
-        let t = ((avg - 120.0) / 100.0).clamp(0.0, 1.0);
-        1.0 - t * 0.55
+        scale
     }
 
     pub fn local_reconciliation_softness(&self) -> f32 {

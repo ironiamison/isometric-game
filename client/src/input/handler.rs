@@ -74,6 +74,17 @@ fn mark_chat_channel_as_read(state: &mut GameState, channel: ChatChannel) {
     }
 }
 
+fn queue_face(state: &mut GameState, commands: &mut Vec<InputCommand>, direction: u8) {
+    commands.push(InputCommand::Face { direction });
+    if let Some(local_id) = &state.local_player_id {
+        if let Some(player) = state.players.get_mut(local_id) {
+            let dir = crate::game::Direction::from_u8(direction);
+            player.direction = dir;
+            player.animation.direction = dir;
+        }
+    }
+}
+
 /// Activate a hotkey slot binding — returns InputCommand(s) to execute
 fn activate_hotkey_slot(
     state: &mut GameState,
@@ -363,10 +374,10 @@ fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCom
     if let Some(local_id) = &state.local_player_id.clone() {
         if let Some(local_player) = state.players.get(local_id) {
             if let Some(target) = state.players.get(target_id) {
-                let px = local_player.x.round() as i32;
-                let py = local_player.y.round() as i32;
-                let tx = target.x.round() as i32;
-                let ty = target.y.round() as i32;
+                let px = local_player.server_x.round() as i32;
+                let py = local_player.server_y.round() as i32;
+                let tx = target.server_x.round() as i32;
+                let ty = target.server_y.round() as i32;
                 let cdx = (px - tx).abs();
                 let cdy = (py - ty).abs();
                 if (cdx + cdy) != 1 {
@@ -382,7 +393,7 @@ fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCom
                     }
                 } else {
                     let dir = crate::game::Direction::from_velocity(tx as f32 - px as f32, ty as f32 - py as f32);
-                    commands.push(InputCommand::Face { direction: dir as u8 });
+                    queue_face(state, commands, dir as u8);
                     commands.push(InputCommand::StartAutoAction {
                         target_type: "player".to_string(),
                         target_id: target_id.to_string(),
@@ -399,10 +410,10 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
     if let Some(local_id) = &state.local_player_id.clone() {
         if let Some(player) = state.players.get(local_id) {
             if let Some(npc) = state.npcs.get(npc_id) {
-                let px = player.x.round() as i32;
-                let py = player.y.round() as i32;
-                let nx = npc.x.round() as i32;
-                let ny = npc.y.round() as i32;
+                let px = player.server_x.round() as i32;
+                let py = player.server_y.round() as i32;
+                let nx = npc.server_x.round() as i32;
+                let ny = npc.server_y.round() as i32;
                 let cdx = (px - nx).abs();
                 let cdy = (py - ny).abs();
                 if (cdx + cdy) != 1 {
@@ -418,7 +429,7 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                     }
                 } else {
                     let dir = crate::game::Direction::from_velocity(nx as f32 - px as f32, ny as f32 - py as f32);
-                    commands.push(InputCommand::Face { direction: dir as u8 });
+                    queue_face(state, commands, dir as u8);
                     commands.push(InputCommand::StartAutoAction {
                         target_type: "npc".to_string(),
                         target_id: npc_id.to_string(),
@@ -441,8 +452,8 @@ fn pathfind_and_interact_npc(
     let should_interact = if let Some(local_id) = &state.local_player_id.clone() {
         if let Some(player) = state.players.get(local_id) {
             if let Some(npc) = state.npcs.get(npc_id) {
-                let dx = npc.x - player.x;
-                let dy = npc.y - player.y;
+                let dx = npc.server_x - player.server_x;
+                let dy = npc.server_y - player.server_y;
                 let dist = (dx * dx + dy * dy).sqrt();
                 Some(dist < INTERACT_RANGE)
             } else { None }
@@ -457,10 +468,10 @@ fn pathfind_and_interact_npc(
             if let Some(local_id) = &state.local_player_id.clone() {
                 if let Some(player) = state.players.get(local_id) {
                     if let Some(npc) = state.npcs.get(npc_id) {
-                        let px = player.x.round() as i32;
-                        let py = player.y.round() as i32;
-                        let nx = npc.x.round() as i32;
-                        let ny = npc.y.round() as i32;
+                        let px = player.server_x.round() as i32;
+                        let py = player.server_y.round() as i32;
+                        let nx = npc.server_x.round() as i32;
+                        let ny = npc.server_y.round() as i32;
                         let occupied = build_occupied_set(state);
                         const MAX_PATH_DISTANCE: i32 = 32;
                         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
@@ -484,8 +495,8 @@ fn pathfind_and_interact_npc(
 /// Pathfind to adjacent tile of a resource and start auto-action, or do it immediately if adjacent.
 fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>, tile_x: i32, tile_y: i32, target_id: &str, action: &str) {
     if let Some(player) = state.get_local_player() {
-        let px = player.x.round() as i32;
-        let py = player.y.round() as i32;
+        let px = player.server_x.round() as i32;
+        let py = player.server_y.round() as i32;
         let cdx = (px - tile_x).abs();
         let cdy = (py - tile_y).abs();
         if (cdx + cdy) != 1 {
@@ -501,7 +512,7 @@ fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>
             }
         } else {
             let dir = crate::game::Direction::from_velocity(tile_x as f32 - px as f32, tile_y as f32 - py as f32);
-            commands.push(InputCommand::Face { direction: dir as u8 });
+            queue_face(state, commands, dir as u8);
             commands.push(InputCommand::StartAutoAction {
                 target_type: "resource".to_string(),
                 target_id: target_id.to_string(),
@@ -1839,10 +1850,10 @@ impl InputHandler {
                                             if let Some(local_id) = &state.local_player_id.clone() {
                                                 if let Some(player) = state.players.get(local_id) {
                                                     if let Some(target) = state.players.get(id) {
-                                                        let px = player.x.round() as i32;
-                                                        let py = player.y.round() as i32;
-                                                        let tx = target.x.round() as i32;
-                                                        let ty = target.y.round() as i32;
+                                                        let px = player.server_x.round() as i32;
+                                                        let py = player.server_y.round() as i32;
+                                                        let tx = target.server_x.round() as i32;
+                                                        let ty = target.server_y.round() as i32;
                                                         let mut occupied = build_occupied_set(state);
                                                         occupied.remove(&(tx, ty));
                                                         const MAX_PATH_DISTANCE: i32 = 32;
@@ -6388,7 +6399,7 @@ impl InputHandler {
                     });
                     if !attack_anim && !state.is_sitting {
                         let dir = self.prev_dir.to_direction_u8();
-                        commands.push(InputCommand::Face { direction: dir });
+                        queue_face(state, &mut commands, dir);
                         self.last_send_time = current_time;
                     }
                 }
@@ -6427,7 +6438,7 @@ impl InputHandler {
                 });
                 if !attack_anim && !state.is_sitting {
                     let dir = dpad_released.to_direction_u8();
-                    commands.push(InputCommand::Face { direction: dir });
+                    queue_face(state, &mut commands, dir);
                     self.last_send_time = current_time;
                 }
             } else if self.touch_controls.was_dpad_move_sent() {
@@ -6553,9 +6564,7 @@ impl InputHandler {
                         }
                         if !state.is_sitting {
                             let face_dir = new_dir.to_direction_u8();
-                            commands.push(InputCommand::Face {
-                                direction: face_dir,
-                            });
+                            queue_face(state, &mut commands, face_dir);
                             self.last_dx = dx;
                             self.last_dy = dy;
                             self.last_send_time = current_time;
@@ -6619,7 +6628,7 @@ impl InputHandler {
                                     tx as f32 - player_x as f32,
                                     ty as f32 - player_y as f32,
                                 );
-                                commands.push(InputCommand::Face { direction: dir as u8 });
+                                queue_face(state, &mut commands, dir as u8);
                                 commands.push(InputCommand::StartAutoAction {
                                     target_type: aa.target_type.clone(),
                                     target_id: aa.target_id.clone(),
@@ -6970,7 +6979,7 @@ impl InputHandler {
                                     let dx = tx - player.x;
                                     let dy = ty - player.y;
                                     let dir = crate::game::Direction::from_velocity(dx, dy);
-                                    commands.push(InputCommand::Face { direction: dir as u8 });
+                                    queue_face(state, &mut commands, dir as u8);
                                 }
                             }
                         }
@@ -7391,10 +7400,10 @@ impl InputHandler {
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(player) = state.players.get(local_id) {
                             if let Some(npc) = state.npcs.get(&npc_id) {
-                                let player_x = player.x.round() as i32;
-                                let player_y = player.y.round() as i32;
-                                let npc_x = npc.x.round() as i32;
-                                let npc_y = npc.y.round() as i32;
+                                let player_x = player.server_x.round() as i32;
+                                let player_y = player.server_y.round() as i32;
+                                let npc_x = npc.server_x.round() as i32;
+                                let npc_y = npc.server_y.round() as i32;
                                 let cdx = (player_x - npc_x).abs();
                                 let cdy = (player_y - npc_y).abs();
                                 // Cardinal adjacency only (no diagonal)
@@ -7424,7 +7433,7 @@ impl InputHandler {
                                         npc_x as f32 - player_x as f32,
                                         npc_y as f32 - player_y as f32,
                                     );
-                                    commands.push(InputCommand::Face { direction: dir as u8 });
+                                    queue_face(state, &mut commands, dir as u8);
                                     commands.push(InputCommand::StartAutoAction {
                                         target_type: "npc".to_string(),
                                         target_id: npc_id.clone(),
@@ -7521,10 +7530,10 @@ impl InputHandler {
                 if let Some(local_id) = &state.local_player_id {
                     if let Some(local_player) = state.players.get(local_id) {
                         if let Some(target_player) = state.players.get(&entity_id) {
-                            let player_x = local_player.x.round() as i32;
-                            let player_y = local_player.y.round() as i32;
-                            let target_x = target_player.x.round() as i32;
-                            let target_y = target_player.y.round() as i32;
+                            let player_x = local_player.server_x.round() as i32;
+                            let player_y = local_player.server_y.round() as i32;
+                            let target_x = target_player.server_x.round() as i32;
+                            let target_y = target_player.server_y.round() as i32;
                             let cdx = (player_x - target_x).abs();
                             let cdy = (player_y - target_y).abs();
                             // Cardinal adjacency only (no diagonal)
@@ -7554,7 +7563,7 @@ impl InputHandler {
                                     target_x as f32 - player_x as f32,
                                     target_y as f32 - player_y as f32,
                                 );
-                                commands.push(InputCommand::Face { direction: dir as u8 });
+                                queue_face(state, &mut commands, dir as u8);
                                 commands.push(InputCommand::StartAutoAction {
                                     target_type: "player".to_string(),
                                     target_id: entity_id.clone(),
@@ -7630,7 +7639,7 @@ impl InputHandler {
                                     clicked_tile_x as f32 - player_x as f32,
                                     clicked_tile_y as f32 - player_y as f32,
                                 );
-                                commands.push(InputCommand::Face { direction: dir as u8 });
+                                queue_face(state, &mut commands, dir as u8);
                                 commands.push(InputCommand::StartAutoAction {
                                     target_type: "resource".to_string(),
                                     target_id,
@@ -7696,7 +7705,7 @@ impl InputHandler {
                                     clicked_tile_x as f32 - player_x as f32,
                                     clicked_tile_y as f32 - player_y as f32,
                                 );
-                                commands.push(InputCommand::Face { direction: dir as u8 });
+                                queue_face(state, &mut commands, dir as u8);
                                 commands.push(InputCommand::StartAutoAction {
                                     target_type: "resource".to_string(),
                                     target_id,
