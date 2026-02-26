@@ -12,6 +12,7 @@ impl Renderer {
     pub(crate) fn render_item_tooltip(&self, state: &GameState) {
         // Check if we're hovering over an inventory, quick slot, or equipment slot
         let mut smithing_req: Option<i32> = None;
+        let mut skill_req_name: &str = "Smithing";
         let (item_id, quantity) = match &state.ui_state.hovered_element {
             Some(UiElementId::InventorySlot(idx)) if state.ui_state.inventory_open => {
                 if let Some(slot) = state.inventory.slots.get(*idx).and_then(|s| s.as_ref()) {
@@ -89,18 +90,23 @@ impl Renderer {
                     return;
                 }
 
-                let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
+                let station = state.ui_state.furnace_station_type.as_str();
+                let is_fire_pit = station == "fire_pit";
+                let section_filter = if is_fire_pit { "fish" } else if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
                 let mut furnace_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
-                    .filter(|r| r.station.as_deref() == Some("furnace"))
-                    .filter(|r| r.section.as_deref() == Some(section_filter))
+                    .filter(|r| r.station.as_deref() == Some(station))
+                    .filter(|r| {
+                        if is_fire_pit { true } else { r.section.as_deref() == Some(section_filter) }
+                    })
                     .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
                     .collect();
                 furnace_recipes.sort_by_key(|r| r.level_required);
                 if let Some(recipe) = furnace_recipes.get(*idx) {
                     if recipe.level_required > 1 {
                         smithing_req = Some(recipe.level_required);
+                        if is_fire_pit { skill_req_name = "Survivalist"; }
                     }
                     if let Some(result) = recipe.results.first() {
                         (result.item_id.clone(), result.count)
@@ -216,6 +222,10 @@ impl Renderer {
             .get_local_player()
             .map(|p| p.skills.smithing.level)
             .unwrap_or(1);
+        let player_survivalist_level = state
+            .get_local_player()
+            .map(|p| p.skills.survivalist.level)
+            .unwrap_or(1);
 
         // Get mouse position for tooltip placement
         let (mouse_x, mouse_y) = mouse_position();
@@ -317,7 +327,7 @@ impl Renderer {
         }
 
         if let Some(req) = smithing_req {
-            let smithing_req_text = format!("Requires {} Smithing", req);
+            let smithing_req_text = format!("Requires {} {}", req, skill_req_name);
             max_w = max_w.max(self.measure_text_sharp(&smithing_req_text, small_font_size).width);
         }
 
@@ -614,14 +624,15 @@ impl Renderer {
             }
         }
 
-        // Smithing level requirement (from recipe, for furnace/anvil tooltips)
+        // Skill level requirement (from recipe, for furnace/anvil/fire_pit tooltips)
         if let Some(req) = smithing_req {
             y += 2.0;
             let stat_green = Color::new(0.392, 0.784, 0.392, 1.0);
             let stat_red = Color::new(1.0, 0.392, 0.392, 1.0);
-            let meets_req = player_smithing_level >= req;
+            let player_level = if skill_req_name == "Survivalist" { player_survivalist_level } else { player_smithing_level };
+            let meets_req = player_level >= req;
             let req_color = if meets_req { stat_green } else { stat_red };
-            let req_text = format!("Requires {} Smithing", req);
+            let req_text = format!("Requires {} {}", req, skill_req_name);
             self.draw_text_sharp(
                 &req_text,
                 tooltip_x + padding,

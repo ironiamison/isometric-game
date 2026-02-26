@@ -19,7 +19,7 @@ amount = 30
 
 [baked_potato]
 display_name = "Baked Potato"
-sprite = "item_baked_potato"
+sprite = "baked_potato"
 description = "A simple baked potato. Restores 12 HP."
 category = "consumable"
 max_stack = 10
@@ -32,7 +32,7 @@ amount = 12
 
 [tomato_soup]
 display_name = "Tomato Soup"
-sprite = "item_tomato_soup"
+sprite = "tomato_soup"
 description = "A warm bowl of tomato soup. Restores 18 HP."
 category = "consumable"
 max_stack = 10
@@ -45,7 +45,7 @@ amount = 18
 
 [sweetcorn_bread]
 display_name = "Sweetcorn Bread"
-sprite = "item_sweetcorn_bread"
+sprite = "sweetcorn_bread"
 description = "Bread made with freshly ground sweetcorn. Restores 16 HP."
 category = "consumable"
 max_stack = 10
@@ -58,7 +58,7 @@ amount = 16
 
 [vegetable_stew]
 display_name = "Vegetable Stew"
-sprite = "item_vegetable_stew"
+sprite = "vegetable_stew"
 description = "A hearty stew made from assorted vegetables. Restores 25 HP."
 category = "consumable"
 max_stack = 10
@@ -335,3 +335,165 @@ sellable = true
 [scroll_tornado.use_effect]
 type = "learn_spell"
 spell_id = "tornado"
+
+# =============================================================================
+# Cooked Fish (Survivalist - Cooking)
+# =============================================================================
+
+[cooked_shrimp]
+display_name = "Cooked Shrimp"
+sprite = "cooked_shrimp"
+description = "A freshly cooked shrimp. Restores 3 HP."
+category = "consumable"
+max_stack = 10
+base_price = 10
+sellable = true
+
+[cooked_shrimp.use_effect]
+type = "heal"
+amount = 3
+
+[cooked_sardine]
+display_name = "Cooked Sardine"
+sprite = "cooked_sardine"
+description = "A grilled sardine. Restores 4 HP."
+category = "consumable"
+max_stack = 10
+base_price = 15
+sellable = true
+
+[cooked_sardine.use_effect]
+type = "heal"
+amount = 4
+
+[cooked_herring]
+display_name = "Cooked Herring"
+sprite = "cooked_herring"
+description = "A tender cooked herring. Restores 5 HP."
+category = "consumable"
+max_stack = 10
+base_price = 20
+sellable = true
+
+[cooked_herring.use_effect]
+type = "heal"
+amount = 5
+
+[cooked_trout]
+display_name = "Cooked Trout"
+sprite = "cooked_trout"
+description = "A nicely grilled trout. Restores 7 HP."
+category = "consumable"
+max_stack = 10
+base_price = 30
+sellable = true
+
+[cooked_trout.use_effect]
+type = "heal"
+amount = 7
+
+[cooked_salmon]
+display_name = "Cooked Salmon"
+sprite = "cooked_trout"
+description = "A perfectly cooked salmon fillet. Restores 9 HP."
+category = "consumable"
+max_stack = 10
+base_price = 45
+sellable = true
+
+[cooked_salmon.use_effect]
+type = "heal"
+amount = 9
+
+[cooked_lobster]
+display_name = "Cooked Lobster"
+sprite = "cooked_lobster"
+description = "A delicious cooked lobster. Restores 12 HP."
+category = "consumable"
+max_stack = 10
+base_price = 80
+sellable = true
+
+[cooked_lobster.use_effect]
+type = "heal"
+amount = 12
+
+[cooked_swordfish]
+display_name = "Cooked Swordfish"
+sprite = "cooked_shark"
+description = "A hearty swordfish steak. Restores 14 HP."
+category = "consumable"
+max_stack = 10
+base_price = 120
+sellable = true
+
+[cooked_swordfish.use_effect]
+type = "heal"
+amount = 14
+
+# =============================================================================
+# Burnt Fish (Survivalist - Cooking failures)
+# =============================================================================
+
+[burnt_shrimp]
+display_name = "Burnt Shrimp"
+sprite = "burnt_shrimp"
+description = "An inedible burnt shrimp."
+category = "material"
+max_stack = 100
+base_price = 1
+sellable = true
+
+[burnt_sardine]
+display_name = "Burnt Sardine"
+sprite = "burnt_sardine"
+description = "An inedible burnt sardine."
+category = "material"
+max_stack = 100
+base_price = 1
+sellable = true
+
+[burnt_herring]
+display_name = "Burnt Herring"
+sprite = "burnt_herring"
+description = "An inedible burnt herring."
+category = "material"
+max_stack = 100
+base_price = 1
+sellable = true
+
+[burnt_trout]
+display_name = "Burnt Trout"
+sprite = "burnt_trout"
+description = "An inedible burnt trout."
+category = "material"
+max_stack = 100
+base_price = 1
+sellable = true
+
+[burnt_salmon]
+display_name = "Burnt Salmon"
+sprite = "burnt_salmon"
+description = "An inedible burnt salmon."
+category = "material"
+max_stack = 100
+base_price = 1
+sellable = true
+
+[burnt_lobster]
+display_name = "Burnt Lobster"
+sprite = "burnt_lobster"
+description = "An inedible burnt lobster."
+category = "material"
+max_stack = 100
+base_price = 1
+sellable = true
+
+[burnt_swordfish]
+display_name = "Burnt Swordfish"
+sprite = "burnt_swordfish"
+description = "An inedible burnt swordfish."
+category = "material"
+max_stack = 100
+base_price = 1
+sellable = true

@@ -1202,8 +1202,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(xp) = extract_i32(value, "slayer_xp") {
                             player.skills.slayer.xp = xp as i64;
                         }
+                        if let Some(level) = extract_i32(value, "survivalist_level") {
+                            player.skills.survivalist.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "survivalist_xp") {
+                            player.skills.survivalist.xp = xp as i64;
+                        }
 
-                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}, Slayer {}",
+                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}, Slayer {}, Survivalist {}",
                             player_id,
                             player.skills.hitpoints.level,
                             player.skills.combat.level,
@@ -1215,7 +1221,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.skills.woodcutting.level,
                             player.skills.alchemy.level,
                             player.skills.mining.level,
-                            player.skills.slayer.level
+                            player.skills.slayer.level,
+                            player.skills.survivalist.level
                         );
                     } else {
                         log::warn!(
@@ -1939,6 +1946,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let xp = extract_u32(recipe_value, "xp").unwrap_or(0);
                         let requires_discovery =
                             extract_bool(recipe_value, "requires_discovery").unwrap_or(false);
+                        let required_tool = extract_string(recipe_value, "required_tool");
+                        let burn_result = extract_string(recipe_value, "burn_result");
+                        let burn_stop_level =
+                            extract_i32(recipe_value, "burn_stop_level");
 
                         // Parse ingredients
                         let mut ingredients = Vec::new();
@@ -1987,6 +1998,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             craft_time_ms,
                             xp,
                             requires_discovery,
+                            required_tool,
+                            burn_result,
+                            burn_stop_level,
                         });
                     }
                 }

@@ -1,0 +1,264 @@
+# =============================================================================
+# Fletching Recipes (Survivalist skill)
+# Requires knife in inventory (required_tool), no station needed
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Arrow Shafts
+# -----------------------------------------------------------------------------
+
+[cut_arrow_shafts]
+display_name = "Cut Arrow Shafts"
+description = "Cut oak logs into arrow shafts with a knife."
+category = "fletching"
+section = "shafts"
+level_required = 1
+craft_time_ms = 2000
+xp = 10
+required_tool = "knife"
+
+[[cut_arrow_shafts.ingredients]]
+item_id = "oak_log"
+count = 1
+
+[[cut_arrow_shafts.results]]
+item_id = "arrow_shaft"
+count = 15
+
+# -----------------------------------------------------------------------------
+# Arrows
+# -----------------------------------------------------------------------------
+
+[fletch_bronze_arrow]
+display_name = "Bronze Arrows"
+description = "Tip arrow shafts with bronze arrowheads."
+category = "fletching"
+section = "arrows"
+level_required = 1
+craft_time_ms = 2000
+xp = 15
+required_tool = "knife"
+
+[[fletch_bronze_arrow.ingredients]]
+item_id = "arrow_shaft"
+count = 15
+
+[[fletch_bronze_arrow.ingredients]]
+item_id = "bronze_arrowhead"
+count = 15
+
+[[fletch_bronze_arrow.results]]
+item_id = "bronze_arrow"
+count = 15
+
+[fletch_iron_arrow]
+display_name = "Iron Arrows"
+description = "Tip arrow shafts with iron arrowheads."
+category = "fletching"
+section = "arrows"
+level_required = 15
+craft_time_ms = 2000
+xp = 30
+required_tool = "knife"
+
+[[fletch_iron_arrow.ingredients]]
+item_id = "arrow_shaft"
+count = 15
+
+[[fletch_iron_arrow.ingredients]]
+item_id = "iron_arrowhead"
+count = 15
+
+[[fletch_iron_arrow.results]]
+item_id = "iron_arrow"
+count = 15
+
+[fletch_steel_arrow]
+display_name = "Steel Arrows"
+description = "Tip arrow shafts with steel arrowheads."
+category = "fletching"
+section = "arrows"
+level_required = 30
+craft_time_ms = 2000
+xp = 50
+required_tool = "knife"
+
+[[fletch_steel_arrow.ingredients]]
+item_id = "arrow_shaft"
+count = 15
+
+[[fletch_steel_arrow.ingredients]]
+item_id = "steel_arrowhead"
+count = 15
+
+[[fletch_steel_arrow.results]]
+item_id = "steel_arrow"
+count = 15
+
+# -----------------------------------------------------------------------------
+# Unstrung Bows (cutting)
+# -----------------------------------------------------------------------------
+
+[cut_oak_bow]
+display_name = "Cut Oak Bow"
+description = "Carve an unstrung bow from oak logs."
+category = "fletching"
+section = "bows"
+level_required = 5
+craft_time_ms = 3000
+xp = 20
+required_tool = "knife"
+
+[[cut_oak_bow.ingredients]]
+item_id = "oak_log"
+count = 1
+
+[[cut_oak_bow.results]]
+item_id = "oak_bow_u"
+count = 1
+
+[cut_willow_bow]
+display_name = "Cut Willow Bow"
+description = "Carve an unstrung bow from willow logs."
+category = "fletching"
+section = "bows"
+level_required = 15
+craft_time_ms = 3000
+xp = 35
+required_tool = "knife"
+
+[[cut_willow_bow.ingredients]]
+item_id = "willow_log"
+count = 1
+
+[[cut_willow_bow.results]]
+item_id = "willow_bow_u"
+count = 1
+
+[cut_maple_bow]
+display_name = "Cut Maple Bow"
+description = "Carve an unstrung bow from maple logs."
+category = "fletching"
+section = "bows"
+level_required = 25
+craft_time_ms = 3000
+xp = 50
+required_tool = "knife"
+
+[[cut_maple_bow.ingredients]]
+item_id = "maple_log"
+count = 1
+
+[[cut_maple_bow.results]]
+item_id = "maple_bow_u"
+count = 1
+
+[cut_yew_bow]
+display_name = "Cut Yew Bow"
+description = "Carve an unstrung bow from yew logs."
+category = "fletching"
+section = "bows"
+level_required = 35
+craft_time_ms = 4000
+xp = 70
+required_tool = "knife"
+
+[[cut_yew_bow.ingredients]]
+item_id = "yew_log"
+count = 1
+
+[[cut_yew_bow.results]]
+item_id = "yew_bow_u"
+count = 1
+
+# -----------------------------------------------------------------------------
+# Stringing Bows
+# -----------------------------------------------------------------------------
+
+[string_oak_bow]
+display_name = "String Oak Bow"
+description = "String an unstrung oak bow."
+category = "fletching"
+section = "bows"
+level_required = 5
+craft_time_ms = 2000
+xp = 20
+required_tool = "knife"
+
+[[string_oak_bow.ingredients]]
+item_id = "oak_bow_u"
+count = 1
+
+[[string_oak_bow.ingredients]]
+item_id = "bowstring"
+count = 1
+
+[[string_oak_bow.results]]
+item_id = "oak_bow"
+count = 1
+
+[string_willow_bow]
+display_name = "String Willow Bow"
+description = "String an unstrung willow bow."
+category = "fletching"
+section = "bows"
+level_required = 15
+craft_time_ms = 2000
+xp = 35
+required_tool = "knife"
+
+[[string_willow_bow.ingredients]]
+item_id = "willow_bow_u"
+count = 1
+
+[[string_willow_bow.ingredients]]
+item_id = "bowstring"
+count = 1
+
+[[string_willow_bow.results]]
+item_id = "willow_bow"
+count = 1
+
+[string_maple_bow]
+display_name = "String Maple Bow"
+description = "String an unstrung maple bow."
+category = "fletching"
+section = "bows"
+level_required = 25
+craft_time_ms = 2000
+xp = 50
+required_tool = "knife"
+
+[[string_maple_bow.ingredients]]
+item_id = "maple_bow_u"
+count = 1
+
+[[string_maple_bow.ingredients]]
+item_id = "bowstring"
+count = 1
+
+[[string_maple_bow.results]]
+item_id = "maple_bow"
+count = 1
+
+[string_yew_bow]
+display_name = "String Yew Bow"
+description = "String an unstrung yew bow."
+category = "fletching"
+section = "bows"
+level_required = 35
+craft_time_ms = 2000
+xp = 70
+required_tool = "knife"
+
+[[string_yew_bow.ingredients]]
+item_id = "yew_bow_u"
+count = 1
+
+[[string_yew_bow.ingredients]]
+item_id = "bowstring"
+count = 1
+
+[[string_yew_bow.results]]
+item_id = "yew_bow"
+count = 1

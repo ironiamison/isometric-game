@@ -1,0 +1,102 @@
+# =============================================================================
+# Leatherworking Recipes (Survivalist skill)
+# Requires workbench station
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Tanning
+# -----------------------------------------------------------------------------
+
+[tan_leather]
+display_name = "Tan Leather"
+description = "Tan a tainted hide into usable leather."
+category = "leatherworking"
+section = "tanning"
+level_required = 1
+station = "workbench"
+craft_time_ms = 3000
+xp = 15
+
+[[tan_leather.ingredients]]
+item_id = "tainted_hide"
+count = 1
+
+[[tan_leather.results]]
+item_id = "leather"
+count = 1
+
+# -----------------------------------------------------------------------------
+# Leather Armor
+# -----------------------------------------------------------------------------
+
+[craft_leather_gloves]
+display_name = "Leather Gloves"
+description = "Craft a pair of leather gloves."
+category = "leatherworking"
+section = "armor"
+level_required = 1
+station = "workbench"
+craft_time_ms = 4000
+xp = 20
+
+[[craft_leather_gloves.ingredients]]
+item_id = "leather"
+count = 1
+
+[[craft_leather_gloves.results]]
+item_id = "leather_gloves"
+count = 1
+
+[craft_leather_boots]
+display_name = "Leather Boots"
+description = "Craft a pair of leather boots."
+category = "leatherworking"
+section = "armor"
+level_required = 3
+station = "workbench"
+craft_time_ms = 4000
+xp = 25
+
+[[craft_leather_boots.ingredients]]
+item_id = "leather"
+count = 1
+
+[[craft_leather_boots.results]]
+item_id = "leather_boots"
+count = 1
+
+[craft_leather_hood]
+display_name = "Leather Hood"
+description = "Craft a leather hood."
+category = "leatherworking"
+section = "armor"
+level_required = 7
+station = "workbench"
+craft_time_ms = 5000
+xp = 35
+
+[[craft_leather_hood.ingredients]]
+item_id = "leather"
+count = 2
+
+[[craft_leather_hood.results]]
+item_id = "leather_hood"
+count = 1
+
+[craft_leather_body]
+display_name = "Leather Body"
+description = "Craft a leather chestpiece."
+category = "leatherworking"
+section = "armor"
+level_required = 11
+station = "workbench"
+craft_time_ms = 6000
+xp = 50
+
+[[craft_leather_body.ingredients]]
+item_id = "leather"
+count = 3
+
+[[craft_leather_body.results]]
+item_id = "leather_body"
+count = 1

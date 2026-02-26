@@ -73,6 +73,30 @@ fn direction_from_delta(dx: i32, dy: i32) -> Direction {
 }
 
 // ============================================================================
+// Cooking Burn Helper
+// ============================================================================
+
+/// Check if a cooking recipe burns based on player level.
+/// Returns true if the food should burn.
+/// Burn chance: 50% at recipe's level_required, linearly decreasing to 0% at burn_stop_level.
+fn check_burn(recipe: &crate::crafting::definition::RecipeDefinition, player_level: i32) -> bool {
+    if let (Some(_burn_result), Some(burn_stop)) = (&recipe.burn_result, recipe.burn_stop_level)
+    {
+        if player_level >= burn_stop {
+            return false;
+        }
+        let level_range = (burn_stop - recipe.level_required) as f64;
+        if level_range <= 0.0 {
+            return false;
+        }
+        let burn_chance = ((burn_stop - player_level) as f64 / level_range) * 0.5;
+        rand::random::<f64>() < burn_chance
+    } else {
+        false
+    }
+}
+
+// ============================================================================
 // NPC Speech Helper
 // ============================================================================
 
@@ -2396,6 +2420,8 @@ impl GameRoom {
             mining_xp: p.skills.mining.xp,
             slayer_level: p.skills.slayer.level,
             slayer_xp: p.skills.slayer.xp,
+            survivalist_level: p.skills.survivalist.level,
+            survivalist_xp: p.skills.survivalist.xp,
         })
     }
 
@@ -7308,10 +7334,13 @@ impl GameRoom {
             _ => return,
         };
 
-        // Check level requirement - smithing/alchemy check their own skill, others use combat level
+        // Check level requirement - smithing/alchemy/survivalist check their own skill, others use combat level
         let level_check_passed = match recipe.category {
             RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
             RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
+            RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => {
+                player.skills.survivalist.level >= recipe.level_required
+            }
             _ => player.combat_level() >= recipe.level_required,
         };
 
@@ -7319,6 +7348,7 @@ impl GameRoom {
             let skill_name = match recipe.category {
                 RecipeCategory::Smithing => "Smithing",
                 RecipeCategory::Alchemy => "Alchemy",
+                RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => "Survivalist",
                 _ => "Combat",
             };
             drop(players);
@@ -7336,6 +7366,29 @@ impl GameRoom {
             )
             .await;
             return;
+        }
+
+        // Check required tool (e.g. knife for fletching)
+        if let Some(ref tool) = recipe.required_tool {
+            if !player.inventory.has_item(tool, 1) {
+                let tool_name = self
+                    .item_registry
+                    .get(tool)
+                    .map(|d| d.display_name.as_str())
+                    .unwrap_or(tool.as_str());
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftResult {
+                        success: false,
+                        recipe_id: recipe_id.to_string(),
+                        error: Some(format!("You need a {} to do that", tool_name)),
+                        items_gained: vec![],
+                    },
+                )
+                .await;
+                return;
+            }
         }
 
         // Check all ingredients (using string IDs now)
@@ -7387,26 +7440,46 @@ impl GameRoom {
                 .remove_item(&ingredient.item_id, ingredient.count);
         }
 
-        // Add results
+        // Check burn for cooking recipes
+        let burned = check_burn(&recipe, player.skills.survivalist.level);
+
+        // Add results (burnt item if burned)
         let mut items_gained = Vec::new();
-        for result in &recipe.results {
+        if burned {
+            let burn_item = recipe.burn_result.as_ref().unwrap();
             player
                 .inventory
-                .add_item(&result.item_id, result.count, &self.item_registry);
+                .add_item(burn_item, 1, &self.item_registry);
             let display_name = self
                 .item_registry
-                .get(&result.item_id)
+                .get(burn_item)
                 .map(|def| def.display_name.clone())
-                .unwrap_or_else(|| result.item_id.clone());
+                .unwrap_or_else(|| burn_item.clone());
             items_gained.push(ProtoRecipeResult {
-                item_id: result.item_id.clone(),
+                item_id: burn_item.clone(),
                 item_name: display_name,
-                count: result.count,
+                count: 1,
             });
+        } else {
+            for result in &recipe.results {
+                player
+                    .inventory
+                    .add_item(&result.item_id, result.count, &self.item_registry);
+                let display_name = self
+                    .item_registry
+                    .get(&result.item_id)
+                    .map(|def| def.display_name.clone())
+                    .unwrap_or_else(|| result.item_id.clone());
+                items_gained.push(ProtoRecipeResult {
+                    item_id: result.item_id.clone(),
+                    item_name: display_name,
+                    count: result.count,
+                });
+            }
         }
 
-        // Award crafting skill XP if applicable
-        let xp_gained = recipe.xp;
+        // Award crafting skill XP if applicable (half if burned)
+        let xp_gained = if burned { recipe.xp / 2 } else { recipe.xp };
         let mut xp_results = Vec::new();
         if xp_gained > 0 && recipe.category == RecipeCategory::Smithing {
             let leveled = player.skills.smithing.add_xp(xp_gained as i64);
@@ -7425,6 +7498,21 @@ impl GameRoom {
                 xp_gained as i64,
                 player.skills.alchemy.xp,
                 player.skills.alchemy.level,
+                leveled,
+            ));
+        }
+        if xp_gained > 0
+            && matches!(
+                recipe.category,
+                RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking
+            )
+        {
+            let leveled = player.skills.survivalist.add_xp(xp_gained as i64);
+            xp_results.push((
+                SkillType::Survivalist,
+                xp_gained as i64,
+                player.skills.survivalist.xp,
+                player.skills.survivalist.level,
                 leveled,
             ));
         }
@@ -7539,10 +7627,13 @@ impl GameRoom {
             return;
         }
 
-        // Check level requirement - smithing/alchemy check their own skill, others use combat level
+        // Check level requirement - smithing/alchemy/survivalist check their own skill, others use combat level
         let level_check_passed = match recipe.category {
             RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
             RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
+            RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => {
+                player.skills.survivalist.level >= recipe.level_required
+            }
             _ => player.combat_level() >= recipe.level_required,
         };
 
@@ -7550,6 +7641,7 @@ impl GameRoom {
             let skill_name = match recipe.category {
                 RecipeCategory::Smithing => "Smithing",
                 RecipeCategory::Alchemy => "Alchemy",
+                RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => "Survivalist",
                 _ => "Combat",
             };
             drop(players);
@@ -7561,6 +7653,26 @@ impl GameRoom {
             )
             .await;
             return;
+        }
+
+        // Check required tool (e.g. knife for fletching)
+        if let Some(ref tool) = recipe.required_tool {
+            if !player.inventory.has_item(tool, 1) {
+                let tool_name = self
+                    .item_registry
+                    .get(tool)
+                    .map(|d| d.display_name.as_str())
+                    .unwrap_or(tool.as_str());
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftingCancelled {
+                        reason: format!("You need a {} to do that", tool_name),
+                    },
+                )
+                .await;
+                return;
+            }
         }
 
         // Check recipe discovery requirement
@@ -7631,17 +7743,28 @@ impl GameRoom {
         }
 
         if recipe.craft_time_ms == 0 {
-            // Instant craft - add results immediately
+            // Check burn for cooking recipes
+            let burned = check_burn(&recipe, player.skills.survivalist.level);
+
+            // Instant craft - add results immediately (burnt item if burned)
             let mut items_gained = Vec::new();
-            for result in &recipe.results {
+            if burned {
+                let burn_item = recipe.burn_result.as_ref().unwrap();
                 player
                     .inventory
-                    .add_item(&result.item_id, result.count, &self.item_registry);
-                items_gained.push((result.item_id.clone(), result.count as u32));
+                    .add_item(burn_item, 1, &self.item_registry);
+                items_gained.push((burn_item.clone(), 1));
+            } else {
+                for result in &recipe.results {
+                    player
+                        .inventory
+                        .add_item(&result.item_id, result.count, &self.item_registry);
+                    items_gained.push((result.item_id.clone(), result.count as u32));
+                }
             }
 
-            // Award crafting skill XP if applicable
-            let xp_gained = recipe.xp;
+            // Award crafting skill XP if applicable (half if burned)
+            let xp_gained = if burned { recipe.xp / 2 } else { recipe.xp };
             let mut xp_results = Vec::new();
             if xp_gained > 0 && recipe.category == RecipeCategory::Smithing {
                 let leveled = player.skills.smithing.add_xp(xp_gained as i64);
@@ -7660,6 +7783,23 @@ impl GameRoom {
                     xp_gained as i64,
                     player.skills.alchemy.xp,
                     player.skills.alchemy.level,
+                    leveled,
+                ));
+            }
+            if xp_gained > 0
+                && matches!(
+                    recipe.category,
+                    RecipeCategory::Cooking
+                        | RecipeCategory::Fletching
+                        | RecipeCategory::Leatherworking
+                )
+            {
+                let leveled = player.skills.survivalist.add_xp(xp_gained as i64);
+                xp_results.push((
+                    SkillType::Survivalist,
+                    xp_gained as i64,
+                    player.skills.survivalist.xp,
+                    player.skills.survivalist.level,
                     leveled,
                 ));
             }
@@ -7865,6 +8005,9 @@ impl GameRoom {
         let level_check_passed = match recipe.category {
             RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
             RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
+            RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => {
+                player.skills.survivalist.level >= recipe.level_required
+            }
             _ => player.combat_level() >= recipe.level_required,
         };
 
@@ -7872,6 +8015,7 @@ impl GameRoom {
             let skill_name = match recipe.category {
                 RecipeCategory::Smithing => "Smithing",
                 RecipeCategory::Alchemy => "Alchemy",
+                RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => "Survivalist",
                 _ => "Combat",
             };
             drop(players);
@@ -7883,6 +8027,26 @@ impl GameRoom {
             )
             .await;
             return;
+        }
+
+        // Check required tool (e.g. knife for fletching)
+        if let Some(ref tool) = recipe.required_tool {
+            if !player.inventory.has_item(tool, 1) {
+                let tool_name = self
+                    .item_registry
+                    .get(tool)
+                    .map(|d| d.display_name.as_str())
+                    .unwrap_or(tool.as_str());
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftingCancelled {
+                        reason: format!("You need a {} to do that", tool_name),
+                    },
+                )
+                .await;
+                return;
+            }
         }
 
         // Check recipe discovery requirement
@@ -12712,6 +12876,7 @@ impl GameRoom {
                 xp_gained: u32,
                 is_smithing: bool,
                 is_alchemy: bool,
+                is_survivalist: bool,
                 inv_update: Vec<crate::item::InventorySlotUpdate>,
                 gold: i32,
                 smithing_xp: i64,
@@ -12722,6 +12887,10 @@ impl GameRoom {
                 alchemy_total_xp: i64,
                 alchemy_level: i32,
                 alchemy_leveled: bool,
+                survivalist_xp: i64,
+                survivalist_total_xp: i64,
+                survivalist_level: i32,
+                survivalist_leveled: bool,
                 // Batch info
                 batch_continued: bool, // true if next batch craft was started
                 batch_completed: u32,  // how many have completed so far
@@ -12753,21 +12922,38 @@ impl GameRoom {
                         None => continue,
                     };
 
-                    // Add results to inventory
+                    // Check burn for cooking recipes
+                    let burned = check_burn(&recipe, player.skills.survivalist.level);
+
+                    // Add results to inventory (burnt item if burned)
                     let mut items_gained = Vec::new();
-                    for result in &recipe.results {
-                        player.inventory.add_item(
-                            &result.item_id,
-                            result.count,
-                            &self.item_registry,
-                        );
-                        items_gained.push((result.item_id.clone(), result.count as u32));
+                    if burned {
+                        let burn_item = recipe.burn_result.as_ref().unwrap();
+                        player
+                            .inventory
+                            .add_item(burn_item, 1, &self.item_registry);
+                        items_gained.push((burn_item.clone(), 1));
+                    } else {
+                        for result in &recipe.results {
+                            player.inventory.add_item(
+                                &result.item_id,
+                                result.count,
+                                &self.item_registry,
+                            );
+                            items_gained.push((result.item_id.clone(), result.count as u32));
+                        }
                     }
 
-                    // Award crafting skill XP if applicable
-                    let xp_gained = recipe.xp;
+                    // Award crafting skill XP if applicable (half if burned)
+                    let xp_gained = if burned { recipe.xp / 2 } else { recipe.xp };
                     let is_smithing = recipe.category == RecipeCategory::Smithing;
                     let is_alchemy = recipe.category == RecipeCategory::Alchemy;
+                    let is_survivalist = matches!(
+                        recipe.category,
+                        RecipeCategory::Cooking
+                            | RecipeCategory::Fletching
+                            | RecipeCategory::Leatherworking
+                    );
                     let (smithing_xp, smithing_total_xp, smithing_level, smithing_leveled) =
                         if xp_gained > 0 && is_smithing {
                             let leveled = player.skills.smithing.add_xp(xp_gained as i64);
@@ -12792,6 +12978,22 @@ impl GameRoom {
                         } else {
                             (0, 0, 0, false)
                         };
+                    let (
+                        survivalist_xp,
+                        survivalist_total_xp,
+                        survivalist_level,
+                        survivalist_leveled,
+                    ) = if xp_gained > 0 && is_survivalist {
+                        let leveled = player.skills.survivalist.add_xp(xp_gained as i64);
+                        (
+                            xp_gained as i64,
+                            player.skills.survivalist.xp,
+                            player.skills.survivalist.level,
+                            leveled,
+                        )
+                    } else {
+                        (0, 0, 0, false)
+                    };
 
                     let batch_total = crafting.batch_total;
                     let completed_count = batch_total - crafting.batch_remaining;
@@ -12841,6 +13043,7 @@ impl GameRoom {
                         xp_gained,
                         is_smithing,
                         is_alchemy,
+                        is_survivalist,
                         inv_update: player.inventory.to_update(),
                         gold: player.inventory.gold,
                         smithing_xp,
@@ -12851,6 +13054,10 @@ impl GameRoom {
                         alchemy_total_xp,
                         alchemy_level,
                         alchemy_leveled,
+                        survivalist_xp,
+                        survivalist_total_xp,
+                        survivalist_level,
+                        survivalist_leveled,
                         batch_continued,
                         batch_completed: completed_count,
                         batch_total,
@@ -12946,8 +13153,37 @@ impl GameRoom {
                     }
                 }
 
+                // Send survivalist XP if applicable
+                if comp.is_survivalist && comp.survivalist_xp > 0 {
+                    self.send_to_player(
+                        &comp.pid,
+                        ServerMessage::SkillXp {
+                            player_id: comp.pid.clone(),
+                            skill: "survivalist".to_string(),
+                            xp_gained: comp.survivalist_xp,
+                            total_xp: comp.survivalist_total_xp,
+                            level: comp.survivalist_level,
+                        },
+                    )
+                    .await;
+
+                    if comp.survivalist_leveled {
+                        tracing::info!(
+                            "Player {} leveled up survivalist to {}",
+                            comp.pid,
+                            comp.survivalist_level
+                        );
+                        self.broadcast(ServerMessage::SkillLevelUp {
+                            player_id: comp.pid.clone(),
+                            skill: "survivalist".to_string(),
+                            new_level: comp.survivalist_level,
+                        })
+                        .await;
+                    }
+                }
+
                 // Sync quest objectives on any skill level-up
-                if comp.smithing_leveled || comp.alchemy_leveled {
+                if comp.smithing_leveled || comp.alchemy_leveled || comp.survivalist_leveled {
                     self.process_quest_progression_snapshot(&comp.pid).await;
                 }
 

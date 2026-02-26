@@ -22,3 +22,16 @@ category = "quest"
 max_stack = 1
 base_price = 0
 sellable = false
+
+# =============================================================================
+# Crafting Tools
+# =============================================================================
+
+[knife]
+display_name = "Knife"
+sprite = "knife"
+description = "A sharp knife. Required for fletching."
+category = "material"
+max_stack = 1
+base_price = 50
+sellable = true

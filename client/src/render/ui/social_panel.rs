@@ -9,7 +9,7 @@ use macroquad::prelude::*;
 
 /// Social panel dimensions (matches INV_WIDTH for consistency)
 const SOCIAL_PANEL_WIDTH: f32 = 240.0;
-const SOCIAL_PANEL_HEIGHT: f32 = 320.0;
+const SOCIAL_PANEL_HEIGHT: f32 = 314.0;
 const SOCIAL_HEADER_HEIGHT: f32 = 28.0;
 const SOCIAL_TAB_HEIGHT: f32 = 26.0;
 const SOCIAL_ROW_HEIGHT: f32 = 32.0;

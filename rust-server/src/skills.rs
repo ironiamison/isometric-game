@@ -82,6 +82,7 @@ impl SkillType {
             SkillType::Alchemy,
             SkillType::Mining,
             SkillType::Slayer,
+            SkillType::Survivalist,
         ]
     }
 }
@@ -199,6 +200,8 @@ pub struct Skills {
     pub mining: Skill,
     #[serde(default)]
     pub slayer: Skill,
+    #[serde(default)]
+    pub survivalist: Skill,
 }
 
 impl Default for Skills {
@@ -222,6 +225,7 @@ impl Skills {
             alchemy: Skill::new(1),
             mining: Skill::new(1),
             slayer: Skill::new(1),
+            survivalist: Skill::new(1),
         }
     }
 
@@ -245,6 +249,7 @@ impl Skills {
             SkillType::Alchemy => &self.alchemy,
             SkillType::Mining => &self.mining,
             SkillType::Slayer => &self.slayer,
+            SkillType::Survivalist => &self.survivalist,
         }
     }
 
@@ -262,6 +267,7 @@ impl Skills {
             SkillType::Alchemy => &mut self.alchemy,
             SkillType::Mining => &mut self.mining,
             SkillType::Slayer => &mut self.slayer,
+            SkillType::Survivalist => &mut self.survivalist,
         }
     }
 
@@ -278,6 +284,7 @@ impl Skills {
             + self.alchemy.level
             + self.mining.level
             + self.slayer.level
+            + self.survivalist.level
     }
 }
 
@@ -310,6 +317,7 @@ impl LegacySkills {
             alchemy: Skill::new(1),
             mining: Skill::new(1),
             slayer: Skill::new(1),
+            survivalist: Skill::new(1),
         }
     }
 }
@@ -434,6 +442,7 @@ mod tests {
             alchemy: Skill::new(1),
             mining: Skill::new(1),
             slayer: Skill::new(1),
+            survivalist: Skill::new(1),
         };
         // combat_level = floor((99 + 99) / 2) = 99
         assert_eq!(max_skills.combat_level(), 99);
@@ -442,8 +451,8 @@ mod tests {
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 + Alchemy 1 + Mining 1 + Slayer 1 = 22
-        assert_eq!(skills.total_level(), 22);
+        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 + Alchemy 1 + Mining 1 + Slayer 1 + Survivalist 1 = 23
+        assert_eq!(skills.total_level(), 23);
     }
 
     #[test]

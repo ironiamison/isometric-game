@@ -146,6 +146,9 @@ impl CraftingRegistry {
                 craft_time_ms: recipe.craft_time_ms,
                 xp: recipe.xp,
                 requires_discovery: recipe.requires_discovery,
+                required_tool: recipe.required_tool.clone(),
+                burn_result: recipe.burn_result.clone(),
+                burn_stop_level: recipe.burn_stop_level,
             })
             .collect();
 

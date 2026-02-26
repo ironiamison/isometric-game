@@ -15,6 +15,9 @@ pub enum RecipeCategory {
     Tools,
     Smithing,
     Alchemy,
+    Cooking,
+    Fletching,
+    Leatherworking,
 }
 
 impl Default for RecipeCategory {
@@ -32,6 +35,9 @@ impl RecipeCategory {
             RecipeCategory::Tools => "tools",
             RecipeCategory::Smithing => "smithing",
             RecipeCategory::Alchemy => "alchemy",
+            RecipeCategory::Cooking => "cooking",
+            RecipeCategory::Fletching => "fletching",
+            RecipeCategory::Leatherworking => "leatherworking",
         }
     }
 }
@@ -78,6 +84,9 @@ pub struct RawRecipeDefinition {
     pub craft_time_ms: Option<u64>,
     pub xp: Option<u32>,
     pub requires_discovery: Option<bool>,
+    pub required_tool: Option<String>,
+    pub burn_result: Option<String>,
+    pub burn_stop_level: Option<i32>,
 }
 
 // ============================================================================
@@ -113,6 +122,9 @@ pub struct RecipeDefinition {
     pub craft_time_ms: u64,
     pub xp: u32,
     pub requires_discovery: bool,
+    pub required_tool: Option<String>,
+    pub burn_result: Option<String>,
+    pub burn_stop_level: Option<i32>,
 }
 
 impl RecipeDefinition {
@@ -148,6 +160,9 @@ impl RecipeDefinition {
             craft_time_ms: raw.craft_time_ms.unwrap_or(0),
             xp: raw.xp.unwrap_or(0),
             requires_discovery: raw.requires_discovery.unwrap_or(false),
+            required_tool: raw.required_tool.clone(),
+            burn_result: raw.burn_result.clone(),
+            burn_stop_level: raw.burn_stop_level,
         }
     }
 }

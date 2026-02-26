@@ -69,7 +69,11 @@ impl Renderer {
         }
 
         // Title
-        let title = "FURNACE";
+        let title = if state.ui_state.furnace_station_type == "fire_pit" {
+            "FIRE PIT"
+        } else {
+            "FURNACE"
+        };
         let title_dims = self.measure_text_sharp(title, 16.0);
         self.draw_text_sharp(
             title,
@@ -111,55 +115,63 @@ impl Renderer {
         draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
         draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
 
-        // ===== TABS =====
+        // ===== TABS (only for furnace, not fire pit) =====
+        let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
         let tab_y = header_y + header_h + 2.0;
         let tab_h = tab_h_scaled;
-        let tab_w = header_w / 2.0;
-        let active_tab = state.ui_state.furnace_tab;
 
-        let tab_labels = ["Smelting", "Jewelry"];
-        let tab_ids = [UiElementId::FurnaceTabSmelting, UiElementId::FurnaceTabJewelry];
+        if !is_fire_pit {
+            let tab_w = header_w / 2.0;
+            let active_tab = state.ui_state.furnace_tab;
 
-        for (idx, (label, id)) in tab_labels.iter().zip(tab_ids.iter()).enumerate() {
-            let tx = header_x + idx as f32 * tab_w;
-            let is_active = idx as u8 == active_tab;
+            let tab_labels = ["Smelting", "Jewelry"];
+            let tab_ids = [UiElementId::FurnaceTabSmelting, UiElementId::FurnaceTabJewelry];
 
-            let bounds = Rect::new(tx, tab_y, tab_w, tab_h);
-            layout.add(id.clone(), bounds);
+            for (idx, (label, id)) in tab_labels.iter().zip(tab_ids.iter()).enumerate() {
+                let tx = header_x + idx as f32 * tab_w;
+                let is_active = idx as u8 == active_tab;
 
-            let (tab_bg, tab_text_color) = if is_active {
-                (PANEL_BG_MID, TEXT_TITLE)
-            } else {
-                (SLOT_BG_EMPTY, TEXT_DIM)
-            };
+                let bounds = Rect::new(tx, tab_y, tab_w, tab_h);
+                layout.add(id.clone(), bounds);
 
-            draw_rectangle(tx, tab_y, tab_w, tab_h, tab_bg);
+                let (tab_bg, tab_text_color) = if is_active {
+                    (PANEL_BG_MID, TEXT_TITLE)
+                } else {
+                    (SLOT_BG_EMPTY, TEXT_DIM)
+                };
 
-            // Border between tabs
-            if idx > 0 {
-                draw_line(tx, tab_y + 4.0 * s, tx, tab_y + tab_h - 4.0 * s, 1.0, SLOT_BORDER);
+                draw_rectangle(tx, tab_y, tab_w, tab_h, tab_bg);
+
+                // Border between tabs
+                if idx > 0 {
+                    draw_line(tx, tab_y + 4.0 * s, tx, tab_y + tab_h - 4.0 * s, 1.0, SLOT_BORDER);
+                }
+
+                // Active tab bottom accent
+                if is_active {
+                    draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 2.0, SLOT_SELECTED_BORDER);
+                } else {
+                    draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 1.0, SLOT_BORDER);
+                }
+
+                let label_dims = self.measure_text_sharp(label, TAB_FONT_SIZE);
+                self.draw_text_sharp(
+                    label,
+                    tx + (tab_w - label_dims.width) / 2.0,
+                    tab_y + tab_h * 0.68,
+                    TAB_FONT_SIZE,
+                    tab_text_color,
+                );
             }
-
-            // Active tab bottom accent
-            if is_active {
-                draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 2.0, SLOT_SELECTED_BORDER);
-            } else {
-                draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 1.0, SLOT_BORDER);
-            }
-
-            let label_dims = self.measure_text_sharp(label, TAB_FONT_SIZE);
-            self.draw_text_sharp(
-                label,
-                tx + (tab_w - label_dims.width) / 2.0,
-                tab_y + tab_h * 0.68,
-                TAB_FONT_SIZE,
-                tab_text_color,
-            );
         }
 
         // ===== CONTENT AREA =====
         let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
-        let content_y = tab_y + tab_h + 4.0 * s;
+        let content_y = if is_fire_pit {
+            tab_y + 4.0 * s // no tabs, content starts right after header
+        } else {
+            tab_y + tab_h + 4.0 * s
+        };
         let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
         let content_h = panel_y + panel_height - FRAME_THICKNESS - footer_h - 4.0 * s - content_y;
 
@@ -188,10 +200,11 @@ impl Renderer {
         if state.ui_state.crafting_in_progress {
             self.draw_text_sharp("[Esc] Cancel", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
         } else {
+            let action_label = if is_fire_pit { "[Enter] Cook" } else { "[Enter] Smelt" };
             self.draw_text_sharp("[Tab] Tab", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
             self.draw_text_sharp("[W/S] Select", footer_x + 105.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
             self.draw_text_sharp("[1/X/A] Qty", footer_x + 220.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[Enter] Smelt", footer_x + 335.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp(action_label, footer_x + 335.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
         }
     }
 
@@ -206,13 +219,27 @@ impl Renderer {
         content_w: f32,
         content_h: f32,
     ) {
-        // Filter recipes for furnace station + active tab section
-        let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
+        // Filter recipes for active station type + active tab section
+        let station = state.ui_state.furnace_station_type.as_str();
+        let is_fire_pit = station == "fire_pit";
+        let section_filter = if is_fire_pit {
+            "fish" // fire pit only has fish section
+        } else if state.ui_state.furnace_tab == 0 {
+            "materials"
+        } else {
+            "jewelry"
+        };
         let mut furnace_recipes: Vec<_> = state
             .recipe_definitions
             .iter()
-            .filter(|r| r.station.as_deref() == Some("furnace"))
-            .filter(|r| r.section.as_deref() == Some(section_filter))
+            .filter(|r| r.station.as_deref() == Some(station))
+            .filter(|r| {
+                if is_fire_pit {
+                    true // fire pit: show all recipes (no tab filtering)
+                } else {
+                    r.section.as_deref() == Some(section_filter)
+                }
+            })
             .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
             .collect();
         furnace_recipes.sort_by_key(|r| r.level_required);
@@ -220,7 +247,9 @@ impl Renderer {
         let s = self.font_scale.get();
 
         if furnace_recipes.is_empty() {
-            let msg = if state.ui_state.furnace_tab == 0 {
+            let msg = if is_fire_pit {
+                "No cooking recipes available"
+            } else if state.ui_state.furnace_tab == 0 {
                 "No smelting recipes available"
             } else {
                 "No jewelry recipes available"
@@ -349,7 +378,12 @@ impl Renderer {
             if recipe.level_required > 1 {
                 // Determine level color: green if met, red if not
                 let level_color = if let Some(player) = state.get_local_player() {
-                    if player.skills.smithing.level >= recipe.level_required {
+                    let player_level = if is_fire_pit {
+                        player.skills.survivalist.level
+                    } else {
+                        player.skills.smithing.level
+                    };
+                    if player_level >= recipe.level_required {
                         Color::new(0.392, 0.784, 0.392, 1.0)
                     } else {
                         Color::new(0.784, 0.314, 0.314, 1.0)
@@ -358,10 +392,10 @@ impl Renderer {
                     TEXT_DIM
                 };
 
-                // Draw small smithing icon from spritesheet
+                // Draw small skill icon from spritesheet
                 let icon_size = 14.0 * s;
                 if let Some(ref texture) = self.ui_icons {
-                    let src_x = 5.0 * 24.0; // Smithing = col 5
+                    let src_x = 5.0 * 24.0; // col 5
                     let src_y = 6.0 * 24.0; // row 6
                     draw_texture_ex(
                         texture,
@@ -398,12 +432,40 @@ impl Renderer {
                 let separator = if recipe.level_required > 1 { " · " } else { "" };
                 let extra_text = format!("{}{}", separator, extra_parts.join(" · "));
                 self.draw_text_sharp(&extra_text, info_x, info_y, 16.0, TEXT_DIM);
+                info_x += self.measure_text_sharp(&extra_text, 16.0).width;
+            }
+
+            // Show burn chance for cooking recipes
+            if let (Some(ref _burn_result), Some(burn_stop)) =
+                (&recipe.burn_result, recipe.burn_stop_level)
+            {
+                if let Some(player) = state.get_local_player() {
+                    let player_level = player.skills.survivalist.level;
+                    if player_level < burn_stop {
+                        let level_range = (burn_stop - recipe.level_required) as f32;
+                        let burn_pct = if level_range > 0.0 {
+                            ((burn_stop - player_level) as f32 / level_range * 50.0) as i32
+                        } else {
+                            0
+                        };
+                        if burn_pct > 0 {
+                            let burn_text = format!(" · ~{}% burn", burn_pct);
+                            let burn_color = Color::new(0.85, 0.55, 0.15, 1.0); // orange
+                            self.draw_text_sharp(&burn_text, info_x, info_y, 16.0, burn_color);
+                        }
+                    }
+                }
             }
 
             // Level check - show warning if too low
             if recipe.level_required > 1 {
                 if let Some(player) = state.get_local_player() {
-                    if player.skills.smithing.level < recipe.level_required {
+                    let player_level = if is_fire_pit {
+                        player.skills.survivalist.level
+                    } else {
+                        player.skills.smithing.level
+                    };
+                    if player_level < recipe.level_required {
                         can_craft = false;
                     }
                 }
@@ -509,7 +571,11 @@ impl Renderer {
                     );
                 }
 
-                let smelt_text = if can_craft { "[ SMELT ]" } else { "Can't Smelt" };
+                let smelt_text = if is_fire_pit {
+                    if can_craft { "[ COOK ]" } else { "Can't Cook" }
+                } else {
+                    if can_craft { "[ SMELT ]" } else { "Can't Smelt" }
+                };
                 let smelt_text_w = self.measure_text_sharp(smelt_text, 16.0).width;
                 let smelt_text_color = if !can_craft {
                     Color::new(0.5, 0.3, 0.3, 1.0)
@@ -592,16 +658,18 @@ impl Renderer {
         let progress = state.ui_state.crafting_progress;
         let time = get_time() as f32;
 
-        // "SMELTING..." text with pulsing ellipsis
+        // Progress text with pulsing ellipsis
+        let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
+        let base_text = if is_fire_pit { "COOKING" } else { "SMELTING" };
         let dots = match ((time * 2.0) as i32) % 4 {
-            0 => "SMELTING",
-            1 => "SMELTING.",
-            2 => "SMELTING..",
-            _ => "SMELTING...",
+            0 => format!("{}", base_text),
+            1 => format!("{}.", base_text),
+            2 => format!("{}..", base_text),
+            _ => format!("{}...", base_text),
         };
-        let dots_dims = self.measure_text_sharp(dots, 16.0);
+        let dots_dims = self.measure_text_sharp(&dots, 16.0);
         self.draw_text_sharp(
-            dots,
+            &dots,
             area_x + (area_w - dots_dims.width) / 2.0,
             area_y + 36.0 * s,
             16.0,

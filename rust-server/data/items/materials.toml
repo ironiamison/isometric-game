@@ -374,7 +374,7 @@ base_price = 12
 
 [raw_salmon]
 display_name = "Raw Salmon"
-sprite = "raw_salmon"
+sprite = "raw_trout"
 description = "A pink-fleshed fish that swims upstream. Nutritious when cooked."
 category = "material"
 max_stack = 5
@@ -390,7 +390,7 @@ base_price = 30
 
 [raw_swordfish]
 display_name = "Raw Swordfish"
-sprite = "raw_swordfish"
+sprite = "raw_shark"
 description = "A powerful ocean fish with a sharp bill. Rare and valuable."
 category = "material"
 max_stack = 5
@@ -641,3 +641,128 @@ description = "The magical core that once animated a construct. Still hums with 
 category = "material"
 max_stack = 99
 base_price = 40
+
+# =============================================================================
+# Fletching Materials
+# =============================================================================
+
+[arrow_shaft]
+display_name = "Arrow Shaft"
+sprite = "arrow_shaft"
+description = "A straight wooden shaft, ready to be tipped and fletched."
+category = "material"
+max_stack = 100
+base_price = 2
+sellable = true
+
+[bowstring]
+display_name = "Bowstring"
+sprite = "bowstring"
+description = "A strong bowstring made from sinew. Used to string bows."
+category = "material"
+max_stack = 100
+base_price = 10
+sellable = true
+
+[bronze_arrowhead]
+display_name = "Bronze Arrowhead"
+sprite = "bronze_arrowhead"
+description = "A sharp bronze arrowhead for tipping arrows."
+category = "material"
+max_stack = 100
+base_price = 3
+sellable = true
+
+[iron_arrowhead]
+display_name = "Iron Arrowhead"
+sprite = "iron_arrowhead"
+description = "A sturdy iron arrowhead for tipping arrows."
+category = "material"
+max_stack = 100
+base_price = 8
+sellable = true
+
+[steel_arrowhead]
+display_name = "Steel Arrowhead"
+sprite = "steel_arrowhead"
+description = "A keen steel arrowhead for tipping arrows."
+category = "material"
+max_stack = 100
+base_price = 15
+sellable = true
+
+[bronze_arrow]
+display_name = "Bronze Arrow"
+sprite = "bronze_arrow"
+description = "Arrows tipped with bronze arrowheads."
+category = "material"
+max_stack = 100
+base_price = 5
+sellable = true
+
+[iron_arrow]
+display_name = "Iron Arrow"
+sprite = "iron_arrow"
+description = "Arrows tipped with iron arrowheads."
+category = "material"
+max_stack = 100
+base_price = 12
+sellable = true
+
+[steel_arrow]
+display_name = "Steel Arrow"
+sprite = "steel_arrow"
+description = "Arrows tipped with steel arrowheads."
+category = "material"
+max_stack = 100
+base_price = 20
+sellable = true
+
+[oak_bow_u]
+display_name = "Oak Bow (u)"
+sprite = "oak_bow_u"
+description = "An unstrung oak bow. Needs a bowstring."
+category = "material"
+max_stack = 1
+base_price = 20
+sellable = true
+
+[willow_bow_u]
+display_name = "Willow Bow (u)"
+sprite = "willow_bow_u"
+description = "An unstrung willow bow. Needs a bowstring."
+category = "material"
+max_stack = 1
+base_price = 50
+sellable = true
+
+[maple_bow_u]
+display_name = "Maple Bow (u)"
+sprite = "maple_bow_u"
+description = "An unstrung maple bow. Needs a bowstring."
+category = "material"
+max_stack = 1
+base_price = 100
+sellable = true
+
+[yew_bow_u]
+display_name = "Yew Bow (u)"
+sprite = "yew_bow_u"
+description = "An unstrung yew bow. Needs a bowstring."
+category = "material"
+max_stack = 1
+base_price = 200
+sellable = true
+
+# =============================================================================
+# Leatherworking Materials
+# =============================================================================
+
+[leather]
+display_name = "Leather"
+sprite = "leather"
+description = "Tanned leather, ready to be crafted into armor."
+category = "material"
+max_stack = 99
+base_price = 15
+sellable = true

@@ -959,3 +959,61 @@ count = 1
 [[diamond_pendant.results]]
 item_id = "diamond_pendant"
 count = 1
+
+# =============================================================================
+# Arrowheads (for Fletching)
+# =============================================================================
+
+[smith_bronze_arrowheads]
+display_name = "Bronze Arrowheads"
+description = "Smith bronze arrowheads from a bronze bar."
+category = "smithing"
+section = "arrowheads"
+level_required = 5
+station = "anvil"
+craft_time_ms = 3000
+xp = 15
+
+[[smith_bronze_arrowheads.ingredients]]
+item_id = "bronze_bar"
+count = 1
+
+[[smith_bronze_arrowheads.results]]
+item_id = "bronze_arrowhead"
+count = 15
+
+[smith_iron_arrowheads]
+display_name = "Iron Arrowheads"
+description = "Smith iron arrowheads from an iron bar."
+category = "smithing"
+section = "arrowheads"
+level_required = 15
+station = "anvil"
+craft_time_ms = 3000
+xp = 30
+
+[[smith_iron_arrowheads.ingredients]]
+item_id = "iron_bar"
+count = 1
+
+[[smith_iron_arrowheads.results]]
+item_id = "iron_arrowhead"
+count = 15
+
+[smith_steel_arrowheads]
+display_name = "Steel Arrowheads"
+description = "Smith steel arrowheads from a steel bar."
+category = "smithing"
+section = "arrowheads"
+level_required = 25
+station = "anvil"
+craft_time_ms = 3000
+xp = 50
+
+[[smith_steel_arrowheads.ingredients]]
+item_id = "steel_bar"
+count = 1
+
+[[smith_steel_arrowheads.results]]
+item_id = "steel_arrowhead"
+count = 15

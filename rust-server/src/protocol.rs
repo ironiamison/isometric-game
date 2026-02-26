@@ -533,6 +533,8 @@ pub enum ServerMessage {
         mining_xp: i64,
         slayer_level: i32,
         slayer_xp: i64,
+        survivalist_level: i32,
+        survivalist_xp: i64,
     },
     ItemDropped {
         id: String,
@@ -1341,6 +1343,9 @@ pub struct ClientRecipeDef {
     pub craft_time_ms: u64,
     pub xp: u32,
     pub requires_discovery: bool,
+    pub required_tool: Option<String>,
+    pub burn_result: Option<String>,
+    pub burn_stop_level: Option<i32>,
 }
 
 /// Shop data for client synchronization
@@ -2439,6 +2444,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             mining_xp,
             slayer_level,
             slayer_xp,
+            survivalist_level,
+            survivalist_xp,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -2532,6 +2539,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("slayer_xp".into()),
                 Value::Integer((*slayer_xp).into()),
+            ));
+            map.push((
+                Value::String("survivalist_level".into()),
+                Value::Integer((*survivalist_level as i64).into()),
+            ));
+            map.push((
+                Value::String("survivalist_xp".into()),
+                Value::Integer((*survivalist_xp).into()),
             ));
             Value::Map(map)
         }
@@ -3301,6 +3316,18 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::String("requires_discovery".into()),
                         Value::Boolean(r.requires_discovery),
                     ));
+                    if let Some(ref br) = r.burn_result {
+                        rmap.push((
+                            Value::String("burn_result".into()),
+                            Value::String(br.clone().into()),
+                        ));
+                    }
+                    if let Some(bsl) = r.burn_stop_level {
+                        rmap.push((
+                            Value::String("burn_stop_level".into()),
+                            Value::Integer((bsl as i64).into()),
+                        ));
+                    }
 
                     Value::Map(rmap)
                 })

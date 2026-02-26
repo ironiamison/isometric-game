@@ -106,7 +106,7 @@ impl Renderer {
 
         // Title
         self.draw_text_sharp(
-            "QUESTS",
+            "Quests",
             header_x + 12.0 * s,
             header_y + header_h * 0.65,
             16.0,
@@ -886,7 +886,7 @@ impl Renderer {
         let mut max_text_width: f32 = 0.0;
 
         // Header
-        let header = "QUESTS";
+        let header = "Quests";
         max_text_width = max_text_width.max(self.measure_text_sharp(header, font_size).width);
         lines.push(TrackerLine {
             text: header.to_string(),

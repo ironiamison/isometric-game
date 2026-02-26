@@ -1190,13 +1190,14 @@ pub struct UiState {
     pub crafting_started_at: Option<f64>,
     // Crafting completion animation: (recipe_id, timer_0_to_1)
     pub crafting_complete_animation: Option<(String, f32)>,
-    // Furnace UI state
+    // Furnace / Fire Pit UI state (shared — fire pit reuses furnace UI)
     pub furnace_open: bool,
     pub furnace_tile: Option<(i32, i32)>,
     pub furnace_selected_recipe: usize,
     pub furnace_scroll_offset: f32,
     pub furnace_quantity: u32,
     pub furnace_tab: u8,
+    pub furnace_station_type: String, // "furnace" or "fire_pit"
     // Anvil UI state
     pub anvil_open: bool,
     pub anvil_tile: Option<(i32, i32)>,
@@ -1399,6 +1400,7 @@ impl Default for UiState {
             furnace_scroll_offset: 0.0,
             furnace_quantity: 1,
             furnace_tab: 0,
+            furnace_station_type: "furnace".to_string(),
             anvil_open: false,
             anvil_tile: None,
             anvil_selected_recipe: 0,

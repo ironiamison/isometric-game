@@ -57,7 +57,7 @@ impl Renderer {
         );
 
         // Title centered in header
-        let title = "SETTINGS";
+        let title = "Settings";
         let title_width = self.measure_text_sharp(title, 16.0).width;
         self.draw_text_sharp(
             title,

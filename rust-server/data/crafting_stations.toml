@@ -17,3 +17,8 @@ interaction_range = 2
 display_name = "Alchemy Station"
 description = "A bubbling cauldron for brewing potions and elixirs."
 interaction_range = 2
+
+[fire_pit]
+display_name = "Fire Pit"
+description = "A fire pit for cooking food."
+interaction_range = 2

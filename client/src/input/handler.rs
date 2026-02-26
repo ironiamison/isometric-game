@@ -2169,6 +2169,16 @@ impl InputHandler {
                                                         if let Some(npc) = state.npcs.get(npc_id) {
                                                             match npc.station_type.as_deref() {
                                                                 Some("furnace") => {
+                                                                    state.ui_state.furnace_station_type = "furnace".to_string();
+                                                                    state.ui_state.furnace_open = true;
+                                                                    state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                                                    state.ui_state.furnace_selected_recipe = 0;
+                                                                    state.ui_state.furnace_scroll_offset = 0.0;
+                                                                    state.ui_state.furnace_quantity = 1;
+                                                                    state.ui_state.furnace_tab = 0;
+                                                                }
+                                                                Some("fire_pit") => {
+                                                                    state.ui_state.furnace_station_type = "fire_pit".to_string();
                                                                     state.ui_state.furnace_open = true;
                                                                     state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                                                     state.ui_state.furnace_selected_recipe = 0;
@@ -5265,12 +5275,16 @@ impl InputHandler {
                         }
                         UiElementId::FurnaceSmeltButton => {
                             if !state.ui_state.crafting_in_progress {
-                                let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
+                                let station = state.ui_state.furnace_station_type.as_str();
+                                let is_fire_pit = station == "fire_pit";
+                                let section_filter = if is_fire_pit { "fish" } else if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
                                 let mut furnace_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
-                                    .filter(|r| r.station.as_deref() == Some("furnace"))
-                                    .filter(|r| r.section.as_deref() == Some(section_filter))
+                                    .filter(|r| r.station.as_deref() == Some(station))
+                                    .filter(|r| {
+                                        if is_fire_pit { true } else { r.section.as_deref() == Some(section_filter) }
+                                    })
                                     .filter(|r| {
                                         !r.requires_discovery
                                             || state.discovered_recipes.contains(&r.id)
@@ -5364,12 +5378,16 @@ impl InputHandler {
                     state.pending_sfx.push("enter".to_string());
                 }
 
-                let section_filter = if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
+                let station = state.ui_state.furnace_station_type.as_str();
+                let is_fire_pit = station == "fire_pit";
+                let section_filter = if is_fire_pit { "fish" } else if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
                 let mut furnace_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
-                    .filter(|r| r.station.as_deref() == Some("furnace"))
-                    .filter(|r| r.section.as_deref() == Some(section_filter))
+                    .filter(|r| r.station.as_deref() == Some(station))
+                    .filter(|r| {
+                        if is_fire_pit { true } else { r.section.as_deref() == Some(section_filter) }
+                    })
                     .filter(|r| {
                         !r.requires_discovery || state.discovered_recipes.contains(&r.id)
                     })
@@ -7139,7 +7157,8 @@ impl InputHandler {
                                     altar_npc_id: npc_id.clone(),
                                     altar_name: npc.display_name.clone(),
                                 });
-                            } else if npc.station_type.as_deref() == Some("furnace") {
+                            } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
+                                state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
                                 state.ui_state.furnace_open = true;
                                 state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                 state.ui_state.furnace_selected_recipe = 0;
@@ -7700,7 +7719,8 @@ impl InputHandler {
                                                 altar_npc_id: npc_id.clone(),
                                                 altar_name: npc.display_name.clone(),
                                             });
-                                    } else if npc.station_type.as_deref() == Some("furnace") {
+                                    } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
+                                        state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
                                         state.ui_state.furnace_open = true;
                                         state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                         state.ui_state.furnace_selected_recipe = 0;
@@ -8629,7 +8649,8 @@ impl InputHandler {
                                             altar_npc_id: npc_id.clone(),
                                             altar_name: npc.display_name.clone(),
                                         });
-                                } else if npc.station_type.as_deref() == Some("furnace") {
+                                } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
+                                    state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
                                     state.ui_state.furnace_open = true;
                                     state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                     state.ui_state.furnace_selected_recipe = 0;

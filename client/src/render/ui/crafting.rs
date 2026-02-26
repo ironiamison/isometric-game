@@ -993,12 +993,14 @@ impl Renderer {
                 let skill_name = match recipe.category.as_str() {
                     "smithing" => "Smithing",
                     "alchemy" => "Alchemy",
+                    "cooking" | "fletching" | "leatherworking" => "Survivalist",
                     _ => "Combat",
                 };
                 let (level_color, level_icon) = if let Some(player) = state.get_local_player() {
                     let player_level = match recipe.category.as_str() {
                         "smithing" => player.skills.smithing.level,
                         "alchemy" => player.skills.alchemy.level,
+                        "cooking" | "fletching" | "leatherworking" => player.skills.survivalist.level,
                         _ => player.combat_level(),
                     };
                     if player_level >= recipe.level_required {
@@ -1022,6 +1024,33 @@ impl Renderer {
                 section_y += 22.0 * s;
             }
 
+            // Show required tool if any
+            if let Some(ref tool) = recipe.required_tool {
+                let tool_display = match tool.as_str() {
+                    "knife" => "Knife",
+                    other => other,
+                };
+                let has_tool = state
+                    .inventory
+                    .slots
+                    .iter()
+                    .flatten()
+                    .any(|slot| slot.item_id == *tool);
+                let (tool_color, tool_icon) = if has_tool {
+                    (Color::new(0.392, 0.784, 0.392, 1.0), "[OK]")
+                } else {
+                    (Color::new(0.784, 0.314, 0.314, 1.0), "[!!]")
+                };
+                self.draw_text_sharp(
+                    &format!("{} Requires: {}", tool_icon, tool_display),
+                    detail_x + 12.0 * s,
+                    section_y,
+                    16.0,
+                    tool_color,
+                );
+                section_y += 22.0 * s;
+            }
+
             self.draw_text_sharp(
                 "Materials Required:",
                 detail_x + 12.0 * s,
@@ -1039,10 +1068,26 @@ impl Renderer {
                     let player_level = match recipe.category.as_str() {
                         "smithing" => player.skills.smithing.level,
                         "alchemy" => player.skills.alchemy.level,
+                        "cooking" | "fletching" | "leatherworking" => player.skills.survivalist.level,
                         _ => player.combat_level(),
                     };
                     if player_level < recipe.level_required {
                         craft_blocked_reason = Some("Requirements Not Met");
+                    }
+                }
+            }
+
+            // Check required tool
+            if craft_blocked_reason.is_none() {
+                if let Some(ref tool) = recipe.required_tool {
+                    let has_tool = state
+                        .inventory
+                        .slots
+                        .iter()
+                        .flatten()
+                        .any(|slot| slot.item_id == *tool);
+                    if !has_tool {
+                        craft_blocked_reason = Some("Missing Required Tool");
                     }
                 }
             }

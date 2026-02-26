@@ -1716,3 +1716,139 @@ magic_bonus = 8
 attack_bonus = 6
 strength_bonus = 5
 defence_bonus = 0
+
+# =============================================================================
+# Fletching - Bows
+# =============================================================================
+
+[oak_bow]
+display_name = "Oak Bow"
+sprite = "oak_bow"
+description = "A sturdy bow carved from oak. Good for beginners."
+category = "equipment"
+max_stack = 1
+base_price = 40
+sellable = true
+[oak_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 6
+attack_level_required = 1
+attack_bonus = 4
+strength_bonus = 3
+defence_bonus = 0
+
+[willow_bow]
+display_name = "Willow Bow"
+sprite = "willow_bow"
+description = "A flexible willow bow with good draw weight."
+category = "equipment"
+max_stack = 1
+base_price = 100
+sellable = true
+[willow_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 7
+attack_level_required = 10
+attack_bonus = 8
+strength_bonus = 6
+defence_bonus = 0
+
+[maple_bow]
+display_name = "Maple Bow"
+sprite = "maple_bow"
+description = "A powerful maple bow favored by experienced archers."
+category = "equipment"
+max_stack = 1
+base_price = 200
+sellable = true
+[maple_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 8
+attack_level_required = 20
+attack_bonus = 12
+strength_bonus = 9
+defence_bonus = 0
+
+[yew_bow]
+display_name = "Yew Bow"
+sprite = "yew_bow"
+description = "A masterfully crafted yew bow. Deadly in skilled hands."
+category = "equipment"
+max_stack = 1
+base_price = 400
+sellable = true
+[yew_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 9
+attack_level_required = 30
+attack_bonus = 16
+strength_bonus = 12
+defence_bonus = 0
+
+# =============================================================================
+# Leatherworking - Leather Armor
+# =============================================================================
+
+[leather_gloves]
+display_name = "Leather Gloves"
+sprite = "leather_gloves"
+description = "Light leather gloves. Favored by rangers."
+category = "equipment"
+max_stack = 1
+base_price = 30
+sellable = true
+[leather_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 0
+defence_bonus = 1
+
+[leather_boots]
+display_name = "Leather Boots"
+sprite = "leather_boots"
+description = "Supple leather boots. Light and quiet."
+category = "equipment"
+max_stack = 1
+base_price = 30
+sellable = true
+[leather_boots.equipment]
+slot_type = "feet"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 0
+defence_bonus = 1
+
+[leather_body]
+display_name = "Leather Body"
+sprite = "leather_body"
+description = "A hardened leather chestpiece. Offers decent protection without slowing you down."
+category = "equipment"
+max_stack = 1
+base_price = 80
+sellable = true
+[leather_body.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 3
+
+[leather_hood]
+display_name = "Leather Hood"
+sprite = "leather_hood"
+description = "A leather hood that keeps you hidden. Light head protection."
+category = "equipment"
+max_stack = 1
+base_price = 50
+sellable = true
+[leather_hood.equipment]
+slot_type = "head"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 0
+defence_bonus = 2

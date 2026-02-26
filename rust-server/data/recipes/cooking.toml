@@ -1,0 +1,144 @@
+# =============================================================================
+# Cooking Recipes (Survivalist skill)
+# Requires fire_pit station
+# =============================================================================
+
+[cook_shrimp]
+display_name = "Cook Shrimp"
+description = "Cook a raw shrimp over the fire."
+category = "cooking"
+section = "fish"
+level_required = 1
+station = "fire_pit"
+craft_time_ms = 2000
+xp = 10
+burn_result = "burnt_shrimp"
+burn_stop_level = 5
+
+[[cook_shrimp.ingredients]]
+item_id = "raw_shrimp"
+count = 1
+
+[[cook_shrimp.results]]
+item_id = "cooked_shrimp"
+count = 1
+
+[cook_sardine]
+display_name = "Cook Sardine"
+description = "Cook a raw sardine over the fire."
+category = "cooking"
+section = "fish"
+level_required = 1
+station = "fire_pit"
+craft_time_ms = 2000
+xp = 15
+burn_result = "burnt_sardine"
+burn_stop_level = 8
+
+[[cook_sardine.ingredients]]
+item_id = "raw_sardine"
+count = 1
+
+[[cook_sardine.results]]
+item_id = "cooked_sardine"
+count = 1
+
+[cook_herring]
+display_name = "Cook Herring"
+description = "Cook a raw herring over the fire."
+category = "cooking"
+section = "fish"
+level_required = 5
+station = "fire_pit"
+craft_time_ms = 2500
+xp = 20
+burn_result = "burnt_herring"
+burn_stop_level = 18
+
+[[cook_herring.ingredients]]
+item_id = "raw_herring"
+count = 1
+
+[[cook_herring.results]]
+item_id = "cooked_herring"
+count = 1
+
+[cook_trout]
+display_name = "Cook Trout"
+description = "Cook a raw trout over the fire."
+category = "cooking"
+section = "fish"
+level_required = 10
+station = "fire_pit"
+craft_time_ms = 3000
+xp = 30
+burn_result = "burnt_trout"
+burn_stop_level = 24
+
+[[cook_trout.ingredients]]
+item_id = "raw_trout"
+count = 1
+
+[[cook_trout.results]]
+item_id = "cooked_trout"
+count = 1
+
+[cook_salmon]
+display_name = "Cook Salmon"
+description = "Cook a raw salmon over the fire."
+category = "cooking"
+section = "fish"
+level_required = 15
+station = "fire_pit"
+craft_time_ms = 3000
+xp = 45
+burn_result = "burnt_salmon"
+burn_stop_level = 30
+
+[[cook_salmon.ingredients]]
+item_id = "raw_salmon"
+count = 1
+
+[[cook_salmon.results]]
+item_id = "cooked_salmon"
+count = 1
+
+[cook_lobster]
+display_name = "Cook Lobster"
+description = "Cook a raw lobster over the fire."
+category = "cooking"
+section = "fish"
+level_required = 25
+station = "fire_pit"
+craft_time_ms = 4000
+xp = 80
+burn_result = "burnt_lobster"
+burn_stop_level = 40
+
+[[cook_lobster.ingredients]]
+item_id = "raw_lobster"
+count = 1
+
+[[cook_lobster.results]]
+item_id = "cooked_lobster"
+count = 1
+
+[cook_swordfish]
+display_name = "Cook Swordfish"
+description = "Cook a raw swordfish over the fire."
+category = "cooking"
+section = "fish"
+level_required = 35
+station = "fire_pit"
+craft_time_ms = 5000
+xp = 120
+burn_result = "burnt_swordfish"
+burn_stop_level = 50
+
+[[cook_swordfish.ingredients]]
+item_id = "raw_swordfish"
+count = 1
+
+[[cook_swordfish.results]]
+item_id = "cooked_swordfish"
+count = 1

@@ -266,4 +266,7 @@ pub struct RecipeDefinition {
     pub craft_time_ms: u64,
     pub xp: u32,
     pub requires_discovery: bool,
+    pub required_tool: Option<String>,
+    pub burn_result: Option<String>,
+    pub burn_stop_level: Option<i32>,
 }
