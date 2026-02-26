@@ -656,6 +656,9 @@ impl Player {
         self.death_time = 0;
         self.target_id = None;
         self.last_regen_time = 0;
+        // Reset movement cooldown so the player can move immediately after respawning
+        self.last_move_tick = 0;
+        self.clear_move_intent();
         chair_to_free
     }
 
@@ -11980,6 +11983,63 @@ impl GameRoom {
         // Stop gathering for respawning players
         for (id, _, _, _, _, _) in &respawned_players {
             self.handle_stop_gathering(id).await;
+        }
+
+        // Exit instances for respawning players (they respawn to overworld)
+        for (id, _, _, _, _, _) in &respawned_players {
+            let instance_id = self.player_instances.write().await.remove(id);
+            if let Some(instance_id) = instance_id {
+                self.reset_sync_state(id).await;
+                if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                    let other_players: Vec<String> = instance
+                        .get_player_ids()
+                        .await
+                        .into_iter()
+                        .filter(|pid| pid != id)
+                        .collect();
+
+                    let remaining = instance.remove_player(id).await;
+                    if remaining == 0
+                        && instance.instance_type == crate::interior::InstanceType::Private
+                    {
+                        if let Some(owner_id) = &instance.owner_id {
+                            self.instance_manager
+                                .remove_private(owner_id, &instance.map_id);
+                        }
+                    }
+
+                    // Notify other instance players and the respawning player
+                    for other_id in &other_players {
+                        self.send_to_player(
+                            other_id,
+                            ServerMessage::PlayerLeft {
+                                id: id.to_string(),
+                            },
+                        )
+                        .await;
+                        self.send_to_player(
+                            id,
+                            ServerMessage::PlayerLeft {
+                                id: other_id.clone(),
+                            },
+                        )
+                        .await;
+                    }
+                }
+
+                // Tell client to transition back to overworld
+                self.send_to_player(
+                    id,
+                    ServerMessage::MapTransition {
+                        map_type: "overworld".to_string(),
+                        map_id: "world_0".to_string(),
+                        spawn_x: WORLD_SPAWN_X as f32,
+                        spawn_y: WORLD_SPAWN_Y as f32,
+                        instance_id: String::new(),
+                    },
+                )
+                .await;
+            }
         }
 
         // Broadcast respawns
