@@ -6,3 +6,9 @@ item_id = "fishing_rod"
 max_quantity = 1
 restock_rate = 1
 restock_interval_minutes = 1
+
+[[stock]]
+item_id = "maple_rod"
+max_quantity = 1
+restock_rate = 1
+restock_interval_minutes = 1

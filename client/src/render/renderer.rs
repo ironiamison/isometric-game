@@ -8267,17 +8267,26 @@ impl Renderer {
             let scaled_width = (tex_width * zoom).round();
             let scaled_height = (tex_height * zoom).round();
 
-            let (draw_x, draw_y) = match wall.edge {
-                WallEdge::Down => {
-                    // Bottom-right corner of sprite at bottom vertex
-                    (
-                        bottom_vertex_x - scaled_width,
-                        bottom_vertex_y - scaled_height,
-                    )
-                }
-                WallEdge::Right => {
-                    // Bottom-left corner of sprite at bottom vertex
-                    (bottom_vertex_x, bottom_vertex_y - scaled_height)
+            let is_animated = self.animated_walls.contains_key(&sprite_id);
+            let (draw_x, draw_y) = if is_animated {
+                // Animated walls (torches, candelabras) center on the tile
+                (
+                    bottom_vertex_x - scaled_width / 2.0,
+                    bottom_vertex_y - scaled_height,
+                )
+            } else {
+                match wall.edge {
+                    WallEdge::Down => {
+                        // Bottom-right corner of sprite at bottom vertex
+                        (
+                            bottom_vertex_x - scaled_width,
+                            bottom_vertex_y - scaled_height,
+                        )
+                    }
+                    WallEdge::Right => {
+                        // Bottom-left corner of sprite at bottom vertex
+                        (bottom_vertex_x, bottom_vertex_y - scaled_height)
+                    }
                 }
             };
 
