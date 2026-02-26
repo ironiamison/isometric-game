@@ -429,6 +429,13 @@ fn load_logo() -> Option<RetainedImage> {
 }
 
 fn load_icon_data() -> Option<egui::IconData> {
+    for path in asset_candidates("app-icon.png") {
+        if let Ok(bytes) = fs::read(&path) {
+            if let Ok(icon) = icon_data::from_png_bytes(&bytes) {
+                return Some(icon);
+            }
+        }
+    }
     for path in asset_candidates("logo.png") {
         if let Ok(bytes) = fs::read(&path) {
             if let Ok(icon) = icon_data::from_png_bytes(&bytes) {

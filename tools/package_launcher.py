@@ -56,6 +56,7 @@ def main() -> None:
     bin_path = Path(args.bin).resolve()
     config_path = Path(args.config).resolve()
     logo_path = Path(args.logo).resolve()
+    app_icon_path = logo_path.parent / "app-icon.png"
     out_path = Path(args.out).resolve()
 
     if not bin_path.exists():
@@ -70,6 +71,8 @@ def main() -> None:
         copy_file(bin_path, staging_root / bin_path.name)
         copy_file(config_path, staging_root / "launcher-config.toml")
         copy_file(logo_path, staging_root / "assets" / "logo.png")
+        if app_icon_path.exists():
+            copy_file(app_icon_path, staging_root / "assets" / "app-icon.png")
 
         if args.format == "zip":
             build_zip(staging_root, out_path)

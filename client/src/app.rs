@@ -143,6 +143,7 @@ pub fn window_conf() -> Conf {
 #[cfg(not(target_os = "android"))]
 fn load_icon() -> Option<miniquad::conf::Icon> {
     let candidates = [
+        "assets/app-icon.png",
         "assets/logo.png",
         "assets/ui/logo.png",
         "assets/favicon.png",
