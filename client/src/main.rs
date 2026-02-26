@@ -144,6 +144,7 @@ async fn main() {
         audio.play_music("assets/audio/menu.ogg").await;
 
         let mut login_screen = LoginScreen::new(SERVER_URL);
+        login_screen.use_renderer_font(renderer.font().clone());
         login_screen.load_font().await;
         let mut app_state = AppState::Login(login_screen);
         let mut last_next_frame_ms: f64 = 0.0;
@@ -169,6 +170,12 @@ async fn main() {
                         ScreenState::ToCharacterSelect(session) => {
                             audio.play_sfx("login_success");
                             let mut char_screen = CharacterSelectScreen::new(session, SERVER_URL);
+                            char_screen.use_renderer_assets(
+                                renderer.font().clone(),
+                                renderer.player_sprites().clone(),
+                                renderer.hair_sprites().clone(),
+                                renderer.equipment_sprites().clone(),
+                            );
                             char_screen.load_font().await;
                             app_state = AppState::CharacterSelect(char_screen);
                         }
@@ -294,11 +301,17 @@ async fn main() {
                         }
                         ScreenState::ToCharacterCreate(session) => {
                             let mut create_screen = CharacterCreateScreen::new(session, SERVER_URL);
+                            create_screen.use_renderer_assets(
+                                renderer.font().clone(),
+                                renderer.player_sprites().clone(),
+                                renderer.hair_sprites().clone(),
+                            );
                             create_screen.load_font().await;
                             app_state = AppState::CharacterCreate(create_screen);
                         }
                         ScreenState::ToLogin => {
                             let mut login_screen = LoginScreen::new(SERVER_URL);
+                            login_screen.use_renderer_font(renderer.font().clone());
                             login_screen.load_font().await;
                             app_state = AppState::Login(login_screen);
                         }
@@ -313,6 +326,12 @@ async fn main() {
                     match result {
                         ScreenState::ToCharacterSelect(session) => {
                             let mut char_screen = CharacterSelectScreen::new(session, SERVER_URL);
+                            char_screen.use_renderer_assets(
+                                renderer.font().clone(),
+                                renderer.player_sprites().clone(),
+                                renderer.hair_sprites().clone(),
+                                renderer.equipment_sprites().clone(),
+                            );
                             char_screen.load_font().await;
                             app_state = AppState::CharacterSelect(char_screen);
                         }
@@ -339,6 +358,7 @@ async fn main() {
                         audio.play_music("assets/audio/menu.ogg").await;
                         network.disconnect();
                         let mut login_screen = LoginScreen::new(SERVER_URL);
+                        login_screen.use_renderer_font(renderer.font().clone());
                         login_screen.load_font().await;
                         app_state = AppState::Login(login_screen);
                         continue;
@@ -350,6 +370,7 @@ async fn main() {
                         audio.play_music("assets/audio/menu.ogg").await;
                         network.disconnect();
                         let mut login_screen = LoginScreen::new(SERVER_URL);
+                        login_screen.use_renderer_font(renderer.font().clone());
                         login_screen.load_font().await;
                         app_state = AppState::Login(login_screen);
                         continue;
