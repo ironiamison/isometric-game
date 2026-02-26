@@ -12,4 +12,5 @@ pub use ui::area_banner::{AreaBanner, OVERWORLD_NAME};
 pub use ui::alchemy_station::sections_for_tab;
 pub use ui::crafting::{section_sort_key, SECTION_HEADER_HEIGHT};
 pub use ui::fletching::fletching_sections_for_tab;
+pub use ui::workbench::workbench_sections_for_tab;
 pub use ui::xp_globes::XpGlobesManager;

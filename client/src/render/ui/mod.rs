@@ -26,5 +26,6 @@ pub mod skills;
 pub mod slayer_panel;
 pub mod social_panel;
 pub mod tooltip;
+pub mod workbench;
 pub mod xp_drops;
 pub mod xp_globes;

@@ -9194,6 +9194,11 @@ impl Renderer {
             self.render_alchemy_station(state, hovered, &mut layout);
         }
 
+        // Workbench UI (when open)
+        if state.ui_state.workbench_open {
+            self.render_workbench(state, hovered, &mut layout);
+        }
+
         // Fletching panel (when open)
         if state.ui_state.fletching_open {
             self.render_fletching(state, hovered, &mut layout);

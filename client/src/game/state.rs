@@ -1212,6 +1212,13 @@ pub struct UiState {
     pub alchemy_station_scroll_offset: f32,
     pub alchemy_station_quantity: u32,
     pub alchemy_station_tab: u8,
+    // Workbench UI state
+    pub workbench_open: bool,
+    pub workbench_tile: Option<(i32, i32)>,
+    pub workbench_selected_recipe: usize,
+    pub workbench_scroll_offset: f32,
+    pub workbench_quantity: u32,
+    pub workbench_tab: u8,
     // Fletching panel (tool-based, no station)
     pub fletching_open: bool,
     pub fletching_selected_recipe: usize,
@@ -1334,6 +1341,7 @@ pub struct UiState {
     pub furnace_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub anvil_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub alchemy_station_scroll_drag: crate::ui::scroll::ScrollDragState,
+    pub workbench_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub fletching_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub crafting_scroll_drag: crate::ui::scroll::ScrollDragState,
     /// Which settings slider is currently being dragged (if any)
@@ -1420,6 +1428,12 @@ impl Default for UiState {
             alchemy_station_scroll_offset: 0.0,
             alchemy_station_quantity: 1,
             alchemy_station_tab: 0,
+            workbench_open: false,
+            workbench_tile: None,
+            workbench_selected_recipe: 0,
+            workbench_scroll_offset: 0.0,
+            workbench_quantity: 1,
+            workbench_tab: 0,
             fletching_open: false,
             fletching_selected_recipe: 0,
             fletching_scroll_offset: 0.0,
@@ -1520,6 +1534,7 @@ impl Default for UiState {
             furnace_scroll_drag: Default::default(),
             anvil_scroll_drag: Default::default(),
             alchemy_station_scroll_drag: Default::default(),
+            workbench_scroll_drag: Default::default(),
             fletching_scroll_drag: Default::default(),
             crafting_scroll_drag: Default::default(),
             settings_slider_dragging: None,
@@ -2222,6 +2237,22 @@ impl GameState {
                     if dx > 3 || dy > 3 {
                         self.ui_state.alchemy_station_open = false;
                         self.ui_state.alchemy_station_tile = None;
+                    }
+                }
+            }
+        }
+
+        // Auto-close workbench when player moves too far away
+        if self.ui_state.workbench_open {
+            if let Some((wx, wy)) = self.ui_state.workbench_tile {
+                if let Some(player) = self.get_local_player() {
+                    let px = player.x.round() as i32;
+                    let py = player.y.round() as i32;
+                    let dx = (px - wx).abs();
+                    let dy = (py - wy).abs();
+                    if dx > 3 || dy > 3 {
+                        self.ui_state.workbench_open = false;
+                        self.ui_state.workbench_tile = None;
                     }
                 }
             }

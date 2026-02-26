@@ -1128,6 +1128,14 @@ fn run_game_frame(
                 recipe_id: recipe_id.clone(),
                 quantity: *quantity,
             },
+            // Workbench commands
+            InputCommand::WorkbenchCraft {
+                recipe_id,
+                quantity,
+            } => ClientMessage::StartCraftBatch {
+                recipe_id: recipe_id.clone(),
+                quantity: *quantity,
+            },
             // Fletching commands
             InputCommand::FletchingCraft {
                 recipe_id,

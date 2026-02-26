@@ -212,6 +212,17 @@ pub enum UiElementId {
     AlchemyQuantityMinus,
     AlchemyQuantityPlus,
 
+    // Workbench
+    WorkbenchCloseButton,
+    WorkbenchTab(usize),
+    WorkbenchRecipeItem(usize),
+    WorkbenchScrollArea,
+    WorkbenchScrollbar,
+    WorkbenchCraftButton,
+    WorkbenchCancelButton,
+    WorkbenchQuantityMinus,
+    WorkbenchQuantityPlus,
+
     // Fletching Panel
     FletchingTab(usize),
     FletchingRecipeItem(usize),
