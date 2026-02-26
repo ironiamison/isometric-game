@@ -1,4 +1,5 @@
-/// Cinematic camera that drifts between waypoints for the login screen spectator view.
+/// Cinematic camera that drifts smoothly through waypoints for the login screen spectator view.
+/// Uses Catmull-Rom spline interpolation for continuous, jitter-free motion.
 pub struct SpectatorCamera {
     waypoints: Vec<(f32, f32)>,
     current_index: usize,
@@ -22,7 +23,7 @@ impl SpectatorCamera {
             waypoints,
             current_index: 0,
             progress: 0.0,
-            speed: 0.04, // ~25 seconds per segment
+            speed: 0.03, // ~33 seconds per segment (slower = smoother feel)
         }
     }
 
@@ -35,25 +36,39 @@ impl SpectatorCamera {
             self.current_index = (self.current_index + 1) % self.waypoints.len();
         }
 
-        let (x0, y0) = self.waypoints[self.current_index];
-        let next = (self.current_index + 1) % self.waypoints.len();
-        let (x1, y1) = self.waypoints[next];
-
-        // Smooth interpolation (ease in-out)
-        let t = smooth_step(self.progress);
-        (x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
+        self.catmull_rom_position(self.current_index, self.progress)
     }
 
     /// Get current position without advancing.
     pub fn position(&self) -> (f32, f32) {
-        let (x0, y0) = self.waypoints[self.current_index];
-        let next = (self.current_index + 1) % self.waypoints.len();
-        let (x1, y1) = self.waypoints[next];
-        let t = smooth_step(self.progress);
-        (x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
+        self.catmull_rom_position(self.current_index, self.progress)
     }
-}
 
-fn smooth_step(t: f32) -> f32 {
-    t * t * (3.0 - 2.0 * t)
+    /// Catmull-Rom spline interpolation through waypoints.
+    /// Produces smooth, continuous curves with no velocity jumps at waypoint boundaries.
+    fn catmull_rom_position(&self, index: usize, t: f32) -> (f32, f32) {
+        let len = self.waypoints.len();
+        let p0 = self.waypoints[(index + len - 1) % len];
+        let p1 = self.waypoints[index];
+        let p2 = self.waypoints[(index + 1) % len];
+        let p3 = self.waypoints[(index + 2) % len];
+
+        let t2 = t * t;
+        let t3 = t2 * t;
+
+        // Catmull-Rom basis functions
+        let x = 0.5
+            * ((2.0 * p1.0)
+                + (-p0.0 + p2.0) * t
+                + (2.0 * p0.0 - 5.0 * p1.0 + 4.0 * p2.0 - p3.0) * t2
+                + (-p0.0 + 3.0 * p1.0 - 3.0 * p2.0 + p3.0) * t3);
+
+        let y = 0.5
+            * ((2.0 * p1.1)
+                + (-p0.1 + p2.1) * t
+                + (2.0 * p0.1 - 5.0 * p1.1 + 4.0 * p2.1 - p3.1) * t2
+                + (-p0.1 + 3.0 * p1.1 - 3.0 * p2.1 + p3.1) * t3);
+
+        (x, y)
+    }
 }

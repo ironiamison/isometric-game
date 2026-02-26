@@ -1230,7 +1230,7 @@ impl Screen for LoginScreen {
             (sw - version_w - 10.0).floor(),
             sh - 10.0,
             16.0,
-            DARKGRAY,
+            WHITE,
         );
 
         // Server status (bottom left)
@@ -1246,7 +1246,7 @@ impl Screen for LoginScreen {
         };
         let status_y = sh - 10.0;
         draw_rectangle(10.0, status_y - 6.0, 6.0, 6.0, status_dot_color);
-        self.draw_text_sharp(status_text, 20.0, status_y, 16.0, DARKGRAY);
+        self.draw_text_sharp(status_text, 20.0, status_y, 16.0, WHITE);
     }
 }
 

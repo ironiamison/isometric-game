@@ -3151,13 +3151,19 @@ impl Renderer {
 
             timings.entities_ms = (get_time() - t1) * 1000.0;
 
-            // 8. Render UI (non-interactive elements)
+            // 8. Render UI (non-interactive elements) — skip in spectator mode
             let t4 = get_time();
-            self.font_scale.set(state.ui_state.ui_scale);
-            self.render_ui(state);
+            if !state.spectator_mode {
+                self.font_scale.set(state.ui_state.ui_scale);
+                self.render_ui(state);
+            }
 
             // 9. Render interactive UI elements and return layout for hit detection
-            let layout = self.render_interactive_ui(state);
+            let layout = if state.spectator_mode {
+                UiLayout::default()
+            } else {
+                self.render_interactive_ui(state)
+            };
             timings.ui_ms = (get_time() - t4) * 1000.0;
 
             timings.total_ms = (get_time() - render_start) * 1000.0;
@@ -3670,13 +3676,19 @@ impl Renderer {
         self.render_spell_effects(state);
         timings.effects_ms = (get_time() - t3) * 1000.0;
 
-        // 8. Render UI (non-interactive elements)
+        // 8. Render UI (non-interactive elements) — skip in spectator mode
         let t4 = get_time();
-        self.font_scale.set(state.ui_state.ui_scale);
-        self.render_ui(state);
+        if !state.spectator_mode {
+            self.font_scale.set(state.ui_state.ui_scale);
+            self.render_ui(state);
+        }
 
         // 9. Render interactive UI elements and return layout for hit detection
-        let layout = self.render_interactive_ui(state);
+        let layout = if state.spectator_mode {
+            UiLayout::default()
+        } else {
+            self.render_interactive_ui(state)
+        };
         timings.ui_ms = (get_time() - t4) * 1000.0;
 
         timings.total_ms = (get_time() - render_start) * 1000.0;
