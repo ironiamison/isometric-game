@@ -98,12 +98,16 @@ jobs:
           print(data['package']['version'])
           PY
           )
+          PUBLIC_DOWNLOAD_BASE="${PUBLIC_DOWNLOAD_BASE:-}"
+          BASE_URL="${PUBLIC_DOWNLOAD_BASE:-https://dl.aeven.xyz/isometric}"
+          VERSION_PREFIX="v${VERSION}"
 
           python tools/launcher_manifest.py \
             --platform macos-arm64 \
             --input dist/client/macos-arm64 \
             --entrypoint new-aeven \
             --version "$VERSION" \
+            --url-base "${BASE_URL}/${VERSION_PREFIX}" \
             --out dist/manifest.json
 
           python tools/launcher_manifest.py \
@@ -111,6 +115,7 @@ jobs:
             --input dist/client/windows-x86_64 \
             --entrypoint new-aeven.exe \
             --version "$VERSION" \
+            --url-base "${BASE_URL}/${VERSION_PREFIX}" \
             --out dist/manifest.json \
             --merge
 
@@ -119,6 +124,7 @@ jobs:
             --input dist/client/linux-x86_64 \
             --entrypoint new-aeven \
             --version "$VERSION" \
+            --url-base "${BASE_URL}/${VERSION_PREFIX}" \
             --out dist/manifest.json \
             --merge
 
@@ -136,6 +142,7 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PREFIX: ${{ vars.R2_PREFIX }}
+          PUBLIC_DOWNLOAD_BASE: ${{ vars.PUBLIC_DOWNLOAD_BASE }}
         run: |
           set -euo pipefail
 
@@ -149,8 +156,15 @@ jobs:
 
           PREFIX="${R2_PREFIX:-isometric}"
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          VERSION=$(python - <<'PY'
+          import tomllib
+          with open('client/Cargo.toml', 'rb') as f:
+              data = tomllib.load(f)
+          print(data['package']['version'])
+          PY
+          )
 
-          aws s3 sync dist/client "s3://${R2_BUCKET}/${PREFIX}" \
+          aws s3 sync dist/client "s3://${R2_BUCKET}/${PREFIX}/v${VERSION}" \
             --endpoint-url "$ENDPOINT" \
             --cache-control "public, max-age=31536000, immutable" \
             --no-progress

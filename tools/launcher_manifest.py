@@ -32,14 +32,17 @@ def gather_files(root):
     return files
 
 
-def build_platform_block(root, entrypoint):
+def build_platform_block(root, entrypoint, platform, url_base=None):
     files = gather_files(root)
     for entry in files:
         if entry["path"] == entrypoint:
             entry["executable"] = True
+        if url_base:
+            base = url_base.rstrip("/")
+            entry["url"] = f"{base}/{platform}/{entry['path']}"
     for entry in files:
-        if entry["executable"] is None:
-            del entry["executable"]
+        if entry.get("executable") is None:
+            entry.pop("executable", None)
     return {
         "entrypoint": entrypoint,
         "files": files,
@@ -54,13 +57,18 @@ def main():
     parser.add_argument("--version", required=True, help="Release version")
     parser.add_argument("--out", required=True, help="Output manifest path")
     parser.add_argument("--merge", action="store_true", help="Merge into existing manifest")
+    parser.add_argument(
+        "--url-base",
+        default=None,
+        help="Base URL for file downloads (will append /<platform>/<path>).",
+    )
     args = parser.parse_args()
 
     input_dir = pathlib.Path(args.input).resolve()
     if not input_dir.exists():
         raise SystemExit(f"Input directory not found: {input_dir}")
 
-    platform_block = build_platform_block(input_dir, args.entrypoint)
+    platform_block = build_platform_block(input_dir, args.entrypoint, args.platform, args.url_base)
 
     if args.merge and pathlib.Path(args.out).exists():
         with open(args.out, "r", encoding="utf-8") as f:
