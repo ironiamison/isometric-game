@@ -1739,7 +1739,15 @@
       { "id": 1825, "name": "1825", "width": 25, "height": 25 },
       { "id": 1826, "name": "1826", "width": 15, "height": 26 },
       { "id": 1827, "name": "1827", "width": 57, "height": 61 },
-      { "id": 1828, "name": "1828", "width": 38, "height": 89 }
+      { "id": 1828, "name": "1828", "width": 38, "height": 89 },
+      { "id": 1829, "name": "1829", "width": 111, "height": 59 },
+      { "id": 1830, "name": "1830", "width": 111, "height": 59 },
+      { "id": 1831, "name": "1831", "width": 147, "height": 107 },
+      { "id": 1832, "name": "1832", "width": 43, "height": 40 },
+      { "id": 1833, "name": "1833", "width": 92, "height": 117 },
+      { "id": 1834, "name": "1834", "width": 128, "height": 104 },
+      { "id": 1835, "name": "1835", "width": 180, "height": 59 },
+      { "id": 1836, "name": "1836", "width": 132, "height": 48 }
     ]
   },
   "walls": {
