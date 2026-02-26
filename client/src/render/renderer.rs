@@ -386,6 +386,10 @@ pub struct Renderer {
     pub(crate) font_scale: Cell<f32>,
     /// Off-screen render target for compositing the player silhouette at full opacity
     silhouette_rt: RefCell<Option<RenderTarget>>,
+    /// Animated object sprites: sprite_id -> frame_count
+    animated_objects: HashMap<u32, u32>,
+    /// Animated wall sprites: sprite_id -> frame_count
+    animated_walls: HashMap<u32, u32>,
     /// Reusable lookup tables for tree/rock effects (cleared + rebuilt each frame to avoid allocations)
     falling_tree_positions: RefCell<HashSet<(i32, i32)>>,
     tree_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
@@ -1606,6 +1610,16 @@ impl Renderer {
         let water_material: Option<Material> = None;
         let water_overlay_material: Option<Material> = None;
 
+        // Build animated sprite lookup maps from manifest frame metadata
+        let animated_objects = Self::build_animated_map(&manifest.objects_atlas);
+        let animated_walls = Self::build_animated_map(&manifest.walls_atlas);
+        if !animated_objects.is_empty() {
+            log::info!("Found {} animated object sprites", animated_objects.len());
+        }
+        if !animated_walls.is_empty() {
+            log::info!("Found {} animated wall sprites", animated_walls.len());
+        }
+
         #[cfg(target_arch = "wasm32")]
         Self::hide_loading();
 
@@ -1650,10 +1664,45 @@ impl Renderer {
             text_wrap_cache: RefCell::new(HashMap::new()),
             font_scale: Cell::new(1.0),
             silhouette_rt: RefCell::new(None),
+            animated_objects,
+            animated_walls,
             falling_tree_positions: RefCell::new(HashSet::new()),
             tree_shake_offsets: RefCell::new(HashMap::new()),
             crumbling_rock_positions: RefCell::new(HashSet::new()),
             rock_shake_offsets: RefCell::new(HashMap::new()),
+        }
+    }
+
+    /// Build a map of sprite_id -> frame_count from atlas info for animated sprites.
+    fn build_animated_map(atlas_info: &Option<SpriteAtlasInfo>) -> HashMap<u32, u32> {
+        let mut map = HashMap::new();
+        if let Some(info) = atlas_info {
+            for (key, sr) in &info.sprites {
+                if let Some(frames) = sr.frames {
+                    if frames > 1 {
+                        if let Ok(id) = key.parse::<u32>() {
+                            map.insert(id, frames);
+                        }
+                    }
+                }
+            }
+        }
+        map
+    }
+
+    /// Get the animation source rect for a multi-frame sprite.
+    /// Divides the full rect into `frames` equal horizontal slices and cycles through them.
+    fn get_animated_source_rect(source_rect: Option<Rect>, frames: u32) -> (Option<Rect>, f32) {
+        if let Some(r) = source_rect {
+            let frame_w = r.w / frames as f32;
+            let fps = 4.0_f64; // ~4 FPS for ambient animations
+            let frame_idx = ((get_time() * fps) as u32 % frames) as f32;
+            (
+                Some(Rect::new(r.x + frame_idx * frame_w, r.y, frame_w, r.h)),
+                frame_w,
+            )
+        } else {
+            (None, 0.0)
         }
     }
 
@@ -7918,11 +7967,22 @@ impl Renderer {
 
         // Try to get the sprite for this gid
         if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
-            let (tex_width, tex_height) = if let Some(r) = source_rect {
-                (r.w, r.h)
-            } else {
-                (texture.width(), texture.height())
-            };
+            // Check if this is an animated sprite
+            let sprite_id = obj.gid.wrapping_sub(OBJECTS_FIRSTGID);
+            let (source_rect, tex_width, tex_height) =
+                if let Some(&frames) = self.animated_objects.get(&sprite_id) {
+                    let (anim_rect, frame_w) =
+                        Self::get_animated_source_rect(source_rect, frames);
+                    let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
+                    (anim_rect, frame_w, h)
+                } else {
+                    let (w, h) = if let Some(r) = source_rect {
+                        (r.w, r.h)
+                    } else {
+                        (texture.width(), texture.height())
+                    };
+                    (source_rect, w, h)
+                };
 
             // Scale the sprite (round to avoid fractional scaling artifacts)
             let scaled_width = (tex_width * zoom).round();
@@ -7976,11 +8036,22 @@ impl Renderer {
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
-            let (tex_width, tex_height) = if let Some(r) = source_rect {
-                (r.w, r.h)
-            } else {
-                (texture.width(), texture.height())
-            };
+            // Check if this is an animated sprite
+            let sprite_id = obj.gid.wrapping_sub(OBJECTS_FIRSTGID);
+            let (source_rect, tex_width, tex_height) =
+                if let Some(&frames) = self.animated_objects.get(&sprite_id) {
+                    let (anim_rect, frame_w) =
+                        Self::get_animated_source_rect(source_rect, frames);
+                    let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
+                    (anim_rect, frame_w, h)
+                } else {
+                    let (w, h) = if let Some(r) = source_rect {
+                        (r.w, r.h)
+                    } else {
+                        (texture.width(), texture.height())
+                    };
+                    (source_rect, w, h)
+                };
 
             let scaled_width = (tex_width * zoom).round();
             let scaled_height = (tex_height * zoom).round();
@@ -8019,11 +8090,22 @@ impl Renderer {
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
-            let (tex_width, tex_height) = if let Some(r) = source_rect {
-                (r.w, r.h)
-            } else {
-                (texture.width(), texture.height())
-            };
+            // Check if this is an animated sprite
+            let sprite_id = gid.wrapping_sub(OBJECTS_FIRSTGID);
+            let (source_rect, tex_width, tex_height) =
+                if let Some(&frames) = self.animated_objects.get(&sprite_id) {
+                    let (anim_rect, frame_w) =
+                        Self::get_animated_source_rect(source_rect, frames);
+                    let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
+                    (anim_rect, frame_w, h)
+                } else {
+                    let (w, h) = if let Some(r) = source_rect {
+                        (r.w, r.h)
+                    } else {
+                        (texture.width(), texture.height())
+                    };
+                    (source_rect, w, h)
+                };
 
             let w = tex_width * zoom;
             let h = tex_height * zoom;
@@ -8110,11 +8192,22 @@ impl Renderer {
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
-            let (tex_width, tex_height) = if let Some(r) = source_rect {
-                (r.w, r.h)
-            } else {
-                (texture.width(), texture.height())
-            };
+            // Check if this is an animated sprite
+            let sprite_id = gid.wrapping_sub(OBJECTS_FIRSTGID);
+            let (source_rect, tex_width, tex_height) =
+                if let Some(&frames) = self.animated_objects.get(&sprite_id) {
+                    let (anim_rect, frame_w) =
+                        Self::get_animated_source_rect(source_rect, frames);
+                    let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
+                    (anim_rect, frame_w, h)
+                } else {
+                    let (w, h) = if let Some(r) = source_rect {
+                        (r.w, r.h)
+                    } else {
+                        (texture.width(), texture.height())
+                    };
+                    (source_rect, w, h)
+                };
 
             let scaled_width = (tex_width * zoom * scale).round();
             let scaled_height = (tex_height * zoom * scale).round();
@@ -8154,11 +8247,22 @@ impl Renderer {
 
         // Try to get the wall sprite for this gid
         if let Some((texture, source_rect)) = self.get_wall_sprite(wall.gid) {
-            let (tex_width, tex_height) = if let Some(r) = source_rect {
-                (r.w, r.h)
-            } else {
-                (texture.width(), texture.height())
-            };
+            // Check if this is an animated wall sprite
+            let sprite_id = wall.gid.wrapping_sub(WALLS_FIRSTGID);
+            let (source_rect, tex_width, tex_height) =
+                if let Some(&frames) = self.animated_walls.get(&sprite_id) {
+                    let (anim_rect, frame_w) =
+                        Self::get_animated_source_rect(source_rect, frames);
+                    let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
+                    (anim_rect, frame_w, h)
+                } else {
+                    let (w, h) = if let Some(r) = source_rect {
+                        (r.w, r.h)
+                    } else {
+                        (texture.width(), texture.height())
+                    };
+                    (source_rect, w, h)
+                };
 
             let scaled_width = (tex_width * zoom).round();
             let scaled_height = (tex_height * zoom).round();

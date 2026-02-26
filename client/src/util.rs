@@ -68,6 +68,9 @@ pub struct SpriteRect {
     pub y: i32,
     pub w: i32,
     pub h: i32,
+    /// Number of animation frames (horizontal strip). None or 1 = static sprite.
+    #[serde(default)]
+    pub frames: Option<u32>,
 }
 
 /// Atlas info from the manifest: file path + sprite rectangles

@@ -74,6 +74,8 @@ fn mark_chat_channel_as_read(state: &mut GameState, channel: ChatChannel) {
     }
 }
 
+const AUTO_ACTION_NPC_SETTLE_EPS: f32 = 0.06;
+
 fn queue_face(state: &mut GameState, commands: &mut Vec<InputCommand>, direction: u8) {
     commands.push(InputCommand::Face { direction });
     if let Some(local_id) = &state.local_player_id {
@@ -83,6 +85,17 @@ fn queue_face(state: &mut GameState, commands: &mut Vec<InputCommand>, direction
             player.animation.direction = dir;
         }
     }
+}
+
+fn auto_action_target_settled(aa: &crate::game::AutoActionState, state: &GameState) -> bool {
+    if aa.target_type != "npc" {
+        return true;
+    }
+    state.npcs.get(&aa.target_id).map_or(true, |npc| {
+        let dx = (npc.x - npc.target_x).abs();
+        let dy = (npc.y - npc.target_y).abs();
+        dx.max(dy) <= AUTO_ACTION_NPC_SETTLE_EPS
+    })
 }
 
 /// Activate a hotkey slot binding — returns InputCommand(s) to execute
@@ -430,11 +443,15 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                 } else {
                     let dir = crate::game::Direction::from_velocity(nx as f32 - px as f32, ny as f32 - py as f32);
                     queue_face(state, commands, dir as u8);
-                    commands.push(InputCommand::StartAutoAction {
-                        target_type: "npc".to_string(),
-                        target_id: npc_id.to_string(),
-                        action: "attack".to_string(),
-                    });
+                    if let Some(aa) = state.auto_action_state.as_ref() {
+                        if auto_action_target_settled(aa, state) {
+                            commands.push(InputCommand::StartAutoAction {
+                                target_type: "npc".to_string(),
+                                target_id: npc_id.to_string(),
+                                action: "attack".to_string(),
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -6622,7 +6639,7 @@ impl InputHandler {
                     // If already adjacent and auto-action not yet sent, send now
                     if is_adjacent {
                         if let Some(aa) = state.auto_action_state.as_ref() {
-                            if !aa.confirmed {
+                            if !aa.confirmed && auto_action_target_settled(aa, state) {
                                 // Clone data before mutable borrow
                                 let target_type = aa.target_type.clone();
                                 let target_id = aa.target_id.clone();
@@ -6974,7 +6991,7 @@ impl InputHandler {
                 }
                 // Handle auto-action: send StartAutoAction now that we've arrived
                 if let Some(aa) = state.auto_action_state.as_ref() {
-                    if !aa.confirmed {
+                    if !aa.confirmed && auto_action_target_settled(aa, state) {
                         // Clone data before mutable borrow
                         let target_type = aa.target_type.clone();
                         let target_id = aa.target_id.clone();
@@ -6984,8 +7001,8 @@ impl InputHandler {
                         if let Some(local_id) = &state.local_player_id {
                             if let Some((tx, ty)) = target_pos {
                                 if let Some(player) = state.players.get(local_id) {
-                                    let dx = tx - player.x;
-                                    let dy = ty - player.y;
+                                    let dx = tx - player.server_x;
+                                    let dy = ty - player.server_y;
                                     let dir = crate::game::Direction::from_velocity(dx, dy);
                                     queue_face(state, &mut commands, dir as u8);
                                 }
@@ -7442,11 +7459,15 @@ impl InputHandler {
                                         npc_y as f32 - player_y as f32,
                                     );
                                     queue_face(state, &mut commands, dir as u8);
-                                    commands.push(InputCommand::StartAutoAction {
-                                        target_type: "npc".to_string(),
-                                        target_id: npc_id.clone(),
-                                        action: "attack".to_string(),
-                                    });
+                                    if let Some(aa) = state.auto_action_state.as_ref() {
+                                        if auto_action_target_settled(aa, state) {
+                                            commands.push(InputCommand::StartAutoAction {
+                                                target_type: "npc".to_string(),
+                                                target_id: npc_id.clone(),
+                                                action: "attack".to_string(),
+                                            });
+                                        }
+                                    }
                                 }
                             }
                         }

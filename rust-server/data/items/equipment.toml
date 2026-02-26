@@ -348,7 +348,7 @@ strength_bonus = 0
 defence_bonus = 0
 
 [maple_rod]
-display_name = "Fishing Rod"
+display_name = "Maple Fishing Rod"
 sprite = "maple_rod"
 description = "A sturdier rod than most, decently useful for fishing, but still far from exceptional."
 category = "equipment"

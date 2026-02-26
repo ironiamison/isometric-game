@@ -21,6 +21,7 @@ ASSETS_DIR = Path(__file__).parent.parent / "client" / "assets"
 SPRITES_DIR = ASSETS_DIR / "sprites"
 UI_DIR = ASSETS_DIR / "ui"
 MANIFEST_PATH = ASSETS_DIR / "sprite_manifest.json"
+ANIMATED_SPRITES_PATH = ASSETS_DIR / "animated_sprites.json"
 MAX_ATLAS_SIZE = 4096
 
 
@@ -284,9 +285,38 @@ def pack_ui_misc_icons():
         }
 
 
+def load_animated_sprites():
+    """Load animated sprite metadata if available."""
+    if ANIMATED_SPRITES_PATH.exists():
+        with open(ANIMATED_SPRITES_PATH) as f:
+            data = json.load(f)
+        total = sum(len(v) for v in data.values())
+        print(f"Loaded animated_sprites.json ({total} animated sprites)")
+        return data
+    print("No animated_sprites.json found, skipping animation metadata")
+    return {}
+
+
+def apply_animation_metadata(atlas_info, category, animated_sprites):
+    """Add 'frames' field to animated sprite entries in atlas info."""
+    if not atlas_info or category not in animated_sprites:
+        return
+    anim_data = animated_sprites[category]
+    count = 0
+    for sprite_id, rect in atlas_info["sprites"].items():
+        if sprite_id in anim_data:
+            rect["frames"] = anim_data[sprite_id]["frames"]
+            count += 1
+    if count > 0:
+        print(f"  Tagged {count} animated {category} sprites with frame counts")
+
+
 def main():
     print("Sprite Atlas Packer")
     print("=" * 40)
+
+    # Load animated sprite metadata
+    animated_sprites = load_animated_sprites()
 
     # Load existing manifest
     with open(MANIFEST_PATH) as f:
@@ -336,6 +366,7 @@ def main():
     for category, recursive, key_transform in categories_to_pack:
         atlas_info = pack_category(category, recursive=recursive, key_transform=key_transform)
         if atlas_info:
+            apply_animation_metadata(atlas_info, category, animated_sprites)
             manifest[f"{category}_atlas"] = atlas_info
 
     # Pack UI categories (prayers, spells)
