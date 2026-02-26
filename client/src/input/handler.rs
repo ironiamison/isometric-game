@@ -7031,7 +7031,7 @@ impl InputHandler {
             if current_time - self.last_attack_time >= self.attack_cooldown {
                 // Check if we should gather instead of attack
                 let should_gather = if let Some(player) = state.get_local_player() {
-                    if player.equipped_weapon.as_deref() == Some("fishing_rod") {
+                    if matches!(player.equipped_weapon.as_deref(), Some("fishing_rod" | "maple_rod")) {
                         let px = player.x.round() as i32;
                         let py = player.y.round() as i32;
                         let (fdx, fdy) = player.direction.to_unit_vector();

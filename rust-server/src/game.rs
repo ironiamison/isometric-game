@@ -9269,7 +9269,9 @@ impl GameRoom {
         );
 
         // If equipping a non-fishing-rod weapon while gathering, stop gathering
-        if equip_slot == EquipmentSlot::Weapon && item_id != "fishing_rod" {
+        if equip_slot == EquipmentSlot::Weapon
+            && !matches!(item_id.as_str(), "fishing_rod" | "maple_rod")
+        {
             let is_gathering = {
                 let gathering = self.gathering.read().await;
                 gathering.is_gathering(player_id)
@@ -9851,21 +9853,19 @@ impl GameRoom {
         {
             let gathering = self.gathering.read().await;
             if let Some(zone) = gathering.get_zone_for_marker(marker_x, marker_y) {
-                let required_weapon = match zone.skill.as_str() {
-                    "fishing" => Some("fishing_rod"),
-                    _ => None,
-                };
-                if let Some(required) = required_weapon {
-                    if equipped_weapon.as_deref() != Some(required) {
+                let needs_fishing_rod = zone.skill.as_str() == "fishing";
+                if needs_fishing_rod {
+                    let has_rod = matches!(
+                        equipped_weapon.as_deref(),
+                        Some("fishing_rod" | "maple_rod")
+                    );
+                    if !has_rod {
                         drop(gathering);
                         self.send_to_player(
                             player_id,
                             ServerMessage::Error {
                                 code: 400,
-                                message: format!(
-                                    "You need a {} to do that",
-                                    required.replace('_', " ")
-                                ),
+                                message: "You need a fishing rod to do that".to_string(),
                             },
                         )
                         .await;
