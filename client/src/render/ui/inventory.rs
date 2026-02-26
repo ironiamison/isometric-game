@@ -368,24 +368,6 @@ impl Renderer {
                 }
             }
 
-            // Show slot number badge for first 5 (quick slots)
-            if i < 5 {
-                let num_text = (i + 1).to_string();
-                let text_w = self.measure_text_sharp(&num_text, 16.0).width;
-                let badge_w = text_w + 2.0;
-                let badge_h = 13.0;
-                let num_x = x + slot_size - badge_w - 1.0;
-                let num_y = y + 1.0;
-                draw_rectangle(
-                    num_x,
-                    num_y,
-                    badge_w,
-                    badge_h,
-                    Color::new(0.0, 0.0, 0.0, 0.5),
-                );
-                self.draw_text_sharp(&num_text, num_x + 1.0, num_y + 11.0, 16.0, TEXT_DIM);
-            }
-
             // Shift-drop indicator overlay
             let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
             if shift_held && state.ui_state.shift_drop_enabled && has_item && is_hovered {
