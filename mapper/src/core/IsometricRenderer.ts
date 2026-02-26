@@ -1,4 +1,4 @@
-import type { Chunk, Viewport, WorldCoord, MapObject, Wall, InteriorMap } from '@/types';
+import type { Chunk, Viewport, WorldCoord, MapObject, Wall, InteriorMap, SpriteRect } from '@/types';
 import {
   TILE_WIDTH,
   TILE_HEIGHT,
@@ -10,6 +10,13 @@ import {
 import { BitSet } from './BitSet';
 import { tilesetLoader } from './TilesetLoader';
 import { objectLoader } from './ObjectLoader';
+
+/** Returns the atlas source X for the current animation frame. */
+function getAnimatedSourceX(rect: SpriteRect, frames: number | undefined, fps: number | undefined): number {
+  if (!frames || frames <= 1) return rect.x;
+  const frameIndex = Math.floor(performance.now() / 1000 * (fps ?? 4)) % frames;
+  return rect.x + frameIndex * rect.w;
+}
 
 export interface RenderOptions {
   showGrid: boolean;
@@ -319,9 +326,10 @@ export class IsometricRenderer {
       const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
 
       const r = objDef.atlasRect;
+      const srcX = r ? getAnimatedSourceX(r, objDef.frames, objDef.fps) : 0;
       this.ctx.drawImage(
         objDef.image,
-        r ? r.x : 0,
+        srcX,
         r ? r.y : 0,
         r ? r.w : objDef.image.width,
         r ? r.h : objDef.image.height,
@@ -362,9 +370,10 @@ export class IsometricRenderer {
         drawY = bottomVertexY - scaledHeight;
       }
 
+      const srcX = r ? getAnimatedSourceX(r, objDef.frames, objDef.fps) : 0;
       this.ctx.drawImage(
         objDef.image,
-        r ? r.x : 0,
+        srcX,
         r ? r.y : 0,
         spriteW,
         spriteH,
@@ -680,9 +689,10 @@ export class IsometricRenderer {
       const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
 
       const r = objDef.atlasRect;
+      const srcX = r ? getAnimatedSourceX(r, objDef.frames, objDef.fps) : 0;
       this.ctx.drawImage(
         objDef.image,
-        r ? r.x : 0,
+        srcX,
         r ? r.y : 0,
         r ? r.w : objDef.image.width,
         r ? r.h : objDef.image.height,
@@ -727,9 +737,10 @@ export class IsometricRenderer {
         drawY = bottomVertexY - scaledHeight;
       }
 
+      const srcX = r ? getAnimatedSourceX(r, objDef.frames, objDef.fps) : 0;
       this.ctx.drawImage(
         objDef.image,
-        r ? r.x : 0,
+        srcX,
         r ? r.y : 0,
         spriteW,
         spriteH,

@@ -34,16 +34,15 @@ export function ObjectPalette() {
   // Get current items based on category
   const currentItems = category === 'objects' ? objects : walls;
 
-  // Draw object previews
+  // Draw object previews (static once, animated via rAF)
   useEffect(() => {
-    for (const obj of currentItems) {
+    const drawPreview = (obj: ObjectDefinition, frameIndex?: number) => {
       const canvas = canvasRefs.current.get(obj.id);
-      if (!canvas || !obj.image) continue;
+      if (!canvas || !obj.image) return;
 
       const ctx = canvas.getContext('2d');
-      if (!ctx) continue;
+      if (!ctx) return;
 
-      // Scale to fit in preview box while maintaining aspect ratio
       const maxSize = 64;
       const scale = Math.min(maxSize / obj.width, maxSize / obj.height, 1);
       const drawWidth = obj.width * scale;
@@ -56,9 +55,10 @@ export function ObjectPalette() {
       ctx.clearRect(0, 0, maxSize, maxSize);
       const r = obj.atlasRect;
       if (r) {
+        const srcX = (frameIndex !== undefined) ? r.x + frameIndex * r.w : r.x;
         ctx.drawImage(
           obj.image,
-          r.x, r.y, r.w, r.h,
+          srcX, r.y, r.w, r.h,
           (maxSize - drawWidth) / 2,
           maxSize - drawHeight,
           drawWidth,
@@ -73,7 +73,32 @@ export function ObjectPalette() {
           drawHeight
         );
       }
+    };
+
+    // Draw all static sprites once
+    for (const obj of currentItems) {
+      if (!obj.frames || obj.frames <= 1) {
+        drawPreview(obj);
+      }
     }
+
+    // Animate sprites with frames > 1
+    const animatedItems = currentItems.filter(obj => obj.frames && obj.frames > 1);
+    if (animatedItems.length === 0) return;
+
+    let rafId: number;
+    const animate = () => {
+      const now = performance.now() / 1000;
+      for (const obj of animatedItems) {
+        const fps = obj.fps ?? 4;
+        const frameIndex = Math.floor(now * fps) % obj.frames!;
+        drawPreview(obj, frameIndex);
+      }
+      rafId = requestAnimationFrame(animate);
+    };
+    rafId = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(rafId);
   }, [currentItems]);
 
   const filteredObjects = filter

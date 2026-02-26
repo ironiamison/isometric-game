@@ -10,18 +10,40 @@ interface SpriteManifest {
   walls_atlas: SpriteManifestAtlas;
 }
 
+interface AnimatedSpriteEntry {
+  fps: number;
+  frames: number;
+}
+
+interface AnimatedSpritesData {
+  objects: Record<string, AnimatedSpriteEntry>;
+  walls: Record<string, AnimatedSpriteEntry>;
+}
+
 export class ObjectLoader {
   private objects: Map<number, ObjectDefinition> = new Map();
   private walls: Map<number, ObjectDefinition> = new Map();
   private firstGid: number = 1001;
   private wallsFirstGid: number = 1;
   private manifest: SpriteManifest | null = null;
+  private animatedSprites: AnimatedSpritesData | null = null;
 
   private async loadManifest(): Promise<SpriteManifest> {
     if (this.manifest) return this.manifest;
     const resp = await fetch('/assets/sprite_manifest.json');
     this.manifest = await resp.json();
     return this.manifest!;
+  }
+
+  private async loadAnimatedSprites(): Promise<AnimatedSpritesData> {
+    if (this.animatedSprites) return this.animatedSprites;
+    try {
+      const resp = await fetch('/assets/animated_sprites.json');
+      this.animatedSprites = await resp.json();
+    } catch {
+      this.animatedSprites = { objects: {}, walls: {} };
+    }
+    return this.animatedSprites!;
   }
 
   private loadImage(src: string): Promise<HTMLImageElement> {
@@ -37,15 +59,24 @@ export class ObjectLoader {
     this.firstGid = config.firstGid;
 
     const manifest = await this.loadManifest();
+    const animData = await this.loadAnimatedSprites();
     const atlasInfo = manifest.objects_atlas;
     const atlasImage = await this.loadImage(`/assets/${atlasInfo.file}`);
 
     for (const item of config.items) {
       const spriteData = atlasInfo.sprites[String(item.id)];
+      const anim = animData.objects[String(item.id)];
       const obj: ObjectDefinition = {
         ...item,
         image: spriteData ? atlasImage : undefined,
-        atlasRect: spriteData ? { x: spriteData.x, y: spriteData.y, w: spriteData.w, h: spriteData.h } : undefined,
+        atlasRect: spriteData ? {
+          x: spriteData.x,
+          y: spriteData.y,
+          w: anim ? spriteData.w / anim.frames : spriteData.w,
+          h: spriteData.h,
+        } : undefined,
+        frames: anim?.frames,
+        fps: anim?.fps,
       };
       this.objects.set(item.id, obj);
     }
@@ -82,15 +113,24 @@ export class ObjectLoader {
     this.wallsFirstGid = config.firstGid;
 
     const manifest = await this.loadManifest();
+    const animData = await this.loadAnimatedSprites();
     const atlasInfo = manifest.walls_atlas;
     const atlasImage = await this.loadImage(`/assets/${atlasInfo.file}`);
 
     for (const item of config.items) {
       const spriteData = atlasInfo.sprites[String(item.id)];
+      const anim = animData.walls[String(item.id)];
       const obj: ObjectDefinition = {
         ...item,
         image: spriteData ? atlasImage : undefined,
-        atlasRect: spriteData ? { x: spriteData.x, y: spriteData.y, w: spriteData.w, h: spriteData.h } : undefined,
+        atlasRect: spriteData ? {
+          x: spriteData.x,
+          y: spriteData.y,
+          w: anim ? spriteData.w / anim.frames : spriteData.w,
+          h: spriteData.h,
+        } : undefined,
+        frames: anim?.frames,
+        fps: anim?.fps,
       };
       this.walls.set(item.id, obj);
     }

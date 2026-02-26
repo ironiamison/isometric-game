@@ -185,7 +185,9 @@ export interface ObjectDefinition {
   width: number;
   height: number;
   image?: HTMLImageElement; // Atlas image (shared) or individual image
-  atlasRect?: SpriteRect; // Source rect within atlas
+  atlasRect?: SpriteRect; // Source rect within atlas (single frame width for animated sprites)
+  frames?: number; // Number of animation frames (1 or undefined = static)
+  fps?: number; // Animation speed in frames per second (default 4)
 }
 
 export interface ObjectsConfig {
