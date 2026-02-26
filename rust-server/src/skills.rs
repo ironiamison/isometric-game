@@ -30,6 +30,7 @@ pub enum SkillType {
     Alchemy,
     Mining,
     Slayer,
+    Survivalist,
 }
 
 impl SkillType {
@@ -46,6 +47,7 @@ impl SkillType {
             SkillType::Alchemy => "alchemy",
             SkillType::Mining => "mining",
             SkillType::Slayer => "slayer",
+            SkillType::Survivalist => "survivalist",
         }
     }
 
@@ -62,6 +64,7 @@ impl SkillType {
             "alchemy" => Some(SkillType::Alchemy),
             "mining" => Some(SkillType::Mining),
             "slayer" => Some(SkillType::Slayer),
+            "survivalist" => Some(SkillType::Survivalist),
             _ => None,
         }
     }

@@ -3757,9 +3757,7 @@ impl InputHandler {
                             }
                         }
                         UiElementId::DialogueContinue => {
-                            if guide_actions_locked
-                                || (guide_selected_active_tier && !guide_selected_tier_completable)
-                            {
+                            if guide_actions_locked {
                                 return commands;
                             }
                             commands.push(InputCommand::DialogueChoice {
@@ -3831,7 +3829,6 @@ impl InputHandler {
                 // Send __continue__ to server so Lua script can resume execution
                 // Don't clear dialogue here - wait for server response (either new dialogue or close)
                 if !guide_actions_locked
-                    && (!guide_selected_active_tier || guide_selected_tier_completable)
                     && (is_key_pressed(KeyCode::Enter)
                         || is_key_pressed(KeyCode::Space)
                         || is_key_pressed(KeyCode::Escape))

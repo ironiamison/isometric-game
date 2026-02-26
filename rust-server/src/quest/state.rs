@@ -210,6 +210,11 @@ impl QuestProgress {
             keep
         });
 
+        // Re-check completion status after adding/removing objectives
+        if modified {
+            self.check_all_complete();
+        }
+
         modified
     }
 
