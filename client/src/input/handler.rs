@@ -373,11 +373,10 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
         }
     }
 
-    // Add chair positions so pathfinding routes around them.
-    // The server rejects movement onto chair tiles, so the client must avoid them too.
-    for &(cx, cy) in &state.chair_positions {
-        occupied.insert((cx, cy));
-    }
+    // NOTE: Chairs are intentionally NOT in the occupied set. The server rejects
+    // movement onto chair tiles, but also triggers auto-sit when approaching from
+    // the front. If we block chair moves client-side, the Move never reaches the
+    // server and auto-sit can't fire.
 
     occupied
 }
