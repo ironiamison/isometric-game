@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "ACAAAABYAAAACAAAAIkCAMAQAAAgFAABEBoQAnAK8ABQDggAyAUEgI8XBoDBHwIgAAACIAAAMiAAADIgwA8CIMAYBCBBCQgkgQ1woIFKAKGBCgCggBIAoQATkKA+FQSgwKUAoBwrACHkOgAgADcQYBBQAmAAkAAgoJABIKAeBj8=",
+  "collision": "ACAAAABYAAAACAAAAIkCAMAQAAAgFAABEBoQAnAK8ANQDgg+yAUEoI8XBqDBHwIgAAACIAAAMiAAADIgwA8CIMAYBCBBCQgggQ1woIFKAKGBCgCggBIAoQATkKA+FQSgwKUAoBwrACHkOgAgADcQYBBQAmAAkAAgoJABIKAeBj8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3143,8 +3143,8 @@
     },
     {
       "entityId": "adventurer_guide",
-      "x": 28,
-      "y": 8,
+      "x": 26,
+      "y": 6,
       "level": 1
     }
   ],
@@ -3659,13 +3659,6 @@
       "y": 9,
       "width": 34,
       "height": 32
-    },
-    {
-      "gid": 1831,
-      "x": 26,
-      "y": 17,
-      "width": 44,
-      "height": 91
     },
     {
       "gid": 1444,
@@ -4473,12 +4466,6 @@
       "edge": "right"
     },
     {
-      "gid": 395,
-      "x": 29,
-      "y": 11,
-      "edge": "right"
-    },
-    {
       "gid": 396,
       "x": 23,
       "y": 7,
@@ -4513,6 +4500,66 @@
       "x": 29,
       "y": 31,
       "edge": "right"
+    },
+    {
+      "gid": 395,
+      "x": 29,
+      "y": 11,
+      "edge": "right"
+    },
+    {
+      "gid": 395,
+      "x": 29,
+      "y": 10,
+      "edge": "right"
+    },
+    {
+      "gid": 395,
+      "x": 29,
+      "y": 9,
+      "edge": "right"
+    },
+    {
+      "gid": 396,
+      "x": 29,
+      "y": 8,
+      "edge": "down"
+    },
+    {
+      "gid": 396,
+      "x": 28,
+      "y": 8,
+      "edge": "down"
+    },
+    {
+      "gid": 396,
+      "x": 27,
+      "y": 8,
+      "edge": "down"
+    },
+    {
+      "gid": 396,
+      "x": 26,
+      "y": 8,
+      "edge": "down"
+    },
+    {
+      "gid": 395,
+      "x": 25,
+      "y": 8,
+      "edge": "right"
+    },
+    {
+      "gid": 396,
+      "x": 25,
+      "y": 7,
+      "edge": "down"
+    },
+    {
+      "gid": 396,
+      "x": 24,
+      "y": 7,
+      "edge": "down"
     }
   ],
   "portals": [],
