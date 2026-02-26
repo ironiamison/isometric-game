@@ -1,2 +1,11 @@
 # Persistent ground item spawns
 # Items that always exist at a location and respawn after pickup
+
+[[spawns]]
+id = "oakshore_cooker_knife"
+item_id = "knife"
+x = 7.0
+y = 1.0
+quantity = 1
+respawn_seconds = 15
+instance_id = "oakshore_cooker"

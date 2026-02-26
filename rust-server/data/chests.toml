@@ -12,6 +12,16 @@ respawn_secs = 30
 name = "Storage Chest"
 slots = 10
 
+[oakshore_workshop_chest]
+name = "Supply Chest"
+slots = 5
+
+[[oakshore_workshop_chest.spawn_items]]
+item_id = "knife"
+quantity = 1
+slot = 0
+respawn_secs = 30
+
 [wilderness_cabin_chest]
 name = "Dusty Chest"
 slots = 5

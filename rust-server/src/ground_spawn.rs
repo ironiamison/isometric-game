@@ -16,6 +16,9 @@ pub struct GroundSpawnDef {
     pub y: f32,
     pub quantity: i32,
     pub respawn_seconds: u64,
+    /// Optional instance/map id (None = overworld)
+    #[serde(default)]
+    pub instance_id: Option<String>,
 }
 
 /// TOML file structure: `[[spawns]]` array-of-tables.
@@ -103,8 +106,8 @@ impl GroundSpawnManager {
     }
 
     /// Check for spawns whose respawn timers have elapsed.
-    /// Returns a Vec of (spawn_id, item_id, x, y, quantity) for items that should respawn.
-    pub fn check_respawns(&mut self) -> Vec<(String, String, f32, f32, i32)> {
+    /// Returns a Vec of (spawn_id, item_id, x, y, quantity, instance_id) for items that should respawn.
+    pub fn check_respawns(&mut self) -> Vec<(String, String, f32, f32, i32, Option<String>)> {
         let now = Instant::now();
         let mut respawns = Vec::new();
 
@@ -119,6 +122,7 @@ impl GroundSpawnManager {
                         state.def.x,
                         state.def.y,
                         state.def.quantity,
+                        state.def.instance_id.clone(),
                     ));
                 }
             }
@@ -135,8 +139,8 @@ impl GroundSpawnManager {
     }
 
     /// Get all spawns that should be created at startup.
-    /// Returns a Vec of (spawn_id, item_id, x, y, quantity).
-    pub fn get_initial_spawns(&self) -> Vec<(String, String, f32, f32, i32)> {
+    /// Returns a Vec of (spawn_id, item_id, x, y, quantity, instance_id).
+    pub fn get_initial_spawns(&self) -> Vec<(String, String, f32, f32, i32, Option<String>)> {
         self.spawns
             .values()
             .map(|state| {
@@ -146,6 +150,7 @@ impl GroundSpawnManager {
                     state.def.x,
                     state.def.y,
                     state.def.quantity,
+                    state.def.instance_id.clone(),
                 )
             })
             .collect()

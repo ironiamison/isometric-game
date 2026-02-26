@@ -1,0 +1,49 @@
+# Tools of the Trade - Fletching tutorial quest
+# Given by Camp Cook after completing A Warm Meal
+
+[quest]
+id = "survivalist_tools_of_trade"
+name = "Tools of the Trade"
+description = "Head to the Oakshore workshop, find a knife, and try your hand at fletching arrow shafts."
+giver_npc = "camp_cook"
+level_required = 1
+repeatable = false
+lua_script = "survivalist/tools_of_trade.lua"
+
+[quest.chain]
+previous = "survivalist_warm_meal"
+next = "survivalist_leather_craft"
+
+[[quest.objectives]]
+id = "get_knife"
+type = "collect_item"
+target = "knife"
+count = 1
+description = "Pick up a knife from the Oakshore workshop"
+
+[[quest.objectives]]
+id = "fletch_shafts"
+type = "collect_item"
+target = "arrow_shaft"
+count = 15
+description = "Fletch arrow shafts using the knife"
+
+[[quest.objectives]]
+id = "return_to_cook"
+type = "talk_to"
+target = "camp_cook"
+description = "Return to the Camp Cook"
+sequential = true
+
+[quest.rewards]
+exp = 200
+gold = 25
+items = [
+    { id = "bronze_arrowhead", count = 15 },
+]
+
+[quest.dialogue]
+offer = "Ready for the next lesson? Head to the Oakshore workshop - there's a knife in there you can use. Grab it and fletch some arrow shafts."
+accept = "The workshop entrance is just south of here. Pick up the knife, then right-click it in your inventory and choose 'Fletch' to cut arrow shafts from logs. Here's a log to get you started."
+progress = "Found that knife yet? The workshop is south of the fire pit."
+complete = "Arrow shafts! You're a natural. Here, take some bronze arrowheads - combine them with your shafts to make proper arrows."

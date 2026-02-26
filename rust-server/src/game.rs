@@ -1292,10 +1292,10 @@ impl GameRoom {
                 .as_millis() as u64;
 
             let initial_spawns = ground_spawn_manager.get_initial_spawns();
-            for (spawn_id, item_id, x, y, quantity) in initial_spawns {
+            for (spawn_id, item_id, x, y, quantity, instance_id) in initial_spawns {
                 let ground_item_id = format!("persistent_{}", spawn_id);
-                let ground_item = crate::item::GroundItem::new(
-                    &ground_item_id, &item_id, x, y, quantity, None, current_time,
+                let ground_item = crate::item::GroundItem::new_in_instance(
+                    &ground_item_id, &item_id, x, y, quantity, None, current_time, instance_id,
                 );
                 ground_spawn_manager.set_active_ground_item(&spawn_id, ground_item_id.clone());
                 ground_items.insert(ground_item_id, ground_item);
@@ -7820,11 +7820,17 @@ impl GameRoom {
                 player_id,
                 ServerMessage::CraftingCompleted {
                     recipe_id: recipe_id.to_string(),
-                    items_gained,
+                    items_gained: items_gained.clone(),
                     xp_gained,
                 },
             )
             .await;
+
+            // Process quest item collection for crafted items
+            for (item_id_gained, count) in &items_gained {
+                self.process_quest_item_collect(player_id, item_id_gained, *count as i32)
+                    .await;
+            }
 
             // Send inventory update
             self.send_to_player(
@@ -13079,11 +13085,17 @@ impl GameRoom {
                     &comp.pid,
                     ServerMessage::CraftingCompleted {
                         recipe_id: comp.recipe_id.clone(),
-                        items_gained: comp.items_gained,
+                        items_gained: comp.items_gained.clone(),
                         xp_gained: comp.xp_gained,
                     },
                 )
                 .await;
+
+                // Process quest item collection for crafted items
+                for (item_id_gained, count) in &comp.items_gained {
+                    self.process_quest_item_collect(&comp.pid, item_id_gained, *count as i32)
+                        .await;
+                }
 
                 self.send_to_player(
                     &comp.pid,
@@ -13971,10 +13983,10 @@ impl GameRoom {
                     .unwrap()
                     .as_millis() as u64;
 
-                for (spawn_id, item_id, x, y, quantity) in respawns {
+                for (spawn_id, item_id, x, y, quantity, instance_id) in respawns {
                     let ground_item_id = format!("persistent_{}", spawn_id);
-                    let ground_item = crate::item::GroundItem::new(
-                        &ground_item_id, &item_id, x, y, quantity, None, current_time,
+                    let ground_item = crate::item::GroundItem::new_in_instance(
+                        &ground_item_id, &item_id, x, y, quantity, None, current_time, instance_id,
                     );
                     {
                         let mut items = self.ground_items.write().await;
@@ -17862,6 +17874,10 @@ impl GameRoom {
             }
             return;
         }
+
+        // Process quest item collection for chest pickup
+        self.process_quest_item_collect(player_id, &taken_item.item_id, taken_item.quantity)
+            .await;
 
         // Start spawn timer if this was a spawn-configured slot
         if let Some(def) = self.chest_registry.get(&chest.chest_def_id) {

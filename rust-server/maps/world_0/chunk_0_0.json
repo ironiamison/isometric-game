@@ -3121,6 +3121,12 @@
       "entityId": "fire_pit",
       "x": 15,
       "y": 26
+    },
+    {
+      "entityId": "camp_cook",
+      "x": 14,
+      "y": 25,
+      "level": 1
     }
   ],
   "mapObjects": [

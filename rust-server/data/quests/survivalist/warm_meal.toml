@@ -1,0 +1,46 @@
+# A Warm Meal - Cooking tutorial quest
+# Given by Camp Cook near the fire pit
+
+[quest]
+id = "survivalist_warm_meal"
+name = "A Warm Meal"
+description = "The Camp Cook wants to teach you the basics of fishing and cooking. Catch some shrimp and cook them at the fire pit."
+giver_npc = "camp_cook"
+level_required = 1
+repeatable = false
+lua_script = "survivalist/warm_meal.lua"
+
+[quest.chain]
+next = "survivalist_tools_of_trade"
+
+[[quest.objectives]]
+id = "catch_shrimp"
+type = "collect_item"
+target = "raw_shrimp"
+count = 3
+description = "Catch 3 raw shrimp"
+
+[[quest.objectives]]
+id = "cook_shrimp"
+type = "collect_item"
+target = "cooked_shrimp"
+count = 3
+description = "Cook 3 shrimp at the fire pit"
+
+[[quest.objectives]]
+id = "return_to_cook"
+type = "talk_to"
+target = "camp_cook"
+description = "Return to the Camp Cook"
+sequential = true
+
+[quest.rewards]
+exp = 200
+gold = 25
+items = []
+
+[quest.dialogue]
+offer = "Know how to fish? There's shrimp in the waters nearby. Catch a few and I'll show you how to cook 'em up proper."
+accept = "Head to the water and catch 3 shrimp. Then cook them at my fire pit here. Simple as that!"
+progress = "Still working on those shrimp? Fish near the water, then cook 'em at the fire pit."
+complete = "Nicely done! Nothing beats a warm meal. You're picking up the survivalist trade fast."

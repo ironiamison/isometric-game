@@ -433,9 +433,9 @@ base_price = 15
 # =============================================================================
 
 [scrap_leather]
-display_name = "Scrap Leather"
+display_name = "Animal Hide"
 sprite = "scrap_leather"
-description = "Crudely tanned leather from forest creatures."
+description = "A rough animal hide, ready to be tanned into leather."
 category = "material"
 max_stack = 99
 base_price = 15

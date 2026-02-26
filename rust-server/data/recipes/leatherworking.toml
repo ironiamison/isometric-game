@@ -9,7 +9,7 @@
 
 [tan_leather]
 display_name = "Tan Leather"
-description = "Tan a tainted hide into usable leather."
+description = "Tan an animal hide into usable leather."
 category = "leatherworking"
 section = "tanning"
 level_required = 1
@@ -18,7 +18,7 @@ craft_time_ms = 3000
 xp = 15
 
 [[tan_leather.ingredients]]
-item_id = "tainted_hide"
+item_id = "scrap_leather"
 count = 1
 
 [[tan_leather.results]]
@@ -47,6 +47,24 @@ count = 1
 item_id = "leather_gloves"
 count = 1
 
+[craft_leather_belt]
+display_name = "Leather Belt"
+description = "Craft a leather belt."
+category = "leatherworking"
+section = "armor"
+level_required = 2
+station = "workbench"
+craft_time_ms = 4000
+xp = 20
+
+[[craft_leather_belt.ingredients]]
+item_id = "leather"
+count = 1
+
+[[craft_leather_belt.results]]
+item_id = "leather_belt"
+count = 1
+
 [craft_leather_boots]
 display_name = "Leather Boots"
 description = "Craft a pair of leather boots."
@@ -65,9 +83,27 @@ count = 1
 item_id = "leather_boots"
 count = 1
 
-[craft_leather_hood]
-display_name = "Leather Hood"
-description = "Craft a leather hood."
+[craft_backpack]
+display_name = "Backpack"
+description = "Craft a leather backpack."
+category = "leatherworking"
+section = "armor"
+level_required = 5
+station = "workbench"
+craft_time_ms = 5000
+xp = 30
+
+[[craft_backpack.ingredients]]
+item_id = "leather"
+count = 2
+
+[[craft_backpack.results]]
+item_id = "backpack"
+count = 1
+
+[craft_leather_hat]
+display_name = "Leather Hat"
+description = "Craft a leather hat."
 category = "leatherworking"
 section = "armor"
 level_required = 7
@@ -75,16 +111,16 @@ station = "workbench"
 craft_time_ms = 5000
 xp = 35
 
-[[craft_leather_hood.ingredients]]
+[[craft_leather_hat.ingredients]]
 item_id = "leather"
 count = 2
 
-[[craft_leather_hood.results]]
-item_id = "leather_hood"
+[[craft_leather_hat.results]]
+item_id = "leather_hat"
 count = 1
 
 [craft_leather_body]
-display_name = "Leather Body"
+display_name = "Leather Body (M)"
 description = "Craft a leather chestpiece."
 category = "leatherworking"
 section = "armor"
@@ -99,4 +135,22 @@ count = 3
 
 [[craft_leather_body.results]]
 item_id = "leather_body"
+count = 1
+
+[craft_leather_body_female]
+display_name = "Leather Body (F)"
+description = "Craft a leather chestpiece."
+category = "leatherworking"
+section = "armor"
+level_required = 11
+station = "workbench"
+craft_time_ms = 6000
+xp = 50
+
+[[craft_leather_body_female.ingredients]]
+item_id = "leather"
+count = 3
+
+[[craft_leather_body_female.results]]
+item_id = "leather_body_female"
 count = 1

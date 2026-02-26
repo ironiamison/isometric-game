@@ -1,0 +1,55 @@
+# Leather and Craft - Leatherworking tutorial quest
+# Given by Camp Cook after completing Tools of the Trade
+
+[quest]
+id = "survivalist_leather_craft"
+name = "Leather and Craft"
+description = "Learn the art of leatherworking. Tan an animal hide into leather and craft your first pair of leather gloves."
+giver_npc = "camp_cook"
+level_required = 1
+repeatable = false
+lua_script = "survivalist/leather_craft.lua"
+
+[quest.chain]
+previous = "survivalist_tools_of_trade"
+
+[[quest.objectives]]
+id = "get_hide"
+type = "collect_item"
+target = "scrap_leather"
+count = 1
+description = "Obtain an animal hide"
+
+[[quest.objectives]]
+id = "tan_leather"
+type = "collect_item"
+target = "leather"
+count = 1
+description = "Tan the hide into leather at a workbench"
+
+[[quest.objectives]]
+id = "craft_gloves"
+type = "collect_item"
+target = "leather_gloves"
+count = 1
+description = "Craft leather gloves at a workbench"
+
+[[quest.objectives]]
+id = "return_to_cook"
+type = "talk_to"
+target = "camp_cook"
+description = "Return to the Camp Cook"
+sequential = true
+
+[quest.rewards]
+exp = 300
+gold = 50
+items = [
+    { id = "scrap_leather", count = 3 },
+]
+
+[quest.dialogue]
+offer = "Last lesson - leatherworking. I've got an animal hide for you. Take it to a workbench in the workshop and tan it into leather, then craft yourself some gloves."
+accept = "Here's an animal hide. Use the workbench to tan it into leather, then craft leather gloves. The workshop has plenty of workbenches."
+progress = "How's the leatherworking going? Remember - tan the hide first, then craft the gloves."
+complete = "Leather gloves! You've learned cooking, fletching, and leatherworking. You're a proper survivalist now. Here's some extra hides to keep practicing."

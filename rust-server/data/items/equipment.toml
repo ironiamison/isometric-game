@@ -911,6 +911,21 @@ attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 1
 
+[leather_belt]
+display_name = "Leather Belt"
+sprite = "leather_belt"
+description = "A sturdy belt crafted from tanned leather. A survivalist staple."
+category = "equipment"
+max_stack = 1
+base_price = 50
+sellable = true
+[leather_belt.equipment]
+slot_type = "belt"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 1
+defence_bonus = 1
+
 [worn_belt]
 display_name = "Worn Belt"
 sprite = "worn_belt"
@@ -1824,7 +1839,7 @@ strength_bonus = 0
 defence_bonus = 1
 
 [leather_body]
-display_name = "Leather Body"
+display_name = "Leather Body (M)"
 sprite = "leather_body"
 description = "A hardened leather chestpiece. Offers decent protection without slowing you down."
 category = "equipment"
@@ -1838,15 +1853,30 @@ attack_bonus = 2
 strength_bonus = 0
 defence_bonus = 3
 
-[leather_hood]
-display_name = "Leather Hood"
-sprite = "leather_hood"
-description = "A leather hood that keeps you hidden. Light head protection."
+[leather_body_female]
+display_name = "Leather Body (F)"
+sprite = "leather_armor_female"
+description = "A hardened leather chestpiece. Offers decent protection without slowing you down."
+category = "equipment"
+max_stack = 1
+base_price = 80
+sellable = true
+[leather_body_female.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 3
+
+[leather_hat]
+display_name = "Leather Hat"
+sprite = "leather_hat"
+description = "A leather hat that keeps you hidden. Light head protection."
 category = "equipment"
 max_stack = 1
 base_price = 50
 sellable = true
-[leather_hood.equipment]
+[leather_hat.equipment]
 slot_type = "head"
 defence_level_required = 1
 attack_bonus = 1
