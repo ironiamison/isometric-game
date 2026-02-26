@@ -14351,6 +14351,47 @@ impl GameRoom {
         }
         drop(sync_states);
 
+        // === Spectator StateSync ===
+        // Generate a single StateSync for all spectators, centered on world spawn.
+        // Spectators are read-only observers so we skip quest turn-in icons and delta
+        // compression — one full encode shared across every spectator connection.
+        let spectator_senders = self.spectator_senders.read().await;
+        if !spectator_senders.is_empty() {
+            // Gather players near spawn with VIEW_DISTANCE culling
+            let mut spectator_player_values: Vec<rmpv::Value> = Vec::new();
+            for p in &overworld_players {
+                let dx = (p.x - WORLD_SPAWN_X).abs();
+                let dy = (p.y - WORLD_SPAWN_Y).abs();
+                if dx <= VIEW_DISTANCE && dy <= VIEW_DISTANCE {
+                    spectator_player_values.push(crate::protocol::player_update_to_value(p));
+                }
+            }
+
+            // Gather NPCs near spawn
+            let mut spectator_npc_values: Vec<rmpv::Value> = Vec::new();
+            for n in &npc_updates {
+                let dx = (n.x - WORLD_SPAWN_X).abs();
+                let dy = (n.y - WORLD_SPAWN_Y).abs();
+                if dx <= VIEW_DISTANCE && dy <= VIEW_DISTANCE {
+                    spectator_npc_values.push(crate::protocol::npc_update_to_value(n));
+                }
+            }
+
+            // Encode once for all spectators (always full sync, no delta tracking)
+            if let Ok(raw) = crate::protocol::encode_state_sync_from_values(
+                current_tick,
+                spectator_player_values,
+                spectator_npc_values,
+                "",
+            ) {
+                let bytes = crate::protocol::maybe_compress(raw);
+                for sender in spectator_senders.values() {
+                    let _ = sender.try_send(bytes.clone());
+                }
+            }
+        }
+        drop(spectator_senders);
+
         let state_sync_ms = state_sync_start.elapsed().as_millis();
 
         // Arena tick: zone detection + state machine
