@@ -1070,8 +1070,7 @@ impl InputHandler {
             || state.ui_state.slayer_panel_open
             || in_dialogue;
         let hide_action_buttons = any_panel_open;
-        let hide_direction_controls = state.ui_state.escape_menu_open
-            || state.ui_state.crafting_open
+        let hide_direction_controls = state.ui_state.crafting_open
             || state.ui_state.furnace_open
             || state.ui_state.anvil_open
             || state.ui_state.shop_data.is_some()
@@ -2439,6 +2438,7 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
+                            state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
                         }
                         return commands;
@@ -2455,6 +2455,7 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
+                            state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
                         }
                         return commands;
@@ -2472,6 +2473,7 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
+                            state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
                             // Request online players list when opening panel
                             commands.push(InputCommand::GetOnlinePlayers);
@@ -2490,6 +2492,7 @@ impl InputHandler {
                             state.ui_state.social_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
+                            state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
                         }
                         return commands;
@@ -2506,6 +2509,7 @@ impl InputHandler {
                             state.ui_state.social_open = false;
                             state.ui_state.skills_open = false;
                             state.ui_state.minimap_panel_open = false;
+                            state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
                         }
                         return commands;
@@ -2525,13 +2529,25 @@ impl InputHandler {
                             state.ui_state.skills_open = false;
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
+                            state.ui_state.escape_menu_open = false;
                         }
                         return commands;
                     }
                     UiElementId::MenuButtonSettings => {
                         audio.play_sfx("enter");
-                        // Toggle escape/settings menu
-                        state.ui_state.escape_menu_open = !state.ui_state.escape_menu_open;
+                        // Toggle settings panel, close others if opening
+                        if state.ui_state.escape_menu_open {
+                            state.ui_state.escape_menu_open = false;
+                        } else {
+                            state.ui_state.escape_menu_open = true;
+                            state.ui_state.inventory_open = false;
+                            state.ui_state.character_panel_open = false;
+                            state.ui_state.social_open = false;
+                            state.ui_state.skills_open = false;
+                            state.ui_state.prayer_book_open = false;
+                            state.ui_state.minimap_panel_open = false;
+                            state.ui_state.close_quest_log();
+                        }
                         return commands;
                     }
                     UiElementId::ChatButton => {
@@ -2952,21 +2968,18 @@ impl InputHandler {
                             audio.play_sfx("enter");
                             state.camera.zoom = 0.5;
                             save_current_ui_settings(state);
-                            state.ui_state.escape_menu_open = false;
                             return commands;
                         }
                         UiElementId::EscapeMenuZoom1x => {
                             audio.play_sfx("enter");
                             state.camera.zoom = 1.0;
                             save_current_ui_settings(state);
-                            state.ui_state.escape_menu_open = false;
                             return commands;
                         }
                         UiElementId::EscapeMenuZoom2x => {
                             audio.play_sfx("enter");
                             state.camera.zoom = 2.0;
                             save_current_ui_settings(state);
-                            state.ui_state.escape_menu_open = false;
                             return commands;
                         }
                         UiElementId::EscapeMenuMusicSlider => {
@@ -3082,25 +3095,16 @@ impl InputHandler {
                             state.ui_state.escape_menu_open = false;
                             return commands;
                         }
-                        _ => {
-                            // Clicked somewhere else, close menu
-                            state.ui_state.escape_menu_open = false;
-                        }
+                        _ => {}
                     }
                 }
-            } else if mouse_clicked {
-                // Clicked outside any element, close menu
-                state.ui_state.escape_menu_open = false;
             }
 
-            // Escape closes escape menu
+            // Escape closes settings panel
             if is_key_pressed(KeyCode::Escape) {
                 state.ui_state.escape_menu_open = false;
                 return commands;
             }
-
-            // Don't process other input while escape menu is open
-            return commands;
         }
 
         // Handle gold drop dialog

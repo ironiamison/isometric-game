@@ -1,4 +1,4 @@
-//! Escape menu rendering
+//! Settings panel rendering (bottom-right aligned, like inventory/skills/character)
 
 use super::super::Renderer;
 use super::common::*;
@@ -8,19 +8,31 @@ use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
 impl Renderer {
-    /// Render the escape menu (settings and disconnect)
+    /// Render the settings panel (bottom-right, above menu buttons)
     pub(crate) fn render_escape_menu(&self, state: &GameState, layout: &mut UiLayout) {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
 
-        // Semi-transparent overlay
-        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.5));
-
-        // Compact menu sizing - fits on mobile
+        // Panel sizing - compute height from content
         let menu_width = 240.0 * s;
-        let menu_height = (sh - 40.0).min(430.0 * s); // Cap height, leave margin
-        let menu_x = ((sw - menu_width) / 2.0).floor();
-        let menu_y = ((sh - menu_height) / 2.0).floor();
+
+        // Content height varies by platform:
+        //   header(24) + pad(8) + zoom(30) + disconnect(28) + gap(8) + pad(8)
+        //   + toggle rows: mute(26) + chat(26) + tapwalk(26) = 78
+        //   Desktop: sliders(22+22+26=70) + control(26) + gfx(26) = 122
+        //   Android: sliders(22) + joystick(26) = 48
+        #[cfg(not(target_os = "android"))]
+        let content_height = 306.0 * s;
+        #[cfg(target_os = "android")]
+        let content_height = 232.0 * s;
+        let menu_height = (FRAME_THICKNESS * 2.0 + content_height).min(sh - 40.0);
+
+        // Position at bottom-right, above menu buttons (matching other panels)
+        let button_size = MENU_BUTTON_SIZE * s;
+        let exp_bar_gap = EXP_BAR_GAP * s;
+        let button_area_height = button_size + exp_bar_gap;
+        let menu_x = (sw - menu_width - 8.0).floor();
+        let menu_y = (sh - button_area_height - menu_height - 8.0).floor();
 
         // ===== PANEL FRAME =====
         self.draw_panel_frame(menu_x, menu_y, menu_width, menu_height);
@@ -512,19 +524,6 @@ impl Renderer {
             disconnect_text_color,
         );
 
-        // ===== FOOTER HINT (desktop only) =====
-        #[cfg(not(target_os = "android"))]
-        {
-            let hint = "[Esc] Close";
-            let hint_width = self.measure_text_sharp(hint, 16.0).width;
-            self.draw_text_sharp(
-                hint,
-                (menu_x + (menu_width - hint_width) / 2.0).floor(),
-                (menu_y + menu_height - FRAME_THICKNESS - 6.0 * s).floor(),
-                16.0,
-                TEXT_DIM,
-            );
-        }
     }
 
     /// Draw a compact slider with label on left

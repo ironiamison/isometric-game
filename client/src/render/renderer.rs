@@ -9220,6 +9220,11 @@ impl Renderer {
         // Social panel (when open)
         self.render_social_panel(state, hovered, &mut layout);
 
+        // Settings panel (when open)
+        if state.ui_state.escape_menu_open {
+            self.render_escape_menu(state, &mut layout);
+        }
+
         // Chat log area is intentionally NOT registered for hit detection
         // so that clicks/hovers pass through to the game world beneath it.
         // However, the tab bar above the chat log IS registered for click handling.
@@ -9436,11 +9441,6 @@ impl Renderer {
         // Render dragged item at cursor (on top of everything)
         if let Some(ref drag) = state.ui_state.drag_state {
             self.render_dragged_item(drag, state);
-        }
-
-        // Render escape menu on top of everything
-        if state.ui_state.escape_menu_open {
-            self.render_escape_menu(state, &mut layout);
         }
 
         // Chat panel (fullscreen overlay, on top of everything)

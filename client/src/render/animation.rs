@@ -1508,14 +1508,14 @@ pub fn get_hair_offset(
         Gender::Male => (0.0, 0.0),
         Gender::Female => {
             // Female hair needs adjustment for left and up directions
-            let x_adj = match direction {
-                Direction::Up => -1.0,  // Move 1px to the left
-                Direction::Left => 1.0, // Mirror: move 1px to the right (since sprite is flipped)
-                _ => 0.0,
+            let (x_adj, y_adj_dir) = match direction {
+                Direction::Up => (-2.0, 1.0),   // Move 2px to the left, 1px down
+                Direction::Left => (1.0, 0.0),  // Mirror: move 1px to the right (since sprite is flipped)
+                _ => (0.0, 0.0),
             };
             // Female hair needs to be 3px higher when sitting on chair
-            let y_adj = if is_sitting_chair { -3.0 } else { 0.0 };
-            (x_adj, y_adj)
+            let y_adj_sit = if is_sitting_chair { -3.0 } else { 0.0 };
+            (x_adj, y_adj_dir + y_adj_sit)
         }
     };
 
