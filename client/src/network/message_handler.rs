@@ -1034,7 +1034,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if state.local_player_id.as_ref() == Some(&player_id) {
                     state.is_sitting = false;
                     // Clear stale pending move sequences so interpolation starts clean
-                    state.pending_move_seqs.clear();
+                    state.clear_pending_moves();
                     // Defensively clear interior mode in case we died in an instance
                     // (mapTransition should also handle this, but belt-and-suspenders)
                     if state.chunk_manager.is_interior() {

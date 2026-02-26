@@ -1909,6 +1909,12 @@ impl GameState {
         self.pending_move_seqs.clear();
     }
 
+    /// Clear pending move sequences without resetting the monotonic counter.
+    /// Used on respawn where server seq state is preserved (unlike reconnect).
+    pub fn clear_pending_moves(&mut self) {
+        self.pending_move_seqs.clear();
+    }
+
     pub fn refresh_high_ping_movement_mode(&mut self) {
         if !self.ping_stats.has_data() {
             self.high_ping_movement_mode = false;
