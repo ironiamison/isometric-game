@@ -373,8 +373,13 @@ async fn main() {
                                                 // Send upgrade over existing spectator WS
                                                 spec.network.send_spectator_upgrade(token);
 
+                                                // Capture spectator camera position for smooth transition
+                                                let (cam_x, cam_y) = spec.camera.position();
+
                                                 // Reuse spectator's game state (chunks already loaded!)
                                                 let mut game_state = spec.game_state;
+                                                game_state.camera.transition_from = Some((cam_x, cam_y));
+                                                game_state.camera.transition_progress = 0.0;
                                                 game_state.spectator_mode = false;
                                                 game_state.selected_character_name =
                                                     Some(character_name);

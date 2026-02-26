@@ -260,6 +260,8 @@ pub struct Camera {
     pub y: f32,
     pub zoom: f32,
     pub initialized: bool,
+    pub transition_from: Option<(f32, f32)>, // Starting position of transition
+    pub transition_progress: f32,            // 0.0 to 1.0
 }
 
 impl Default for Camera {
@@ -269,8 +271,15 @@ impl Default for Camera {
             y: 0.0,
             zoom: 1.0,
             initialized: false,
+            transition_from: None,
+            transition_progress: 0.0,
         }
     }
+}
+
+/// Smooth-step interpolation (ease in-out) for camera transitions.
+fn smooth_step(t: f32) -> f32 {
+    t * t * (3.0 - 2.0 * t)
 }
 
 /// Chat channel types for different message sources
@@ -2009,8 +2018,23 @@ impl GameState {
         // Update camera to follow local player
         if let Some(local_id) = &self.local_player_id {
             if let Some(player) = self.players.get(local_id) {
-                self.camera.x = player.x;
-                self.camera.y = player.y;
+                if let Some((from_x, from_y)) = self.camera.transition_from {
+                    // Smooth transition from spectator position to player
+                    let dt = macroquad::time::get_frame_time();
+                    self.camera.transition_progress += dt * 1.5; // ~0.67 seconds
+                    if self.camera.transition_progress >= 1.0 {
+                        self.camera.transition_from = None;
+                        self.camera.x = player.x;
+                        self.camera.y = player.y;
+                    } else {
+                        let t = smooth_step(self.camera.transition_progress);
+                        self.camera.x = from_x + (player.x - from_x) * t;
+                        self.camera.y = from_y + (player.y - from_y) * t;
+                    }
+                } else {
+                    self.camera.x = player.x;
+                    self.camera.y = player.y;
+                }
                 self.camera.initialized = true;
             }
         }
