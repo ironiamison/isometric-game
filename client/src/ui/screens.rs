@@ -86,6 +86,12 @@ async fn load_player_sprites() -> SpritesheetStore {
     SpritesheetStore::Individual(sprites)
 }
 
+/// Fallback for platforms without the `image` crate (WASM, Android)
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+async fn load_player_sprites() -> SpritesheetStore {
+    SpritesheetStore::Individual(HashMap::new())
+}
+
 /// Load a spritesheet atlas texture and return the texture + rect mappings
 async fn load_spritesheet_atlas(
     atlas_info: &crate::util::SpriteAtlasInfo,

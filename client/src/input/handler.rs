@@ -6621,8 +6621,12 @@ impl InputHandler {
 
                     // If already adjacent and auto-action not yet sent, send now
                     if is_adjacent {
-                        if let Some(ref aa) = state.auto_action_state {
+                        if let Some(aa) = state.auto_action_state.as_ref() {
                             if !aa.confirmed {
+                                // Clone data before mutable borrow
+                                let target_type = aa.target_type.clone();
+                                let target_id = aa.target_id.clone();
+                                let action = aa.action.clone();
                                 // Face toward target
                                 let dir = crate::game::Direction::from_velocity(
                                     tx as f32 - player_x as f32,
@@ -6630,9 +6634,9 @@ impl InputHandler {
                                 );
                                 queue_face(state, &mut commands, dir as u8);
                                 commands.push(InputCommand::StartAutoAction {
-                                    target_type: aa.target_type.clone(),
-                                    target_id: aa.target_id.clone(),
-                                    action: aa.action.clone(),
+                                    target_type,
+                                    target_id,
+                                    action,
                                 });
                                 state.auto_path = None;
                             }
@@ -6969,11 +6973,15 @@ impl InputHandler {
                     commands.push(InputCommand::HarvestCrop { patch_id });
                 }
                 // Handle auto-action: send StartAutoAction now that we've arrived
-                if let Some(ref aa) = state.auto_action_state {
+                if let Some(aa) = state.auto_action_state.as_ref() {
                     if !aa.confirmed {
+                        // Clone data before mutable borrow
+                        let target_type = aa.target_type.clone();
+                        let target_id = aa.target_id.clone();
+                        let action = aa.action.clone();
+                        let target_pos = auto_action_target_pos(aa, state);
                         // Face toward the target before starting
                         if let Some(local_id) = &state.local_player_id {
-                            let target_pos = auto_action_target_pos(aa, state);
                             if let Some((tx, ty)) = target_pos {
                                 if let Some(player) = state.players.get(local_id) {
                                     let dx = tx - player.x;
@@ -6984,9 +6992,9 @@ impl InputHandler {
                             }
                         }
                         commands.push(InputCommand::StartAutoAction {
-                            target_type: aa.target_type.clone(),
-                            target_id: aa.target_id.clone(),
-                            action: aa.action.clone(),
+                            target_type,
+                            target_id,
+                            action,
                         });
                     }
                 }
