@@ -1756,6 +1756,137 @@ struct WsQuery {
     session_token: String,
 }
 
+// ============================================================================
+// Spectator WebSocket Handler
+// ============================================================================
+
+const MAX_SPECTATORS: usize = 50;
+
+async fn spectate_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    // Get or create the main game room
+    let room = state.get_or_create_room("game_room").await;
+
+    // Rate limit spectators
+    if room.spectator_count().await >= MAX_SPECTATORS {
+        return (StatusCode::SERVICE_UNAVAILABLE, "Too many spectators").into_response();
+    }
+
+    ws.on_upgrade(move |socket| handle_spectator(socket, state, room))
+        .into_response()
+}
+
+async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom>) {
+    let (mut sender, mut receiver) = socket.split();
+
+    let spectator_id = Uuid::new_v4().to_string();
+    info!("Spectator {} connected", spectator_id);
+
+    // Send initial chunks around spawn (5x5 area)
+    let spawn_chunk = chunk::ChunkCoord::from_world(
+        crate::game::WORLD_SPAWN_X,
+        crate::game::WORLD_SPAWN_Y,
+    );
+    for dy in -2..=2 {
+        for dx in -2..=2 {
+            let coord = chunk::ChunkCoord::new(spawn_chunk.x + dx, spawn_chunk.y + dy);
+            if let Some(chunk_msg) = room.handle_chunk_request(coord.x, coord.y).await {
+                if let Ok(bytes) = protocol::encode_server_message(&chunk_msg) {
+                    let _ = sender.send(Message::Binary(bytes)).await;
+                }
+            }
+        }
+    }
+
+    // Create channel for sending messages to this spectator
+    let (tx, mut rx) = mpsc::channel::<Vec<u8>>(256);
+
+    // Register spectator sender so tick loop can send StateSync
+    room.add_spectator(&spectator_id, tx).await;
+
+    // Subscribe to room broadcasts
+    let mut broadcast_rx = room.subscribe();
+
+    // Spawn send loop task (forward mpsc + broadcast to WebSocket)
+    let send_spectator_id = spectator_id.clone();
+    let mut send_task = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                biased;
+
+                // Handle direct messages (spectator StateSync)
+                Some(msg) = rx.recv() => {
+                    if sender.send(Message::Binary(msg)).await.is_err() {
+                        break;
+                    }
+                }
+                // Handle broadcast messages
+                result = broadcast_rx.recv() => {
+                    match result {
+                        Ok(bytes) => {
+                            if sender.send(Message::Binary(bytes)).await.is_err() {
+                                break;
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!("Broadcast lagged for spectator {}: skipped {} messages", send_spectator_id, n);
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+                else => break,
+            }
+        }
+    });
+
+    // Spawn recv loop task — ignore all messages except SpectatorUpgrade
+    let _recv_room = room.clone();
+    let recv_spectator_id = spectator_id.clone();
+    let _recv_state = state.clone();
+    let mut recv_task = tokio::spawn(async move {
+        while let Some(Ok(msg)) = receiver.next().await {
+            match msg {
+                Message::Binary(data) => {
+                    match protocol::decode_client_message(&data) {
+                        Ok(ClientMessage::SpectatorUpgrade { session_token }) => {
+                            info!(
+                                "Spectator {} upgrade requested (not yet implemented), token: {}...",
+                                recv_spectator_id,
+                                &session_token[..session_token.len().min(8)]
+                            );
+                            // Task 5 will implement the actual upgrade logic
+                        }
+                        Ok(_) => {
+                            // Ignore all other messages from spectators
+                        }
+                        Err(_) => {
+                            // Ignore decode errors
+                        }
+                    }
+                }
+                Message::Close(_) => break,
+                _ => {}
+            }
+        }
+    });
+
+    // Wait for either task to finish
+    tokio::select! {
+        _ = &mut send_task => recv_task.abort(),
+        _ = &mut recv_task => send_task.abort(),
+    }
+
+    // Cleanup: remove spectator from room
+    room.remove_spectator(&spectator_id).await;
+    info!("Spectator {} disconnected", spectator_id);
+}
+
+// ============================================================================
+// Authenticated WebSocket Handler
+// ============================================================================
+
 async fn ws_handler(
     ws: WebSocketUpgrade,
     Path(room_id): Path<String>,
@@ -4112,6 +4243,7 @@ async fn main() {
             post(matchmake_join_or_create),
         )
         // WebSocket
+        .route("/spectate", get(spectate_handler))
         .route("/:room_id", get(ws_handler))
         // Stats API (public, read-only)
         .route("/api/stats/overview", get(stats_overview))

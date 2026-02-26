@@ -52,8 +52,8 @@ const VIEW_DISTANCE: i32 = 40;
 const STATE_SYNC_MIN_QUEUE_CAPACITY: usize = 8;
 
 // World spawn point (chunk 0,0) - where players respawn after death
-const WORLD_SPAWN_X: i32 = 15;
-const WORLD_SPAWN_Y: i32 = 4;
+pub const WORLD_SPAWN_X: i32 = 15;
+pub const WORLD_SPAWN_Y: i32 = 4;
 // Preload a small ring of overworld chunks near spawn at startup and on transitions
 pub const SPAWN_PRELOAD_RADIUS: i32 = 3;
 
