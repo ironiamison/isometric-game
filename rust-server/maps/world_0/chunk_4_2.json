@@ -1005,10 +1005,10 @@
       381,
       396,
       396,
-      396,
-      396,
-      396,
-      396,
+      386,
+      381,
+      381,
+      381,
       396,
       396,
       418,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AKBAAJzzQAD88wAAn/9AAJz/QACc80AA///h/0AAIgAgAQAAQgAAAIAAAAAAAACAsAMAgFAAAEAwAAAgQAAAEEAAABCAAQAIAAAACAAAAASAAQADAACAAAABQACAASAAgAAQAAABEAAAAQwAgAEDAACCAAAAQQAAACEAAAAQAAA=",
+  "collision": "AKBAAJzzQAD88wAAn/9AAJz/QACc80AA///h/0AAIgBgAQAAQgAAAIAAAACAAQCA8AMAgFAAAEAwAAAgQAAAEEAAABCAAQAIAAAACAAAAASAAQAD4ACAAOABQADAASAAgAEQAIABEADAAQwAgAEDAICDAACAQQAAgCEAAP8fAAA=",
   "entities": [
     {
       "entityId": "cow",
@@ -4006,6 +4006,84 @@
       "x": 20,
       "y": 7,
       "edge": "right"
+    },
+    {
+      "gid": 173,
+      "x": 0,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 173,
+      "x": 1,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 173,
+      "x": 2,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 173,
+      "x": 3,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 173,
+      "x": 4,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 173,
+      "x": 5,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 173,
+      "x": 6,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 173,
+      "x": 7,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 172,
+      "x": 7,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 169,
+      "x": 8,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 169,
+      "x": 9,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 170,
+      "x": 10,
+      "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 170,
+      "x": 11,
+      "y": 31,
+      "edge": "down"
     }
   ],
   "portals": [],

@@ -3088,12 +3088,6 @@
   "collision": "AAAgBIAAAAQAAEQEBAAABAAAAAIBAAIBAGCAAAAAYAAAABgAQAgQAAQACAAACBAAAAARAAAAEAAAAAgAgAAEAAAACAAAgAQAAAAGAAAgBAAAAAQAgAACAAAAAQAAAAEAAQgBAADAAAAAIAAAABgAAAAIAACABAAAIAIAAAABAAA=",
   "entities": [
     {
-      "entityId": "snake",
-      "x": 6,
-      "y": 23,
-      "level": 1
-    },
-    {
       "entityId": "crow",
       "x": 17,
       "y": 7,
@@ -3109,12 +3103,6 @@
       "entityId": "snake",
       "x": 9,
       "y": 4,
-      "level": 1
-    },
-    {
-      "entityId": "snake",
-      "x": 0,
-      "y": 31,
       "level": 1
     }
   ],

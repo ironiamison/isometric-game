@@ -3095,12 +3095,6 @@
     },
     {
       "entityId": "snake",
-      "x": 16,
-      "y": 1,
-      "level": 1
-    },
-    {
-      "entityId": "snake",
       "x": 6,
       "y": 3,
       "level": 1

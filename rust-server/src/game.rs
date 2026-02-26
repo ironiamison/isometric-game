@@ -12176,15 +12176,41 @@ impl GameRoom {
             }
         }
 
+        let (arena_fighting, arena_ring_zone, arena_fighters): (
+            bool,
+            Option<crate::arena::ZoneBounds>,
+            std::collections::HashSet<String>,
+        ) = {
+            let arena = self.arena_manager.read().await;
+            let fighting = arena.is_fighting();
+            let ring_zone = arena.active_ring_zone().cloned();
+            let fighters = arena.active_fighters.iter().cloned().collect();
+            (fighting, ring_zone, fighters)
+        };
+
         // Check walkability and entity collision for each pending move
         // Grab chunks lock once for all walkability checks (avoids per-move lock acquisition)
         let chunks_guard = self.world.chunks_read().await;
-        let mut valid_moves: Vec<(String, i32, i32, i32, i32, u32)> = Vec::new();
-        let mut auto_sit_requests: Vec<(String, i32, i32, u32)> = Vec::new();
-        for (id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq) in pending_moves {
-            let player_inst = player_instance_map.get(&id);
+
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+        enum MoveCheck {
+            Valid,
+            AutoSit,
+            BlockedTile,
+            BlockedPlayer,
+            BlockedNpc,
+            BlockedChair,
+            BlockedArena,
+        }
+
+        let mut check_move = |id: &str,
+                              target_x: i32,
+                              target_y: i32,
+                              move_dir: Direction,
+                              record_telemetry: bool|
+         -> MoveCheck {
+            let player_inst = player_instance_map.get(id);
             let is_overworld = player_inst.is_none();
-            let move_dir = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
             // Check static tile collision (overworld uses chunk data, instances use instance collision)
             if is_overworld {
                 let coord = crate::chunk::ChunkCoord::from_world(target_x, target_y);
@@ -12195,12 +12221,14 @@ impl GameRoom {
                     false
                 };
                 if !walkable {
-                    tick_telemetry.rejected_tile_blocked += 1;
-                    continue;
+                    if record_telemetry {
+                        tick_telemetry.rejected_tile_blocked += 1;
+                    }
+                    return MoveCheck::BlockedTile;
                 }
-            } else if let Some(inst_id) = player_inst.as_ref() {
+            } else if let Some(inst_id) = player_inst {
                 let walkable = if let Some((collision, map_width, map_height)) =
-                    instance_collision_snapshots.get(*inst_id)
+                    instance_collision_snapshots.get(inst_id)
                 {
                     if target_x < 0
                         || target_y < 0
@@ -12216,8 +12244,10 @@ impl GameRoom {
                     false // Instance not found - reject for safety
                 };
                 if !walkable {
-                    tick_telemetry.rejected_tile_blocked += 1;
-                    continue;
+                    if record_telemetry {
+                        tick_telemetry.rejected_tile_blocked += 1;
+                    }
+                    return MoveCheck::BlockedTile;
                 }
             }
             // Check if another player is on the target tile (same context only)
@@ -12229,22 +12259,26 @@ impl GameRoom {
                     .map_or(false, |positions| positions.contains(&(target_x, target_y)))
             };
             if player_blocked {
-                tick_telemetry.rejected_player_blocked += 1;
-                continue;
+                if record_telemetry {
+                    tick_telemetry.rejected_player_blocked += 1;
+                }
+                return MoveCheck::BlockedPlayer;
             }
             // Check if an NPC is on the target tile
             let npc_blocked = if is_overworld {
                 npc_positions.contains(&(target_x, target_y))
-            } else if let Some(inst_id) = player_inst.as_ref() {
+            } else if let Some(inst_id) = player_inst {
                 instance_npc_positions
-                    .get(*inst_id)
+                    .get(inst_id)
                     .map_or(false, |positions| positions.contains(&(target_x, target_y)))
             } else {
                 false
             };
             if npc_blocked {
-                tick_telemetry.rejected_npc_blocked += 1;
-                continue;
+                if record_telemetry {
+                    tick_telemetry.rejected_npc_blocked += 1;
+                }
+                return MoveCheck::BlockedNpc;
             }
             // Check if target tile is a chair (overworld only - instances have their own maps)
             if is_overworld {
@@ -12258,30 +12292,43 @@ impl GameRoom {
                         Direction::Right => move_dir == Direction::Left,
                         _ => false,
                     };
-                    if is_approaching_from_front && occupied_by.is_none() {
-                        // Correct direction and unoccupied - auto-sit
-                        auto_sit_requests.push((id, target_x, target_y, sampled_seq));
+                    if record_telemetry {
+                        tick_telemetry.rejected_chair_blocked += 1;
                     }
-                    // Always block the move (chair is solid from all directions)
-                    tick_telemetry.rejected_chair_blocked += 1;
-                    continue;
+                    if is_approaching_from_front && occupied_by.is_none() {
+                        return MoveCheck::AutoSit;
+                    }
+                    return MoveCheck::BlockedChair;
                 }
             }
             // Block fighters from leaving the ring during arena fights
-            {
-                let arena = self.arena_manager.read().await;
-                if arena.is_fighting() && arena.is_in_ring(&id) {
-                    if let Some(ring_zone) = arena.active_ring_zone() {
-                        if !ring_zone.contains(target_x, target_y) {
+            if arena_fighting && arena_fighters.contains(id) {
+                if let Some(ring_zone) = &arena_ring_zone {
+                    if !ring_zone.contains(target_x, target_y) {
+                        if record_telemetry {
                             tick_telemetry.rejected_arena_blocked += 1;
-                            continue;
                         }
+                        return MoveCheck::BlockedArena;
                     }
                 }
             }
-            valid_moves.push((id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq));
+            MoveCheck::Valid
+        };
+
+        let mut valid_moves: Vec<(String, i32, i32, i32, i32, u32)> = Vec::new();
+        let mut auto_sit_requests: Vec<(String, i32, i32, u32)> = Vec::new();
+        for (id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq) in pending_moves {
+            let move_dir = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
+            match check_move(&id, target_x, target_y, move_dir, true) {
+                MoveCheck::Valid => {
+                    valid_moves.push((id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq));
+                }
+                MoveCheck::AutoSit => {
+                    auto_sit_requests.push((id, target_x, target_y, sampled_seq));
+                }
+                _ => {}
+            }
         }
-        drop(chunks_guard); // Release before NPC AI section acquires its own
 
         // If a newer move intent arrived after pending snapshot, drop the stale
         // sampled move so we don't apply an outdated direction step.
@@ -12296,54 +12343,14 @@ impl GameRoom {
             current_pending_seqs.get(id).copied() == Some(*sampled_seq)
         });
 
-        // Process auto-sit requests (players who walked into unoccupied chairs)
-        for (id, tile_x, tile_y, sampled_seq) in auto_sit_requests {
-            if current_pending_seqs.get(&id).copied() == Some(sampled_seq) {
-                self.handle_sit_chair(&id, tile_x, tile_y).await;
-            }
-        }
-
-        // Track which players moved this tick
-        let moved_players: std::collections::HashSet<String> = valid_moves
-            .iter()
-            .map(|(id, _, _, _, _, _)| id.clone())
-            .collect();
-        tick_telemetry.rejected_moves =
-            pending_player_ids.len().saturating_sub(moved_players.len());
-
         // Get set of gathering player IDs for state sync
         let gathering_player_ids: std::collections::HashSet<String> = {
             let gathering = self.gathering.read().await;
             gathering.gathering_player_ids()
         };
 
-        // Stop woodcutting for moved players + get remaining IDs for StateSync (single lock)
-        let (woodcutting_player_ids, woodcutting_stopped): (
-            std::collections::HashSet<String>,
-            Vec<String>,
-        ) = {
-            let mut woodcutting = self.woodcutting.write().await;
-            let mut stopped = Vec::new();
-            for id in &moved_players {
-                if woodcutting.is_woodcutting(id) {
-                    woodcutting.stop_woodcutting(id);
-                    stopped.push(id.clone());
-                }
-            }
-            // Get IDs AFTER stopping, so StateSync reflects accurate state
-            let ids = woodcutting.woodcutting_player_ids();
-            (ids, stopped)
-        };
-
-        // Snapshot moved positions for quest location checks (before valid_moves is consumed)
-        let moved_positions: Vec<(String, i32, i32)> = if !self.quest_locations.is_empty() {
-            valid_moves
-                .iter()
-                .map(|(id, x, y, _, _, _)| (id.clone(), *x, *y))
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let mut moved_players: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut moved_positions: Vec<(String, i32, i32)> = Vec::new();
 
         {
             let mut players = self.players.write().await;
@@ -12351,6 +12358,45 @@ impl GameRoom {
             // Apply valid moves
             for (id, target_x, target_y, sampled_dx, sampled_dy, sampled_seq) in valid_moves {
                 if let Some(player) = players.get_mut(&id) {
+                    // If a newer move intent arrived after our snapshot, skip this stale move.
+                    if player.pending_move_seq != Some(sampled_seq) {
+                        if let Some(new_seq) = player.pending_move_seq {
+                            if current_tick - player.last_move_tick >= MOVE_COOLDOWN_TICKS {
+                                let new_dx = player.move_dx;
+                                let new_dy = player.move_dy;
+                                if new_dx != 0 || new_dy != 0 {
+                                    let new_target_x = player.x + new_dx;
+                                    let new_target_y = player.y + new_dy;
+                                    let move_dir =
+                                        Direction::from_velocity(new_dx as f32, new_dy as f32);
+                                    match check_move(&id, new_target_x, new_target_y, move_dir, true)
+                                    {
+                                        MoveCheck::Valid => {
+                                            player.direction = move_dir;
+                                            player.x = new_target_x;
+                                            player.y = new_target_y;
+                                            player.last_move_tick = current_tick;
+                                            player.mark_move_seq_processed(new_seq);
+                                            moved_players.insert(id.clone());
+                                            if !self.quest_locations.is_empty() {
+                                                moved_positions
+                                                    .push((id.clone(), new_target_x, new_target_y));
+                                            }
+                                            if player.pending_move_seq == Some(new_seq) {
+                                                player.clear_move_intent();
+                                            }
+                                        }
+                                        MoveCheck::AutoSit => {
+                                            auto_sit_requests
+                                                .push((id.clone(), new_target_x, new_target_y, new_seq));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                        continue;
+                    }
                     if sampled_dx != 0 || sampled_dy != 0 {
                         // Facing changes only when movement is actually applied.
                         player.direction =
@@ -12360,6 +12406,10 @@ impl GameRoom {
                     player.y = target_y;
                     player.last_move_tick = current_tick;
                     player.mark_move_seq_processed(sampled_seq);
+                    moved_players.insert(id.clone());
+                    if !self.quest_locations.is_empty() {
+                        moved_positions.push((id.clone(), target_x, target_y));
+                    }
 
                     // Clear only if this is still the same sampled intent.
                     // If a new Move message arrived after we built pending_moves,
@@ -12400,6 +12450,38 @@ impl GameRoom {
                 }
             }
         }
+
+        // Release chunk lock before any awaits.
+        drop(chunks_guard);
+
+        // Process auto-sit requests (players who walked into unoccupied chairs)
+        for (id, tile_x, tile_y, sampled_seq) in auto_sit_requests {
+            if current_pending_seqs.get(&id).copied() == Some(sampled_seq) {
+                self.handle_sit_chair(&id, tile_x, tile_y).await;
+            }
+        }
+
+        // Track rejected moves after applying the authoritative set.
+        tick_telemetry.rejected_moves =
+            pending_player_ids.len().saturating_sub(moved_players.len());
+
+        // Stop woodcutting for moved players + get remaining IDs for StateSync (single lock)
+        let (woodcutting_player_ids, woodcutting_stopped): (
+            std::collections::HashSet<String>,
+            Vec<String>,
+        ) = {
+            let mut woodcutting = self.woodcutting.write().await;
+            let mut stopped = Vec::new();
+            for id in &moved_players {
+                if woodcutting.is_woodcutting(id) {
+                    woodcutting.stop_woodcutting(id);
+                    stopped.push(id.clone());
+                }
+            }
+            // Get IDs AFTER stopping, so StateSync reflects accurate state
+            let ids = woodcutting.woodcutting_player_ids();
+            (ids, stopped)
+        };
 
         // Check if any moved players reached a quest location
         for (player_id, px, py) in &moved_positions {
