@@ -168,14 +168,9 @@ impl Renderer {
                 }
             }
             Some(UiElementId::ShopSellItem(idx)) if state.ui_state.shop_data.is_some() => {
-                let inventory_items: Vec<&crate::game::InventorySlot> = state
-                    .inventory
-                    .slots
-                    .iter()
-                    .filter_map(|slot| slot.as_ref())
-                    .collect();
-                if let Some(inv_slot) = inventory_items.get(*idx) {
-                    (inv_slot.item_id.clone(), inv_slot.quantity)
+                let inventory_items = state.inventory.aggregate_items();
+                if let Some(agg_item) = inventory_items.get(*idx) {
+                    (agg_item.item_id.clone(), agg_item.total_quantity)
                 } else {
                     return;
                 }

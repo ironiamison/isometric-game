@@ -145,6 +145,12 @@ impl InventorySlot {
     }
 }
 
+/// An inventory item aggregated across all stacks
+pub struct AggregatedItem {
+    pub item_id: String,
+    pub total_quantity: i32,
+}
+
 pub const INVENTORY_SIZE: usize = 20;
 
 /// Player's inventory
@@ -170,6 +176,27 @@ impl Inventory {
             .filter(|slot| slot.item_id == item_id)
             .map(|slot| slot.quantity)
             .sum()
+    }
+
+    /// Aggregate items by item_id, summing quantities across all stacks.
+    /// Preserves the order of first occurrence.
+    pub fn aggregate_items(&self) -> Vec<AggregatedItem> {
+        let mut map: std::collections::HashMap<&str, i32> = std::collections::HashMap::new();
+        let mut order: Vec<&str> = Vec::new();
+        for slot in self.slots.iter().flatten() {
+            let entry = map.entry(&slot.item_id).or_insert_with(|| {
+                order.push(&slot.item_id);
+                0
+            });
+            *entry += slot.quantity;
+        }
+        order
+            .into_iter()
+            .map(|item_id| AggregatedItem {
+                item_id: item_id.to_string(),
+                total_quantity: map[item_id],
+            })
+            .collect()
     }
 
     /// Find the first inventory slot index containing the given item_id

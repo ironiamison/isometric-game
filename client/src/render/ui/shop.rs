@@ -346,14 +346,8 @@ impl Renderer {
         let item_sp = SHOP_ITEM_SPACING * s;
         let scrollbar_w = SCROLLBAR_WIDTH * s;
 
-        // Collect inventory items
-        let inventory_items: Vec<(usize, &crate::game::InventorySlot)> = state
-            .inventory
-            .slots
-            .iter()
-            .enumerate()
-            .filter_map(|(i, slot)| slot.as_ref().map(|s| (i, s)))
-            .collect();
+        // Collect and aggregate inventory items by item_id
+        let inventory_items = state.inventory.aggregate_items();
 
         if inventory_items.is_empty() {
             self.draw_text_sharp("No items", x + 10.0 * s, list_y + 20.0 * s, 16.0, TEXT_DIM);
@@ -383,7 +377,7 @@ impl Renderer {
 
         // Render visible items (overflow will be covered by headers/transaction bars drawn later)
         for i in scroll_state.first_visible..scroll_state.last_visible {
-            if let Some((_slot_idx, inv_slot)) = inventory_items.get(i) {
+            if let Some(agg_item) = inventory_items.get(i) {
                 let relative_idx = i - scroll_state.first_visible;
                 let item_y = list_y
                     + scroll_state.first_item_offset
@@ -422,7 +416,7 @@ impl Renderer {
                 let sprite_x = x + 13.0 * s;
                 let sprite_y = item_y + 8.0 * s;
                 self.draw_item_icon(
-                    &inv_slot.item_id,
+                    &agg_item.item_id,
                     sprite_x,
                     sprite_y,
                     32.0 * s,
@@ -435,9 +429,9 @@ impl Renderer {
                 let text_offset = ITEM_TEXT_OFFSET * s;
                 let name = state
                     .item_registry
-                    .get(&inv_slot.item_id)
+                    .get(&agg_item.item_id)
                     .map(|def| def.display_name.as_str())
-                    .unwrap_or(&inv_slot.item_id);
+                    .unwrap_or(&agg_item.item_id);
                 self.draw_text_sharp(
                     name,
                     sprite_x + text_offset,
@@ -446,8 +440,8 @@ impl Renderer {
                     TEXT_NORMAL,
                 );
 
-                // Quantity owned
-                let qty_text = format!("x{}", inv_slot.quantity);
+                // Quantity owned (total across all stacks)
+                let qty_text = format!("x{}", agg_item.total_quantity);
                 self.draw_text_sharp(
                     &qty_text,
                     sprite_x + text_offset,
@@ -457,7 +451,7 @@ impl Renderer {
                 );
 
                 // Sell price (right side)
-                if let Some(item_def) = state.item_registry.get(&inv_slot.item_id) {
+                if let Some(item_def) = state.item_registry.get(&agg_item.item_id) {
                     if item_def.sellable {
                         let sell_price =
                             (item_def.base_price as f32 * shop_data.buy_multiplier) as i32;
@@ -730,22 +724,17 @@ impl Renderer {
             PANEL_BG_MID,
         );
 
-        // Get selected item info
-        let inventory_items: Vec<_> = state
-            .inventory
-            .slots
-            .iter()
-            .filter_map(|slot| slot.as_ref())
-            .collect();
+        // Get selected item info (using aggregated items)
+        let inventory_items = state.inventory.aggregate_items();
 
-        let (total_price, can_sell) = if let Some(inv_slot) =
+        let (total_price, can_sell) = if let Some(agg_item) =
             inventory_items.get(state.ui_state.shop_selected_sell_index)
         {
-            if let Some(item_def) = state.item_registry.get(&inv_slot.item_id) {
+            if let Some(item_def) = state.item_registry.get(&agg_item.item_id) {
                 if item_def.sellable {
                     let sell_price = (item_def.base_price as f32 * shop_data.buy_multiplier) as i32;
                     let total = sell_price * state.ui_state.shop_sell_quantity;
-                    let has_quantity = inv_slot.quantity >= state.ui_state.shop_sell_quantity;
+                    let has_quantity = agg_item.total_quantity >= state.ui_state.shop_sell_quantity;
                     (total, has_quantity)
                 } else {
                     (0, false)

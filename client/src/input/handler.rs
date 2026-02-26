@@ -4232,12 +4232,9 @@ impl InputHandler {
                                         (state.ui_state.shop_buy_scroll + dy)
                                             .clamp(0.0, max_scroll);
                                 } else {
-                                    let inventory_count = state
-                                        .inventory
-                                        .slots
-                                        .iter()
-                                        .filter(|s| s.is_some())
-                                        .count();
+                                    let inventory_count =
+                                        state.inventory.aggregate_items()
+                                        .len();
                                     let max_scroll =
                                         ((inventory_count as f32) * item_height - 200.0).max(0.0);
                                     state.ui_state.shop_sell_scroll =
@@ -4446,16 +4443,13 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::ShopSellQuantityMax => {
-                            let inventory_items: Vec<_> = state
-                                .inventory
-                                .slots
-                                .iter()
-                                .filter_map(|slot| slot.as_ref())
-                                .collect();
-                            if let Some(inv_slot) =
+                            let inventory_items =
+                                state.inventory.aggregate_items();
+                            if let Some(agg_item) =
                                 inventory_items.get(state.ui_state.shop_selected_sell_index)
                             {
-                                state.ui_state.shop_sell_quantity = inv_slot.quantity.max(1);
+                                state.ui_state.shop_sell_quantity =
+                                    agg_item.total_quantity.max(1);
                             }
                             return commands;
                         }
@@ -4478,18 +4472,13 @@ impl InputHandler {
                         }
                         UiElementId::ShopSellConfirmButton => {
                             if let Some(ref npc_id) = state.ui_state.shop_npc_id {
-                                let inventory_items: Vec<_> = state
-                                    .inventory
-                                    .slots
-                                    .iter()
-                                    .filter_map(|slot| slot.as_ref())
-                                    .collect();
-                                if let Some(inv_slot) =
+                                let inventory_items = state.inventory.aggregate_items();
+                                if let Some(agg_item) =
                                     inventory_items.get(state.ui_state.shop_selected_sell_index)
                                 {
                                     commands.push(InputCommand::ShopSell {
                                         npc_id: npc_id.clone(),
-                                        item_id: inv_slot.item_id.clone(),
+                                        item_id: agg_item.item_id.clone(),
                                         quantity: state.ui_state.shop_sell_quantity as u32,
                                     });
                                 }
@@ -4872,7 +4861,8 @@ impl InputHandler {
                         Some(UiElementId::ShopSellScrollArea)
                         | Some(UiElementId::ShopSellItem(_)) => {
                             let inventory_count =
-                                state.inventory.slots.iter().filter(|s| s.is_some()).count();
+                                state.inventory.aggregate_items()
+                                .len();
                             let max_scroll =
                                 ((inventory_count as f32) * item_height - 200.0).max(0.0);
                             state.ui_state.shop_sell_scroll = (state.ui_state.shop_sell_scroll
@@ -4908,7 +4898,7 @@ impl InputHandler {
                     }
                     // Sell scrollbar
                     if let Some(track_bounds) = layout.get_bounds(&UiElementId::ShopSellScrollbar) {
-                        let inventory_count = state.inventory.slots.iter().filter(|s| s.is_some()).count();
+                        let inventory_count = state.inventory.aggregate_items().len();
                         let max_scroll = ((inventory_count as f32) * item_height - 200.0).max(0.0);
                         let clicked_on = matches!(clicked_element, Some(UiElementId::ShopSellScrollbar));
                         crate::ui::scroll::handle_scrollbar_drag(
@@ -4998,12 +4988,7 @@ impl InputHandler {
                         }
                     }
                     ShopSubTab::Sell => {
-                        let inventory_items: Vec<_> = state
-                            .inventory
-                            .slots
-                            .iter()
-                            .filter_map(|slot| slot.as_ref())
-                            .collect();
+                        let inventory_items = state.inventory.aggregate_items();
                         let item_count = inventory_items.len();
 
                         if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
@@ -5034,12 +5019,12 @@ impl InputHandler {
                         // Enter to confirm sell
                         if is_key_pressed(KeyCode::Enter) {
                             if let Some(ref npc_id) = state.ui_state.shop_npc_id {
-                                if let Some(inv_slot) =
+                                if let Some(agg_item) =
                                     inventory_items.get(state.ui_state.shop_selected_sell_index)
                                 {
                                     commands.push(InputCommand::ShopSell {
                                         npc_id: npc_id.clone(),
-                                        item_id: inv_slot.item_id.clone(),
+                                        item_id: agg_item.item_id.clone(),
                                         quantity: state.ui_state.shop_sell_quantity as u32,
                                     });
                                 }
