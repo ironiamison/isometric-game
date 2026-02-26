@@ -5633,9 +5633,10 @@ impl InputHandler {
                 });
                 let recipe_count = alchemy_recipes.len();
 
-                // Count unique sections to include section header heights (must match renderer)
-                let row_h = 56.0_f32;
-                let section_header_h = 22.0_f32;
+                // Must match renderer layout in alchemy_station.rs
+                let s = state.ui_state.ui_scale;
+                let row_h = 56.0 * s;
+                let section_header_h = 22.0 * s;
                 let section_count = {
                     let mut sections = std::collections::HashSet::new();
                     for r in &alchemy_recipes {
@@ -5646,10 +5647,26 @@ impl InputHandler {
                 let total_content = recipe_count as f32 * row_h + section_count as f32 * section_header_h;
 
                 let (_, sh) = crate::util::virtual_screen_size();
-                let panel_h = (520.0_f32).min(sh - 16.0);
-                // 8=frame, 40=header, 28=tabs, 24=skill bar, 30=footer, 16=padding, 6=skill bar gap
-                let content_h = panel_h - 8.0 - 40.0 - 28.0 - 24.0 - 30.0 - 16.0 - 6.0;
-                let recipe_list_h = (content_h * 0.60).floor();
+                let panel_h = (520.0 * s).min(sh - 16.0);
+                let header_h = 40.0 * s;
+                let footer_h = 30.0 * s;
+                let tab_h = 28.0 * s;
+                let skill_bar_h = 24.0 * s;
+                let frame = 4.0; // FRAME_THICKNESS
+                // content_y = panel_y + frame + header_h + 2 + tab_h + 2 + skill_bar_h + 4*s
+                // footer_y = panel_y + panel_h - frame - footer_h
+                let total_content_h = panel_h - frame * 2.0 - header_h - 2.0 - tab_h - 2.0
+                    - skill_bar_h - 4.0 * s - 4.0 * s - footer_h;
+
+                // Dynamic detail panel height based on selected recipe's ingredient count
+                let ingredient_count = alchemy_recipes
+                    .get(state.ui_state.alchemy_station_selected_recipe)
+                    .map(|r| r.ingredients.len())
+                    .unwrap_or(1);
+                let detail_h = (8.0 * s + 40.0 * s + 8.0 * s + 6.0 * s
+                    + ingredient_count as f32 * 28.0 * s + 10.0 * s + 26.0 * s + 6.0 * s)
+                    .min(total_content_h * 0.65);
+                let recipe_list_h = total_content_h - detail_h - 4.0 * s;
                 let max_scroll = (total_content - recipe_list_h).max(0.0);
 
                 // W/S or Up/Down to navigate recipes

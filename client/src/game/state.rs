@@ -113,7 +113,7 @@ impl Default for FrameTimings {
             delta_max_ms: 0.0,
             delta_samples: [0.0; 60],
             delta_idx: 0,
-            fps_cap: None, // Uncapped by default, cycle with F4
+            fps_cap: Some(140), // Default cap, toggle with F4
             next_frame_ms: 0.0,
             next_frame_min_ms: 0.0,
             next_frame_max_ms: 0.0,
@@ -173,9 +173,8 @@ impl FrameTimings {
 
         // Update smoothed delta for visual interpolation.
         // Clamp extreme outliers so one hitch doesn't create a large visual jump.
-        // Clamp only the upper bound to avoid big hitch jumps.
-        // Do not clamp the lower bound: extremely high FPS should not speed up simulation.
-        let delta_secs = ((delta_ms / 1000.0) as f32).min(1.0 / 30.0);
+        // Clamp extreme outliers so one hitch doesn't create a large visual jump.
+        let delta_secs = ((delta_ms / 1000.0) as f32).clamp(1.0 / 240.0, 1.0 / 30.0);
         if self.delta_smoothing > 0.0 {
             self.smoothed_delta = self.smoothed_delta * self.delta_smoothing
                 + delta_secs * (1.0 - self.delta_smoothing);
@@ -1989,8 +1988,7 @@ impl GameState {
         let visual_delta = self.frame_timings.smoothed_delta;
         // Keep local movement tightly synced to real frame time to reduce
         // drift/corrections during rapid directional changes.
-        // Cap large deltas, but allow very small deltas at high FPS.
-        let local_visual_delta = delta.min(1.0 / 30.0);
+        let local_visual_delta = delta.clamp(1.0 / 240.0, 1.0 / 30.0);
         let local_id = self.local_player_id.clone();
 
         // Update all players (smooth interpolation toward server positions)
