@@ -251,6 +251,10 @@ pub enum ClientMessage {
     // Ping for latency measurement
     #[serde(rename = "ping")]
     Ping { timestamp: f64 },
+
+    /// Spectator upgrades to a full player session
+    #[serde(rename = "spectatorUpgrade")]
+    SpectatorUpgrade { session_token: String },
 }
 
 impl ClientMessage {
@@ -607,6 +611,10 @@ impl ClientMessage {
             ClientMessage::Ping { timestamp } => {
                 data.insert("timestamp".into(), Value::F64(*timestamp));
                 "ping"
+            }
+            ClientMessage::SpectatorUpgrade { session_token } => {
+                data.insert("sessionToken".into(), Value::String(session_token.clone().into()));
+                "spectatorUpgrade"
             }
         };
 

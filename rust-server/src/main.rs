@@ -3725,6 +3725,10 @@ async fn handle_client_message(
         ClientMessage::ChestDeposit { chest_id, inventory_slot } => {
             room.handle_chest_deposit(player_id, &chest_id, inventory_slot).await;
         }
+        ClientMessage::SpectatorUpgrade { .. } => {
+            // Handled by spectator WebSocket handler, not the normal game message dispatch
+            tracing::warn!("SpectatorUpgrade received in normal message handler for player {}", player_id);
+        }
     }
 
     let handler_duration = handler_start.elapsed();

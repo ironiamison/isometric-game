@@ -298,6 +298,10 @@ pub enum ClientMessage {
     /// Deposit item from inventory into chest
     #[serde(rename = "chestDeposit")]
     ChestDeposit { chest_id: String, inventory_slot: u8 },
+
+    /// Spectator upgrades to a full player session
+    #[serde(rename = "spectatorUpgrade")]
+    SpectatorUpgrade { session_token: String },
 }
 
 impl ClientMessage {
@@ -368,6 +372,7 @@ impl ClientMessage {
             ClientMessage::OpenChest { .. } => "OpenChest",
             ClientMessage::ChestTake { .. } => "ChestTake",
             ClientMessage::ChestDeposit { .. } => "ChestDeposit",
+            ClientMessage::SpectatorUpgrade { .. } => "SpectatorUpgrade",
         }
     }
 }
@@ -5540,6 +5545,10 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let chest_id = extract_string(msg_data, "chest_id").unwrap_or_default();
             let inventory_slot = extract_i32(msg_data, "inventory_slot").unwrap_or(0) as u8;
             Ok(ClientMessage::ChestDeposit { chest_id, inventory_slot })
+        }
+        "spectatorUpgrade" => {
+            let session_token = extract_string(msg_data, "sessionToken").unwrap_or_default();
+            Ok(ClientMessage::SpectatorUpgrade { session_token })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
