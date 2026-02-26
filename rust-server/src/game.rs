@@ -915,6 +915,8 @@ pub struct GameRoom {
     chest_manager: RwLock<crate::chest::ChestManager>,
     /// Tracks which chest each player has open (player_id -> chest_key)
     player_open_chests: RwLock<HashMap<String, String>>,
+    /// Per-spectator message senders (read-only viewers on login screen)
+    spectator_senders: RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>,
 }
 
 impl GameRoom {
@@ -1367,11 +1369,27 @@ impl GameRoom {
             chest_registry,
             chest_manager: RwLock::new(chest_manager),
             player_open_chests: RwLock::new(HashMap::new()),
+            spectator_senders: RwLock::new(HashMap::new()),
         }
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Vec<u8>> {
         self.broadcast_tx.subscribe()
+    }
+
+    /// Register a spectator's message channel.
+    pub async fn add_spectator(&self, spectator_id: &str, sender: mpsc::Sender<Vec<u8>>) {
+        self.spectator_senders.write().await.insert(spectator_id.to_string(), sender);
+    }
+
+    /// Remove a spectator's message channel.
+    pub async fn remove_spectator(&self, spectator_id: &str) {
+        self.spectator_senders.write().await.remove(spectator_id);
+    }
+
+    /// Get current spectator count.
+    pub async fn spectator_count(&self) -> usize {
+        self.spectator_senders.read().await.len()
     }
 
     pub async fn broadcast(&self, msg: ServerMessage) {
