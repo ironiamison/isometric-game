@@ -277,15 +277,16 @@ impl GatheringSystem {
         player_fishing_level: i32,
         current_time: u64,
         prayer_speed_multiplier: f32,
+        rod_speed_multiplier: f32,
     ) -> Option<GatherResult> {
         let state = self.player_states.get(player_id)?;
         let zone = self.zones.get(&state.zone_id)?;
 
-        // Determine gather speed (2x if buffed, plus prayer bonus)
+        // Determine gather speed (2x if buffed, plus prayer and rod bonuses)
         let has_buff = state.buff_expires_at > 0 && current_time < state.buff_expires_at;
         let buff_multiplier = if has_buff { 2.0 } else { 1.0 };
-        // Combined multiplier: buff and prayer stack multiplicatively
-        let total_multiplier = buff_multiplier * prayer_speed_multiplier;
+        // Combined multiplier: buff, prayer, and rod speed stack multiplicatively
+        let total_multiplier = buff_multiplier * prayer_speed_multiplier * rod_speed_multiplier;
         let gather_speed_ms = (zone.base_gather_speed * 1000.0 / total_multiplier) as u64;
 
         // Check if enough time has elapsed

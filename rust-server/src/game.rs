@@ -13685,7 +13685,7 @@ impl GameRoom {
         }
 
         // Phase 1a: Read player stats for active gatherers (players.read only)
-        let gatherer_stats: HashMap<String, (i32, f32)> = {
+        let gatherer_stats: HashMap<String, (i32, f32, f32)> = {
             let players = self.players.read().await;
             let gathering = self.gathering.read().await;
             gathering
@@ -13695,9 +13695,17 @@ impl GameRoom {
                     players.get(pid).map(|p| {
                         let active_ids: Vec<String> = p.active_prayers.iter().cloned().collect();
                         let effects = self.prayer_registry.calculate_effects(&active_ids);
+                        let rod_speed = p
+                            .equipped_weapon
+                            .as_ref()
+                            .and_then(|w| self.item_registry.get(w))
+                            .and_then(|def| def.equipment.as_ref())
+                            .map(|eq| eq.fishing_speed_multiplier)
+                            .unwrap_or(1.0)
+                            .max(1.0);
                         (
                             pid.clone(),
-                            (p.skills.fishing.level, effects.gather_speed_multiplier()),
+                            (p.skills.fishing.level, effects.gather_speed_multiplier(), rod_speed),
                         )
                     })
                 })
@@ -13715,10 +13723,10 @@ impl GameRoom {
             let mut results: Vec<GatherResult> = Vec::new();
             let gatherer_ids: Vec<String> = gathering.player_states.keys().cloned().collect();
             for pid in &gatherer_ids {
-                let (fishing_level, prayer_speed) =
-                    gatherer_stats.get(pid).copied().unwrap_or((1, 1.0));
+                let (fishing_level, prayer_speed, rod_speed) =
+                    gatherer_stats.get(pid).copied().unwrap_or((1, 1.0, 1.0));
                 if let Some(result) =
-                    gathering.tick_gathering(pid, fishing_level, current_time, prayer_speed)
+                    gathering.tick_gathering(pid, fishing_level, current_time, prayer_speed, rod_speed)
                 {
                     results.push(GatherResult {
                         pid: pid.clone(),

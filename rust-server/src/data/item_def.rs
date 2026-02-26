@@ -141,6 +141,10 @@ pub struct EquipmentStats {
     #[serde(default)]
     pub mine_success_bonus: f32,
 
+    /// Fishing speed multiplier for rods (1.0 = base speed, higher = faster)
+    #[serde(default)]
+    pub fishing_speed_multiplier: f32,
+
     /// Magic bonus - affects spell accuracy
     #[serde(default)]
     pub magic_bonus: i32,

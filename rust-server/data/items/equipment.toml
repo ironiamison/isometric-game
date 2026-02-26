@@ -346,6 +346,7 @@ attack_level_required = 1
 attack_bonus = 1
 strength_bonus = 0
 defence_bonus = 0
+fishing_speed_multiplier = 1.0
 
 [maple_rod]
 display_name = "Maple Fishing Rod"
@@ -361,6 +362,7 @@ attack_level_required = 1
 attack_bonus = 2
 strength_bonus = 0
 defence_bonus = 0
+fishing_speed_multiplier = 1.1
 
 [salvaged_sword]
 display_name = "Salvaged Sword"
