@@ -76,10 +76,10 @@ animation_type = "standard"
 description = "A menacing black crow with sharp talons."
 
 [crow.stats]
-level = 2
+level = 1
 max_hp = 5
 damage = 1
-attack_bonus = 1
+attack_bonus = 0
 defence_bonus = -3
 attack_range = 1
 aggro_range = 7
