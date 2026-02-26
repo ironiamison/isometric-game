@@ -744,8 +744,10 @@ fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, til
 
     const MAX_PATH_DISTANCE: i32 = 32;
     if let Some(player) = state.get_local_player() {
-        let px = player.x.round() as i32;
-        let py = player.y.round() as i32;
+        // Start path plans from authoritative server tile to avoid
+        // planning from a visual/interpolated future tile.
+        let px = player.server_x.round() as i32;
+        let py = player.server_y.round() as i32;
         let dist = (tile_x - px).abs().max((tile_y - py).abs());
         if dist <= MAX_PATH_DISTANCE && state.chunk_manager.is_walkable(tile_x as f32, tile_y as f32) {
             let occupied = build_occupied_set(state, true);
@@ -2381,8 +2383,8 @@ impl InputHandler {
                                             if is_obelisk_gid(*gid) {
                                                 // Walk to obelisk, then teleport directly
                                                 if let Some(player) = state.get_local_player() {
-                                                    let px = player.x.round() as i32;
-                                                    let py = player.y.round() as i32;
+                                                    let px = player.server_x.round() as i32;
+                                                    let py = player.server_y.round() as i32;
                                                     let cdx = (px - tx).abs();
                                                     let cdy = (py - ty).abs();
                                                     if cdx <= 1 && cdy <= 1 {
@@ -2412,8 +2414,8 @@ impl InputHandler {
                                             } else if is_chest {
                                                 // Walk to chest and open it
                                                 if let Some(player) = state.get_local_player() {
-                                                    let px = player.x.round() as i32;
-                                                    let py = player.y.round() as i32;
+                                                    let px = player.server_x.round() as i32;
+                                                    let py = player.server_y.round() as i32;
                                                     let cdx = (px - tx).abs();
                                                     let cdy = (py - ty).abs();
                                                     if cdx <= 1 && cdy <= 1 {
@@ -2468,8 +2470,8 @@ impl InputHandler {
                                                 let marker_y = marker.y;
                                                 // Pathfind to marker and start gathering
                                                 if let Some(player) = state.get_local_player() {
-                                                    let px = player.x.round() as i32;
-                                                    let py = player.y.round() as i32;
+                                                    let px = player.server_x.round() as i32;
+                                                    let py = player.server_y.round() as i32;
                                                     let dx = (px - marker_x).abs();
                                                     let dy = (py - marker_y).abs();
                                                     if dx <= 1 && dy <= 1 {
@@ -2525,8 +2527,8 @@ impl InputHandler {
                                                         commands.push(InputCommand::Pickup { item_id });
                                                     } else {
                                                         // Pathfind to item
-                                                        let px = player.x.round() as i32;
-                                                        let py = player.y.round() as i32;
+                                                        let px = player.server_x.round() as i32;
+                                                        let py = player.server_y.round() as i32;
                                                         let occupied = build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some(path) = find_path_with_optimistic_splice(
@@ -2568,8 +2570,8 @@ impl InputHandler {
                                             match option_idx {
                                                 0 => {
                                                     if let Some(player) = state.get_local_player() {
-                                                        let px = player.x.round() as i32;
-                                                        let py = player.y.round() as i32;
+                                                        let px = player.server_x.round() as i32;
+                                                        let py = player.server_y.round() as i32;
                                                         let cdx = (px - patch_x).abs();
                                                         let cdy = (py - patch_y).abs();
                                                         if cdx <= 1 && cdy <= 1 {
@@ -7980,10 +7982,10 @@ impl InputHandler {
                                     }
                                 } else {
                                     // Out of range - pathfind to adjacent tile
-                                    let player_x = player.x.round() as i32;
-                                    let player_y = player.y.round() as i32;
-                                    let npc_x = npc.x.round() as i32;
-                                    let npc_y = npc.y.round() as i32;
+                                    let player_x = player.server_x.round() as i32;
+                                    let player_y = player.server_y.round() as i32;
+                                    let npc_x = npc.server_x.round() as i32;
+                                    let npc_y = npc.server_y.round() as i32;
 
                                     // Build occupied set (other players + NPCs)
                                     let occupied = build_occupied_set(state, true);
@@ -8101,8 +8103,8 @@ impl InputHandler {
                             });
                         // Pathfind to adjacent tile, or send immediately if already adjacent
                         if let Some(player) = state.get_local_player() {
-                            let player_x = player.x.round() as i32;
-                            let player_y = player.y.round() as i32;
+                            let player_x = player.server_x.round() as i32;
+                            let player_y = player.server_y.round() as i32;
                             let cdx = (player_x - clicked_tile_x).abs();
                             let cdy = (player_y - clicked_tile_y).abs();
                             // Cardinal adjacency only (no diagonal)
@@ -8167,8 +8169,8 @@ impl InputHandler {
                             });
                         // Pathfind to adjacent tile, or send immediately if already adjacent
                         if let Some(player) = state.get_local_player() {
-                            let player_x = player.x.round() as i32;
-                            let player_y = player.y.round() as i32;
+                            let player_x = player.server_x.round() as i32;
+                            let player_y = player.server_y.round() as i32;
                             let cdx = (player_x - clicked_tile_x).abs();
                             let cdy = (player_y - clicked_tile_y).abs();
                             // Cardinal adjacency only (no diagonal)
@@ -8210,8 +8212,8 @@ impl InputHandler {
                 } else if is_obelisk_gid(obj_gid) || state.chest_positions.contains(&(clicked_tile_x, clicked_tile_y)) {
                     // Clicked on an obelisk or chest — walk to it and interact
                     if let Some(player) = state.get_local_player() {
-                        let player_x = player.x.round() as i32;
-                        let player_y = player.y.round() as i32;
+                        let player_x = player.server_x.round() as i32;
+                        let player_y = player.server_y.round() as i32;
                         let cdx = (player_x - clicked_tile_x).abs();
                         let cdy = (player_y - clicked_tile_y).abs();
                         if cdx <= 1 && cdy <= 1 {
@@ -8253,8 +8255,8 @@ impl InputHandler {
                     if patch.state == "harvestable" {
                         if let Some(local_id) = &state.local_player_id {
                             if let Some(player) = state.players.get(local_id) {
-                                let px = player.x.round() as i32;
-                                let py = player.y.round() as i32;
+                                let px = player.server_x.round() as i32;
+                                let py = player.server_y.round() as i32;
                                 let cdx = (px - clicked_tile_x).abs();
                                 let cdy = (py - clicked_tile_y).abs();
                                 if cdx <= 1 && cdy <= 1 {
@@ -8292,8 +8294,8 @@ impl InputHandler {
                 if !state.is_sitting {
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(player) = state.players.get(local_id) {
-                            let px = player.x.round() as i32;
-                            let py = player.y.round() as i32;
+                            let px = player.server_x.round() as i32;
+                            let py = player.server_y.round() as i32;
                             let cdx = (px - clicked_tile_x).abs();
                             let cdy = (py - clicked_tile_y).abs();
                             if cdx <= 1 && cdy <= 1 {
@@ -8333,8 +8335,8 @@ impl InputHandler {
             {
                 // Clicked on a chest - walk to it and interact
                 if let Some(player) = state.get_local_player() {
-                    let px = player.x.round() as i32;
-                    let py = player.y.round() as i32;
+                    let px = player.server_x.round() as i32;
+                    let py = player.server_y.round() as i32;
                     let cdx = (px - clicked_tile_x).abs();
                     let cdy = (py - clicked_tile_y).abs();
                     if cdx <= 1 && cdy <= 1 {
@@ -8379,8 +8381,9 @@ impl InputHandler {
                 const MAX_PATH_DISTANCE: i32 = 32;
 
                 if let Some(player) = state.get_local_player() {
-                    let player_x = player.x.round() as i32;
-                    let player_y = player.y.round() as i32;
+                    // Use server-authoritative tile for click-to-move.
+                    let player_x = player.server_x.round() as i32;
+                    let player_y = player.server_y.round() as i32;
                     let dist = (tile_x - player_x).abs().max((tile_y - player_y).abs());
 
                     if dist <= MAX_PATH_DISTANCE
