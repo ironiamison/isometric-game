@@ -10,7 +10,7 @@ use macroquad::prelude::*;
 /// Social panel dimensions (matches INV_WIDTH for consistency)
 const SOCIAL_PANEL_WIDTH: f32 = 240.0;
 const SOCIAL_PANEL_HEIGHT: f32 = 314.0;
-const SOCIAL_HEADER_HEIGHT: f32 = 28.0;
+const SOCIAL_HEADER_HEIGHT: f32 = 24.0;
 const SOCIAL_TAB_HEIGHT: f32 = 26.0;
 const SOCIAL_ROW_HEIGHT: f32 = 32.0;
 const SOCIAL_PADDING: f32 = 8.0;
@@ -72,9 +72,9 @@ impl Renderer {
 
         draw_rectangle(header_x, header_y, header_w, header_height, HEADER_BG);
         draw_line(
-            header_x + 6.0 * scale,
+            header_x,
             header_y + header_height,
-            header_x + header_w - 6.0 * scale,
+            header_x + header_w,
             header_y + header_height,
             1.0,
             HEADER_BORDER,
@@ -92,7 +92,7 @@ impl Renderer {
         self.draw_text_sharp(
             &header_text,
             text_x,
-            header_y + (header_height + 12.0) / 2.0,
+            (header_y + 17.0 * scale).floor(),
             16.0,
             TEXT_TITLE,
         );

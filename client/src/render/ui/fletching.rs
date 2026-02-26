@@ -37,8 +37,7 @@ impl Renderer {
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 
-        // Semi-transparent overlay
-        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
+        // No background darkening — fletching is a quick tool-based panel
 
         // Panel frame + corner accents
         self.draw_panel_frame(panel_x, panel_y, panel_width, panel_height);

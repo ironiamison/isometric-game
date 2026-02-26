@@ -58,9 +58,9 @@
       17,
       17,
       17,
-      566,
-      566,
-      566,
+      17,
+      17,
+      17,
       17,
       17,
       17,
@@ -78,9 +78,9 @@
       17,
       17,
       17,
-      566,
-      566,
-      566,
+      17,
+      17,
+      17,
       17,
       17,
       17,
@@ -860,24 +860,12 @@
       0
     ]
   },
-  "collision": "//9/mt8BADADAAEAMAMAAQAQAwABADADAAMAEAAAAQAQAAA=",
+  "collision": "//9/2t8BADAAYAEAMANgAQAQA2ABADADYAMAEABgAwAQAAA=",
   "entities": [
     {
       "entityId": "furnace",
       "x": 12,
       "y": 1,
-      "level": 1
-    },
-    {
-      "entityId": "blacksmith",
-      "x": 3,
-      "y": 6,
-      "level": 1
-    },
-    {
-      "entityId": "anvil",
-      "x": 5,
-      "y": 3,
       "level": 1
     },
     {
@@ -897,23 +885,15 @@
       "x": 5,
       "y": 9,
       "level": 1
+    },
+    {
+      "entityId": "blacksmith",
+      "x": 11,
+      "y": 7,
+      "level": 1
     }
   ],
   "mapObjects": [
-    {
-      "gid": 1684,
-      "x": 1,
-      "y": 1,
-      "width": 30,
-      "height": 91
-    },
-    {
-      "gid": 1684,
-      "x": 2,
-      "y": 1,
-      "width": 30,
-      "height": 91
-    },
     {
       "gid": 1684,
       "x": 18,
@@ -999,20 +979,6 @@
       "height": 44
     },
     {
-      "gid": 1951,
-      "x": 5,
-      "y": 3,
-      "width": 39,
-      "height": 44
-    },
-    {
-      "gid": 1365,
-      "x": 4,
-      "y": 3,
-      "width": 21,
-      "height": 39
-    },
-    {
       "gid": 1365,
       "x": 4,
       "y": 7,
@@ -1025,6 +991,146 @@
       "y": 9,
       "width": 21,
       "height": 39
+    },
+    {
+      "gid": 2990,
+      "x": 1,
+      "y": 12,
+      "width": 38,
+      "height": 89
+    },
+    {
+      "gid": 2990,
+      "x": 1,
+      "y": 1,
+      "width": 38,
+      "height": 89
+    },
+    {
+      "gid": 2988,
+      "x": 8,
+      "y": 11,
+      "width": 15,
+      "height": 26
+    },
+    {
+      "gid": 2988,
+      "x": 9,
+      "y": 1,
+      "width": 15,
+      "height": 26
+    },
+    {
+      "gid": 2988,
+      "x": 6,
+      "y": 1,
+      "width": 15,
+      "height": 26
+    },
+    {
+      "gid": 2988,
+      "x": 17,
+      "y": 1,
+      "width": 15,
+      "height": 26
+    },
+    {
+      "gid": 2988,
+      "x": 1,
+      "y": 11,
+      "width": 15,
+      "height": 26
+    },
+    {
+      "gid": 2988,
+      "x": 1,
+      "y": 4,
+      "width": 15,
+      "height": 26
+    },
+    {
+      "gid": 2987,
+      "x": 2,
+      "y": 11,
+      "width": 25,
+      "height": 25
+    },
+    {
+      "gid": 2961,
+      "x": 17,
+      "y": 3,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 18,
+      "y": 3,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 17,
+      "y": 5,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 18,
+      "y": 5,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 17,
+      "y": 7,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 18,
+      "y": 7,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 17,
+      "y": 9,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 18,
+      "y": 9,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 17,
+      "y": 11,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2961,
+      "x": 18,
+      "y": 11,
+      "width": 61,
+      "height": 56
+    },
+    {
+      "gid": 2646,
+      "x": 10,
+      "y": 1,
+      "width": 35,
+      "height": 37
     }
   ],
   "walls": [

@@ -14,6 +14,7 @@ impl Renderer {
         let s = state.ui_state.ui_scale;
 
         // Panel sizing - compute height from content
+        let frame_thickness = FRAME_THICKNESS * s;
         let menu_width = 240.0 * s;
 
         // Content height varies by platform:
@@ -25,14 +26,14 @@ impl Renderer {
         let content_height = 306.0 * s;
         #[cfg(target_os = "android")]
         let content_height = 232.0 * s;
-        let menu_height = (FRAME_THICKNESS * 2.0 + content_height).min(sh - 40.0);
+        let menu_height = (frame_thickness * 2.0 + content_height).min(sh - 40.0);
 
         // Position at bottom-right, above menu buttons (matching other panels)
         let button_size = MENU_BUTTON_SIZE * s;
         let exp_bar_gap = EXP_BAR_GAP * s;
         let button_area_height = button_size + exp_bar_gap;
-        let menu_x = (sw - menu_width - 8.0).floor();
-        let menu_y = (sh - button_area_height - menu_height - 8.0).floor();
+        let menu_x = sw - menu_width - 8.0;
+        let menu_y = sh - button_area_height - menu_height - 8.0;
 
         // ===== PANEL FRAME =====
         self.draw_panel_frame(menu_x, menu_y, menu_width, menu_height);
@@ -41,17 +42,17 @@ impl Renderer {
         // ===== HEADER =====
         let header_height = 24.0 * s;
         draw_rectangle(
-            menu_x + FRAME_THICKNESS,
-            menu_y + FRAME_THICKNESS,
-            menu_width - FRAME_THICKNESS * 2.0,
+            menu_x + frame_thickness,
+            menu_y + frame_thickness,
+            menu_width - frame_thickness * 2.0,
             header_height,
             HEADER_BG,
         );
         draw_line(
-            menu_x + FRAME_THICKNESS,
-            menu_y + FRAME_THICKNESS + header_height,
-            menu_x + menu_width - FRAME_THICKNESS,
-            menu_y + FRAME_THICKNESS + header_height,
+            menu_x + frame_thickness,
+            menu_y + frame_thickness + header_height,
+            menu_x + menu_width - frame_thickness,
+            menu_y + frame_thickness + header_height,
             1.0,
             HEADER_BORDER,
         );
@@ -62,7 +63,7 @@ impl Renderer {
         self.draw_text_sharp(
             title,
             (menu_x + (menu_width - title_width) / 2.0).floor(),
-            (menu_y + FRAME_THICKNESS + 17.0 * s).floor(),
+            (menu_y + frame_thickness + 17.0 * s).floor(),
             16.0,
             TEXT_TITLE,
         );
@@ -71,14 +72,14 @@ impl Renderer {
         let (mouse_x, mouse_y) = mouse_position();
 
         // ===== CONTENT AREA =====
-        let content_x = menu_x + FRAME_THICKNESS + 8.0 * s;
-        let mut y = menu_y + FRAME_THICKNESS + header_height + 8.0 * s;
+        let content_x = menu_x + frame_thickness + 8.0 * s;
+        let mut y = menu_y + frame_thickness + header_height + 8.0 * s;
 
         // Shared dimensions
         let row_height = 26.0 * s;
         let btn_height = 24.0 * s;
         let slider_height = 16.0 * s;
-        let inner_width = menu_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
+        let inner_width = menu_width - frame_thickness * 2.0 - 16.0 * s;
 
         // Helper to draw themed button
         let draw_button = |btn_x: f32,

@@ -693,7 +693,7 @@ sellable = true
 
 [bronze_arrow]
 display_name = "Bronze Arrow"
-sprite = "bronze_arrow"
+sprite = "bronze_arrows"
 description = "Arrows tipped with bronze arrowheads."
 category = "material"
 max_stack = 100
@@ -702,7 +702,7 @@ sellable = true
 
 [iron_arrow]
 display_name = "Iron Arrow"
-sprite = "iron_arrow"
+sprite = "iron_arrows"
 description = "Arrows tipped with iron arrowheads."
 category = "material"
 max_stack = 100
@@ -711,7 +711,7 @@ sellable = true
 
 [steel_arrow]
 display_name = "Steel Arrow"
-sprite = "steel_arrow"
+sprite = "steel_arrows"
 description = "Arrows tipped with steel arrowheads."
 category = "material"
 max_stack = 100
