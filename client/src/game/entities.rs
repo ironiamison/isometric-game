@@ -373,17 +373,29 @@ impl Player {
             return;
         }
 
-        // Teleport detection. For high-ping local play, allow a slightly larger
-        // visual divergence before hard snap to reduce perceived "rubber band."
+        // Teleport detection. For local play, prefer soft correction when
+        // we're only a few tiles off, and reserve hard snaps for truly large
+        // divergences (map transitions, respawns, etc.).
+        let softness = local_reconciliation_softness.clamp(1.0, 2.5);
         let teleport_snap_distance = if is_local_player {
-            2.0 * local_reconciliation_softness.clamp(1.0, 1.75)
+            2.0 * softness
         } else {
             2.0
         };
+        let hard_snap_distance = if is_local_player {
+            6.0 * softness
+        } else {
+            teleport_snap_distance
+        };
         let dist = ((self.x - x).powi(2) + (self.y - y).powi(2)).sqrt();
-        if dist > teleport_snap_distance {
+        if dist > hard_snap_distance {
             self.x = x;
             self.y = y;
+            self.target_x = x;
+            self.target_y = y;
+            return;
+        }
+        if is_local_player && dist > teleport_snap_distance {
             self.target_x = x;
             self.target_y = y;
             return;

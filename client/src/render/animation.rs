@@ -1504,17 +1504,20 @@ pub fn get_hair_offset(
     };
 
     // Apply gender-specific adjustments
-    let gender_adjust_x = match gender {
-        Gender::Male => 0.0,
+    let (gender_adjust_x, gender_adjust_y) = match gender {
+        Gender::Male => (0.0, 0.0),
         Gender::Female => {
             // Female hair needs adjustment for left and up directions
-            match direction {
+            let x_adj = match direction {
                 Direction::Up => -1.0,  // Move 1px to the left
                 Direction::Left => 1.0, // Mirror: move 1px to the right (since sprite is flipped)
                 _ => 0.0,
-            }
+            };
+            // Female hair needs to be 3px higher when sitting on chair
+            let y_adj = if is_sitting_chair { -3.0 } else { 0.0 };
+            (x_adj, y_adj)
         }
     };
 
-    (base_x + gender_adjust_x, base_y + sit_offset_y)
+    (base_x + gender_adjust_x, base_y + sit_offset_y + gender_adjust_y)
 }

@@ -6746,8 +6746,14 @@ impl Renderer {
 
         let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
         let zoom = camera.zoom;
+        let sit_offset_y =
+            if player.animation.state == crate::render::animation::AnimationState::SittingChair {
+                10.0 * zoom
+            } else {
+                0.0
+            };
         let player_draw_x = screen_x - SPRITE_WIDTH * zoom / 2.0;
-        let player_draw_y = screen_y - SPRITE_HEIGHT * zoom + 16.0 * zoom;
+        let player_draw_y = screen_y - SPRITE_HEIGHT * zoom + 16.0 * zoom + sit_offset_y;
 
         let rt_screen_x = player_draw_x - SILHOUETTE_ANCHOR_X * zoom;
         let rt_screen_y = player_draw_y - SILHOUETTE_ANCHOR_Y * zoom;
