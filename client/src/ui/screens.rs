@@ -420,6 +420,8 @@ pub struct LoginScreen {
     remember_me: bool,
     // Auto-focus: show keyboard on first frame
     keyboard_shown: bool,
+    // Alpha for the starry background (1.0 = full stars, 0.0 = no stars, world shows through)
+    stars_alpha: f32,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -478,12 +480,18 @@ impl LoginScreen {
             loading: false,
             remember_me,
             keyboard_shown: false,
+            stars_alpha: 1.0,
         }
     }
 
     /// Use pre-loaded font from the renderer (avoids duplicate loading)
     pub fn use_renderer_font(&mut self, font: BitmapFont) {
         self.font = font;
+    }
+
+    /// Set the alpha for the starry background (1.0 = full stars, 0.0 = hidden for world backdrop)
+    pub fn set_stars_alpha(&mut self, alpha: f32) {
+        self.stars_alpha = alpha;
     }
 
     /// Load font and logo asynchronously - call this after creating the screen
@@ -868,55 +876,64 @@ impl Screen for LoginScreen {
 
         // === ANIMATED BACKGROUND SCENE ===
 
-        // Night sky gradient (full screen)
-        let sky_steps = 20;
-        for i in 0..sky_steps {
-            let frac = i as f32 / sky_steps as f32;
-            let r = (10.0 + frac * 15.0) as u8;
-            let g = (12.0 + frac * 8.0) as u8;
-            let b = (40.0 - frac * 10.0) as u8;
-            let y = frac * sh;
-            let h = sh / sky_steps as f32 + 1.0;
-            draw_rectangle(0.0, y, sw, h, Color::from_rgba(r, g, b, 255));
-        }
+        let sa = self.stars_alpha;
+        if sa > 0.001 {
+            // Night sky gradient (full screen)
+            let sky_steps = 20;
+            for i in 0..sky_steps {
+                let frac = i as f32 / sky_steps as f32;
+                let r = (10.0 + frac * 15.0) as u8;
+                let g = (12.0 + frac * 8.0) as u8;
+                let b = (40.0 - frac * 10.0) as u8;
+                let y = frac * sh;
+                let h = sh / sky_steps as f32 + 1.0;
+                draw_rectangle(
+                    0.0,
+                    y,
+                    sw,
+                    h,
+                    Color::from_rgba(r, g, b, (255.0 * sa) as u8),
+                );
+            }
 
-        // Twinkling stars
-        for &(sx, sy, phase) in &self.stars {
-            let alpha = ((t * 1.5 + phase).sin() * 0.5 + 0.5) * 0.9 + 0.1;
-            let size = if alpha > 0.7 { 2.0 } else { 1.0 };
-            draw_rectangle(
-                sx * sw,
-                sy * sh,
-                size,
-                size,
-                Color::new(1.0, 1.0, 0.95, alpha),
-            );
-        }
+            // Twinkling stars
+            for &(sx, sy, phase) in &self.stars {
+                let alpha = (((t * 1.5 + phase).sin() * 0.5 + 0.5) * 0.9 + 0.1) * sa;
+                let size = if alpha > 0.7 * sa { 2.0 } else { 1.0 };
+                draw_rectangle(
+                    sx * sw,
+                    sy * sh,
+                    size,
+                    size,
+                    Color::new(1.0, 1.0, 0.95, alpha),
+                );
+            }
 
-        // Shooting stars
-        for s in &self.shooting_stars {
-            let alpha = s.life.min(1.0);
-            let speed = (s.vx * s.vx + s.vy * s.vy).sqrt();
-            let dx = -s.vx / speed * s.length;
-            let dy = -s.vy / speed * s.length;
-            // Bright head
-            draw_line(
-                s.x,
-                s.y,
-                s.x + dx * 0.3,
-                s.y + dy * 0.3,
-                2.0,
-                Color::new(1.0, 1.0, 1.0, alpha),
-            );
-            // Fading tail
-            draw_line(
-                s.x + dx * 0.3,
-                s.y + dy * 0.3,
-                s.x + dx,
-                s.y + dy,
-                1.0,
-                Color::new(0.8, 0.85, 1.0, alpha * 0.4),
-            );
+            // Shooting stars
+            for s in &self.shooting_stars {
+                let alpha = s.life.min(1.0) * sa;
+                let speed = (s.vx * s.vx + s.vy * s.vy).sqrt();
+                let dx = -s.vx / speed * s.length;
+                let dy = -s.vy / speed * s.length;
+                // Bright head
+                draw_line(
+                    s.x,
+                    s.y,
+                    s.x + dx * 0.3,
+                    s.y + dy * 0.3,
+                    2.0,
+                    Color::new(1.0, 1.0, 1.0, alpha),
+                );
+                // Fading tail
+                draw_line(
+                    s.x + dx * 0.3,
+                    s.y + dy * 0.3,
+                    s.x + dx,
+                    s.y + dy,
+                    1.0,
+                    Color::new(0.8, 0.85, 1.0, alpha * 0.4),
+                );
+            }
         }
 
         // === FORM OVERLAY ===

@@ -1749,6 +1749,9 @@ pub struct GameState {
     pub tutorial: Option<TutorialManager>,
     /// Flag set by the welcome message handler when is_new_character is true
     pub tutorial_pending: bool,
+
+    /// Whether this GameState is in spectator mode (login screen world view)
+    pub spectator_mode: bool,
 }
 
 impl GameState {
@@ -1849,6 +1852,7 @@ impl GameState {
             world_was_ready: false,
             tutorial: None,
             tutorial_pending: false,
+            spectator_mode: false,
         }
     }
 
@@ -2221,6 +2225,11 @@ impl GameState {
 
     /// Returns true when the world is ready to render (player exists and their chunk is loaded)
     pub fn is_world_ready(&self) -> bool {
+        if self.spectator_mode {
+            // In spectator mode, check if spawn chunk is loaded (no local player)
+            let spawn_chunk = crate::game::chunk::ChunkCoord::from_world(15, 4);
+            return self.chunk_manager.chunks().contains_key(&spawn_chunk);
+        }
         if let Some(player) = self.get_local_player() {
             if self.current_instance.is_some() {
                 // Interiors are loaded as a single chunk at (0,0) regardless of player position

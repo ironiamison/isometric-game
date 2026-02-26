@@ -91,12 +91,74 @@ fn icon_from_image(image: image::DynamicImage) -> miniquad::conf::Icon {
     }
 }
 
+/// Spectator state for login/character select screens — streams the world behind the UI.
+#[cfg(not(target_arch = "wasm32"))]
+struct SpectatorState {
+    game_state: GameState,
+    network: NetworkClient,
+    camera: game::SpectatorCamera,
+    crossfade_alpha: f32, // 0.0 = stars fully visible, 1.0 = world fully visible
+    world_ready: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl SpectatorState {
+    fn new() -> Self {
+        let mut game_state = GameState::new();
+        game_state.spectator_mode = true;
+        let network = NetworkClient::new_spectator(WS_URL);
+        Self {
+            game_state,
+            network,
+            camera: game::SpectatorCamera::new(),
+            crossfade_alpha: 0.0,
+            world_ready: false,
+        }
+    }
+
+    fn update(&mut self, dt: f32) {
+        // Poll network messages into game state
+        self.network.poll(&mut self.game_state);
+
+        // Update spectator camera
+        let (cx, cy) = self.camera.update(dt);
+        self.game_state.camera.x = cx;
+        self.game_state.camera.y = cy;
+        self.game_state.camera.zoom = 1.0;
+        self.game_state.camera.initialized = true;
+
+        // Request chunks around camera position (spectator has no local player)
+        let chunks_to_request = self
+            .game_state
+            .chunk_manager
+            .update_player_position(cx, cy);
+        for coord in chunks_to_request {
+            self.network
+                .send(&network::messages::ClientMessage::RequestChunk {
+                    chunk_x: coord.x,
+                    chunk_y: coord.y,
+                });
+        }
+        self.game_state.chunk_manager.unload_distant_chunks();
+
+        // Check world readiness and drive crossfade
+        if !self.world_ready && self.game_state.is_world_ready() {
+            self.world_ready = true;
+        }
+
+        if self.world_ready {
+            // Fade in over ~1.5 seconds
+            self.crossfade_alpha = (self.crossfade_alpha + dt / 1.5).min(1.0);
+        }
+    }
+}
+
 /// Application state for native builds
 #[cfg(not(target_arch = "wasm32"))]
 enum AppState {
-    Login(LoginScreen),
-    CharacterSelect(CharacterSelectScreen),
-    CharacterCreate(CharacterCreateScreen),
+    Login(LoginScreen, Option<SpectatorState>),
+    CharacterSelect(CharacterSelectScreen, Option<SpectatorState>),
+    CharacterCreate(CharacterCreateScreen, Option<SpectatorState>),
     Playing {
         game_state: GameState,
         network: NetworkClient,
@@ -146,7 +208,8 @@ async fn main() {
         let mut login_screen = LoginScreen::new(SERVER_URL);
         login_screen.use_renderer_font(renderer.font().clone());
         login_screen.load_font().await;
-        let mut app_state = AppState::Login(login_screen);
+        let spectator = SpectatorState::new();
+        let mut app_state = AppState::Login(login_screen, Some(spectator));
         let mut last_next_frame_ms: f64 = 0.0;
 
         loop {
@@ -162,8 +225,24 @@ async fn main() {
             }
 
             match &mut app_state {
-                AppState::Login(screen) => {
+                AppState::Login(screen, spectator) => {
+                    let dt = get_frame_time();
+
+                    // Update spectator world view behind login screen
+                    if let Some(spec) = spectator.as_mut() {
+                        spec.update(dt);
+                        screen.set_stars_alpha(1.0 - spec.crossfade_alpha);
+                    }
+
                     let result = screen.update(&audio);
+
+                    // Render: world backdrop first (if spectator ready), then login screen on top
+                    if let Some(spec) = spectator.as_mut() {
+                        if spec.world_ready {
+                            clear_background(Color::from_rgba(30, 30, 40, 255));
+                            renderer.render(&spec.game_state);
+                        }
+                    }
                     screen.render();
 
                     match result {
@@ -177,9 +256,13 @@ async fn main() {
                                 renderer.equipment_sprites().clone(),
                             );
                             char_screen.load_font().await;
-                            app_state = AppState::CharacterSelect(char_screen);
+                            app_state = AppState::CharacterSelect(char_screen, spectator.take());
                         }
                         ScreenState::StartGuestMode => {
+                            // Disconnect spectator if active
+                            if let Some(mut spec) = spectator.take() {
+                                spec.network.disconnect();
+                            }
                             // Guest mode - connect without auth
                             let mut game_state = GameState::new();
                             // Sync audio settings to UI state
@@ -233,8 +316,23 @@ async fn main() {
                     }
                 }
 
-                AppState::CharacterSelect(screen) => {
+                AppState::CharacterSelect(screen, spectator) => {
+                    let dt = get_frame_time();
+
+                    // Update spectator world view behind character select
+                    if let Some(spec) = spectator.as_mut() {
+                        spec.update(dt);
+                    }
+
                     let result = screen.update(&audio);
+
+                    // Render: world backdrop first (if spectator ready), then screen on top
+                    if let Some(spec) = spectator.as_mut() {
+                        if spec.world_ready {
+                            clear_background(Color::from_rgba(30, 30, 40, 255));
+                            renderer.render(&spec.game_state);
+                        }
+                    }
                     screen.render();
 
                     match result {
@@ -243,7 +341,120 @@ async fn main() {
                             character_id,
                             character_name,
                         } => {
-                            // Start game with selected character
+                            // Try to upgrade spectator connection, fall back to fresh connection
+                            if let Some(mut spec) = spectator.take() {
+                                // HTTP matchmake to get session_token for upgrade
+                                let http_url = WS_URL
+                                    .replace("ws://", "http://")
+                                    .replace("wss://", "https://");
+                                let matchmake_url = format!(
+                                    "{}/matchmake/joinOrCreate/game_room",
+                                    http_url
+                                );
+                                let body = serde_json::json!({
+                                    "character_id": character_id,
+                                });
+                                let result = ureq::post(&matchmake_url)
+                                    .set(
+                                        "Authorization",
+                                        &format!("Bearer {}", session.token),
+                                    )
+                                    .set("Content-Type", "application/json")
+                                    .send_json(&body);
+
+                                match result {
+                                    Ok(response) => {
+                                        if let Ok(data) =
+                                            response.into_json::<serde_json::Value>()
+                                        {
+                                            if let Some(token) =
+                                                data["session_token"].as_str()
+                                            {
+                                                // Send upgrade over existing spectator WS
+                                                spec.network.send_spectator_upgrade(token);
+
+                                                // Reuse spectator's game state (chunks already loaded!)
+                                                let mut game_state = spec.game_state;
+                                                game_state.spectator_mode = false;
+                                                game_state.selected_character_name =
+                                                    Some(character_name);
+                                                // Sync audio settings to UI state
+                                                game_state.ui_state.audio_volume =
+                                                    audio.music_volume();
+                                                game_state.ui_state.audio_sfx_volume =
+                                                    audio.sfx_volume();
+                                                game_state.ui_state.audio_muted =
+                                                    audio.is_muted();
+                                                game_state.ui_state.classic_controls =
+                                                    settings::load_classic_controls();
+                                                // Load persisted UI settings
+                                                let ui_settings = settings::load_ui_settings();
+                                                game_state.camera.zoom = ui_settings.zoom;
+                                                game_state.ui_state.ui_scale =
+                                                    ui_settings.ui_scale;
+                                                game_state.ui_state.shift_drop_enabled =
+                                                    ui_settings.shift_drop_enabled;
+                                                game_state.ui_state.chat_log_visible =
+                                                    ui_settings.chat_log_visible;
+                                                game_state.ui_state.tap_to_pathfind =
+                                                    ui_settings.tap_to_pathfind;
+                                                game_state.ui_state.use_joystick =
+                                                    ui_settings.use_joystick;
+                                                game_state.ui_state.graphics_low =
+                                                    ui_settings.graphics_low;
+                                                game_state.ui_state.chat_log_background =
+                                                    ui_settings.chat_log_background;
+                                                game_state.ui_state.hotkey_bar =
+                                                    ui_settings.hotkey_bar;
+                                                if game_state.ui_state.classic_controls {
+                                                    game_state.ui_state.chat_open = true;
+                                                }
+                                                if !settings::load_control_scheme_chosen() {
+                                                    game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
+                                                        quest_id: "__control_scheme__".to_string(),
+                                                        npc_id: String::new(),
+                                                        speaker: "Control Scheme".to_string(),
+                                                        text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
+                                                        choices: vec![
+                                                            game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space + Enter)".to_string() },
+                                                            game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl + Always-on Chat)".to_string() },
+                                                        ],
+                                                        show_time: get_time(),
+                                                    });
+                                                }
+
+                                                let mut input_handler = InputHandler::new();
+                                                input_handler.load_touch_icons().await;
+
+                                                // Start background music
+                                                audio
+                                                    .play_music("assets/audio/start.ogg")
+                                                    .await;
+
+                                                app_state = AppState::Playing {
+                                                    game_state,
+                                                    network: spec.network,
+                                                    input_handler,
+                                                    _session: session,
+                                                };
+                                                continue;
+                                            }
+                                        }
+                                        // JSON parse failed — fall through to fresh connection
+                                        log::error!("Matchmake for upgrade: bad response format");
+                                        spec.network.disconnect();
+                                    }
+                                    Err(e) => {
+                                        log::error!(
+                                            "Matchmake for upgrade failed: {}",
+                                            e
+                                        );
+                                        spec.network.disconnect();
+                                    }
+                                }
+                            }
+
+                            // Fallback: fresh connection (no spectator or upgrade failed)
                             let mut game_state = GameState::new();
                             game_state.selected_character_name = Some(character_name);
                             // Sync audio settings to UI state
@@ -307,20 +518,35 @@ async fn main() {
                                 renderer.hair_sprites().clone(),
                             );
                             create_screen.load_font().await;
-                            app_state = AppState::CharacterCreate(create_screen);
+                            app_state = AppState::CharacterCreate(create_screen, spectator.take());
                         }
                         ScreenState::ToLogin => {
                             let mut login_screen = LoginScreen::new(SERVER_URL);
                             login_screen.use_renderer_font(renderer.font().clone());
                             login_screen.load_font().await;
-                            app_state = AppState::Login(login_screen);
+                            app_state = AppState::Login(login_screen, spectator.take());
                         }
                         _ => {}
                     }
                 }
 
-                AppState::CharacterCreate(screen) => {
+                AppState::CharacterCreate(screen, spectator) => {
+                    let dt = get_frame_time();
+
+                    // Update spectator world view behind character create
+                    if let Some(spec) = spectator.as_mut() {
+                        spec.update(dt);
+                    }
+
                     let result = screen.update(&audio);
+
+                    // Render: world backdrop first (if spectator ready), then screen on top
+                    if let Some(spec) = spectator.as_mut() {
+                        if spec.world_ready {
+                            clear_background(Color::from_rgba(30, 30, 40, 255));
+                            renderer.render(&spec.game_state);
+                        }
+                    }
                     screen.render();
 
                     match result {
@@ -333,7 +559,7 @@ async fn main() {
                                 renderer.equipment_sprites().clone(),
                             );
                             char_screen.load_font().await;
-                            app_state = AppState::CharacterSelect(char_screen);
+                            app_state = AppState::CharacterSelect(char_screen, spectator.take());
                         }
                         _ => {}
                     }
@@ -360,7 +586,8 @@ async fn main() {
                         let mut login_screen = LoginScreen::new(SERVER_URL);
                         login_screen.use_renderer_font(renderer.font().clone());
                         login_screen.load_font().await;
-                        app_state = AppState::Login(login_screen);
+                        let spectator = SpectatorState::new();
+                        app_state = AppState::Login(login_screen, Some(spectator));
                         continue;
                     }
 
@@ -372,7 +599,8 @@ async fn main() {
                         let mut login_screen = LoginScreen::new(SERVER_URL);
                         login_screen.use_renderer_font(renderer.font().clone());
                         login_screen.load_font().await;
-                        app_state = AppState::Login(login_screen);
+                        let spectator = SpectatorState::new();
+                        app_state = AppState::Login(login_screen, Some(spectator));
                         continue;
                     }
                 }
