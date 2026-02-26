@@ -1,4 +1,4 @@
-//! Furnace panel rendering — medieval-themed smelting & jewelry UI
+//! Fletching panel rendering — tool-based crafting UI (knife)
 
 use super::super::Renderer;
 use super::common::*;
@@ -7,13 +7,23 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
-// Progress bar colors (kept for smelting animation)
-const FURNACE_PROGRESS_DARK: Color = Color::new(0.55, 0.30, 0.08, 1.0);
-const FURNACE_PROGRESS_MID: Color = Color::new(0.75, 0.42, 0.12, 1.0);
-const FURNACE_PROGRESS_LIGHT: Color = Color::new(0.90, 0.55, 0.18, 1.0);
+// Green-brown progress bar colors for woodworking theme
+const FLETCH_PROGRESS_DARK: Color = Color::new(0.22, 0.40, 0.15, 1.0);
+const FLETCH_PROGRESS_MID: Color = Color::new(0.32, 0.55, 0.22, 1.0);
+const FLETCH_PROGRESS_LIGHT: Color = Color::new(0.45, 0.70, 0.30, 1.0);
+
+/// Returns which recipe sections belong to each fletching tab.
+pub fn fletching_sections_for_tab(tab: u8) -> &'static [&'static str] {
+    match tab {
+        0 => &["shafts"],
+        1 => &["arrows"],
+        2 => &["bows"],
+        _ => &[],
+    }
+}
 
 impl Renderer {
-    pub(crate) fn render_furnace(
+    pub(crate) fn render_fletching(
         &self,
         state: &GameState,
         hovered: &Option<UiElementId>,
@@ -36,7 +46,6 @@ impl Renderer {
 
         let header_h = HEADER_HEIGHT * s;
         let footer_h = FOOTER_HEIGHT * s;
-        let tab_h_scaled = TAB_HEIGHT * s;
 
         // ===== HEADER =====
         let header_x = panel_x + FRAME_THICKNESS;
@@ -69,11 +78,7 @@ impl Renderer {
         }
 
         // Title
-        let title = if state.ui_state.furnace_station_type == "fire_pit" {
-            "FIRE PIT"
-        } else {
-            "FURNACE"
-        };
+        let title = "FLETCHING";
         let title_dims = self.measure_text_sharp(title, 16.0);
         self.draw_text_sharp(
             title,
@@ -89,9 +94,9 @@ impl Renderer {
         let close_btn_x = header_x + header_w - close_btn_size - 6.0 * s;
         let close_btn_y = header_y + (header_h - close_btn_size) / 2.0;
         let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
-        layout.add(UiElementId::FurnaceCloseButton, close_bounds);
+        layout.add(UiElementId::FletchingCloseButton, close_bounds);
 
-        let is_close_hovered = matches!(hovered, Some(UiElementId::FurnaceCloseButton));
+        let is_close_hovered = matches!(hovered, Some(UiElementId::FletchingCloseButton));
         let (close_bg, close_border) = if is_close_hovered {
             (
                 Color::new(0.4, 0.15, 0.15, 1.0),
@@ -115,71 +120,72 @@ impl Renderer {
         draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
         draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
 
-        // ===== TABS (only for furnace, not fire pit) =====
-        let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
+        // ===== TABS =====
         let tab_y = header_y + header_h + 2.0;
-        let tab_h = tab_h_scaled;
+        let tab_h = 28.0 * s;
+        let tab_count = 3;
+        let tab_w = header_w / tab_count as f32;
+        let tab_labels = ["Shafts", "Arrows", "Bows"];
 
-        if !is_fire_pit {
-            let tab_w = header_w / 2.0;
-            let active_tab = state.ui_state.furnace_tab;
+        for (idx, label) in tab_labels.iter().enumerate() {
+            let tx = header_x + idx as f32 * tab_w;
+            let is_active = idx as u8 == state.ui_state.fletching_tab;
+            let has_content = !fletching_sections_for_tab(idx as u8).is_empty();
 
-            let tab_labels = ["Smelting", "Jewelry"];
-            let tab_ids = [UiElementId::FurnaceTabSmelting, UiElementId::FurnaceTabJewelry];
+            let bounds = Rect::new(tx, tab_y, tab_w, tab_h);
+            layout.add(UiElementId::FletchingTab(idx), bounds);
 
-            for (idx, (label, id)) in tab_labels.iter().zip(tab_ids.iter()).enumerate() {
-                let tx = header_x + idx as f32 * tab_w;
-                let is_active = idx as u8 == active_tab;
+            let (tab_bg, tab_text_color) = if is_active {
+                (PANEL_BG_MID, TEXT_TITLE)
+            } else if has_content {
+                (SLOT_BG_EMPTY, Color::new(0.50, 0.50, 0.55, 0.8))
+            } else {
+                (SLOT_BG_EMPTY, Color::new(0.35, 0.35, 0.40, 0.6))
+            };
 
-                let bounds = Rect::new(tx, tab_y, tab_w, tab_h);
-                layout.add(id.clone(), bounds);
+            draw_rectangle(tx, tab_y, tab_w, tab_h, tab_bg);
 
-                let (tab_bg, tab_text_color) = if is_active {
-                    (PANEL_BG_MID, TEXT_TITLE)
-                } else {
-                    (SLOT_BG_EMPTY, TEXT_DIM)
-                };
+            // Border between tabs
+            if idx > 0 {
+                draw_line(tx, tab_y + 4.0 * s, tx, tab_y + tab_h - 4.0 * s, 1.0, SLOT_BORDER);
+            }
 
-                draw_rectangle(tx, tab_y, tab_w, tab_h, tab_bg);
-
-                // Border between tabs
-                if idx > 0 {
-                    draw_line(tx, tab_y + 4.0 * s, tx, tab_y + tab_h - 4.0 * s, 1.0, SLOT_BORDER);
-                }
-
-                // Active tab bottom accent
-                if is_active {
-                    draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 2.0, SLOT_SELECTED_BORDER);
-                } else {
-                    draw_line(tx + 4.0 * s, tab_y + tab_h - 1.0, tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0, 1.0, SLOT_BORDER);
-                }
-
-                let label_dims = self.measure_text_sharp(label, TAB_FONT_SIZE);
-                self.draw_text_sharp(
-                    label,
-                    tx + (tab_w - label_dims.width) / 2.0,
-                    tab_y + tab_h * 0.68,
-                    TAB_FONT_SIZE,
-                    tab_text_color,
+            // Active tab bottom accent (green for fletching)
+            if is_active {
+                draw_line(
+                    tx + 4.0 * s, tab_y + tab_h - 1.0,
+                    tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0,
+                    2.0, Color::new(0.35, 0.75, 0.45, 1.0),
+                );
+            } else {
+                draw_line(
+                    tx + 4.0 * s, tab_y + tab_h - 1.0,
+                    tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0,
+                    1.0, SLOT_BORDER,
                 );
             }
+
+            let label_dims = self.measure_text_sharp(label, TAB_FONT_SIZE);
+            self.draw_text_sharp(
+                label,
+                tx + (tab_w - label_dims.width) / 2.0,
+                tab_y + tab_h * 0.68,
+                TAB_FONT_SIZE,
+                tab_text_color,
+            );
         }
 
         // ===== CONTENT AREA =====
         let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
-        let content_y = if is_fire_pit {
-            tab_y + 4.0 * s // no tabs, content starts right after header
-        } else {
-            tab_y + tab_h + 4.0 * s
-        };
+        let content_y = tab_y + tab_h + 4.0 * s;
         let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
         let content_h = panel_y + panel_height - FRAME_THICKNESS - footer_h - 4.0 * s - content_y;
 
         // If crafting is in progress, show progress overlay
         if state.ui_state.crafting_in_progress {
-            self.render_furnace_progress(state, hovered, layout, content_x, content_y, content_w, content_h);
+            self.render_fletching_progress(state, hovered, layout, content_x, content_y, content_w, content_h);
         } else {
-            self.render_furnace_recipe_list(state, hovered, layout, content_x, content_y, content_w, content_h);
+            self.render_fletching_recipe_list(state, hovered, layout, content_x, content_y, content_w, content_h);
         }
 
         // ===== FOOTER =====
@@ -200,16 +206,15 @@ impl Renderer {
         if state.ui_state.crafting_in_progress {
             self.draw_text_sharp("[Esc] Cancel", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
         } else {
-            let action_label = if is_fire_pit { "[Enter] Cook" } else { "[Enter] Smelt" };
-            self.draw_text_sharp("[Tab] Tab", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[W/S] Select", footer_x + 105.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[1/X/A] Qty", footer_x + 220.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
-            self.draw_text_sharp(action_label, footer_x + 335.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[W/S] Select", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[1/X/A] Qty", footer_x + 110.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Tab] Tab", footer_x + 210.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp("[Enter] Fletch", footer_x + 310.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
         }
     }
 
-    /// Render the list of smelting recipes
-    fn render_furnace_recipe_list(
+    /// Render the list of fletching recipes
+    fn render_fletching_recipe_list(
         &self,
         state: &GameState,
         hovered: &Option<UiElementId>,
@@ -219,43 +224,21 @@ impl Renderer {
         content_w: f32,
         content_h: f32,
     ) {
-        // Filter recipes for active station type + active tab section
-        let station = state.ui_state.furnace_station_type.as_str();
-        let is_fire_pit = station == "fire_pit";
-        let section_filter = if is_fire_pit {
-            "fish" // fire pit only has fish section
-        } else if state.ui_state.furnace_tab == 0 {
-            "materials"
-        } else {
-            "jewelry"
-        };
-        let mut furnace_recipes: Vec<_> = state
+        // Filter recipes: fletching category with knife tool, filtered by active tab
+        let tab_sections = fletching_sections_for_tab(state.ui_state.fletching_tab);
+        let mut fletching_recipes: Vec<_> = state
             .recipe_definitions
             .iter()
-            .filter(|r| r.station.as_deref() == Some(station))
-            .filter(|r| {
-                if is_fire_pit {
-                    true // fire pit: show all recipes (no tab filtering)
-                } else {
-                    r.section.as_deref() == Some(section_filter)
-                }
-            })
-            .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+            .filter(|r| r.category == "fletching" && r.required_tool.as_deref() == Some("knife"))
+            .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
             .collect();
-        furnace_recipes.sort_by_key(|r| r.level_required);
+        fletching_recipes.sort_by_key(|r| r.level_required);
 
         let s = self.font_scale.get();
 
-        if furnace_recipes.is_empty() {
-            let msg = if is_fire_pit {
-                "No cooking recipes available"
-            } else if state.ui_state.furnace_tab == 0 {
-                "No smelting recipes available"
-            } else {
-                "No jewelry recipes available"
-            };
+        if fletching_recipes.is_empty() {
             self.draw_text_sharp(
-                msg,
+                "No fletching recipes available",
                 content_x + 20.0 * s,
                 content_y + 40.0 * s,
                 16.0,
@@ -266,12 +249,12 @@ impl Renderer {
 
         // Register scroll area
         let scroll_bounds = Rect::new(content_x, content_y, content_w, content_h);
-        layout.add(UiElementId::FurnaceScrollArea, scroll_bounds);
+        layout.add(UiElementId::FletchingScrollArea, scroll_bounds);
 
         let row_height = 72.0 * s;
-        let total_content = furnace_recipes.len() as f32 * row_height;
+        let total_content = fletching_recipes.len() as f32 * row_height;
         let max_scroll = (total_content - content_h).max(0.0);
-        let scroll_offset = state.ui_state.furnace_scroll_offset.clamp(0.0, max_scroll);
+        let scroll_offset = state.ui_state.fletching_scroll_offset.clamp(0.0, max_scroll);
 
         // Scissor clipping for scrollable area
         let physical_w = screen_width();
@@ -292,7 +275,7 @@ impl Renderer {
 
         let mut y = content_y - scroll_offset;
 
-        for (i, recipe) in furnace_recipes.iter().enumerate() {
+        for (i, recipe) in fletching_recipes.iter().enumerate() {
             let row_top = y;
             let row_bottom = y + row_height;
 
@@ -302,8 +285,8 @@ impl Renderer {
                 continue;
             }
 
-            let is_selected = i == state.ui_state.furnace_selected_recipe;
-            let is_hovered = matches!(hovered, Some(UiElementId::FurnaceRecipeItem(idx)) if *idx == i);
+            let is_selected = i == state.ui_state.fletching_selected_recipe;
+            let is_hovered = matches!(hovered, Some(UiElementId::FletchingRecipeItem(idx)) if *idx == i);
 
             // Row background
             let row_bg = if is_selected {
@@ -325,7 +308,7 @@ impl Renderer {
 
             // Register click area
             let row_bounds = Rect::new(content_x + 2.0, y + 1.0, content_w - 4.0, row_height - 2.0);
-            layout.add(UiElementId::FurnaceRecipeItem(i), row_bounds);
+            layout.add(UiElementId::FletchingRecipeItem(i), row_bounds);
 
             // Icon (left side)
             let icon_size = 40.0 * s;
@@ -378,11 +361,7 @@ impl Renderer {
             if recipe.level_required > 1 {
                 // Determine level color: green if met, red if not
                 let level_color = if let Some(player) = state.get_local_player() {
-                    let player_level = if is_fire_pit {
-                        player.skills.survivalist.level
-                    } else {
-                        player.skills.smithing.level
-                    };
+                    let player_level = player.skills.survivalist.level;
                     if player_level >= recipe.level_required {
                         Color::new(0.392, 0.784, 0.392, 1.0)
                     } else {
@@ -392,14 +371,10 @@ impl Renderer {
                     TEXT_DIM
                 };
 
-                // Draw small skill icon from spritesheet
+                // Draw small survivalist skill icon from spritesheet
                 let icon_size = 14.0 * s;
                 if let Some(ref texture) = self.ui_icons {
-                    let (icon_col, icon_row) = if is_fire_pit {
-                        (1.0, 5.0) // Survivalist icon
-                    } else {
-                        (5.0, 6.0) // Smithing icon
-                    };
+                    let (icon_col, icon_row) = (1.0, 5.0); // Survivalist icon
                     let src_x = icon_col * 24.0;
                     let src_y = icon_row * 24.0;
                     draw_texture_ex(
@@ -437,46 +412,19 @@ impl Renderer {
                 let separator = if recipe.level_required > 1 { " · " } else { "" };
                 let extra_text = format!("{}{}", separator, extra_parts.join(" · "));
                 self.draw_text_sharp(&extra_text, info_x, info_y, 16.0, TEXT_DIM);
-                info_x += self.measure_text_sharp(&extra_text, 16.0).width;
-            }
-
-            // Show burn chance for cooking recipes
-            if let (Some(ref _burn_result), Some(burn_stop)) =
-                (&recipe.burn_result, recipe.burn_stop_level)
-            {
-                if let Some(player) = state.get_local_player() {
-                    let player_level = player.skills.survivalist.level;
-                    if player_level < burn_stop {
-                        let level_range = (burn_stop - recipe.level_required) as f32;
-                        let burn_pct = if level_range > 0.0 {
-                            ((burn_stop - player_level) as f32 / level_range * 50.0) as i32
-                        } else {
-                            0
-                        };
-                        if burn_pct > 0 {
-                            let burn_text = format!(" · ~{}% burn", burn_pct);
-                            let burn_color = Color::new(0.85, 0.55, 0.15, 1.0); // orange
-                            self.draw_text_sharp(&burn_text, info_x, info_y, 16.0, burn_color);
-                        }
-                    }
-                }
             }
 
             // Level check - show warning if too low
             if recipe.level_required > 1 {
                 if let Some(player) = state.get_local_player() {
-                    let player_level = if is_fire_pit {
-                        player.skills.survivalist.level
-                    } else {
-                        player.skills.smithing.level
-                    };
+                    let player_level = player.skills.survivalist.level;
                     if player_level < recipe.level_required {
                         can_craft = false;
                     }
                 }
             }
 
-            // Right side: quantity buttons + smelt button (only for selected recipe)
+            // Right side: quantity buttons + fletch button (only for selected recipe)
             if is_selected {
                 let right_x = content_x + content_w - 170.0 * s;
 
@@ -486,11 +434,10 @@ impl Renderer {
                 let qty_y = y + 6.0 * s;
                 let qty_labels = ["1", "X", "All"];
                 let qty_ids = [
-                    UiElementId::FurnaceQuantity1,
-                    UiElementId::FurnaceQuantityX,
-                    UiElementId::FurnaceQuantityAll,
+                    UiElementId::FletchingQuantity1,
+                    UiElementId::FletchingQuantityX,
+                    UiElementId::FletchingQuantityAll,
                 ];
-                let _qty_values: [u32; 3] = [1, 0, u32::MAX]; // 0 = custom X
 
                 for (j, (label, id)) in qty_labels.iter().zip(qty_ids.iter()).enumerate() {
                     let bx = right_x + j as f32 * (qty_btn_w + 4.0 * s);
@@ -498,9 +445,9 @@ impl Renderer {
                     layout.add(id.clone(), bounds);
 
                     let is_qty_active = match j {
-                        0 => state.ui_state.furnace_quantity == 1,
-                        2 => state.ui_state.furnace_quantity == u32::MAX,
-                        _ => state.ui_state.furnace_quantity != 1 && state.ui_state.furnace_quantity != u32::MAX,
+                        0 => state.ui_state.fletching_quantity == 1,
+                        2 => state.ui_state.fletching_quantity == u32::MAX,
+                        _ => state.ui_state.fletching_quantity != 1 && state.ui_state.fletching_quantity != u32::MAX,
                     };
                     let is_qty_hovered = hovered.as_ref() == Some(id);
 
@@ -527,74 +474,70 @@ impl Renderer {
                 }
 
                 // Quantity display
-                let qty_display = if state.ui_state.furnace_quantity == u32::MAX {
+                let qty_display = if state.ui_state.fletching_quantity == u32::MAX {
                     "All".to_string()
                 } else {
-                    format!("x{}", state.ui_state.furnace_quantity)
+                    format!("x{}", state.ui_state.fletching_quantity)
                 };
                 let qty_disp_x = right_x + 3.0 * (qty_btn_w + 4.0 * s) + 4.0 * s;
                 self.draw_text_sharp(&qty_display, qty_disp_x, qty_y + qty_btn_h * 0.73, 16.0, TEXT_NORMAL);
 
-                // SMELT button (green, like shop Buy)
-                let smelt_btn_w = 100.0 * s;
-                let smelt_btn_h = 26.0 * s;
-                let smelt_btn_x = right_x + 4.0 * s;
-                let smelt_btn_y = y + row_height - smelt_btn_h - 8.0 * s;
+                // FLETCH button (green)
+                let fletch_btn_w = 100.0 * s;
+                let fletch_btn_h = 26.0 * s;
+                let fletch_btn_x = right_x + 4.0 * s;
+                let fletch_btn_y = y + row_height - fletch_btn_h - 8.0 * s;
 
                 if can_craft {
-                    let bounds = Rect::new(smelt_btn_x, smelt_btn_y, smelt_btn_w, smelt_btn_h);
-                    layout.add(UiElementId::FurnaceSmeltButton, bounds);
+                    let bounds = Rect::new(fletch_btn_x, fletch_btn_y, fletch_btn_w, fletch_btn_h);
+                    layout.add(UiElementId::FletchingFletchButton, bounds);
                 }
 
-                let is_smelt_hovered = can_craft && matches!(hovered, Some(UiElementId::FurnaceSmeltButton));
+                let is_fletch_hovered = can_craft && matches!(hovered, Some(UiElementId::FletchingFletchButton));
                 let (btn_bg, btn_border) = if !can_craft {
                     (Color::new(0.12, 0.08, 0.06, 1.0), SLOT_BORDER)
-                } else if is_smelt_hovered {
+                } else if is_fletch_hovered {
                     (Color::new(0.2, 0.5, 0.2, 1.0), Color::new(0.3, 0.7, 0.3, 1.0))
                 } else {
                     (Color::new(0.15, 0.4, 0.15, 1.0), Color::new(0.25, 0.6, 0.25, 1.0))
                 };
 
-                draw_rectangle(smelt_btn_x, smelt_btn_y, smelt_btn_w, smelt_btn_h, btn_border);
+                draw_rectangle(fletch_btn_x, fletch_btn_y, fletch_btn_w, fletch_btn_h, btn_border);
                 draw_rectangle(
-                    smelt_btn_x + 1.0,
-                    smelt_btn_y + 1.0,
-                    smelt_btn_w - 2.0,
-                    smelt_btn_h - 2.0,
+                    fletch_btn_x + 1.0,
+                    fletch_btn_y + 1.0,
+                    fletch_btn_w - 2.0,
+                    fletch_btn_h - 2.0,
                     btn_bg,
                 );
 
                 if can_craft {
                     // Top highlight
                     draw_line(
-                        smelt_btn_x + 2.0,
-                        smelt_btn_y + 2.0,
-                        smelt_btn_x + smelt_btn_w - 2.0,
-                        smelt_btn_y + 2.0,
+                        fletch_btn_x + 2.0,
+                        fletch_btn_y + 2.0,
+                        fletch_btn_x + fletch_btn_w - 2.0,
+                        fletch_btn_y + 2.0,
                         1.0,
                         Color::new(0.3, 0.7, 0.3, 1.0),
                     );
                 }
 
-                let smelt_text = if is_fire_pit {
-                    if can_craft { "[ COOK ]" } else { "Can't Cook" }
-                } else {
-                    if can_craft { "[ SMELT ]" } else { "Can't Smelt" }
-                };
-                let smelt_text_w = self.measure_text_sharp(smelt_text, 16.0).width;
-                let smelt_text_color = if !can_craft {
+                let fletch_text = if can_craft { "[ FLETCH ]" } else { "Can't Fletch" };
+                let fletch_text_w = self.measure_text_sharp(fletch_text, 16.0).width;
+                let fletch_text_color = if !can_craft {
                     Color::new(0.5, 0.3, 0.3, 1.0)
-                } else if is_smelt_hovered {
+                } else if is_fletch_hovered {
                     WHITE
                 } else {
                     Color::new(0.3, 0.7, 0.3, 1.0)
                 };
                 self.draw_text_sharp(
-                    smelt_text,
-                    smelt_btn_x + (smelt_btn_w - smelt_text_w) / 2.0,
-                    smelt_btn_y + smelt_btn_h * 0.69,
+                    fletch_text,
+                    fletch_btn_x + (fletch_btn_w - fletch_text_w) / 2.0,
+                    fletch_btn_y + fletch_btn_h * 0.69,
                     16.0,
-                    smelt_text_color,
+                    fletch_text_color,
                 );
             }
 
@@ -637,19 +580,19 @@ impl Renderer {
             let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0 * s);
             let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
-            let is_dragging = state.ui_state.furnace_scroll_drag.dragging;
-            let is_hovered = matches!(hovered, Some(UiElementId::FurnaceScrollbar));
+            let is_dragging = state.ui_state.fletching_scroll_drag.dragging;
+            let is_hovered = matches!(hovered, Some(UiElementId::FletchingScrollbar));
             let thumb_color = if is_dragging || is_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
             draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
             layout.add_scrollbar(
-                UiElementId::FurnaceScrollbar,
+                UiElementId::FletchingScrollbar,
                 Rect::new(scrollbar_x, scrollbar_y, scrollbar_w, scrollbar_track_h),
             );
         }
     }
 
-    /// Render smelting progress overlay
-    fn render_furnace_progress(
+    /// Render fletching progress overlay
+    fn render_fletching_progress(
         &self,
         state: &GameState,
         _hovered: &Option<UiElementId>,
@@ -664,8 +607,7 @@ impl Renderer {
         let time = get_time() as f32;
 
         // Progress text with pulsing ellipsis
-        let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
-        let base_text = if is_fire_pit { "COOKING" } else { "SMELTING" };
+        let base_text = "FLETCHING";
         let dots = match ((time * 2.0) as i32) % 4 {
             0 => format!("{}", base_text),
             1 => format!("{}.", base_text),
@@ -752,16 +694,16 @@ impl Renderer {
             SLOT_INNER_SHADOW,
         );
 
-        // Bar fill (ember gradient)
+        // Bar fill (green-brown gradient for woodworking)
         let fill_width = (bar_width - 4.0) * progress;
         if fill_width > 0.0 {
             let fill_x = bar_x + 2.0;
             let fill_y = bar_y + 2.0;
             let fill_h = bar_height - 4.0;
 
-            draw_rectangle(fill_x, fill_y, fill_width, fill_h, FURNACE_PROGRESS_DARK);
-            draw_rectangle(fill_x, fill_y, fill_width, fill_h / 2.0, FURNACE_PROGRESS_MID);
-            draw_line(fill_x, fill_y, fill_x + fill_width, fill_y, 1.0, FURNACE_PROGRESS_LIGHT);
+            draw_rectangle(fill_x, fill_y, fill_width, fill_h, FLETCH_PROGRESS_DARK);
+            draw_rectangle(fill_x, fill_y, fill_width, fill_h / 2.0, FLETCH_PROGRESS_MID);
+            draw_line(fill_x, fill_y, fill_x + fill_width, fill_y, 1.0, FLETCH_PROGRESS_LIGHT);
         }
 
         // Percentage
@@ -782,9 +724,9 @@ impl Renderer {
         let cancel_y = area_y + area_h - 42.0 * s;
 
         let cancel_bounds = Rect::new(cancel_x, cancel_y, cancel_w, cancel_h);
-        layout.add(UiElementId::FurnaceCancelButton, cancel_bounds);
+        layout.add(UiElementId::FletchingCancelButton, cancel_bounds);
 
-        let is_cancel_hovered = matches!(_hovered, Some(UiElementId::FurnaceCancelButton));
+        let is_cancel_hovered = matches!(_hovered, Some(UiElementId::FletchingCancelButton));
         let (cancel_bg, cancel_border) = if is_cancel_hovered {
             (Color::new(0.45, 0.15, 0.15, 1.0), Color::new(0.6, 0.2, 0.2, 1.0))
         } else {

@@ -3116,6 +3116,11 @@
       "x": 7,
       "y": 28,
       "level": 1
+    },
+    {
+      "entityId": "fire_pit",
+      "x": 15,
+      "y": 26
     }
   ],
   "mapObjects": [

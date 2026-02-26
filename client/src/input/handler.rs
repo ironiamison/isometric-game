@@ -958,6 +958,11 @@ pub enum InputCommand {
         recipe_id: String,
         quantity: u32,
     },
+    // Fletching commands
+    FletchingCraft {
+        recipe_id: String,
+        quantity: u32,
+    },
     // Slayer commands
     SlayerGetTask {
         master_id: String,
@@ -1259,6 +1264,7 @@ impl InputHandler {
             || state.ui_state.crafting_open
             || state.ui_state.furnace_open
             || state.ui_state.anvil_open
+            || state.ui_state.fletching_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
             || state.ui_state.chest_open
@@ -1270,6 +1276,7 @@ impl InputHandler {
         let hide_direction_controls = state.ui_state.crafting_open
             || state.ui_state.furnace_open
             || state.ui_state.anvil_open
+            || state.ui_state.fletching_open
             || state.ui_state.shop_data.is_some()
             || state.ui_state.bank_open
             || state.ui_state.chest_open
@@ -1859,7 +1866,7 @@ impl InputHandler {
                 ContextMenuTarget::EquipmentSlot(_) => 1,
                 ContextMenuTarget::Gold => 1,
                 ContextMenuTarget::InventorySlot(slot_index) => {
-                    let (is_equippable, is_bones) = state
+                    let (is_equippable, is_bones, is_knife) = state
                         .inventory
                         .slots
                         .get(*slot_index)
@@ -1868,11 +1875,12 @@ impl InputHandler {
                             let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
                             let equippable = item_def.equipment.is_some();
                             let bones = slot.item_id.contains("bones");
-                            (equippable, bones)
+                            let knife = slot.item_id == "knife";
+                            (equippable, bones, knife)
                         })
-                        .unwrap_or((false, false));
+                        .unwrap_or((false, false, false));
                     let has_deposit = state.ui_state.chest_open;
-                    1 + if is_equippable { 1 } else { 0 } + if is_bones { 1 } else { 0 } + if has_deposit { 1 } else { 0 }
+                    1 + if is_equippable { 1 } else { 0 } + if is_bones { 1 } else { 0 } + if is_knife { 1 } else { 0 } + if has_deposit { 1 } else { 0 }
                 }
                 ContextMenuTarget::Player { .. } => 4,
                 ContextMenuTarget::Npc { id } => {
@@ -1953,7 +1961,7 @@ impl InputHandler {
                                 ContextMenuTarget::InventorySlot(slot_index) => {
                                     // Inventory slot context menu
                                     // Determine menu options based on item type
-                                    let (is_equippable, is_bones, is_dig, has_item) = state
+                                    let (is_equippable, is_bones, is_dig, is_knife, has_item) = state
                                         .inventory
                                         .slots
                                         .get(*slot_index)
@@ -1965,12 +1973,13 @@ impl InputHandler {
                                             let equippable = item_def.equipment.is_some();
                                             let bones = slot.item_id.contains("bones");
                                             let dig = item_def.use_effect.as_deref() == Some("dig");
-                                            (equippable, bones, dig, true)
+                                            let knife = slot.item_id == "knife";
+                                            (equippable, bones, dig, knife, true)
                                         })
-                                        .unwrap_or((false, false, false, false));
+                                        .unwrap_or((false, false, false, false, false));
                                     let chest_open = state.ui_state.chest_open && has_item;
 
-                                    // Build option index mapping: [Equip?] [Bury?] [Dig?] [Deposit?] Drop
+                                    // Build option index mapping: [Equip?] [Bury?] [Dig?] [Fletch?] [Deposit?] Drop
                                     let mut current_idx = 0usize;
                                     let equip_idx = if is_equippable {
                                         let idx = current_idx;
@@ -1987,6 +1996,13 @@ impl InputHandler {
                                         None
                                     };
                                     let dig_idx = if is_dig {
+                                        let idx = current_idx;
+                                        current_idx += 1;
+                                        Some(idx)
+                                    } else {
+                                        None
+                                    };
+                                    let fletch_idx = if is_knife {
                                         let idx = current_idx;
                                         current_idx += 1;
                                         Some(idx)
@@ -2014,6 +2030,13 @@ impl InputHandler {
                                         commands.push(InputCommand::UseItem {
                                             slot_index: *slot_index as u8,
                                         });
+                                    } else if Some(*option_idx) == fletch_idx {
+                                        state.ui_state.fletching_open = true;
+                                        state.ui_state.fletching_selected_recipe = 0;
+                                        state.ui_state.fletching_scroll_offset = 0.0;
+                                        state.ui_state.fletching_quantity = 1;
+                                        state.ui_state.fletching_tab = 0;
+                                        state.pending_sfx.push("ui_open".to_string());
                                     } else if Some(*option_idx) == deposit_idx {
                                         commands.push(InputCommand::ChestDeposit {
                                             chest_id: state.ui_state.chest_id.clone(),
@@ -2170,6 +2193,7 @@ impl InputHandler {
                                                             match npc.station_type.as_deref() {
                                                                 Some("furnace") => {
                                                                     state.ui_state.furnace_station_type = "furnace".to_string();
+                                                                    state.ui_state.fletching_open = false;
                                                                     state.ui_state.furnace_open = true;
                                                                     state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                                                     state.ui_state.furnace_selected_recipe = 0;
@@ -2179,6 +2203,7 @@ impl InputHandler {
                                                                 }
                                                                 Some("fire_pit") => {
                                                                     state.ui_state.furnace_station_type = "fire_pit".to_string();
+                                                                    state.ui_state.fletching_open = false;
                                                                     state.ui_state.furnace_open = true;
                                                                     state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                                                     state.ui_state.furnace_selected_recipe = 0;
@@ -2187,6 +2212,7 @@ impl InputHandler {
                                                                     state.ui_state.furnace_tab = 0;
                                                                 }
                                                                 Some("anvil") => {
+                                                                    state.ui_state.fletching_open = false;
                                                                     state.ui_state.anvil_open = true;
                                                                     state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                                                     state.ui_state.anvil_selected_recipe = 0;
@@ -2195,6 +2221,7 @@ impl InputHandler {
                                                                     state.ui_state.anvil_tab = 0;
                                                                 }
                                                                 Some("alchemy_station") => {
+                                                                    state.ui_state.fletching_open = false;
                                                                     state.ui_state.alchemy_station_open = true;
                                                                     state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                                                     state.ui_state.alchemy_station_selected_recipe = 0;
@@ -5977,6 +6004,207 @@ impl InputHandler {
             return commands;
         }
 
+        // ===== FLETCHING PANEL (tool-based, no station) =====
+        if state.ui_state.fletching_open {
+            // Handle mouse clicks on fletching panel elements
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::FletchingCloseButton => {
+                            state.ui_state.fletching_open = false;
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            state.pending_sfx.push("enter".to_string());
+                            return commands;
+                        }
+                        UiElementId::FletchingRecipeItem(idx) => {
+                            if !state.ui_state.crafting_in_progress {
+                                state.ui_state.fletching_selected_recipe = *idx;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        UiElementId::FletchingFletchButton => {
+                            if !state.ui_state.crafting_in_progress {
+                                let tab_sections = crate::render::fletching_sections_for_tab(state.ui_state.fletching_tab);
+                                let mut fletching_recipes: Vec<_> = state
+                                    .recipe_definitions
+                                    .iter()
+                                    .filter(|r| r.category == "fletching" && r.required_tool.as_deref() == Some("knife"))
+                                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
+                                    .collect();
+                                fletching_recipes.sort_by_key(|r| r.level_required);
+                                if let Some(recipe) =
+                                    fletching_recipes.get(state.ui_state.fletching_selected_recipe)
+                                {
+                                    commands.push(InputCommand::FletchingCraft {
+                                        recipe_id: recipe.id.clone(),
+                                        quantity: state.ui_state.fletching_quantity,
+                                    });
+                                }
+                            }
+                            return commands;
+                        }
+                        UiElementId::FletchingCancelButton => {
+                            if state.ui_state.crafting_in_progress {
+                                commands.push(InputCommand::CancelCraft);
+                            }
+                            return commands;
+                        }
+                        UiElementId::FletchingQuantity1 => {
+                            state.ui_state.fletching_quantity = 1;
+                            return commands;
+                        }
+                        UiElementId::FletchingQuantityX => {
+                            state.ui_state.fletching_quantity = 5;
+                            return commands;
+                        }
+                        UiElementId::FletchingQuantityAll => {
+                            state.ui_state.fletching_quantity = u32::MAX;
+                            return commands;
+                        }
+                        UiElementId::FletchingTab(idx) => {
+                            if (*idx as u8) < 3 && !state.ui_state.crafting_in_progress {
+                                state.ui_state.fletching_tab = *idx as u8;
+                                state.ui_state.fletching_selected_recipe = 0;
+                                state.ui_state.fletching_scroll_offset = 0.0;
+                                state.pending_sfx.push("enter".to_string());
+                            }
+                            return commands;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Escape: cancel if crafting, otherwise close
+            if is_key_pressed(KeyCode::Escape) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                    return commands;
+                }
+                state.ui_state.fletching_open = false;
+                return commands;
+            }
+
+            // E key closes fletching panel
+            if is_key_pressed(KeyCode::E) {
+                if state.ui_state.crafting_in_progress {
+                    commands.push(InputCommand::CancelCraft);
+                }
+                state.ui_state.fletching_open = false;
+                return commands;
+            }
+
+            if !state.ui_state.crafting_in_progress {
+                // Tab key to cycle tabs
+                if is_key_pressed(KeyCode::Tab) {
+                    state.ui_state.fletching_tab = (state.ui_state.fletching_tab + 1) % 3;
+                    state.ui_state.fletching_selected_recipe = 0;
+                    state.ui_state.fletching_scroll_offset = 0.0;
+                    state.pending_sfx.push("enter".to_string());
+                }
+
+                let tab_sections = crate::render::fletching_sections_for_tab(state.ui_state.fletching_tab);
+                let mut fletching_recipes: Vec<_> = state
+                    .recipe_definitions
+                    .iter()
+                    .filter(|r| r.category == "fletching" && r.required_tool.as_deref() == Some("knife"))
+                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
+                    .collect();
+                fletching_recipes.sort_by_key(|r| r.level_required);
+                let recipe_count = fletching_recipes.len();
+
+                let s = state.ui_state.ui_scale;
+                let row_h = 72.0 * s;
+                let total_content = recipe_count as f32 * row_h;
+
+                let (_, sh) = crate::util::virtual_screen_size();
+                let panel_h = (450.0 * s).min(sh - 16.0);
+                let header_h = 40.0 * s;
+                let footer_h = 30.0 * s;
+                let tab_h = 28.0 * s;
+                let frame = 4.0;
+                let content_h = panel_h - frame * 2.0 - header_h - 2.0 - tab_h - 4.0 * s - footer_h - 4.0 * s;
+                let max_scroll = (total_content - content_h).max(0.0);
+
+                // W/S or Up/Down to navigate recipes
+                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                    if state.ui_state.fletching_selected_recipe > 0 {
+                        state.ui_state.fletching_selected_recipe -= 1;
+                        let item_top = state.ui_state.fletching_selected_recipe as f32 * row_h;
+                        if item_top < state.ui_state.fletching_scroll_offset {
+                            state.ui_state.fletching_scroll_offset = item_top;
+                        }
+                    }
+                }
+                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
+                    if state.ui_state.fletching_selected_recipe < recipe_count.saturating_sub(1) {
+                        state.ui_state.fletching_selected_recipe += 1;
+                        let item_bottom =
+                            (state.ui_state.fletching_selected_recipe + 1) as f32 * row_h;
+                        if item_bottom > state.ui_state.fletching_scroll_offset + content_h {
+                            state.ui_state.fletching_scroll_offset = item_bottom - content_h;
+                        }
+                    }
+                }
+
+                // 1/X/A for quantity shortcuts
+                if is_key_pressed(KeyCode::Key1) {
+                    state.ui_state.fletching_quantity = 1;
+                }
+                if is_key_pressed(KeyCode::X) {
+                    state.ui_state.fletching_quantity = 5;
+                }
+                if is_key_pressed(KeyCode::A) {
+                    state.ui_state.fletching_quantity = u32::MAX;
+                }
+
+                // Enter or C to craft
+                if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::C) {
+                    if let Some(recipe) =
+                        fletching_recipes.get(state.ui_state.fletching_selected_recipe)
+                    {
+                        commands.push(InputCommand::FletchingCraft {
+                            recipe_id: recipe.id.clone(),
+                            quantity: state.ui_state.fletching_quantity,
+                        });
+                    }
+                }
+
+                // Mouse wheel scrolling
+                let (_wheel_x, wheel_y) = mouse_wheel();
+                if wheel_y != 0.0 {
+                    const SCROLL_SPEED: f32 = 30.0;
+                    state.ui_state.fletching_scroll_offset = (state.ui_state.fletching_scroll_offset
+                        - wheel_y * SCROLL_SPEED)
+                        .clamp(0.0, max_scroll);
+                }
+
+                // Scrollbar drag handling
+                if let Some(track_bounds) = layout.get_bounds(&UiElementId::FletchingScrollbar) {
+                    let clicked_on = matches!(clicked_element, Some(UiElementId::FletchingScrollbar));
+                    crate::ui::scroll::handle_scrollbar_drag(
+                        &mut state.ui_state.fletching_scroll_drag,
+                        &mut state.ui_state.fletching_scroll_offset,
+                        max_scroll,
+                        track_bounds,
+                        total_content,
+                        my,
+                        is_mouse_button_down(MouseButton::Left),
+                        mouse_clicked,
+                        clicked_on,
+                    );
+                } else if !is_mouse_button_down(MouseButton::Left) {
+                    state.ui_state.fletching_scroll_drag.dragging = false;
+                }
+            }
+
+            // Don't process other input while fletching panel is open
+            return commands;
+        }
+
         // Handle social panel touch scrolling
         if state.ui_state.social_open {
             let all_touches: Vec<Touch> = touches();
@@ -7159,6 +7387,7 @@ impl InputHandler {
                                 });
                             } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
                                 state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
+                                state.ui_state.fletching_open = false;
                                 state.ui_state.furnace_open = true;
                                 state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                 state.ui_state.furnace_selected_recipe = 0;
@@ -7166,6 +7395,7 @@ impl InputHandler {
                                 state.ui_state.furnace_quantity = 1;
                                 state.ui_state.furnace_tab = 0;
                             } else if npc.station_type.as_deref() == Some("anvil") {
+                                state.ui_state.fletching_open = false;
                                 state.ui_state.anvil_open = true;
                                 state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                 state.ui_state.anvil_selected_recipe = 0;
@@ -7173,6 +7403,7 @@ impl InputHandler {
                                 state.ui_state.anvil_quantity = 1;
                                 state.ui_state.anvil_tab = 0;
                             } else if npc.station_type.as_deref() == Some("alchemy_station") {
+                                state.ui_state.fletching_open = false;
                                 state.ui_state.alchemy_station_open = true;
                                 state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                 state.ui_state.alchemy_station_selected_recipe = 0;
@@ -7721,6 +7952,7 @@ impl InputHandler {
                                             });
                                     } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
                                         state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
+                                        state.ui_state.fletching_open = false;
                                         state.ui_state.furnace_open = true;
                                         state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                         state.ui_state.furnace_selected_recipe = 0;
@@ -7728,6 +7960,7 @@ impl InputHandler {
                                         state.ui_state.furnace_quantity = 1;
                                         state.ui_state.furnace_tab = 0;
                                     } else if npc.station_type.as_deref() == Some("anvil") {
+                                        state.ui_state.fletching_open = false;
                                         state.ui_state.anvil_open = true;
                                         state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                         state.ui_state.anvil_selected_recipe = 0;
@@ -7735,6 +7968,7 @@ impl InputHandler {
                                         state.ui_state.anvil_quantity = 1;
                                         state.ui_state.anvil_tab = 0;
                                     } else if npc.station_type.as_deref() == Some("alchemy_station") {
+                                        state.ui_state.fletching_open = false;
                                         state.ui_state.alchemy_station_open = true;
                                         state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                         state.ui_state.alchemy_station_selected_recipe = 0;
@@ -8651,6 +8885,7 @@ impl InputHandler {
                                         });
                                 } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
                                     state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
+                                    state.ui_state.fletching_open = false;
                                     state.ui_state.furnace_open = true;
                                     state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                     state.ui_state.furnace_selected_recipe = 0;
@@ -8658,6 +8893,7 @@ impl InputHandler {
                                     state.ui_state.furnace_quantity = 1;
                                     state.ui_state.furnace_tab = 0;
                                 } else if npc.station_type.as_deref() == Some("anvil") {
+                                    state.ui_state.fletching_open = false;
                                     state.ui_state.anvil_open = true;
                                     state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                     state.ui_state.anvil_selected_recipe = 0;
@@ -8665,6 +8901,7 @@ impl InputHandler {
                                     state.ui_state.anvil_quantity = 1;
                                     state.ui_state.anvil_tab = 0;
                                 } else if npc.station_type.as_deref() == Some("alchemy_station") {
+                                    state.ui_state.fletching_open = false;
                                     state.ui_state.alchemy_station_open = true;
                                     state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
                                     state.ui_state.alchemy_station_selected_recipe = 0;

@@ -1128,6 +1128,14 @@ fn run_game_frame(
                 recipe_id: recipe_id.clone(),
                 quantity: *quantity,
             },
+            // Fletching commands
+            InputCommand::FletchingCraft {
+                recipe_id,
+                quantity,
+            } => ClientMessage::StartCraftBatch {
+                recipe_id: recipe_id.clone(),
+                quantity: *quantity,
+            },
             // Slayer commands
             InputCommand::SlayerGetTask { master_id } => ClientMessage::SlayerGetTask {
                 master_id: master_id.clone(),

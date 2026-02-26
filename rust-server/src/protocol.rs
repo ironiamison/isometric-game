@@ -3316,6 +3316,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::String("requires_discovery".into()),
                         Value::Boolean(r.requires_discovery),
                     ));
+                    if let Some(ref tool) = r.required_tool {
+                        rmap.push((
+                            Value::String("required_tool".into()),
+                            Value::String(tool.clone().into()),
+                        ));
+                    }
                     if let Some(ref br) = r.burn_result {
                         rmap.push((
                             Value::String("burn_result".into()),

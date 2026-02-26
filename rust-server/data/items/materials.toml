@@ -720,7 +720,7 @@ sellable = true
 
 [oak_bow_u]
 display_name = "Oak Bow (u)"
-sprite = "oak_bow_u"
+sprite = "oak_bow_unstrung"
 description = "An unstrung oak bow. Needs a bowstring."
 category = "material"
 max_stack = 1
@@ -729,7 +729,7 @@ sellable = true
 
 [willow_bow_u]
 display_name = "Willow Bow (u)"
-sprite = "willow_bow_u"
+sprite = "willow_bow_unstrung"
 description = "An unstrung willow bow. Needs a bowstring."
 category = "material"
 max_stack = 1
@@ -738,7 +738,7 @@ sellable = true
 
 [maple_bow_u]
 display_name = "Maple Bow (u)"
-sprite = "maple_bow_u"
+sprite = "maple_bow_unstrung"
 description = "An unstrung maple bow. Needs a bowstring."
 category = "material"
 max_stack = 1
@@ -747,7 +747,7 @@ sellable = true
 
 [yew_bow_u]
 display_name = "Yew Bow (u)"
-sprite = "yew_bow_u"
+sprite = "yew_bow_unstrung"
 description = "An unstrung yew bow. Needs a bowstring."
 category = "material"
 max_stack = 1

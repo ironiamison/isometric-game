@@ -53,6 +53,9 @@ impl Renderer {
                     if item_def.use_effect.as_deref() == Some("dig") {
                         push_option(&mut options, "Dig");
                     }
+                    if slot.item_id == "knife" {
+                        push_option(&mut options, "Fletch");
+                    }
                     if state.ui_state.chest_open {
                         push_option(&mut options, "Deposit");
                     }

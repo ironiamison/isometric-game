@@ -212,6 +212,18 @@ pub enum UiElementId {
     AlchemyQuantityMinus,
     AlchemyQuantityPlus,
 
+    // Fletching Panel
+    FletchingTab(usize),
+    FletchingRecipeItem(usize),
+    FletchingFletchButton,
+    FletchingCancelButton,
+    FletchingCloseButton,
+    FletchingQuantity1,
+    FletchingQuantityX,
+    FletchingQuantityAll,
+    FletchingScrollArea,
+    FletchingScrollbar,
+
     // Chest Panel
     ChestSlot(u8),
     ChestClose,
