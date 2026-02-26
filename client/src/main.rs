@@ -1,6 +1,8 @@
 use macroquad::prelude::*;
+use macroquad::window::set_fullscreen;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 mod audio;
 mod auth;
@@ -32,14 +34,16 @@ const WS_URL: &str = "wss://aeven.xyz";
 // Development mode - enables guest login
 // Set to false for production builds
 const DEV_MODE: bool = false;
+static FULLSCREEN: AtomicBool = AtomicBool::new(cfg!(target_os = "windows"));
 
 fn window_conf() -> Conf {
+    let fullscreen = FULLSCREEN.load(Ordering::Relaxed);
     let icon = load_icon().map(|icon| Some(icon)).unwrap_or(None);
     Conf {
         window_title: "New Aeven".to_string(),
         window_width: 1280,
         window_height: 720,
-        fullscreen: false,
+        fullscreen,
         icon,
         platform: miniquad::conf::Platform {
             // Disable VSync for uncapped FPS - manual frame timing handles pacing
@@ -421,6 +425,14 @@ fn run_game_frame(
     // Toggle debug mode with F3
     if is_key_pressed(KeyCode::F3) {
         game_state.debug_mode = !game_state.debug_mode;
+    }
+
+    // Toggle fullscreen (borderless on Windows)
+    if is_key_pressed(KeyCode::F11) {
+        let new_state = !FULLSCREEN.load(Ordering::Relaxed);
+        FULLSCREEN.store(new_state, Ordering::Relaxed);
+        set_fullscreen(new_state);
+        log::info!("Fullscreen: {}", new_state);
     }
 
     // Cycle FPS cap with F4: 60 -> 140 -> 60

@@ -1910,11 +1910,16 @@ impl Renderer {
 
     fn minimap_preview_rect(&self) -> Rect {
         let (sw, _) = virtual_screen_size();
+        let s = self.font_scale.get();
+        let width = MINIMAP_PREVIEW_WIDTH * s;
+        let height = MINIMAP_PREVIEW_HEIGHT * s;
+        let margin = MINIMAP_MARGIN * s;
+        let y = MINIMAP_PREVIEW_Y * s;
         Rect::new(
-            (sw - MINIMAP_PREVIEW_WIDTH - MINIMAP_MARGIN).floor(),
-            MINIMAP_PREVIEW_Y,
-            MINIMAP_PREVIEW_WIDTH,
-            MINIMAP_PREVIEW_HEIGHT,
+            (sw - width - margin).floor(),
+            y.floor(),
+            width,
+            height,
         )
     }
 
@@ -2763,6 +2768,7 @@ impl Renderer {
     }
 
     fn render_minimap_preview(&self, state: &GameState) {
+        let s = self.font_scale.get();
         let preview_rect = self.minimap_preview_rect();
         self.draw_minimap_preview_frame(
             preview_rect.x,
@@ -2774,17 +2780,17 @@ impl Renderer {
         let title = "Minimap [M]";
         self.draw_text_sharp(
             title,
-            preview_rect.x + 8.0,
-            preview_rect.y + 17.0,
+            preview_rect.x + 8.0 * s,
+            preview_rect.y + 17.0 * s,
             MINIMAP_WORLD_TEXT_SIZE,
             TEXT_TITLE,
         );
 
         let map_rect = Rect::new(
-            preview_rect.x + 6.0,
-            preview_rect.y + 24.0,
-            preview_rect.w - 12.0,
-            preview_rect.h - 30.0,
+            preview_rect.x + 6.0 * s,
+            preview_rect.y + 24.0 * s,
+            preview_rect.w - 12.0 * s,
+            preview_rect.h - 30.0 * s,
         );
 
         if let Some(bounds) = self.minimap_preview_bounds(state) {
@@ -2809,8 +2815,8 @@ impl Renderer {
             );
             self.draw_text_sharp(
                 "Loading map...",
-                map_rect.x + 10.0,
-                map_rect.y + 24.0,
+                map_rect.x + 10.0 * s,
+                map_rect.y + 24.0 * s,
                 16.0,
                 TEXT_DIM,
             );
@@ -9010,11 +9016,18 @@ impl Renderer {
         // Quest objective tracker / contract tracker below minimap on the right side.
         // Rendered early so interactive panels (inventory, quest log, etc.) draw on top.
         let preview = self.minimap_preview_rect();
+        let s = state.ui_state.ui_scale;
+        let preview_enabled = self.minimap_preview_enabled(state);
+        let header_font_size = 16.0;
+        let scaled_header_size = self.scaled_font_size(header_font_size);
+        let extra_gap = (scaled_header_size - header_font_size).max(0.0) * 0.5;
         let tracker_right = (preview.x + preview.w).floor();
-        let tracker_y = if self.minimap_preview_enabled(state) {
-            (preview.y + preview.h + 16.0).floor()
+        let base_gap = if preview_enabled { 16.0 } else { 14.0 };
+        let tracker_gap = base_gap * s + extra_gap;
+        let tracker_y = if preview_enabled {
+            (preview.y + preview.h + tracker_gap).floor()
         } else {
-            (MINIMAP_PREVIEW_Y + 14.0).floor()
+            (preview.y + tracker_gap).floor()
         };
         let tracker_width = (preview.w + 88.0).max(120.0).min(tracker_right - 10.0);
         let tracker_x = (tracker_right - tracker_width).floor();

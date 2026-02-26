@@ -13,8 +13,9 @@ impl Renderer {
             return 0.0;
         }
 
-        let line_height = 18.0;
-        let objective_line_height = line_height - 2.0;
+        let s = state.ui_state.ui_scale;
+        let line_height = 18.0 * s;
+        let objective_line_height = line_height - 2.0 * s;
         let title_wrap_width = (tracker_width + 58.0).max(140.0);
         let detail_wrap_width = (tracker_width + 42.0).max(132.0);
         let mut height = line_height; // header
@@ -29,7 +30,7 @@ impl Renderer {
                 height += wrapped.len().max(1) as f32 * objective_line_height;
             }
 
-            height += 8.0;
+            height += 8.0 * s;
         }
 
         if state.ui_state.active_quests.len() > 2 {
@@ -867,9 +868,10 @@ impl Renderer {
             return;
         }
 
-        let line_height = 18.0;
-        let objective_line_height = line_height - 2.0;
-        let inner_pad = 12.0;
+        let s = state.ui_state.ui_scale;
+        let line_height = 18.0 * s;
+        let objective_line_height = line_height - 2.0 * s;
+        let inner_pad = 12.0 * s;
         let font_size = 16.0;
 
         // First pass: collect all rendered lines and measure the widest one
@@ -926,7 +928,7 @@ impl Renderer {
             lines.push(TrackerLine {
                 text: String::new(),
                 color: WHITE,
-                height: 8.0,
+                height: 8.0 * s,
                 underline: false,
             });
         }
@@ -964,7 +966,7 @@ impl Renderer {
                 self.draw_text_sharp(&line.text, text_x, y, font_size, line.color);
 
                 if line.underline {
-                    let underline_y = y + 3.0;
+                    let underline_y = y + 3.0 * s;
                     draw_line(
                         text_x,
                         underline_y,
