@@ -319,13 +319,15 @@ export class IsometricRenderer {
     const objDef = objectLoader.getObject(objectLoader.gidToId(obj.gid));
 
     if (objDef?.image) {
-      const scaledWidth = obj.width * viewport.zoom;
-      const scaledHeight = obj.height * viewport.zoom;
+      const r = objDef.atlasRect;
+      const spriteW = r ? r.w : obj.width;
+      const spriteH = r ? r.h : obj.height;
+      const scaledWidth = spriteW * viewport.zoom;
+      const scaledHeight = spriteH * viewport.zoom;
 
       const drawX = screen.sx - scaledWidth / 2;
       const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
 
-      const r = objDef.atlasRect;
       const srcX = r ? getAnimatedSourceX(r, objDef.frames, objDef.fps) : 0;
       this.ctx.drawImage(
         objDef.image,
@@ -681,14 +683,17 @@ export class IsometricRenderer {
     if (objDef?.image) {
       // Calculate draw position - objects are anchored at their base tile
       // The sprite extends upward from the base position
-      const scaledWidth = obj.width * viewport.zoom;
-      const scaledHeight = obj.height * viewport.zoom;
+      // Use single-frame dimensions for animated sprites
+      const r = objDef.atlasRect;
+      const spriteW = r ? r.w : obj.width;
+      const spriteH = r ? r.h : obj.height;
+      const scaledWidth = spriteW * viewport.zoom;
+      const scaledHeight = spriteH * viewport.zoom;
 
       // Center horizontally on the tile, align bottom to tile position
       const drawX = screen.sx - scaledWidth / 2;
       const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
 
-      const r = objDef.atlasRect;
       const srcX = r ? getAnimatedSourceX(r, objDef.frames, objDef.fps) : 0;
       this.ctx.drawImage(
         objDef.image,
