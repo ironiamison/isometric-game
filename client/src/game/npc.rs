@@ -156,12 +156,10 @@ impl Npc {
     }
 
     /// Start the death sequence - NPC will finish moving to target then play death animation.
-    /// Includes a small delay so the killing blow attack animation is visible before death starts.
     pub fn start_death(&mut self) {
         self.state = NpcState::Dead;
         self.hp = 0;
         self.pending_death = true;
-        self.death_delay = Some(0.3); // 300ms delay so killing blow animation plays first
         // death_timer starts when NPC reaches target position (in update())
     }
 

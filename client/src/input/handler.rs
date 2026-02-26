@@ -341,7 +341,7 @@ fn sync_path_index(path_state: &mut PathState, player_pos: (i32, i32)) {
 }
 
 /// Build set of tiles occupied by entities (other players + NPCs) for pathfinding
-fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
+fn build_occupied_set(state: &GameState, include_chairs: bool) -> HashSet<(i32, i32)> {
     let mut occupied = HashSet::new();
 
     // When in interior mode, don't count overworld players as obstacles
@@ -373,12 +373,187 @@ fn build_occupied_set(state: &GameState) -> HashSet<(i32, i32)> {
         }
     }
 
-    // NOTE: Chairs are intentionally NOT in the occupied set. The server rejects
-    // movement onto chair tiles, but also triggers auto-sit when approaching from
-    // the front. If we block chair moves client-side, the Move never reaches the
-    // server and auto-sit can't fire.
+    if include_chairs {
+        for (cx, cy) in &state.chair_positions {
+            occupied.insert((*cx, *cy));
+        }
+    }
 
     occupied
+}
+
+fn preferred_adjacent_tile_for_target(state: &GameState, target: (i32, i32)) -> Option<(i32, i32)> {
+    let player = state.get_local_player()?;
+    let dx = player.x - target.0 as f32;
+    let dy = player.y - target.1 as f32;
+
+    if dx.abs() < 0.01 && dy.abs() < 0.01 {
+        return None;
+    }
+
+    if dx.abs() >= dy.abs() {
+        Some((target.0 + if dx > 0.0 { 1 } else { -1 }, target.1))
+    } else {
+        Some((target.0, target.1 + if dy > 0.0 { 1 } else { -1 }))
+    }
+}
+
+#[derive(Clone)]
+struct SpliceCandidate {
+    pos: (i32, i32),
+    steps_to_pos: i32,
+    prefix_range: Option<(usize, usize)>,
+}
+
+fn splice_candidates(state: &GameState, start: (i32, i32)) -> Vec<SpliceCandidate> {
+    let mut candidates = Vec::new();
+    candidates.push(SpliceCandidate {
+        pos: start,
+        steps_to_pos: 0,
+        prefix_range: None,
+    });
+
+    let Some(path_state) = state.auto_path.as_ref() else {
+        return candidates;
+    };
+
+    if path_state.current_index >= path_state.path.len() {
+        return candidates;
+    }
+
+    const MAX_SPLICE_AHEAD: usize = 6;
+    let max_idx = (path_state.current_index + MAX_SPLICE_AHEAD).min(path_state.path.len() - 1);
+    let start_is_next = path_state.path[path_state.current_index] == start;
+    let base_steps: i32 = if start_is_next { 0 } else { 1 };
+
+    for i in path_state.current_index..=max_idx {
+        let pos = path_state.path[i];
+        if pos == start {
+            continue;
+        }
+        let steps_to_pos = base_steps + (i as i32 - path_state.current_index as i32);
+        candidates.push(SpliceCandidate {
+            pos,
+            steps_to_pos,
+            prefix_range: Some((path_state.current_index, i)),
+        });
+    }
+
+    candidates
+}
+
+fn find_path_with_optimistic_splice(
+    state: &GameState,
+    start: (i32, i32),
+    goal: (i32, i32),
+    occupied: &HashSet<(i32, i32)>,
+    max_distance: i32,
+) -> Option<Vec<(i32, i32)>> {
+    let candidates = splice_candidates(state, start);
+    let path_state = state.auto_path.as_ref();
+
+    let mut best: Option<(i32, SpliceCandidate, Vec<(i32, i32)>)> = None;
+
+    for cand in candidates {
+        if let Some(path) =
+            pathfinding::find_path(cand.pos, goal, &state.chunk_manager, occupied, max_distance)
+        {
+            let steps_from_pos = path.len().saturating_sub(1) as i32;
+            let total_steps = cand.steps_to_pos + steps_from_pos;
+            let better = match &best {
+                None => true,
+                Some((best_total, best_cand, _)) => {
+                    total_steps < *best_total
+                        || (total_steps == *best_total
+                            && cand.steps_to_pos > best_cand.steps_to_pos)
+                }
+            };
+            if better {
+                best = Some((total_steps, cand.clone(), path));
+            }
+        }
+    }
+
+    let Some((_, cand, path)) = best else {
+        return None;
+    };
+
+    if let (Some((start_idx, end_idx)), Some(path_state)) = (cand.prefix_range, path_state) {
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&path_state.path[start_idx..=end_idx]);
+        if path.len() > 1 {
+            combined.extend_from_slice(&path[1..]);
+        }
+        return Some(combined);
+    }
+
+    Some(path)
+}
+
+fn find_path_to_adjacent_with_optimistic_splice(
+    state: &GameState,
+    start: (i32, i32),
+    target: (i32, i32),
+    occupied: &HashSet<(i32, i32)>,
+    max_distance: i32,
+    preferred_adjacent: Option<(i32, i32)>,
+) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+    let candidates = splice_candidates(state, start);
+    let path_state = state.auto_path.as_ref();
+
+    let mut best: Option<(i32, SpliceCandidate, (i32, i32), Vec<(i32, i32)>)> = None;
+
+    for cand in candidates {
+        if let Some((dest, path)) = pathfinding::find_path_to_adjacent_prefer(
+            cand.pos,
+            target,
+            &state.chunk_manager,
+            occupied,
+            max_distance,
+            preferred_adjacent,
+        ) {
+            let steps_from_pos = path.len().saturating_sub(1) as i32;
+            let total_steps = cand.steps_to_pos + steps_from_pos;
+            let better = match &best {
+                None => true,
+                Some((best_total, best_cand, _, _)) => {
+                    total_steps < *best_total
+                        || (total_steps == *best_total
+                            && cand.steps_to_pos > best_cand.steps_to_pos)
+                }
+            };
+            if better {
+                best = Some((total_steps, cand.clone(), dest, path));
+            }
+        }
+    }
+
+    let Some((_, cand, dest, path)) = best else {
+        return None;
+    };
+
+    if let (Some((start_idx, end_idx)), Some(path_state)) = (cand.prefix_range, path_state) {
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&path_state.path[start_idx..=end_idx]);
+        if path.len() > 1 {
+            combined.extend_from_slice(&path[1..]);
+        }
+        return Some((dest, combined));
+    }
+
+    Some((dest, path))
+}
+
+fn face_target_if_needed(state: &mut GameState, commands: &mut Vec<InputCommand>, dx: f32, dy: f32) {
+    let dir = crate::game::Direction::from_velocity(dx, dy);
+    if let Some(local_id) = &state.local_player_id {
+        if let Some(player) = state.players.get(local_id) {
+            if player.direction == dir {
+                return;
+            }
+        }
+    }
+    queue_face(state, commands, dir as u8);
 }
 
 /// Pathfind to adjacent tile of a player and set up attack, or attack immediately if adjacent.
@@ -393,10 +568,16 @@ fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCom
                 let cdx = (px - tx).abs();
                 let cdy = (py - ty).abs();
                 if (cdx + cdy) != 1 {
-                    let occupied = build_occupied_set(state);
+                    let occupied = build_occupied_set(state, true);
+                    let preferred = preferred_adjacent_tile_for_target(state, (tx, ty));
                     const MAX_PATH_DISTANCE: i32 = 32;
-                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                        (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                    if let Some((dest, path)) = find_path_to_adjacent_with_optimistic_splice(
+                        state,
+                        (px, py),
+                        (tx, ty),
+                        &occupied,
+                        MAX_PATH_DISTANCE,
+                        preferred,
                     ) {
                         state.auto_path = Some(PathState {
                             path, current_index: 0, destination: dest,
@@ -404,7 +585,10 @@ fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCom
                         });
                     }
                 } else {
-                    let dir = crate::game::Direction::from_velocity(tx as f32 - px as f32, ty as f32 - py as f32);
+                    let dir = crate::game::Direction::from_velocity(
+                        target.server_x - local_player.x,
+                        target.server_y - local_player.y,
+                    );
                     queue_face(state, commands, dir as u8);
                     commands.push(InputCommand::StartAutoAction {
                         target_type: "player".to_string(),
@@ -429,10 +613,16 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                 let cdx = (px - nx).abs();
                 let cdy = (py - ny).abs();
                 if (cdx + cdy) != 1 {
-                    let occupied = build_occupied_set(state);
+                    let occupied = build_occupied_set(state, true);
+                    let preferred = preferred_adjacent_tile_for_target(state, (nx, ny));
                     const MAX_PATH_DISTANCE: i32 = 32;
-                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                        (px, py), (nx, ny), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                    if let Some((dest, path)) = find_path_to_adjacent_with_optimistic_splice(
+                        state,
+                        (px, py),
+                        (nx, ny),
+                        &occupied,
+                        MAX_PATH_DISTANCE,
+                        preferred,
                     ) {
                         state.auto_path = Some(PathState {
                             path, current_index: 0, destination: dest,
@@ -440,7 +630,10 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                         });
                     }
                 } else {
-                    let dir = crate::game::Direction::from_velocity(nx as f32 - px as f32, ny as f32 - py as f32);
+                    let dir = crate::game::Direction::from_velocity(
+                        npc.server_x - player.x,
+                        npc.server_y - player.y,
+                    );
                     queue_face(state, commands, dir as u8);
                     if let Some(aa) = state.auto_action_state.as_ref() {
                         if auto_action_target_settled(aa, state) {
@@ -488,7 +681,7 @@ fn pathfind_and_interact_npc(
                         let py = player.server_y.round() as i32;
                         let nx = npc.server_x.round() as i32;
                         let ny = npc.server_y.round() as i32;
-                        let occupied = build_occupied_set(state);
+                        let occupied = build_occupied_set(state, false);
                         const MAX_PATH_DISTANCE: i32 = 32;
                         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                             (px, py), (nx, ny), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
@@ -516,7 +709,7 @@ fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>
         let cdx = (px - tile_x).abs();
         let cdy = (py - tile_y).abs();
         if (cdx + cdy) != 1 {
-            let occupied = build_occupied_set(state);
+            let occupied = build_occupied_set(state, true);
             const MAX_PATH_DISTANCE: i32 = 32;
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                 (px, py), (tile_x, tile_y), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
@@ -555,9 +748,13 @@ fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, til
         let py = player.y.round() as i32;
         let dist = (tile_x - px).abs().max((tile_y - py).abs());
         if dist <= MAX_PATH_DISTANCE && state.chunk_manager.is_walkable(tile_x as f32, tile_y as f32) {
-            let occupied = build_occupied_set(state);
-            if let Some(path) = pathfinding::find_path(
-                (px, py), (tile_x, tile_y), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+            let occupied = build_occupied_set(state, true);
+            if let Some(path) = find_path_with_optimistic_splice(
+                state,
+                (px, py),
+                (tile_x, tile_y),
+                &occupied,
+                MAX_PATH_DISTANCE,
             ) {
                 state.auto_path = Some(PathState {
                     path, current_index: 0, destination: (tile_x, tile_y),
@@ -1869,7 +2066,7 @@ impl InputHandler {
                                                         let py = player.server_y.round() as i32;
                                                         let tx = target.server_x.round() as i32;
                                                         let ty = target.server_y.round() as i32;
-                                                        let mut occupied = build_occupied_set(state);
+                                                        let mut occupied = build_occupied_set(state, true);
                                                         occupied.remove(&(tx, ty));
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
@@ -2154,7 +2351,7 @@ impl InputHandler {
                                                     if cdx <= 1 && cdy <= 1 {
                                                         commands.push(InputCommand::UseWaystone { x: tx, y: ty });
                                                     } else {
-                                                        let occupied = build_occupied_set(state);
+                                                        let occupied = build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) =
                                                             pathfinding::find_path_to_adjacent(
@@ -2185,7 +2382,7 @@ impl InputHandler {
                                                     if cdx <= 1 && cdy <= 1 {
                                                         commands.push(InputCommand::InteractObject { x: tx, y: ty });
                                                     } else {
-                                                        let occupied = build_occupied_set(state);
+                                                        let occupied = build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) =
                                                             pathfinding::find_path_to_adjacent(
@@ -2244,7 +2441,7 @@ impl InputHandler {
                                                             marker_y,
                                                         });
                                                     } else {
-                                                        let occupied = build_occupied_set(state);
+                                                        let occupied = build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                                             (px, py),
@@ -2293,12 +2490,12 @@ impl InputHandler {
                                                         // Pathfind to item
                                                         let px = player.x.round() as i32;
                                                         let py = player.y.round() as i32;
-                                                        let occupied = build_occupied_set(state);
+                                                        let occupied = build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
-                                                        if let Some(path) = pathfinding::find_path(
+                                                        if let Some(path) = find_path_with_optimistic_splice(
+                                                            state,
                                                             (px, py),
                                                             (item_x, item_y),
-                                                            &state.chunk_manager,
                                                             &occupied,
                                                             MAX_PATH_DISTANCE,
                                                         ) {
@@ -2341,7 +2538,7 @@ impl InputHandler {
                                                         if cdx <= 1 && cdy <= 1 {
                                                             commands.push(InputCommand::HarvestCrop { patch_id: pid });
                                                         } else {
-                                                            let occupied = build_occupied_set(state);
+                                                            let occupied = build_occupied_set(state, true);
                                                             const MAX_PATH_DISTANCE: i32 = 32;
                                                             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                                                 (px, py),
@@ -6545,7 +6742,7 @@ impl InputHandler {
                         let tile_walkable = state
                             .chunk_manager
                             .is_walkable(target_x as f32, target_y as f32);
-                        let occupied = build_occupied_set(state);
+                        let occupied = build_occupied_set(state, true);
                         let not_occupied = !occupied.contains(&(target_x, target_y));
                         tile_walkable && not_occupied
                     } else {
@@ -6631,18 +6828,31 @@ impl InputHandler {
 
                     // If already adjacent and auto-action not yet sent, send now
                     if is_adjacent {
-                        if let Some(aa) = state.auto_action_state.as_ref() {
-                            if !aa.confirmed && auto_action_target_settled(aa, state) {
-                                // Clone data before mutable borrow
-                                let target_type = aa.target_type.clone();
-                                let target_id = aa.target_id.clone();
-                                let action = aa.action.clone();
-                                // Face toward target
-                                let dir = crate::game::Direction::from_velocity(
-                                    tx as f32 - player_x as f32,
-                                    ty as f32 - player_y as f32,
-                                );
-                                queue_face(state, &mut commands, dir as u8);
+                        let auto_action_data = state.auto_action_state.as_ref().map(|aa| {
+                            (
+                                aa.confirmed,
+                                auto_action_target_settled(aa, state),
+                                aa.target_type.clone(),
+                                aa.target_id.clone(),
+                                aa.action.clone(),
+                            )
+                        });
+
+                        if auto_action_data.is_some() {
+                            // Always face the target while adjacent so client visuals
+                            // stay aligned even if the target is still moving.
+                            let face_delta = state
+                                .get_local_player()
+                                .map(|player| (tx as f32 - player.x, ty as f32 - player.y));
+                            if let Some((dx, dy)) = face_delta {
+                                face_target_if_needed(state, &mut commands, dx, dy);
+                            }
+                        }
+
+                        if let Some((confirmed, settled, target_type, target_id, action)) =
+                            auto_action_data
+                        {
+                            if !confirmed && settled {
                                 commands.push(InputCommand::StartAutoAction {
                                     target_type,
                                     target_id,
@@ -6686,7 +6896,7 @@ impl InputHandler {
                             if needs_repath && repath_allowed {
                                 // Exclude chase target from occupied set so the target
                                 // doesn't block our path when it moves onto our route.
-                                let mut occupied = build_occupied_set(state);
+                                let mut occupied = build_occupied_set(state, true);
                                 if let Some(ref aa) = state.auto_action_state {
                                     match aa.target_type.as_str() {
                                         "npc" => {
@@ -6703,12 +6913,14 @@ impl InputHandler {
                                     }
                                 }
                                 const MAX_PATH_DISTANCE: i32 = 32;
-                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                let preferred = preferred_adjacent_tile_for_target(state, (tx, ty));
+                                if let Some((dest, path)) = find_path_to_adjacent_with_optimistic_splice(
+                                    state,
                                     (player_x, player_y),
                                     (tx, ty),
-                                    &state.chunk_manager,
                                     &occupied,
                                     MAX_PATH_DISTANCE,
+                                    preferred,
                                 ) {
                                     state.auto_path = Some(PathState {
                                         path,
@@ -6769,7 +6981,7 @@ impl InputHandler {
                                 // Delay elapsed — clear waiting state and path to target
                                 state.follow_arrived_target_pos = None;
                                 state.follow_target_move_time = 0.0;
-                                let mut occupied = build_occupied_set(state);
+                                let mut occupied = build_occupied_set(state, true);
                                 if let Some(p) = state.players.get(follow_id) {
                                     occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
                                 }
@@ -6799,7 +7011,7 @@ impl InputHandler {
                         let repath_allowed = current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
 
                         if needs_repath && repath_allowed {
-                            let mut occupied = build_occupied_set(state);
+                            let mut occupied = build_occupied_set(state, true);
                             if let Some(p) = state.players.get(follow_id) {
                                 occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
                             }
@@ -6843,7 +7055,7 @@ impl InputHandler {
                 if path_state.current_index < path_state.path.len() {
                     let (next_x, next_y) = path_state.path[path_state.current_index];
                     if player_x != next_x || player_y != next_y {
-                        let mut occupied = build_occupied_set(state);
+                        let mut occupied = build_occupied_set(state, true);
                         // Exclude chase/follow target from blocked check
                         if let Some(ref aa) = state.auto_action_state {
                             match aa.target_type.as_str() {
@@ -6983,24 +7195,32 @@ impl InputHandler {
                     commands.push(InputCommand::HarvestCrop { patch_id });
                 }
                 // Handle auto-action: send StartAutoAction now that we've arrived
-                if let Some(aa) = state.auto_action_state.as_ref() {
-                    if !aa.confirmed && auto_action_target_settled(aa, state) {
-                        // Clone data before mutable borrow
-                        let target_type = aa.target_type.clone();
-                        let target_id = aa.target_id.clone();
-                        let action = aa.action.clone();
-                        let target_pos = auto_action_target_pos(aa, state);
-                        // Face toward the target before starting
+                let auto_action_snapshot = state.auto_action_state.as_ref().map(|aa| {
+                    (
+                        aa.confirmed,
+                        auto_action_target_settled(aa, state),
+                        aa.target_type.clone(),
+                        aa.target_id.clone(),
+                        aa.action.clone(),
+                        auto_action_target_pos(aa, state),
+                    )
+                });
+
+                if let Some((confirmed, settled, target_type, target_id, action, target_pos)) =
+                    auto_action_snapshot
+                {
+                    // Always face the target when we reach the destination.
+                    if let Some((tx, ty)) = target_pos {
                         if let Some(local_id) = &state.local_player_id {
-                            if let Some((tx, ty)) = target_pos {
-                                if let Some(player) = state.players.get(local_id) {
-                                    let dx = tx - player.server_x;
-                                    let dy = ty - player.server_y;
-                                    let dir = crate::game::Direction::from_velocity(dx, dy);
-                                    queue_face(state, &mut commands, dir as u8);
-                                }
+                            if let Some(player) = state.players.get(local_id) {
+                                let dx = tx - player.x;
+                                let dy = ty - player.y;
+                                face_target_if_needed(state, &mut commands, dx, dy);
                             }
                         }
+                    }
+
+                    if !confirmed && settled {
                         commands.push(InputCommand::StartAutoAction {
                             target_type,
                             target_id,
@@ -7318,7 +7538,7 @@ impl InputHandler {
                                         let item_y = ground_item.y.round() as i32;
 
                                         // Build occupied set (other players + NPCs)
-                                        let occupied = build_occupied_set(state);
+                                        let occupied = build_occupied_set(state, true);
 
                                         const MAX_PATH_DISTANCE: i32 = 32;
                                         if let Some((dest, path)) =
@@ -7426,7 +7646,7 @@ impl InputHandler {
                                 let cdy = (player_y - npc_y).abs();
                                 // Cardinal adjacency only (no diagonal)
                                 if (cdx + cdy) != 1 {
-                                    let occupied = build_occupied_set(state);
+                                    let occupied = build_occupied_set(state, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     if let Some((dest, path)) =
                                         pathfinding::find_path_to_adjacent(
@@ -7515,7 +7735,7 @@ impl InputHandler {
                                     let npc_y = npc.y.round() as i32;
 
                                     // Build occupied set (other players + NPCs)
-                                    let occupied = build_occupied_set(state);
+                                    let occupied = build_occupied_set(state, true);
 
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
@@ -7560,7 +7780,7 @@ impl InputHandler {
                             let cdy = (player_y - target_y).abs();
                             // Cardinal adjacency only (no diagonal)
                             if (cdx + cdy) != 1 {
-                                let occupied = build_occupied_set(state);
+                                let occupied = build_occupied_set(state, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) =
                                     pathfinding::find_path_to_adjacent(
@@ -7636,7 +7856,7 @@ impl InputHandler {
                             let cdy = (player_y - clicked_tile_y).abs();
                             // Cardinal adjacency only (no diagonal)
                             if (cdx + cdy) != 1 {
-                                let occupied = build_occupied_set(state);
+                                let occupied = build_occupied_set(state, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) =
                                     pathfinding::find_path_to_adjacent(
@@ -7702,7 +7922,7 @@ impl InputHandler {
                             let cdy = (player_y - clicked_tile_y).abs();
                             // Cardinal adjacency only (no diagonal)
                             if (cdx + cdy) != 1 {
-                                let occupied = build_occupied_set(state);
+                                let occupied = build_occupied_set(state, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) =
                                     pathfinding::find_path_to_adjacent(
@@ -7748,7 +7968,7 @@ impl InputHandler {
                             commands.push(InputCommand::InteractObject { x: clicked_tile_x, y: clicked_tile_y });
                         } else {
                             // Pathfind to adjacent tile, then interact
-                            let occupied = build_occupied_set(state);
+                            let occupied = build_occupied_set(state, true);
                             const MAX_PATH_DISTANCE: i32 = 32;
                             if let Some((dest, path)) =
                                 pathfinding::find_path_to_adjacent(
@@ -7790,7 +8010,7 @@ impl InputHandler {
                                     commands.push(InputCommand::HarvestCrop { patch_id });
                                 } else {
                                     // Out of range - pathfind to adjacent tile
-                                    let occupied = build_occupied_set(state);
+                                    let occupied = build_occupied_set(state, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                         (px, py),
@@ -7833,7 +8053,7 @@ impl InputHandler {
                                 });
                             } else {
                                 // Out of range - pathfind to adjacent tile, then sit
-                                let occupied = build_occupied_set(state);
+                                let occupied = build_occupied_set(state, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                     (px, py),
@@ -7871,7 +8091,7 @@ impl InputHandler {
                         commands.push(InputCommand::InteractObject { x: clicked_tile_x, y: clicked_tile_y });
                     } else {
                         // Pathfind to adjacent tile, then interact
-                        let occupied = build_occupied_set(state);
+                        let occupied = build_occupied_set(state, true);
                         const MAX_PATH_DISTANCE: i32 = 32;
                         if let Some((dest, path)) =
                             pathfinding::find_path_to_adjacent(
@@ -7918,13 +8138,13 @@ impl InputHandler {
                             .is_walkable(tile_x as f32, tile_y as f32)
                     {
                         // Build occupied set (other players + NPCs)
-                        let occupied = build_occupied_set(state);
+                        let occupied = build_occupied_set(state, true);
 
                         // Calculate path using A*
-                        if let Some(path) = pathfinding::find_path(
+                        if let Some(path) = find_path_with_optimistic_splice(
+                            state,
                             (player_x, player_y),
                             (tile_x, tile_y),
-                            &state.chunk_manager,
                             &occupied,
                             MAX_PATH_DISTANCE,
                         ) {

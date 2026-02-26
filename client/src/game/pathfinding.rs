@@ -197,3 +197,58 @@ pub fn find_path_to_adjacent(
 
     best_path
 }
+
+/// Find the best adjacent tile with a preferred approach side.
+/// Preference is used only as a tie-breaker among equally short paths.
+pub fn find_path_to_adjacent_prefer(
+    start: (i32, i32),
+    target: (i32, i32),
+    chunk_manager: &ChunkManager,
+    occupied: &HashSet<(i32, i32)>,
+    max_distance: i32,
+    preferred_adjacent: Option<(i32, i32)>,
+) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+    // Check all 4 cardinal directions
+    let adjacent_tiles = [
+        (target.0, target.1 - 1), // North
+        (target.0, target.1 + 1), // South
+        (target.0 - 1, target.1), // West
+        (target.0 + 1, target.1), // East
+    ];
+
+    let mut best_path: Option<((i32, i32), Vec<(i32, i32)>)> = None;
+    let mut best_length = i32::MAX;
+    let mut best_preferred = false;
+    let mut best_secondary = i32::MAX;
+
+    for adj in adjacent_tiles {
+        // Skip if not walkable
+        if !chunk_manager.is_walkable(adj.0 as f32, adj.1 as f32) {
+            continue;
+        }
+
+        // Skip if occupied by another entity
+        if occupied.contains(&adj) {
+            continue;
+        }
+
+        if let Some(path) = find_path(start, adj, chunk_manager, occupied, max_distance) {
+            let path_len = path.len() as i32;
+            let is_preferred = preferred_adjacent.map_or(false, |p| p == adj);
+            let secondary = heuristic(start, adj);
+
+            let better = path_len < best_length
+                || (path_len == best_length && is_preferred && !best_preferred)
+                || (path_len == best_length && is_preferred == best_preferred && secondary < best_secondary);
+
+            if better {
+                best_length = path_len;
+                best_preferred = is_preferred;
+                best_secondary = secondary;
+                best_path = Some((adj, path));
+            }
+        }
+    }
+
+    best_path
+}

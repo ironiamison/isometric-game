@@ -1264,7 +1264,8 @@ impl Renderer {
             if completed {
                 // Completed tiers intentionally expose no dialogue actions.
             } else if tier_is_active {
-                if tier_is_completable && dialogue.choices.is_empty() {
+                if dialogue.choices.is_empty() {
+                    let btn_label = if tier_is_completable { "Complete" } else { "Continue" };
                     let btn_w = 150.0 * s;
                     let btn_h = 30.0 * s;
                     let btn = Rect::new(right_x + right_w - (btn_w + 20.0 * s), action_base_y, btn_w, btn_h);
@@ -1293,7 +1294,7 @@ impl Renderer {
                         },
                     );
                     self.draw_text_sharp(
-                        "Complete",
+                        btn_label,
                         btn.x + 46.0 * s,
                         btn.y + btn_h * 0.67,
                         16.0,

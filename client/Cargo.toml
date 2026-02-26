@@ -1,6 +1,6 @@
 [package]
 name = "new-aeven-client"
-version = "2.17.5"
+version = "2.17.6"
 edition = "2021"
 description = "Isometric MMORPG client"
 
