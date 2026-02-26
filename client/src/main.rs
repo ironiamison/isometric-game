@@ -59,6 +59,7 @@ fn window_conf() -> Conf {
 fn load_icon() -> Option<miniquad::conf::Icon> {
     let candidates = [
         "assets/app-icon.png",
+        "assets/ui/app-icon.png",
         "assets/logo.png",
         "assets/ui/logo.png",
         "assets/favicon.png",
