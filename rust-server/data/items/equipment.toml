@@ -347,6 +347,21 @@ attack_bonus = 1
 strength_bonus = 0
 defence_bonus = 0
 
+[maple_rod]
+display_name = "Fishing Rod"
+sprite = "maple_rod"
+description = "A sturdier rod than most, decently useful for fishing, but still far from exceptional."
+category = "equipment"
+max_stack = 1
+base_price = 2000
+sellable = true
+[maple_rod.equipment]
+slot_type = "weapon"
+attack_level_required = 1
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 0
+
 [salvaged_sword]
 display_name = "Salvaged Sword"
 sprite = "salvaged_sword"
