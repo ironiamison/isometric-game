@@ -67,9 +67,9 @@ impl Renderer {
 
         draw_rectangle(header_x, header_y, header_w, header_height, HEADER_BG);
         draw_line(
-            header_x + 6.0 * scale,
+            header_x,
             header_y + header_height,
-            header_x + header_w - 6.0 * scale,
+            header_x + header_w,
             header_y + header_height,
             1.0,
             HEADER_BORDER,
@@ -82,7 +82,7 @@ impl Renderer {
         self.draw_text_sharp(
             header_text,
             text_x,
-            header_y + (header_height + 12.0) / 2.0,
+            (header_y + 17.0 * scale).floor(),
             16.0,
             TEXT_TITLE,
         );

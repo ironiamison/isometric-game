@@ -54,8 +54,9 @@ impl Renderer {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
 
+        let frame_thickness = FRAME_THICKNESS * s;
         let panel_width = (INV_WIDTH * s).min(sw - 16.0);
-        let panel_height_full = INV_HEIGHT * s;
+        let panel_height_full = 314.0 * s;
         let button_area_height = MENU_BUTTON_SIZE * s + EXP_BAR_GAP * s;
         let min_panel_y = 4.0;
         let max_available_height = sh - button_area_height - 8.0 - min_panel_y;
@@ -65,7 +66,7 @@ impl Renderer {
 
         let line_height = 17.0 * s;
         let entry_padding = 4.0 * s;
-        let header_h = HEADER_HEIGHT * s;
+        let header_h = 24.0 * s;
         let footer_h = FOOTER_HEIGHT * s;
 
         // Draw themed panel frame with corner accents
@@ -73,42 +74,30 @@ impl Renderer {
         self.draw_corner_accents(panel_x, panel_y, panel_width, panel_height);
 
         // ===== HEADER SECTION =====
-        let header_x = panel_x + FRAME_THICKNESS;
-        let header_y = panel_y + FRAME_THICKNESS;
-        let header_w = panel_width - FRAME_THICKNESS * 2.0;
+        let header_x = panel_x + frame_thickness;
+        let header_y = panel_y + frame_thickness;
+        let header_w = panel_width - frame_thickness * 2.0;
 
         // Header background
         draw_rectangle(header_x, header_y, header_w, header_h, HEADER_BG);
 
-        // Header bottom separator with decorative dots
+        // Header bottom separator
         draw_line(
-            header_x + 10.0 * s,
+            header_x,
             header_y + header_h,
-            header_x + header_w - 10.0 * s,
+            header_x + header_w,
             header_y + header_h,
-            2.0,
+            1.0,
             HEADER_BORDER,
         );
 
-        let dot_spacing = 50.0 * s;
-        let num_dots = ((header_w - 40.0 * s) / dot_spacing) as i32;
-        let start_dot_x = header_x + 20.0 * s;
-        for i in 0..num_dots {
-            let dot_x = start_dot_x + i as f32 * dot_spacing;
-            draw_rectangle(
-                dot_x - 1.5,
-                header_y + header_h - 1.5,
-                3.0,
-                3.0,
-                FRAME_ACCENT,
-            );
-        }
-
-        // Title
+        // Title centered in header
+        let title = "Quests";
+        let title_width = self.measure_text_sharp(title, 16.0).width;
         self.draw_text_sharp(
-            "Quests",
-            header_x + 12.0 * s,
-            header_y + header_h * 0.65,
+            title,
+            (header_x + (header_w - title_width) / 2.0).floor(),
+            (header_y + 17.0 * s).floor(),
             16.0,
             TEXT_TITLE,
         );
@@ -117,14 +106,14 @@ impl Renderer {
         if state.ui_state.selected_quest_id.is_some() {
             self.render_quest_detail(state, hovered, layout, panel_x, panel_y, panel_width, panel_height);
             // Still draw footer
-            let footer_x = panel_x + FRAME_THICKNESS;
-            let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
-            let footer_w = panel_width - FRAME_THICKNESS * 2.0;
+            let footer_x = panel_x + frame_thickness;
+            let footer_y = panel_y + panel_height - frame_thickness - footer_h;
+            let footer_w = panel_width - frame_thickness * 2.0;
             draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
             draw_line(
-                footer_x + 10.0 * s,
+                footer_x,
                 footer_y,
-                footer_x + footer_w - 10.0 * s,
+                footer_x + footer_w,
                 footer_y,
                 1.0,
                 HEADER_BORDER,
@@ -133,10 +122,10 @@ impl Renderer {
         }
 
         // ===== CONTENT AREA =====
-        let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
-        let content_y = panel_y + FRAME_THICKNESS + header_h + 8.0 * s;
-        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
-        let content_h = panel_height - FRAME_THICKNESS * 2.0 - header_h - footer_h - 16.0 * s;
+        let content_x = panel_x + frame_thickness + 8.0 * s;
+        let content_y = panel_y + frame_thickness + header_h + 8.0 * s;
+        let content_w = panel_width - frame_thickness * 2.0 - 16.0 * s;
+        let content_h = panel_height - frame_thickness * 2.0 - header_h - footer_h - 16.0 * s;
 
         // Quest list panel with inset effect
         draw_rectangle(content_x, content_y, content_w, content_h, SLOT_BORDER);
@@ -378,15 +367,15 @@ impl Renderer {
         }
 
         // ===== FOOTER SECTION =====
-        let footer_x = panel_x + FRAME_THICKNESS;
-        let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
-        let footer_w = panel_width - FRAME_THICKNESS * 2.0;
+        let footer_x = panel_x + frame_thickness;
+        let footer_y = panel_y + panel_height - frame_thickness - footer_h;
+        let footer_w = panel_width - frame_thickness * 2.0;
 
         draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
         draw_line(
-            footer_x + 10.0 * s,
+            footer_x,
             footer_y,
-            footer_x + footer_w - 10.0 * s,
+            footer_x + footer_w,
             footer_y,
             1.0,
             HEADER_BORDER,
@@ -417,12 +406,13 @@ impl Renderer {
     ) {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
-        let header_h = HEADER_HEIGHT * s;
+        let frame_thickness = FRAME_THICKNESS * s;
+        let header_h = 24.0 * s;
         let footer_h = FOOTER_HEIGHT * s;
-        let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
-        let content_y = panel_y + FRAME_THICKNESS + header_h + 8.0 * s;
-        let content_w = panel_width - FRAME_THICKNESS * 2.0 - 16.0 * s;
-        let content_h = panel_height - FRAME_THICKNESS * 2.0 - header_h - footer_h - 16.0 * s;
+        let content_x = panel_x + frame_thickness + 8.0 * s;
+        let content_y = panel_y + frame_thickness + header_h + 8.0 * s;
+        let content_w = panel_width - frame_thickness * 2.0 - 16.0 * s;
+        let content_h = panel_height - frame_thickness * 2.0 - header_h - footer_h - 16.0 * s;
 
         // Inset background
         draw_rectangle(content_x, content_y, content_w, content_h, SLOT_BORDER);
