@@ -52,8 +52,8 @@ const VIEW_DISTANCE: i32 = 40;
 const STATE_SYNC_MIN_QUEUE_CAPACITY: usize = 8;
 
 // World spawn point (chunk 0,0) - where players respawn after death
-const WORLD_SPAWN_X: i32 = 15;
-const WORLD_SPAWN_Y: i32 = 4;
+pub const WORLD_SPAWN_X: i32 = 15;
+pub const WORLD_SPAWN_Y: i32 = 4;
 // Preload a small ring of overworld chunks near spawn at startup and on transitions
 pub const SPAWN_PRELOAD_RADIUS: i32 = 3;
 
@@ -915,6 +915,8 @@ pub struct GameRoom {
     chest_manager: RwLock<crate::chest::ChestManager>,
     /// Tracks which chest each player has open (player_id -> chest_key)
     player_open_chests: RwLock<HashMap<String, String>>,
+    /// Per-spectator message senders (read-only viewers on login screen)
+    spectator_senders: RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>,
 }
 
 impl GameRoom {
@@ -1367,11 +1369,27 @@ impl GameRoom {
             chest_registry,
             chest_manager: RwLock::new(chest_manager),
             player_open_chests: RwLock::new(HashMap::new()),
+            spectator_senders: RwLock::new(HashMap::new()),
         }
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Vec<u8>> {
         self.broadcast_tx.subscribe()
+    }
+
+    /// Register a spectator's message channel.
+    pub async fn add_spectator(&self, spectator_id: &str, sender: mpsc::Sender<Vec<u8>>) {
+        self.spectator_senders.write().await.insert(spectator_id.to_string(), sender);
+    }
+
+    /// Remove a spectator's message channel.
+    pub async fn remove_spectator(&self, spectator_id: &str) {
+        self.spectator_senders.write().await.remove(spectator_id);
+    }
+
+    /// Get current spectator count.
+    pub async fn spectator_count(&self) -> usize {
+        self.spectator_senders.read().await.len()
     }
 
     pub async fn broadcast(&self, msg: ServerMessage) {
@@ -14332,6 +14350,47 @@ impl GameRoom {
             }
         }
         drop(sync_states);
+
+        // === Spectator StateSync ===
+        // Generate a single StateSync for all spectators, centered on world spawn.
+        // Spectators are read-only observers so we skip quest turn-in icons and delta
+        // compression — one full encode shared across every spectator connection.
+        let spectator_senders = self.spectator_senders.read().await;
+        if !spectator_senders.is_empty() {
+            // Gather players near spawn with VIEW_DISTANCE culling
+            let mut spectator_player_values: Vec<rmpv::Value> = Vec::new();
+            for p in &overworld_players {
+                let dx = (p.x - WORLD_SPAWN_X).abs();
+                let dy = (p.y - WORLD_SPAWN_Y).abs();
+                if dx <= VIEW_DISTANCE && dy <= VIEW_DISTANCE {
+                    spectator_player_values.push(crate::protocol::player_update_to_value(p));
+                }
+            }
+
+            // Gather NPCs near spawn
+            let mut spectator_npc_values: Vec<rmpv::Value> = Vec::new();
+            for n in &npc_updates {
+                let dx = (n.x - WORLD_SPAWN_X).abs();
+                let dy = (n.y - WORLD_SPAWN_Y).abs();
+                if dx <= VIEW_DISTANCE && dy <= VIEW_DISTANCE {
+                    spectator_npc_values.push(crate::protocol::npc_update_to_value(n));
+                }
+            }
+
+            // Encode once for all spectators (always full sync, no delta tracking)
+            if let Ok(raw) = crate::protocol::encode_state_sync_from_values(
+                current_tick,
+                spectator_player_values,
+                spectator_npc_values,
+                "",
+            ) {
+                let bytes = crate::protocol::maybe_compress(raw);
+                for sender in spectator_senders.values() {
+                    let _ = sender.try_send(bytes.clone());
+                }
+            }
+        }
+        drop(spectator_senders);
 
         let state_sync_ms = state_sync_start.elapsed().as_millis();
 

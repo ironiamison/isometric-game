@@ -67,6 +67,7 @@ pub struct NetworkClient {
     // Reconnection tracking
     reconnect_attempts: u32,
     was_connected: bool,
+    spectator_mode: bool,
 }
 
 impl NetworkClient {
@@ -90,6 +91,7 @@ impl NetworkClient {
             character_id: None,
             reconnect_attempts: 0,
             was_connected: false,
+            spectator_mode: false,
         };
         client.start_matchmaking();
         client
@@ -110,6 +112,7 @@ impl NetworkClient {
             character_id: Some(character_id),
             reconnect_attempts: 0,
             was_connected: false,
+            spectator_mode: false,
         };
         client.start_matchmaking();
         client
@@ -130,9 +133,61 @@ impl NetworkClient {
             character_id: None, // Not used in simple model
             reconnect_attempts: 0,
             was_connected: false,
+            spectator_mode: false,
         };
         client.start_matchmaking();
         client
+    }
+
+    /// Create a spectator client that connects to /spectate for login screen world view.
+    /// No auth needed. Connection is read-only until upgraded.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new_spectator(base_url: &str) -> Self {
+        let mut client = Self {
+            sender: None,
+            receiver: None,
+            base_url: base_url.to_string(),
+            player_name: String::new(),
+            connection_state: ConnectionState::Disconnected,
+            reconnect_timer: 0.0,
+            room_id: None,
+            session_token: None,
+            auth_token: None,
+            character_id: None,
+            reconnect_attempts: 0,
+            was_connected: false,
+            spectator_mode: true,
+        };
+        client.connect_spectator();
+        client
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn connect_spectator(&mut self) {
+        let ws_url = format!("{}/spectate", self.base_url);
+        log::info!("Connecting spectator WebSocket: {}", ws_url);
+        self.connection_state = ConnectionState::Connecting;
+        match ewebsock::connect(&ws_url, ewebsock::Options::default()) {
+            Ok((sender, receiver)) => {
+                log::info!("Spectator WebSocket connection initiated");
+                self.sender = Some(sender);
+                self.receiver = Some(receiver);
+            }
+            Err(e) => {
+                log::warn!("Spectator WebSocket connection failed: {}", e);
+                self.connection_state = ConnectionState::Disconnected;
+            }
+        }
+    }
+
+    /// Send upgrade message to transition from spectator to authenticated player.
+    pub fn send_spectator_upgrade(&mut self, session_token: &str) {
+        let msg = ClientMessage::SpectatorUpgrade {
+            session_token: session_token.to_string(),
+        };
+        self.send(&msg);
+        self.spectator_mode = false;
+        log::info!("Sent spectator upgrade message");
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -252,6 +307,16 @@ impl NetworkClient {
     pub fn poll(&mut self, state: &mut GameState) {
         match self.connection_state {
             ConnectionState::Disconnected => {
+                #[cfg(not(target_arch = "wasm32"))]
+                if self.spectator_mode {
+                    // Spectator reconnection - retry /spectate, no matchmaking
+                    self.reconnect_timer += 1.0 / 60.0;
+                    if self.reconnect_timer > 3.0 {
+                        self.reconnect_timer = 0.0;
+                        self.connect_spectator();
+                    }
+                    return;
+                }
                 // Only try to reconnect if we were previously connected
                 if self.was_connected {
                     // Check if we've exhausted reconnection attempts
@@ -513,6 +578,10 @@ impl NetworkClient {
 
     pub fn is_connected(&self) -> bool {
         self.connection_state == ConnectionState::Connected
+    }
+
+    pub fn is_spectator(&self) -> bool {
+        self.spectator_mode
     }
 
     pub fn disconnect(&mut self) {
