@@ -173,7 +173,9 @@ impl FrameTimings {
 
         // Update smoothed delta for visual interpolation.
         // Clamp extreme outliers so one hitch doesn't create a large visual jump.
-        let delta_secs = ((delta_ms / 1000.0) as f32).clamp(1.0 / 240.0, 1.0 / 30.0);
+        // Clamp only the upper bound to avoid big hitch jumps.
+        // Do not clamp the lower bound: extremely high FPS should not speed up simulation.
+        let delta_secs = ((delta_ms / 1000.0) as f32).min(1.0 / 30.0);
         if self.delta_smoothing > 0.0 {
             self.smoothed_delta = self.smoothed_delta * self.delta_smoothing
                 + delta_secs * (1.0 - self.delta_smoothing);
@@ -1664,6 +1666,8 @@ pub struct GameState {
     pending_move_seqs: VecDeque<u32>,
     /// Adaptive movement mode for elevated latency.
     pub high_ping_movement_mode: bool,
+    /// Number of server ticks we're catching up within the current frame.
+    pub state_sync_catchup_ticks: u64,
 
     // Debug
     pub debug_mode: bool,
@@ -1814,6 +1818,7 @@ impl GameState {
             last_acked_move_seq: 0,
             pending_move_seqs: VecDeque::new(),
             high_ping_movement_mode: false,
+            state_sync_catchup_ticks: 0,
             debug_mode: false,
             hovered_tile: None,
             hovered_entity_id: None,
@@ -1909,11 +1914,19 @@ impl GameState {
     }
 
     pub fn local_prediction_lead_scale(&self) -> f32 {
-        if !self.high_ping_movement_mode || !self.ping_stats.has_data() {
+        if !self.ping_stats.has_data() {
             return 1.0;
         }
 
         let avg = self.ping_stats.avg_ms as f32;
+        if avg < 40.0 {
+            let t = (avg / 40.0).clamp(0.0, 1.0);
+            return 0.75 + t * 0.25;
+        }
+        if !self.high_ping_movement_mode {
+            return 1.0;
+        }
+
         let t = ((avg - 120.0) / 100.0).clamp(0.0, 1.0);
         1.0 - t * 0.55
     }
@@ -1926,6 +1939,24 @@ impl GameState {
         let avg = self.ping_stats.avg_ms as f32;
         let t = ((avg - 120.0) / 100.0).clamp(0.0, 1.0);
         1.0 + t * 0.5
+    }
+
+    pub fn sync_catchup_softness(&self) -> f32 {
+        let extra_ticks = self.state_sync_catchup_ticks.saturating_sub(1) as f32;
+        if extra_ticks <= 0.0 {
+            return 1.0;
+        }
+        let softness = 1.0 + extra_ticks * 0.35;
+        softness.min(2.0)
+    }
+
+    pub fn sync_catchup_lead_scale(&self) -> f32 {
+        let extra_ticks = self.state_sync_catchup_ticks.saturating_sub(1) as f32;
+        if extra_ticks <= 0.0 {
+            return 1.0;
+        }
+        let scale = 1.0 - extra_ticks * 0.15;
+        scale.clamp(0.55, 1.0)
     }
 
     /// Append a chat message and bump revision so renderer cache invalidates once.
@@ -1958,7 +1989,8 @@ impl GameState {
         let visual_delta = self.frame_timings.smoothed_delta;
         // Keep local movement tightly synced to real frame time to reduce
         // drift/corrections during rapid directional changes.
-        let local_visual_delta = delta.clamp(1.0 / 240.0, 1.0 / 30.0);
+        // Cap large deltas, but allow very small deltas at high FPS.
+        let local_visual_delta = delta.min(1.0 / 30.0);
         let local_id = self.local_player_id.clone();
 
         // Update all players (smooth interpolation toward server positions)

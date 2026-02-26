@@ -303,15 +303,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         }
                         let has_pending_local_moves =
                             is_local_player && state.has_pending_move_sequences();
+                        let catchup_softness = state.sync_catchup_softness();
+                        let catchup_lead_scale = state.sync_catchup_lead_scale();
                         let local_lead_scale = if is_local_player {
-                            state.local_prediction_lead_scale()
+                            state.local_prediction_lead_scale() * catchup_lead_scale
                         } else {
                             1.0
                         };
                         let local_reconciliation_softness = if is_local_player {
-                            state.local_reconciliation_softness()
+                            state.local_reconciliation_softness() * catchup_softness
                         } else {
-                            1.0
+                            catchup_softness
                         };
 
                         if let Some(player) = state.players.get_mut(&id) {
