@@ -5150,17 +5150,29 @@ impl GameRoom {
             "potion" | "equipment" => {
                 // Grant items to player inventory
                 if let Some(ref item_id) = reward.target_id {
-                    let mut players = self.players.write().await;
-                    if let Some(player) = players.get_mut(player_id) {
-                        if !player.inventory.has_space_for(item_id, reward.quantity, &self.item_registry) {
-                            self.send_to_player(player_id, ServerMessage::SlayerResult {
-                                success: false, action: "buy_reward".to_string(),
-                                message: "Your inventory is full.".to_string(),
-                                task: None, points: Some(state.points),
-                            }).await;
-                            return;
+                    let inv_update = {
+                        let mut players = self.players.write().await;
+                        if let Some(player) = players.get_mut(player_id) {
+                            if !player.inventory.has_space_for(item_id, reward.quantity, &self.item_registry) {
+                                self.send_to_player(player_id, ServerMessage::SlayerResult {
+                                    success: false, action: "buy_reward".to_string(),
+                                    message: "Your inventory is full.".to_string(),
+                                    task: None, points: Some(state.points),
+                                }).await;
+                                return;
+                            }
+                            player.inventory.add_item(item_id, reward.quantity, &self.item_registry);
+                            Some((player.inventory.to_update(), player.inventory.gold))
+                        } else {
+                            None
                         }
-                        player.inventory.add_item(item_id, reward.quantity, &self.item_registry);
+                    };
+                    if let Some((slots, gold)) = inv_update {
+                        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                            player_id: player_id.to_string(),
+                            slots,
+                            gold,
+                        }).await;
                     }
                 }
                 state.points -= reward.cost;
