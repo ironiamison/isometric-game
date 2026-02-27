@@ -1008,6 +1008,49 @@ pub enum InputCommand {
         x: i32,
         y: i32,
     },
+    // Trade commands
+    TradeRequest {
+        target_id: String,
+    },
+    TradeAcceptRequest {
+        requester_id: String,
+    },
+    TradeDeclineRequest {
+        requester_id: String,
+    },
+    TradeOfferItem {
+        slot_index: u8,
+        quantity: i32,
+    },
+    TradeRemoveItem {
+        offer_index: u8,
+    },
+    TradeOfferGold {
+        amount: i32,
+    },
+    TradeAccept,
+    TradeCancel,
+    // Stall commands
+    StallOpen {
+        name: String,
+    },
+    StallClose,
+    StallSetItem {
+        inventory_slot: u8,
+        quantity: i32,
+        price: i32,
+    },
+    StallRemoveItem {
+        stall_slot: u8,
+    },
+    StallBrowse {
+        player_id: String,
+    },
+    StallBuy {
+        seller_id: String,
+        stall_slot: u8,
+        quantity: i32,
+    },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -1720,6 +1763,25 @@ impl InputHandler {
                     UiElementId::InventorySlot(idx) => {
                         // Check if slot has an item
                         if let Some(Some(slot)) = state.inventory.slots.get(*idx) {
+                            // If trade is open, add item to trade offer instead of dragging
+                            if state.ui_state.trade_open {
+                                commands.push(InputCommand::TradeOfferItem {
+                                    slot_index: *idx as u8,
+                                    quantity: slot.quantity,
+                                });
+                                return commands;
+                            }
+
+                            // If stall setup is open, add item to stall instead of dragging
+                            if state.ui_state.stall_setup_open && !state.ui_state.stall_active {
+                                commands.push(InputCommand::StallSetItem {
+                                    inventory_slot: *idx as u8,
+                                    quantity: slot.quantity,
+                                    price: 1,
+                                });
+                                return commands;
+                            }
+
                             // Check for shift+click to drop (if enabled)
                             let shift_held =
                                 is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
@@ -2067,66 +2129,71 @@ impl InputHandler {
                                 }
                                 // === World context menu targets ===
                                 ContextMenuTarget::Player { id } => {
-                                    // Options: 0=Attack, 1=Follow, 2=Add Friend, 3=Examine
-                                    match option_idx {
-                                        0 => {
-                                            // Attack - reuse player attack logic
-                                            commands.push(InputCommand::Target { entity_id: id.clone() });
-                                            state.auto_action_state = Some(crate::game::AutoActionState {
-                                                target_type: "player".to_string(),
-                                                target_id: id.clone(),
-                                                action: "attack".to_string(),
-                                                confirmed: false,
-                                            });
-                                            pathfind_and_attack_player(state, &mut commands, id);
+                                    // Options: 0=Attack, 1=Follow, 2=Trade, [3=Browse Shop if stall], N=Add Friend, N+1=Examine
+                                    let player_has_stall = state.players.get(id).map_or(false, |p| p.has_stall);
+                                    let mut ci = 0usize;
+                                    let attack_idx = { let idx = ci; ci += 1; idx };
+                                    let follow_idx = { let idx = ci; ci += 1; idx };
+                                    let trade_idx = { let idx = ci; ci += 1; idx };
+                                    let browse_shop_idx = if player_has_stall {
+                                        let idx = ci; ci += 1; Some(idx)
+                                    } else { None };
+                                    let add_friend_idx = { let idx = ci; ci += 1; idx };
+                                    let examine_idx = ci;
+
+                                    if *option_idx == attack_idx {
+                                        commands.push(InputCommand::Target { entity_id: id.clone() });
+                                        state.auto_action_state = Some(crate::game::AutoActionState {
+                                            target_type: "player".to_string(),
+                                            target_id: id.clone(),
+                                            action: "attack".to_string(),
+                                            confirmed: false,
+                                        });
+                                        pathfind_and_attack_player(state, &mut commands, id);
+                                    } else if *option_idx == follow_idx {
+                                        state.follow_target = Some(id.clone());
+                                        if state.auto_action_state.is_some() {
+                                            state.auto_action_state = None;
+                                            commands.push(InputCommand::CancelAutoAction);
                                         }
-                                        1 => {
-                                            // Follow - persistently follow this player
-                                            state.follow_target = Some(id.clone());
-                                            // Cancel any auto-action
-                                            if state.auto_action_state.is_some() {
-                                                state.auto_action_state = None;
-                                                commands.push(InputCommand::CancelAutoAction);
-                                            }
-                                            // Initial pathfind to adjacent
-                                            if let Some(local_id) = &state.local_player_id.clone() {
-                                                if let Some(player) = state.players.get(local_id) {
-                                                    if let Some(target) = state.players.get(id) {
-                                                        let px = player.server_x.round() as i32;
-                                                        let py = player.server_y.round() as i32;
-                                                        let tx = target.server_x.round() as i32;
-                                                        let ty = target.server_y.round() as i32;
-                                                        let mut occupied = build_occupied_set(state, true);
-                                                        occupied.remove(&(tx, ty));
-                                                        const MAX_PATH_DISTANCE: i32 = 32;
-                                                        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                                            (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
-                                                        ) {
-                                                            state.auto_path = Some(PathState {
-                                                                path, current_index: 0, destination: dest,
-                                                                pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
-                                                            });
-                                                        }
+                                        if let Some(local_id) = &state.local_player_id.clone() {
+                                            if let Some(player) = state.players.get(local_id) {
+                                                if let Some(target) = state.players.get(id) {
+                                                    let px = player.server_x.round() as i32;
+                                                    let py = player.server_y.round() as i32;
+                                                    let tx = target.server_x.round() as i32;
+                                                    let ty = target.server_y.round() as i32;
+                                                    let mut occupied = build_occupied_set(state, true);
+                                                    occupied.remove(&(tx, ty));
+                                                    const MAX_PATH_DISTANCE: i32 = 32;
+                                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                                        (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                                                    ) {
+                                                        state.auto_path = Some(PathState {
+                                                            path, current_index: 0, destination: dest,
+                                                            pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None,
+                                                        });
                                                     }
                                                 }
                                             }
                                         }
-                                        2 => {
-                                            // Add Friend
-                                            if let Some(player) = state.players.get(id) {
-                                                commands.push(InputCommand::SendFriendRequest {
-                                                    target_name: player.name.clone(),
-                                                });
-                                            }
+                                    } else if *option_idx == trade_idx {
+                                        // Send trade request
+                                        commands.push(InputCommand::TradeRequest { target_id: id.clone() });
+                                    } else if browse_shop_idx == Some(*option_idx) {
+                                        // Browse this player's stall
+                                        commands.push(InputCommand::StallBrowse { player_id: id.clone() });
+                                    } else if *option_idx == add_friend_idx {
+                                        if let Some(player) = state.players.get(id) {
+                                            commands.push(InputCommand::SendFriendRequest {
+                                                target_name: player.name.clone(),
+                                            });
                                         }
-                                        3 => {
-                                            // Examine
-                                            if let Some(player) = state.players.get(id) {
-                                                let msg = format!("{} (level {})", player.name, player.combat_level());
-                                                state.push_system_chat(msg);
-                                            }
+                                    } else if *option_idx == examine_idx {
+                                        if let Some(player) = state.players.get(id) {
+                                            let msg = format!("{} (level {})", player.name, player.combat_level());
+                                            state.push_system_chat(msg);
                                         }
-                                        _ => {}
                                     }
                                 }
                                 ContextMenuTarget::Npc { id } => {
@@ -3373,7 +3440,11 @@ impl InputHandler {
                             let dialog = state.ui_state.gold_drop_dialog.as_ref().unwrap();
                             if let Ok(amount) = dialog.input.parse::<i32>() {
                                 if amount > 0 && amount <= state.inventory.gold {
-                                    commands.push(InputCommand::DropGold { amount });
+                                    if state.ui_state.trade_open {
+                                        commands.push(InputCommand::TradeOfferGold { amount });
+                                    } else {
+                                        commands.push(InputCommand::DropGold { amount });
+                                    }
                                     state.ui_state.gold_drop_dialog = None;
                                 }
                             }
@@ -3399,7 +3470,11 @@ impl InputHandler {
                 let dialog = state.ui_state.gold_drop_dialog.as_ref().unwrap();
                 if let Ok(amount) = dialog.input.parse::<i32>() {
                     if amount > 0 && amount <= state.inventory.gold {
-                        commands.push(InputCommand::DropGold { amount });
+                        if state.ui_state.trade_open {
+                            commands.push(InputCommand::TradeOfferGold { amount });
+                        } else {
+                            commands.push(InputCommand::DropGold { amount });
+                        }
                         state.ui_state.gold_drop_dialog = None;
                     }
                 }
@@ -3599,6 +3674,171 @@ impl InputHandler {
             // Escape to close
             if is_key_pressed(KeyCode::Escape) {
                 state.ui_state.slayer_panel_open = false;
+                return commands;
+            }
+
+            return commands;
+        }
+
+        // Handle trade panel input
+        if state.ui_state.trade_open {
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::TradeOfferSlot(i) => {
+                            // Remove item from our offer
+                            commands.push(InputCommand::TradeRemoveItem { offer_index: *i as u8 });
+                        }
+                        UiElementId::TradeGoldInput => {
+                            // Open gold input dialog reusing the gold drop pattern
+                            state.ui_state.gold_drop_dialog = Some(GoldDropDialog {
+                                input: String::new(),
+                                cursor: 0,
+                            });
+                        }
+                        UiElementId::TradeAcceptButton => {
+                            commands.push(InputCommand::TradeAccept);
+                        }
+                        UiElementId::TradeCancelButton => {
+                            commands.push(InputCommand::TradeCancel);
+                        }
+                        UiElementId::InventorySlot(slot_idx) => {
+                            // Offer item from inventory
+                            if let Some(slot) = state.inventory.slots.get(*slot_idx).and_then(|s| s.as_ref()) {
+                                commands.push(InputCommand::TradeOfferItem {
+                                    slot_index: *slot_idx as u8,
+                                    quantity: slot.quantity,
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Escape to close trade
+            if is_key_pressed(KeyCode::Escape) {
+                commands.push(InputCommand::TradeCancel);
+                return commands;
+            }
+
+            return commands;
+        }
+
+        // Handle trade request popup
+        if state.ui_state.trade_pending_request.is_some() {
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::TradeRequestAccept => {
+                            if let Some((ref requester_id, _)) = state.ui_state.trade_pending_request {
+                                commands.push(InputCommand::TradeAcceptRequest { requester_id: requester_id.clone() });
+                            }
+                            state.ui_state.trade_pending_request = None;
+                        }
+                        UiElementId::TradeRequestDecline => {
+                            if let Some((ref requester_id, _)) = state.ui_state.trade_pending_request {
+                                commands.push(InputCommand::TradeDeclineRequest { requester_id: requester_id.clone() });
+                            }
+                            state.ui_state.trade_pending_request = None;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        // Handle stall setup panel input
+        if state.ui_state.stall_setup_open {
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::StallSetupRemove(i) => {
+                            if let Some(slot) = state.ui_state.stall_my_slots.get(*i) {
+                                commands.push(InputCommand::StallRemoveItem { stall_slot: slot.slot });
+                            }
+                        }
+                        UiElementId::StallSetupOpenButton => {
+                            let name = if state.ui_state.stall_my_name.is_empty() {
+                                "My Shop".to_string()
+                            } else {
+                                state.ui_state.stall_my_name.clone()
+                            };
+                            commands.push(InputCommand::StallOpen { name });
+                        }
+                        UiElementId::StallSetupCloseButton => {
+                            commands.push(InputCommand::StallClose);
+                        }
+                        UiElementId::InventorySlot(slot_idx) => {
+                            // Add item to stall from inventory
+                            if let Some(slot) = state.inventory.slots.get(*slot_idx).and_then(|s| s.as_ref()) {
+                                commands.push(InputCommand::StallSetItem {
+                                    inventory_slot: *slot_idx as u8,
+                                    quantity: slot.quantity,
+                                    price: 1, // Default price; player can edit later
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.stall_setup_open = false;
+                return commands;
+            }
+
+            return commands;
+        }
+
+        // Handle stall browse panel input
+        if state.ui_state.stall_browse.is_some() {
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::StallBrowseItem(i) => {
+                            state.ui_state.stall_browse_selected = *i;
+                            state.ui_state.stall_buy_quantity = 1;
+                        }
+                        UiElementId::StallBrowseQuantityMinus => {
+                            if state.ui_state.stall_buy_quantity > 1 {
+                                state.ui_state.stall_buy_quantity -= 1;
+                            }
+                        }
+                        UiElementId::StallBrowseQuantityPlus => {
+                            state.ui_state.stall_buy_quantity += 1;
+                            // Clamp to available quantity
+                            if let Some(ref browse) = state.ui_state.stall_browse {
+                                if let Some(item) = browse.items.get(state.ui_state.stall_browse_selected) {
+                                    if state.ui_state.stall_buy_quantity > item.quantity {
+                                        state.ui_state.stall_buy_quantity = item.quantity;
+                                    }
+                                }
+                            }
+                        }
+                        UiElementId::StallBrowseBuyButton => {
+                            if let Some(ref browse) = state.ui_state.stall_browse {
+                                if let Some(item) = browse.items.get(state.ui_state.stall_browse_selected) {
+                                    commands.push(InputCommand::StallBuy {
+                                        seller_id: browse.seller_id.clone(),
+                                        stall_slot: item.slot,
+                                        quantity: state.ui_state.stall_buy_quantity,
+                                    });
+                                }
+                            }
+                        }
+                        UiElementId::StallBrowseCloseButton => {
+                            state.ui_state.stall_browse = None;
+                            state.pending_sfx.push("ui_close".to_string());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.stall_browse = None;
                 return commands;
             }
 
@@ -9050,6 +9290,12 @@ impl InputHandler {
             }
             state.ui_state.minimap_panel_dragging = false;
             return commands;
+        }
+
+        // Toggle stall setup panel (Y key)
+        if !classic && is_key_pressed(KeyCode::Y) {
+            audio.play_sfx("enter");
+            state.ui_state.stall_setup_open = !state.ui_state.stall_setup_open;
         }
 
         // Use/equip items or cast spells via unified hotkey bar (1-5 keys, disabled in classic mode)

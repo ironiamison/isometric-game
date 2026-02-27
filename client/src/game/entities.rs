@@ -155,6 +155,10 @@ pub struct Player {
 
     /// Whether this player is currently in a dash slide
     pub is_dashing: bool,
+    /// Whether this player has an active stall
+    pub has_stall: bool,
+    /// Name of the player's stall (if has_stall)
+    pub stall_name: Option<String>,
     /// True for the local player (set from state sync calls)
     is_local_player: bool,
 }
@@ -206,6 +210,8 @@ impl Player {
             mining_started_at: 0.0,
             last_mining_anim: 0.0,
             is_dashing: false,
+            has_stall: false,
+            stall_name: None,
             is_local_player: false,
         }
     }

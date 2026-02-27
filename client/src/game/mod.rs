@@ -38,7 +38,8 @@ pub use state::{
     FriendInfo, GameState, GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent,
     MapTransition, OnlinePlayerInfo, PendingRequestInfo, Projectile, CatalogObjective,
     QuestCatalogEntry, QuestCompletedEvent, QuestObjective, SkillXpEvent, SocialState, SocialTab,
-    SpellEffect, TransitionState, UiState, XpDropFeed, quest_status_order,
+    SpellEffect, StallBrowseInfo, StallSlotInfo, TradeOfferItem, TransitionState, UiState,
+    XpDropFeed, quest_status_order,
 };
 pub use spectator_camera::SpectatorCamera;
 pub use tilemap::{LayerType, Tilemap, TilemapLayer};

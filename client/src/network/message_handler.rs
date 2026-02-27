@@ -293,6 +293,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let equipped_belt =
                             extract_string(player_value, "equipped_belt").filter(|s| !s.is_empty());
                         let is_admin = extract_bool(player_value, "is_admin").unwrap_or(false);
+                        let has_stall = extract_bool(player_value, "has_stall").unwrap_or(false);
+                        let stall_name = extract_string(player_value, "stall_name");
                         let move_ack_seq = extract_u32(player_value, "moveAckSeq");
 
                         let is_local_player = state.local_player_id.as_ref() == Some(&id);
@@ -396,6 +398,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.equipped_belt = equipped_belt.clone();
                             // Update admin status
                             player.is_admin = is_admin;
+                            // Update stall status
+                            player.has_stall = has_stall;
+                            player.stall_name = stall_name.clone();
                             // Update sitting state
                             let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
                             if sitting
@@ -482,6 +487,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 new_player.equipped_necklace = equipped_necklace;
                                 new_player.equipped_belt = equipped_belt;
                                 new_player.is_admin = is_admin;
+                                new_player.has_stall = has_stall;
+                                new_player.stall_name = stall_name;
                                 let sitting =
                                     extract_bool(player_value, "sitting").unwrap_or(false);
                                 if sitting {
@@ -3867,6 +3874,208 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 log::warn!("Server error: {}", message);
                 state.push_system_chat(message);
                 state.pending_sfx.push("error".to_string());
+            }
+        }
+
+        // ===== Trade System Messages =====
+        "tradeRequestReceived" => {
+            if let Some(value) = data {
+                let requester_id = extract_string(value, "requester_id").unwrap_or_default();
+                let requester_name = extract_string(value, "requester_name").unwrap_or_default();
+                state.ui_state.trade_pending_request = Some((requester_id, requester_name.clone()));
+                state.push_system_chat(format!("{} wants to trade with you.", requester_name));
+            }
+        }
+
+        "tradeOpened" => {
+            if let Some(value) = data {
+                let partner_id = extract_string(value, "partner_id").unwrap_or_default();
+                let partner_name = extract_string(value, "partner_name").unwrap_or_default();
+                state.ui_state.trade_open = true;
+                state.ui_state.inventory_open = true;
+                state.ui_state.trade_partner_id = Some(partner_id);
+                state.ui_state.trade_partner_name = Some(partner_name);
+                state.ui_state.trade_my_items.clear();
+                state.ui_state.trade_my_gold = 0;
+                state.ui_state.trade_my_accepted = false;
+                state.ui_state.trade_partner_items.clear();
+                state.ui_state.trade_partner_gold = 0;
+                state.ui_state.trade_partner_accepted = false;
+                state.ui_state.trade_pending_request = None;
+                state.pending_sfx.push("ui_open".to_string());
+            }
+        }
+
+        "tradeOfferUpdate" => {
+            if let Some(value) = data {
+                // Parse partner's items
+                let mut items = Vec::new();
+                if let Some(arr) = extract_map_field(value, "partner_items") {
+                    if let rmpv::Value::Array(ref list) = *arr {
+                        for item in list {
+                            let slot_index = extract_u8(item, "slot_index").unwrap_or(0);
+                            let item_id = extract_string(item, "item_id").unwrap_or_default();
+                            let quantity = extract_i32(item, "quantity").unwrap_or(1);
+                            items.push(crate::game::TradeOfferItem { slot_index, item_id, quantity });
+                        }
+                    }
+                }
+                state.ui_state.trade_partner_items = items;
+                state.ui_state.trade_partner_gold = extract_i32(value, "partner_gold").unwrap_or(0);
+                state.ui_state.trade_partner_accepted = extract_bool(value, "partner_accepted").unwrap_or(false);
+                // If partner changed offer, reset our accepted state
+                state.ui_state.trade_my_accepted = false;
+            }
+        }
+
+        "tradeMyOfferUpdate" => {
+            if let Some(value) = data {
+                let mut items = Vec::new();
+                if let Some(arr) = extract_map_field(value, "my_items") {
+                    if let rmpv::Value::Array(ref list) = *arr {
+                        for item in list {
+                            let slot_index = extract_u8(item, "slot_index").unwrap_or(0);
+                            let item_id = extract_string(item, "item_id").unwrap_or_default();
+                            let quantity = extract_i32(item, "quantity").unwrap_or(1);
+                            items.push(crate::game::TradeOfferItem { slot_index, item_id, quantity });
+                        }
+                    }
+                }
+                state.ui_state.trade_my_items = items;
+                state.ui_state.trade_my_gold = extract_i32(value, "my_gold").unwrap_or(0);
+                state.ui_state.trade_my_accepted = extract_bool(value, "my_accepted").unwrap_or(false);
+            }
+        }
+
+        "tradeCompleted" => {
+            state.ui_state.trade_open = false;
+            state.ui_state.trade_partner_id = None;
+            state.ui_state.trade_partner_name = None;
+            state.ui_state.trade_my_items.clear();
+            state.ui_state.trade_partner_items.clear();
+            state.push_system_chat("Trade completed successfully!".to_string());
+            state.pending_sfx.push("ui_close".to_string());
+        }
+
+        "tradeCancelled" => {
+            if let Some(value) = data {
+                let reason = extract_string(value, "reason").unwrap_or_else(|| "Trade cancelled.".to_string());
+                state.push_system_chat(reason);
+            }
+            state.ui_state.trade_open = false;
+            state.ui_state.trade_partner_id = None;
+            state.ui_state.trade_partner_name = None;
+            state.ui_state.trade_my_items.clear();
+            state.ui_state.trade_partner_items.clear();
+            state.ui_state.trade_pending_request = None;
+            state.pending_sfx.push("ui_close".to_string());
+        }
+
+        // ===== Stall System Messages =====
+        "stallOpened" => {
+            if let Some(value) = data {
+                let name = extract_string(value, "name").unwrap_or_default();
+                state.ui_state.stall_active = true;
+                state.ui_state.stall_my_name = name;
+                state.ui_state.stall_setup_open = true;
+                state.push_system_chat("Your shop is now open!".to_string());
+            }
+        }
+
+        "stallClosed" => {
+            state.ui_state.stall_active = false;
+            state.ui_state.stall_my_slots.clear();
+            state.ui_state.stall_setup_open = false;
+            state.push_system_chat("Your shop has been closed.".to_string());
+        }
+
+        "stallUpdate" => {
+            if let Some(value) = data {
+                let mut slots = Vec::new();
+                if let Some(arr) = extract_map_field(value, "slots") {
+                    if let rmpv::Value::Array(ref list) = *arr {
+                        for item in list {
+                            let slot = extract_u8(item, "slot").unwrap_or(0);
+                            let item_id = extract_string(item, "item_id").unwrap_or_default();
+                            let quantity = extract_i32(item, "quantity").unwrap_or(1);
+                            let price = extract_i32(item, "price").unwrap_or(0);
+                            slots.push(crate::game::StallSlotInfo { slot, item_id, quantity, price });
+                        }
+                    }
+                }
+                state.ui_state.stall_my_slots = slots;
+            }
+        }
+
+        "stallBrowseData" => {
+            if let Some(value) = data {
+                let seller_id = extract_string(value, "seller_id").unwrap_or_default();
+                let seller_name = extract_string(value, "seller_name").unwrap_or_default();
+                let stall_name = extract_string(value, "stall_name").unwrap_or_default();
+                let mut items = Vec::new();
+                if let Some(arr) = extract_map_field(value, "items") {
+                    if let rmpv::Value::Array(ref list) = *arr {
+                        for item in list {
+                            let slot = extract_u8(item, "slot").unwrap_or(0);
+                            let item_id = extract_string(item, "item_id").unwrap_or_default();
+                            let quantity = extract_i32(item, "quantity").unwrap_or(1);
+                            let price = extract_i32(item, "price").unwrap_or(0);
+                            items.push(crate::game::StallSlotInfo { slot, item_id, quantity, price });
+                        }
+                    }
+                }
+                state.ui_state.stall_browse = Some(crate::game::StallBrowseInfo {
+                    seller_id,
+                    seller_name,
+                    stall_name,
+                    items,
+                });
+                state.ui_state.stall_buy_quantity = 1;
+                state.ui_state.stall_browse_selected = 0;
+                state.pending_sfx.push("ui_open".to_string());
+            }
+        }
+
+        "stallBuyResult" => {
+            if let Some(value) = data {
+                let success = extract_bool(value, "success").unwrap_or(false);
+                let message = extract_string(value, "message").unwrap_or_default();
+                if success {
+                    state.push_system_chat(format!("Purchase successful: {}", message));
+                } else {
+                    state.push_system_chat(format!("Purchase failed: {}", message));
+                }
+            }
+        }
+
+        "stallSaleNotification" => {
+            if let Some(value) = data {
+                let buyer_name = extract_string(value, "buyer_name").unwrap_or_default();
+                let item_id = extract_string(value, "item_id").unwrap_or_default();
+                let quantity = extract_i32(value, "quantity").unwrap_or(1);
+                let gold_earned = extract_i32(value, "gold_earned").unwrap_or(0);
+                let item_def = state.item_registry.get_or_placeholder(&item_id);
+                state.push_system_chat(format!(
+                    "{} bought {}x {} from your shop for {}g!",
+                    buyer_name, quantity, item_def.display_name, gold_earned
+                ));
+            }
+        }
+
+        "stallItemUpdate" => {
+            if let Some(value) = data {
+                let slot = extract_u8(value, "slot").unwrap_or(0);
+                let quantity = extract_i32(value, "quantity").unwrap_or(0);
+                // Update browse data if open
+                if let Some(ref mut browse) = state.ui_state.stall_browse {
+                    if let Some(item) = browse.items.iter_mut().find(|i| i.slot == slot) {
+                        if quantity <= 0 {
+                            browse.items.retain(|i| i.slot != slot);
+                        } else {
+                            item.quantity = quantity;
+                        }
+                    }
+                }
             }
         }
 

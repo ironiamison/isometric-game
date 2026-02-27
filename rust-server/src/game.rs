@@ -383,6 +383,70 @@ pub struct Player {
     pub is_dashing: bool,
     /// Active auto-action (OSRS-style click-to-act). Processed each server tick.
     pub auto_action: Option<AutoAction>,
+    /// Active player stall (None if no stall open)
+    pub stall: Option<PlayerStall>,
+}
+
+// ============================================================================
+// Trade System
+// ============================================================================
+
+pub const TRADE_MAX_DISTANCE: i32 = 3;
+
+#[derive(Debug, Clone)]
+pub struct TradeOfferEntry {
+    pub inv_slot: u8,
+    pub item_id: String,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct TradeOffer {
+    pub items: Vec<TradeOfferEntry>,
+    pub gold: i32,
+    pub accepted: bool,
+}
+
+impl TradeOffer {
+    pub fn new() -> Self {
+        Self { items: Vec::new(), gold: 0, accepted: false }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TradeSession {
+    pub player_a: String,
+    pub player_b: String,
+    pub offer_a: TradeOffer,
+    pub offer_b: TradeOffer,
+}
+
+// ============================================================================
+// Player Stall System
+// ============================================================================
+
+pub const STALL_MAX_SLOTS: usize = 10;
+
+#[derive(Debug, Clone)]
+pub struct StallSlot {
+    pub item_id: String,
+    pub quantity: i32,
+    pub price: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct PlayerStall {
+    pub name: String,
+    pub slots: Vec<Option<StallSlot>>,
+}
+
+impl PlayerStall {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            slots: (0..STALL_MAX_SLOTS).map(|_| None).collect(),
+        }
+    }
 }
 
 /// Unified spell representation for both static (const) and scroll-based spells.
@@ -473,6 +537,7 @@ impl Player {
             last_dash_tick: 0,
             is_dashing: false,
             auto_action: None,
+            stall: None,
         }
     }
 
@@ -784,6 +849,8 @@ pub struct PlayerUpdate {
     pub dashing: bool,
     pub mp: i32,
     pub max_mp: i32,
+    pub has_stall: bool,
+    pub stall_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -944,6 +1011,12 @@ pub struct GameRoom {
     player_open_chests: RwLock<HashMap<String, String>>,
     /// Per-spectator message senders (read-only viewers on login screen)
     spectator_senders: RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>,
+    /// Active trade sessions: trade_id -> TradeSession
+    trades: RwLock<HashMap<String, TradeSession>>,
+    /// Player -> trade_id mapping for quick lookup
+    player_trades: RwLock<HashMap<String, String>>,
+    /// Pending trade requests: target_id -> (requester_id, tick_when_sent)
+    trade_requests: RwLock<HashMap<String, (String, u64)>>,
 }
 
 impl GameRoom {
@@ -1397,6 +1470,9 @@ impl GameRoom {
             chest_manager: RwLock::new(chest_manager),
             player_open_chests: RwLock::new(HashMap::new()),
             spectator_senders: RwLock::new(HashMap::new()),
+            trades: RwLock::new(HashMap::new()),
+            player_trades: RwLock::new(HashMap::new()),
+            trade_requests: RwLock::new(HashMap::new()),
         }
     }
 
@@ -1814,6 +1890,12 @@ impl GameRoom {
 
         // Close any open chest
         self.close_player_chest(player_id).await;
+
+        // Cancel any active trade on disconnect
+        self.cancel_trade_for_player(player_id, "Partner disconnected").await;
+
+        // Close stall on disconnect, return items to inventory/bank
+        self.force_close_stall(player_id).await;
 
         // Stop any active gathering/woodcutting
         {
@@ -2481,6 +2563,11 @@ impl GameRoom {
                     return;
                 }
                 player.last_received_move_seq = move_seq;
+
+                // Block movement while stall is active
+                if player.stall.is_some() {
+                    return;
+                }
 
                 // Auto-stand when trying to move while sitting (only in chair facing direction)
                 if let Some(pos) = player.sitting_at {
@@ -6846,6 +6933,12 @@ impl GameRoom {
     }
 
     pub async fn handle_use_item(&self, player_id: &str, slot_index: u8) {
+        // Block using items that are in an active trade offer
+        if self.is_slot_in_trade(player_id, slot_index).await {
+            self.send_system_message(player_id, "That item is in a trade offer.").await;
+            return;
+        }
+
         // Block consumables during arena fights
         {
             let arena = self.arena_manager.read().await;
@@ -9214,6 +9307,12 @@ impl GameRoom {
 
         let slot_idx = slot_index as usize;
 
+        // Block equipping items that are in an active trade offer
+        if self.is_slot_in_trade(player_id, slot_index).await {
+            self.send_system_message(player_id, "That item is in a trade offer.").await;
+            return;
+        }
+
         // Get item info from inventory slot
         let item_info = {
             let players = self.players.read().await;
@@ -9683,6 +9782,12 @@ impl GameRoom {
         target_y: Option<i32>,
     ) {
         let slot_idx = slot_index as usize;
+
+        // Block dropping items that are in an active trade offer
+        if self.is_slot_in_trade(player_id, slot_index).await {
+            self.send_system_message(player_id, "That item is in a trade offer.").await;
+            return;
+        }
 
         // Get player position and item info
         let drop_info: Option<(i32, i32, String, i32)> = {
@@ -12809,6 +12914,8 @@ impl GameRoom {
                     dashing: player.is_dashing,
                     mp: player.mp,
                     max_mp: player.max_mp(),
+                    has_stall: player.stall.is_some(),
+                    stall_name: player.stall.as_ref().map(|s| s.name.clone()),
                 });
             }
             player_updates
@@ -14791,6 +14898,72 @@ impl GameRoom {
         drop(spectator_senders);
 
         let state_sync_ms = state_sync_start.elapsed().as_millis();
+
+        // Cancel trades if players moved too far apart
+        {
+            let trade_ids: Vec<String> = {
+                let trades = self.trades.read().await;
+                trades.keys().cloned().collect()
+            };
+            for trade_id in trade_ids {
+                let should_cancel = {
+                    let trades = self.trades.read().await;
+                    if let Some(session) = trades.get(&trade_id) {
+                        let players = self.players.read().await;
+                        match (players.get(&session.player_a), players.get(&session.player_b)) {
+                            (Some(a), Some(b)) => {
+                                let dx = (a.x - b.x).abs();
+                                let dy = (a.y - b.y).abs();
+                                dx > TRADE_MAX_DISTANCE || dy > TRADE_MAX_DISTANCE
+                                    || a.is_dead || b.is_dead || !a.active || !b.active
+                            }
+                            _ => true,
+                        }
+                    } else {
+                        false
+                    }
+                };
+                if should_cancel {
+                    let session = {
+                        let mut trades = self.trades.write().await;
+                        trades.remove(&trade_id)
+                    };
+                    if let Some(session) = session {
+                        {
+                            let mut pt = self.player_trades.write().await;
+                            pt.remove(&session.player_a);
+                            pt.remove(&session.player_b);
+                        }
+                        let msg = ServerMessage::TradeCancelled { reason: "Too far apart.".to_string() };
+                        self.send_to_player(&session.player_a, msg.clone()).await;
+                        self.send_to_player(&session.player_b, msg).await;
+                    }
+                }
+            }
+        }
+
+        // Expire old trade requests (20 second timeout)
+        {
+            let mut requests = self.trade_requests.write().await;
+            requests.retain(|_, (_, tick)| current_tick - *tick < 400);
+        }
+
+        // Close stall if player died
+        {
+            let stall_owners: Vec<String> = {
+                let players = self.players.read().await;
+                players.values()
+                    .filter(|p| p.stall.is_some() && p.is_dead)
+                    .map(|p| p.id.clone())
+                    .collect()
+            };
+            for pid in stall_owners {
+                self.force_close_stall(&pid).await;
+                self.send_to_player(&pid, ServerMessage::StallClosed {
+                    reason: "Shop closed (you died).".to_string(),
+                }).await;
+            }
+        }
 
         // Arena tick: zone detection + state machine
         let arena_start = std::time::Instant::now();
@@ -18015,5 +18188,1091 @@ impl GameRoom {
                 chest.viewers.remove(player_id);
             }
         }
+    }
+
+    // ========================================================================
+    // Trade System Handlers
+    // ========================================================================
+
+    /// Check if a player's inventory slot is locked in an active trade offer
+    async fn is_slot_in_trade(&self, player_id: &str, slot_index: u8) -> bool {
+        let player_trades = self.player_trades.read().await;
+        if let Some(trade_id) = player_trades.get(player_id) {
+            let trades = self.trades.read().await;
+            if let Some(session) = trades.get(trade_id) {
+                let offer = if session.player_a == player_id {
+                    &session.offer_a
+                } else {
+                    &session.offer_b
+                };
+                return offer.items.iter().any(|item| item.inv_slot == slot_index);
+            }
+        }
+        false
+    }
+
+    fn make_trade_offer_items(offer: &TradeOffer) -> Vec<crate::protocol::TradeOfferItemData> {
+        offer.items.iter().map(|e| crate::protocol::TradeOfferItemData {
+            slot_index: e.inv_slot,
+            item_id: e.item_id.clone(),
+            quantity: e.quantity,
+        }).collect()
+    }
+
+    async fn cancel_trade_for_player(&self, player_id: &str, reason: &str) {
+        let trade_id = {
+            let pt = self.player_trades.read().await;
+            pt.get(player_id).cloned()
+        };
+        if let Some(trade_id) = trade_id {
+            let session = {
+                let mut trades = self.trades.write().await;
+                trades.remove(&trade_id)
+            };
+            if let Some(session) = session {
+                {
+                    let mut pt = self.player_trades.write().await;
+                    pt.remove(&session.player_a);
+                    pt.remove(&session.player_b);
+                }
+                let msg = ServerMessage::TradeCancelled { reason: reason.to_string() };
+                self.send_to_player(&session.player_a, msg.clone()).await;
+                self.send_to_player(&session.player_b, msg).await;
+            }
+        }
+        // Also clean up any pending requests FROM this player
+        let mut requests = self.trade_requests.write().await;
+        requests.retain(|_, (requester, _)| requester != player_id);
+    }
+
+    pub async fn handle_trade_request(&self, player_id: &str, target_id: &str) {
+        // Validate both players exist and are active
+        let (requester_name, valid) = {
+            let players = self.players.read().await;
+            let requester = match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => p,
+                _ => return,
+            };
+            let target = match players.get(target_id) {
+                Some(p) if p.active && !p.is_dead => p,
+                _ => {
+                    return;
+                }
+            };
+            // Check proximity
+            let dx = (requester.x - target.x).abs();
+            let dy = (requester.y - target.y).abs();
+            if dx > TRADE_MAX_DISTANCE || dy > TRADE_MAX_DISTANCE {
+                return;
+            }
+            // Check not already trading
+            let name = requester.name.clone();
+            // Check stall
+            if target.stall.is_some() {
+                drop(players);
+                self.send_system_message(player_id, "That player is running a shop.").await;
+                return;
+            }
+            if requester.stall.is_some() {
+                drop(players);
+                self.send_system_message(player_id, "Close your shop before trading.").await;
+                return;
+            }
+            (name, true)
+        };
+        if !valid { return; }
+
+        // Check not already in a trade
+        {
+            let pt = self.player_trades.read().await;
+            if pt.contains_key(player_id) {
+                self.send_system_message(player_id, "You are already in a trade.").await;
+                return;
+            }
+            if pt.contains_key(target_id) {
+                self.send_system_message(player_id, "That player is already trading.").await;
+                return;
+            }
+        }
+
+        // Store the request
+        let current_tick = *self.tick.read().await;
+        {
+            let mut requests = self.trade_requests.write().await;
+            requests.insert(target_id.to_string(), (player_id.to_string(), current_tick));
+        }
+
+        self.send_to_player(target_id, ServerMessage::TradeRequestReceived {
+            requester_id: player_id.to_string(),
+            requester_name,
+        }).await;
+    }
+
+    pub async fn handle_trade_accept_request(&self, player_id: &str, requester_id: &str) {
+        // Validate the pending request
+        let valid_request = {
+            let requests = self.trade_requests.read().await;
+            requests.get(player_id)
+                .map(|(rid, _)| rid == requester_id)
+                .unwrap_or(false)
+        };
+        if !valid_request {
+            self.send_system_message(player_id, "No pending trade request from that player.").await;
+            return;
+        }
+
+        // Remove the request
+        {
+            let mut requests = self.trade_requests.write().await;
+            requests.remove(player_id);
+        }
+
+        // Check both players aren't already trading and are still valid
+        {
+            let pt = self.player_trades.read().await;
+            if pt.contains_key(player_id) || pt.contains_key(requester_id) {
+                self.send_system_message(player_id, "Trade no longer available.").await;
+                return;
+            }
+        }
+
+        // Validate proximity again
+        let (name_a, name_b) = {
+            let players = self.players.read().await;
+            let pa = match players.get(requester_id) {
+                Some(p) if p.active && !p.is_dead => p,
+                _ => return,
+            };
+            let pb = match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => p,
+                _ => return,
+            };
+            let dx = (pa.x - pb.x).abs();
+            let dy = (pa.y - pb.y).abs();
+            if dx > TRADE_MAX_DISTANCE || dy > TRADE_MAX_DISTANCE {
+                self.send_system_message(player_id, "Too far away to trade.").await;
+                return;
+            }
+            (pa.name.clone(), pb.name.clone())
+        };
+
+        // Create trade session
+        let trade_id = format!("trade_{}_{}", requester_id, player_id);
+        let session = TradeSession {
+            player_a: requester_id.to_string(),
+            player_b: player_id.to_string(),
+            offer_a: TradeOffer::new(),
+            offer_b: TradeOffer::new(),
+        };
+
+        {
+            let mut trades = self.trades.write().await;
+            trades.insert(trade_id.clone(), session);
+        }
+        {
+            let mut pt = self.player_trades.write().await;
+            pt.insert(requester_id.to_string(), trade_id.clone());
+            pt.insert(player_id.to_string(), trade_id.clone());
+        }
+
+        // Notify both players
+        self.send_to_player(requester_id, ServerMessage::TradeOpened {
+            trade_id: trade_id.clone(),
+            partner_id: player_id.to_string(),
+            partner_name: name_b,
+        }).await;
+        self.send_to_player(player_id, ServerMessage::TradeOpened {
+            trade_id,
+            partner_id: requester_id.to_string(),
+            partner_name: name_a,
+        }).await;
+    }
+
+    pub async fn handle_trade_decline_request(&self, player_id: &str, requester_id: &str) {
+        let removed = {
+            let mut requests = self.trade_requests.write().await;
+            if requests.get(player_id).map(|(rid, _)| rid == requester_id).unwrap_or(false) {
+                requests.remove(player_id);
+                true
+            } else {
+                false
+            }
+        };
+        if removed {
+            self.send_system_message(requester_id, "Trade request declined.").await;
+        }
+    }
+
+    pub async fn handle_trade_offer_item(&self, player_id: &str, slot_index: u8, quantity: i32) {
+        if quantity <= 0 { return; }
+
+        let trade_id = {
+            let pt = self.player_trades.read().await;
+            match pt.get(player_id) {
+                Some(id) => id.clone(),
+                None => return,
+            }
+        };
+
+        // Validate the item exists in inventory
+        let item_info = {
+            let players = self.players.read().await;
+            let player = match players.get(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+            match player.inventory.slots.get(slot_index as usize) {
+                Some(Some(slot)) => {
+                    let available_qty = slot.quantity;
+                    Some((slot.item_id.clone(), available_qty))
+                }
+                _ => None,
+            }
+        };
+
+        let (item_id, available_qty) = match item_info {
+            Some(info) => info,
+            None => {
+                self.send_system_message(player_id, "No item in that slot.").await;
+                return;
+            }
+        };
+
+        let qty = quantity.min(available_qty);
+
+        let mut trades = self.trades.write().await;
+        if let Some(session) = trades.get_mut(&trade_id) {
+            let (my_offer, partner_id) = if session.player_a == player_id {
+                (&mut session.offer_a, session.player_b.clone())
+            } else {
+                (&mut session.offer_b, session.player_a.clone())
+            };
+
+            // Check if this slot is already offered
+            if my_offer.items.iter().any(|e| e.inv_slot == slot_index) {
+                drop(trades);
+                self.send_system_message(player_id, "That slot is already in the offer.").await;
+                return;
+            }
+
+            my_offer.items.push(TradeOfferEntry {
+                inv_slot: slot_index,
+                item_id: item_id.clone(),
+                quantity: qty,
+            });
+
+            // Reset both accepted flags
+            session.offer_a.accepted = false;
+            session.offer_b.accepted = false;
+
+            // Send updates to both players
+            // my_items = the current player's offer (shown to them as "your offer")
+            // partner_view_items = the current player's offer (shown to partner as "their offer")
+            let (my_offer, partner_offer) = if session.player_a == player_id {
+                (&session.offer_a, &session.offer_b)
+            } else {
+                (&session.offer_b, &session.offer_a)
+            };
+            let my_items = Self::make_trade_offer_items(my_offer);
+            let my_gold = my_offer.gold;
+            // Send our offer to the partner so they see what we're offering
+            let partner_view_items = Self::make_trade_offer_items(my_offer);
+            let partner_view_gold = my_offer.gold;
+
+            drop(trades);
+
+            self.send_to_player(player_id, ServerMessage::TradeMyOfferUpdate {
+                my_items,
+                my_gold,
+                my_accepted: false,
+            }).await;
+            self.send_to_player(&partner_id, ServerMessage::TradeOfferUpdate {
+                partner_items: partner_view_items,
+                partner_gold: partner_view_gold,
+                partner_accepted: false,
+            }).await;
+        }
+    }
+
+    pub async fn handle_trade_remove_item(&self, player_id: &str, offer_index: u8) {
+        let trade_id = {
+            let pt = self.player_trades.read().await;
+            match pt.get(player_id) {
+                Some(id) => id.clone(),
+                None => return,
+            }
+        };
+
+        let mut trades = self.trades.write().await;
+        if let Some(session) = trades.get_mut(&trade_id) {
+            let (my_offer, partner_id) = if session.player_a == player_id {
+                (&mut session.offer_a, session.player_b.clone())
+            } else {
+                (&mut session.offer_b, session.player_a.clone())
+            };
+
+            if (offer_index as usize) < my_offer.items.len() {
+                my_offer.items.remove(offer_index as usize);
+            } else {
+                return;
+            }
+
+            // Reset both accepted flags
+            session.offer_a.accepted = false;
+            session.offer_b.accepted = false;
+
+            let my_offer_ref = if session.player_a == player_id { &session.offer_a } else { &session.offer_b };
+            let my_items = Self::make_trade_offer_items(my_offer_ref);
+            let my_gold = my_offer_ref.gold;
+            // Send our updated offer to partner so they see changes in real-time
+            let partner_view_items = Self::make_trade_offer_items(my_offer_ref);
+            let partner_view_gold = my_offer_ref.gold;
+
+            drop(trades);
+
+            self.send_to_player(player_id, ServerMessage::TradeMyOfferUpdate {
+                my_items,
+                my_gold,
+                my_accepted: false,
+            }).await;
+            self.send_to_player(&partner_id, ServerMessage::TradeOfferUpdate {
+                partner_items: partner_view_items,
+                partner_gold: partner_view_gold,
+                partner_accepted: false,
+            }).await;
+        }
+    }
+
+    pub async fn handle_trade_offer_gold(&self, player_id: &str, amount: i32) {
+        if amount < 0 { return; }
+
+        let trade_id = {
+            let pt = self.player_trades.read().await;
+            match pt.get(player_id) {
+                Some(id) => id.clone(),
+                None => return,
+            }
+        };
+
+        // Validate gold amount
+        let max_gold = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => p.inventory.gold,
+                None => return,
+            }
+        };
+        let gold = amount.min(max_gold);
+
+        let mut trades = self.trades.write().await;
+        if let Some(session) = trades.get_mut(&trade_id) {
+            let (my_offer, partner_id) = if session.player_a == player_id {
+                (&mut session.offer_a, session.player_b.clone())
+            } else {
+                (&mut session.offer_b, session.player_a.clone())
+            };
+
+            my_offer.gold = gold;
+
+            // Reset both accepted flags
+            session.offer_a.accepted = false;
+            session.offer_b.accepted = false;
+
+            let my_offer_ref = if session.player_a == player_id { &session.offer_a } else { &session.offer_b };
+            let my_items = Self::make_trade_offer_items(my_offer_ref);
+            let my_gold = my_offer_ref.gold;
+            // Send our updated offer to partner so they see changes in real-time
+            let partner_view_items = Self::make_trade_offer_items(my_offer_ref);
+            let partner_view_gold = my_offer_ref.gold;
+
+            drop(trades);
+
+            self.send_to_player(player_id, ServerMessage::TradeMyOfferUpdate {
+                my_items,
+                my_gold,
+                my_accepted: false,
+            }).await;
+            self.send_to_player(&partner_id, ServerMessage::TradeOfferUpdate {
+                partner_items: partner_view_items,
+                partner_gold: partner_view_gold,
+                partner_accepted: false,
+            }).await;
+        }
+    }
+
+    pub async fn handle_trade_accept(&self, player_id: &str) {
+        let trade_id = {
+            let pt = self.player_trades.read().await;
+            match pt.get(player_id) {
+                Some(id) => id.clone(),
+                None => return,
+            }
+        };
+
+        let should_complete;
+        let partner_id;
+        {
+            let mut trades = self.trades.write().await;
+            if let Some(session) = trades.get_mut(&trade_id) {
+                let (my_offer, other_offer, pid) = if session.player_a == player_id {
+                    (&mut session.offer_a, &session.offer_b, session.player_b.clone())
+                } else {
+                    (&mut session.offer_b, &session.offer_a, session.player_a.clone())
+                };
+                partner_id = pid;
+
+                my_offer.accepted = true;
+                should_complete = other_offer.accepted;
+
+                if !should_complete {
+                    // Notify partner of acceptance status
+                    let partner_items = Self::make_trade_offer_items(my_offer);
+                    let partner_gold = my_offer.gold;
+                    drop(trades);
+
+                    self.send_to_player(&partner_id, ServerMessage::TradeOfferUpdate {
+                        partner_items,
+                        partner_gold,
+                        partner_accepted: true,
+                    }).await;
+
+                    // Also update own status
+                    let trade_id2 = {
+                        let pt = self.player_trades.read().await;
+                        pt.get(player_id).cloned()
+                    };
+                    if let Some(tid) = trade_id2 {
+                        let trades = self.trades.read().await;
+                        if let Some(session) = trades.get(&tid) {
+                            let my_items = Self::make_trade_offer_items(if session.player_a == player_id { &session.offer_a } else { &session.offer_b });
+                            let my_gold = if session.player_a == player_id { session.offer_a.gold } else { session.offer_b.gold };
+                            drop(trades);
+                            self.send_to_player(player_id, ServerMessage::TradeMyOfferUpdate {
+                                my_items,
+                                my_gold,
+                                my_accepted: true,
+                            }).await;
+                        }
+                    }
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
+        // Both accepted - execute the trade!
+        self.execute_trade(&trade_id).await;
+    }
+
+    async fn execute_trade(&self, trade_id: &str) {
+        let session = {
+            let mut trades = self.trades.write().await;
+            match trades.remove(trade_id) {
+                Some(s) => s,
+                None => return,
+            }
+        };
+
+        {
+            let mut pt = self.player_trades.write().await;
+            pt.remove(&session.player_a);
+            pt.remove(&session.player_b);
+        }
+
+        let registry = self.item_registry.clone();
+
+        // Validate and execute the trade
+        let mut players = self.players.write().await;
+        let (pa, pb) = match (players.get(&session.player_a), players.get(&session.player_b)) {
+            (Some(a), Some(b)) => {
+                // Validate items still exist
+                for item in &session.offer_a.items {
+                    match a.inventory.slots.get(item.inv_slot as usize) {
+                        Some(Some(slot)) if slot.item_id == item.item_id && slot.quantity >= item.quantity => {}
+                        _ => {
+                            drop(players);
+                            let msg = ServerMessage::TradeCancelled { reason: "Items changed during trade.".to_string() };
+                            self.send_to_player(&session.player_a, msg.clone()).await;
+                            self.send_to_player(&session.player_b, msg).await;
+                            return;
+                        }
+                    }
+                }
+                for item in &session.offer_b.items {
+                    match b.inventory.slots.get(item.inv_slot as usize) {
+                        Some(Some(slot)) if slot.item_id == item.item_id && slot.quantity >= item.quantity => {}
+                        _ => {
+                            drop(players);
+                            let msg = ServerMessage::TradeCancelled { reason: "Items changed during trade.".to_string() };
+                            self.send_to_player(&session.player_a, msg.clone()).await;
+                            self.send_to_player(&session.player_b, msg).await;
+                            return;
+                        }
+                    }
+                }
+                // Validate gold
+                if a.inventory.gold < session.offer_a.gold || b.inventory.gold < session.offer_b.gold {
+                    drop(players);
+                    let msg = ServerMessage::TradeCancelled { reason: "Insufficient gold.".to_string() };
+                    self.send_to_player(&session.player_a, msg.clone()).await;
+                    self.send_to_player(&session.player_b, msg).await;
+                    return;
+                }
+                (session.player_a.clone(), session.player_b.clone())
+            }
+            _ => return,
+        };
+
+        // Remove items from both players
+        // Player A's offered items
+        for item in session.offer_a.items.iter().rev() {
+            if let Some(player) = players.get_mut(&pa) {
+                if let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize) {
+                    slot.quantity -= item.quantity;
+                    if slot.quantity <= 0 {
+                        player.inventory.slots[item.inv_slot as usize] = None;
+                    }
+                }
+            }
+        }
+        // Player B's offered items
+        for item in session.offer_b.items.iter().rev() {
+            if let Some(player) = players.get_mut(&pb) {
+                if let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize) {
+                    slot.quantity -= item.quantity;
+                    if slot.quantity <= 0 {
+                        player.inventory.slots[item.inv_slot as usize] = None;
+                    }
+                }
+            }
+        }
+
+        // Transfer gold
+        if let Some(player_a) = players.get_mut(&pa) {
+            player_a.inventory.gold -= session.offer_a.gold;
+            player_a.inventory.gold += session.offer_b.gold;
+        }
+        if let Some(player_b) = players.get_mut(&pb) {
+            player_b.inventory.gold -= session.offer_b.gold;
+            player_b.inventory.gold += session.offer_a.gold;
+        }
+
+        // Add received items
+        // Player A receives Player B's items
+        for item in &session.offer_b.items {
+            if let Some(player) = players.get_mut(&pa) {
+                player.inventory.add_item(&item.item_id, item.quantity, &registry);
+            }
+        }
+        // Player B receives Player A's items
+        for item in &session.offer_a.items {
+            if let Some(player) = players.get_mut(&pb) {
+                player.inventory.add_item(&item.item_id, item.quantity, &registry);
+            }
+        }
+
+        // Get inventory updates
+        let inv_a = players.get(&pa).map(|p| (p.inventory.to_update(), p.inventory.gold));
+        let inv_b = players.get(&pb).map(|p| (p.inventory.to_update(), p.inventory.gold));
+        drop(players);
+
+        // Send trade completed messages
+        let items_a_received: Vec<crate::protocol::TradeOfferItemData> = session.offer_b.items.iter().map(|e| {
+            crate::protocol::TradeOfferItemData {
+                slot_index: e.inv_slot,
+                item_id: e.item_id.clone(),
+                quantity: e.quantity,
+            }
+        }).collect();
+        let items_b_received: Vec<crate::protocol::TradeOfferItemData> = session.offer_a.items.iter().map(|e| {
+            crate::protocol::TradeOfferItemData {
+                slot_index: e.inv_slot,
+                item_id: e.item_id.clone(),
+                quantity: e.quantity,
+            }
+        }).collect();
+
+        self.send_to_player(&pa, ServerMessage::TradeCompleted {
+            items_received: items_a_received,
+            gold_received: session.offer_b.gold,
+        }).await;
+        self.send_to_player(&pb, ServerMessage::TradeCompleted {
+            items_received: items_b_received,
+            gold_received: session.offer_a.gold,
+        }).await;
+
+        // Send inventory updates
+        if let Some((slots, gold)) = inv_a {
+            self.send_to_player(&pa, ServerMessage::InventoryUpdate {
+                player_id: pa.clone(),
+                slots,
+                gold,
+            }).await;
+        }
+        if let Some((slots, gold)) = inv_b {
+            self.send_to_player(&pb, ServerMessage::InventoryUpdate {
+                player_id: pb.clone(),
+                slots,
+                gold,
+            }).await;
+        }
+    }
+
+    pub async fn handle_trade_cancel(&self, player_id: &str) {
+        self.cancel_trade_for_player(player_id, "Trade cancelled.").await;
+    }
+
+    // ========================================================================
+    // Player Stall Handlers
+    // ========================================================================
+
+    async fn force_close_stall(&self, player_id: &str) {
+        let stall_data = {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.stall.take()
+            } else {
+                None
+            }
+        };
+
+        if let Some(stall) = stall_data {
+            let registry = self.item_registry.clone();
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                // Return items to inventory, overflow to bank
+                for slot in &stall.slots {
+                    if let Some(stall_slot) = slot {
+                        let leftover = player.inventory.add_item(&stall_slot.item_id, stall_slot.quantity, &registry);
+                        if leftover > 0 {
+                            player.bank.add_item(&stall_slot.item_id, leftover, &registry);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn stall_slots_to_data(stall: &PlayerStall) -> Vec<crate::protocol::StallSlotData> {
+        stall.slots.iter().enumerate().filter_map(|(i, slot)| {
+            slot.as_ref().map(|s| crate::protocol::StallSlotData {
+                slot: i as u8,
+                item_id: s.item_id.clone(),
+                quantity: s.quantity,
+                price: s.price,
+            })
+        }).collect()
+    }
+
+    pub async fn handle_stall_open(&self, player_id: &str, name: &str) {
+        // Validate player state
+        {
+            let players = self.players.read().await;
+            let player = match players.get(player_id) {
+                Some(p) if p.active && !p.is_dead => p,
+                _ => return,
+            };
+            if player.stall.is_some() {
+                drop(players);
+                self.send_system_message(player_id, "You already have a shop open.").await;
+                return;
+            }
+        }
+
+        // Check not in trade
+        {
+            let pt = self.player_trades.read().await;
+            if pt.contains_key(player_id) {
+                self.send_system_message(player_id, "Cannot open shop while trading.").await;
+                return;
+            }
+        }
+
+        // Check not in instance
+        {
+            let instances = self.player_instances.read().await;
+            if instances.contains_key(player_id) {
+                self.send_system_message(player_id, "Cannot open shop in an instance.").await;
+                return;
+            }
+        }
+
+        let stall_name = if name.trim().is_empty() { "Shop".to_string() } else {
+            name.chars().take(32).collect::<String>()
+        };
+
+        let stall = PlayerStall::new(stall_name.clone());
+        let slots = Self::stall_slots_to_data(&stall);
+
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.stall = Some(stall);
+            }
+        }
+
+        self.send_to_player(player_id, ServerMessage::StallOpened {
+            name: stall_name,
+            slots,
+        }).await;
+    }
+
+    pub async fn handle_stall_close(&self, player_id: &str) {
+        // Check if items fit back into inventory
+        {
+            let players = self.players.read().await;
+            let player = match players.get(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+            let stall = match &player.stall {
+                Some(s) => s,
+                None => return,
+            };
+
+            // Count how many slots we need
+            let item_count = stall.slots.iter().filter(|s| s.is_some()).count();
+            let empty_inv_slots = player.inventory.slots.iter().filter(|s| s.is_none()).count();
+            if item_count > empty_inv_slots {
+                drop(players);
+                self.send_system_message(player_id, "Not enough inventory space. Remove items first.").await;
+                return;
+            }
+        }
+
+        // Return items to inventory
+        let registry = self.item_registry.clone();
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                if let Some(stall) = player.stall.take() {
+                    for slot in &stall.slots {
+                        if let Some(stall_slot) = slot {
+                            player.inventory.add_item(&stall_slot.item_id, stall_slot.quantity, &registry);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Send inventory update and stall closed
+        let inv_update = {
+            let players = self.players.read().await;
+            players.get(player_id).map(|p| (p.inventory.to_update(), p.inventory.gold))
+        };
+        if let Some((slots, gold)) = inv_update {
+            self.send_to_player(player_id, ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots,
+                gold,
+            }).await;
+        }
+        self.send_to_player(player_id, ServerMessage::StallClosed {
+            reason: "Shop closed.".to_string(),
+        }).await;
+    }
+
+    pub async fn handle_stall_set_item(&self, player_id: &str, inventory_slot: u8, quantity: i32, price: i32) {
+        if quantity <= 0 || price < 0 { return; }
+
+        let registry = self.item_registry.clone();
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.stall.is_some() => p,
+            _ => return,
+        };
+
+        // Get item from inventory
+        let (item_id, available) = match player.inventory.slots.get(inventory_slot as usize) {
+            Some(Some(slot)) => (slot.item_id.clone(), slot.quantity),
+            _ => {
+                drop(players);
+                self.send_system_message(player_id, "No item in that slot.").await;
+                return;
+            }
+        };
+
+        let qty = quantity.min(available);
+
+        // Find empty stall slot
+        let stall = player.stall.as_mut().unwrap();
+        let empty_slot = stall.slots.iter().position(|s| s.is_none());
+        let slot_idx = match empty_slot {
+            Some(i) => i,
+            None => {
+                drop(players);
+                self.send_system_message(player_id, "Shop is full (max 10 slots).").await;
+                return;
+            }
+        };
+
+        // Remove from inventory
+        if let Some(Some(inv_slot)) = player.inventory.slots.get_mut(inventory_slot as usize) {
+            inv_slot.quantity -= qty;
+            if inv_slot.quantity <= 0 {
+                player.inventory.slots[inventory_slot as usize] = None;
+            }
+        }
+
+        // Add to stall
+        stall.slots[slot_idx] = Some(StallSlot {
+            item_id,
+            quantity: qty,
+            price,
+        });
+
+        let stall_data = Self::stall_slots_to_data(stall);
+        let inv_slots = player.inventory.to_update();
+        let gold = player.inventory.gold;
+        let pid = player_id.to_string();
+        drop(players);
+
+        self.send_to_player(&pid, ServerMessage::StallUpdate { slots: stall_data }).await;
+        self.send_to_player(&pid, ServerMessage::InventoryUpdate {
+            player_id: pid.clone(),
+            slots: inv_slots,
+            gold,
+        }).await;
+    }
+
+    pub async fn handle_stall_remove_item(&self, player_id: &str, stall_slot: u8) {
+        let registry = self.item_registry.clone();
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.stall.is_some() => p,
+            _ => return,
+        };
+
+        let stall = player.stall.as_mut().unwrap();
+        let slot_data = match stall.slots.get(stall_slot as usize) {
+            Some(Some(s)) => s.clone(),
+            _ => return,
+        };
+
+        // Check inventory space
+        if !player.inventory.has_space_for(&slot_data.item_id, slot_data.quantity, &registry) {
+            drop(players);
+            self.send_system_message(player_id, "Inventory full.").await;
+            return;
+        }
+
+        // Remove from stall
+        stall.slots[stall_slot as usize] = None;
+
+        // Add to inventory
+        player.inventory.add_item(&slot_data.item_id, slot_data.quantity, &registry);
+
+        let stall_data = Self::stall_slots_to_data(stall);
+        let inv_slots = player.inventory.to_update();
+        let gold = player.inventory.gold;
+        let pid = player_id.to_string();
+        drop(players);
+
+        self.send_to_player(&pid, ServerMessage::StallUpdate { slots: stall_data }).await;
+        self.send_to_player(&pid, ServerMessage::InventoryUpdate {
+            player_id: pid.clone(),
+            slots: inv_slots,
+            gold,
+        }).await;
+    }
+
+    pub async fn handle_stall_update_price(&self, player_id: &str, stall_slot: u8, price: i32) {
+        if price < 0 { return; }
+
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.stall.is_some() => p,
+            _ => return,
+        };
+
+        let stall = player.stall.as_mut().unwrap();
+        if let Some(Some(slot)) = stall.slots.get_mut(stall_slot as usize) {
+            slot.price = price;
+        }
+
+        let stall_data = Self::stall_slots_to_data(stall);
+        drop(players);
+
+        self.send_to_player(player_id, ServerMessage::StallUpdate { slots: stall_data }).await;
+    }
+
+    pub async fn handle_stall_browse(&self, player_id: &str, seller_id: &str) {
+        let players = self.players.read().await;
+        let seller = match players.get(seller_id) {
+            Some(p) if p.active && p.stall.is_some() => p,
+            _ => {
+                drop(players);
+                self.send_system_message(player_id, "That player doesn't have a shop open.").await;
+                return;
+            }
+        };
+
+        let stall = seller.stall.as_ref().unwrap();
+        let items = Self::stall_slots_to_data(stall);
+        let seller_name = seller.name.clone();
+        let stall_name = stall.name.clone();
+        drop(players);
+
+        self.send_to_player(player_id, ServerMessage::StallBrowseData {
+            seller_id: seller_id.to_string(),
+            seller_name,
+            stall_name,
+            items,
+        }).await;
+    }
+
+    pub async fn handle_stall_buy(&self, buyer_id: &str, seller_id: &str, stall_slot: u8, quantity: i32) {
+        if quantity <= 0 { return; }
+
+        let registry = self.item_registry.clone();
+
+        let mut players = self.players.write().await;
+
+        // Validate seller has stall
+        let (item_id, available_qty, price_per, seller_name) = {
+            let seller = match players.get(seller_id) {
+                Some(p) if p.active && p.stall.is_some() => p,
+                _ => {
+                    drop(players);
+                    self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
+                        success: false,
+                        item_id: String::new(),
+                        quantity: 0,
+                        total_price: 0,
+                        error: Some("Shop no longer available.".to_string()),
+                    }).await;
+                    return;
+                }
+            };
+            let stall = seller.stall.as_ref().unwrap();
+            match stall.slots.get(stall_slot as usize) {
+                Some(Some(slot)) => (slot.item_id.clone(), slot.quantity, slot.price, seller.name.clone()),
+                _ => {
+                    drop(players);
+                    self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
+                        success: false,
+                        item_id: String::new(),
+                        quantity: 0,
+                        total_price: 0,
+                        error: Some("Item no longer available.".to_string()),
+                    }).await;
+                    return;
+                }
+            }
+        };
+
+        let buy_qty = quantity.min(available_qty);
+        let total_price = price_per * buy_qty;
+
+        // Validate buyer has gold and inventory space
+        let buyer = match players.get(buyer_id) {
+            Some(p) if p.active => p,
+            _ => return,
+        };
+
+        if buyer.inventory.gold < total_price {
+            drop(players);
+            self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
+                success: false,
+                item_id: item_id.clone(),
+                quantity: buy_qty,
+                total_price,
+                error: Some("Not enough gold.".to_string()),
+            }).await;
+            return;
+        }
+
+        if !buyer.inventory.has_space_for(&item_id, buy_qty, &registry) {
+            drop(players);
+            self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
+                success: false,
+                item_id: item_id.clone(),
+                quantity: buy_qty,
+                total_price,
+                error: Some("Inventory full.".to_string()),
+            }).await;
+            return;
+        }
+
+        // Execute the purchase
+        // Deduct from seller's stall
+        if let Some(seller) = players.get_mut(seller_id) {
+            if let Some(stall) = seller.stall.as_mut() {
+                if let Some(Some(slot)) = stall.slots.get_mut(stall_slot as usize) {
+                    slot.quantity -= buy_qty;
+                    if slot.quantity <= 0 {
+                        stall.slots[stall_slot as usize] = None;
+                    }
+                }
+            }
+            seller.inventory.gold += total_price;
+        }
+
+        // Add to buyer
+        if let Some(buyer) = players.get_mut(buyer_id) {
+            buyer.inventory.gold -= total_price;
+            buyer.inventory.add_item(&item_id, buy_qty, &registry);
+        }
+
+        // Gather update data
+        let buyer_inv = players.get(buyer_id).map(|p| (p.inventory.to_update(), p.inventory.gold));
+        let seller_inv = players.get(seller_id).map(|p| (p.inventory.to_update(), p.inventory.gold));
+        let stall_update = players.get(seller_id).and_then(|p| p.stall.as_ref()).map(|s| Self::stall_slots_to_data(s));
+        let new_qty = players.get(seller_id)
+            .and_then(|p| p.stall.as_ref())
+            .and_then(|s| s.slots.get(stall_slot as usize))
+            .map(|s| s.as_ref().map_or(0, |slot| slot.quantity))
+            .unwrap_or(0);
+        let buyer_name = players.get(buyer_id).map(|p| p.name.clone()).unwrap_or_default();
+
+        drop(players);
+
+        // Send buy result to buyer
+        self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
+            success: true,
+            item_id: item_id.clone(),
+            quantity: buy_qty,
+            total_price,
+            error: None,
+        }).await;
+
+        // Send inventory updates
+        if let Some((slots, gold)) = buyer_inv {
+            self.send_to_player(buyer_id, ServerMessage::InventoryUpdate {
+                player_id: buyer_id.to_string(),
+                slots,
+                gold,
+            }).await;
+        }
+        if let Some((slots, gold)) = seller_inv {
+            self.send_to_player(seller_id, ServerMessage::InventoryUpdate {
+                player_id: seller_id.to_string(),
+                slots,
+                gold,
+            }).await;
+        }
+
+        // Send stall update to seller
+        if let Some(slots) = stall_update {
+            self.send_to_player(seller_id, ServerMessage::StallUpdate { slots }).await;
+        }
+
+        // Send sale notification to seller
+        self.send_to_player(seller_id, ServerMessage::StallSaleNotification {
+            item_id: item_id.clone(),
+            quantity: buy_qty,
+            gold_received: total_price,
+            buyer_name,
+        }).await;
+
+        // Send live update to any browsers
+        self.send_to_player(buyer_id, ServerMessage::StallItemUpdate {
+            seller_id: seller_id.to_string(),
+            stall_slot,
+            new_quantity: new_qty,
+        }).await;
     }
 }

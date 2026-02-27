@@ -18,7 +18,7 @@ end
 function show_offer_dialogue(ctx)
     local choice = ctx:show_dialogue({
         speaker = "Camp Cook",
-        text = "Last lesson - leatherworking. I've got an animal hide for you. Take it to a workbench in the workshop and tan it into leather, then craft yourself some gloves. What do you say?",
+        text = "Last lesson - leatherworking. I've got an animal hide and some wool for you. Spin the wool into thread, tan the hide into leather, then craft yourself some gloves at a workbench. What do you say?",
         choices = {
             { id = "accept", text = "Let's do it!" },
             { id = "decline", text = "Maybe later." },
@@ -29,14 +29,15 @@ function show_offer_dialogue(ctx)
     if choice == "accept" then
         ctx:accept_quest()
         ctx:give_item("scrap_leather", 1)
+        ctx:give_item("wool", 1)
         ctx:show_dialogue({
             speaker = "Camp Cook",
-            text = "Here's an animal hide. Use the workbench to tan it into leather, then craft leather gloves. The workshop has plenty of workbenches."
+            text = "Here's an animal hide and some wool. Spin the wool into thread at a workbench, tan the hide into leather, then craft leather gloves. The workshop has plenty of workbenches."
         })
     elseif choice == "ask_more" then
         ctx:show_dialogue({
             speaker = "Camp Cook",
-            text = "Leatherworking turns raw animal hides into useful gear. First you tan the hide into leather at a workbench, then you can craft all sorts - gloves, boots, armor. It's essential for any survivalist."
+            text = "Leatherworking turns raw animal hides into useful gear. You'll also need thread spun from wool to stitch things together. Tan the hide, spin some thread, then craft all sorts - gloves, boots, armor. It's essential for any survivalist."
         })
         return show_offer_dialogue(ctx)
     else

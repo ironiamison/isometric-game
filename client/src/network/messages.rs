@@ -252,6 +252,40 @@ pub enum ClientMessage {
     #[serde(rename = "ping")]
     Ping { timestamp: f64 },
 
+    // ===== Trade System =====
+    #[serde(rename = "tradeRequest")]
+    TradeRequest { target_id: String },
+    #[serde(rename = "tradeAcceptRequest")]
+    TradeAcceptRequest { requester_id: String },
+    #[serde(rename = "tradeDeclineRequest")]
+    TradeDeclineRequest { requester_id: String },
+    #[serde(rename = "tradeOfferItem")]
+    TradeOfferItem { slot_index: u8, quantity: i32 },
+    #[serde(rename = "tradeRemoveItem")]
+    TradeRemoveItem { offer_index: u8 },
+    #[serde(rename = "tradeOfferGold")]
+    TradeOfferGold { amount: i32 },
+    #[serde(rename = "tradeAccept")]
+    TradeAccept,
+    #[serde(rename = "tradeCancel")]
+    TradeCancel,
+
+    // ===== Player Stall System =====
+    #[serde(rename = "stallOpen")]
+    StallOpen { name: String },
+    #[serde(rename = "stallClose")]
+    StallClose,
+    #[serde(rename = "stallSetItem")]
+    StallSetItem { inventory_slot: u8, quantity: i32, price: i32 },
+    #[serde(rename = "stallRemoveItem")]
+    StallRemoveItem { stall_slot: u8 },
+    #[serde(rename = "stallUpdatePrice")]
+    StallUpdatePrice { stall_slot: u8, price: i32 },
+    #[serde(rename = "stallBrowse")]
+    StallBrowse { player_id: String },
+    #[serde(rename = "stallBuy")]
+    StallBuy { seller_id: String, stall_slot: u8, quantity: i32 },
+
     /// Spectator upgrades to a full player session
     #[serde(rename = "spectatorUpgrade")]
     SpectatorUpgrade { session_token: String },
@@ -611,6 +645,65 @@ impl ClientMessage {
             ClientMessage::Ping { timestamp } => {
                 data.insert("timestamp".into(), Value::F64(*timestamp));
                 "ping"
+            }
+            // Trade system
+            ClientMessage::TradeRequest { target_id } => {
+                data.insert("target_id".into(), Value::String(target_id.clone().into()));
+                "tradeRequest"
+            }
+            ClientMessage::TradeAcceptRequest { requester_id } => {
+                data.insert("requester_id".into(), Value::String(requester_id.clone().into()));
+                "tradeAcceptRequest"
+            }
+            ClientMessage::TradeDeclineRequest { requester_id } => {
+                data.insert("requester_id".into(), Value::String(requester_id.clone().into()));
+                "tradeDeclineRequest"
+            }
+            ClientMessage::TradeOfferItem { slot_index, quantity } => {
+                data.insert("slot_index".into(), Value::Integer((*slot_index as i64).into()));
+                data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
+                "tradeOfferItem"
+            }
+            ClientMessage::TradeRemoveItem { offer_index } => {
+                data.insert("offer_index".into(), Value::Integer((*offer_index as i64).into()));
+                "tradeRemoveItem"
+            }
+            ClientMessage::TradeOfferGold { amount } => {
+                data.insert("amount".into(), Value::Integer((*amount as i64).into()));
+                "tradeOfferGold"
+            }
+            ClientMessage::TradeAccept => "tradeAccept",
+            ClientMessage::TradeCancel => "tradeCancel",
+            // Stall system
+            ClientMessage::StallOpen { name } => {
+                data.insert("name".into(), Value::String(name.clone().into()));
+                "stallOpen"
+            }
+            ClientMessage::StallClose => "stallClose",
+            ClientMessage::StallSetItem { inventory_slot, quantity, price } => {
+                data.insert("inventory_slot".into(), Value::Integer((*inventory_slot as i64).into()));
+                data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
+                data.insert("price".into(), Value::Integer((*price as i64).into()));
+                "stallSetItem"
+            }
+            ClientMessage::StallRemoveItem { stall_slot } => {
+                data.insert("stall_slot".into(), Value::Integer((*stall_slot as i64).into()));
+                "stallRemoveItem"
+            }
+            ClientMessage::StallUpdatePrice { stall_slot, price } => {
+                data.insert("stall_slot".into(), Value::Integer((*stall_slot as i64).into()));
+                data.insert("price".into(), Value::Integer((*price as i64).into()));
+                "stallUpdatePrice"
+            }
+            ClientMessage::StallBrowse { player_id } => {
+                data.insert("player_id".into(), Value::String(player_id.clone().into()));
+                "stallBrowse"
+            }
+            ClientMessage::StallBuy { seller_id, stall_slot, quantity } => {
+                data.insert("seller_id".into(), Value::String(seller_id.clone().into()));
+                data.insert("stall_slot".into(), Value::Integer((*stall_slot as i64).into()));
+                data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
+                "stallBuy"
             }
             ClientMessage::SpectatorUpgrade { session_token } => {
                 data.insert("sessionToken".into(), Value::String(session_token.clone().into()));

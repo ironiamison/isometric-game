@@ -4402,6 +4402,53 @@ async fn handle_client_message(
             // Handled by spectator WebSocket handler, not the normal game message dispatch
             tracing::warn!("SpectatorUpgrade received in normal message handler for player {}", player_id);
         }
+        // Trade system messages
+        ClientMessage::TradeRequest { target_id } => {
+            room.handle_trade_request(player_id, &target_id).await;
+        }
+        ClientMessage::TradeAcceptRequest { requester_id } => {
+            room.handle_trade_accept_request(player_id, &requester_id).await;
+        }
+        ClientMessage::TradeDeclineRequest { requester_id } => {
+            room.handle_trade_decline_request(player_id, &requester_id).await;
+        }
+        ClientMessage::TradeOfferItem { slot_index, quantity } => {
+            room.handle_trade_offer_item(player_id, slot_index, quantity).await;
+        }
+        ClientMessage::TradeRemoveItem { offer_index } => {
+            room.handle_trade_remove_item(player_id, offer_index).await;
+        }
+        ClientMessage::TradeOfferGold { amount } => {
+            room.handle_trade_offer_gold(player_id, amount).await;
+        }
+        ClientMessage::TradeAccept => {
+            room.handle_trade_accept(player_id).await;
+        }
+        ClientMessage::TradeCancel => {
+            room.handle_trade_cancel(player_id).await;
+        }
+        // Stall system messages
+        ClientMessage::StallOpen { name } => {
+            room.handle_stall_open(player_id, &name).await;
+        }
+        ClientMessage::StallClose => {
+            room.handle_stall_close(player_id).await;
+        }
+        ClientMessage::StallSetItem { inventory_slot, quantity, price } => {
+            room.handle_stall_set_item(player_id, inventory_slot, quantity, price).await;
+        }
+        ClientMessage::StallRemoveItem { stall_slot } => {
+            room.handle_stall_remove_item(player_id, stall_slot).await;
+        }
+        ClientMessage::StallUpdatePrice { stall_slot, price } => {
+            room.handle_stall_update_price(player_id, stall_slot, price).await;
+        }
+        ClientMessage::StallBrowse { player_id: target_id } => {
+            room.handle_stall_browse(player_id, &target_id).await;
+        }
+        ClientMessage::StallBuy { seller_id, stall_slot, quantity } => {
+            room.handle_stall_buy(player_id, &seller_id, stall_slot, quantity).await;
+        }
     }
 
     let handler_duration = handler_start.elapsed();

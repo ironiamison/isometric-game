@@ -302,6 +302,68 @@ pub enum ClientMessage {
     /// Spectator upgrades to a full player session
     #[serde(rename = "spectatorUpgrade")]
     SpectatorUpgrade { session_token: String },
+
+    // ===== Trade System Messages =====
+    /// Request to trade with another player
+    #[serde(rename = "tradeRequest")]
+    TradeRequest { target_id: String },
+
+    /// Accept an incoming trade request
+    #[serde(rename = "tradeAcceptRequest")]
+    TradeAcceptRequest { requester_id: String },
+
+    /// Decline an incoming trade request
+    #[serde(rename = "tradeDeclineRequest")]
+    TradeDeclineRequest { requester_id: String },
+
+    /// Add inventory item to trade offer
+    #[serde(rename = "tradeOfferItem")]
+    TradeOfferItem { slot_index: u8, quantity: i32 },
+
+    /// Remove item from trade offer
+    #[serde(rename = "tradeRemoveItem")]
+    TradeRemoveItem { offer_index: u8 },
+
+    /// Set gold amount in trade offer
+    #[serde(rename = "tradeOfferGold")]
+    TradeOfferGold { amount: i32 },
+
+    /// Accept current trade offers
+    #[serde(rename = "tradeAccept")]
+    TradeAccept,
+
+    /// Cancel active trade
+    #[serde(rename = "tradeCancel")]
+    TradeCancel,
+
+    // ===== Player Stall System Messages =====
+    /// Open a player stall with a custom name
+    #[serde(rename = "stallOpen")]
+    StallOpen { name: String },
+
+    /// Close player stall
+    #[serde(rename = "stallClose")]
+    StallClose,
+
+    /// Move item from inventory to stall slot with price
+    #[serde(rename = "stallSetItem")]
+    StallSetItem { inventory_slot: u8, quantity: i32, price: i32 },
+
+    /// Remove item from stall back to inventory
+    #[serde(rename = "stallRemoveItem")]
+    StallRemoveItem { stall_slot: u8 },
+
+    /// Update price of a stall slot
+    #[serde(rename = "stallUpdatePrice")]
+    StallUpdatePrice { stall_slot: u8, price: i32 },
+
+    /// Browse another player's stall
+    #[serde(rename = "stallBrowse")]
+    StallBrowse { player_id: String },
+
+    /// Buy from another player's stall
+    #[serde(rename = "stallBuy")]
+    StallBuy { seller_id: String, stall_slot: u8, quantity: i32 },
 }
 
 impl ClientMessage {
@@ -372,6 +434,23 @@ impl ClientMessage {
             ClientMessage::OpenChest { .. } => "OpenChest",
             ClientMessage::ChestTake { .. } => "ChestTake",
             ClientMessage::ChestDeposit { .. } => "ChestDeposit",
+            // Trade system
+            ClientMessage::TradeRequest { .. } => "TradeRequest",
+            ClientMessage::TradeAcceptRequest { .. } => "TradeAcceptRequest",
+            ClientMessage::TradeDeclineRequest { .. } => "TradeDeclineRequest",
+            ClientMessage::TradeOfferItem { .. } => "TradeOfferItem",
+            ClientMessage::TradeRemoveItem { .. } => "TradeRemoveItem",
+            ClientMessage::TradeOfferGold { .. } => "TradeOfferGold",
+            ClientMessage::TradeAccept => "TradeAccept",
+            ClientMessage::TradeCancel => "TradeCancel",
+            // Stall system
+            ClientMessage::StallOpen { .. } => "StallOpen",
+            ClientMessage::StallClose => "StallClose",
+            ClientMessage::StallSetItem { .. } => "StallSetItem",
+            ClientMessage::StallRemoveItem { .. } => "StallRemoveItem",
+            ClientMessage::StallUpdatePrice { .. } => "StallUpdatePrice",
+            ClientMessage::StallBrowse { .. } => "StallBrowse",
+            ClientMessage::StallBuy { .. } => "StallBuy",
             ClientMessage::SpectatorUpgrade { .. } => "SpectatorUpgrade",
         }
     }
@@ -387,6 +466,21 @@ pub struct ChestSlotUpdate {
     pub item_id: String,
     pub quantity: i32,
     pub value: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TradeOfferItemData {
+    pub slot_index: u8,
+    pub item_id: String,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StallSlotData {
+    pub slot: u8,
+    pub item_id: String,
+    pub quantity: i32,
+    pub price: i32,
 }
 
 // ============================================================================
@@ -1108,6 +1202,83 @@ pub enum ServerMessage {
         slots: Vec<ChestSlotUpdate>,
         total_value: i32,
     },
+
+    // ===== Trade System Messages =====
+    /// Incoming trade request notification
+    TradeRequestReceived {
+        requester_id: String,
+        requester_name: String,
+    },
+    /// Trade window opened
+    TradeOpened {
+        trade_id: String,
+        partner_id: String,
+        partner_name: String,
+    },
+    /// Partner's offer updated
+    TradeOfferUpdate {
+        partner_items: Vec<TradeOfferItemData>,
+        partner_gold: i32,
+        partner_accepted: bool,
+    },
+    /// Server confirms your offer
+    TradeMyOfferUpdate {
+        my_items: Vec<TradeOfferItemData>,
+        my_gold: i32,
+        my_accepted: bool,
+    },
+    /// Trade completed successfully
+    TradeCompleted {
+        items_received: Vec<TradeOfferItemData>,
+        gold_received: i32,
+    },
+    /// Trade cancelled
+    TradeCancelled {
+        reason: String,
+    },
+
+    // ===== Player Stall System Messages =====
+    /// Confirms stall opened (to owner)
+    StallOpened {
+        name: String,
+        slots: Vec<StallSlotData>,
+    },
+    /// Stall closed (to owner)
+    StallClosed {
+        reason: String,
+    },
+    /// Stall contents changed (to owner)
+    StallUpdate {
+        slots: Vec<StallSlotData>,
+    },
+    /// Browse data sent to buyer
+    StallBrowseData {
+        seller_id: String,
+        seller_name: String,
+        stall_name: String,
+        items: Vec<StallSlotData>,
+    },
+    /// Purchase result
+    StallBuyResult {
+        success: bool,
+        item_id: String,
+        quantity: i32,
+        total_price: i32,
+        error: Option<String>,
+    },
+    /// Sale notification to seller
+    StallSaleNotification {
+        item_id: String,
+        quantity: i32,
+        gold_received: i32,
+        buyer_name: String,
+    },
+    /// Live update for browsers when stall item changes
+    StallItemUpdate {
+        seller_id: String,
+        stall_slot: u8,
+        new_quantity: i32,
+    },
 }
 
 /// Scroll spell definition sent to clients
@@ -1496,6 +1667,21 @@ impl ServerMessage {
             // Chest system messages
             ServerMessage::ChestOpen { .. } => "chestOpen",
             ServerMessage::ChestUpdate { .. } => "chestUpdate",
+            // Trade system messages
+            ServerMessage::TradeRequestReceived { .. } => "tradeRequestReceived",
+            ServerMessage::TradeOpened { .. } => "tradeOpened",
+            ServerMessage::TradeOfferUpdate { .. } => "tradeOfferUpdate",
+            ServerMessage::TradeMyOfferUpdate { .. } => "tradeMyOfferUpdate",
+            ServerMessage::TradeCompleted { .. } => "tradeCompleted",
+            ServerMessage::TradeCancelled { .. } => "tradeCancelled",
+            // Stall system messages
+            ServerMessage::StallOpened { .. } => "stallOpened",
+            ServerMessage::StallClosed { .. } => "stallClosed",
+            ServerMessage::StallUpdate { .. } => "stallUpdate",
+            ServerMessage::StallBrowseData { .. } => "stallBrowseData",
+            ServerMessage::StallBuyResult { .. } => "stallBuyResult",
+            ServerMessage::StallSaleNotification { .. } => "stallSaleNotification",
+            ServerMessage::StallItemUpdate { .. } => "stallItemUpdate",
         }
     }
 }
@@ -1658,6 +1844,14 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
         Value::Boolean(p.is_gathering),
     ));
     pmap.push((Value::String("dashing".into()), Value::Boolean(p.dashing)));
+    pmap.push((Value::String("has_stall".into()), Value::Boolean(p.has_stall)));
+    pmap.push((
+        Value::String("stall_name".into()),
+        match &p.stall_name {
+            Some(name) => Value::String(name.clone().into()),
+            None => Value::Nil,
+        },
+    ));
     pmap.push((
         Value::String("mp".into()),
         Value::Integer((p.mp as i64).into()),
@@ -2111,6 +2305,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::Boolean(p.is_gathering),
                     ));
                     pmap.push((Value::String("dashing".into()), Value::Boolean(p.dashing)));
+                    pmap.push((Value::String("has_stall".into()), Value::Boolean(p.has_stall)));
+                    pmap.push((
+                        Value::String("stall_name".into()),
+                        match &p.stall_name {
+                            Some(name) => Value::String(name.clone().into()),
+                            None => Value::Nil,
+                        },
+                    ));
                     pmap.push((
                         Value::String("mp".into()),
                         Value::Integer((p.mp as i64).into()),
@@ -5201,6 +5403,144 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("total_value".into()), Value::Integer((*total_value as i64).into())));
             Value::Map(map)
         }
+
+        // ===== Trade System Messages =====
+        ServerMessage::TradeRequestReceived { requester_id, requester_name } => {
+            let mut map = Vec::new();
+            map.push((Value::String("requester_id".into()), Value::String(requester_id.clone().into())));
+            map.push((Value::String("requester_name".into()), Value::String(requester_name.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::TradeOpened { trade_id, partner_id, partner_name } => {
+            let mut map = Vec::new();
+            map.push((Value::String("trade_id".into()), Value::String(trade_id.clone().into())));
+            map.push((Value::String("partner_id".into()), Value::String(partner_id.clone().into())));
+            map.push((Value::String("partner_name".into()), Value::String(partner_name.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::TradeOfferUpdate { partner_items, partner_gold, partner_accepted } => {
+            let mut map = Vec::new();
+            let items: Vec<Value> = partner_items.iter().map(|item| {
+                let mut imap = Vec::new();
+                imap.push((Value::String("slot_index".into()), Value::Integer((item.slot_index as i64).into())));
+                imap.push((Value::String("item_id".into()), Value::String(item.item_id.clone().into())));
+                imap.push((Value::String("quantity".into()), Value::Integer((item.quantity as i64).into())));
+                Value::Map(imap)
+            }).collect();
+            map.push((Value::String("partner_items".into()), Value::Array(items)));
+            map.push((Value::String("partner_gold".into()), Value::Integer((*partner_gold as i64).into())));
+            map.push((Value::String("partner_accepted".into()), Value::Boolean(*partner_accepted)));
+            Value::Map(map)
+        }
+        ServerMessage::TradeMyOfferUpdate { my_items, my_gold, my_accepted } => {
+            let mut map = Vec::new();
+            let items: Vec<Value> = my_items.iter().map(|item| {
+                let mut imap = Vec::new();
+                imap.push((Value::String("slot_index".into()), Value::Integer((item.slot_index as i64).into())));
+                imap.push((Value::String("item_id".into()), Value::String(item.item_id.clone().into())));
+                imap.push((Value::String("quantity".into()), Value::Integer((item.quantity as i64).into())));
+                Value::Map(imap)
+            }).collect();
+            map.push((Value::String("my_items".into()), Value::Array(items)));
+            map.push((Value::String("my_gold".into()), Value::Integer((*my_gold as i64).into())));
+            map.push((Value::String("my_accepted".into()), Value::Boolean(*my_accepted)));
+            Value::Map(map)
+        }
+        ServerMessage::TradeCompleted { items_received, gold_received } => {
+            let mut map = Vec::new();
+            let items: Vec<Value> = items_received.iter().map(|item| {
+                let mut imap = Vec::new();
+                imap.push((Value::String("slot_index".into()), Value::Integer((item.slot_index as i64).into())));
+                imap.push((Value::String("item_id".into()), Value::String(item.item_id.clone().into())));
+                imap.push((Value::String("quantity".into()), Value::Integer((item.quantity as i64).into())));
+                Value::Map(imap)
+            }).collect();
+            map.push((Value::String("items_received".into()), Value::Array(items)));
+            map.push((Value::String("gold_received".into()), Value::Integer((*gold_received as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::TradeCancelled { reason } => {
+            let mut map = Vec::new();
+            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            Value::Map(map)
+        }
+
+        // ===== Player Stall System Messages =====
+        ServerMessage::StallOpened { name, slots } => {
+            let mut map = Vec::new();
+            map.push((Value::String("name".into()), Value::String(name.clone().into())));
+            let slot_values: Vec<Value> = slots.iter().map(|s| {
+                let mut smap = Vec::new();
+                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
+                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
+                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
+                smap.push((Value::String("price".into()), Value::Integer((s.price as i64).into())));
+                Value::Map(smap)
+            }).collect();
+            map.push((Value::String("slots".into()), Value::Array(slot_values)));
+            Value::Map(map)
+        }
+        ServerMessage::StallClosed { reason } => {
+            let mut map = Vec::new();
+            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::StallUpdate { slots } => {
+            let mut map = Vec::new();
+            let slot_values: Vec<Value> = slots.iter().map(|s| {
+                let mut smap = Vec::new();
+                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
+                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
+                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
+                smap.push((Value::String("price".into()), Value::Integer((s.price as i64).into())));
+                Value::Map(smap)
+            }).collect();
+            map.push((Value::String("slots".into()), Value::Array(slot_values)));
+            Value::Map(map)
+        }
+        ServerMessage::StallBrowseData { seller_id, seller_name, stall_name, items } => {
+            let mut map = Vec::new();
+            map.push((Value::String("seller_id".into()), Value::String(seller_id.clone().into())));
+            map.push((Value::String("seller_name".into()), Value::String(seller_name.clone().into())));
+            map.push((Value::String("stall_name".into()), Value::String(stall_name.clone().into())));
+            let item_values: Vec<Value> = items.iter().map(|s| {
+                let mut smap = Vec::new();
+                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
+                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
+                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
+                smap.push((Value::String("price".into()), Value::Integer((s.price as i64).into())));
+                Value::Map(smap)
+            }).collect();
+            map.push((Value::String("items".into()), Value::Array(item_values)));
+            Value::Map(map)
+        }
+        ServerMessage::StallBuyResult { success, item_id, quantity, total_price, error } => {
+            let mut map = Vec::new();
+            map.push((Value::String("success".into()), Value::Boolean(*success)));
+            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
+            map.push((Value::String("quantity".into()), Value::Integer((*quantity as i64).into())));
+            map.push((Value::String("total_price".into()), Value::Integer((*total_price as i64).into())));
+            map.push((Value::String("error".into()), match error {
+                Some(e) => Value::String(e.clone().into()),
+                None => Value::Nil,
+            }));
+            Value::Map(map)
+        }
+        ServerMessage::StallSaleNotification { item_id, quantity, gold_received, buyer_name } => {
+            let mut map = Vec::new();
+            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
+            map.push((Value::String("quantity".into()), Value::Integer((*quantity as i64).into())));
+            map.push((Value::String("gold_received".into()), Value::Integer((*gold_received as i64).into())));
+            map.push((Value::String("buyer_name".into()), Value::String(buyer_name.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::StallItemUpdate { seller_id, stall_slot, new_quantity } => {
+            let mut map = Vec::new();
+            map.push((Value::String("seller_id".into()), Value::String(seller_id.clone().into())));
+            map.push((Value::String("stall_slot".into()), Value::Integer((*stall_slot as i64).into())));
+            map.push((Value::String("new_quantity".into()), Value::Integer((*new_quantity as i64).into())));
+            Value::Map(map)
+        }
     };
 
     // Encode as [13, "msg_type", data] - matching Colyseus ROOM_DATA format
@@ -5582,6 +5922,65 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "spectatorUpgrade" => {
             let session_token = extract_string(msg_data, "sessionToken").unwrap_or_default();
             Ok(ClientMessage::SpectatorUpgrade { session_token })
+        }
+        // ===== Trade System Messages =====
+        "tradeRequest" => {
+            let target_id = extract_string(msg_data, "target_id").unwrap_or_default();
+            Ok(ClientMessage::TradeRequest { target_id })
+        }
+        "tradeAcceptRequest" => {
+            let requester_id = extract_string(msg_data, "requester_id").unwrap_or_default();
+            Ok(ClientMessage::TradeAcceptRequest { requester_id })
+        }
+        "tradeDeclineRequest" => {
+            let requester_id = extract_string(msg_data, "requester_id").unwrap_or_default();
+            Ok(ClientMessage::TradeDeclineRequest { requester_id })
+        }
+        "tradeOfferItem" => {
+            let slot_index = extract_i32(msg_data, "slot_index").unwrap_or(0) as u8;
+            let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
+            Ok(ClientMessage::TradeOfferItem { slot_index, quantity })
+        }
+        "tradeRemoveItem" => {
+            let offer_index = extract_i32(msg_data, "offer_index").unwrap_or(0) as u8;
+            Ok(ClientMessage::TradeRemoveItem { offer_index })
+        }
+        "tradeOfferGold" => {
+            let amount = extract_i32(msg_data, "amount").unwrap_or(0);
+            Ok(ClientMessage::TradeOfferGold { amount })
+        }
+        "tradeAccept" => Ok(ClientMessage::TradeAccept),
+        "tradeCancel" => Ok(ClientMessage::TradeCancel),
+        // ===== Player Stall System Messages =====
+        "stallOpen" => {
+            let name = extract_string(msg_data, "name").unwrap_or_default();
+            Ok(ClientMessage::StallOpen { name })
+        }
+        "stallClose" => Ok(ClientMessage::StallClose),
+        "stallSetItem" => {
+            let inventory_slot = extract_i32(msg_data, "inventory_slot").unwrap_or(0) as u8;
+            let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
+            let price = extract_i32(msg_data, "price").unwrap_or(0);
+            Ok(ClientMessage::StallSetItem { inventory_slot, quantity, price })
+        }
+        "stallRemoveItem" => {
+            let stall_slot = extract_i32(msg_data, "stall_slot").unwrap_or(0) as u8;
+            Ok(ClientMessage::StallRemoveItem { stall_slot })
+        }
+        "stallUpdatePrice" => {
+            let stall_slot = extract_i32(msg_data, "stall_slot").unwrap_or(0) as u8;
+            let price = extract_i32(msg_data, "price").unwrap_or(0);
+            Ok(ClientMessage::StallUpdatePrice { stall_slot, price })
+        }
+        "stallBrowse" => {
+            let player_id = extract_string(msg_data, "player_id").unwrap_or_default();
+            Ok(ClientMessage::StallBrowse { player_id })
+        }
+        "stallBuy" => {
+            let seller_id = extract_string(msg_data, "seller_id").unwrap_or_default();
+            let stall_slot = extract_i32(msg_data, "stall_slot").unwrap_or(0) as u8;
+            let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
+            Ok(ClientMessage::StallBuy { seller_id, stall_slot, quantity })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }

@@ -49,7 +49,7 @@ items = [
 ]
 
 [quest.dialogue]
-offer = "Last lesson - leatherworking. I've got an animal hide for you. Take it to a workbench in the workshop and tan it into leather, then craft yourself some gloves."
-accept = "Here's an animal hide. Use the workbench to tan it into leather, then craft leather gloves. The workshop has plenty of workbenches."
+offer = "Last lesson - leatherworking. I've got an animal hide and some wool for you. Spin the wool into thread, tan the hide into leather, then craft yourself some gloves at a workbench."
+accept = "Here's an animal hide and some wool. Spin the wool into thread at a workbench, tan the hide into leather, then craft leather gloves. The workshop has plenty of workbenches."
 progress = "How's the leatherworking going? Remember - tan the hide first, then craft the gloves."
 complete = "Leather gloves! You've learned cooking, fletching, and leatherworking. You're a proper survivalist now. Here's some extra hides to keep practicing."

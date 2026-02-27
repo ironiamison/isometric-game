@@ -27,5 +27,8 @@ pub mod slayer_panel;
 pub mod social_panel;
 pub mod tooltip;
 pub mod workbench;
+pub mod stall_browse;
+pub mod stall_setup;
+pub mod trade;
 pub mod xp_drops;
 pub mod xp_globes;

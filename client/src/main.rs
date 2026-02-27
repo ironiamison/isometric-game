@@ -28,11 +28,11 @@ use auth::AuthSession;
 #[cfg(not(target_arch = "wasm32"))]
 use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+// const SERVER_URL: &str = "https://aeven.xyz";
+// const WS_URL: &str = "wss://aeven.xyz";
 
-// const SERVER_URL: &str = "http://localhost:2567";
-// const WS_URL: &str = "ws://localhost:2567";
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -1185,6 +1185,49 @@ fn run_game_frame(
             InputCommand::UseWaystone { x, y } => ClientMessage::UseWaystone {
                 x: *x,
                 y: *y,
+            },
+            // Trade commands
+            InputCommand::TradeRequest { target_id } => ClientMessage::TradeRequest {
+                target_id: target_id.clone(),
+            },
+            InputCommand::TradeAcceptRequest { requester_id } => ClientMessage::TradeAcceptRequest {
+                requester_id: requester_id.clone(),
+            },
+            InputCommand::TradeDeclineRequest { requester_id } => ClientMessage::TradeDeclineRequest {
+                requester_id: requester_id.clone(),
+            },
+            InputCommand::TradeOfferItem { slot_index, quantity } => ClientMessage::TradeOfferItem {
+                slot_index: *slot_index,
+                quantity: *quantity,
+            },
+            InputCommand::TradeRemoveItem { offer_index } => ClientMessage::TradeRemoveItem {
+                offer_index: *offer_index,
+            },
+            InputCommand::TradeOfferGold { amount } => ClientMessage::TradeOfferGold {
+                amount: *amount,
+            },
+            InputCommand::TradeAccept => ClientMessage::TradeAccept,
+            InputCommand::TradeCancel => ClientMessage::TradeCancel,
+            // Stall commands
+            InputCommand::StallOpen { name } => ClientMessage::StallOpen {
+                name: name.clone(),
+            },
+            InputCommand::StallClose => ClientMessage::StallClose,
+            InputCommand::StallSetItem { inventory_slot, quantity, price } => ClientMessage::StallSetItem {
+                inventory_slot: *inventory_slot,
+                quantity: *quantity,
+                price: *price,
+            },
+            InputCommand::StallRemoveItem { stall_slot } => ClientMessage::StallRemoveItem {
+                stall_slot: *stall_slot,
+            },
+            InputCommand::StallBrowse { player_id } => ClientMessage::StallBrowse {
+                player_id: player_id.clone(),
+            },
+            InputCommand::StallBuy { seller_id, stall_slot, quantity } => ClientMessage::StallBuy {
+                seller_id: seller_id.clone(),
+                stall_slot: *stall_slot,
+                quantity: *quantity,
             },
         };
         network.send(&msg);

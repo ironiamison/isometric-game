@@ -1153,6 +1153,32 @@ pub struct AltarPanelState {
     pub altar_name: String,
 }
 
+/// A single item in a trade offer
+#[derive(Debug, Clone)]
+pub struct TradeOfferItem {
+    pub slot_index: u8,
+    pub item_id: String,
+    pub quantity: i32,
+}
+
+/// A stall slot with item, quantity and price
+#[derive(Debug, Clone)]
+pub struct StallSlotInfo {
+    pub slot: u8,
+    pub item_id: String,
+    pub quantity: i32,
+    pub price: i32,
+}
+
+/// Data for browsing another player's stall
+#[derive(Debug, Clone)]
+pub struct StallBrowseInfo {
+    pub seller_id: String,
+    pub seller_name: String,
+    pub stall_name: String,
+    pub items: Vec<StallSlotInfo>,
+}
+
 pub struct UiState {
     pub chat_open: bool,
     pub chat_input: String,
@@ -1372,6 +1398,44 @@ pub struct UiState {
     pub slayer_unlocked_monsters: Vec<String>,
     pub slayer_reward_tab: usize,
     pub slayer_reward_scroll: f32,
+
+    // ===== Trade System =====
+    /// Whether trade window is open
+    pub trade_open: bool,
+    /// Trade partner's player ID
+    pub trade_partner_id: Option<String>,
+    /// Trade partner's name
+    pub trade_partner_name: Option<String>,
+    /// Our trade offer items
+    pub trade_my_items: Vec<TradeOfferItem>,
+    /// Our gold offer
+    pub trade_my_gold: i32,
+    /// Whether we accepted
+    pub trade_my_accepted: bool,
+    /// Partner's offered items
+    pub trade_partner_items: Vec<TradeOfferItem>,
+    /// Partner's gold offer
+    pub trade_partner_gold: i32,
+    /// Whether partner accepted
+    pub trade_partner_accepted: bool,
+    /// Pending trade request (requester_id, requester_name)
+    pub trade_pending_request: Option<(String, String)>,
+
+    // ===== Player Stall System =====
+    /// Whether the stall setup panel is open (owner)
+    pub stall_setup_open: bool,
+    /// Our stall slots (when we own a stall)
+    pub stall_my_slots: Vec<StallSlotInfo>,
+    /// Our stall name
+    pub stall_my_name: String,
+    /// Whether we have an active stall
+    pub stall_active: bool,
+    /// Stall browse data (when browsing another player's stall)
+    pub stall_browse: Option<StallBrowseInfo>,
+    /// Selected stall browse buy quantity
+    pub stall_buy_quantity: i32,
+    /// Selected stall browse slot index
+    pub stall_browse_selected: usize,
 }
 
 impl Default for UiState {
@@ -1559,6 +1623,25 @@ impl Default for UiState {
             slayer_unlocked_monsters: Vec::new(),
             slayer_reward_tab: 0,
             slayer_reward_scroll: 0.0,
+            // Trade system
+            trade_open: false,
+            trade_partner_id: None,
+            trade_partner_name: None,
+            trade_my_items: Vec::new(),
+            trade_my_gold: 0,
+            trade_my_accepted: false,
+            trade_partner_items: Vec::new(),
+            trade_partner_gold: 0,
+            trade_partner_accepted: false,
+            trade_pending_request: None,
+            // Stall system
+            stall_setup_open: false,
+            stall_my_slots: Vec::new(),
+            stall_my_name: String::new(),
+            stall_active: false,
+            stall_browse: None,
+            stall_buy_quantity: 1,
+            stall_browse_selected: 0,
         }
     }
 }

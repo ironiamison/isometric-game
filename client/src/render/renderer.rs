@@ -3703,6 +3703,7 @@ impl Renderer {
 
         // 4.5. Render name tags above all map elements (overhead, walls, objects, etc.)
         self.render_name_tags(state);
+        self.render_stall_indicators(state);
         self.render_tree_name_tag(state);
         self.render_ore_name_tag(state);
         self.render_map_object_name_tag(state);
@@ -4128,6 +4129,57 @@ impl Renderer {
             };
 
             self.draw_text_sharp(&name, text_x, name_y, font_size, name_color);
+        }
+    }
+
+    /// Render overhead stall indicator for players with active stalls
+    fn render_stall_indicators(&self, state: &GameState) {
+        let zoom = state.camera.zoom;
+        let font_size = 13.0 * zoom;
+        let scaled_sprite_height = SPRITE_HEIGHT * zoom;
+
+        for player in state.players.values() {
+            if !player.has_stall {
+                continue;
+            }
+            // Skip local player
+            if state.local_player_id.as_ref() == Some(&player.id) {
+                continue;
+            }
+
+            let (screen_x, screen_y) = world_to_screen(player.x, player.y, &state.camera);
+            let has_sprite = self
+                .get_player_sprite(&player.gender, &player.skin)
+                .is_some();
+            let name_y_offset = if has_sprite {
+                scaled_sprite_height - 8.0 * zoom
+            } else {
+                24.0 * zoom
+            };
+
+            // Position above the name tag area
+            let stall_label = player.stall_name.as_deref().unwrap_or("Shop");
+            let label_w = self.measure_text_sharp(stall_label, font_size).width;
+            let tag_h = 16.0 * zoom;
+            let padding = 4.0 * zoom;
+            let tag_x = screen_x - (label_w + padding * 2.0) / 2.0;
+            let tag_y = screen_y - name_y_offset - tag_h - 4.0 * zoom;
+
+            // Green background bar
+            draw_rectangle(
+                tag_x,
+                tag_y,
+                label_w + padding * 2.0,
+                tag_h,
+                Color::new(0.1, 0.45, 0.1, 0.85),
+            );
+            self.draw_text_sharp(
+                stall_label,
+                tag_x + padding,
+                tag_y + tag_h - 3.0 * zoom,
+                font_size,
+                Color::new(0.9, 1.0, 0.9, 1.0),
+            );
         }
     }
 
@@ -9397,10 +9449,7 @@ impl Renderer {
             );
         }
 
-        // Gold drop dialog (when active)
-        if let Some(ref dialog) = state.ui_state.gold_drop_dialog {
-            self.render_gold_drop_dialog(dialog, state.inventory.gold, hovered, &mut layout);
-        }
+
 
         // Altar offering panel (when active)
         if let Some(ref panel) = state.ui_state.altar_panel {
@@ -9415,6 +9464,19 @@ impl Renderer {
         // Slayer panel (when open)
         if state.ui_state.slayer_panel_open {
             self.render_slayer_panel(state, hovered, &mut layout);
+        }
+
+        // Trade panel and request popup
+        self.render_trade_panel(state, &mut layout);
+        self.render_trade_request_popup(state, &mut layout);
+
+        // Stall panels
+        self.render_stall_setup_panel(state, &mut layout);
+        self.render_stall_browse_panel(state, &mut layout);
+
+        // Gold drop dialog (when active) - rendered after trade/stall so it appears on top
+        if let Some(ref dialog) = state.ui_state.gold_drop_dialog {
+            self.render_gold_drop_dialog(dialog, state.inventory.gold, state.ui_state.trade_open, hovered, &mut layout);
         }
 
         // Quest completion notifications (on top of dialogue/panels)

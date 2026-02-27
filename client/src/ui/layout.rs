@@ -248,6 +248,29 @@ pub enum UiElementId {
     SlayerBuyReward(usize),
     SlayerRemoveBlock(usize),
     SlayerScrollArea,
+
+    // Trade Panel
+    TradeOfferSlot(usize),
+    TradePartnerSlot(usize),
+    TradeGoldInput,
+    TradeAcceptButton,
+    TradeCancelButton,
+    TradeRequestAccept,
+    TradeRequestDecline,
+
+    // Stall Setup Panel (owner)
+    StallSetupSlot(usize),
+    StallSetupRemove(usize),
+    StallSetupOpenButton,
+    StallSetupCloseButton,
+    StallSetupNameInput,
+
+    // Stall Browse Panel (buyer)
+    StallBrowseItem(usize),
+    StallBrowseBuyButton,
+    StallBrowseCloseButton,
+    StallBrowseQuantityMinus,
+    StallBrowseQuantityPlus,
 }
 
 /// A single interactive UI element with its bounds

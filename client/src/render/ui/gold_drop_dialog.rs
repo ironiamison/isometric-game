@@ -13,6 +13,7 @@ impl Renderer {
         &self,
         dialog: &GoldDropDialog,
         player_gold: i32,
+        trade_context: bool,
         hovered: &Option<UiElementId>,
         layout: &mut UiLayout,
     ) {
@@ -31,7 +32,7 @@ impl Renderer {
         self.draw_corner_accents(box_x, box_y, box_width, box_height);
 
         // ===== TITLE TAB =====
-        let title_text = "DROP GOLD";
+        let title_text = if trade_context { "ADD GOLD" } else { "DROP GOLD" };
         let title_width = self.measure_text_sharp(title_text, 16.0).width + 28.0;
         let title_x = box_x + (box_width - title_width) / 2.0;
         let title_y = box_y - 8.0;

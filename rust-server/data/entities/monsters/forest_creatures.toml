@@ -439,6 +439,12 @@ drop_chance = 0.20
 quantity_min = 1
 quantity_max = 1
 
+[[sheep.loot]]
+item_id = "wool"
+drop_chance = 0.60
+quantity_min = 1
+quantity_max = 2
+
 [sheep.behaviors]
 hostile = false
 wander_enabled = true

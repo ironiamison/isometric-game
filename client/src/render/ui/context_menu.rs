@@ -71,6 +71,11 @@ impl Renderer {
                     .unwrap_or_else(|| "Player".to_string());
                 push_option(&mut options, "Attack");
                 push_option(&mut options, "Follow");
+                push_option(&mut options, "Trade");
+                // Show "Browse Shop" if the player has an active stall
+                if state.players.get(id).map_or(false, |p| p.has_stall) {
+                    push_option(&mut options, "Browse Shop");
+                }
                 push_option(&mut options, "Add Friend");
                 push_option(&mut options, "Examine");
                 name
