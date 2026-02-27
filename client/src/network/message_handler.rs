@@ -3893,6 +3893,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let partner_name = extract_string(value, "partner_name").unwrap_or_default();
                 state.ui_state.trade_open = true;
                 state.ui_state.inventory_open = true;
+                state.ui_state.character_panel_open = false;
+                state.ui_state.stall_setup_open = false;
+                state.ui_state.stall_name_editing = false;
                 state.ui_state.trade_partner_id = Some(partner_id);
                 state.ui_state.trade_partner_name = Some(partner_name);
                 state.ui_state.trade_my_items.clear();
@@ -4040,11 +4043,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "stallBuyResult" => {
             if let Some(value) = data {
                 let success = extract_bool(value, "success").unwrap_or(false);
-                let message = extract_string(value, "message").unwrap_or_default();
                 if success {
-                    state.push_system_chat(format!("Purchase successful: {}", message));
+                    let item_id = extract_string(value, "item_id").unwrap_or_default();
+                    let quantity = extract_i32(value, "quantity").unwrap_or(1);
+                    let total_price = extract_i32(value, "total_price").unwrap_or(0);
+                    let item_def = state.item_registry.get_or_placeholder(&item_id);
+                    state.push_system_chat(format!(
+                        "Bought {}x {} for {}g",
+                        quantity, item_def.display_name, total_price
+                    ));
                 } else {
-                    state.push_system_chat(format!("Purchase failed: {}", message));
+                    let error = extract_string(value, "error").unwrap_or("Unknown error".to_string());
+                    state.push_system_chat(format!("Purchase failed: {}", error));
                 }
             }
         }
@@ -4054,7 +4064,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let buyer_name = extract_string(value, "buyer_name").unwrap_or_default();
                 let item_id = extract_string(value, "item_id").unwrap_or_default();
                 let quantity = extract_i32(value, "quantity").unwrap_or(1);
-                let gold_earned = extract_i32(value, "gold_earned").unwrap_or(0);
+                let gold_earned = extract_i32(value, "gold_received").unwrap_or(0);
                 let item_def = state.item_registry.get_or_placeholder(&item_id);
                 state.push_system_chat(format!(
                     "{} bought {}x {} from your shop for {}g!",
