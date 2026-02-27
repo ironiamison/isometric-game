@@ -15,6 +15,208 @@ use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 use std::collections::HashSet;
 
+/// Convert a character index to a byte index in a UTF-8 string.
+fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
+    s.char_indices()
+        .nth(char_idx)
+        .map(|(byte_idx, _)| byte_idx)
+        .unwrap_or(s.len())
+}
+
+/// Check if a key should fire (initial press or auto-repeat).
+fn chat_key_should_fire(key: KeyCode, state: &mut GameState, current_time: f64) -> bool {
+    const INITIAL_DELAY: f64 = 0.4;
+    const REPEAT_RATE: f64 = 0.035;
+
+    if is_key_pressed(key) {
+        state.ui_state.chat_key_repeat_time = current_time;
+        state.ui_state.chat_key_initial_delay = true;
+        return true;
+    } else if is_key_down(key) {
+        let delay = if state.ui_state.chat_key_initial_delay {
+            INITIAL_DELAY
+        } else {
+            REPEAT_RATE
+        };
+        if current_time - state.ui_state.chat_key_repeat_time >= delay {
+            state.ui_state.chat_key_repeat_time = current_time;
+            state.ui_state.chat_key_initial_delay = false;
+            return true;
+        }
+    }
+    false
+}
+
+/// Process chat keyboard input when chat is open.
+/// Returns `true` if the caller should return early (non-classic mode consumes all input).
+fn process_chat_keyboard_input(
+    state: &mut GameState,
+    commands: &mut Vec<InputCommand>,
+    audio: &mut AudioManager,
+) -> bool {
+    let classic = state.ui_state.classic_controls;
+    let current_time = macroquad::time::get_time();
+
+    // Escape cancels chat (in classic mode, Escape opens ESC menu instead)
+    if is_key_pressed(KeyCode::Escape) {
+        if classic {
+            state.ui_state.escape_menu_open = !state.ui_state.escape_menu_open;
+            return true;
+        }
+        state.ui_state.chat_open = false;
+        state.ui_state.chat_input.clear();
+        state.ui_state.chat_cursor = 0;
+        state.ui_state.chat_scroll_offset = 0;
+        if state.ui_state.chat_panel_open {
+            state.ui_state.chat_panel_open = false;
+        }
+        #[cfg(target_os = "android")]
+        macroquad::miniquad::window::show_keyboard(false);
+        return true;
+    }
+
+    // Enter sends message
+    if is_key_pressed(KeyCode::Enter) {
+        if matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
+            state.ui_state.chat_input.clear();
+            state.ui_state.chat_cursor = 0;
+            state.ui_state.chat_scroll_offset = 0;
+        } else {
+            let text = state.ui_state.chat_input.trim().to_string();
+            let (send_text, channel) = if text.starts_with('~') {
+                let trimmed = text[1..].trim().to_string();
+                (trimmed, "global".to_string())
+            } else {
+                let ch = match state.ui_state.chat_active_tab {
+                    ChatChannel::Global => "global",
+                    _ => "public",
+                };
+                (text.clone(), ch.to_string())
+            };
+            if !send_text.is_empty() {
+                audio.play_sfx("send_message");
+                commands.push(InputCommand::Chat {
+                    text: send_text,
+                    channel,
+                });
+            }
+            state.ui_state.chat_input.clear();
+            state.ui_state.chat_cursor = 0;
+            state.ui_state.chat_scroll_offset = 0;
+        }
+        if !classic {
+            state.ui_state.chat_open = false;
+        }
+        #[cfg(target_os = "android")]
+        macroquad::miniquad::window::show_keyboard(false);
+        return true;
+    }
+
+    let char_count = state.ui_state.chat_input.chars().count();
+
+    // Check if any repeatable key is held
+    let repeatable_keys = if classic {
+        vec![KeyCode::Backspace, KeyCode::Delete]
+    } else {
+        vec![KeyCode::Left, KeyCode::Right, KeyCode::Backspace, KeyCode::Delete]
+    };
+    let any_repeatable_held = repeatable_keys.iter().any(|k| is_key_down(*k));
+    if !any_repeatable_held {
+        state.ui_state.chat_key_initial_delay = true;
+    }
+
+    // Arrow key navigation (non-classic only)
+    if !classic {
+        if chat_key_should_fire(KeyCode::Left, state, current_time) {
+            if state.ui_state.chat_cursor > 0 {
+                state.ui_state.chat_cursor -= 1;
+            }
+            while get_char_pressed().is_some() {}
+        }
+        if chat_key_should_fire(KeyCode::Right, state, current_time) {
+            let char_count = state.ui_state.chat_input.chars().count();
+            if state.ui_state.chat_cursor < char_count {
+                state.ui_state.chat_cursor += 1;
+            }
+            while get_char_pressed().is_some() {}
+        }
+    }
+    // Home/End for quick navigation
+    if is_key_pressed(KeyCode::Home) {
+        state.ui_state.chat_cursor = 0;
+        while get_char_pressed().is_some() {}
+    }
+    if is_key_pressed(KeyCode::End) {
+        state.ui_state.chat_cursor = char_count;
+        while get_char_pressed().is_some() {}
+    }
+
+    // Paste from clipboard (Ctrl+V / Cmd+V)
+    let ctrl_held = is_key_down(KeyCode::LeftControl)
+        || is_key_down(KeyCode::RightControl)
+        || is_key_down(KeyCode::LeftSuper)
+        || is_key_down(KeyCode::RightSuper);
+    if ctrl_held && is_key_pressed(KeyCode::V) {
+        if let Some(text) = macroquad::miniquad::window::clipboard_get() {
+            for c in text.chars() {
+                if state.ui_state.chat_input.chars().count() >= 200 {
+                    break;
+                }
+                if c.is_control() {
+                    continue;
+                }
+                let byte_idx = char_to_byte_index(
+                    &state.ui_state.chat_input,
+                    state.ui_state.chat_cursor,
+                );
+                state.ui_state.chat_input.insert(byte_idx, c);
+                state.ui_state.chat_cursor += 1;
+            }
+        }
+        while get_char_pressed().is_some() {}
+    }
+
+    // Backspace removes character before cursor
+    if chat_key_should_fire(KeyCode::Backspace, state, current_time) {
+        if state.ui_state.chat_cursor > 0 {
+            let byte_idx = char_to_byte_index(
+                &state.ui_state.chat_input,
+                state.ui_state.chat_cursor - 1,
+            );
+            state.ui_state.chat_input.remove(byte_idx);
+            state.ui_state.chat_cursor -= 1;
+        }
+    }
+
+    // Delete removes character at cursor
+    if chat_key_should_fire(KeyCode::Delete, state, current_time) {
+        let char_count = state.ui_state.chat_input.chars().count();
+        if state.ui_state.chat_cursor < char_count {
+            let byte_idx =
+                char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
+            state.ui_state.chat_input.remove(byte_idx);
+        }
+    }
+
+    // Capture typed characters - insert at cursor position
+    while let Some(c) = get_char_pressed() {
+        if c.is_control()
+            || !c.is_ascii_graphic() && !c.is_ascii_whitespace() && !c.is_alphanumeric()
+        {
+            continue;
+        }
+        if state.ui_state.chat_input.chars().count() < 200 {
+            let byte_idx =
+                char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
+            state.ui_state.chat_input.insert(byte_idx, c);
+            state.ui_state.chat_cursor += 1;
+        }
+    }
+
+    // In classic mode, don't return early - fall through to movement/attack handling
+    !classic
+}
+
 /// GID for obelisk map objects (objects tileset firstgid 1162 + sprite 796)
 const OBELISK_GID: u32 = 1958;
 
@@ -5231,6 +5433,12 @@ impl InputHandler {
                 state.ui_state.shop_quantity_hold_element = None;
             }
 
+            // Allow chat input while shop panel is open
+            if state.ui_state.chat_open && !state.ui_state.classic_controls {
+                process_chat_keyboard_input(state, &mut commands, audio);
+                return commands;
+            }
+
             // Escape: if crafting in progress, cancel craft; otherwise close menu
             if is_key_pressed(KeyCode::Escape) {
                 if state.ui_state.crafting_in_progress {
@@ -5833,6 +6041,12 @@ impl InputHandler {
                 }
             }
 
+            // Allow chat input while furnace panel is open
+            if state.ui_state.chat_open && !state.ui_state.classic_controls {
+                process_chat_keyboard_input(state, &mut commands, audio);
+                return commands;
+            }
+
             // Escape: cancel if crafting, otherwise close
             if is_key_pressed(KeyCode::Escape) {
                 if state.ui_state.crafting_in_progress {
@@ -6073,6 +6287,12 @@ impl InputHandler {
                 }
             }
 
+            // Allow chat input while anvil panel is open
+            if state.ui_state.chat_open && !state.ui_state.classic_controls {
+                process_chat_keyboard_input(state, &mut commands, audio);
+                return commands;
+            }
+
             // Escape: cancel if crafting, otherwise close
             if is_key_pressed(KeyCode::Escape) {
                 if state.ui_state.crafting_in_progress {
@@ -6311,6 +6531,12 @@ impl InputHandler {
                 }
             }
 
+            // Allow chat input while alchemy station panel is open
+            if state.ui_state.chat_open && !state.ui_state.classic_controls {
+                process_chat_keyboard_input(state, &mut commands, audio);
+                return commands;
+            }
+
             // Escape: cancel if crafting, otherwise close
             if is_key_pressed(KeyCode::Escape) {
                 if state.ui_state.crafting_in_progress {
@@ -6544,6 +6770,12 @@ impl InputHandler {
                 }
             }
 
+            // Allow chat input while workbench panel is open
+            if state.ui_state.chat_open && !state.ui_state.classic_controls {
+                process_chat_keyboard_input(state, &mut commands, audio);
+                return commands;
+            }
+
             // Escape: cancel if crafting, otherwise close
             if is_key_pressed(KeyCode::Escape) {
                 if state.ui_state.crafting_in_progress {
@@ -6773,6 +7005,12 @@ impl InputHandler {
                         _ => {}
                     }
                 }
+            }
+
+            // Allow chat input while fletching panel is open
+            if state.ui_state.chat_open && !state.ui_state.classic_controls {
+                process_chat_keyboard_input(state, &mut commands, audio);
+                return commands;
             }
 
             // Escape: cancel if crafting, otherwise close
@@ -7050,221 +7288,7 @@ impl InputHandler {
 
         // Handle chat input mode (must be before chat_panel_open block so typing works)
         if state.ui_state.chat_open {
-            let classic = state.ui_state.classic_controls;
-
-            // Helper to convert character index to byte index
-            let char_to_byte_index = |s: &str, char_idx: usize| -> usize {
-                s.char_indices()
-                    .nth(char_idx)
-                    .map(|(byte_idx, _)| byte_idx)
-                    .unwrap_or(s.len())
-            };
-
-            // Key repeat timing constants
-            const INITIAL_DELAY: f64 = 0.4; // 400ms before repeat starts
-            const REPEAT_RATE: f64 = 0.035; // ~28 repeats per second
-
-            let current_time = macroquad::time::get_time();
-
-            // Escape cancels chat (in classic mode, Escape opens ESC menu instead - don't close chat)
-            if is_key_pressed(KeyCode::Escape) {
-                if classic {
-                    // In classic mode, Escape toggles the ESC menu, chat stays open
-                    state.ui_state.escape_menu_open = !state.ui_state.escape_menu_open;
-                    return commands;
-                }
-                state.ui_state.chat_open = false;
-                state.ui_state.chat_input.clear();
-                state.ui_state.chat_cursor = 0;
-                state.ui_state.chat_scroll_offset = 0;
-                if state.ui_state.chat_panel_open {
-                    state.ui_state.chat_panel_open = false;
-                }
-                #[cfg(target_os = "android")]
-                macroquad::miniquad::window::show_keyboard(false);
-                return commands;
-            }
-
-            // Enter sends message
-            if is_key_pressed(KeyCode::Enter) {
-                // Block sending on System tab
-                if matches!(state.ui_state.chat_active_tab, ChatChannel::System) {
-                    state.ui_state.chat_input.clear();
-                    state.ui_state.chat_cursor = 0;
-                    state.ui_state.chat_scroll_offset = 0;
-                } else {
-                    let text = state.ui_state.chat_input.trim().to_string();
-                    // Determine channel: ~ prefix forces global, otherwise match active tab
-                    let (send_text, channel) = if text.starts_with('~') {
-                        let trimmed = text[1..].trim().to_string();
-                        (trimmed, "global".to_string())
-                    } else {
-                        let ch = match state.ui_state.chat_active_tab {
-                            ChatChannel::Global => "global",
-                            _ => "public",
-                        };
-                        (text.clone(), ch.to_string())
-                    };
-                    if !send_text.is_empty() {
-                        audio.play_sfx("send_message");
-                        commands.push(InputCommand::Chat {
-                            text: send_text,
-                            channel,
-                        });
-                    }
-                    state.ui_state.chat_input.clear();
-                    state.ui_state.chat_cursor = 0;
-                    state.ui_state.chat_scroll_offset = 0;
-                }
-                if classic {
-                    // In classic mode, chat stays open after sending
-                } else {
-                    // Close keyboard input but keep chat panel open if it's showing
-                    state.ui_state.chat_open = false;
-                }
-                #[cfg(target_os = "android")]
-                macroquad::miniquad::window::show_keyboard(false);
-                return commands;
-            }
-
-            let char_count = state.ui_state.chat_input.chars().count();
-
-            // Check if any repeatable key is held
-            let repeatable_keys = if classic {
-                // In classic mode, arrow keys are for movement, not chat cursor
-                vec![KeyCode::Backspace, KeyCode::Delete]
-            } else {
-                vec![
-                    KeyCode::Left,
-                    KeyCode::Right,
-                    KeyCode::Backspace,
-                    KeyCode::Delete,
-                ]
-            };
-            let any_repeatable_held = repeatable_keys.iter().any(|k| is_key_down(*k));
-
-            // Reset repeat state if no repeatable keys held
-            if !any_repeatable_held {
-                state.ui_state.chat_key_initial_delay = true;
-            }
-
-            // Helper to check if we should fire a key action (initial press or repeat)
-            let should_fire = |key: KeyCode, state: &mut GameState, current_time: f64| -> bool {
-                if is_key_pressed(key) {
-                    // Initial press - always fire and start repeat timer
-                    state.ui_state.chat_key_repeat_time = current_time;
-                    state.ui_state.chat_key_initial_delay = true;
-                    return true;
-                } else if is_key_down(key) {
-                    // Key held - check repeat timing
-                    let delay = if state.ui_state.chat_key_initial_delay {
-                        INITIAL_DELAY
-                    } else {
-                        REPEAT_RATE
-                    };
-                    if current_time - state.ui_state.chat_key_repeat_time >= delay {
-                        state.ui_state.chat_key_repeat_time = current_time;
-                        state.ui_state.chat_key_initial_delay = false;
-                        return true;
-                    }
-                }
-                false
-            };
-
-            // Arrow key navigation (drain char queue after to prevent ghost characters)
-            // In classic mode, arrow keys are used for movement, not chat cursor
-            if !classic {
-                if should_fire(KeyCode::Left, state, current_time) {
-                    if state.ui_state.chat_cursor > 0 {
-                        state.ui_state.chat_cursor -= 1;
-                    }
-                    while get_char_pressed().is_some() {}
-                }
-                if should_fire(KeyCode::Right, state, current_time) {
-                    let char_count = state.ui_state.chat_input.chars().count();
-                    if state.ui_state.chat_cursor < char_count {
-                        state.ui_state.chat_cursor += 1;
-                    }
-                    while get_char_pressed().is_some() {}
-                }
-            }
-            // Home/End for quick navigation (no repeat needed)
-            if is_key_pressed(KeyCode::Home) {
-                state.ui_state.chat_cursor = 0;
-                while get_char_pressed().is_some() {}
-            }
-            if is_key_pressed(KeyCode::End) {
-                state.ui_state.chat_cursor = char_count;
-                while get_char_pressed().is_some() {}
-            }
-
-            // Paste from clipboard (Ctrl+V / Cmd+V)
-            let ctrl_held = is_key_down(KeyCode::LeftControl)
-                || is_key_down(KeyCode::RightControl)
-                || is_key_down(KeyCode::LeftSuper)
-                || is_key_down(KeyCode::RightSuper);
-            if ctrl_held && is_key_pressed(KeyCode::V) {
-                if let Some(text) = macroquad::miniquad::window::clipboard_get() {
-                    for c in text.chars() {
-                        if state.ui_state.chat_input.chars().count() >= 200 {
-                            break;
-                        }
-                        if c.is_control() {
-                            continue;
-                        }
-                        let byte_idx = char_to_byte_index(
-                            &state.ui_state.chat_input,
-                            state.ui_state.chat_cursor,
-                        );
-                        state.ui_state.chat_input.insert(byte_idx, c);
-                        state.ui_state.chat_cursor += 1;
-                    }
-                }
-                // Drain char queue to prevent 'v' from leaking through
-                while get_char_pressed().is_some() {}
-            }
-
-            // Backspace removes character before cursor
-            if should_fire(KeyCode::Backspace, state, current_time) {
-                if state.ui_state.chat_cursor > 0 {
-                    let byte_idx = char_to_byte_index(
-                        &state.ui_state.chat_input,
-                        state.ui_state.chat_cursor - 1,
-                    );
-                    state.ui_state.chat_input.remove(byte_idx);
-                    state.ui_state.chat_cursor -= 1;
-                }
-            }
-
-            // Delete removes character at cursor
-            if should_fire(KeyCode::Delete, state, current_time) {
-                let char_count = state.ui_state.chat_input.chars().count();
-                if state.ui_state.chat_cursor < char_count {
-                    let byte_idx =
-                        char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
-                    state.ui_state.chat_input.remove(byte_idx);
-                }
-            }
-
-            // Capture typed characters - insert at cursor position
-            while let Some(c) = get_char_pressed() {
-                // Filter control characters and non-printable special chars (like arrow key ghosts)
-                if c.is_control()
-                    || !c.is_ascii_graphic() && !c.is_ascii_whitespace() && !c.is_alphanumeric()
-                {
-                    continue;
-                }
-                // Limit chat message length (by character count)
-                if state.ui_state.chat_input.chars().count() < 200 {
-                    let byte_idx =
-                        char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
-                    state.ui_state.chat_input.insert(byte_idx, c);
-                    state.ui_state.chat_cursor += 1;
-                }
-            }
-
-            // In classic mode, don't return - fall through to movement/attack handling
-            if !classic {
+            if process_chat_keyboard_input(state, &mut commands, audio) {
                 return commands;
             }
         }
@@ -7533,6 +7557,7 @@ impl InputHandler {
                     self.last_dx = 0.0;
                     self.last_dy = 0.0;
                     self.last_send_time = current_time;
+                    self.move_sent = false;
                 } else {
                     // Never sent a move (quick tap or frame timing edge case) - send Face command
                     // But not if attacking - player must finish attack first

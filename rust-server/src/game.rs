@@ -25,6 +25,12 @@ const TICK_RATE: f32 = 20.0;
 
 // Grid-based movement: ticks between tile moves (5 ticks * 50ms = 250ms per tile)
 const MOVE_COOLDOWN_TICKS: u64 = 5;
+// If a non-zero move intent is not refreshed within this window, clear it.
+// Prevents "keeps moving after key-up" when stop/update packets are delayed.
+const MOVE_INTENT_STALE_TIMEOUT_MS: u64 = 700;
+// Warn when move input cadence is irregular while moving (ingress jitter signal).
+const MOVE_INPUT_GAP_WARN_MS: u64 = 250;
+const MOVE_INPUT_WARN_THROTTLE_MS: u64 = 2_000;
 
 // Dash: 1 tile forward, 5 second cooldown (100 ticks at 20Hz)
 const DASH_COOLDOWN_TICKS: u64 = 100;
@@ -326,6 +332,8 @@ pub struct Player {
     pub last_received_move_seq: u32,
     pub last_processed_move_seq: u32,
     pub last_move_tick: u64, // Tick-based movement cooldown
+    pub last_move_input_ms: u64,
+    pub last_move_input_warn_ms: u64,
     pub direction: Direction,
     pub hp: i32,
     pub skills: Skills,            // Combat skills (Hitpoints determines max HP)
@@ -500,6 +508,8 @@ impl Player {
             last_received_move_seq: 0,
             last_processed_move_seq: 0,
             last_move_tick: 0,
+            last_move_input_ms: 0,
+            last_move_input_warn_ms: 0,
             direction: Direction::Down,
             hp: skills.hitpoints.level, // HP = Hitpoints level
             prayer_points: 10 + skills.prayer.level, // Prayer points = 10 + Prayer level
@@ -2556,15 +2566,81 @@ impl GameRoom {
         // interrupt auto-action, otherwise the player can never catch a moving target.
 
         let mut chair_to_free: Option<(i32, i32)> = None;
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
         {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 let move_seq =
                     seq.unwrap_or_else(|| player.last_received_move_seq.saturating_add(1));
+                let prev_seq = player.last_received_move_seq;
                 if move_seq <= player.last_received_move_seq {
+                    // Out-of-order/duplicate move packet. This is especially useful when
+                    // diagnosing "continued movement after key-up" reports.
+                    if now_ms.saturating_sub(player.last_move_input_warn_ms)
+                        >= MOVE_INPUT_WARN_THROTTLE_MS
+                    {
+                        let is_stop = dx.abs() <= 0.1 && dy.abs() <= 0.1;
+                        tracing::warn!(
+                            "Ignoring stale move packet for {} (seq={} <= last={}, stop={}, intent=({}, {}) pos=({}, {}))",
+                            player_id,
+                            move_seq,
+                            player.last_received_move_seq,
+                            is_stop,
+                            player.move_dx,
+                            player.move_dy,
+                            player.x,
+                            player.y
+                        );
+                        player.last_move_input_warn_ms = now_ms;
+                    }
                     return;
                 }
                 player.last_received_move_seq = move_seq;
+
+                // Detect missing move packets from client/network path.
+                let seq_gap = move_seq.saturating_sub(prev_seq);
+                if seq_gap > 4
+                    && now_ms.saturating_sub(player.last_move_input_warn_ms)
+                        >= MOVE_INPUT_WARN_THROTTLE_MS
+                {
+                    tracing::warn!(
+                        "Move seq gap {} for {} (prev={} recv={} pos=({}, {}) intent=({}, {}))",
+                        seq_gap,
+                        player_id,
+                        prev_seq,
+                        move_seq,
+                        player.x,
+                        player.y,
+                        player.move_dx,
+                        player.move_dy
+                    );
+                    player.last_move_input_warn_ms = now_ms;
+                }
+
+                // Track movement-input cadence for diagnostics.
+                if player.last_move_input_ms > 0 && (player.move_dx != 0 || player.move_dy != 0) {
+                    let gap_ms = now_ms.saturating_sub(player.last_move_input_ms);
+                    if gap_ms > MOVE_INPUT_GAP_WARN_MS
+                        && now_ms.saturating_sub(player.last_move_input_warn_ms)
+                            >= MOVE_INPUT_WARN_THROTTLE_MS
+                    {
+                        tracing::warn!(
+                            "Move input gap {}ms for {} (seq={} pos=({}, {}) intent=({}, {}))",
+                            gap_ms,
+                            player_id,
+                            move_seq,
+                            player.x,
+                            player.y,
+                            player.move_dx,
+                            player.move_dy
+                        );
+                        player.last_move_input_warn_ms = now_ms;
+                    }
+                }
+                player.last_move_input_ms = now_ms;
 
                 // Block movement while stall is active
                 if player.stall.as_ref().map_or(false, |s| s.active) {
@@ -12409,6 +12485,33 @@ impl GameRoom {
                 },
             )
             .await;
+        }
+
+        // Deadman stop: clear stale movement intents that were not refreshed recently.
+        // This hardens against delayed/missed key-up updates causing long drift.
+        {
+            let mut players = self.players.write().await;
+            for player in players.values_mut().filter(|p| p.active && !p.is_dead) {
+                if (player.move_dx == 0 && player.move_dy == 0) || player.pending_move_seq.is_none() {
+                    continue;
+                }
+
+                let stale_ms = current_time.saturating_sub(player.last_move_input_ms);
+                if stale_ms > MOVE_INTENT_STALE_TIMEOUT_MS {
+                    let seq = player.pending_move_seq;
+                    tracing::warn!(
+                        "Clearing stale move intent for {} after {}ms without input (seq={:?} pos=({}, {}) intent=({}, {}))",
+                        player.id,
+                        stale_ms,
+                        seq,
+                        player.x,
+                        player.y,
+                        player.move_dx,
+                        player.move_dy
+                    );
+                    player.reject_pending_move();
+                }
+            }
         }
 
         // Collect pending moves from a snapshot.
