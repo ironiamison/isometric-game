@@ -626,15 +626,21 @@ async fn main() {
 
             if let Some(cap) = fps_cap {
                 let target_frame_time = Duration::from_secs_f64(1.0 / cap as f64);
+                // Subtract previous next_frame() time from our sleep budget so total
+                // frame time (work + sleep + next_frame) hits the target. Without this,
+                // next_frame() overhead is additive and fast-rendering frames (e.g.
+                // small interior maps) sleep too long, causing FPS to drop well below cap.
+                let nf_compensation = Duration::from_secs_f64(last_next_frame_ms / 1000.0);
+                let effective_target = target_frame_time.saturating_sub(nf_compensation);
                 let elapsed = frame_start.elapsed();
-                if elapsed < target_frame_time {
+                if elapsed < effective_target {
                     // Two-phase pacing: coarse sleep, then short spin to reduce oversleep jitter.
                     // This keeps frame times more consistent than a single sleep() call.
-                    let remaining = target_frame_time - elapsed;
+                    let remaining = effective_target - elapsed;
                     if remaining > Duration::from_millis(2) {
                         std::thread::sleep(remaining - Duration::from_millis(1));
                     }
-                    while frame_start.elapsed() < target_frame_time {
+                    while frame_start.elapsed() < effective_target {
                         std::hint::spin_loop();
                     }
                 }
