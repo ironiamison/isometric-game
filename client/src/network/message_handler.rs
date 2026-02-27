@@ -1065,8 +1065,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let reason = extract_string(value, "reason");
 
                 if !success {
-                    if let Some(reason) = reason {
+                    if let Some(ref reason) = reason {
                         log::debug!("Attack failed: {}", reason);
+                        if reason == "no_arrows" {
+                            state.pending_sfx.push("error".to_string());
+                            state.push_system_chat("You have no arrows!".to_string());
+                        }
                     }
                 }
             }

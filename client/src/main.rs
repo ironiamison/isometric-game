@@ -832,6 +832,26 @@ fn run_game_frame(
                         .map(|item_def| item_def.weapon_type.as_deref() == Some("ranged"))
                         .unwrap_or(false);
 
+                    // For ranged weapons, check if player has arrows
+                    if is_ranged {
+                        let has_arrows = game_state
+                            .inventory
+                            .slots
+                            .iter()
+                            .any(|slot| {
+                                slot.as_ref()
+                                    .map_or(false, |s| s.item_id.ends_with("_arrow"))
+                            });
+                        if !has_arrows {
+                            // No arrows - play error sound and show message
+                            game_state.pending_sfx.push("error".to_string());
+                            game_state.push_system_chat(
+                                "You have no arrows!".to_string(),
+                            );
+                            continue;
+                        }
+                    }
+
                     if let Some(player) = game_state.players.get_mut(local_id) {
                         if is_ranged {
                             player.play_shoot_bow();

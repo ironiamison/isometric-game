@@ -3951,6 +3951,55 @@ impl GameRoom {
             }
         };
 
+        // For ranged weapons, check and consume 1 arrow before allowing the attack
+        if weapon_type == WeaponType::Ranged {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                // Find the first arrow in inventory (any item ending with "_arrow")
+                let arrow_info = player
+                    .inventory
+                    .slots
+                    .iter()
+                    .find_map(|slot| {
+                        slot.as_ref()
+                            .filter(|s| s.item_id.ends_with("_arrow"))
+                            .map(|s| s.item_id.clone())
+                    });
+
+                if let Some(arrow_id) = arrow_info {
+                    player.inventory.remove_item(&arrow_id, 1);
+                    let inv_update = player.inventory.to_update();
+                    let gold = player.inventory.gold;
+                    drop(players);
+
+                    // Send inventory update to reflect consumed arrow
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::InventoryUpdate {
+                            player_id: player_id.to_string(),
+                            slots: inv_update,
+                            gold,
+                        },
+                    )
+                    .await;
+                } else {
+                    drop(players);
+                    // No arrows available - reject the attack
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::AttackResult {
+                            success: false,
+                            reason: Some("no_arrows".to_string()),
+                        },
+                    )
+                    .await;
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
         // Broadcast attack animation to all clients (plays even if no target hit)
         let attack_type = match weapon_type {
             WeaponType::Ranged => "ranged",
