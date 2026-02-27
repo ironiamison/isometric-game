@@ -17,6 +17,7 @@ fn workbench_section_name(section: &str) -> &str {
     match section {
         "tanning" => "Tanning",
         "armor" => "Armor",
+        "miscellaneous" => "Spinning",
         _ => section,
     }
 }
@@ -26,6 +27,7 @@ pub fn workbench_sections_for_tab(tab: u8) -> &'static [&'static str] {
     match tab {
         0 => &["tanning"],
         1 => &["armor"],
+        2 => &["miscellaneous"],
         _ => &[],
     }
 }
@@ -131,10 +133,10 @@ impl Renderer {
         // ===== TABS =====
         let tab_y = header_y + header_h + 2.0;
         let tab_h = tab_h_scaled;
-        let tab_count = 2;
+        let tab_count = 3;
         let tab_w = header_w / tab_count as f32;
 
-        let tab_labels = ["Tanning", "Armor"];
+        let tab_labels = ["Tanning", "Armor", "Spinning"];
 
         for (idx, label) in tab_labels.iter().enumerate() {
             let tx = header_x + idx as f32 * tab_w;

@@ -6568,7 +6568,7 @@ impl InputHandler {
             if !state.ui_state.crafting_in_progress {
                 // Tab key to cycle tabs
                 if is_key_pressed(KeyCode::Tab) {
-                    state.ui_state.workbench_tab = (state.ui_state.workbench_tab + 1) % 2;
+                    state.ui_state.workbench_tab = (state.ui_state.workbench_tab + 1) % 3;
                     state.ui_state.workbench_selected_recipe = 0;
                     state.ui_state.workbench_scroll_offset = 0.0;
                     state.pending_sfx.push("enter".to_string());

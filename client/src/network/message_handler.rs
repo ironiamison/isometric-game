@@ -4079,15 +4079,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "stallItemUpdate" => {
             if let Some(value) = data {
-                let slot = extract_u8(value, "slot").unwrap_or(0);
-                let quantity = extract_i32(value, "quantity").unwrap_or(0);
-                // Update browse data if open
+                let seller_id = extract_string(value, "seller_id").unwrap_or_default();
+                let slot = extract_u8(value, "stall_slot").unwrap_or(0);
+                let quantity = extract_i32(value, "new_quantity").unwrap_or(0);
+                // Update browse data if open and matches the seller
                 if let Some(ref mut browse) = state.ui_state.stall_browse {
-                    if let Some(item) = browse.items.iter_mut().find(|i| i.slot == slot) {
-                        if quantity <= 0 {
-                            browse.items.retain(|i| i.slot != slot);
-                        } else {
-                            item.quantity = quantity;
+                    if browse.seller_id == seller_id {
+                        if let Some(item) = browse.items.iter_mut().find(|i| i.slot == slot) {
+                            if quantity <= 0 {
+                                browse.items.retain(|i| i.slot != slot);
+                            } else {
+                                item.quantity = quantity;
+                            }
                         }
                     }
                 }
