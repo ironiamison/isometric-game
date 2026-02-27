@@ -36,7 +36,9 @@ impl LogBuffer {
     pub fn new() -> Self {
         Self {
             entries: Arc::new(Mutex::new(VecDeque::with_capacity(MAX_LOG_ENTRIES))),
-            important_entries: Arc::new(Mutex::new(VecDeque::with_capacity(MAX_IMPORTANT_LOG_ENTRIES))),
+            important_entries: Arc::new(Mutex::new(VecDeque::with_capacity(
+                MAX_IMPORTANT_LOG_ENTRIES,
+            ))),
         }
     }
 

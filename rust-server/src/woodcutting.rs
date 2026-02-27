@@ -265,8 +265,10 @@ impl WoodcuttingSystem {
         let log_item_id = tree_config.log_item_id.clone();
         let xp_gained = tree_config.xp_per_log;
         // Effective success = base + tool bonus + 0.5% per level above requirement (capped at 95%)
-        let level_bonus = (player_woodcutting_level - tree_config.level_required).max(0) as f32 * 0.005;
-        let success_chance = (tree_config.success_chance + chop_success_bonus + level_bonus).min(0.95);
+        let level_bonus =
+            (player_woodcutting_level - tree_config.level_required).max(0) as f32 * 0.005;
+        let success_chance =
+            (tree_config.success_chance + chop_success_bonus + level_bonus).min(0.95);
         let depletion_chance = tree_config.depletion_chance;
         let respawn_min = tree_config.respawn_time_min;
         let respawn_max = tree_config.respawn_time_max;
@@ -433,8 +435,10 @@ impl WoodcuttingSystem {
         let log_item_id = tree_config.log_item_id.clone();
         let xp_gained = tree_config.xp_per_log;
         // Effective success = base + tool bonus + 0.3% per level above requirement (capped at 40%)
-        let level_bonus = (player_woodcutting_level - tree_config.level_required).max(0) as f32 * 0.003;
-        let success_chance = (tree_config.success_chance + tool_success_bonus + level_bonus).min(0.40);
+        let level_bonus =
+            (player_woodcutting_level - tree_config.level_required).max(0) as f32 * 0.003;
+        let success_chance =
+            (tree_config.success_chance + tool_success_bonus + level_bonus).min(0.40);
         let depletion_chance = tree_config.depletion_chance;
         let respawn_min = tree_config.respawn_time_min;
         let respawn_max = tree_config.respawn_time_max;

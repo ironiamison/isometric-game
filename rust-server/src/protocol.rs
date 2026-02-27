@@ -25,7 +25,11 @@ pub enum ClientMessage {
     Face { direction: u8 },
 
     #[serde(rename = "chat")]
-    Chat { text: String, #[serde(default)] channel: String },
+    Chat {
+        text: String,
+        #[serde(default)]
+        channel: String,
+    },
 
     #[serde(rename = "attack")]
     Attack,
@@ -267,7 +271,11 @@ pub enum ClientMessage {
 
     /// Buy a slayer reward
     #[serde(rename = "slayerBuyReward")]
-    SlayerBuyReward { reward_id: String, #[serde(default)] target_monster_id: Option<String> },
+    SlayerBuyReward {
+        reward_id: String,
+        #[serde(default)]
+        target_monster_id: Option<String>,
+    },
 
     /// Remove a blocked monster
     #[serde(rename = "slayerRemoveBlock")]
@@ -297,7 +305,10 @@ pub enum ClientMessage {
 
     /// Deposit item from inventory into chest
     #[serde(rename = "chestDeposit")]
-    ChestDeposit { chest_id: String, inventory_slot: u8 },
+    ChestDeposit {
+        chest_id: String,
+        inventory_slot: u8,
+    },
 
     /// Spectator upgrades to a full player session
     #[serde(rename = "spectatorUpgrade")]
@@ -347,7 +358,11 @@ pub enum ClientMessage {
 
     /// Move item from inventory to stall slot with price
     #[serde(rename = "stallSetItem")]
-    StallSetItem { inventory_slot: u8, quantity: i32, price: i32 },
+    StallSetItem {
+        inventory_slot: u8,
+        quantity: i32,
+        price: i32,
+    },
 
     /// Remove item from stall back to inventory
     #[serde(rename = "stallRemoveItem")]
@@ -363,7 +378,11 @@ pub enum ClientMessage {
 
     /// Buy from another player's stall
     #[serde(rename = "stallBuy")]
-    StallBuy { seller_id: String, stall_slot: u8, quantity: i32 },
+    StallBuy {
+        seller_id: String,
+        stall_slot: u8,
+        quantity: i32,
+    },
 }
 
 impl ClientMessage {
@@ -1844,7 +1863,10 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
         Value::Boolean(p.is_gathering),
     ));
     pmap.push((Value::String("dashing".into()), Value::Boolean(p.dashing)));
-    pmap.push((Value::String("has_stall".into()), Value::Boolean(p.has_stall)));
+    pmap.push((
+        Value::String("has_stall".into()),
+        Value::Boolean(p.has_stall),
+    ));
     pmap.push((
         Value::String("stall_name".into()),
         match &p.stall_name {
@@ -1925,11 +1947,23 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
         Value::Boolean(n.is_merchant),
     ));
     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
-    nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
-    nmap.push((Value::String("is_slayer_master".into()), Value::Boolean(n.is_slayer_master)));
-    nmap.push((Value::String("is_friendly".into()), Value::Boolean(n.is_friendly)));
+    nmap.push((
+        Value::String("is_banker".into()),
+        Value::Boolean(n.is_banker),
+    ));
+    nmap.push((
+        Value::String("is_slayer_master".into()),
+        Value::Boolean(n.is_slayer_master),
+    ));
+    nmap.push((
+        Value::String("is_friendly".into()),
+        Value::Boolean(n.is_friendly),
+    ));
     if let Some(ref st) = n.station_type {
-        nmap.push((Value::String("station_type".into()), Value::String(st.clone().into())));
+        nmap.push((
+            Value::String("station_type".into()),
+            Value::String(st.clone().into()),
+        ));
     }
     nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
     nmap.push((
@@ -1953,13 +1987,34 @@ fn slayer_task_to_value(task: &Option<SlayerTaskData>) -> rmpv::Value {
     match task {
         Some(t) => {
             let mut map = Vec::new();
-            map.push((Value::String("monster_id".into()), Value::String(t.monster_id.clone().into())));
-            map.push((Value::String("display_name".into()), Value::String(t.display_name.clone().into())));
-            map.push((Value::String("kills_current".into()), Value::Integer((t.kills_current as i64).into())));
-            map.push((Value::String("kills_required".into()), Value::Integer((t.kills_required as i64).into())));
-            map.push((Value::String("xp_per_kill".into()), Value::Integer(t.xp_per_kill.into())));
-            map.push((Value::String("master_id".into()), Value::String(t.master_id.clone().into())));
-            map.push((Value::String("points_on_complete".into()), Value::Integer((t.points_on_complete as i64).into())));
+            map.push((
+                Value::String("monster_id".into()),
+                Value::String(t.monster_id.clone().into()),
+            ));
+            map.push((
+                Value::String("display_name".into()),
+                Value::String(t.display_name.clone().into()),
+            ));
+            map.push((
+                Value::String("kills_current".into()),
+                Value::Integer((t.kills_current as i64).into()),
+            ));
+            map.push((
+                Value::String("kills_required".into()),
+                Value::Integer((t.kills_required as i64).into()),
+            ));
+            map.push((
+                Value::String("xp_per_kill".into()),
+                Value::Integer(t.xp_per_kill.into()),
+            ));
+            map.push((
+                Value::String("master_id".into()),
+                Value::String(t.master_id.clone().into()),
+            ));
+            map.push((
+                Value::String("points_on_complete".into()),
+                Value::Integer((t.points_on_complete as i64).into()),
+            ));
             Value::Map(map)
         }
         None => Value::Nil,
@@ -1970,16 +2025,37 @@ fn slayer_task_to_value(task: &Option<SlayerTaskData>) -> rmpv::Value {
 fn slayer_reward_to_value(r: &SlayerRewardData) -> rmpv::Value {
     use rmpv::Value;
     let mut map = Vec::new();
-    map.push((Value::String("id".into()), Value::String(r.id.clone().into())));
-    map.push((Value::String("display_name".into()), Value::String(r.display_name.clone().into())));
-    map.push((Value::String("description".into()), Value::String(r.description.clone().into())));
-    map.push((Value::String("cost".into()), Value::Integer((r.cost as i64).into())));
-    map.push((Value::String("category".into()), Value::String(r.category.clone().into())));
-    map.push((Value::String("target_id".into()), match &r.target_id {
-        Some(id) => Value::String(id.clone().into()),
-        None => Value::Nil,
-    }));
-    map.push((Value::String("quantity".into()), Value::Integer((r.quantity as i64).into())));
+    map.push((
+        Value::String("id".into()),
+        Value::String(r.id.clone().into()),
+    ));
+    map.push((
+        Value::String("display_name".into()),
+        Value::String(r.display_name.clone().into()),
+    ));
+    map.push((
+        Value::String("description".into()),
+        Value::String(r.description.clone().into()),
+    ));
+    map.push((
+        Value::String("cost".into()),
+        Value::Integer((r.cost as i64).into()),
+    ));
+    map.push((
+        Value::String("category".into()),
+        Value::String(r.category.clone().into()),
+    ));
+    map.push((
+        Value::String("target_id".into()),
+        match &r.target_id {
+            Some(id) => Value::String(id.clone().into()),
+            None => Value::Nil,
+        },
+    ));
+    map.push((
+        Value::String("quantity".into()),
+        Value::Integer((r.quantity as i64).into()),
+    ));
     Value::Map(map)
 }
 
@@ -2043,13 +2119,23 @@ pub fn encode_delta_state_sync(
         if !removed_players.is_empty() {
             map.push((
                 Value::String("removedPlayers".into()),
-                Value::Array(removed_players.iter().map(|id| Value::String(id.clone().into())).collect()),
+                Value::Array(
+                    removed_players
+                        .iter()
+                        .map(|id| Value::String(id.clone().into()))
+                        .collect(),
+                ),
             ));
         }
         if !removed_npcs.is_empty() {
             map.push((
                 Value::String("removedNpcs".into()),
-                Value::Array(removed_npcs.iter().map(|id| Value::String(id.clone().into())).collect()),
+                Value::Array(
+                    removed_npcs
+                        .iter()
+                        .map(|id| Value::String(id.clone().into()))
+                        .collect(),
+                ),
             ));
         }
     }
@@ -2075,7 +2161,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
 
     // Convert message to rmpv::Value
     let data = match msg {
-        ServerMessage::Welcome { player_id, is_new_character } => {
+        ServerMessage::Welcome {
+            player_id,
+            is_new_character,
+        } => {
             let mut map = Vec::new();
             map.push((
                 Value::String("player_id".into()),
@@ -2305,7 +2394,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::Boolean(p.is_gathering),
                     ));
                     pmap.push((Value::String("dashing".into()), Value::Boolean(p.dashing)));
-                    pmap.push((Value::String("has_stall".into()), Value::Boolean(p.has_stall)));
+                    pmap.push((
+                        Value::String("has_stall".into()),
+                        Value::Boolean(p.has_stall),
+                    ));
                     pmap.push((
                         Value::String("stall_name".into()),
                         match &p.stall_name {
@@ -2388,11 +2480,23 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::Boolean(n.is_merchant),
                     ));
                     nmap.push((Value::String("is_altar".into()), Value::Boolean(n.is_altar)));
-                    nmap.push((Value::String("is_banker".into()), Value::Boolean(n.is_banker)));
-                    nmap.push((Value::String("is_slayer_master".into()), Value::Boolean(n.is_slayer_master)));
-                    nmap.push((Value::String("is_friendly".into()), Value::Boolean(n.is_friendly)));
+                    nmap.push((
+                        Value::String("is_banker".into()),
+                        Value::Boolean(n.is_banker),
+                    ));
+                    nmap.push((
+                        Value::String("is_slayer_master".into()),
+                        Value::Boolean(n.is_slayer_master),
+                    ));
+                    nmap.push((
+                        Value::String("is_friendly".into()),
+                        Value::Boolean(n.is_friendly),
+                    ));
                     if let Some(ref st) = n.station_type {
-                        nmap.push((Value::String("station_type".into()), Value::String(st.clone().into())));
+                        nmap.push((
+                            Value::String("station_type".into()),
+                            Value::String(st.clone().into()),
+                        ));
                     }
                     nmap.push((Value::String("move_speed".into()), Value::F32(n.move_speed)));
                     nmap.push((
@@ -2961,7 +3065,9 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::QuestStateSync { completed_quest_ids } => {
+        ServerMessage::QuestStateSync {
+            completed_quest_ids,
+        } => {
             let mut map = Vec::new();
             map.push((
                 Value::String("completed_quest_ids".into()),
@@ -3012,13 +3118,26 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                             Value::String(req_name.clone().into()),
                         ));
                     }
-                    let obj_values: Vec<Value> = q.objectives.iter().map(|obj| {
-                        let mut omap = Vec::new();
-                        omap.push((Value::String("id".into()), Value::String(obj.id.clone().into())));
-                        omap.push((Value::String("description".into()), Value::String(obj.description.clone().into())));
-                        omap.push((Value::String("target".into()), Value::Integer((obj.target as i64).into())));
-                        Value::Map(omap)
-                    }).collect();
+                    let obj_values: Vec<Value> = q
+                        .objectives
+                        .iter()
+                        .map(|obj| {
+                            let mut omap = Vec::new();
+                            omap.push((
+                                Value::String("id".into()),
+                                Value::String(obj.id.clone().into()),
+                            ));
+                            omap.push((
+                                Value::String("description".into()),
+                                Value::String(obj.description.clone().into()),
+                            ));
+                            omap.push((
+                                Value::String("target".into()),
+                                Value::Integer((obj.target as i64).into()),
+                            ));
+                            Value::Map(omap)
+                        })
+                        .collect();
                     qmap.push((Value::String("objectives".into()), Value::Array(obj_values)));
                     Value::Map(qmap)
                 })
@@ -3617,14 +3736,18 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::String("sellMultiplier".into()),
                 Value::F64(shop.sell_multiplier as f64),
             ));
-            let cat_values: Vec<Value> = shop.crafting_categories.iter()
+            let cat_values: Vec<Value> = shop
+                .crafting_categories
+                .iter()
                 .map(|c| Value::String(c.clone().into()))
                 .collect();
             shop_map.push((
                 Value::String("craftingCategories".into()),
                 Value::Array(cat_values),
             ));
-            let station_values: Vec<Value> = shop.crafting_stations.iter()
+            let station_values: Vec<Value> = shop
+                .crafting_stations
+                .iter()
                 .map(|s| Value::String(s.clone().into()))
                 .collect();
             shop_map.push((
@@ -5104,7 +5227,11 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::BankOpen { slots, gold, max_slots } => {
+        ServerMessage::BankOpen {
+            slots,
+            gold,
+            max_slots,
+        } => {
             let mut map = Vec::new();
 
             let slot_values: Vec<Value> = slots
@@ -5168,7 +5295,11 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::BankResult { success, action, error } => {
+        ServerMessage::BankResult {
+            success,
+            action,
+            error,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
             map.push((
@@ -5208,17 +5339,45 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             unlocked_monsters,
         } => {
             let mut map = Vec::new();
-            map.push((Value::String("master_id".into()), Value::String(master_id.clone().into())));
-            map.push((Value::String("master_name".into()), Value::String(master_name.clone().into())));
-            map.push((Value::String("current_task".into()), slayer_task_to_value(current_task)));
-            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
-            map.push((Value::String("tasks_completed".into()), Value::Integer((*tasks_completed as i64).into())));
-            let reward_values: Vec<Value> = rewards.iter().map(|r| slayer_reward_to_value(r)).collect();
+            map.push((
+                Value::String("master_id".into()),
+                Value::String(master_id.clone().into()),
+            ));
+            map.push((
+                Value::String("master_name".into()),
+                Value::String(master_name.clone().into()),
+            ));
+            map.push((
+                Value::String("current_task".into()),
+                slayer_task_to_value(current_task),
+            ));
+            map.push((
+                Value::String("points".into()),
+                Value::Integer((*points as i64).into()),
+            ));
+            map.push((
+                Value::String("tasks_completed".into()),
+                Value::Integer((*tasks_completed as i64).into()),
+            ));
+            let reward_values: Vec<Value> =
+                rewards.iter().map(|r| slayer_reward_to_value(r)).collect();
             map.push((Value::String("rewards".into()), Value::Array(reward_values)));
-            let blocked: Vec<Value> = blocked_monsters.iter().map(|s| Value::String(s.clone().into())).collect();
-            map.push((Value::String("blocked_monsters".into()), Value::Array(blocked)));
-            let unlocked: Vec<Value> = unlocked_monsters.iter().map(|s| Value::String(s.clone().into())).collect();
-            map.push((Value::String("unlocked_monsters".into()), Value::Array(unlocked)));
+            let blocked: Vec<Value> = blocked_monsters
+                .iter()
+                .map(|s| Value::String(s.clone().into()))
+                .collect();
+            map.push((
+                Value::String("blocked_monsters".into()),
+                Value::Array(blocked),
+            ));
+            let unlocked: Vec<Value> = unlocked_monsters
+                .iter()
+                .map(|s| Value::String(s.clone().into()))
+                .collect();
+            map.push((
+                Value::String("unlocked_monsters".into()),
+                Value::Array(unlocked),
+            ));
             Value::Map(map)
         }
         ServerMessage::SlayerTaskProgress {
@@ -5228,10 +5387,22 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             kills_required,
         } => {
             let mut map = Vec::new();
-            map.push((Value::String("monster_id".into()), Value::String(monster_id.clone().into())));
-            map.push((Value::String("display_name".into()), Value::String(display_name.clone().into())));
-            map.push((Value::String("kills_current".into()), Value::Integer((*kills_current as i64).into())));
-            map.push((Value::String("kills_required".into()), Value::Integer((*kills_required as i64).into())));
+            map.push((
+                Value::String("monster_id".into()),
+                Value::String(monster_id.clone().into()),
+            ));
+            map.push((
+                Value::String("display_name".into()),
+                Value::String(display_name.clone().into()),
+            ));
+            map.push((
+                Value::String("kills_current".into()),
+                Value::Integer((*kills_current as i64).into()),
+            ));
+            map.push((
+                Value::String("kills_required".into()),
+                Value::Integer((*kills_required as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::SlayerTaskComplete {
@@ -5241,10 +5412,22 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             total_points,
         } => {
             let mut map = Vec::new();
-            map.push((Value::String("monster_id".into()), Value::String(monster_id.clone().into())));
-            map.push((Value::String("display_name".into()), Value::String(display_name.clone().into())));
-            map.push((Value::String("points_awarded".into()), Value::Integer((*points_awarded as i64).into())));
-            map.push((Value::String("total_points".into()), Value::Integer((*total_points as i64).into())));
+            map.push((
+                Value::String("monster_id".into()),
+                Value::String(monster_id.clone().into()),
+            ));
+            map.push((
+                Value::String("display_name".into()),
+                Value::String(display_name.clone().into()),
+            ));
+            map.push((
+                Value::String("points_awarded".into()),
+                Value::Integer((*points_awarded as i64).into()),
+            ));
+            map.push((
+                Value::String("total_points".into()),
+                Value::Integer((*total_points as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::SlayerResult {
@@ -5256,13 +5439,22 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
-            map.push((Value::String("action".into()), Value::String(action.clone().into())));
-            map.push((Value::String("message".into()), Value::String(message.clone().into())));
+            map.push((
+                Value::String("action".into()),
+                Value::String(action.clone().into()),
+            ));
+            map.push((
+                Value::String("message".into()),
+                Value::String(message.clone().into()),
+            ));
             map.push((Value::String("task".into()), slayer_task_to_value(task)));
-            map.push((Value::String("points".into()), match points {
-                Some(p) => Value::Integer((*p as i64).into()),
-                None => Value::Nil,
-            }));
+            map.push((
+                Value::String("points".into()),
+                match points {
+                    Some(p) => Value::Integer((*p as i64).into()),
+                    None => Value::Nil,
+                },
+            ));
             Value::Map(map)
         }
         ServerMessage::SlayerStateSync {
@@ -5273,13 +5465,34 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             unlocked_monsters,
         } => {
             let mut map = Vec::new();
-            map.push((Value::String("current_task".into()), slayer_task_to_value(current_task)));
-            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
-            map.push((Value::String("tasks_completed".into()), Value::Integer((*tasks_completed as i64).into())));
-            let blocked: Vec<Value> = blocked_monsters.iter().map(|s| Value::String(s.clone().into())).collect();
-            map.push((Value::String("blocked_monsters".into()), Value::Array(blocked)));
-            let unlocked: Vec<Value> = unlocked_monsters.iter().map(|s| Value::String(s.clone().into())).collect();
-            map.push((Value::String("unlocked_monsters".into()), Value::Array(unlocked)));
+            map.push((
+                Value::String("current_task".into()),
+                slayer_task_to_value(current_task),
+            ));
+            map.push((
+                Value::String("points".into()),
+                Value::Integer((*points as i64).into()),
+            ));
+            map.push((
+                Value::String("tasks_completed".into()),
+                Value::Integer((*tasks_completed as i64).into()),
+            ));
+            let blocked: Vec<Value> = blocked_monsters
+                .iter()
+                .map(|s| Value::String(s.clone().into()))
+                .collect();
+            map.push((
+                Value::String("blocked_monsters".into()),
+                Value::Array(blocked),
+            ));
+            let unlocked: Vec<Value> = unlocked_monsters
+                .iter()
+                .map(|s| Value::String(s.clone().into()))
+                .collect();
+            map.push((
+                Value::String("unlocked_monsters".into()),
+                Value::Array(unlocked),
+            ));
             Value::Map(map)
         }
         ServerMessage::AutoActionStarted {
@@ -5316,16 +5529,46 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .iter()
                 .map(|s| {
                     let mut smap = Vec::new();
-                    smap.push((Value::String("id".into()), Value::String(s.id.clone().into())));
-                    smap.push((Value::String("name".into()), Value::String(s.name.clone().into())));
-                    smap.push((Value::String("spell_type".into()), Value::String(s.spell_type.clone().into())));
-                    smap.push((Value::String("mana_cost".into()), Value::Integer((s.mana_cost as i64).into())));
-                    smap.push((Value::String("cooldown_ms".into()), Value::Integer((s.cooldown_ms as i64).into())));
-                    smap.push((Value::String("base_power".into()), Value::Integer((s.base_power as i64).into())));
-                    smap.push((Value::String("effect_sprite".into()), Value::String(s.effect_sprite.clone().into())));
-                    smap.push((Value::String("pushback_distance".into()), Value::Integer((s.pushback_distance as i64).into())));
-                    smap.push((Value::String("wall_slam_damage_per_tile".into()), Value::Integer((s.wall_slam_damage_per_tile as i64).into())));
-                    smap.push((Value::String("description".into()), Value::String(s.description.clone().into())));
+                    smap.push((
+                        Value::String("id".into()),
+                        Value::String(s.id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("name".into()),
+                        Value::String(s.name.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("spell_type".into()),
+                        Value::String(s.spell_type.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("mana_cost".into()),
+                        Value::Integer((s.mana_cost as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("cooldown_ms".into()),
+                        Value::Integer((s.cooldown_ms as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("base_power".into()),
+                        Value::Integer((s.base_power as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("effect_sprite".into()),
+                        Value::String(s.effect_sprite.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("pushback_distance".into()),
+                        Value::Integer((s.pushback_distance as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("wall_slam_damage_per_tile".into()),
+                        Value::Integer((s.wall_slam_damage_per_tile as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("description".into()),
+                        Value::String(s.description.clone().into()),
+                    ));
                     Value::Map(smap)
                 })
                 .collect();
@@ -5359,186 +5602,461 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             bonus_damage,
         } => {
             let mut map = Vec::new();
-            map.push((Value::String("target_id".into()), Value::String(target_id.clone().into())));
-            map.push((Value::String("from_x".into()), Value::Integer((*from_x as i64).into())));
-            map.push((Value::String("from_y".into()), Value::Integer((*from_y as i64).into())));
-            map.push((Value::String("to_x".into()), Value::Integer((*to_x as i64).into())));
-            map.push((Value::String("to_y".into()), Value::Integer((*to_y as i64).into())));
-            map.push((Value::String("wall_slam".into()), Value::Boolean(*wall_slam)));
-            map.push((Value::String("bonus_damage".into()), Value::Integer((*bonus_damage as i64).into())));
+            map.push((
+                Value::String("target_id".into()),
+                Value::String(target_id.clone().into()),
+            ));
+            map.push((
+                Value::String("from_x".into()),
+                Value::Integer((*from_x as i64).into()),
+            ));
+            map.push((
+                Value::String("from_y".into()),
+                Value::Integer((*from_y as i64).into()),
+            ));
+            map.push((
+                Value::String("to_x".into()),
+                Value::Integer((*to_x as i64).into()),
+            ));
+            map.push((
+                Value::String("to_y".into()),
+                Value::Integer((*to_y as i64).into()),
+            ));
+            map.push((
+                Value::String("wall_slam".into()),
+                Value::Boolean(*wall_slam),
+            ));
+            map.push((
+                Value::String("bonus_damage".into()),
+                Value::Integer((*bonus_damage as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::ChestOpen { chest_id, name, slots, total_value } => {
+        ServerMessage::ChestOpen {
+            chest_id,
+            name,
+            slots,
+            total_value,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("chest_id".into()), Value::String(chest_id.clone().into())));
-            map.push((Value::String("name".into()), Value::String(name.clone().into())));
+            map.push((
+                Value::String("chest_id".into()),
+                Value::String(chest_id.clone().into()),
+            ));
+            map.push((
+                Value::String("name".into()),
+                Value::String(name.clone().into()),
+            ));
 
-            let slot_values: Vec<Value> = slots.iter().map(|s| {
-                let mut smap = Vec::new();
-                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
-                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
-                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
-                smap.push((Value::String("value".into()), Value::Integer((s.value as i64).into())));
-                Value::Map(smap)
-            }).collect();
+            let slot_values: Vec<Value> = slots
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("slot".into()),
+                        Value::Integer((s.slot as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("item_id".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("value".into()),
+                        Value::Integer((s.value as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
 
             map.push((Value::String("slots".into()), Value::Array(slot_values)));
-            map.push((Value::String("total_value".into()), Value::Integer((*total_value as i64).into())));
+            map.push((
+                Value::String("total_value".into()),
+                Value::Integer((*total_value as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::ChestUpdate { chest_id, slots, total_value } => {
+        ServerMessage::ChestUpdate {
+            chest_id,
+            slots,
+            total_value,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("chest_id".into()), Value::String(chest_id.clone().into())));
+            map.push((
+                Value::String("chest_id".into()),
+                Value::String(chest_id.clone().into()),
+            ));
 
-            let slot_values: Vec<Value> = slots.iter().map(|s| {
-                let mut smap = Vec::new();
-                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
-                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
-                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
-                smap.push((Value::String("value".into()), Value::Integer((s.value as i64).into())));
-                Value::Map(smap)
-            }).collect();
+            let slot_values: Vec<Value> = slots
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("slot".into()),
+                        Value::Integer((s.slot as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("item_id".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("value".into()),
+                        Value::Integer((s.value as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
 
             map.push((Value::String("slots".into()), Value::Array(slot_values)));
-            map.push((Value::String("total_value".into()), Value::Integer((*total_value as i64).into())));
+            map.push((
+                Value::String("total_value".into()),
+                Value::Integer((*total_value as i64).into()),
+            ));
             Value::Map(map)
         }
 
         // ===== Trade System Messages =====
-        ServerMessage::TradeRequestReceived { requester_id, requester_name } => {
+        ServerMessage::TradeRequestReceived {
+            requester_id,
+            requester_name,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("requester_id".into()), Value::String(requester_id.clone().into())));
-            map.push((Value::String("requester_name".into()), Value::String(requester_name.clone().into())));
+            map.push((
+                Value::String("requester_id".into()),
+                Value::String(requester_id.clone().into()),
+            ));
+            map.push((
+                Value::String("requester_name".into()),
+                Value::String(requester_name.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::TradeOpened { trade_id, partner_id, partner_name } => {
+        ServerMessage::TradeOpened {
+            trade_id,
+            partner_id,
+            partner_name,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("trade_id".into()), Value::String(trade_id.clone().into())));
-            map.push((Value::String("partner_id".into()), Value::String(partner_id.clone().into())));
-            map.push((Value::String("partner_name".into()), Value::String(partner_name.clone().into())));
+            map.push((
+                Value::String("trade_id".into()),
+                Value::String(trade_id.clone().into()),
+            ));
+            map.push((
+                Value::String("partner_id".into()),
+                Value::String(partner_id.clone().into()),
+            ));
+            map.push((
+                Value::String("partner_name".into()),
+                Value::String(partner_name.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::TradeOfferUpdate { partner_items, partner_gold, partner_accepted } => {
+        ServerMessage::TradeOfferUpdate {
+            partner_items,
+            partner_gold,
+            partner_accepted,
+        } => {
             let mut map = Vec::new();
-            let items: Vec<Value> = partner_items.iter().map(|item| {
-                let mut imap = Vec::new();
-                imap.push((Value::String("slot_index".into()), Value::Integer((item.slot_index as i64).into())));
-                imap.push((Value::String("item_id".into()), Value::String(item.item_id.clone().into())));
-                imap.push((Value::String("quantity".into()), Value::Integer((item.quantity as i64).into())));
-                Value::Map(imap)
-            }).collect();
+            let items: Vec<Value> = partner_items
+                .iter()
+                .map(|item| {
+                    let mut imap = Vec::new();
+                    imap.push((
+                        Value::String("slot_index".into()),
+                        Value::Integer((item.slot_index as i64).into()),
+                    ));
+                    imap.push((
+                        Value::String("item_id".into()),
+                        Value::String(item.item_id.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((item.quantity as i64).into()),
+                    ));
+                    Value::Map(imap)
+                })
+                .collect();
             map.push((Value::String("partner_items".into()), Value::Array(items)));
-            map.push((Value::String("partner_gold".into()), Value::Integer((*partner_gold as i64).into())));
-            map.push((Value::String("partner_accepted".into()), Value::Boolean(*partner_accepted)));
+            map.push((
+                Value::String("partner_gold".into()),
+                Value::Integer((*partner_gold as i64).into()),
+            ));
+            map.push((
+                Value::String("partner_accepted".into()),
+                Value::Boolean(*partner_accepted),
+            ));
             Value::Map(map)
         }
-        ServerMessage::TradeMyOfferUpdate { my_items, my_gold, my_accepted } => {
+        ServerMessage::TradeMyOfferUpdate {
+            my_items,
+            my_gold,
+            my_accepted,
+        } => {
             let mut map = Vec::new();
-            let items: Vec<Value> = my_items.iter().map(|item| {
-                let mut imap = Vec::new();
-                imap.push((Value::String("slot_index".into()), Value::Integer((item.slot_index as i64).into())));
-                imap.push((Value::String("item_id".into()), Value::String(item.item_id.clone().into())));
-                imap.push((Value::String("quantity".into()), Value::Integer((item.quantity as i64).into())));
-                Value::Map(imap)
-            }).collect();
+            let items: Vec<Value> = my_items
+                .iter()
+                .map(|item| {
+                    let mut imap = Vec::new();
+                    imap.push((
+                        Value::String("slot_index".into()),
+                        Value::Integer((item.slot_index as i64).into()),
+                    ));
+                    imap.push((
+                        Value::String("item_id".into()),
+                        Value::String(item.item_id.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((item.quantity as i64).into()),
+                    ));
+                    Value::Map(imap)
+                })
+                .collect();
             map.push((Value::String("my_items".into()), Value::Array(items)));
-            map.push((Value::String("my_gold".into()), Value::Integer((*my_gold as i64).into())));
-            map.push((Value::String("my_accepted".into()), Value::Boolean(*my_accepted)));
+            map.push((
+                Value::String("my_gold".into()),
+                Value::Integer((*my_gold as i64).into()),
+            ));
+            map.push((
+                Value::String("my_accepted".into()),
+                Value::Boolean(*my_accepted),
+            ));
             Value::Map(map)
         }
-        ServerMessage::TradeCompleted { items_received, gold_received } => {
+        ServerMessage::TradeCompleted {
+            items_received,
+            gold_received,
+        } => {
             let mut map = Vec::new();
-            let items: Vec<Value> = items_received.iter().map(|item| {
-                let mut imap = Vec::new();
-                imap.push((Value::String("slot_index".into()), Value::Integer((item.slot_index as i64).into())));
-                imap.push((Value::String("item_id".into()), Value::String(item.item_id.clone().into())));
-                imap.push((Value::String("quantity".into()), Value::Integer((item.quantity as i64).into())));
-                Value::Map(imap)
-            }).collect();
+            let items: Vec<Value> = items_received
+                .iter()
+                .map(|item| {
+                    let mut imap = Vec::new();
+                    imap.push((
+                        Value::String("slot_index".into()),
+                        Value::Integer((item.slot_index as i64).into()),
+                    ));
+                    imap.push((
+                        Value::String("item_id".into()),
+                        Value::String(item.item_id.clone().into()),
+                    ));
+                    imap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((item.quantity as i64).into()),
+                    ));
+                    Value::Map(imap)
+                })
+                .collect();
             map.push((Value::String("items_received".into()), Value::Array(items)));
-            map.push((Value::String("gold_received".into()), Value::Integer((*gold_received as i64).into())));
+            map.push((
+                Value::String("gold_received".into()),
+                Value::Integer((*gold_received as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::TradeCancelled { reason } => {
             let mut map = Vec::new();
-            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            map.push((
+                Value::String("reason".into()),
+                Value::String(reason.clone().into()),
+            ));
             Value::Map(map)
         }
 
         // ===== Player Stall System Messages =====
         ServerMessage::StallOpened { name, slots } => {
             let mut map = Vec::new();
-            map.push((Value::String("name".into()), Value::String(name.clone().into())));
-            let slot_values: Vec<Value> = slots.iter().map(|s| {
-                let mut smap = Vec::new();
-                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
-                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
-                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
-                smap.push((Value::String("price".into()), Value::Integer((s.price as i64).into())));
-                Value::Map(smap)
-            }).collect();
+            map.push((
+                Value::String("name".into()),
+                Value::String(name.clone().into()),
+            ));
+            let slot_values: Vec<Value> = slots
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("slot".into()),
+                        Value::Integer((s.slot as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("item_id".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("price".into()),
+                        Value::Integer((s.price as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
             map.push((Value::String("slots".into()), Value::Array(slot_values)));
             Value::Map(map)
         }
         ServerMessage::StallClosed { reason } => {
             let mut map = Vec::new();
-            map.push((Value::String("reason".into()), Value::String(reason.clone().into())));
+            map.push((
+                Value::String("reason".into()),
+                Value::String(reason.clone().into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::StallUpdate { slots } => {
             let mut map = Vec::new();
-            let slot_values: Vec<Value> = slots.iter().map(|s| {
-                let mut smap = Vec::new();
-                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
-                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
-                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
-                smap.push((Value::String("price".into()), Value::Integer((s.price as i64).into())));
-                Value::Map(smap)
-            }).collect();
+            let slot_values: Vec<Value> = slots
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("slot".into()),
+                        Value::Integer((s.slot as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("item_id".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("price".into()),
+                        Value::Integer((s.price as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
             map.push((Value::String("slots".into()), Value::Array(slot_values)));
             Value::Map(map)
         }
-        ServerMessage::StallBrowseData { seller_id, seller_name, stall_name, items } => {
+        ServerMessage::StallBrowseData {
+            seller_id,
+            seller_name,
+            stall_name,
+            items,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("seller_id".into()), Value::String(seller_id.clone().into())));
-            map.push((Value::String("seller_name".into()), Value::String(seller_name.clone().into())));
-            map.push((Value::String("stall_name".into()), Value::String(stall_name.clone().into())));
-            let item_values: Vec<Value> = items.iter().map(|s| {
-                let mut smap = Vec::new();
-                smap.push((Value::String("slot".into()), Value::Integer((s.slot as i64).into())));
-                smap.push((Value::String("item_id".into()), Value::String(s.item_id.clone().into())));
-                smap.push((Value::String("quantity".into()), Value::Integer((s.quantity as i64).into())));
-                smap.push((Value::String("price".into()), Value::Integer((s.price as i64).into())));
-                Value::Map(smap)
-            }).collect();
+            map.push((
+                Value::String("seller_id".into()),
+                Value::String(seller_id.clone().into()),
+            ));
+            map.push((
+                Value::String("seller_name".into()),
+                Value::String(seller_name.clone().into()),
+            ));
+            map.push((
+                Value::String("stall_name".into()),
+                Value::String(stall_name.clone().into()),
+            ));
+            let item_values: Vec<Value> = items
+                .iter()
+                .map(|s| {
+                    let mut smap = Vec::new();
+                    smap.push((
+                        Value::String("slot".into()),
+                        Value::Integer((s.slot as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("item_id".into()),
+                        Value::String(s.item_id.clone().into()),
+                    ));
+                    smap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((s.quantity as i64).into()),
+                    ));
+                    smap.push((
+                        Value::String("price".into()),
+                        Value::Integer((s.price as i64).into()),
+                    ));
+                    Value::Map(smap)
+                })
+                .collect();
             map.push((Value::String("items".into()), Value::Array(item_values)));
             Value::Map(map)
         }
-        ServerMessage::StallBuyResult { success, item_id, quantity, total_price, error } => {
+        ServerMessage::StallBuyResult {
+            success,
+            item_id,
+            quantity,
+            total_price,
+            error,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
-            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
-            map.push((Value::String("quantity".into()), Value::Integer((*quantity as i64).into())));
-            map.push((Value::String("total_price".into()), Value::Integer((*total_price as i64).into())));
-            map.push((Value::String("error".into()), match error {
-                Some(e) => Value::String(e.clone().into()),
-                None => Value::Nil,
-            }));
+            map.push((
+                Value::String("item_id".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("quantity".into()),
+                Value::Integer((*quantity as i64).into()),
+            ));
+            map.push((
+                Value::String("total_price".into()),
+                Value::Integer((*total_price as i64).into()),
+            ));
+            map.push((
+                Value::String("error".into()),
+                match error {
+                    Some(e) => Value::String(e.clone().into()),
+                    None => Value::Nil,
+                },
+            ));
             Value::Map(map)
         }
-        ServerMessage::StallSaleNotification { item_id, quantity, gold_received, buyer_name } => {
+        ServerMessage::StallSaleNotification {
+            item_id,
+            quantity,
+            gold_received,
+            buyer_name,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("item_id".into()), Value::String(item_id.clone().into())));
-            map.push((Value::String("quantity".into()), Value::Integer((*quantity as i64).into())));
-            map.push((Value::String("gold_received".into()), Value::Integer((*gold_received as i64).into())));
-            map.push((Value::String("buyer_name".into()), Value::String(buyer_name.clone().into())));
+            map.push((
+                Value::String("item_id".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("quantity".into()),
+                Value::Integer((*quantity as i64).into()),
+            ));
+            map.push((
+                Value::String("gold_received".into()),
+                Value::Integer((*gold_received as i64).into()),
+            ));
+            map.push((
+                Value::String("buyer_name".into()),
+                Value::String(buyer_name.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::StallItemUpdate { seller_id, stall_slot, new_quantity } => {
+        ServerMessage::StallItemUpdate {
+            seller_id,
+            stall_slot,
+            new_quantity,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("seller_id".into()), Value::String(seller_id.clone().into())));
-            map.push((Value::String("stall_slot".into()), Value::Integer((*stall_slot as i64).into())));
-            map.push((Value::String("new_quantity".into()), Value::Integer((*new_quantity as i64).into())));
+            map.push((
+                Value::String("seller_id".into()),
+                Value::String(seller_id.clone().into()),
+            ));
+            map.push((
+                Value::String("stall_slot".into()),
+                Value::Integer((*stall_slot as i64).into()),
+            ));
+            map.push((
+                Value::String("new_quantity".into()),
+                Value::Integer((*new_quantity as i64).into()),
+            ));
             Value::Map(map)
         }
     };
@@ -5871,7 +6389,10 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "startCraftBatch" => {
             let recipe_id = extract_string(msg_data, "recipe_id").unwrap_or_default();
             let quantity = extract_u32(msg_data, "quantity").unwrap_or(1);
-            Ok(ClientMessage::StartCraftBatch { recipe_id, quantity })
+            Ok(ClientMessage::StartCraftBatch {
+                recipe_id,
+                quantity,
+            })
         }
         "slayerGetTask" => {
             let master_id = extract_string(msg_data, "master_id").unwrap_or_default();
@@ -5881,7 +6402,10 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "slayerBuyReward" => {
             let reward_id = extract_string(msg_data, "reward_id").unwrap_or_default();
             let target_monster_id = extract_string(msg_data, "target_monster_id");
-            Ok(ClientMessage::SlayerBuyReward { reward_id, target_monster_id })
+            Ok(ClientMessage::SlayerBuyReward {
+                reward_id,
+                target_monster_id,
+            })
         }
         "slayerRemoveBlock" => {
             let monster_id = extract_string(msg_data, "monster_id").unwrap_or_default();
@@ -5891,7 +6415,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let target_type = extract_string(msg_data, "target_type").unwrap_or_default();
             let target_id = extract_string(msg_data, "target_id").unwrap_or_default();
             let action = extract_string(msg_data, "action").unwrap_or_default();
-            Ok(ClientMessage::StartAutoAction { target_type, target_id, action })
+            Ok(ClientMessage::StartAutoAction {
+                target_type,
+                target_id,
+                action,
+            })
         }
         "cancelAutoAction" => Ok(ClientMessage::CancelAutoAction),
         "interactObject" => {
@@ -5917,7 +6445,10 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "chestDeposit" => {
             let chest_id = extract_string(msg_data, "chest_id").unwrap_or_default();
             let inventory_slot = extract_i32(msg_data, "inventory_slot").unwrap_or(0) as u8;
-            Ok(ClientMessage::ChestDeposit { chest_id, inventory_slot })
+            Ok(ClientMessage::ChestDeposit {
+                chest_id,
+                inventory_slot,
+            })
         }
         "spectatorUpgrade" => {
             let session_token = extract_string(msg_data, "sessionToken").unwrap_or_default();
@@ -5939,7 +6470,10 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "tradeOfferItem" => {
             let slot_index = extract_i32(msg_data, "slot_index").unwrap_or(0) as u8;
             let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
-            Ok(ClientMessage::TradeOfferItem { slot_index, quantity })
+            Ok(ClientMessage::TradeOfferItem {
+                slot_index,
+                quantity,
+            })
         }
         "tradeRemoveItem" => {
             let offer_index = extract_i32(msg_data, "offer_index").unwrap_or(0) as u8;
@@ -5961,7 +6495,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let inventory_slot = extract_i32(msg_data, "inventory_slot").unwrap_or(0) as u8;
             let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
             let price = extract_i32(msg_data, "price").unwrap_or(0);
-            Ok(ClientMessage::StallSetItem { inventory_slot, quantity, price })
+            Ok(ClientMessage::StallSetItem {
+                inventory_slot,
+                quantity,
+                price,
+            })
         }
         "stallRemoveItem" => {
             let stall_slot = extract_i32(msg_data, "stall_slot").unwrap_or(0) as u8;
@@ -5980,7 +6518,11 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let seller_id = extract_string(msg_data, "seller_id").unwrap_or_default();
             let stall_slot = extract_i32(msg_data, "stall_slot").unwrap_or(0) as u8;
             let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
-            Ok(ClientMessage::StallBuy { seller_id, stall_slot, quantity })
+            Ok(ClientMessage::StallBuy {
+                seller_id,
+                stall_slot,
+                quantity,
+            })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
@@ -6064,8 +6606,8 @@ const COMPRESSION_THRESHOLD: usize = 1024;
 /// - 0x01 prefix: deflate-compressed data follows
 /// Only compresses if the payload exceeds COMPRESSION_THRESHOLD bytes.
 pub fn maybe_compress(data: Vec<u8>) -> Vec<u8> {
-    use flate2::write::DeflateEncoder;
     use flate2::Compression;
+    use flate2::write::DeflateEncoder;
     use std::io::Write;
 
     if data.len() <= COMPRESSION_THRESHOLD {

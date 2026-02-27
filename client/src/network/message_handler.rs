@@ -4,19 +4,31 @@ use super::protocol::{
 };
 use crate::game::npc::{Npc, NpcState};
 use crate::game::{
-    ActiveDialogue, ActiveQuest, BonusTile, ChatBubble, ChatChannel, ChatMessage, ConnectionStatus,
-    DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch, FriendInfo, GameState,
-    GatheringBuff, GatheringMarker, GroundItem, InventorySlot, ItemDefinition, LevelUpEvent,
-    MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal, CatalogObjective, QuestCatalogEntry,
-    QuestCompletedEvent, QuestObjective, RecipeDefinition, RecipeIngredient, RecipeResult,
-    ShopData, ShopStockItem,
-    SkillType, SkillXpEvent, SpellEffect, TransitionState, Wall, WallEdge,
+    ActiveDialogue, ActiveQuest, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
+    ConnectionStatus, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
+    FriendInfo, GameState, GatheringBuff, GatheringMarker, GroundItem, InventorySlot,
+    ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal,
+    QuestCatalogEntry, QuestCompletedEvent, QuestObjective, RecipeDefinition, RecipeIngredient,
+    RecipeResult, ShopData, ShopStockItem, SkillType, SkillXpEvent, SpellEffect, TransitionState,
+    Wall, WallEdge,
 };
 use crate::render::OVERWORLD_NAME;
 
 /// Max tile distance from local player to play other players' SFX.
 /// Roughly matches the visible screen area so you don't hear off-screen actions.
 const SFX_AUDIBLE_RANGE: f32 = 20.0;
+
+fn current_time() -> f64 {
+    #[cfg(test)]
+    {
+        0.0
+    }
+
+    #[cfg(not(test))]
+    {
+        macroquad::time::get_time()
+    }
+}
 
 fn adventurer_guide_tier_id(tab_idx: usize, tier_idx: usize) -> Option<&'static str> {
     match (tab_idx, tier_idx) {
@@ -79,7 +91,10 @@ fn extract_i64(value: &rmpv::Value, key: &str) -> Option<i64> {
     })
 }
 
-fn extract_slayer_task(value: &rmpv::Value, key: &str) -> Option<crate::game::slayer::SlayerTaskClientData> {
+fn extract_slayer_task(
+    value: &rmpv::Value,
+    key: &str,
+) -> Option<crate::game::slayer::SlayerTaskClientData> {
     let task_val = extract_map_field(value, key)?;
     if task_val.is_nil() {
         return None;
@@ -95,7 +110,10 @@ fn extract_slayer_task(value: &rmpv::Value, key: &str) -> Option<crate::game::sl
     })
 }
 
-fn extract_slayer_rewards(value: &rmpv::Value, key: &str) -> Vec<crate::game::slayer::SlayerRewardClientData> {
+fn extract_slayer_rewards(
+    value: &rmpv::Value,
+    key: &str,
+) -> Vec<crate::game::slayer::SlayerRewardClientData> {
     let mut rewards = Vec::new();
     if let Some(arr) = extract_map_field(value, key) {
         if let rmpv::Value::Array(ref items) = *arr {
@@ -129,674 +147,722 @@ fn extract_string_array(value: &rmpv::Value, key: &str) -> Vec<String> {
     result
 }
 
+fn handle_welcome(value: &rmpv::Value, state: &mut GameState) {
+    if let Some(player_id) = extract_string(value, "player_id") {
+        log::info!("Welcome! Player ID: {}", player_id);
+        state.local_player_id = Some(player_id);
+        state.reset_move_sequence_state();
+        state.connection_status = ConnectionStatus::Connected;
+
+        let is_new = extract_bool(value, "is_new_character").unwrap_or(false);
+        let tutorial_done = crate::settings::load_tutorial_completed();
+        log::warn!("TUTORIAL: Welcome data={:?}", value);
+        log::warn!(
+            "TUTORIAL: is_new={}, tutorial_done={}",
+            is_new,
+            tutorial_done
+        );
+        if is_new && !tutorial_done {
+            log::info!("Tutorial: setting tutorial_pending = true");
+            state.tutorial_pending = true;
+        }
+    }
+}
+
+fn handle_player_joined(value: &rmpv::Value, state: &mut GameState) {
+    let id = extract_string(value, "id").unwrap_or_default();
+    let name = extract_string(value, "name").unwrap_or_default();
+    let x = extract_i32(value, "x").unwrap_or(0) as f32;
+    let y = extract_i32(value, "y").unwrap_or(0) as f32;
+    let gender = extract_string(value, "gender").unwrap_or_else(|| "male".to_string());
+    let skin = extract_string(value, "skin").unwrap_or_else(|| "tan".to_string());
+    let hair_style = extract_i32(value, "hair_style");
+    let hair_color = extract_i32(value, "hair_color");
+    let equipped_head = extract_string(value, "equipped_head").filter(|s| !s.is_empty());
+    let equipped_body = extract_string(value, "equipped_body").filter(|s| !s.is_empty());
+    let equipped_weapon = extract_string(value, "equipped_weapon").filter(|s| !s.is_empty());
+    let equipped_back = extract_string(value, "equipped_back").filter(|s| !s.is_empty());
+    let equipped_feet = extract_string(value, "equipped_feet").filter(|s| !s.is_empty());
+    let equipped_ring = extract_string(value, "equipped_ring").filter(|s| !s.is_empty());
+    let equipped_gloves = extract_string(value, "equipped_gloves").filter(|s| !s.is_empty());
+    let equipped_necklace = extract_string(value, "equipped_necklace").filter(|s| !s.is_empty());
+    let equipped_belt = extract_string(value, "equipped_belt").filter(|s| !s.is_empty());
+    let is_admin = extract_bool(value, "is_admin").unwrap_or(false);
+
+    log::info!(
+        "Player joined: {} at ({}, {}) [{}/{}]",
+        name,
+        x,
+        y,
+        gender,
+        skin
+    );
+    let mut player = Player::new(id.clone(), name, x, y, gender, skin);
+    player.hair_style = hair_style;
+    player.hair_color = hair_color;
+    player.equipped_head = equipped_head;
+    player.equipped_body = equipped_body;
+    player.equipped_weapon = equipped_weapon;
+    player.equipped_back = equipped_back;
+    player.equipped_feet = equipped_feet;
+    player.equipped_ring = equipped_ring;
+    player.equipped_gloves = equipped_gloves;
+    player.equipped_necklace = equipped_necklace;
+    player.equipped_belt = equipped_belt;
+    player.is_admin = is_admin;
+    state.players.insert(id, player);
+}
+
+fn handle_player_left(value: &rmpv::Value, state: &mut GameState) {
+    if let Some(id) = extract_string(value, "id") {
+        log::info!("Player left: {}", id);
+        state.players.remove(&id);
+    }
+}
+
+fn handle_chat_message(value: &rmpv::Value, state: &mut GameState) {
+    let sender_name = extract_string(value, "senderName").unwrap_or_default();
+    let text = extract_string(value, "text").unwrap_or_default();
+    let extracted_ts = extract_u64(value, "timestamp").unwrap_or(0) as f64;
+    let timestamp = if extracted_ts > 0.0 {
+        extracted_ts
+    } else {
+        current_time()
+    };
+    let channel_str = extract_string(value, "channel").unwrap_or_default();
+
+    let channel = match channel_str.as_str() {
+        "global" => ChatChannel::Global,
+        "system" => ChatChannel::System,
+        _ => ChatChannel::Local,
+    };
+
+    state.push_chat_message(ChatMessage {
+        sender_name: sender_name.clone(),
+        text: text.clone(),
+        timestamp,
+        channel,
+    });
+    state.pending_sfx.push("message_add".to_string());
+
+    if matches!(channel, ChatChannel::Local) {
+        if let Some((player_id, _)) = state.players.iter().find(|(_, p)| p.name == sender_name) {
+            let player_id = player_id.clone();
+            state.chat_bubbles.retain(|b| b.player_id != player_id);
+            state.chat_bubbles.push(ChatBubble {
+                player_id,
+                text,
+                time: current_time(),
+            });
+        }
+    }
+}
+
+fn handle_target_changed(value: &rmpv::Value, state: &mut GameState) {
+    let player_id = extract_string(value, "player_id").unwrap_or_default();
+    let target_id = extract_string(value, "target_id");
+
+    if state.local_player_id.as_ref() == Some(&player_id) {
+        state.selected_entity_id = target_id.clone();
+        log::debug!("Target changed to: {:?}", state.selected_entity_id);
+    }
+}
+
+fn handle_player_respawned(value: &rmpv::Value, state: &mut GameState) {
+    let player_id = extract_string(value, "id").unwrap_or_default();
+    let x = extract_i32(value, "x").unwrap_or(0) as f32;
+    let y = extract_i32(value, "y").unwrap_or(0) as f32;
+    let hp = extract_i32(value, "hp").unwrap_or(100);
+    log::info!("Player {} respawned at ({}, {})", player_id, x, y);
+
+    if let Some(player) = state.players.get_mut(&player_id) {
+        player.respawn(x, y, hp);
+    }
+
+    if state.local_player_id.as_ref() == Some(&player_id) {
+        state.is_sitting = false;
+        state.clear_pending_moves();
+        if state.chunk_manager.is_interior() {
+            state.chunk_manager.clear_interior();
+            state.current_interior = None;
+            state.current_instance = None;
+            state.npcs.clear();
+            state.ground_items.clear();
+        }
+    }
+}
+
+fn handle_inventory_update(value: &rmpv::Value, state: &mut GameState) {
+    for slot in state.inventory.slots.iter_mut() {
+        *slot = None;
+    }
+
+    if let Some(slots) = extract_array(value, "slots") {
+        for slot_value in slots {
+            let slot_idx = extract_u8(slot_value, "slot").unwrap_or(0) as usize;
+            let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
+            let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
+
+            if slot_idx < state.inventory.slots.len() && !item_id.is_empty() && quantity > 0 {
+                state.inventory.slots[slot_idx] = Some(InventorySlot::new(item_id, quantity));
+            }
+        }
+    }
+
+    if let Some(gold) = extract_i32(value, "gold") {
+        state.inventory.gold = gold;
+    }
+
+    log::debug!(
+        "Inventory updated: {} gold, {} items",
+        state.inventory.gold,
+        state.inventory.slots.iter().filter(|s| s.is_some()).count()
+    );
+}
+
+fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
+    let tick = extract_u64(value, "tick").unwrap_or(0);
+
+    // Discard stale StateSyncs from a different map context.
+    // This prevents instance NPCs (e.g. Elder Mara) from appearing
+    // in the overworld when a StateSync races with a map transition.
+    let sync_instance = extract_string(value, "instanceId").unwrap_or_default();
+    let current_instance = state.current_instance.clone().unwrap_or_default();
+    if sync_instance != current_instance {
+        // Context mismatch — skip this entire StateSync
+        return;
+    }
+
+    // Ignore out-of-order snapshots to prevent positional rewinds/jitter.
+    if tick < state.server_tick {
+        log::trace!(
+            "Dropping stale stateSync tick {} (latest {})",
+            tick,
+            state.server_tick
+        );
+        return;
+    }
+    state.server_tick = tick;
+
+    // Delta sync: "full" field absent or true = full snapshot, false = delta
+    let is_full_sync = extract_bool(value, "full").unwrap_or(true);
+
+    // Update players (grid positions from server)
+    let mut player_regen_events: Vec<(String, f32, f32, i32)> = Vec::new();
+    let mut synced_player_ids: Vec<String> = Vec::new();
+    if let Some(players) = extract_array(value, "players") {
+        for player_value in players {
+            let id = extract_string(player_value, "id").unwrap_or_default();
+            synced_player_ids.push(id.clone());
+            let name = extract_string(player_value, "name").unwrap_or_default();
+            // Server sends i32 grid positions
+            let x = extract_i32(player_value, "x");
+            let y = extract_i32(player_value, "y");
+            let direction = extract_i32(player_value, "direction");
+            let hp = extract_i32(player_value, "hp");
+            let max_hp = extract_i32(player_value, "maxHp");
+            let mp = extract_i32(player_value, "mp");
+            let max_mp = extract_i32(player_value, "maxMp");
+            // Skill levels (consolidated combat system)
+            let hitpoints_level = extract_i32(player_value, "hitpointsLevel");
+            let combat_skill_level = extract_i32(player_value, "combatSkillLevel");
+            let gold = extract_i32(player_value, "gold");
+            let gender =
+                extract_string(player_value, "gender").unwrap_or_else(|| "male".to_string());
+            let skin = extract_string(player_value, "skin").unwrap_or_else(|| "tan".to_string());
+            let hair_style = extract_i32(player_value, "hair_style");
+            let hair_color = extract_i32(player_value, "hair_color");
+            let equipped_head =
+                extract_string(player_value, "equipped_head").filter(|s| !s.is_empty());
+            let equipped_body =
+                extract_string(player_value, "equipped_body").filter(|s| !s.is_empty());
+            let equipped_weapon =
+                extract_string(player_value, "equipped_weapon").filter(|s| !s.is_empty());
+            let equipped_back =
+                extract_string(player_value, "equipped_back").filter(|s| !s.is_empty());
+            let equipped_feet =
+                extract_string(player_value, "equipped_feet").filter(|s| !s.is_empty());
+            let equipped_ring =
+                extract_string(player_value, "equipped_ring").filter(|s| !s.is_empty());
+            let equipped_gloves =
+                extract_string(player_value, "equipped_gloves").filter(|s| !s.is_empty());
+            let equipped_necklace =
+                extract_string(player_value, "equipped_necklace").filter(|s| !s.is_empty());
+            let equipped_belt =
+                extract_string(player_value, "equipped_belt").filter(|s| !s.is_empty());
+            let is_admin = extract_bool(player_value, "is_admin").unwrap_or(false);
+            let has_stall = extract_bool(player_value, "has_stall").unwrap_or(false);
+            let stall_name = extract_string(player_value, "stall_name");
+            let move_ack_seq = extract_u32(player_value, "moveAckSeq");
+
+            let is_local_player = state.local_player_id.as_ref() == Some(&id);
+            if is_local_player {
+                if let Some(ack_seq) = move_ack_seq {
+                    state.acknowledge_move_sequence(ack_seq);
+                }
+            }
+            let has_pending_local_moves = is_local_player && state.has_pending_move_sequences();
+            let catchup_softness = state.sync_catchup_softness();
+            let catchup_lead_scale = state.sync_catchup_lead_scale();
+            let local_lead_scale = if is_local_player {
+                state.local_prediction_lead_scale() * catchup_lead_scale
+            } else {
+                1.0
+            };
+            let local_reconciliation_softness = if is_local_player {
+                state.local_reconciliation_softness() * catchup_softness
+            } else {
+                catchup_softness
+            };
+
+            if let Some(player) = state.players.get_mut(&id) {
+                // Read velocity (movement intent) from server
+                let vel_x = extract_i32(player_value, "velX").unwrap_or(0) as f32;
+                let vel_y = extract_i32(player_value, "velY").unwrap_or(0) as f32;
+                // Direction from server
+                let dir = direction
+                    .map(|d| Direction::from_u8(d as u8))
+                    .unwrap_or(player.direction);
+
+                // Check if player is dashing (set before set_server_state so it handles interpolation)
+                let dashing = extract_bool(player_value, "dashing").unwrap_or(false);
+                if dashing {
+                    player.is_dashing = true;
+                }
+
+                if let (Some(x), Some(y)) = (x, y) {
+                    // Set server state - local player direction only updates when moving
+                    player.set_server_state(
+                        x as f32,
+                        y as f32,
+                        vel_x,
+                        vel_y,
+                        dir,
+                        is_local_player,
+                        has_pending_local_moves,
+                        local_lead_scale,
+                        local_reconciliation_softness,
+                    );
+                } else if direction.is_some() && !is_local_player {
+                    // Direction-only update for remote players
+                    // Local player direction is controlled locally when stationary
+                    player.direction = dir;
+                }
+                if let Some(hp) = hp {
+                    // Update last_damage_time if HP decreased (ensures HP bar shows)
+                    if hp < player.hp {
+                        player.last_damage_time = macroquad::time::get_time();
+                    } else if hp > player.hp && player.hp > 0 {
+                        // HP increased (regen) - record for floating text
+                        let heal_amount = hp - player.hp;
+                        player_regen_events.push((id.clone(), player.x, player.y, heal_amount));
+                    }
+                    player.hp = hp;
+                }
+                if let Some(max_hp) = max_hp {
+                    player.max_hp = max_hp;
+                }
+                if let Some(mp) = mp {
+                    player.mp = mp;
+                }
+                if let Some(max_mp) = max_mp {
+                    player.max_mp = max_mp;
+                }
+                // Update skill levels
+                if let Some(level) = hitpoints_level {
+                    player.skills.hitpoints.level = level;
+                }
+                if let Some(level) = combat_skill_level {
+                    player.skills.combat.level = level;
+                }
+                // Update hair
+                player.hair_style = hair_style;
+                player.hair_color = hair_color;
+                // Update equipment
+                player.equipped_head = equipped_head.clone();
+                player.equipped_body = equipped_body.clone();
+                player.equipped_weapon = equipped_weapon.clone();
+                player.equipped_back = equipped_back.clone();
+                player.equipped_feet = equipped_feet.clone();
+                player.equipped_ring = equipped_ring.clone();
+                player.equipped_gloves = equipped_gloves.clone();
+                player.equipped_necklace = equipped_necklace.clone();
+                player.equipped_belt = equipped_belt.clone();
+                // Update admin status
+                player.is_admin = is_admin;
+                // Update stall status
+                player.has_stall = has_stall;
+                player.stall_name = stall_name.clone();
+                // Update sitting state
+                let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
+                if sitting
+                    && player.animation.state
+                        != crate::render::animation::AnimationState::SittingChair
+                {
+                    // Snap position immediately so remote players don't "walk" to the chair
+                    if !is_local_player {
+                        player.x = player.target_x;
+                        player.y = player.target_y;
+                        player.server_x = player.target_x;
+                        player.server_y = player.target_y;
+                    }
+                    // Force direction to match chair direction from server
+                    // (bypass the face command grace period when sitting)
+                    if let Some(d) = direction {
+                        let chair_dir = Direction::from_u8(d as u8);
+                        player.direction = chair_dir;
+                        player.animation.direction = chair_dir;
+                    }
+                    player.sit_chair();
+                    if is_local_player {
+                        state.is_sitting = true;
+                    }
+                } else if !sitting
+                    && player.animation.state
+                        == crate::render::animation::AnimationState::SittingChair
+                {
+                    player.stand_up();
+                    if is_local_player {
+                        state.is_sitting = false;
+                    }
+                }
+
+                // Update gathering state (for players who started fishing before we logged in)
+                let server_is_gathering =
+                    extract_bool(player_value, "is_gathering").unwrap_or(false);
+                if server_is_gathering && !player.is_gathering {
+                    player.is_gathering = true;
+                    player.gathering_started_at = macroquad::time::get_time();
+                    // Don't play attack animation - they're already in gathering pose
+                    if is_local_player {
+                        state.is_gathering = true;
+                        state.gathering_started_at = macroquad::time::get_time();
+                    }
+                } else if !server_is_gathering && player.is_gathering {
+                    // Don't reset if gathering was started very recently (grace period to avoid race condition)
+                    let recently_started =
+                        macroquad::time::get_time() - player.gathering_started_at < 1.0;
+                    if !recently_started {
+                        player.is_gathering = false;
+                        if is_local_player {
+                            state.is_gathering = false;
+                        }
+                    }
+                }
+            } else if state.local_player_id.as_ref() != Some(&id) && !id.is_empty() {
+                // Player not in our map - create them from stateSync data
+                // This handles players re-appearing after map transitions
+                if let (Some(px), Some(py)) = (x, y) {
+                    log::info!(
+                        "Creating player from stateSync: {} at ({}, {})",
+                        name,
+                        px,
+                        py
+                    );
+                    let mut new_player =
+                        Player::new(id.clone(), name.clone(), px as f32, py as f32, gender, skin);
+                    new_player.hair_style = hair_style;
+                    new_player.hair_color = hair_color;
+                    new_player.equipped_head = equipped_head;
+                    new_player.equipped_body = equipped_body;
+                    new_player.equipped_weapon = equipped_weapon;
+                    new_player.equipped_back = equipped_back;
+                    new_player.equipped_feet = equipped_feet;
+                    new_player.equipped_ring = equipped_ring;
+                    new_player.equipped_gloves = equipped_gloves;
+                    new_player.equipped_necklace = equipped_necklace;
+                    new_player.equipped_belt = equipped_belt;
+                    new_player.is_admin = is_admin;
+                    new_player.has_stall = has_stall;
+                    new_player.stall_name = stall_name;
+                    let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
+                    if sitting {
+                        new_player.sit_chair();
+                    }
+                    let is_gathering = extract_bool(player_value, "is_gathering").unwrap_or(false);
+                    if is_gathering {
+                        new_player.is_gathering = true;
+                        new_player.gathering_started_at = macroquad::time::get_time();
+                    }
+                    let is_woodcutting =
+                        extract_bool(player_value, "is_woodcutting").unwrap_or(false);
+                    if is_woodcutting {
+                        new_player.is_woodcutting = true;
+                        new_player.woodcutting_started_at = macroquad::time::get_time();
+                    }
+                    let is_mining = extract_bool(player_value, "is_mining").unwrap_or(false);
+                    if is_mining {
+                        new_player.is_mining = true;
+                        new_player.mining_started_at = macroquad::time::get_time();
+                    }
+                    let dashing = extract_bool(player_value, "dashing").unwrap_or(false);
+                    if dashing {
+                        new_player.is_dashing = true;
+                    }
+                    if let Some(hp_val) = hp {
+                        new_player.hp = hp_val;
+                    }
+                    if let Some(max_hp_val) = max_hp {
+                        new_player.max_hp = max_hp_val;
+                    }
+                    if let Some(mp_val) = mp {
+                        new_player.mp = mp_val;
+                    }
+                    if let Some(max_mp_val) = max_mp {
+                        new_player.max_mp = max_mp_val;
+                    }
+                    if let Some(dir) = direction {
+                        let new_dir = Direction::from_u8(dir as u8);
+                        new_player.direction = new_dir;
+                        new_player.animation.direction = new_dir;
+                    }
+                    state.players.insert(id.clone(), new_player);
+                }
+            }
+
+            // Update inventory gold for local player
+            if state.local_player_id.as_ref() == Some(&id) {
+                if let Some(gold) = gold {
+                    state.inventory.gold = gold;
+                }
+            }
+        }
+    }
+
+    // Reconcile: remove players who are no longer in this StateSync.
+    // In instances, the server sends ALL players in the group, so anyone
+    // missing has left. This prevents ghost players from lingering when a
+    // PlayerLeft message races with a StateSync that still included them.
+    // Only reconcile on full syncs (delta syncs use explicit removal lists).
+    if is_full_sync && !sync_instance.is_empty() {
+        let local_id = state.local_player_id.clone().unwrap_or_default();
+        state
+            .players
+            .retain(|id, _| *id == local_id || synced_player_ids.contains(id));
+    }
+
+    // Delta sync: process explicit removal lists
+    if !is_full_sync {
+        if let Some(removed) = extract_array(value, "removedPlayers") {
+            for rv in removed {
+                if let Some(id) = rv.as_str() {
+                    if state.local_player_id.as_deref() != Some(id) {
+                        state.players.remove(id);
+                    }
+                }
+            }
+        }
+    }
+
+    // Check if local player walked onto a portal (auto-trigger)
+    // Uses server-authoritative position (not interpolated visual position)
+    // to detect portals immediately when the server confirms the move
+    if let Some(local_id) = &state.local_player_id {
+        if let Some(player) = state.players.get(local_id) {
+            let current_tile = (
+                player.server_x.floor() as i32,
+                player.server_y.floor() as i32,
+            );
+            let prev_tile = state.last_portal_check_pos;
+
+            // Only check for portal if we moved to a different tile
+            let moved_tiles = prev_tile.map_or(false, |prev| prev != current_tile);
+
+            // Clear the ignored portal tile once the player steps off it
+            if moved_tiles {
+                if let Some(ignored) = state.portal_ignore_tile {
+                    if current_tile != ignored {
+                        state.portal_ignore_tile = None;
+                    }
+                }
+            }
+
+            if moved_tiles
+                && state.pending_portal_id.is_none()
+                && state
+                    .portal_ignore_tile
+                    .map_or(true, |ignored| current_tile != ignored)
+                && matches!(state.map_transition.state, TransitionState::None)
+            {
+                if let Some(portal) = state
+                    .chunk_manager
+                    .get_portal_at(player.server_x, player.server_y)
+                {
+                    state.pending_portal_id = Some(portal.id.clone());
+                }
+            }
+
+            // Always update last checked position
+            state.last_portal_check_pos = Some(current_tile);
+        }
+    }
+
+    // Push player regen events as healing numbers (negative damage = green +X)
+    let current_time = macroquad::time::get_time();
+    for (target_id, x, y, heal_amount) in player_regen_events {
+        state.damage_events.push(DamageEvent {
+            x,
+            y,
+            damage: -heal_amount, // Negative = healing
+            time: current_time,
+            target_id,
+            source_id: None,
+            projectile: None,
+        });
+    }
+
+    // Update NPCs (grid positions from server, converted to f32 for interpolation)
+    let mut npc_regen_events: Vec<(String, f32, f32, i32)> = Vec::new();
+    if let Some(npcs) = extract_array(value, "npcs") {
+        for npc_value in npcs {
+            let id = extract_string(npc_value, "id").unwrap_or_default();
+            let _npc_type = extract_u8(npc_value, "npc_type").unwrap_or(0);
+            let entity_type =
+                extract_string(npc_value, "entity_type").unwrap_or_else(|| "pig".to_string());
+            let display_name =
+                extract_string(npc_value, "display_name").unwrap_or_else(|| "???".to_string());
+            // Server sends i32 grid positions
+            let x = extract_i32(npc_value, "x").unwrap_or(0) as f32;
+            let y = extract_i32(npc_value, "y").unwrap_or(0) as f32;
+            let direction = extract_u8(npc_value, "direction").unwrap_or(0);
+            let hp = extract_i32(npc_value, "hp").unwrap_or(50);
+            let max_hp = extract_i32(npc_value, "max_hp").unwrap_or(50);
+            let level = extract_i32(npc_value, "level").unwrap_or(1);
+            let npc_state = extract_u8(npc_value, "state").unwrap_or(0);
+            let hostile = extract_bool(npc_value, "hostile").unwrap_or(true);
+            let is_quest_giver = extract_bool(npc_value, "is_quest_giver").unwrap_or(false);
+            let can_turn_in_quest = extract_bool(npc_value, "can_turn_in_quest").unwrap_or(false);
+            let is_merchant = extract_bool(npc_value, "is_merchant").unwrap_or(false);
+            let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
+            let is_banker = extract_bool(npc_value, "is_banker").unwrap_or(false);
+            let is_slayer_master = extract_bool(npc_value, "is_slayer_master").unwrap_or(false);
+            let is_friendly = extract_bool(npc_value, "is_friendly").unwrap_or(false);
+            let station_type = extract_string(npc_value, "station_type");
+            let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
+            let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
+            let render_offset_y = extract_f32(npc_value, "render_offset_y").unwrap_or(0.0);
+
+            if let Some(npc) = state.npcs.get_mut(&id) {
+                // Update existing NPC - interpolate toward new grid position
+                npc.set_server_position(x, y);
+                npc.direction = Direction::from_u8(direction);
+                // Update last_damage_time if HP decreased (ensures HP bar shows)
+                if hp < npc.hp {
+                    npc.last_damage_time = macroquad::time::get_time();
+                } else if hp > npc.hp && npc.hp > 0 {
+                    // HP increased (regen) - record for floating text
+                    let heal_amount = hp - npc.hp;
+                    npc_regen_events.push((id.clone(), npc.x, npc.y, heal_amount));
+                }
+                npc.hp = hp;
+                npc.max_hp = max_hp;
+                npc.level = level;
+                // Handle state transitions
+                let new_state = NpcState::from_u8(npc_state);
+                if new_state != NpcState::Dead {
+                    // NPC is alive - clear death state if it was dying
+                    npc.death_timer = None;
+                    npc.pending_death = false;
+                    npc.state = new_state;
+                } else if npc.death_timer.is_none() && !npc.pending_death {
+                    // Server says dead, start death sequence if not already
+                    npc.start_death();
+                }
+                // If death_timer is Some and new_state is Dead, let animation continue
+                // Update display name in case it changed
+                npc.display_name = display_name;
+                npc.hostile = hostile;
+                npc.is_quest_giver = is_quest_giver;
+                npc.can_turn_in_quest = can_turn_in_quest;
+                npc.is_merchant = is_merchant;
+                npc.is_altar = is_altar;
+                npc.is_banker = is_banker;
+                npc.is_slayer_master = is_slayer_master;
+                npc.is_friendly = is_friendly;
+                npc.station_type = station_type;
+                npc.move_speed = move_speed;
+                npc.no_shadow = no_shadow;
+                npc.render_offset_y = render_offset_y;
+            } else {
+                // New NPC - add to state
+                let mut npc = Npc::new(id.clone(), entity_type, x, y);
+                npc.display_name = display_name;
+                npc.direction = Direction::from_u8(direction);
+                npc.hp = hp;
+                npc.max_hp = max_hp;
+                npc.level = level;
+                npc.state = NpcState::from_u8(npc_state);
+                npc.hostile = hostile;
+                npc.is_quest_giver = is_quest_giver;
+                npc.can_turn_in_quest = can_turn_in_quest;
+                npc.is_merchant = is_merchant;
+                npc.is_altar = is_altar;
+                npc.is_banker = is_banker;
+                npc.is_slayer_master = is_slayer_master;
+                npc.is_friendly = is_friendly;
+                npc.station_type = station_type;
+                npc.move_speed = move_speed;
+                npc.no_shadow = no_shadow;
+                npc.render_offset_y = render_offset_y;
+                state.npcs.insert(id, npc);
+            }
+        }
+    }
+
+    // Delta sync: process explicit NPC removal list
+    if !is_full_sync {
+        if let Some(removed) = extract_array(value, "removedNpcs") {
+            for rv in removed {
+                if let Some(id) = rv.as_str() {
+                    state.npcs.remove(id);
+                }
+            }
+        }
+    }
+
+    // Push NPC regen events as healing numbers (negative damage = green +X)
+    for (target_id, x, y, heal_amount) in npc_regen_events {
+        state.damage_events.push(DamageEvent {
+            x,
+            y,
+            damage: -heal_amount, // Negative = healing
+            time: current_time,
+            target_id,
+            source_id: None,
+            projectile: None,
+        });
+    }
+}
+
 pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut GameState) {
     match msg_type {
         "welcome" => {
             if let Some(value) = data {
-                if let Some(player_id) = extract_string(value, "player_id") {
-                    log::info!("Welcome! Player ID: {}", player_id);
-                    state.local_player_id = Some(player_id);
-                    state.reset_move_sequence_state();
-                    state.connection_status = ConnectionStatus::Connected;
-
-                    // Check if this is a new character (for tutorial)
-                    let is_new = extract_bool(value, "is_new_character").unwrap_or(false);
-                    let tutorial_done = crate::settings::load_tutorial_completed();
-                    log::warn!("TUTORIAL: Welcome data={:?}", value);
-                    log::warn!("TUTORIAL: is_new={}, tutorial_done={}", is_new, tutorial_done);
-                    if is_new && !tutorial_done {
-                        log::info!("Tutorial: setting tutorial_pending = true");
-                        state.tutorial_pending = true;
-                    }
-                }
+                handle_welcome(value, state);
             }
         }
 
         "playerJoined" => {
             if let Some(value) = data {
-                let id = extract_string(value, "id").unwrap_or_default();
-                let name = extract_string(value, "name").unwrap_or_default();
-                // Server sends i32 grid positions
-                let x = extract_i32(value, "x").unwrap_or(0) as f32;
-                let y = extract_i32(value, "y").unwrap_or(0) as f32;
-                // Appearance
-                let gender = extract_string(value, "gender").unwrap_or_else(|| "male".to_string());
-                let skin = extract_string(value, "skin").unwrap_or_else(|| "tan".to_string());
-                let hair_style = extract_i32(value, "hair_style");
-                let hair_color = extract_i32(value, "hair_color");
-                // Equipment (filter empty strings to None)
-                let equipped_head =
-                    extract_string(value, "equipped_head").filter(|s| !s.is_empty());
-                let equipped_body =
-                    extract_string(value, "equipped_body").filter(|s| !s.is_empty());
-                let equipped_weapon =
-                    extract_string(value, "equipped_weapon").filter(|s| !s.is_empty());
-                let equipped_back =
-                    extract_string(value, "equipped_back").filter(|s| !s.is_empty());
-                let equipped_feet =
-                    extract_string(value, "equipped_feet").filter(|s| !s.is_empty());
-                let equipped_ring =
-                    extract_string(value, "equipped_ring").filter(|s| !s.is_empty());
-                let equipped_gloves =
-                    extract_string(value, "equipped_gloves").filter(|s| !s.is_empty());
-                let equipped_necklace =
-                    extract_string(value, "equipped_necklace").filter(|s| !s.is_empty());
-                let equipped_belt =
-                    extract_string(value, "equipped_belt").filter(|s| !s.is_empty());
-                // Admin status
-                let is_admin = extract_bool(value, "is_admin").unwrap_or(false);
-
-                log::info!(
-                    "Player joined: {} at ({}, {}) [{}/{}]",
-                    name,
-                    x,
-                    y,
-                    gender,
-                    skin
-                );
-                let mut player = Player::new(id.clone(), name, x, y, gender, skin);
-                player.hair_style = hair_style;
-                player.hair_color = hair_color;
-                player.equipped_head = equipped_head;
-                player.equipped_body = equipped_body;
-                player.equipped_weapon = equipped_weapon;
-                player.equipped_back = equipped_back;
-                player.equipped_feet = equipped_feet;
-                player.equipped_ring = equipped_ring;
-                player.equipped_gloves = equipped_gloves;
-                player.equipped_necklace = equipped_necklace;
-                player.equipped_belt = equipped_belt;
-                player.is_admin = is_admin;
-                state.players.insert(id, player);
+                handle_player_joined(value, state);
             }
         }
 
         "playerLeft" => {
             if let Some(value) = data {
-                if let Some(id) = extract_string(value, "id") {
-                    log::info!("Player left: {}", id);
-                    state.players.remove(&id);
-                }
+                handle_player_left(value, state);
             }
         }
 
         "stateSync" => {
             if let Some(value) = data {
-                let tick = extract_u64(value, "tick").unwrap_or(0);
-
-                // Discard stale StateSyncs from a different map context.
-                // This prevents instance NPCs (e.g. Elder Mara) from appearing
-                // in the overworld when a StateSync races with a map transition.
-                let sync_instance = extract_string(value, "instanceId").unwrap_or_default();
-                let current_instance = state.current_instance.clone().unwrap_or_default();
-                if sync_instance != current_instance {
-                    // Context mismatch — skip this entire StateSync
-                    return;
-                }
-
-                // Ignore out-of-order snapshots to prevent positional rewinds/jitter.
-                if tick < state.server_tick {
-                    log::trace!(
-                        "Dropping stale stateSync tick {} (latest {})",
-                        tick,
-                        state.server_tick
-                    );
-                    return;
-                }
-                state.server_tick = tick;
-
-                // Delta sync: "full" field absent or true = full snapshot, false = delta
-                let is_full_sync = extract_bool(value, "full").unwrap_or(true);
-
-                // Update players (grid positions from server)
-                let mut player_regen_events: Vec<(String, f32, f32, i32)> = Vec::new();
-                let mut synced_player_ids: Vec<String> = Vec::new();
-                if let Some(players) = extract_array(value, "players") {
-                    for player_value in players {
-                        let id = extract_string(player_value, "id").unwrap_or_default();
-                        synced_player_ids.push(id.clone());
-                        let name = extract_string(player_value, "name").unwrap_or_default();
-                        // Server sends i32 grid positions
-                        let x = extract_i32(player_value, "x");
-                        let y = extract_i32(player_value, "y");
-                        let direction = extract_i32(player_value, "direction");
-                        let hp = extract_i32(player_value, "hp");
-                        let max_hp = extract_i32(player_value, "maxHp");
-                        let mp = extract_i32(player_value, "mp");
-                        let max_mp = extract_i32(player_value, "maxMp");
-                        // Skill levels (consolidated combat system)
-                        let hitpoints_level = extract_i32(player_value, "hitpointsLevel");
-                        let combat_skill_level = extract_i32(player_value, "combatSkillLevel");
-                        let gold = extract_i32(player_value, "gold");
-                        let gender = extract_string(player_value, "gender")
-                            .unwrap_or_else(|| "male".to_string());
-                        let skin = extract_string(player_value, "skin")
-                            .unwrap_or_else(|| "tan".to_string());
-                        let hair_style = extract_i32(player_value, "hair_style");
-                        let hair_color = extract_i32(player_value, "hair_color");
-                        let equipped_head =
-                            extract_string(player_value, "equipped_head").filter(|s| !s.is_empty());
-                        let equipped_body =
-                            extract_string(player_value, "equipped_body").filter(|s| !s.is_empty());
-                        let equipped_weapon = extract_string(player_value, "equipped_weapon")
-                            .filter(|s| !s.is_empty());
-                        let equipped_back =
-                            extract_string(player_value, "equipped_back").filter(|s| !s.is_empty());
-                        let equipped_feet =
-                            extract_string(player_value, "equipped_feet").filter(|s| !s.is_empty());
-                        let equipped_ring =
-                            extract_string(player_value, "equipped_ring").filter(|s| !s.is_empty());
-                        let equipped_gloves = extract_string(player_value, "equipped_gloves")
-                            .filter(|s| !s.is_empty());
-                        let equipped_necklace = extract_string(player_value, "equipped_necklace")
-                            .filter(|s| !s.is_empty());
-                        let equipped_belt =
-                            extract_string(player_value, "equipped_belt").filter(|s| !s.is_empty());
-                        let is_admin = extract_bool(player_value, "is_admin").unwrap_or(false);
-                        let has_stall = extract_bool(player_value, "has_stall").unwrap_or(false);
-                        let stall_name = extract_string(player_value, "stall_name");
-                        let move_ack_seq = extract_u32(player_value, "moveAckSeq");
-
-                        let is_local_player = state.local_player_id.as_ref() == Some(&id);
-                        if is_local_player {
-                            if let Some(ack_seq) = move_ack_seq {
-                                state.acknowledge_move_sequence(ack_seq);
-                            }
-                        }
-                        let has_pending_local_moves =
-                            is_local_player && state.has_pending_move_sequences();
-                        let catchup_softness = state.sync_catchup_softness();
-                        let catchup_lead_scale = state.sync_catchup_lead_scale();
-                        let local_lead_scale = if is_local_player {
-                            state.local_prediction_lead_scale() * catchup_lead_scale
-                        } else {
-                            1.0
-                        };
-                        let local_reconciliation_softness = if is_local_player {
-                            state.local_reconciliation_softness() * catchup_softness
-                        } else {
-                            catchup_softness
-                        };
-
-                        if let Some(player) = state.players.get_mut(&id) {
-                            // Read velocity (movement intent) from server
-                            let vel_x = extract_i32(player_value, "velX").unwrap_or(0) as f32;
-                            let vel_y = extract_i32(player_value, "velY").unwrap_or(0) as f32;
-                            // Direction from server
-                            let dir = direction
-                                .map(|d| Direction::from_u8(d as u8))
-                                .unwrap_or(player.direction);
-
-                            // Check if player is dashing (set before set_server_state so it handles interpolation)
-                            let dashing = extract_bool(player_value, "dashing").unwrap_or(false);
-                            if dashing {
-                                player.is_dashing = true;
-                            }
-
-                            if let (Some(x), Some(y)) = (x, y) {
-                                // Set server state - local player direction only updates when moving
-                                player.set_server_state(
-                                    x as f32,
-                                    y as f32,
-                                    vel_x,
-                                    vel_y,
-                                    dir,
-                                    is_local_player,
-                                    has_pending_local_moves,
-                                    local_lead_scale,
-                                    local_reconciliation_softness,
-                                );
-                            } else if direction.is_some() && !is_local_player {
-                                // Direction-only update for remote players
-                                // Local player direction is controlled locally when stationary
-                                player.direction = dir;
-                            }
-                            if let Some(hp) = hp {
-                                // Update last_damage_time if HP decreased (ensures HP bar shows)
-                                if hp < player.hp {
-                                    player.last_damage_time = macroquad::time::get_time();
-                                } else if hp > player.hp && player.hp > 0 {
-                                    // HP increased (regen) - record for floating text
-                                    let heal_amount = hp - player.hp;
-                                    player_regen_events.push((
-                                        id.clone(),
-                                        player.x,
-                                        player.y,
-                                        heal_amount,
-                                    ));
-                                }
-                                player.hp = hp;
-                            }
-                            if let Some(max_hp) = max_hp {
-                                player.max_hp = max_hp;
-                            }
-                            if let Some(mp) = mp {
-                                player.mp = mp;
-                            }
-                            if let Some(max_mp) = max_mp {
-                                player.max_mp = max_mp;
-                            }
-                            // Update skill levels
-                            if let Some(level) = hitpoints_level {
-                                player.skills.hitpoints.level = level;
-                            }
-                            if let Some(level) = combat_skill_level {
-                                player.skills.combat.level = level;
-                            }
-                            // Update hair
-                            player.hair_style = hair_style;
-                            player.hair_color = hair_color;
-                            // Update equipment
-                            player.equipped_head = equipped_head.clone();
-                            player.equipped_body = equipped_body.clone();
-                            player.equipped_weapon = equipped_weapon.clone();
-                            player.equipped_back = equipped_back.clone();
-                            player.equipped_feet = equipped_feet.clone();
-                            player.equipped_ring = equipped_ring.clone();
-                            player.equipped_gloves = equipped_gloves.clone();
-                            player.equipped_necklace = equipped_necklace.clone();
-                            player.equipped_belt = equipped_belt.clone();
-                            // Update admin status
-                            player.is_admin = is_admin;
-                            // Update stall status
-                            player.has_stall = has_stall;
-                            player.stall_name = stall_name.clone();
-                            // Update sitting state
-                            let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
-                            if sitting
-                                && player.animation.state
-                                    != crate::render::animation::AnimationState::SittingChair
-                            {
-                                // Snap position immediately so remote players don't "walk" to the chair
-                                if !is_local_player {
-                                    player.x = player.target_x;
-                                    player.y = player.target_y;
-                                    player.server_x = player.target_x;
-                                    player.server_y = player.target_y;
-                                }
-                                // Force direction to match chair direction from server
-                                // (bypass the face command grace period when sitting)
-                                if let Some(d) = direction {
-                                    let chair_dir = Direction::from_u8(d as u8);
-                                    player.direction = chair_dir;
-                                    player.animation.direction = chair_dir;
-                                }
-                                player.sit_chair();
-                                if is_local_player {
-                                    state.is_sitting = true;
-                                }
-                            } else if !sitting
-                                && player.animation.state
-                                    == crate::render::animation::AnimationState::SittingChair
-                            {
-                                player.stand_up();
-                                if is_local_player {
-                                    state.is_sitting = false;
-                                }
-                            }
-
-                            // Update gathering state (for players who started fishing before we logged in)
-                            let server_is_gathering =
-                                extract_bool(player_value, "is_gathering").unwrap_or(false);
-                            if server_is_gathering && !player.is_gathering {
-                                player.is_gathering = true;
-                                player.gathering_started_at = macroquad::time::get_time();
-                                // Don't play attack animation - they're already in gathering pose
-                                if is_local_player {
-                                    state.is_gathering = true;
-                                    state.gathering_started_at = macroquad::time::get_time();
-                                }
-                            } else if !server_is_gathering && player.is_gathering {
-                                // Don't reset if gathering was started very recently (grace period to avoid race condition)
-                                let recently_started =
-                                    macroquad::time::get_time() - player.gathering_started_at < 1.0;
-                                if !recently_started {
-                                    player.is_gathering = false;
-                                    if is_local_player {
-                                        state.is_gathering = false;
-                                    }
-                                }
-                            }
-                        } else if state.local_player_id.as_ref() != Some(&id) && !id.is_empty() {
-                            // Player not in our map - create them from stateSync data
-                            // This handles players re-appearing after map transitions
-                            if let (Some(px), Some(py)) = (x, y) {
-                                log::info!(
-                                    "Creating player from stateSync: {} at ({}, {})",
-                                    name,
-                                    px,
-                                    py
-                                );
-                                let mut new_player = Player::new(
-                                    id.clone(),
-                                    name.clone(),
-                                    px as f32,
-                                    py as f32,
-                                    gender,
-                                    skin,
-                                );
-                                new_player.hair_style = hair_style;
-                                new_player.hair_color = hair_color;
-                                new_player.equipped_head = equipped_head;
-                                new_player.equipped_body = equipped_body;
-                                new_player.equipped_weapon = equipped_weapon;
-                                new_player.equipped_back = equipped_back;
-                                new_player.equipped_feet = equipped_feet;
-                                new_player.equipped_ring = equipped_ring;
-                                new_player.equipped_gloves = equipped_gloves;
-                                new_player.equipped_necklace = equipped_necklace;
-                                new_player.equipped_belt = equipped_belt;
-                                new_player.is_admin = is_admin;
-                                new_player.has_stall = has_stall;
-                                new_player.stall_name = stall_name;
-                                let sitting =
-                                    extract_bool(player_value, "sitting").unwrap_or(false);
-                                if sitting {
-                                    new_player.sit_chair();
-                                }
-                                let is_gathering =
-                                    extract_bool(player_value, "is_gathering").unwrap_or(false);
-                                if is_gathering {
-                                    new_player.is_gathering = true;
-                                    new_player.gathering_started_at = macroquad::time::get_time();
-                                }
-                                let is_woodcutting =
-                                    extract_bool(player_value, "is_woodcutting").unwrap_or(false);
-                                if is_woodcutting {
-                                    new_player.is_woodcutting = true;
-                                    new_player.woodcutting_started_at = macroquad::time::get_time();
-                                }
-                                let is_mining =
-                                    extract_bool(player_value, "is_mining").unwrap_or(false);
-                                if is_mining {
-                                    new_player.is_mining = true;
-                                    new_player.mining_started_at = macroquad::time::get_time();
-                                }
-                                let dashing =
-                                    extract_bool(player_value, "dashing").unwrap_or(false);
-                                if dashing {
-                                    new_player.is_dashing = true;
-                                }
-                                if let Some(hp_val) = hp {
-                                    new_player.hp = hp_val;
-                                }
-                                if let Some(max_hp_val) = max_hp {
-                                    new_player.max_hp = max_hp_val;
-                                }
-                                if let Some(mp_val) = mp {
-                                    new_player.mp = mp_val;
-                                }
-                                if let Some(max_mp_val) = max_mp {
-                                    new_player.max_mp = max_mp_val;
-                                }
-                                if let Some(dir) = direction {
-                                    let new_dir = Direction::from_u8(dir as u8);
-                                    new_player.direction = new_dir;
-                                    new_player.animation.direction = new_dir;
-                                }
-                                state.players.insert(id.clone(), new_player);
-                            }
-                        }
-
-                        // Update inventory gold for local player
-                        if state.local_player_id.as_ref() == Some(&id) {
-                            if let Some(gold) = gold {
-                                state.inventory.gold = gold;
-                            }
-                        }
-                    }
-                }
-
-                // Reconcile: remove players who are no longer in this StateSync.
-                // In instances, the server sends ALL players in the group, so anyone
-                // missing has left. This prevents ghost players from lingering when a
-                // PlayerLeft message races with a StateSync that still included them.
-                // Only reconcile on full syncs (delta syncs use explicit removal lists).
-                if is_full_sync && !sync_instance.is_empty() {
-                    let local_id = state.local_player_id.clone().unwrap_or_default();
-                    state
-                        .players
-                        .retain(|id, _| *id == local_id || synced_player_ids.contains(id));
-                }
-
-                // Delta sync: process explicit removal lists
-                if !is_full_sync {
-                    if let Some(removed) = extract_array(value, "removedPlayers") {
-                        for rv in removed {
-                            if let Some(id) = rv.as_str() {
-                                if state.local_player_id.as_deref() != Some(id) {
-                                    state.players.remove(id);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Check if local player walked onto a portal (auto-trigger)
-                // Uses server-authoritative position (not interpolated visual position)
-                // to detect portals immediately when the server confirms the move
-                if let Some(local_id) = &state.local_player_id {
-                    if let Some(player) = state.players.get(local_id) {
-                        let current_tile = (
-                            player.server_x.floor() as i32,
-                            player.server_y.floor() as i32,
-                        );
-                        let prev_tile = state.last_portal_check_pos;
-
-                        // Only check for portal if we moved to a different tile
-                        let moved_tiles = prev_tile.map_or(false, |prev| prev != current_tile);
-
-                        // Clear the ignored portal tile once the player steps off it
-                        if moved_tiles {
-                            if let Some(ignored) = state.portal_ignore_tile {
-                                if current_tile != ignored {
-                                    state.portal_ignore_tile = None;
-                                }
-                            }
-                        }
-
-                        if moved_tiles
-                            && state.pending_portal_id.is_none()
-                            && state
-                                .portal_ignore_tile
-                                .map_or(true, |ignored| current_tile != ignored)
-                            && matches!(state.map_transition.state, TransitionState::None)
-                        {
-                            if let Some(portal) = state
-                                .chunk_manager
-                                .get_portal_at(player.server_x, player.server_y)
-                            {
-                                state.pending_portal_id = Some(portal.id.clone());
-                            }
-                        }
-
-                        // Always update last checked position
-                        state.last_portal_check_pos = Some(current_tile);
-                    }
-                }
-
-                // Push player regen events as healing numbers (negative damage = green +X)
-                let current_time = macroquad::time::get_time();
-                for (target_id, x, y, heal_amount) in player_regen_events {
-                    state.damage_events.push(DamageEvent {
-                        x,
-                        y,
-                        damage: -heal_amount, // Negative = healing
-                        time: current_time,
-                        target_id,
-                        source_id: None,
-                        projectile: None,
-                    });
-                }
-
-                // Update NPCs (grid positions from server, converted to f32 for interpolation)
-                let mut npc_regen_events: Vec<(String, f32, f32, i32)> = Vec::new();
-                if let Some(npcs) = extract_array(value, "npcs") {
-                    for npc_value in npcs {
-                        let id = extract_string(npc_value, "id").unwrap_or_default();
-                        let npc_type = extract_u8(npc_value, "npc_type").unwrap_or(0);
-                        let entity_type = extract_string(npc_value, "entity_type")
-                            .unwrap_or_else(|| "pig".to_string());
-                        let display_name = extract_string(npc_value, "display_name")
-                            .unwrap_or_else(|| "???".to_string());
-                        // Server sends i32 grid positions
-                        let x = extract_i32(npc_value, "x").unwrap_or(0) as f32;
-                        let y = extract_i32(npc_value, "y").unwrap_or(0) as f32;
-                        let direction = extract_u8(npc_value, "direction").unwrap_or(0);
-                        let hp = extract_i32(npc_value, "hp").unwrap_or(50);
-                        let max_hp = extract_i32(npc_value, "max_hp").unwrap_or(50);
-                        let level = extract_i32(npc_value, "level").unwrap_or(1);
-                        let npc_state = extract_u8(npc_value, "state").unwrap_or(0);
-                        let hostile = extract_bool(npc_value, "hostile").unwrap_or(true);
-                        let is_quest_giver =
-                            extract_bool(npc_value, "is_quest_giver").unwrap_or(false);
-                        let can_turn_in_quest =
-                            extract_bool(npc_value, "can_turn_in_quest").unwrap_or(false);
-                        let is_merchant = extract_bool(npc_value, "is_merchant").unwrap_or(false);
-                        let is_altar = extract_bool(npc_value, "is_altar").unwrap_or(false);
-                        let is_banker = extract_bool(npc_value, "is_banker").unwrap_or(false);
-                        let is_slayer_master = extract_bool(npc_value, "is_slayer_master").unwrap_or(false);
-                        let is_friendly = extract_bool(npc_value, "is_friendly").unwrap_or(false);
-                        let station_type = extract_string(npc_value, "station_type");
-                        let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
-                        let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
-                        let render_offset_y =
-                            extract_f32(npc_value, "render_offset_y").unwrap_or(0.0);
-
-                        if let Some(npc) = state.npcs.get_mut(&id) {
-                            // Update existing NPC - interpolate toward new grid position
-                            npc.set_server_position(x, y);
-                            npc.direction = Direction::from_u8(direction);
-                            // Update last_damage_time if HP decreased (ensures HP bar shows)
-                            if hp < npc.hp {
-                                npc.last_damage_time = macroquad::time::get_time();
-                            } else if hp > npc.hp && npc.hp > 0 {
-                                // HP increased (regen) - record for floating text
-                                let heal_amount = hp - npc.hp;
-                                npc_regen_events.push((id.clone(), npc.x, npc.y, heal_amount));
-                            }
-                            npc.hp = hp;
-                            npc.max_hp = max_hp;
-                            npc.level = level;
-                            // Handle state transitions
-                            let new_state = NpcState::from_u8(npc_state);
-                            if new_state != NpcState::Dead {
-                                // NPC is alive - clear death state if it was dying
-                                npc.death_timer = None;
-                                npc.pending_death = false;
-                                npc.state = new_state;
-                            } else if npc.death_timer.is_none() && !npc.pending_death {
-                                // Server says dead, start death sequence if not already
-                                npc.start_death();
-                            }
-                            // If death_timer is Some and new_state is Dead, let animation continue
-                            // Update display name in case it changed
-                            npc.display_name = display_name;
-                            npc.hostile = hostile;
-                            npc.is_quest_giver = is_quest_giver;
-                            npc.can_turn_in_quest = can_turn_in_quest;
-                            npc.is_merchant = is_merchant;
-                            npc.is_altar = is_altar;
-                            npc.is_banker = is_banker;
-                            npc.is_slayer_master = is_slayer_master;
-                            npc.is_friendly = is_friendly;
-                            npc.station_type = station_type;
-                            npc.move_speed = move_speed;
-                            npc.no_shadow = no_shadow;
-                            npc.render_offset_y = render_offset_y;
-                        } else {
-                            // New NPC - add to state
-                            let mut npc = Npc::new(id.clone(), entity_type, x, y);
-                            npc.display_name = display_name;
-                            npc.direction = Direction::from_u8(direction);
-                            npc.hp = hp;
-                            npc.max_hp = max_hp;
-                            npc.level = level;
-                            npc.state = NpcState::from_u8(npc_state);
-                            npc.hostile = hostile;
-                            npc.is_quest_giver = is_quest_giver;
-                            npc.can_turn_in_quest = can_turn_in_quest;
-                            npc.is_merchant = is_merchant;
-                            npc.is_altar = is_altar;
-                            npc.is_banker = is_banker;
-                            npc.is_slayer_master = is_slayer_master;
-                            npc.is_friendly = is_friendly;
-                            npc.station_type = station_type;
-                            npc.move_speed = move_speed;
-                            npc.no_shadow = no_shadow;
-                            npc.render_offset_y = render_offset_y;
-                            state.npcs.insert(id, npc);
-                        }
-                    }
-                }
-
-                // Delta sync: process explicit NPC removal list
-                if !is_full_sync {
-                    if let Some(removed) = extract_array(value, "removedNpcs") {
-                        for rv in removed {
-                            if let Some(id) = rv.as_str() {
-                                state.npcs.remove(id);
-                            }
-                        }
-                    }
-                }
-
-                // Push NPC regen events as healing numbers (negative damage = green +X)
-                for (target_id, x, y, heal_amount) in npc_regen_events {
-                    state.damage_events.push(DamageEvent {
-                        x,
-                        y,
-                        damage: -heal_amount, // Negative = healing
-                        time: current_time,
-                        target_id,
-                        source_id: None,
-                        projectile: None,
-                    });
-                }
+                handle_state_sync(value, state);
             }
         }
 
         "chatMessage" => {
             if let Some(value) = data {
-                let sender_name = extract_string(value, "senderName").unwrap_or_default();
-                let text = extract_string(value, "text").unwrap_or_default();
-                let extracted_ts = extract_u64(value, "timestamp").unwrap_or(0) as f64;
-                let timestamp = if extracted_ts > 0.0 {
-                    extracted_ts
-                } else {
-                    macroquad::time::get_time()
-                };
-                let channel_str = extract_string(value, "channel").unwrap_or_default();
-
-                let channel = match channel_str.as_str() {
-                    "global" => ChatChannel::Global,
-                    "system" => ChatChannel::System,
-                    _ => ChatChannel::Local, // "public" or unknown defaults to Local
-                };
-
-                // Add to chat log
-                state.push_chat_message(ChatMessage {
-                    sender_name: sender_name.clone(),
-                    text: text.clone(),
-                    timestamp,
-                    channel,
-                });
-                state.pending_sfx.push("message_add".to_string());
-
-                // Chat bubbles only for public/nearby messages
-                if matches!(channel, ChatChannel::Local) {
-                    if let Some((player_id, _)) =
-                        state.players.iter().find(|(_, p)| p.name == sender_name)
-                    {
-                        let player_id = player_id.clone();
-                        state.chat_bubbles.retain(|b| b.player_id != player_id);
-                        state.chat_bubbles.push(ChatBubble {
-                            player_id,
-                            text,
-                            time: macroquad::time::get_time(),
-                        });
-                    }
-                }
+                handle_chat_message(value, state);
             }
         }
 
@@ -813,14 +879,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "targetChanged" => {
             if let Some(value) = data {
-                let player_id = extract_string(value, "player_id").unwrap_or_default();
-                let target_id = extract_string(value, "target_id");
-
-                // Update local selection if this is our player
-                if state.local_player_id.as_ref() == Some(&player_id) {
-                    state.selected_entity_id = target_id.clone();
-                    log::debug!("Target changed to: {:?}", state.selected_entity_id);
-                }
+                handle_target_changed(value, state);
             }
         }
 
@@ -836,11 +895,15 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // Manual attacks play animation+sound locally; auto-attacks rely on
                 // this server event. set_state is idempotent (no-op if already in
                 // same state), so always triggering the animation is safe.
-                let already_attacking = is_local && state.players.get(&player_id)
-                    .map_or(false, |p| matches!(p.animation.state,
-                        crate::render::animation::AnimationState::Attacking
-                        | crate::render::animation::AnimationState::ShootingBow
-                        | crate::render::animation::AnimationState::Casting));
+                let already_attacking = is_local
+                    && state.players.get(&player_id).map_or(false, |p| {
+                        matches!(
+                            p.animation.state,
+                            crate::render::animation::AnimationState::Attacking
+                                | crate::render::animation::AnimationState::ShootingBow
+                                | crate::render::animation::AnimationState::Casting
+                        )
+                    });
 
                 if let Some(player) = state.players.get_mut(&player_id) {
                     match attack_type.as_str() {
@@ -1026,32 +1089,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "playerRespawned" => {
             if let Some(value) = data {
-                let player_id = extract_string(value, "id").unwrap_or_default();
-                // Server sends i32 grid positions
-                let x = extract_i32(value, "x").unwrap_or(0) as f32;
-                let y = extract_i32(value, "y").unwrap_or(0) as f32;
-                let hp = extract_i32(value, "hp").unwrap_or(100);
-                log::info!("Player {} respawned at ({}, {})", player_id, x, y);
-
-                if let Some(player) = state.players.get_mut(&player_id) {
-                    player.respawn(x, y, hp);
-                }
-
-                // Reset local player state on respawn
-                if state.local_player_id.as_ref() == Some(&player_id) {
-                    state.is_sitting = false;
-                    // Clear stale pending move sequences so interpolation starts clean
-                    state.clear_pending_moves();
-                    // Defensively clear interior mode in case we died in an instance
-                    // (mapTransition should also handle this, but belt-and-suspenders)
-                    if state.chunk_manager.is_interior() {
-                        state.chunk_manager.clear_interior();
-                        state.current_interior = None;
-                        state.current_instance = None;
-                        state.npcs.clear();
-                        state.ground_items.clear();
-                    }
-                }
+                handle_player_respawned(value, state);
             }
         }
 
@@ -1109,7 +1147,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     // Create floating XP event and system message for local player
                     if state.local_player_id.as_ref() == Some(&player_id) {
                         // Add system chat message (system-only, no Local mirror — too spammy)
-                        state.ui_state.chat_messages.push_system_only(ChatMessage::system(format!(
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push_system_only(ChatMessage::system(format!(
                                 "+{} {} XP",
                                 xp_gained, skill_name
                             )));
@@ -1282,7 +1323,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                     // Create floating level up event and system message for local player
                     if state.local_player_id.as_ref() == Some(&player_id) {
-                        state.ui_state.chat_messages.push(ChatMessage::system(format!(
+                        state
+                            .ui_state
+                            .chat_messages
+                            .push(ChatMessage::system(format!(
                                 "{} leveled up to {}!",
                                 skill_name, new_level
                             )));
@@ -1380,40 +1424,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         }
 
         "inventoryUpdate" => {
-            // Server sends this only to the owning player (unicast)
             if let Some(value) = data {
-                // Clear current inventory
-                for slot in state.inventory.slots.iter_mut() {
-                    *slot = None;
-                }
-
-                // Update slots
-                if let Some(slots) = extract_array(value, "slots") {
-                    for slot_value in slots {
-                        let slot_idx = extract_u8(slot_value, "slot").unwrap_or(0) as usize;
-                        let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
-                        let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
-
-                        if slot_idx < state.inventory.slots.len()
-                            && !item_id.is_empty()
-                            && quantity > 0
-                        {
-                            state.inventory.slots[slot_idx] =
-                                Some(InventorySlot::new(item_id, quantity));
-                        }
-                    }
-                }
-
-                // Update gold
-                if let Some(gold) = extract_i32(value, "gold") {
-                    state.inventory.gold = gold;
-                }
-
-                log::debug!(
-                    "Inventory updated: {} gold, {} items",
-                    state.inventory.gold,
-                    state.inventory.slots.iter().filter(|s| s.is_some()).count()
-                );
+                handle_inventory_update(value, state);
             }
         }
 
@@ -1714,7 +1726,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         let quest_id = extract_string(q, "quest_id").unwrap_or_default();
                         let name = extract_string(q, "name").unwrap_or_default();
                         let description = extract_string(q, "description").unwrap_or_default();
-                        let giver_npc_name = extract_string(q, "giver_npc_name").unwrap_or_default();
+                        let giver_npc_name =
+                            extract_string(q, "giver_npc_name").unwrap_or_default();
                         let level_required = extract_i32(q, "level_required").unwrap_or(0);
                         let required_quest_id = extract_string(q, "required_quest_id");
                         let required_quest_name = extract_string(q, "required_quest_name");
@@ -1722,9 +1735,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(obj_arr) = extract_array(q, "objectives") {
                             for obj in obj_arr {
                                 let id = extract_string(obj, "id").unwrap_or_default();
-                                let description = extract_string(obj, "description").unwrap_or_default();
+                                let description =
+                                    extract_string(obj, "description").unwrap_or_default();
                                 let target = extract_i32(obj, "target").unwrap_or(1);
-                                objectives.push(CatalogObjective { id, description, target });
+                                objectives.push(CatalogObjective {
+                                    id,
+                                    description,
+                                    target,
+                                });
                             }
                         }
                         state.ui_state.quest_catalog.push(QuestCatalogEntry {
@@ -1739,7 +1757,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         });
                     }
                 }
-                log::info!("Received quest catalog with {} quests", state.ui_state.quest_catalog.len());
+                log::info!(
+                    "Received quest catalog with {} quests",
+                    state.ui_state.quest_catalog.len()
+                );
             }
         }
 
@@ -1791,10 +1812,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 );
 
                 // Add system chat message
-                state.push_system_chat(format!(
-                        "Quest '{}' complete!",
-                        quest_name
-                    ));
+                state.push_system_chat(format!("Quest '{}' complete!", quest_name));
 
                 // Remove from active quests
                 state.ui_state.active_quests.retain(|q| q.id != quest_id);
@@ -1959,8 +1977,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             extract_bool(recipe_value, "requires_discovery").unwrap_or(false);
                         let required_tool = extract_string(recipe_value, "required_tool");
                         let burn_result = extract_string(recipe_value, "burn_result");
-                        let burn_stop_level =
-                            extract_i32(recipe_value, "burn_stop_level");
+                        let burn_stop_level = extract_i32(recipe_value, "burn_stop_level");
 
                         // Parse ingredients
                         let mut ingredients = Vec::new();
@@ -2088,10 +2105,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .map(|r| r.display_name.clone())
                         .unwrap_or_else(|| recipe_id.clone());
 
-                    state.push_system_chat(format!(
-                            "Recipe learned: {}",
-                            display_name
-                        ));
+                    state.push_system_chat(format!("Recipe learned: {}", display_name));
                     log::info!("Recipe discovered: {}", recipe_id);
                 }
             }
@@ -2122,10 +2136,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.crafting_progress = 0.0;
 
                 if !reason.is_empty() {
-                    state.push_system_chat(format!(
-                            "Crafting cancelled: {}",
-                            reason
-                        ));
+                    state.push_system_chat(format!("Crafting cancelled: {}", reason));
                 }
             }
         }
@@ -2164,9 +2175,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if state.ui_state.batch_total > 1 {
                     state.push_system_chat(format!(
                         "{} ({}/{})",
-                        display_name,
-                        state.ui_state.batch_completed,
-                        state.ui_state.batch_total
+                        display_name, state.ui_state.batch_completed, state.ui_state.batch_total
                     ));
                 } else {
                     let verb = match station.as_deref() {
@@ -2344,7 +2353,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "chestOpen" => {
             if let Some(value) = data {
                 let chest_id = extract_string(value, "chest_id").unwrap_or_default();
-                let chest_name = extract_string(value, "name").unwrap_or_else(|| "Chest".to_string());
+                let chest_name =
+                    extract_string(value, "name").unwrap_or_else(|| "Chest".to_string());
                 let total_value = extract_i32(value, "total_value").unwrap_or(0);
                 let mut slots = Vec::new();
                 if let Some(slots_arr) = extract_array(value, "slots") {
@@ -2359,10 +2369,19 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
-                log::info!("Chest opened: '{}', {} items, total value {}g", chest_id, slots.len(), total_value);
+                log::info!(
+                    "Chest opened: '{}', {} items, total value {}g",
+                    chest_id,
+                    slots.len(),
+                    total_value
+                );
 
                 // Determine slot count from the max slot index
-                let max_slot = slots.iter().map(|(s, _, _, _)| *s as usize).max().unwrap_or(0);
+                let max_slot = slots
+                    .iter()
+                    .map(|(s, _, _, _)| *s as usize)
+                    .max()
+                    .unwrap_or(0);
                 let num_slots = (max_slot + 1).max(10);
 
                 state.ui_state.chest_open = true;
@@ -2372,7 +2391,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.chest_slots = vec![None; num_slots];
                 for (slot, item_id, quantity, value) in slots {
                     if (slot as usize) < state.ui_state.chest_slots.len() {
-                        state.ui_state.chest_slots[slot as usize] = Some((item_id, quantity, value));
+                        state.ui_state.chest_slots[slot as usize] =
+                            Some((item_id, quantity, value));
                     }
                 }
                 state.ui_state.chest_total_value = total_value;
@@ -2393,7 +2413,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             let item_id = extract_string(slot_value, "item_id").unwrap_or_default();
                             let quantity = extract_i32(slot_value, "quantity").unwrap_or(0);
                             let value = extract_i32(slot_value, "value").unwrap_or(0);
-                            if !item_id.is_empty() && quantity > 0 && (slot as usize) < new_slots.len() {
+                            if !item_id.is_empty()
+                                && quantity > 0
+                                && (slot as usize) < new_slots.len()
+                            {
                                 new_slots[slot as usize] = Some((item_id, quantity, value));
                             }
                         }
@@ -2426,13 +2449,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let sell_multiplier = extract_f32(shop_value, "sellMultiplier").unwrap_or(1.0);
 
                 // Parse crafting categories from server
-                let crafting_categories: Vec<String> = extract_array(shop_value, "craftingCategories")
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                            .collect()
-                    })
-                    .unwrap_or_default();
+                let crafting_categories: Vec<String> =
+                    extract_array(shop_value, "craftingCategories")
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect()
+                        })
+                        .unwrap_or_default();
                 let crafting_stations: Vec<String> = extract_array(shop_value, "craftingStations")
                     .map(|arr| {
                         arr.iter()
@@ -2980,11 +3004,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // Check if the action is close enough to the local player to hear
                 let is_local = state.local_player_id.as_deref() == Some(&player_id);
                 let in_audio_range = is_local || {
-                    state.local_player_id.as_ref().and_then(|id| state.players.get(id)).map(|lp| {
-                        let dx = (lp.x - tree_x as f32).abs();
-                        let dy = (lp.y - tree_y as f32).abs();
-                        dx.max(dy) <= SFX_AUDIBLE_RANGE
-                    }).unwrap_or(false)
+                    state
+                        .local_player_id
+                        .as_ref()
+                        .and_then(|id| state.players.get(id))
+                        .map(|lp| {
+                            let dx = (lp.x - tree_x as f32).abs();
+                            let dy = (lp.y - tree_y as f32).abs();
+                            dx.max(dy) <= SFX_AUDIBLE_RANGE
+                        })
+                        .unwrap_or(false)
                 };
 
                 // Server says player swung - play attack animation (always) and sound (if in range)
@@ -2992,7 +3021,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     player.play_attack();
                 }
                 if in_audio_range {
-                    state.pending_attack_sounds.push(crate::game::state::AttackSoundType::Melee);
+                    state
+                        .pending_attack_sounds
+                        .push(crate::game::state::AttackSoundType::Melee);
 
                     // Play woodcutting sound effect
                     state.pending_sfx.push("woodcut".to_string());
@@ -3036,10 +3067,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .unwrap_or(item_id.clone());
 
                     // Add chat message about the chop
-                    state.push_system_chat(format!(
-                            "You chopped some {}!",
-                            item_name
-                        ));
+                    state.push_system_chat(format!("You chopped some {}!", item_name));
                 }
             }
         }
@@ -3168,11 +3196,16 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // Check if the action is close enough to the local player to hear
                 let is_local = state.local_player_id.as_deref() == Some(&player_id);
                 let in_audio_range = is_local || {
-                    state.local_player_id.as_ref().and_then(|id| state.players.get(id)).map(|lp| {
-                        let dx = (lp.x - rock_x as f32).abs();
-                        let dy = (lp.y - rock_y as f32).abs();
-                        dx.max(dy) <= SFX_AUDIBLE_RANGE
-                    }).unwrap_or(false)
+                    state
+                        .local_player_id
+                        .as_ref()
+                        .and_then(|id| state.players.get(id))
+                        .map(|lp| {
+                            let dx = (lp.x - rock_x as f32).abs();
+                            let dy = (lp.y - rock_y as f32).abs();
+                            dx.max(dy) <= SFX_AUDIBLE_RANGE
+                        })
+                        .unwrap_or(false)
                 };
 
                 // Server says player swung - play attack animation (always) and sound (if in range)
@@ -3180,7 +3213,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     player.play_attack();
                 }
                 if in_audio_range {
-                    state.pending_attack_sounds.push(crate::game::state::AttackSoundType::Melee);
+                    state
+                        .pending_attack_sounds
+                        .push(crate::game::state::AttackSoundType::Melee);
 
                     // Play mining sound effect
                     state.pending_sfx.push("mining".to_string());
@@ -3224,10 +3259,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .unwrap_or(item_id.clone());
 
                     // Add chat message about the mine
-                    state.push_system_chat(format!(
-                            "You mined some {}!",
-                            item_name
-                        ));
+                    state.push_system_chat(format!("You mined some {}!", item_name));
                 }
             }
         }
@@ -3696,27 +3728,41 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     for spell_val in spells_arr {
                         let id = extract_string(spell_val, "id").unwrap_or_default();
                         let name = extract_string(spell_val, "name").unwrap_or_default();
-                        let spell_type_str = extract_string(spell_val, "spell_type").unwrap_or_default();
+                        let spell_type_str =
+                            extract_string(spell_val, "spell_type").unwrap_or_default();
                         let spell_type = match spell_type_str.as_str() {
                             "damage" => crate::game::spell::SpellType::Damage,
                             "heal" => crate::game::spell::SpellType::Heal,
                             "teleport" => crate::game::spell::SpellType::Teleport,
                             _ => crate::game::spell::SpellType::Damage,
                         };
-                        state.scroll_spell_definitions.push(crate::game::spell::ScrollSpellDef {
-                            id,
-                            name,
-                            spell_type,
-                            mana_cost: extract_i32(spell_val, "mana_cost").unwrap_or(0),
-                            cooldown_ms: extract_i32(spell_val, "cooldown_ms").unwrap_or(0) as u64,
-                            base_power: extract_i32(spell_val, "base_power").unwrap_or(0),
-                            effect_sprite: extract_string(spell_val, "effect_sprite").unwrap_or_default(),
-                            pushback_distance: extract_i32(spell_val, "pushback_distance").unwrap_or(0),
-                            wall_slam_damage_per_tile: extract_i32(spell_val, "wall_slam_damage_per_tile").unwrap_or(0),
-                            description: extract_string(spell_val, "description").unwrap_or_default(),
-                        });
+                        state
+                            .scroll_spell_definitions
+                            .push(crate::game::spell::ScrollSpellDef {
+                                id,
+                                name,
+                                spell_type,
+                                mana_cost: extract_i32(spell_val, "mana_cost").unwrap_or(0),
+                                cooldown_ms: extract_i32(spell_val, "cooldown_ms").unwrap_or(0)
+                                    as u64,
+                                base_power: extract_i32(spell_val, "base_power").unwrap_or(0),
+                                effect_sprite: extract_string(spell_val, "effect_sprite")
+                                    .unwrap_or_default(),
+                                pushback_distance: extract_i32(spell_val, "pushback_distance")
+                                    .unwrap_or(0),
+                                wall_slam_damage_per_tile: extract_i32(
+                                    spell_val,
+                                    "wall_slam_damage_per_tile",
+                                )
+                                .unwrap_or(0),
+                                description: extract_string(spell_val, "description")
+                                    .unwrap_or_default(),
+                            });
                     }
-                    log::info!("Received {} scroll spell definitions", state.scroll_spell_definitions.len());
+                    log::info!(
+                        "Received {} scroll spell definitions",
+                        state.scroll_spell_definitions.len()
+                    );
                 }
             }
         }
@@ -3770,10 +3816,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.refresh_high_ping_movement_mode();
                 // Only show in chat if it was a manual /ping (not auto-ping)
                 if !state.debug_mode {
-                    state.push_system_chat(format!(
-                            "Ping: {}ms",
-                            latency_ms.round() as i32
-                        ));
+                    state.push_system_chat(format!("Ping: {}ms", latency_ms.round() as i32));
                 }
             }
         }
@@ -3784,10 +3827,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.slayer_master_name = extract_string(value, "master_name");
                 state.ui_state.slayer_current_task = extract_slayer_task(value, "current_task");
                 state.ui_state.slayer_points = extract_i32(value, "points").unwrap_or(0);
-                state.ui_state.slayer_tasks_completed = extract_i32(value, "tasks_completed").unwrap_or(0);
+                state.ui_state.slayer_tasks_completed =
+                    extract_i32(value, "tasks_completed").unwrap_or(0);
                 state.ui_state.slayer_rewards = extract_slayer_rewards(value, "rewards");
-                state.ui_state.slayer_blocked_monsters = extract_string_array(value, "blocked_monsters");
-                state.ui_state.slayer_unlocked_monsters = extract_string_array(value, "unlocked_monsters");
+                state.ui_state.slayer_blocked_monsters =
+                    extract_string_array(value, "blocked_monsters");
+                state.ui_state.slayer_unlocked_monsters =
+                    extract_string_array(value, "unlocked_monsters");
                 state.ui_state.slayer_panel_open = true;
                 state.ui_state.slayer_reward_tab = 0;
                 state.ui_state.slayer_reward_scroll = 0.0;
@@ -3817,9 +3863,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.slayer_points = total_points;
                 // Add a system message about task completion
                 state.push_system_chat(format!(
-                        "Slayer task complete! {} - earned {} points (total: {}).",
-                        display_name, points_awarded, total_points
-                    ));
+                    "Slayer task complete! {} - earned {} points (total: {}).",
+                    display_name, points_awarded, total_points
+                ));
             }
         }
 
@@ -3844,9 +3890,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             if let Some(value) = data {
                 state.ui_state.slayer_current_task = extract_slayer_task(value, "current_task");
                 state.ui_state.slayer_points = extract_i32(value, "points").unwrap_or(0);
-                state.ui_state.slayer_tasks_completed = extract_i32(value, "tasks_completed").unwrap_or(0);
-                state.ui_state.slayer_blocked_monsters = extract_string_array(value, "blocked_monsters");
-                state.ui_state.slayer_unlocked_monsters = extract_string_array(value, "unlocked_monsters");
+                state.ui_state.slayer_tasks_completed =
+                    extract_i32(value, "tasks_completed").unwrap_or(0);
+                state.ui_state.slayer_blocked_monsters =
+                    extract_string_array(value, "blocked_monsters");
+                state.ui_state.slayer_unlocked_monsters =
+                    extract_string_array(value, "unlocked_monsters");
             }
         }
 
@@ -3858,7 +3907,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if let Some(ref mut aa) = state.auto_action_state {
                     aa.confirmed = true;
                 }
-                log::debug!("Auto-action started: {} {} {}", action, target_type, target_id);
+                log::debug!(
+                    "Auto-action started: {} {} {}",
+                    action,
+                    target_type,
+                    target_id
+                );
             }
         }
 
@@ -3923,13 +3977,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             let slot_index = extract_u8(item, "slot_index").unwrap_or(0);
                             let item_id = extract_string(item, "item_id").unwrap_or_default();
                             let quantity = extract_i32(item, "quantity").unwrap_or(1);
-                            items.push(crate::game::TradeOfferItem { slot_index, item_id, quantity });
+                            items.push(crate::game::TradeOfferItem {
+                                slot_index,
+                                item_id,
+                                quantity,
+                            });
                         }
                     }
                 }
                 state.ui_state.trade_partner_items = items;
                 state.ui_state.trade_partner_gold = extract_i32(value, "partner_gold").unwrap_or(0);
-                state.ui_state.trade_partner_accepted = extract_bool(value, "partner_accepted").unwrap_or(false);
+                state.ui_state.trade_partner_accepted =
+                    extract_bool(value, "partner_accepted").unwrap_or(false);
                 // If partner changed offer, reset our accepted state
                 state.ui_state.trade_my_accepted = false;
             }
@@ -3944,13 +4003,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             let slot_index = extract_u8(item, "slot_index").unwrap_or(0);
                             let item_id = extract_string(item, "item_id").unwrap_or_default();
                             let quantity = extract_i32(item, "quantity").unwrap_or(1);
-                            items.push(crate::game::TradeOfferItem { slot_index, item_id, quantity });
+                            items.push(crate::game::TradeOfferItem {
+                                slot_index,
+                                item_id,
+                                quantity,
+                            });
                         }
                     }
                 }
                 state.ui_state.trade_my_items = items;
                 state.ui_state.trade_my_gold = extract_i32(value, "my_gold").unwrap_or(0);
-                state.ui_state.trade_my_accepted = extract_bool(value, "my_accepted").unwrap_or(false);
+                state.ui_state.trade_my_accepted =
+                    extract_bool(value, "my_accepted").unwrap_or(false);
             }
         }
 
@@ -3966,7 +4030,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "tradeCancelled" => {
             if let Some(value) = data {
-                let reason = extract_string(value, "reason").unwrap_or_else(|| "Trade cancelled.".to_string());
+                let reason = extract_string(value, "reason")
+                    .unwrap_or_else(|| "Trade cancelled.".to_string());
                 state.push_system_chat(reason);
             }
             state.ui_state.trade_open = false;
@@ -4007,7 +4072,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             let item_id = extract_string(item, "item_id").unwrap_or_default();
                             let quantity = extract_i32(item, "quantity").unwrap_or(1);
                             let price = extract_i32(item, "price").unwrap_or(0);
-                            slots.push(crate::game::StallSlotInfo { slot, item_id, quantity, price });
+                            slots.push(crate::game::StallSlotInfo {
+                                slot,
+                                item_id,
+                                quantity,
+                                price,
+                            });
                         }
                     }
                 }
@@ -4028,7 +4098,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             let item_id = extract_string(item, "item_id").unwrap_or_default();
                             let quantity = extract_i32(item, "quantity").unwrap_or(1);
                             let price = extract_i32(item, "price").unwrap_or(0);
-                            items.push(crate::game::StallSlotInfo { slot, item_id, quantity, price });
+                            items.push(crate::game::StallSlotInfo {
+                                slot,
+                                item_id,
+                                quantity,
+                                price,
+                            });
                         }
                     }
                 }
@@ -4057,7 +4132,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         quantity, item_def.display_name, total_price
                     ));
                 } else {
-                    let error = extract_string(value, "error").unwrap_or("Unknown error".to_string());
+                    let error =
+                        extract_string(value, "error").unwrap_or("Unknown error".to_string());
                     state.push_system_chat(format!("Purchase failed: {}", error));
                 }
             }
@@ -4100,5 +4176,272 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         _ => {
             log::debug!("Unhandled message type: {}", msg_type);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rmpv::Value;
+
+    fn map(entries: Vec<(&str, Value)>) -> Value {
+        Value::Map(
+            entries
+                .into_iter()
+                .map(|(key, value)| (Value::from(key), value))
+                .collect(),
+        )
+    }
+
+    fn player(id: &str, name: &str) -> Player {
+        Player::new(
+            id.to_string(),
+            name.to_string(),
+            10.0,
+            20.0,
+            "female".to_string(),
+            "pale".to_string(),
+        )
+    }
+
+    #[test]
+    fn welcome_sets_connection_and_resets_move_sequences() {
+        let mut state = GameState::new();
+        state.next_move_sequence(1.0, 0.0);
+        state.next_move_sequence(0.0, 1.0);
+        assert!(state.has_pending_move_sequences());
+
+        let welcome = map(vec![
+            ("player_id", Value::from("player-1")),
+            ("is_new_character", Value::from(false)),
+        ]);
+
+        handle_room_data("welcome", Some(&welcome), &mut state);
+
+        assert_eq!(state.local_player_id.as_deref(), Some("player-1"));
+        assert!(matches!(
+            state.connection_status,
+            ConnectionStatus::Connected
+        ));
+        assert_eq!(state.next_move_seq, 0);
+        assert_eq!(state.last_acked_move_seq, 0);
+        assert!(!state.has_pending_move_sequences());
+        assert!(!state.tutorial_pending);
+    }
+
+    #[test]
+    fn player_joined_populates_player_appearance_and_equipment() {
+        let mut state = GameState::new();
+        let joined = map(vec![
+            ("id", Value::from("remote-1")),
+            ("name", Value::from("Ayla")),
+            ("x", Value::from(12)),
+            ("y", Value::from(34)),
+            ("gender", Value::from("female")),
+            ("skin", Value::from("pale")),
+            ("hair_style", Value::from(3)),
+            ("hair_color", Value::from(5)),
+            ("equipped_head", Value::from("wizard_hat")),
+            ("equipped_weapon", Value::from("oak_staff")),
+            ("equipped_body", Value::from("")),
+            ("equipped_back", Value::from("")),
+            ("equipped_feet", Value::from("")),
+            ("equipped_ring", Value::from("")),
+            ("equipped_gloves", Value::from("")),
+            ("equipped_necklace", Value::from("")),
+            ("equipped_belt", Value::from("")),
+            ("is_admin", Value::from(true)),
+        ]);
+
+        handle_room_data("playerJoined", Some(&joined), &mut state);
+
+        let player = state.players.get("remote-1").expect("player inserted");
+        assert_eq!(player.name, "Ayla");
+        assert_eq!(player.x, 12.0);
+        assert_eq!(player.y, 34.0);
+        assert_eq!(player.gender, "female");
+        assert_eq!(player.skin, "pale");
+        assert_eq!(player.hair_style, Some(3));
+        assert_eq!(player.hair_color, Some(5));
+        assert_eq!(player.equipped_head.as_deref(), Some("wizard_hat"));
+        assert_eq!(player.equipped_weapon.as_deref(), Some("oak_staff"));
+        assert!(player.is_admin);
+    }
+
+    #[test]
+    fn player_left_removes_existing_player() {
+        let mut state = GameState::new();
+        state
+            .players
+            .insert("remote-1".to_string(), player("remote-1", "Ayla"));
+
+        let left = map(vec![("id", Value::from("remote-1"))]);
+        handle_room_data("playerLeft", Some(&left), &mut state);
+
+        assert!(!state.players.contains_key("remote-1"));
+    }
+
+    #[test]
+    fn chat_message_adds_local_log_entry_bubble_and_sfx() {
+        let mut state = GameState::new();
+        state
+            .players
+            .insert("remote-1".to_string(), player("remote-1", "Ayla"));
+
+        let chat = map(vec![
+            ("senderName", Value::from("Ayla")),
+            ("text", Value::from("Hello there")),
+            ("timestamp", Value::from(123_u64)),
+            ("channel", Value::from("public")),
+        ]);
+
+        handle_room_data("chatMessage", Some(&chat), &mut state);
+
+        let local_messages = state.ui_state.chat_messages.channel(&ChatChannel::Local);
+        assert_eq!(local_messages.len(), 1);
+        assert_eq!(local_messages[0].sender_name, "Ayla");
+        assert_eq!(local_messages[0].text, "Hello there");
+        assert_eq!(local_messages[0].timestamp, 123.0);
+        assert_eq!(local_messages[0].channel, ChatChannel::Local);
+        assert_eq!(state.chat_bubbles.len(), 1);
+        assert_eq!(state.chat_bubbles[0].player_id, "remote-1");
+        assert_eq!(state.chat_bubbles[0].text, "Hello there");
+        assert_eq!(state.pending_sfx, vec!["message_add".to_string()]);
+    }
+
+    #[test]
+    fn target_changed_only_updates_local_player_selection() {
+        let mut state = GameState::new();
+        state.local_player_id = Some("local-1".to_string());
+        state.selected_entity_id = Some("old-target".to_string());
+
+        let remote_target = map(vec![
+            ("player_id", Value::from("remote-1")),
+            ("target_id", Value::from("npc-2")),
+        ]);
+        handle_room_data("targetChanged", Some(&remote_target), &mut state);
+        assert_eq!(state.selected_entity_id.as_deref(), Some("old-target"));
+
+        let local_target = map(vec![
+            ("player_id", Value::from("local-1")),
+            ("target_id", Value::from("npc-3")),
+        ]);
+        handle_room_data("targetChanged", Some(&local_target), &mut state);
+        assert_eq!(state.selected_entity_id.as_deref(), Some("npc-3"));
+    }
+
+    #[test]
+    fn inventory_update_replaces_slots_and_gold() {
+        let mut state = GameState::new();
+        state.inventory.slots[0] = Some(InventorySlot::new("old_item".to_string(), 1));
+        state.inventory.gold = 5;
+
+        let update = map(vec![
+            (
+                "slots",
+                Value::Array(vec![
+                    map(vec![
+                        ("slot", Value::from(1)),
+                        ("item_id", Value::from("bronze_sword")),
+                        ("quantity", Value::from(2)),
+                    ]),
+                    map(vec![
+                        ("slot", Value::from(3)),
+                        ("item_id", Value::from("bread")),
+                        ("quantity", Value::from(5)),
+                    ]),
+                ]),
+            ),
+            ("gold", Value::from(77)),
+        ]);
+
+        handle_room_data("inventoryUpdate", Some(&update), &mut state);
+
+        assert!(state.inventory.slots[0].is_none());
+        let slot_one = state.inventory.slots[1].as_ref().expect("slot 1 set");
+        assert_eq!(slot_one.item_id, "bronze_sword");
+        assert_eq!(slot_one.quantity, 2);
+        let slot_three = state.inventory.slots[3].as_ref().expect("slot 3 set");
+        assert_eq!(slot_three.item_id, "bread");
+        assert_eq!(slot_three.quantity, 5);
+        assert_eq!(state.inventory.gold, 77);
+    }
+
+    #[test]
+    fn player_respawned_resets_local_state_and_pending_moves() {
+        let mut state = GameState::new();
+        state.local_player_id = Some("local-1".to_string());
+        state.is_sitting = true;
+        state.next_move_sequence(1.0, 0.0);
+        state
+            .players
+            .insert("local-1".to_string(), player("local-1", "Hero"));
+
+        if let Some(player) = state.players.get_mut("local-1") {
+            player.is_dead = true;
+            player.hp = 0;
+        }
+
+        let respawn = map(vec![
+            ("id", Value::from("local-1")),
+            ("x", Value::from(42)),
+            ("y", Value::from(24)),
+            ("hp", Value::from(88)),
+        ]);
+
+        handle_room_data("playerRespawned", Some(&respawn), &mut state);
+
+        let player = state.players.get("local-1").expect("local player exists");
+        assert!(!player.is_dead);
+        assert_eq!(player.x, 42.0);
+        assert_eq!(player.y, 24.0);
+        assert_eq!(player.hp, 88);
+        assert_eq!(player.max_hp, 88);
+        assert!(!state.is_sitting);
+        assert!(!state.has_pending_move_sequences());
+    }
+
+    #[test]
+    fn state_sync_ignores_mismatched_instance_context() {
+        let mut state = GameState::new();
+        state.current_instance = Some("instance-a".to_string());
+        state.server_tick = 7;
+        state
+            .players
+            .insert("remote-1".to_string(), player("remote-1", "Ayla"));
+
+        let sync = map(vec![
+            ("tick", Value::from(8)),
+            ("instanceId", Value::from("instance-b")),
+            ("players", Value::Array(vec![])),
+            ("npcs", Value::Array(vec![])),
+        ]);
+
+        handle_room_data("stateSync", Some(&sync), &mut state);
+
+        assert_eq!(state.server_tick, 7);
+        assert!(state.players.contains_key("remote-1"));
+    }
+
+    #[test]
+    fn state_sync_ignores_stale_ticks() {
+        let mut state = GameState::new();
+        state.current_instance = Some("instance-a".to_string());
+        state.server_tick = 12;
+        state
+            .players
+            .insert("remote-1".to_string(), player("remote-1", "Ayla"));
+
+        let stale_sync = map(vec![
+            ("tick", Value::from(11)),
+            ("instanceId", Value::from("instance-a")),
+            ("players", Value::Array(vec![])),
+            ("npcs", Value::Array(vec![])),
+        ]);
+
+        handle_room_data("stateSync", Some(&stale_sync), &mut state);
+
+        assert_eq!(state.server_tick, 12);
+        assert!(state.players.contains_key("remote-1"));
     }
 }

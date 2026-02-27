@@ -37,9 +37,7 @@ impl Renderer {
         draw_rectangle_lines(x, y, chip_w, chip_h, 1.0, Color::from_rgba(80, 70, 55, 180));
 
         // Draw NPC sprite (idle frame 0, down-facing)
-        if let Some((npc_texture, npc_atlas_offset)) =
-            self.npc_sprites.get(&task.monster_id)
-        {
+        if let Some((npc_texture, npc_atlas_offset)) = self.npc_sprites.get(&task.monster_id) {
             let (tex_w, tex_h): (f32, f32) = self
                 .npc_sprites
                 .get_dimensions(&task.monster_id)
@@ -108,20 +106,47 @@ impl Renderer {
 
             let lines = [
                 (format!("Task: {}", task.display_name), TEXT_TITLE),
-                (format!("Progress: {}/{}", task.kills_current, task.kills_required), TEXT_NORMAL),
+                (
+                    format!("Progress: {}/{}", task.kills_current, task.kills_required),
+                    TEXT_NORMAL,
+                ),
                 (format!("XP/kill: {}", task.xp_per_kill), TEXT_NORMAL),
-                (format!("Points on completion: {}", task.points_on_complete), TEXT_NORMAL),
-                (format!("Slayer Points: {}", state.ui_state.slayer_points), TEXT_GOLD),
-                (format!("Tasks completed: {}", state.ui_state.slayer_tasks_completed), TEXT_DIM),
+                (
+                    format!("Points on completion: {}", task.points_on_complete),
+                    TEXT_NORMAL,
+                ),
+                (
+                    format!("Slayer Points: {}", state.ui_state.slayer_points),
+                    TEXT_GOLD,
+                ),
+                (
+                    format!("Tasks completed: {}", state.ui_state.slayer_tasks_completed),
+                    TEXT_DIM,
+                ),
             ];
 
-            let tip_w = lines.iter()
+            let tip_w = lines
+                .iter()
                 .map(|(text, _)| self.measure_text_sharp(text, tip_font).width)
-                .fold(0.0f32, f32::max) + tip_pad * 2.0;
+                .fold(0.0f32, f32::max)
+                + tip_pad * 2.0;
             let tip_h = tip_pad + lines.len() as f32 * line_h + tip_pad;
 
-            draw_rectangle(tip_x, tip_y, tip_w, tip_h, Color::from_rgba(12, 12, 18, 240));
-            draw_rectangle_lines(tip_x, tip_y, tip_w, tip_h, 1.0, Color::from_rgba(80, 70, 55, 200));
+            draw_rectangle(
+                tip_x,
+                tip_y,
+                tip_w,
+                tip_h,
+                Color::from_rgba(12, 12, 18, 240),
+            );
+            draw_rectangle_lines(
+                tip_x,
+                tip_y,
+                tip_w,
+                tip_h,
+                1.0,
+                Color::from_rgba(80, 70, 55, 200),
+            );
 
             for (i, (text, color)) in lines.iter().enumerate() {
                 self.draw_text_sharp(
@@ -230,8 +255,22 @@ impl Renderer {
         } else {
             TEXT_DIM
         };
-        draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
-        draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
+        draw_line(
+            cx - cross,
+            cy - cross,
+            cx + cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
+        draw_line(
+            cx + cross,
+            cy - cross,
+            cx - cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
 
         // ===== SLAYER POINTS DISPLAY =====
         let points_y = header_y + header_h + padding;
@@ -362,28 +401,20 @@ impl Renderer {
 
             let is_get_hovered = matches!(hovered, Some(UiElementId::SlayerGetTaskButton));
             let (get_bg, get_border) = if is_get_hovered {
-                (
-                    Color::new(0.235, 0.204, 0.141, 1.0),
-                    FRAME_ACCENT,
-                )
+                (Color::new(0.235, 0.204, 0.141, 1.0), FRAME_ACCENT)
             } else {
-                (
-                    Color::new(0.157, 0.141, 0.110, 1.0),
-                    FRAME_MID,
-                )
+                (Color::new(0.157, 0.141, 0.110, 1.0), FRAME_MID)
             };
 
             draw_rectangle(get_x, get_y, get_w, get_h, get_border);
-            draw_rectangle(
-                get_x + 1.0,
-                get_y + 1.0,
-                get_w - 2.0,
-                get_h - 2.0,
-                get_bg,
-            );
+            draw_rectangle(get_x + 1.0, get_y + 1.0, get_w - 2.0, get_h - 2.0, get_bg);
 
             let get_text = "Get New Task";
-            let get_text_color = if is_get_hovered { TEXT_TITLE } else { TEXT_NORMAL };
+            let get_text_color = if is_get_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_NORMAL
+            };
             let get_text_dims = self.measure_text_sharp(get_text, 16.0);
             self.draw_text_sharp(
                 get_text,
@@ -438,7 +469,13 @@ impl Renderer {
 
             // Active tab indicator (gold bottom line)
             if is_selected {
-                draw_rectangle(tx + 2.0, tab_y + tab_h - 3.0, tab_w - 4.0, 3.0, FRAME_ACCENT);
+                draw_rectangle(
+                    tx + 2.0,
+                    tab_y + tab_h - 3.0,
+                    tab_w - 4.0,
+                    3.0,
+                    FRAME_ACCENT,
+                );
             }
 
             let tab_text_color = if is_selected { TEXT_TITLE } else { TEXT_NORMAL };
@@ -463,7 +500,13 @@ impl Renderer {
         layout.add(UiElementId::SlayerScrollArea, scroll_rect);
 
         // Content background
-        draw_rectangle(content_x, content_y, content_w, content_h, Color::new(0.06, 0.06, 0.08, 1.0));
+        draw_rectangle(
+            content_x,
+            content_y,
+            content_w,
+            content_h,
+            Color::new(0.06, 0.06, 0.08, 1.0),
+        );
         draw_rectangle_lines(content_x, content_y, content_w, content_h, 1.0, SLOT_BORDER);
 
         // Filter rewards by active tab category
@@ -508,7 +551,8 @@ impl Renderer {
 
             // Render reward items
             for (global_idx, reward) in &filtered_rewards {
-                let item_y = content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
+                let item_y =
+                    content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
 
                 // Skip items outside visible area (but still count them for layout)
                 if item_y + row_h >= content_y && item_y <= content_y + content_h {
@@ -559,8 +603,7 @@ impl Renderer {
                     let btn_bounds = Rect::new(btn_x, btn_y, btn_w, btn_h);
                     layout.add(UiElementId::SlayerBuyReward(*global_idx), btn_bounds);
 
-                    let is_buy_hovered =
-                        matches!(hovered, Some(UiElementId::SlayerBuyReward(idx)) if *idx == *global_idx);
+                    let is_buy_hovered = matches!(hovered, Some(UiElementId::SlayerBuyReward(idx)) if *idx == *global_idx);
 
                     let (btn_bg, btn_border_color) = if !can_afford {
                         (
@@ -568,25 +611,13 @@ impl Renderer {
                             Color::new(0.3, 0.3, 0.3, 1.0),
                         )
                     } else if is_buy_hovered {
-                        (
-                            Color::new(0.235, 0.204, 0.141, 1.0),
-                            FRAME_ACCENT,
-                        )
+                        (Color::new(0.235, 0.204, 0.141, 1.0), FRAME_ACCENT)
                     } else {
-                        (
-                            Color::new(0.157, 0.141, 0.110, 1.0),
-                            FRAME_MID,
-                        )
+                        (Color::new(0.157, 0.141, 0.110, 1.0), FRAME_MID)
                     };
 
                     draw_rectangle(btn_x, btn_y, btn_w, btn_h, btn_border_color);
-                    draw_rectangle(
-                        btn_x + 1.0,
-                        btn_y + 1.0,
-                        btn_w - 2.0,
-                        btn_h - 2.0,
-                        btn_bg,
-                    );
+                    draw_rectangle(btn_x + 1.0, btn_y + 1.0, btn_w - 2.0, btn_h - 2.0, btn_bg);
 
                     let btn_text_color = if can_afford { TEXT_NORMAL } else { TEXT_DIM };
                     let buy_text = "Buy";
@@ -616,7 +647,8 @@ impl Renderer {
             if active_tab == 3 {
                 // Separator if there are rewards above
                 if !filtered_rewards.is_empty() {
-                    let sep_y = content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
+                    let sep_y =
+                        content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
                     if sep_y >= content_y && sep_y <= content_y + content_h {
                         draw_line(
                             content_x + 10.0 * s,
@@ -661,9 +693,8 @@ impl Renderer {
                     for (i, monster_name) in
                         state.ui_state.slayer_blocked_monsters.iter().enumerate()
                     {
-                        let item_y = content_y + 4.0 * s
-                            + row_idx as f32 * (row_h + row_sp)
-                            - scroll_offset;
+                        let item_y =
+                            content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
 
                         if item_y + row_h >= content_y && item_y <= content_y + content_h {
                             // Row background
@@ -672,13 +703,7 @@ impl Renderer {
                             } else {
                                 Color::new(0.06, 0.06, 0.08, 0.6)
                             };
-                            draw_rectangle(
-                                content_x + 2.0,
-                                item_y,
-                                content_w - 4.0,
-                                row_h,
-                                row_bg,
-                            );
+                            draw_rectangle(content_x + 2.0, item_y, content_w - 4.0, row_h, row_bg);
 
                             // Monster name
                             self.draw_text_sharp(
@@ -694,8 +719,7 @@ impl Renderer {
                             let remove_h = 24.0 * s;
                             let remove_x = content_x + content_w - remove_w - 8.0 * s;
                             let remove_y = item_y + (row_h - remove_h) / 2.0;
-                            let remove_bounds =
-                                Rect::new(remove_x, remove_y, remove_w, remove_h);
+                            let remove_bounds = Rect::new(remove_x, remove_y, remove_w, remove_h);
                             layout.add(UiElementId::SlayerRemoveBlock(i), remove_bounds);
 
                             let is_remove_hovered = matches!(
@@ -715,13 +739,7 @@ impl Renderer {
                                 )
                             };
 
-                            draw_rectangle(
-                                remove_x,
-                                remove_y,
-                                remove_w,
-                                remove_h,
-                                remove_border,
-                            );
+                            draw_rectangle(remove_x, remove_y, remove_w, remove_h, remove_border);
                             draw_rectangle(
                                 remove_x + 1.0,
                                 remove_y + 1.0,

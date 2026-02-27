@@ -78,6 +78,7 @@ mod tests {
             x: 0.0,
             y: 0.0,
             zoom: 1.0,
+            ..Default::default()
         };
         let (sx, sy) = world_to_screen(0.0, 0.0, &camera);
         // At origin with centered camera, should be at screen center
@@ -92,6 +93,7 @@ mod tests {
             x: 5.0,
             y: 3.0,
             zoom: 1.5,
+            ..Default::default()
         };
         let world_x = 10.0;
         let world_y = 7.0;

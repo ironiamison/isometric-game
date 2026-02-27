@@ -1,6 +1,6 @@
+use rand::Rng;
 use std::collections::HashMap;
 use std::path::Path;
-use rand::Rng;
 
 use super::definition::*;
 use super::state::PlayerSlayerState;
@@ -47,8 +47,12 @@ impl SlayerRegistry {
             masters.insert(master.id.clone(), master);
         }
 
-        tracing::info!("Loaded {} slayer masters, {} rewards, {} level-gated monsters",
-            masters.len(), rewards_file.rewards.len(), slayer_requirements.len());
+        tracing::info!(
+            "Loaded {} slayer masters, {} rewards, {} level-gated monsters",
+            masters.len(),
+            rewards_file.rewards.len(),
+            slayer_requirements.len()
+        );
 
         Ok(Self {
             masters,
@@ -59,7 +63,8 @@ impl SlayerRegistry {
     }
 
     pub fn get_master_by_prototype(&self, prototype_id: &str) -> Option<&SlayerMasterDef> {
-        self.master_by_prototype.get(prototype_id)
+        self.master_by_prototype
+            .get(prototype_id)
             .and_then(|id| self.masters.get(id))
     }
 
@@ -87,18 +92,22 @@ impl SlayerRegistry {
     ) -> Option<super::state::SlayerTask> {
         let master = self.masters.get(master_id)?;
 
-        let eligible: Vec<&SlayerTaskDef> = master.tasks.iter().filter(|t| {
-            if t.slayer_level_required > player_slayer_level {
-                return false;
-            }
-            if player_state.blocked_monsters.contains(&t.monster_id) {
-                return false;
-            }
-            if t.requires_unlock && !player_state.unlocked_monsters.contains(&t.monster_id) {
-                return false;
-            }
-            true
-        }).collect();
+        let eligible: Vec<&SlayerTaskDef> = master
+            .tasks
+            .iter()
+            .filter(|t| {
+                if t.slayer_level_required > player_slayer_level {
+                    return false;
+                }
+                if player_state.blocked_monsters.contains(&t.monster_id) {
+                    return false;
+                }
+                if t.requires_unlock && !player_state.unlocked_monsters.contains(&t.monster_id) {
+                    return false;
+                }
+                true
+            })
+            .collect();
 
         if eligible.is_empty() {
             return None;

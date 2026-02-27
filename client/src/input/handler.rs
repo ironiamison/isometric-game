@@ -1,9 +1,9 @@
 use super::touch::TouchControls;
 use crate::audio::AudioManager;
 use crate::game::{
-    pathfinding, BankDrag, BankQuantityAction, BankQuantityDialog, ChatChannel, ContextMenu,
-    ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState,
-    QuestCatalogEntry, StallPriceDialog, quest_status_order, CHUNK_SIZE,
+    pathfinding, quest_status_order, BankDrag, BankQuantityAction, BankQuantityDialog, ChatChannel,
+    ContextMenu, ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState,
+    QuestCatalogEntry, StallPriceDialog, CHUNK_SIZE,
 };
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
@@ -118,7 +118,12 @@ fn process_chat_keyboard_input(
     let repeatable_keys = if classic {
         vec![KeyCode::Backspace, KeyCode::Delete]
     } else {
-        vec![KeyCode::Left, KeyCode::Right, KeyCode::Backspace, KeyCode::Delete]
+        vec![
+            KeyCode::Left,
+            KeyCode::Right,
+            KeyCode::Backspace,
+            KeyCode::Delete,
+        ]
     };
     let any_repeatable_held = repeatable_keys.iter().any(|k| is_key_down(*k));
     if !any_repeatable_held {
@@ -165,10 +170,8 @@ fn process_chat_keyboard_input(
                 if c.is_control() {
                     continue;
                 }
-                let byte_idx = char_to_byte_index(
-                    &state.ui_state.chat_input,
-                    state.ui_state.chat_cursor,
-                );
+                let byte_idx =
+                    char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor);
                 state.ui_state.chat_input.insert(byte_idx, c);
                 state.ui_state.chat_cursor += 1;
             }
@@ -179,10 +182,8 @@ fn process_chat_keyboard_input(
     // Backspace removes character before cursor
     if chat_key_should_fire(KeyCode::Backspace, state, current_time) {
         if state.ui_state.chat_cursor > 0 {
-            let byte_idx = char_to_byte_index(
-                &state.ui_state.chat_input,
-                state.ui_state.chat_cursor - 1,
-            );
+            let byte_idx =
+                char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor - 1);
             state.ui_state.chat_input.remove(byte_idx);
             state.ui_state.chat_cursor -= 1;
         }
@@ -301,10 +302,7 @@ fn auto_action_target_settled(aa: &crate::game::AutoActionState, state: &GameSta
 }
 
 /// Activate a hotkey slot binding — returns InputCommand(s) to execute
-fn activate_hotkey_slot(
-    state: &mut GameState,
-    slot_idx: usize,
-) -> Vec<InputCommand> {
+fn activate_hotkey_slot(state: &mut GameState, slot_idx: usize) -> Vec<InputCommand> {
     use crate::game::hotkey::HotkeySlotBinding;
 
     let binding = state.ui_state.hotkey_bar.active().slots[slot_idx].clone();
@@ -348,9 +346,7 @@ fn activate_hotkey_slot(
                     });
                 if let Some(cd_ms) = cooldown_ms {
                     let cooldown_end = now + (cd_ms as f64 / 1000.0);
-                    state
-                        .spell_cooldowns
-                        .insert(spell_id.clone(), cooldown_end);
+                    state.spell_cooldowns.insert(spell_id.clone(), cooldown_end);
                 }
                 vec![InputCommand::CastSpell {
                     spell_id: spell_id.clone(),
@@ -406,7 +402,11 @@ fn is_selected_adventurer_guide_tier_active(state: &GameState) -> bool {
         return false;
     };
 
-    state.ui_state.active_quests.iter().any(|q| q.id == selected_id)
+    state
+        .ui_state
+        .active_quests
+        .iter()
+        .any(|q| q.id == selected_id)
 }
 
 fn is_selected_adventurer_guide_tier_completable(state: &GameState) -> bool {
@@ -500,11 +500,20 @@ fn sync_adventurer_guide_dialogue_target(state: &mut GameState) {
 }
 
 /// Get the world position of an auto-action target (for facing direction)
-fn auto_action_target_pos(aa: &crate::game::AutoActionState, state: &GameState) -> Option<(f32, f32)> {
+fn auto_action_target_pos(
+    aa: &crate::game::AutoActionState,
+    state: &GameState,
+) -> Option<(f32, f32)> {
     match aa.target_type.as_str() {
         // Use server-authoritative positions for chase logic to avoid interpolation mismatches
-        "npc" => state.npcs.get(&aa.target_id).map(|n| (n.server_x, n.server_y)),
-        "player" => state.players.get(&aa.target_id).map(|p| (p.server_x, p.server_y)),
+        "npc" => state
+            .npcs
+            .get(&aa.target_id)
+            .map(|n| (n.server_x, n.server_y)),
+        "player" => state
+            .players
+            .get(&aa.target_id)
+            .map(|p| (p.server_x, p.server_y)),
         "resource" => {
             // target_id format: "x,y,gid"
             let parts: Vec<&str> = aa.target_id.split(',').collect();
@@ -535,7 +544,13 @@ fn sync_path_index(path_state: &mut PathState, player_pos: (i32, i32)) {
             .iter()
             .enumerate()
             .skip(path_state.current_index)
-            .find_map(|(i, &(wx, wy))| if (wx, wy) == player_pos { Some(i) } else { None })
+            .find_map(|(i, &(wx, wy))| {
+                if (wx, wy) == player_pos {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
         {
             path_state.current_index = found_idx + 1;
         }
@@ -746,7 +761,12 @@ fn find_path_to_adjacent_with_optimistic_splice(
     Some((dest, path))
 }
 
-fn face_target_if_needed(state: &mut GameState, commands: &mut Vec<InputCommand>, dx: f32, dy: f32) {
+fn face_target_if_needed(
+    state: &mut GameState,
+    commands: &mut Vec<InputCommand>,
+    dx: f32,
+    dy: f32,
+) {
     let dir = crate::game::Direction::from_velocity(dx, dy);
     if let Some(local_id) = &state.local_player_id {
         if let Some(player) = state.players.get(local_id) {
@@ -759,7 +779,11 @@ fn face_target_if_needed(state: &mut GameState, commands: &mut Vec<InputCommand>
 }
 
 /// Pathfind to adjacent tile of a player and set up attack, or attack immediately if adjacent.
-fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCommand>, target_id: &str) {
+fn pathfind_and_attack_player(
+    state: &mut GameState,
+    commands: &mut Vec<InputCommand>,
+    target_id: &str,
+) {
     if let Some(local_id) = &state.local_player_id.clone() {
         if let Some(local_player) = state.players.get(local_id) {
             if let Some(target) = state.players.get(target_id) {
@@ -782,8 +806,14 @@ fn pathfind_and_attack_player(state: &mut GameState, commands: &mut Vec<InputCom
                         preferred,
                     ) {
                         state.auto_path = Some(PathState {
-                            path, current_index: 0, destination: dest,
-                            pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                            path,
+                            current_index: 0,
+                            destination: dest,
+                            pickup_target: None,
+                            interact_target: None,
+                            interact_object_target: None,
+                            waystone_target: None,
+                            browse_stall_target: None,
                         });
                     }
                 } else {
@@ -827,8 +857,14 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                         preferred,
                     ) {
                         state.auto_path = Some(PathState {
-                            path, current_index: 0, destination: dest,
-                            pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                            path,
+                            current_index: 0,
+                            destination: dest,
+                            pickup_target: None,
+                            interact_target: None,
+                            interact_object_target: None,
+                            waystone_target: None,
+                            browse_stall_target: None,
                         });
                     }
                 } else {
@@ -867,9 +903,15 @@ fn pathfind_and_interact_npc(
                 let dy = npc.server_y - player.server_y;
                 let dist = (dx * dx + dy * dy).sqrt();
                 Some(dist < INTERACT_RANGE)
-            } else { None }
-        } else { None }
-    } else { None };
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     match should_interact {
         Some(true) => {
@@ -886,13 +928,22 @@ fn pathfind_and_interact_npc(
                         let occupied = build_occupied_set(state, false);
                         const MAX_PATH_DISTANCE: i32 = 32;
                         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                            (px, py), (nx, ny), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                            (px, py),
+                            (nx, ny),
+                            &state.chunk_manager,
+                            &occupied,
+                            MAX_PATH_DISTANCE,
                         ) {
                             let npc_id_owned = npc_id.to_string();
                             state.auto_path = Some(PathState {
-                                path, current_index: 0, destination: dest,
+                                path,
+                                current_index: 0,
+                                destination: dest,
                                 pickup_target: None,
-                                interact_target: Some(npc_id_owned), interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                interact_target: Some(npc_id_owned),
+                                interact_object_target: None,
+                                waystone_target: None,
+                                browse_stall_target: None,
                             });
                         }
                     }
@@ -904,7 +955,14 @@ fn pathfind_and_interact_npc(
 }
 
 /// Pathfind to adjacent tile of a resource and start auto-action, or do it immediately if adjacent.
-fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>, tile_x: i32, tile_y: i32, target_id: &str, action: &str) {
+fn pathfind_and_resource(
+    state: &mut GameState,
+    commands: &mut Vec<InputCommand>,
+    tile_x: i32,
+    tile_y: i32,
+    target_id: &str,
+    action: &str,
+) {
     if let Some(player) = state.get_local_player() {
         let px = player.server_x.round() as i32;
         let py = player.server_y.round() as i32;
@@ -914,15 +972,28 @@ fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>
             let occupied = build_occupied_set(state, true);
             const MAX_PATH_DISTANCE: i32 = 32;
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                (px, py), (tile_x, tile_y), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                (px, py),
+                (tile_x, tile_y),
+                &state.chunk_manager,
+                &occupied,
+                MAX_PATH_DISTANCE,
             ) {
                 state.auto_path = Some(PathState {
-                    path, current_index: 0, destination: dest,
-                    pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                    path,
+                    current_index: 0,
+                    destination: dest,
+                    pickup_target: None,
+                    interact_target: None,
+                    interact_object_target: None,
+                    waystone_target: None,
+                    browse_stall_target: None,
                 });
             }
         } else {
-            let dir = crate::game::Direction::from_velocity(tile_x as f32 - px as f32, tile_y as f32 - py as f32);
+            let dir = crate::game::Direction::from_velocity(
+                tile_x as f32 - px as f32,
+                tile_y as f32 - py as f32,
+            );
             queue_face(state, commands, dir as u8);
             commands.push(InputCommand::StartAutoAction {
                 target_type: "resource".to_string(),
@@ -934,7 +1005,12 @@ fn pathfind_and_resource(state: &mut GameState, commands: &mut Vec<InputCommand>
 }
 
 /// Pathfind to a tile.
-fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, tile_x: i32, tile_y: i32) {
+fn pathfind_to_tile(
+    state: &mut GameState,
+    commands: &mut Vec<InputCommand>,
+    tile_x: i32,
+    tile_y: i32,
+) {
     // Cancel any existing auto-action or follow
     if state.auto_action_state.is_some() {
         state.auto_action_state = None;
@@ -951,7 +1027,11 @@ fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, til
         let px = player.server_x.round() as i32;
         let py = player.server_y.round() as i32;
         let dist = (tile_x - px).abs().max((tile_y - py).abs());
-        if dist <= MAX_PATH_DISTANCE && state.chunk_manager.is_walkable(tile_x as f32, tile_y as f32) {
+        if dist <= MAX_PATH_DISTANCE
+            && state
+                .chunk_manager
+                .is_walkable(tile_x as f32, tile_y as f32)
+        {
             let occupied = build_occupied_set(state, true);
             if let Some(path) = find_path_with_optimistic_splice(
                 state,
@@ -961,8 +1041,14 @@ fn pathfind_to_tile(state: &mut GameState, commands: &mut Vec<InputCommand>, til
                 MAX_PATH_DISTANCE,
             ) {
                 state.auto_path = Some(PathState {
-                    path, current_index: 0, destination: (tile_x, tile_y),
-                    pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                    path,
+                    current_index: 0,
+                    destination: (tile_x, tile_y),
+                    pickup_target: None,
+                    interact_target: None,
+                    interact_object_target: None,
+                    waystone_target: None,
+                    browse_stall_target: None,
                 });
             }
         }
@@ -1496,16 +1582,7 @@ impl InputHandler {
         self.touch_controls.load_icons().await;
     }
 
-    pub fn process(
-        &mut self,
-        state: &mut GameState,
-        layout: &UiLayout,
-        audio: &mut AudioManager,
-    ) -> Vec<InputCommand> {
-        let mut commands = Vec::new();
-        let current_time = get_time();
-
-        // Update touch controls (for mobile)
+    fn update_touch_controls(&mut self, state: &GameState, current_time: f64) {
         let in_dialogue = state.ui_state.active_dialogue.is_some();
         let any_panel_open = state.ui_state.inventory_open
             || state.ui_state.character_panel_open
@@ -1540,19 +1617,12 @@ impl InputHandler {
             hide_direction_controls,
             state.ui_state.use_joystick,
         );
+    }
 
-        // Get current mouse/touch position in virtual coordinates (for UI hit detection)
-        let (raw_mx, raw_my) = mouse_position();
-        let (mx, my) = screen_to_virtual_coords(raw_mx, raw_my);
-
-        // Update hover state for visual feedback (used by renderer next frame)
+    fn update_hover_state(&self, state: &mut GameState, layout: &UiLayout, mx: f32, my: f32) {
         state.ui_state.hovered_element = layout.hit_test(mx, my).cloned();
-        // Keep the active chat tab marked as read for unread badge highlighting.
         mark_chat_channel_as_read(state, state.ui_state.chat_active_tab);
 
-        // Update hovered tile based on mouse position (only when not hovering UI or using touch controls)
-        // Use round() instead of floor() because tile sprites are visually centered
-        // at integer world coordinates, forming diamonds that span [-0.5, 0.5) around each point
         let touch_active = self.touch_controls.consumed_touch();
         if state.ui_state.hovered_element.is_none() && !touch_active {
             let (world_x, world_y) = screen_to_world(mx, my, &state.camera);
@@ -1560,11 +1630,9 @@ impl InputHandler {
             let tile_y = world_y.round() as i32;
             state.hovered_tile = Some((tile_x, tile_y));
 
-            // Check for entity hover (players and NPCs within hover radius)
-            let hover_radius = 0.6; // World units - slightly larger than tile size for easier targeting
+            let hover_radius = 0.6;
             let mut hovered_entity: Option<String> = None;
 
-            // Check NPCs first (they're usually more important to interact with)
             for npc in state.npcs.values() {
                 if npc.state != crate::game::npc::NpcState::Dead {
                     let dx = world_x - npc.x;
@@ -1576,7 +1644,6 @@ impl InputHandler {
                 }
             }
 
-            // Check players if no NPC is hovered
             if hovered_entity.is_none() {
                 for player in state.players.values() {
                     if !player.is_dead {
@@ -1595,10 +1662,14 @@ impl InputHandler {
             state.hovered_tile = None;
             state.hovered_entity_id = None;
         }
+    }
 
-        // For click detection, do a fresh hit-test at the moment of click
-        // This ensures we detect what's actually under the mouse when clicked
-        // On mobile, don't count touches that were consumed by touch controls as map clicks
+    fn current_click_target(
+        &self,
+        layout: &UiLayout,
+        mx: f32,
+        my: f32,
+    ) -> (bool, bool, bool, Option<UiElementId>) {
         let touch_consumed = self.touch_controls.consumed_touch();
         let mouse_clicked = is_mouse_button_pressed(MouseButton::Left) && !touch_consumed;
         let mouse_right_clicked = is_mouse_button_pressed(MouseButton::Right);
@@ -1609,349 +1680,891 @@ impl InputHandler {
             None
         };
 
+        (
+            mouse_clicked,
+            mouse_right_clicked,
+            mouse_released,
+            clicked_element,
+        )
+    }
+
+    fn handle_drag_drop(
+        &self,
+        state: &mut GameState,
+        clicked_element: Option<&UiElementId>,
+        audio: &mut AudioManager,
+        commands: &mut Vec<InputCommand>,
+    ) -> bool {
+        let Some(drag) = state.ui_state.drag_state.take() else {
+            return false;
+        };
+
+        if let Some(element) = clicked_element {
+            match element {
+                UiElementId::InventorySlot(to_idx) => match &drag.source {
+                    DragSource::Inventory(from_idx) => {
+                        if *from_idx != *to_idx {
+                            state.inventory.swap_slots(*from_idx, *to_idx);
+                            audio.play_sfx("item_put");
+
+                            commands.push(InputCommand::SwapSlots {
+                                from_slot: *from_idx as u8,
+                                to_slot: *to_idx as u8,
+                            });
+                        }
+                    }
+                    DragSource::Equipment(slot_type) => {
+                        if state
+                            .inventory
+                            .slots
+                            .get(*to_idx)
+                            .map(|s| s.is_none())
+                            .unwrap_or(false)
+                        {
+                            state
+                                .inventory
+                                .set_slot(*to_idx, drag.item_id.clone(), drag.quantity);
+
+                            if let Some(local_id) = &state.local_player_id.clone() {
+                                if let Some(player) = state.players.get_mut(local_id) {
+                                    match slot_type.as_str() {
+                                        "head" => player.equipped_head = None,
+                                        "body" => player.equipped_body = None,
+                                        "weapon" => player.equipped_weapon = None,
+                                        "back" => player.equipped_back = None,
+                                        "feet" => player.equipped_feet = None,
+                                        "ring" => player.equipped_ring = None,
+                                        "gloves" => player.equipped_gloves = None,
+                                        "necklace" => player.equipped_necklace = None,
+                                        "belt" => player.equipped_belt = None,
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+
+                        audio.play_sfx("item_put");
+                        commands.push(InputCommand::Unequip {
+                            slot_type: slot_type.clone(),
+                            target_slot: Some(*to_idx as u8),
+                        });
+                    }
+                    DragSource::Spell(_) => {}
+                },
+                UiElementId::QuickSlot(slot_idx) | UiElementId::HotkeySettingsSlot(slot_idx) => {
+                    match &drag.source {
+                        DragSource::Inventory(inv_idx) => {
+                            if let Some(Some(slot)) = state.inventory.slots.get(*inv_idx) {
+                                state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                    crate::game::hotkey::HotkeySlotBinding::Item {
+                                        item_id: slot.item_id.clone(),
+                                    };
+                                save_current_ui_settings(state);
+                                audio.play_sfx("item_put");
+                            }
+                        }
+                        DragSource::Spell(spell_id) => {
+                            state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
+                                crate::game::hotkey::HotkeySlotBinding::Spell {
+                                    spell_id: spell_id.clone(),
+                                };
+                            save_current_ui_settings(state);
+                            audio.play_sfx("item_put");
+                        }
+                        DragSource::Equipment(_) => {}
+                    }
+                }
+                UiElementId::EquipmentSlot(target_slot_type) => match &drag.source {
+                    DragSource::Inventory(from_idx) => {
+                        let item_def = state.item_registry.get_or_placeholder(&drag.item_id);
+                        let can_equip = if let Some(ref equip) = item_def.equipment {
+                            let slot_matches = equip.slot_type == *target_slot_type;
+                            let level_required = equip
+                                .attack_level_required
+                                .max(equip.defence_level_required);
+                            let level_ok = state
+                                .get_local_player()
+                                .map(|p| p.skills.combat.level >= level_required)
+                                .unwrap_or(false);
+                            slot_matches && level_ok
+                        } else {
+                            false
+                        };
+
+                        if can_equip {
+                            if let Some(local_id) = &state.local_player_id.clone() {
+                                if let Some(player) = state.players.get_mut(local_id) {
+                                    match target_slot_type.as_str() {
+                                        "head" => player.equipped_head = Some(drag.item_id.clone()),
+                                        "body" => player.equipped_body = Some(drag.item_id.clone()),
+                                        "weapon" => {
+                                            player.equipped_weapon = Some(drag.item_id.clone())
+                                        }
+                                        "back" => player.equipped_back = Some(drag.item_id.clone()),
+                                        "feet" => player.equipped_feet = Some(drag.item_id.clone()),
+                                        "ring" => player.equipped_ring = Some(drag.item_id.clone()),
+                                        "gloves" => {
+                                            player.equipped_gloves = Some(drag.item_id.clone())
+                                        }
+                                        "necklace" => {
+                                            player.equipped_necklace = Some(drag.item_id.clone())
+                                        }
+                                        "belt" => player.equipped_belt = Some(drag.item_id.clone()),
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            state.inventory.clear_slot(*from_idx);
+                            audio.play_sfx("item_put");
+
+                            commands.push(InputCommand::Equip {
+                                slot_index: *from_idx as u8,
+                            });
+                        }
+                    }
+                    DragSource::Equipment(source_slot_type) => {
+                        if source_slot_type != target_slot_type {}
+                    }
+                    DragSource::Spell(_) => {}
+                },
+                UiElementId::ChestSlot(_) | UiElementId::ChestScrollArea => {
+                    if state.ui_state.chest_open {
+                        if let DragSource::Inventory(from_idx) = &drag.source {
+                            commands.push(InputCommand::ChestDeposit {
+                                chest_id: state.ui_state.chest_id.clone(),
+                                inventory_slot: *from_idx as u8,
+                            });
+                            audio.play_sfx("item_put");
+                        }
+                    }
+                }
+                _ => {}
+            }
+        } else if let DragSource::Inventory(from_idx) = &drag.source {
+            if let Some((tile_x, tile_y)) = state.hovered_tile {
+                if let Some(player) = state.get_local_player() {
+                    let player_x = player.x.round() as i32;
+                    let player_y = player.y.round() as i32;
+                    let dx = (tile_x - player_x).abs();
+                    let dy = (tile_y - player_y).abs();
+                    let is_adjacent = dx <= 1 && dy <= 1;
+
+                    if is_adjacent {
+                        let is_seed_on_patch = if let Some(patch_id) =
+                            state.farming_patch_positions.get(&(tile_x, tile_y))
+                        {
+                            if let Some(patch) = state.farming_patches.get(patch_id) {
+                                if patch.state == "empty" {
+                                    if let Some(Some(slot)) = state.inventory.slots.get(*from_idx) {
+                                        if slot.item_id.ends_with("_seed") {
+                                            commands.push(InputCommand::PlantSeed {
+                                                patch_id: patch_id.clone(),
+                                                item_id: slot.item_id.clone(),
+                                            });
+                                            audio.play_sfx("item_put");
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+
+                        let is_bones_on_altar = if !is_seed_on_patch {
+                            if let Some(Some(slot)) = state.inventory.slots.get(*from_idx) {
+                                if slot.item_id.contains("bones") {
+                                    let mut altar_id = None;
+                                    for (npc_id, npc) in &state.npcs {
+                                        if npc.is_altar
+                                            && npc.x.round() as i32 == tile_x
+                                            && npc.y.round() as i32 == tile_y
+                                        {
+                                            altar_id = Some(npc_id.clone());
+                                            break;
+                                        }
+                                    }
+                                    if let Some(aid) = altar_id {
+                                        commands.push(InputCommand::OfferBones {
+                                            slot: *from_idx as u8,
+                                            altar_id: aid,
+                                        });
+                                        audio.play_sfx("item_put");
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+
+                        if !is_seed_on_patch && !is_bones_on_altar {
+                            let ctrl_held = is_key_down(KeyCode::LeftControl)
+                                || is_key_down(KeyCode::RightControl)
+                                || is_key_down(KeyCode::LeftSuper)
+                                || is_key_down(KeyCode::RightSuper);
+
+                            let quantity = if ctrl_held { 1 } else { drag.quantity as u32 };
+
+                            commands.push(InputCommand::DropItem {
+                                slot_index: *from_idx as u8,
+                                quantity,
+                                target_x: Some(tile_x),
+                                target_y: Some(tile_y),
+                            });
+                            audio.play_sfx("item_put");
+                        }
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    fn handle_modal_panels(
+        state: &mut GameState,
+        layout: &UiLayout,
+        clicked_element: Option<&UiElementId>,
+        mouse_clicked: bool,
+        commands: &mut Vec<InputCommand>,
+    ) -> bool {
+        if state.ui_state.gold_drop_dialog.is_some() {
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    match element {
+                        UiElementId::GoldDropConfirm => {
+                            let dialog = state.ui_state.gold_drop_dialog.as_ref().unwrap();
+                            if let Ok(amount) = dialog.input.parse::<i32>() {
+                                if amount > 0 && amount <= state.inventory.gold {
+                                    if state.ui_state.trade_open {
+                                        commands.push(InputCommand::TradeOfferGold { amount });
+                                    } else {
+                                        commands.push(InputCommand::DropGold { amount });
+                                    }
+                                    state.ui_state.gold_drop_dialog = None;
+                                }
+                            }
+                            return true;
+                        }
+                        UiElementId::GoldDropCancel => {
+                            state.ui_state.gold_drop_dialog = None;
+                            return true;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.gold_drop_dialog = None;
+                return true;
+            }
+
+            if is_key_pressed(KeyCode::Enter) {
+                let dialog = state.ui_state.gold_drop_dialog.as_ref().unwrap();
+                if let Ok(amount) = dialog.input.parse::<i32>() {
+                    if amount > 0 && amount <= state.inventory.gold {
+                        if state.ui_state.trade_open {
+                            commands.push(InputCommand::TradeOfferGold { amount });
+                        } else {
+                            commands.push(InputCommand::DropGold { amount });
+                        }
+                        state.ui_state.gold_drop_dialog = None;
+                    }
+                }
+                return true;
+            }
+
+            let number_keys = [
+                (KeyCode::Key0, '0'),
+                (KeyCode::Key1, '1'),
+                (KeyCode::Key2, '2'),
+                (KeyCode::Key3, '3'),
+                (KeyCode::Key4, '4'),
+                (KeyCode::Key5, '5'),
+                (KeyCode::Key6, '6'),
+                (KeyCode::Key7, '7'),
+                (KeyCode::Key8, '8'),
+                (KeyCode::Key9, '9'),
+                (KeyCode::Kp0, '0'),
+                (KeyCode::Kp1, '1'),
+                (KeyCode::Kp2, '2'),
+                (KeyCode::Kp3, '3'),
+                (KeyCode::Kp4, '4'),
+                (KeyCode::Kp5, '5'),
+                (KeyCode::Kp6, '6'),
+                (KeyCode::Kp7, '7'),
+                (KeyCode::Kp8, '8'),
+                (KeyCode::Kp9, '9'),
+            ];
+
+            for (key, digit) in &number_keys {
+                if is_key_pressed(*key) {
+                    let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
+                    if dialog.input.len() < 10 {
+                        dialog.input.insert(dialog.cursor, *digit);
+                        dialog.cursor += 1;
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Backspace) {
+                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
+                if dialog.cursor > 0 {
+                    dialog.input.remove(dialog.cursor - 1);
+                    dialog.cursor -= 1;
+                }
+            }
+
+            if is_key_pressed(KeyCode::Delete) {
+                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
+                if dialog.cursor < dialog.input.len() {
+                    dialog.input.remove(dialog.cursor);
+                }
+            }
+
+            if is_key_pressed(KeyCode::Left) {
+                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
+                if dialog.cursor > 0 {
+                    dialog.cursor -= 1;
+                }
+            }
+            if is_key_pressed(KeyCode::Right) {
+                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
+                if dialog.cursor < dialog.input.len() {
+                    dialog.cursor += 1;
+                }
+            }
+
+            if is_key_pressed(KeyCode::Home) {
+                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
+                dialog.cursor = 0;
+            }
+            if is_key_pressed(KeyCode::End) {
+                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
+                dialog.cursor = dialog.input.len();
+            }
+
+            while get_char_pressed().is_some() {}
+            return true;
+        }
+
+        if state.ui_state.stall_price_dialog.is_some() {
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    match element {
+                        UiElementId::StallPriceConfirm => {
+                            let dialog = state.ui_state.stall_price_dialog.as_ref().unwrap();
+                            if let Ok(price) = dialog.input.parse::<i32>() {
+                                if price > 0 {
+                                    let item_id = dialog.item_id.clone();
+                                    commands.push(InputCommand::StallSetItem {
+                                        inventory_slot: dialog.inventory_slot,
+                                        quantity: dialog.quantity,
+                                        price,
+                                    });
+                                    state.ui_state.stall_last_prices.insert(item_id, price);
+                                    state.ui_state.stall_price_dialog = None;
+                                }
+                            }
+                            return true;
+                        }
+                        UiElementId::StallPriceCancel => {
+                            state.ui_state.stall_price_dialog = None;
+                            return true;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.stall_price_dialog = None;
+                return true;
+            }
+
+            if is_key_pressed(KeyCode::Enter) {
+                let dialog = state.ui_state.stall_price_dialog.as_ref().unwrap();
+                if let Ok(price) = dialog.input.parse::<i32>() {
+                    if price > 0 {
+                        let item_id = dialog.item_id.clone();
+                        commands.push(InputCommand::StallSetItem {
+                            inventory_slot: dialog.inventory_slot,
+                            quantity: dialog.quantity,
+                            price,
+                        });
+                        state.ui_state.stall_last_prices.insert(item_id, price);
+                        state.ui_state.stall_price_dialog = None;
+                    }
+                }
+                return true;
+            }
+
+            let number_keys = [
+                (KeyCode::Key0, '0'),
+                (KeyCode::Key1, '1'),
+                (KeyCode::Key2, '2'),
+                (KeyCode::Key3, '3'),
+                (KeyCode::Key4, '4'),
+                (KeyCode::Key5, '5'),
+                (KeyCode::Key6, '6'),
+                (KeyCode::Key7, '7'),
+                (KeyCode::Key8, '8'),
+                (KeyCode::Key9, '9'),
+            ];
+            for (key, digit) in &number_keys {
+                if is_key_pressed(*key) {
+                    let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                    if dialog.input.len() < 10 {
+                        dialog.input.insert(dialog.cursor, *digit);
+                        dialog.cursor += 1;
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Backspace) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                if dialog.cursor > 0 {
+                    dialog.input.remove(dialog.cursor - 1);
+                    dialog.cursor -= 1;
+                }
+            }
+
+            if is_key_pressed(KeyCode::Delete) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                if dialog.cursor < dialog.input.len() {
+                    dialog.input.remove(dialog.cursor);
+                }
+            }
+
+            if is_key_pressed(KeyCode::Left) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                if dialog.cursor > 0 {
+                    dialog.cursor -= 1;
+                }
+            }
+            if is_key_pressed(KeyCode::Right) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                if dialog.cursor < dialog.input.len() {
+                    dialog.cursor += 1;
+                }
+            }
+
+            if is_key_pressed(KeyCode::Home) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                dialog.cursor = 0;
+            }
+            if is_key_pressed(KeyCode::End) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                dialog.cursor = dialog.input.len();
+            }
+
+            while get_char_pressed().is_some() {}
+            return true;
+        }
+
+        if state.ui_state.chest_open {
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                if let Some(UiElementId::ChestScrollArea) = &state.ui_state.hovered_element {
+                    let max_scroll = layout
+                        .get_max_scroll(&UiElementId::ChestScrollArea)
+                        .unwrap_or(0.0);
+                    state.ui_state.chest_scroll =
+                        (state.ui_state.chest_scroll - wheel_y * 30.0).clamp(0.0, max_scroll);
+                }
+            }
+
+            let mut chest_handled = false;
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    match element {
+                        UiElementId::ChestClose => {
+                            state.ui_state.chest_open = false;
+                            state.pending_sfx.push("enter".to_string());
+                            chest_handled = true;
+                        }
+                        UiElementId::ChestSlot(idx) => {
+                            if (*idx as usize) < state.ui_state.chest_slots.len() {
+                                if state.ui_state.chest_slots[*idx as usize].is_some() {
+                                    commands.push(InputCommand::ChestTake {
+                                        chest_id: state.ui_state.chest_id.clone(),
+                                        slot: *idx,
+                                    });
+                                }
+                            }
+                            chest_handled = true;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.chest_open = false;
+                return true;
+            }
+
+            if chest_handled {
+                return true;
+            }
+        }
+
+        if state.ui_state.slayer_panel_open {
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                if let Some(UiElementId::SlayerScrollArea) = &state.ui_state.hovered_element {
+                    state.ui_state.slayer_reward_scroll =
+                        (state.ui_state.slayer_reward_scroll - wheel_y * 30.0).max(0.0);
+                }
+            }
+
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    match element {
+                        UiElementId::SlayerCloseButton => {
+                            state.ui_state.slayer_panel_open = false;
+                            state.pending_sfx.push("enter".to_string());
+                        }
+                        UiElementId::SlayerGetTaskButton => {
+                            if let Some(ref master_id) = state.ui_state.slayer_master_id.clone() {
+                                commands.push(InputCommand::SlayerGetTask {
+                                    master_id: master_id.clone(),
+                                });
+                            }
+                        }
+                        UiElementId::SlayerCancelTaskButton => {
+                            commands.push(InputCommand::SlayerCancelTask);
+                        }
+                        UiElementId::SlayerRewardTab(idx) => {
+                            state.ui_state.slayer_reward_tab = *idx;
+                            state.ui_state.slayer_reward_scroll = 0.0;
+                        }
+                        UiElementId::SlayerBuyReward(idx) => {
+                            if let Some(reward) = state.ui_state.slayer_rewards.get(*idx) {
+                                if state.ui_state.slayer_points >= reward.cost {
+                                    commands.push(InputCommand::SlayerBuyReward {
+                                        reward_id: reward.id.clone(),
+                                        target_monster_id: reward.target_id.clone(),
+                                    });
+                                }
+                            }
+                        }
+                        UiElementId::SlayerRemoveBlock(idx) => {
+                            if let Some(monster_name) =
+                                state.ui_state.slayer_blocked_monsters.get(*idx)
+                            {
+                                commands.push(InputCommand::SlayerRemoveBlock {
+                                    monster_id: monster_name.clone(),
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.slayer_panel_open = false;
+                return true;
+            }
+
+            return true;
+        }
+
+        if state.ui_state.trade_open {
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    match element {
+                        UiElementId::TradeOfferSlot(i) => {
+                            commands.push(InputCommand::TradeRemoveItem {
+                                offer_index: *i as u8,
+                            });
+                        }
+                        UiElementId::TradeGoldInput => {
+                            state.ui_state.gold_drop_dialog = Some(GoldDropDialog {
+                                input: String::new(),
+                                cursor: 0,
+                            });
+                        }
+                        UiElementId::TradeAcceptButton => {
+                            commands.push(InputCommand::TradeAccept);
+                        }
+                        UiElementId::TradeCancelButton => {
+                            commands.push(InputCommand::TradeCancel);
+                        }
+                        UiElementId::InventorySlot(slot_idx) => {
+                            if let Some(slot) = state
+                                .inventory
+                                .slots
+                                .get(*slot_idx)
+                                .and_then(|s| s.as_ref())
+                            {
+                                commands.push(InputCommand::TradeOfferItem {
+                                    slot_index: *slot_idx as u8,
+                                    quantity: slot.quantity,
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                commands.push(InputCommand::TradeCancel);
+                return true;
+            }
+
+            return true;
+        }
+
+        if state.ui_state.trade_pending_request.is_some() && mouse_clicked {
+            if let Some(element) = clicked_element {
+                match element {
+                    UiElementId::TradeRequestAccept => {
+                        if let Some((ref requester_id, _)) = state.ui_state.trade_pending_request {
+                            commands.push(InputCommand::TradeAcceptRequest {
+                                requester_id: requester_id.clone(),
+                            });
+                        }
+                        state.ui_state.trade_pending_request = None;
+                    }
+                    UiElementId::TradeRequestDecline => {
+                        if let Some((ref requester_id, _)) = state.ui_state.trade_pending_request {
+                            commands.push(InputCommand::TradeDeclineRequest {
+                                requester_id: requester_id.clone(),
+                            });
+                        }
+                        state.ui_state.trade_pending_request = None;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if state.ui_state.stall_setup_open {
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    match element {
+                        UiElementId::StallSetupNameInput => {
+                            state.ui_state.stall_name_editing = true;
+                            state.ui_state.stall_name_cursor = state.ui_state.stall_my_name.len();
+                        }
+                        UiElementId::StallSetupRemove(i) => {
+                            state.ui_state.stall_name_editing = false;
+                            if let Some(slot) = state.ui_state.stall_my_slots.get(*i) {
+                                commands.push(InputCommand::StallRemoveItem {
+                                    stall_slot: slot.slot,
+                                });
+                            }
+                        }
+                        UiElementId::StallSetupOpenButton => {
+                            state.ui_state.stall_name_editing = false;
+                            if state.ui_state.stall_active {
+                                commands.push(InputCommand::StallClose);
+                            } else {
+                                let name = if state.ui_state.stall_my_name.is_empty() {
+                                    "My Shop".to_string()
+                                } else {
+                                    state.ui_state.stall_my_name.clone()
+                                };
+                                commands.push(InputCommand::StallOpen { name });
+                            }
+                        }
+                        UiElementId::StallSetupCloseButton => {
+                            state.ui_state.stall_name_editing = false;
+                            state.ui_state.stall_setup_open = false;
+                        }
+                        UiElementId::InventorySlot(slot_idx) => {
+                            state.ui_state.stall_name_editing = false;
+                            if let Some(slot) = state
+                                .inventory
+                                .slots
+                                .get(*slot_idx)
+                                .and_then(|s| s.as_ref())
+                            {
+                                commands.push(InputCommand::StallSetItem {
+                                    inventory_slot: *slot_idx as u8,
+                                    quantity: slot.quantity,
+                                    price: 1,
+                                });
+                            }
+                        }
+                        _ => {
+                            state.ui_state.stall_name_editing = false;
+                        }
+                    }
+                } else {
+                    state.ui_state.stall_name_editing = false;
+                }
+            }
+
+            if state.ui_state.stall_name_editing {
+                if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Enter) {
+                    state.ui_state.stall_name_editing = false;
+                    while get_char_pressed().is_some() {}
+                    return true;
+                }
+
+                if is_key_pressed(KeyCode::Backspace) {
+                    if state.ui_state.stall_name_cursor > 0 {
+                        state.ui_state.stall_name_cursor -= 1;
+                        state
+                            .ui_state
+                            .stall_my_name
+                            .remove(state.ui_state.stall_name_cursor);
+                    }
+                }
+                if is_key_pressed(KeyCode::Delete) {
+                    if state.ui_state.stall_name_cursor < state.ui_state.stall_my_name.len() {
+                        state
+                            .ui_state
+                            .stall_my_name
+                            .remove(state.ui_state.stall_name_cursor);
+                    }
+                }
+                if is_key_pressed(KeyCode::Left) && state.ui_state.stall_name_cursor > 0 {
+                    state.ui_state.stall_name_cursor -= 1;
+                }
+                if is_key_pressed(KeyCode::Right)
+                    && state.ui_state.stall_name_cursor < state.ui_state.stall_my_name.len()
+                {
+                    state.ui_state.stall_name_cursor += 1;
+                }
+                if is_key_pressed(KeyCode::Home) {
+                    state.ui_state.stall_name_cursor = 0;
+                }
+                if is_key_pressed(KeyCode::End) {
+                    state.ui_state.stall_name_cursor = state.ui_state.stall_my_name.len();
+                }
+
+                while let Some(ch) = get_char_pressed() {
+                    if ch.is_control() {
+                        continue;
+                    }
+                    if state.ui_state.stall_my_name.len() < 24 {
+                        state
+                            .ui_state
+                            .stall_my_name
+                            .insert(state.ui_state.stall_name_cursor, ch);
+                        state.ui_state.stall_name_cursor += 1;
+                    }
+                }
+
+                return true;
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.stall_setup_open = false;
+                state.ui_state.stall_name_editing = false;
+                return true;
+            }
+
+            return true;
+        }
+
+        if state.ui_state.stall_browse.is_some() {
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    match element {
+                        UiElementId::StallBrowseItem(i) => {
+                            state.ui_state.stall_browse_selected = *i;
+                            state.ui_state.stall_buy_quantity = 1;
+                        }
+                        UiElementId::StallBrowseQuantityMinus => {
+                            if state.ui_state.stall_buy_quantity > 1 {
+                                state.ui_state.stall_buy_quantity -= 1;
+                            }
+                        }
+                        UiElementId::StallBrowseQuantityPlus => {
+                            state.ui_state.stall_buy_quantity += 1;
+                            if let Some(ref browse) = state.ui_state.stall_browse {
+                                if let Some(item) =
+                                    browse.items.get(state.ui_state.stall_browse_selected)
+                                {
+                                    if state.ui_state.stall_buy_quantity > item.quantity {
+                                        state.ui_state.stall_buy_quantity = item.quantity;
+                                    }
+                                }
+                            }
+                        }
+                        UiElementId::StallBrowseBuyButton => {
+                            if let Some(ref browse) = state.ui_state.stall_browse {
+                                if let Some(item) =
+                                    browse.items.get(state.ui_state.stall_browse_selected)
+                                {
+                                    commands.push(InputCommand::StallBuy {
+                                        seller_id: browse.seller_id.clone(),
+                                        stall_slot: item.slot,
+                                        quantity: state.ui_state.stall_buy_quantity,
+                                    });
+                                }
+                            }
+                        }
+                        UiElementId::StallBrowseCloseButton => {
+                            state.ui_state.stall_browse = None;
+                            state.pending_sfx.push("ui_close".to_string());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.stall_browse = None;
+                return true;
+            }
+
+            return true;
+        }
+
+        false
+    }
+
+    pub fn process(
+        &mut self,
+        state: &mut GameState,
+        layout: &UiLayout,
+        audio: &mut AudioManager,
+    ) -> Vec<InputCommand> {
+        let mut commands = Vec::new();
+        let current_time = get_time();
+
+        self.update_touch_controls(state, current_time);
+
+        // Get current mouse/touch position in virtual coordinates (for UI hit detection)
+        let (raw_mx, raw_my) = mouse_position();
+        let (mx, my) = screen_to_virtual_coords(raw_mx, raw_my);
+
+        self.update_hover_state(state, layout, mx, my);
+        let (mouse_clicked, mouse_right_clicked, mouse_released, clicked_element) =
+            self.current_click_target(layout, mx, my);
+
         // Toggle debug mode
         if is_key_pressed(KeyCode::F3) {
             // Debug toggle handled in main loop
         }
 
-        // Handle drag and drop for inventory slot rearrangement and equipment
-        if mouse_released {
-            if let Some(drag) = state.ui_state.drag_state.take() {
-                // Drag completed - check if we're over a valid drop target
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::InventorySlot(to_idx) => {
-                            match &drag.source {
-                                DragSource::Inventory(from_idx) => {
-                                    // Swap inventory slots if dropping on a different slot
-                                    if *from_idx != *to_idx {
-                                        // Optimistic update: immediately swap locally
-                                        state.inventory.swap_slots(*from_idx, *to_idx);
-                                        audio.play_sfx("item_put");
-
-                                        commands.push(InputCommand::SwapSlots {
-                                            from_slot: *from_idx as u8,
-                                            to_slot: *to_idx as u8,
-                                        });
-                                    }
-                                }
-                                DragSource::Equipment(slot_type) => {
-                                    // Dragging from equipment to inventory - unequip to specific slot
-                                    // Optimistic update: immediately move to inventory and clear equipment
-                                    if state
-                                        .inventory
-                                        .slots
-                                        .get(*to_idx)
-                                        .map(|s| s.is_none())
-                                        .unwrap_or(false)
-                                    {
-                                        state.inventory.set_slot(
-                                            *to_idx,
-                                            drag.item_id.clone(),
-                                            drag.quantity,
-                                        );
-
-                                        // Update player's equipped state optimistically
-                                        if let Some(local_id) = &state.local_player_id.clone() {
-                                            if let Some(player) = state.players.get_mut(local_id) {
-                                                match slot_type.as_str() {
-                                                    "head" => player.equipped_head = None,
-                                                    "body" => player.equipped_body = None,
-                                                    "weapon" => player.equipped_weapon = None,
-                                                    "back" => player.equipped_back = None,
-                                                    "feet" => player.equipped_feet = None,
-                                                    "ring" => player.equipped_ring = None,
-                                                    "gloves" => player.equipped_gloves = None,
-                                                    "necklace" => player.equipped_necklace = None,
-                                                    "belt" => player.equipped_belt = None,
-                                                    _ => {}
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    audio.play_sfx("item_put");
-                                    commands.push(InputCommand::Unequip {
-                                        slot_type: slot_type.clone(),
-                                        target_slot: Some(*to_idx as u8),
-                                    });
-                                }
-                                DragSource::Spell(_) => {
-                                    // Can't drop spells onto inventory slots
-                                }
-                            }
-                        }
-                        UiElementId::QuickSlot(slot_idx) => {
-                            // Drop onto hotkey slot — bind item or spell
-                            match &drag.source {
-                                DragSource::Inventory(inv_idx) => {
-                                    if let Some(Some(slot)) = state.inventory.slots.get(*inv_idx) {
-                                        state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
-                                            crate::game::hotkey::HotkeySlotBinding::Item {
-                                                item_id: slot.item_id.clone(),
-                                            };
-                                        save_current_ui_settings(state);
-                                        audio.play_sfx("item_put");
-                                    }
-                                }
-                                DragSource::Spell(spell_id) => {
-                                    state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
-                                        crate::game::hotkey::HotkeySlotBinding::Spell {
-                                            spell_id: spell_id.clone(),
-                                        };
-                                    save_current_ui_settings(state);
-                                    audio.play_sfx("item_put");
-                                }
-                                DragSource::Equipment(_) => {
-                                    // Can't bind equipment directly to hotkey bar
-                                }
-                            }
-                        }
-                        UiElementId::HotkeySettingsSlot(slot_idx) => {
-                            // Drop onto settings popup slot — same as QuickSlot
-                            match &drag.source {
-                                DragSource::Inventory(inv_idx) => {
-                                    if let Some(Some(slot)) = state.inventory.slots.get(*inv_idx) {
-                                        state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
-                                            crate::game::hotkey::HotkeySlotBinding::Item {
-                                                item_id: slot.item_id.clone(),
-                                            };
-                                        save_current_ui_settings(state);
-                                        audio.play_sfx("item_put");
-                                    }
-                                }
-                                DragSource::Spell(spell_id) => {
-                                    state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
-                                        crate::game::hotkey::HotkeySlotBinding::Spell {
-                                            spell_id: spell_id.clone(),
-                                        };
-                                    save_current_ui_settings(state);
-                                    audio.play_sfx("item_put");
-                                }
-                                DragSource::Equipment(_) => {
-                                    // Can't bind equipment directly to hotkey bar
-                                }
-                            }
-                        }
-                        UiElementId::EquipmentSlot(target_slot_type) => {
-                            match &drag.source {
-                                DragSource::Inventory(from_idx) => {
-                                    // Dragging from inventory to equipment - equip if valid slot type
-                                    // First check if player meets requirements before optimistic update
-                                    let item_def =
-                                        state.item_registry.get_or_placeholder(&drag.item_id);
-                                    let can_equip = if let Some(ref equip) = item_def.equipment {
-                                        // Check slot type matches target
-                                        let slot_matches = equip.slot_type == *target_slot_type;
-                                        // Check level requirement - combat level covers all requirements
-                                        let level_required = equip
-                                            .attack_level_required
-                                            .max(equip.defence_level_required);
-                                        let level_ok = state
-                                            .get_local_player()
-                                            .map(|p| p.skills.combat.level >= level_required)
-                                            .unwrap_or(false);
-                                        slot_matches && level_ok
-                                    } else {
-                                        false // Not equippable
-                                    };
-
-                                    if can_equip {
-                                        // Optimistic update: immediately equip and clear inventory slot
-                                        if let Some(local_id) = &state.local_player_id.clone() {
-                                            if let Some(player) = state.players.get_mut(local_id) {
-                                                match target_slot_type.as_str() {
-                                                    "head" => {
-                                                        player.equipped_head =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    "body" => {
-                                                        player.equipped_body =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    "weapon" => {
-                                                        player.equipped_weapon =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    "back" => {
-                                                        player.equipped_back =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    "feet" => {
-                                                        player.equipped_feet =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    "ring" => {
-                                                        player.equipped_ring =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    "gloves" => {
-                                                        player.equipped_gloves =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    "necklace" => {
-                                                        player.equipped_necklace =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    "belt" => {
-                                                        player.equipped_belt =
-                                                            Some(drag.item_id.clone())
-                                                    }
-                                                    _ => {}
-                                                }
-                                            }
-                                        }
-                                        state.inventory.clear_slot(*from_idx);
-                                        audio.play_sfx("item_put");
-
-                                        commands.push(InputCommand::Equip {
-                                            slot_index: *from_idx as u8,
-                                        });
-                                    }
-                                    // If can't equip, drag is cancelled - item stays in inventory
-                                }
-                                DragSource::Equipment(source_slot_type) => {
-                                    // Dragging from equipment slot to another equipment slot
-                                    // Only makes sense if they're different types, otherwise no-op
-                                    if source_slot_type != target_slot_type {
-                                        // Can't swap different equipment slot types directly
-                                        // Would need unequip + equip, which isn't supported
-                                    }
-                                }
-                                DragSource::Spell(_) => {
-                                    // Can't drop spells onto equipment slots
-                                }
-                            }
-                        }
-                        UiElementId::ChestSlot(_) | UiElementId::ChestScrollArea => {
-                            // Dropped on a chest slot or chest panel — deposit from inventory
-                            if state.ui_state.chest_open {
-                                if let DragSource::Inventory(from_idx) = &drag.source {
-                                    commands.push(InputCommand::ChestDeposit {
-                                        chest_id: state.ui_state.chest_id.clone(),
-                                        inventory_slot: *from_idx as u8,
-                                    });
-                                    audio.play_sfx("item_put");
-                                }
-                            }
-                        }
-                        _ => {
-                            // Dropped on non-inventory UI element, cancel drag
-                        }
-                    }
-                } else {
-                    // No UI element under cursor - check for world tile drop
-                    // Use the already-computed hovered_tile for consistency with visual feedback
-                    if let DragSource::Inventory(from_idx) = &drag.source {
-                        if let Some((tile_x, tile_y)) = state.hovered_tile {
-                            // Get player position
-                            if let Some(player) = state.get_local_player() {
-                                let player_x = player.x.round() as i32;
-                                let player_y = player.y.round() as i32;
-
-                                // Check Chebyshev distance (must be within 1 - own tile, adjacent, or diagonal)
-                                let dx = (tile_x - player_x).abs();
-                                let dy = (tile_y - player_y).abs();
-                                let is_adjacent = dx <= 1 && dy <= 1;
-
-                                if is_adjacent {
-                                    // Check if dropping a seed onto a farming patch
-                                    let is_seed_on_patch = if let Some(patch_id) =
-                                        state.farming_patch_positions.get(&(tile_x, tile_y))
-                                    {
-                                        if let Some(patch) = state.farming_patches.get(patch_id) {
-                                            if patch.state == "empty" {
-                                                // Check if dragged item is a seed
-                                                if let Some(Some(slot)) =
-                                                    state.inventory.slots.get(*from_idx)
-                                                {
-                                                    if slot.item_id.ends_with("_seed") {
-                                                        commands.push(InputCommand::PlantSeed {
-                                                            patch_id: patch_id.clone(),
-                                                            item_id: slot.item_id.clone(),
-                                                        });
-                                                        audio.play_sfx("item_put");
-                                                        true
-                                                    } else {
-                                                        false
-                                                    }
-                                                } else {
-                                                    false
-                                                }
-                                            } else {
-                                                false
-                                            }
-                                        } else {
-                                            false
-                                        }
-                                    } else {
-                                        false
-                                    };
-
-                                    // Check if dropping bones onto an altar NPC
-                                    let is_bones_on_altar = if !is_seed_on_patch {
-                                        if let Some(Some(slot)) =
-                                            state.inventory.slots.get(*from_idx)
-                                        {
-                                            if slot.item_id.contains("bones") {
-                                                // Find altar NPC at this tile
-                                                let mut altar_id = None;
-                                                for (npc_id, npc) in &state.npcs {
-                                                    if npc.is_altar
-                                                        && npc.x.round() as i32 == tile_x
-                                                        && npc.y.round() as i32 == tile_y
-                                                    {
-                                                        altar_id = Some(npc_id.clone());
-                                                        break;
-                                                    }
-                                                }
-                                                if let Some(aid) = altar_id {
-                                                    commands.push(InputCommand::OfferBones {
-                                                        slot: *from_idx as u8,
-                                                        altar_id: aid,
-                                                    });
-                                                    audio.play_sfx("item_put");
-                                                    true
-                                                } else {
-                                                    false
-                                                }
-                                            } else {
-                                                false
-                                            }
-                                        } else {
-                                            false
-                                        }
-                                    } else {
-                                        false
-                                    };
-
-                                    if !is_seed_on_patch && !is_bones_on_altar {
-                                        // Check for Ctrl/Cmd modifier for single item drop
-                                        let ctrl_held = is_key_down(KeyCode::LeftControl)
-                                            || is_key_down(KeyCode::RightControl)
-                                            || is_key_down(KeyCode::LeftSuper)
-                                            || is_key_down(KeyCode::RightSuper);
-
-                                        let quantity =
-                                            if ctrl_held { 1 } else { drag.quantity as u32 };
-
-                                        commands.push(InputCommand::DropItem {
-                                            slot_index: *from_idx as u8,
-                                            quantity,
-                                            target_x: Some(tile_x),
-                                            target_y: Some(tile_y),
-                                        });
-                                        audio.play_sfx("item_put");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    // Equipment drag to world is not supported - just cancel
-                }
-                // Drag ended (either completed swap or cancelled)
-                return commands;
-            }
+        if mouse_released
+            && self.handle_drag_drop(state, clicked_element.as_ref(), audio, &mut commands)
+        {
+            return commands;
         }
 
         // Double-click detection threshold (300ms)
@@ -1977,7 +2590,9 @@ impl InputHandler {
                             // If stall setup is open, open price dialog before adding
                             if state.ui_state.stall_setup_open {
                                 let item_id = slot.item_id.clone();
-                                let last_price = state.ui_state.stall_last_prices
+                                let last_price = state
+                                    .ui_state
+                                    .stall_last_prices
                                     .get(&item_id)
                                     .copied()
                                     .unwrap_or(0);
@@ -2164,27 +2779,43 @@ impl InputHandler {
                         })
                         .unwrap_or((false, false, false));
                     let has_deposit = state.ui_state.chest_open;
-                    1 + if is_equippable { 1 } else { 0 } + if is_bones { 1 } else { 0 } + if is_knife { 1 } else { 0 } + if has_deposit { 1 } else { 0 }
+                    1 + if is_equippable { 1 } else { 0 }
+                        + if is_bones { 1 } else { 0 }
+                        + if is_knife { 1 } else { 0 }
+                        + if has_deposit { 1 } else { 0 }
                 }
                 ContextMenuTarget::Player { .. } => 4,
-                ContextMenuTarget::Npc { id } => {
-                    state.npcs.get(id).map(|npc| {
-                        if npc.is_attackable() { 3 }
-                        else if npc.is_altar { 3 }
-                        else if npc.is_merchant { 3 }
-                        else { 2 }
-                    }).unwrap_or(1)
-                }
+                ContextMenuTarget::Npc { id } => state
+                    .npcs
+                    .get(id)
+                    .map(|npc| {
+                        if npc.is_attackable() {
+                            3
+                        } else if npc.is_altar {
+                            3
+                        } else if npc.is_merchant {
+                            3
+                        } else {
+                            2
+                        }
+                    })
+                    .unwrap_or(1),
                 ContextMenuTarget::Tree { .. } => 2,
                 ContextMenuTarget::Rock { .. } => 2,
                 ContextMenuTarget::MapObject { .. } => 2,
                 ContextMenuTarget::GatheringSpot { .. } => 2,
                 ContextMenuTarget::GroundItem { .. } => 2,
-                ContextMenuTarget::FarmingPatch { patch_id } => {
-                    state.farming_patches.get(patch_id).map(|p| {
-                        if p.state == "harvestable" || p.state == "empty" { 2 } else { 1 }
-                    }).unwrap_or(1)
-                }
+                ContextMenuTarget::FarmingPatch { patch_id } => state
+                    .farming_patches
+                    .get(patch_id)
+                    .map(|p| {
+                        if p.state == "harvestable" || p.state == "empty" {
+                            2
+                        } else {
+                            1
+                        }
+                    })
+                    .unwrap_or(1),
                 ContextMenuTarget::Tile { .. } => 1,
                 ContextMenuTarget::HotkeySlot(_) => 1, // "Clear Slot"
             };
@@ -2245,22 +2876,24 @@ impl InputHandler {
                                 ContextMenuTarget::InventorySlot(slot_index) => {
                                     // Inventory slot context menu
                                     // Determine menu options based on item type
-                                    let (is_equippable, is_bones, is_dig, is_knife, has_item) = state
-                                        .inventory
-                                        .slots
-                                        .get(*slot_index)
-                                        .and_then(|s| s.as_ref())
-                                        .map(|slot| {
-                                            let item_def = state
-                                                .item_registry
-                                                .get_or_placeholder(&slot.item_id);
-                                            let equippable = item_def.equipment.is_some();
-                                            let bones = slot.item_id.contains("bones");
-                                            let dig = item_def.use_effect.as_deref() == Some("dig");
-                                            let knife = slot.item_id == "knife";
-                                            (equippable, bones, dig, knife, true)
-                                        })
-                                        .unwrap_or((false, false, false, false, false));
+                                    let (is_equippable, is_bones, is_dig, is_knife, has_item) =
+                                        state
+                                            .inventory
+                                            .slots
+                                            .get(*slot_index)
+                                            .and_then(|s| s.as_ref())
+                                            .map(|slot| {
+                                                let item_def = state
+                                                    .item_registry
+                                                    .get_or_placeholder(&slot.item_id);
+                                                let equippable = item_def.equipment.is_some();
+                                                let bones = slot.item_id.contains("bones");
+                                                let dig =
+                                                    item_def.use_effect.as_deref() == Some("dig");
+                                                let knife = slot.item_id == "knife";
+                                                (equippable, bones, dig, knife, true)
+                                            })
+                                            .unwrap_or((false, false, false, false, false));
                                     let chest_open = state.ui_state.chest_open && has_item;
 
                                     // Build option index mapping: [Equip?] [Bury?] [Dig?] [Fletch?] [Deposit?] Drop
@@ -2345,25 +2978,49 @@ impl InputHandler {
                                 // === World context menu targets ===
                                 ContextMenuTarget::Player { id } => {
                                     // Options: 0=Attack, 1=Follow, 2=Trade, [3=Browse Shop if stall], N=Add Friend, N+1=Examine
-                                    let player_has_stall = state.players.get(id).map_or(false, |p| p.has_stall);
+                                    let player_has_stall =
+                                        state.players.get(id).map_or(false, |p| p.has_stall);
                                     let mut ci = 0usize;
-                                    let attack_idx = { let idx = ci; ci += 1; idx };
-                                    let follow_idx = { let idx = ci; ci += 1; idx };
-                                    let trade_idx = { let idx = ci; ci += 1; idx };
+                                    let attack_idx = {
+                                        let idx = ci;
+                                        ci += 1;
+                                        idx
+                                    };
+                                    let follow_idx = {
+                                        let idx = ci;
+                                        ci += 1;
+                                        idx
+                                    };
+                                    let trade_idx = {
+                                        let idx = ci;
+                                        ci += 1;
+                                        idx
+                                    };
                                     let browse_shop_idx = if player_has_stall {
-                                        let idx = ci; ci += 1; Some(idx)
-                                    } else { None };
-                                    let add_friend_idx = { let idx = ci; ci += 1; idx };
+                                        let idx = ci;
+                                        ci += 1;
+                                        Some(idx)
+                                    } else {
+                                        None
+                                    };
+                                    let add_friend_idx = {
+                                        let idx = ci;
+                                        ci += 1;
+                                        idx
+                                    };
                                     let examine_idx = ci;
 
                                     if *option_idx == attack_idx {
-                                        commands.push(InputCommand::Target { entity_id: id.clone() });
-                                        state.auto_action_state = Some(crate::game::AutoActionState {
-                                            target_type: "player".to_string(),
-                                            target_id: id.clone(),
-                                            action: "attack".to_string(),
-                                            confirmed: false,
+                                        commands.push(InputCommand::Target {
+                                            entity_id: id.clone(),
                                         });
+                                        state.auto_action_state =
+                                            Some(crate::game::AutoActionState {
+                                                target_type: "player".to_string(),
+                                                target_id: id.clone(),
+                                                action: "attack".to_string(),
+                                                confirmed: false,
+                                            });
                                         pathfind_and_attack_player(state, &mut commands, id);
                                     } else if *option_idx == follow_idx {
                                         state.follow_target = Some(id.clone());
@@ -2378,15 +3035,28 @@ impl InputHandler {
                                                     let py = player.server_y.round() as i32;
                                                     let tx = target.server_x.round() as i32;
                                                     let ty = target.server_y.round() as i32;
-                                                    let mut occupied = build_occupied_set(state, true);
+                                                    let mut occupied =
+                                                        build_occupied_set(state, true);
                                                     occupied.remove(&(tx, ty));
                                                     const MAX_PATH_DISTANCE: i32 = 32;
-                                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                                        (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
-                                                    ) {
+                                                    if let Some((dest, path)) =
+                                                        pathfinding::find_path_to_adjacent(
+                                                            (px, py),
+                                                            (tx, ty),
+                                                            &state.chunk_manager,
+                                                            &occupied,
+                                                            MAX_PATH_DISTANCE,
+                                                        )
+                                                    {
                                                         state.auto_path = Some(PathState {
-                                                            path, current_index: 0, destination: dest,
-                                                            pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                                            path,
+                                                            current_index: 0,
+                                                            destination: dest,
+                                                            pickup_target: None,
+                                                            interact_target: None,
+                                                            interact_object_target: None,
+                                                            waystone_target: None,
+                                                            browse_stall_target: None,
                                                         });
                                                     }
                                                 }
@@ -2394,10 +3064,14 @@ impl InputHandler {
                                         }
                                     } else if *option_idx == trade_idx {
                                         // Send trade request
-                                        commands.push(InputCommand::TradeRequest { target_id: id.clone() });
+                                        commands.push(InputCommand::TradeRequest {
+                                            target_id: id.clone(),
+                                        });
                                     } else if browse_shop_idx == Some(*option_idx) {
                                         // Browse this player's stall
-                                        commands.push(InputCommand::StallBrowse { player_id: id.clone() });
+                                        commands.push(InputCommand::StallBrowse {
+                                            player_id: id.clone(),
+                                        });
                                     } else if *option_idx == add_friend_idx {
                                         if let Some(player) = state.players.get(id) {
                                             commands.push(InputCommand::SendFriendRequest {
@@ -2406,7 +3080,11 @@ impl InputHandler {
                                         }
                                     } else if *option_idx == examine_idx {
                                         if let Some(player) = state.players.get(id) {
-                                            let msg = format!("{} (level {})", player.name, player.combat_level());
+                                            let msg = format!(
+                                                "{} (level {})",
+                                                player.name,
+                                                player.combat_level()
+                                            );
                                             state.push_system_chat(msg);
                                         }
                                     }
@@ -2428,21 +3106,33 @@ impl InputHandler {
                                             // Options: 0=Attack, 1=Target, 2=Examine
                                             match option_idx {
                                                 0 => {
-                                                    commands.push(InputCommand::Target { entity_id: npc_id.clone() });
-                                                    state.auto_action_state = Some(crate::game::AutoActionState {
-                                                        target_type: "npc".to_string(),
-                                                        target_id: npc_id.clone(),
-                                                        action: "attack".to_string(),
-                                                        confirmed: false,
+                                                    commands.push(InputCommand::Target {
+                                                        entity_id: npc_id.clone(),
                                                     });
-                                                    pathfind_and_attack_npc(state, &mut commands, &npc_id);
+                                                    state.auto_action_state =
+                                                        Some(crate::game::AutoActionState {
+                                                            target_type: "npc".to_string(),
+                                                            target_id: npc_id.clone(),
+                                                            action: "attack".to_string(),
+                                                            confirmed: false,
+                                                        });
+                                                    pathfind_and_attack_npc(
+                                                        state,
+                                                        &mut commands,
+                                                        &npc_id,
+                                                    );
                                                 }
                                                 1 => {
                                                     // Target only — select without attacking or moving
-                                                    commands.push(InputCommand::Target { entity_id: npc_id.clone() });
+                                                    commands.push(InputCommand::Target {
+                                                        entity_id: npc_id.clone(),
+                                                    });
                                                 }
                                                 2 => {
-                                                    let msg = format!("{} (level {})", npc_name, npc_level);
+                                                    let msg = format!(
+                                                        "{} (level {})",
+                                                        npc_name, npc_level
+                                                    );
                                                     state.push_system_chat(msg);
                                                 }
                                                 _ => {}
@@ -2452,23 +3142,45 @@ impl InputHandler {
                                             match option_idx {
                                                 0 => {
                                                     // Pray at altar
-                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
-                                                        commands.push(InputCommand::PrayAtAltar { altar_id: npc_id.to_string() });
-                                                    });
+                                                    pathfind_and_interact_npc(
+                                                        state,
+                                                        &mut commands,
+                                                        &npc_id,
+                                                        |_state, commands, npc_id| {
+                                                            commands.push(
+                                                                InputCommand::PrayAtAltar {
+                                                                    altar_id: npc_id.to_string(),
+                                                                },
+                                                            );
+                                                        },
+                                                    );
                                                 }
                                                 1 => {
                                                     // Offer Bones - open altar panel
-                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |state, _commands, npc_id| {
-                                                        if let Some(npc) = state.npcs.get(npc_id) {
-                                                            state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
-                                                                altar_npc_id: npc_id.to_string(),
-                                                                altar_name: npc.display_name.clone(),
-                                                            });
-                                                        }
-                                                    });
+                                                    pathfind_and_interact_npc(
+                                                        state,
+                                                        &mut commands,
+                                                        &npc_id,
+                                                        |state, _commands, npc_id| {
+                                                            if let Some(npc) =
+                                                                state.npcs.get(npc_id)
+                                                            {
+                                                                state.ui_state.altar_panel = Some(
+                                                                    crate::game::AltarPanelState {
+                                                                        altar_npc_id: npc_id
+                                                                            .to_string(),
+                                                                        altar_name: npc
+                                                                            .display_name
+                                                                            .clone(),
+                                                                    },
+                                                                );
+                                                            }
+                                                        },
+                                                    );
                                                 }
                                                 2 => {
-                                                    let msg = format!("An altar dedicated to the gods.");
+                                                    let msg =
+                                                        format!("An altar dedicated to the gods.");
                                                     state.push_system_chat(msg);
                                                 }
                                                 _ => {}
@@ -2477,67 +3189,164 @@ impl InputHandler {
                                             // Options: 0=Use, 1=Examine
                                             match option_idx {
                                                 0 => {
-                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |state, _commands, npc_id| {
-                                                        if let Some(npc) = state.npcs.get(npc_id) {
-                                                            match npc.station_type.as_deref() {
-                                                                Some("furnace") => {
-                                                                    state.ui_state.furnace_station_type = "furnace".to_string();
-                                                                    state.ui_state.fletching_open = false;
-                                                                    state.ui_state.workbench_open = false;
-                                                                    state.ui_state.furnace_open = true;
-                                                                    state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
-                                                                    state.ui_state.furnace_selected_recipe = 0;
-                                                                    state.ui_state.furnace_scroll_offset = 0.0;
-                                                                    state.ui_state.furnace_quantity = 1;
-                                                                    state.ui_state.furnace_tab = 0;
-                                                                }
-                                                                Some("fire_pit") => {
-                                                                    state.ui_state.furnace_station_type = "fire_pit".to_string();
-                                                                    state.ui_state.fletching_open = false;
-                                                                    state.ui_state.workbench_open = false;
-                                                                    state.ui_state.furnace_open = true;
-                                                                    state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
-                                                                    state.ui_state.furnace_selected_recipe = 0;
-                                                                    state.ui_state.furnace_scroll_offset = 0.0;
-                                                                    state.ui_state.furnace_quantity = 1;
-                                                                    state.ui_state.furnace_tab = 0;
-                                                                }
-                                                                Some("anvil") => {
-                                                                    state.ui_state.fletching_open = false;
-                                                                    state.ui_state.workbench_open = false;
-                                                                    state.ui_state.anvil_open = true;
-                                                                    state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
-                                                                    state.ui_state.anvil_selected_recipe = 0;
-                                                                    state.ui_state.anvil_scroll_offset = 0.0;
-                                                                    state.ui_state.anvil_quantity = 1;
-                                                                    state.ui_state.anvil_tab = 0;
-                                                                }
-                                                                Some("alchemy_station") => {
-                                                                    state.ui_state.fletching_open = false;
-                                                                    state.ui_state.workbench_open = false;
-                                                                    state.ui_state.alchemy_station_open = true;
-                                                                    state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
-                                                                    state.ui_state.alchemy_station_selected_recipe = 0;
-                                                                    state.ui_state.alchemy_station_scroll_offset = 0.0;
-                                                                    state.ui_state.alchemy_station_quantity = 1;
-                                                                    state.ui_state.alchemy_station_tab = 0;
-                                                                }
-                                                                Some("workbench") => {
-                                                                    state.ui_state.fletching_open = false;
-                                                                    state.ui_state.alchemy_station_open = false;
-                                                                    state.ui_state.workbench_open = true;
-                                                                    state.ui_state.workbench_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
-                                                                    state.ui_state.workbench_selected_recipe = 0;
-                                                                    state.ui_state.workbench_scroll_offset = 0.0;
-                                                                    state.ui_state.workbench_quantity = 1;
-                                                                    state.ui_state.workbench_tab = 0;
-                                                                }
-                                                                _ => {
-                                                                    _commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
+                                                    pathfind_and_interact_npc(
+                                                        state,
+                                                        &mut commands,
+                                                        &npc_id,
+                                                        |state, _commands, npc_id| {
+                                                            if let Some(npc) =
+                                                                state.npcs.get(npc_id)
+                                                            {
+                                                                match npc.station_type.as_deref() {
+                                                                    Some("furnace") => {
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_station_type =
+                                                                            "furnace".to_string();
+                                                                        state
+                                                                            .ui_state
+                                                                            .fletching_open = false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .workbench_open = false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_open = true;
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_tile = Some((
+                                                                            npc.x.round() as i32,
+                                                                            npc.y.round() as i32,
+                                                                        ));
+                                                                        state.ui_state.furnace_selected_recipe = 0;
+                                                                        state.ui_state.furnace_scroll_offset = 0.0;
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_quantity = 1;
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_tab = 0;
+                                                                    }
+                                                                    Some("fire_pit") => {
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_station_type =
+                                                                            "fire_pit".to_string();
+                                                                        state
+                                                                            .ui_state
+                                                                            .fletching_open = false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .workbench_open = false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_open = true;
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_tile = Some((
+                                                                            npc.x.round() as i32,
+                                                                            npc.y.round() as i32,
+                                                                        ));
+                                                                        state.ui_state.furnace_selected_recipe = 0;
+                                                                        state.ui_state.furnace_scroll_offset = 0.0;
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_quantity = 1;
+                                                                        state
+                                                                            .ui_state
+                                                                            .furnace_tab = 0;
+                                                                    }
+                                                                    Some("anvil") => {
+                                                                        state
+                                                                            .ui_state
+                                                                            .fletching_open = false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .workbench_open = false;
+                                                                        state.ui_state.anvil_open =
+                                                                            true;
+                                                                        state.ui_state.anvil_tile =
+                                                                            Some((
+                                                                                npc.x.round()
+                                                                                    as i32,
+                                                                                npc.y.round()
+                                                                                    as i32,
+                                                                            ));
+                                                                        state.ui_state.anvil_selected_recipe = 0;
+                                                                        state
+                                                                            .ui_state
+                                                                            .anvil_scroll_offset =
+                                                                            0.0;
+                                                                        state
+                                                                            .ui_state
+                                                                            .anvil_quantity = 1;
+                                                                        state.ui_state.anvil_tab =
+                                                                            0;
+                                                                    }
+                                                                    Some("alchemy_station") => {
+                                                                        state
+                                                                            .ui_state
+                                                                            .fletching_open = false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .workbench_open = false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .alchemy_station_open =
+                                                                            true;
+                                                                        state
+                                                                            .ui_state
+                                                                            .alchemy_station_tile =
+                                                                            Some((
+                                                                                npc.x.round()
+                                                                                    as i32,
+                                                                                npc.y.round()
+                                                                                    as i32,
+                                                                            ));
+                                                                        state.ui_state.alchemy_station_selected_recipe = 0;
+                                                                        state.ui_state.alchemy_station_scroll_offset = 0.0;
+                                                                        state.ui_state.alchemy_station_quantity = 1;
+                                                                        state
+                                                                            .ui_state
+                                                                            .alchemy_station_tab =
+                                                                            0;
+                                                                    }
+                                                                    Some("workbench") => {
+                                                                        state
+                                                                            .ui_state
+                                                                            .fletching_open = false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .alchemy_station_open =
+                                                                            false;
+                                                                        state
+                                                                            .ui_state
+                                                                            .workbench_open = true;
+                                                                        state
+                                                                            .ui_state
+                                                                            .workbench_tile =
+                                                                            Some((
+                                                                                npc.x.round()
+                                                                                    as i32,
+                                                                                npc.y.round()
+                                                                                    as i32,
+                                                                            ));
+                                                                        state.ui_state.workbench_selected_recipe = 0;
+                                                                        state.ui_state.workbench_scroll_offset = 0.0;
+                                                                        state
+                                                                            .ui_state
+                                                                            .workbench_quantity = 1;
+                                                                        state
+                                                                            .ui_state
+                                                                            .workbench_tab = 0;
+                                                                    }
+                                                                    _ => {
+                                                                        _commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
+                                                                    }
                                                                 }
                                                             }
-                                                        }
-                                                    });
+                                                        },
+                                                    );
                                                 }
                                                 1 => {
                                                     let msg = npc_name;
@@ -2550,9 +3359,16 @@ impl InputHandler {
                                             match option_idx {
                                                 0 | 1 => {
                                                     // Both Talk-to and Trade interact with merchant
-                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
-                                                        commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
-                                                    });
+                                                    pathfind_and_interact_npc(
+                                                        state,
+                                                        &mut commands,
+                                                        &npc_id,
+                                                        |_state, commands, npc_id| {
+                                                            commands.push(InputCommand::Interact {
+                                                                npc_id: npc_id.to_string(),
+                                                            });
+                                                        },
+                                                    );
                                                 }
                                                 2 => {
                                                     let msg = npc_name;
@@ -2564,9 +3380,16 @@ impl InputHandler {
                                             // Options: 0=Bank, 1=Examine
                                             match option_idx {
                                                 0 => {
-                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
-                                                        commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
-                                                    });
+                                                    pathfind_and_interact_npc(
+                                                        state,
+                                                        &mut commands,
+                                                        &npc_id,
+                                                        |_state, commands, npc_id| {
+                                                            commands.push(InputCommand::Interact {
+                                                                npc_id: npc_id.to_string(),
+                                                            });
+                                                        },
+                                                    );
                                                 }
                                                 1 => {
                                                     let msg = npc_name;
@@ -2579,9 +3402,18 @@ impl InputHandler {
                                             match option_idx {
                                                 0 => {
                                                     // Check requirements client-side for instant feedback
-                                                    let (combat_req, slayer_req) = slayer_master_requirements(&npc_entity_type);
-                                                    let player_combat = state.get_local_player().map(|p| p.combat_level()).unwrap_or(0);
-                                                    let player_slayer = state.get_local_player().map(|p| p.skills.slayer.level).unwrap_or(1);
+                                                    let (combat_req, slayer_req) =
+                                                        slayer_master_requirements(
+                                                            &npc_entity_type,
+                                                        );
+                                                    let player_combat = state
+                                                        .get_local_player()
+                                                        .map(|p| p.combat_level())
+                                                        .unwrap_or(0);
+                                                    let player_slayer = state
+                                                        .get_local_player()
+                                                        .map(|p| p.skills.slayer.level)
+                                                        .unwrap_or(1);
 
                                                     if player_combat < combat_req {
                                                         state.push_system_chat(format!(
@@ -2594,20 +3426,36 @@ impl InputHandler {
                                                             slayer_req, npc_name, player_slayer
                                                         ));
                                                     } else {
-                                                        pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
-                                                            commands.push(InputCommand::SlayerGetTask { master_id: npc_id.to_string() });
-                                                        });
+                                                        pathfind_and_interact_npc(
+                                                            state,
+                                                            &mut commands,
+                                                            &npc_id,
+                                                            |_state, commands, npc_id| {
+                                                                commands.push(
+                                                                    InputCommand::SlayerGetTask {
+                                                                        master_id: npc_id
+                                                                            .to_string(),
+                                                                    },
+                                                                );
+                                                            },
+                                                        );
                                                     }
                                                 }
                                                 1 => {
-                                                    let (combat_req, slayer_req) = slayer_master_requirements(&npc_entity_type);
+                                                    let (combat_req, slayer_req) =
+                                                        slayer_master_requirements(
+                                                            &npc_entity_type,
+                                                        );
                                                     if combat_req > 0 || slayer_req > 1 {
                                                         state.push_system_chat(format!(
                                                             "{} - Requires combat level {}, slayer level {}.",
                                                             npc_name, combat_req, slayer_req
                                                         ));
                                                     } else {
-                                                        state.push_system_chat(format!("{} - Beginner slayer master.", npc_name));
+                                                        state.push_system_chat(format!(
+                                                            "{} - Beginner slayer master.",
+                                                            npc_name
+                                                        ));
                                                     }
                                                 }
                                                 _ => {}
@@ -2616,9 +3464,16 @@ impl InputHandler {
                                             // Generic friendly NPC: 0=Talk-to, 1=Examine
                                             match option_idx {
                                                 0 => {
-                                                    pathfind_and_interact_npc(state, &mut commands, &npc_id, |_state, commands, npc_id| {
-                                                        commands.push(InputCommand::Interact { npc_id: npc_id.to_string() });
-                                                    });
+                                                    pathfind_and_interact_npc(
+                                                        state,
+                                                        &mut commands,
+                                                        &npc_id,
+                                                        |_state, commands, npc_id| {
+                                                            commands.push(InputCommand::Interact {
+                                                                npc_id: npc_id.to_string(),
+                                                            });
+                                                        },
+                                                    );
                                                 }
                                                 1 => {
                                                     state.push_system_chat(npc_name);
@@ -2628,18 +3483,31 @@ impl InputHandler {
                                         }
                                     }
                                 }
-                                ContextMenuTarget::Tree { tile_x, tile_y, gid } => {
+                                ContextMenuTarget::Tree {
+                                    tile_x,
+                                    tile_y,
+                                    gid,
+                                } => {
                                     // Options: 0=Chop, 1=Examine
                                     match option_idx {
                                         0 => {
-                                            let target_id = format!("{},{},{}", tile_x, tile_y, gid);
-                                            state.auto_action_state = Some(crate::game::AutoActionState {
-                                                target_type: "resource".to_string(),
-                                                target_id: target_id.clone(),
-                                                action: "chop".to_string(),
-                                                confirmed: false,
-                                            });
-                                            pathfind_and_resource(state, &mut commands, *tile_x, *tile_y, &target_id, "chop");
+                                            let target_id =
+                                                format!("{},{},{}", tile_x, tile_y, gid);
+                                            state.auto_action_state =
+                                                Some(crate::game::AutoActionState {
+                                                    target_type: "resource".to_string(),
+                                                    target_id: target_id.clone(),
+                                                    action: "chop".to_string(),
+                                                    confirmed: false,
+                                                });
+                                            pathfind_and_resource(
+                                                state,
+                                                &mut commands,
+                                                *tile_x,
+                                                *tile_y,
+                                                &target_id,
+                                                "chop",
+                                            );
                                         }
                                         1 => {
                                             let name = crate::game::tree_types::get_tree_info(*gid)
@@ -2650,29 +3518,49 @@ impl InputHandler {
                                         _ => {}
                                     }
                                 }
-                                ContextMenuTarget::Rock { tile_x, tile_y, gid } => {
+                                ContextMenuTarget::Rock {
+                                    tile_x,
+                                    tile_y,
+                                    gid,
+                                } => {
                                     // Options: 0=Mine, 1=Examine
                                     match option_idx {
                                         0 => {
-                                            let target_id = format!("{},{},{}", tile_x, tile_y, gid);
-                                            state.auto_action_state = Some(crate::game::AutoActionState {
-                                                target_type: "resource".to_string(),
-                                                target_id: target_id.clone(),
-                                                action: "mine".to_string(),
-                                                confirmed: false,
-                                            });
-                                            pathfind_and_resource(state, &mut commands, *tile_x, *tile_y, &target_id, "mine");
+                                            let target_id =
+                                                format!("{},{},{}", tile_x, tile_y, gid);
+                                            state.auto_action_state =
+                                                Some(crate::game::AutoActionState {
+                                                    target_type: "resource".to_string(),
+                                                    target_id: target_id.clone(),
+                                                    action: "mine".to_string(),
+                                                    confirmed: false,
+                                                });
+                                            pathfind_and_resource(
+                                                state,
+                                                &mut commands,
+                                                *tile_x,
+                                                *tile_y,
+                                                &target_id,
+                                                "mine",
+                                            );
                                         }
                                         1 => {
                                             let name = crate::game::ore_types::get_ore_info(*gid)
                                                 .map(|info| info.name)
                                                 .unwrap_or("Rock");
-                                            state.push_system_chat(format!("A rock containing {} ore.", name.to_lowercase()));
+                                            state.push_system_chat(format!(
+                                                "A rock containing {} ore.",
+                                                name.to_lowercase()
+                                            ));
                                         }
                                         _ => {}
                                     }
                                 }
-                                ContextMenuTarget::MapObject { tile_x, tile_y, gid } => {
+                                ContextMenuTarget::MapObject {
+                                    tile_x,
+                                    tile_y,
+                                    gid,
+                                } => {
                                     // Obelisks: 0=Teleport, 1=Examine
                                     // Chests: 0=Open, 1=Examine
                                     // Other objects: 0=Interact, 1=Examine
@@ -2689,9 +3577,13 @@ impl InputHandler {
                                                     let cdx = (px - tx).abs();
                                                     let cdy = (py - ty).abs();
                                                     if cdx <= 1 && cdy <= 1 {
-                                                        commands.push(InputCommand::UseWaystone { x: tx, y: ty });
+                                                        commands.push(InputCommand::UseWaystone {
+                                                            x: tx,
+                                                            y: ty,
+                                                        });
                                                     } else {
-                                                        let occupied = build_occupied_set(state, true);
+                                                        let occupied =
+                                                            build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) =
                                                             pathfinding::find_path_to_adjacent(
@@ -2707,7 +3599,10 @@ impl InputHandler {
                                                                 current_index: 0,
                                                                 destination: dest,
                                                                 pickup_target: None,
-                                                                interact_target: None, interact_object_target: None, waystone_target: Some((tx, ty)), browse_stall_target: None,
+                                                                interact_target: None,
+                                                                interact_object_target: None,
+                                                                waystone_target: Some((tx, ty)),
+                                                                browse_stall_target: None,
                                                             });
                                                         }
                                                     }
@@ -2720,9 +3615,15 @@ impl InputHandler {
                                                     let cdx = (px - tx).abs();
                                                     let cdy = (py - ty).abs();
                                                     if cdx <= 1 && cdy <= 1 {
-                                                        commands.push(InputCommand::InteractObject { x: tx, y: ty });
+                                                        commands.push(
+                                                            InputCommand::InteractObject {
+                                                                x: tx,
+                                                                y: ty,
+                                                            },
+                                                        );
                                                     } else {
-                                                        let occupied = build_occupied_set(state, true);
+                                                        let occupied =
+                                                            build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) =
                                                             pathfinding::find_path_to_adjacent(
@@ -2738,24 +3639,39 @@ impl InputHandler {
                                                                 current_index: 0,
                                                                 destination: dest,
                                                                 pickup_target: None,
-                                                                interact_target: None, interact_object_target: Some((tx, ty)), waystone_target: None, browse_stall_target: None,
+                                                                interact_target: None,
+                                                                interact_object_target: Some((
+                                                                    tx, ty,
+                                                                )),
+                                                                waystone_target: None,
+                                                                browse_stall_target: None,
                                                             });
                                                         }
                                                     }
                                                 }
                                             } else {
-                                                commands.push(InputCommand::InteractObject { x: tx, y: ty });
+                                                commands.push(InputCommand::InteractObject {
+                                                    x: tx,
+                                                    y: ty,
+                                                });
                                             }
                                         }
                                         1 => {
                                             if is_chest {
-                                                state.push_system_chat("A wooden storage chest.".to_string());
+                                                state.push_system_chat(
+                                                    "A wooden storage chest.".to_string(),
+                                                );
                                             } else if is_obelisk_gid(*gid) {
                                                 state.push_system_chat("An ancient obelisk humming with magical energy.".to_string());
                                             } else {
                                                 match get_map_object_name(*gid) {
-                                                    Some(name) => state.push_system_chat(format!("A {}.", name.to_lowercase())),
-                                                    None => state.push_system_chat("Nothing interesting.".to_string()),
+                                                    Some(name) => state.push_system_chat(format!(
+                                                        "A {}.",
+                                                        name.to_lowercase()
+                                                    )),
+                                                    None => state.push_system_chat(
+                                                        "Nothing interesting.".to_string(),
+                                                    ),
                                                 }
                                             }
                                         }
@@ -2766,7 +3682,9 @@ impl InputHandler {
                                     // Options: 0=Fish/Gather, 1=Examine
                                     match option_idx {
                                         0 => {
-                                            if let Some(marker) = state.gathering_markers.get(*marker_index) {
+                                            if let Some(marker) =
+                                                state.gathering_markers.get(*marker_index)
+                                            {
                                                 let marker_x = marker.x;
                                                 let marker_y = marker.y;
                                                 // Pathfind to marker and start gathering
@@ -2776,26 +3694,34 @@ impl InputHandler {
                                                     let dx = (px - marker_x).abs();
                                                     let dy = (py - marker_y).abs();
                                                     if dx <= 1 && dy <= 1 {
-                                                        commands.push(InputCommand::StartGathering {
-                                                            marker_x,
-                                                            marker_y,
-                                                        });
+                                                        commands.push(
+                                                            InputCommand::StartGathering {
+                                                                marker_x,
+                                                                marker_y,
+                                                            },
+                                                        );
                                                     } else {
-                                                        let occupied = build_occupied_set(state, true);
+                                                        let occupied =
+                                                            build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
-                                                        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                                            (px, py),
-                                                            (marker_x, marker_y),
-                                                            &state.chunk_manager,
-                                                            &occupied,
-                                                            MAX_PATH_DISTANCE,
-                                                        ) {
+                                                        if let Some((dest, path)) =
+                                                            pathfinding::find_path_to_adjacent(
+                                                                (px, py),
+                                                                (marker_x, marker_y),
+                                                                &state.chunk_manager,
+                                                                &occupied,
+                                                                MAX_PATH_DISTANCE,
+                                                            )
+                                                        {
                                                             state.auto_path = Some(PathState {
                                                                 path,
                                                                 current_index: 0,
                                                                 destination: dest,
                                                                 pickup_target: None,
-                                                                interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                                                interact_target: None,
+                                                                interact_object_target: None,
+                                                                waystone_target: None,
+                                                                browse_stall_target: None,
                                                             });
                                                             // Player will need to interact again when they arrive
                                                         }
@@ -2804,8 +3730,13 @@ impl InputHandler {
                                             }
                                         }
                                         1 => {
-                                            if let Some(marker) = state.gathering_markers.get(*marker_index) {
-                                                state.push_system_chat(format!("A {} spot.", marker.skill));
+                                            if let Some(marker) =
+                                                state.gathering_markers.get(*marker_index)
+                                            {
+                                                state.push_system_chat(format!(
+                                                    "A {} spot.",
+                                                    marker.skill
+                                                ));
                                             }
                                         }
                                         _ => {}
@@ -2825,26 +3756,33 @@ impl InputHandler {
                                                     let dy = item.y - player.y;
                                                     let dist = (dx * dx + dy * dy).sqrt();
                                                     if dist < PICKUP_RANGE {
-                                                        commands.push(InputCommand::Pickup { item_id });
+                                                        commands
+                                                            .push(InputCommand::Pickup { item_id });
                                                     } else {
                                                         // Pathfind to item
                                                         let px = player.server_x.round() as i32;
                                                         let py = player.server_y.round() as i32;
-                                                        let occupied = build_occupied_set(state, true);
+                                                        let occupied =
+                                                            build_occupied_set(state, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
-                                                        if let Some(path) = find_path_with_optimistic_splice(
-                                                            state,
-                                                            (px, py),
-                                                            (item_x, item_y),
-                                                            &occupied,
-                                                            MAX_PATH_DISTANCE,
-                                                        ) {
+                                                        if let Some(path) =
+                                                            find_path_with_optimistic_splice(
+                                                                state,
+                                                                (px, py),
+                                                                (item_x, item_y),
+                                                                &occupied,
+                                                                MAX_PATH_DISTANCE,
+                                                            )
+                                                        {
                                                             state.auto_path = Some(PathState {
                                                                 path,
                                                                 current_index: 0,
                                                                 destination: (item_x, item_y),
                                                                 pickup_target: Some(item_id),
-                                                                interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                                                interact_target: None,
+                                                                interact_object_target: None,
+                                                                waystone_target: None,
+                                                                browse_stall_target: None,
                                                             });
                                                         }
                                                     }
@@ -2853,8 +3791,13 @@ impl InputHandler {
                                         }
                                         1 => {
                                             if let Some(item) = state.ground_items.get(id) {
-                                                let item_def = state.item_registry.get_or_placeholder(&item.item_id);
-                                                state.push_system_chat(format!("{}: {}", item_def.display_name, item_def.description));
+                                                let item_def = state
+                                                    .item_registry
+                                                    .get_or_placeholder(&item.item_id);
+                                                state.push_system_chat(format!(
+                                                    "{}: {}",
+                                                    item_def.display_name, item_def.description
+                                                ));
                                             }
                                         }
                                         _ => {}
@@ -2876,31 +3819,45 @@ impl InputHandler {
                                                         let cdx = (px - patch_x).abs();
                                                         let cdy = (py - patch_y).abs();
                                                         if cdx <= 1 && cdy <= 1 {
-                                                            commands.push(InputCommand::HarvestCrop { patch_id: pid });
+                                                            commands.push(
+                                                                InputCommand::HarvestCrop {
+                                                                    patch_id: pid,
+                                                                },
+                                                            );
                                                         } else {
-                                                            let occupied = build_occupied_set(state, true);
+                                                            let occupied =
+                                                                build_occupied_set(state, true);
                                                             const MAX_PATH_DISTANCE: i32 = 32;
-                                                            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                                                (px, py),
-                                                                (patch_x, patch_y),
-                                                                &state.chunk_manager,
-                                                                &occupied,
-                                                                MAX_PATH_DISTANCE,
-                                                            ) {
+                                                            if let Some((dest, path)) =
+                                                                pathfinding::find_path_to_adjacent(
+                                                                    (px, py),
+                                                                    (patch_x, patch_y),
+                                                                    &state.chunk_manager,
+                                                                    &occupied,
+                                                                    MAX_PATH_DISTANCE,
+                                                                )
+                                                            {
                                                                 state.auto_path = Some(PathState {
                                                                     path,
                                                                     current_index: 0,
                                                                     destination: dest,
                                                                     pickup_target: None,
-                                                                    interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                                                    interact_target: None,
+                                                                    interact_object_target: None,
+                                                                    waystone_target: None,
+                                                                    browse_stall_target: None,
                                                                 });
-                                                                state.pending_harvest_patch = Some(pid);
+                                                                state.pending_harvest_patch =
+                                                                    Some(pid);
                                                             }
                                                         }
                                                     }
                                                 }
                                                 1 => {
-                                                    state.push_system_chat("This crop is ready to harvest.".to_string());
+                                                    state.push_system_chat(
+                                                        "This crop is ready to harvest."
+                                                            .to_string(),
+                                                    );
                                                 }
                                                 _ => {}
                                             }
@@ -2909,17 +3866,25 @@ impl InputHandler {
                                             match option_idx {
                                                 0 => {
                                                     // TODO: Open seed selection UI or plant first seed
-                                                    state.push_system_chat("Use a seed on this patch to plant it.".to_string());
+                                                    state.push_system_chat(
+                                                        "Use a seed on this patch to plant it."
+                                                            .to_string(),
+                                                    );
                                                 }
                                                 1 => {
-                                                    state.push_system_chat("An empty farming patch.".to_string());
+                                                    state.push_system_chat(
+                                                        "An empty farming patch.".to_string(),
+                                                    );
                                                 }
                                                 _ => {}
                                             }
                                         } else {
                                             // Growing state - only Examine
                                             if *option_idx == 0 {
-                                                state.push_system_chat("A farming patch with something growing.".to_string());
+                                                state.push_system_chat(
+                                                    "A farming patch with something growing."
+                                                        .to_string(),
+                                                );
                                             }
                                         }
                                     }
@@ -3416,7 +4381,8 @@ impl InputHandler {
                     UiElementId::QuestLogEntry(idx) => {
                         audio.play_sfx("enter");
                         // Rebuild sorted quest list matching render_quest_log order
-                        let mut sorted: Vec<&QuestCatalogEntry> = state.ui_state.quest_catalog.iter().collect();
+                        let mut sorted: Vec<&QuestCatalogEntry> =
+                            state.ui_state.quest_catalog.iter().collect();
                         sorted.sort_by(|a, b| {
                             let sa = quest_status_order(&a.quest_id, &state.ui_state);
                             let sb = quest_status_order(&b.quest_id, &state.ui_state);
@@ -3644,603 +4610,13 @@ impl InputHandler {
             }
         }
 
-        // Handle gold drop dialog
-        if state.ui_state.gold_drop_dialog.is_some() {
-            // Handle button clicks
-            if mouse_clicked {
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::GoldDropConfirm => {
-                            // Parse amount and validate
-                            let dialog = state.ui_state.gold_drop_dialog.as_ref().unwrap();
-                            if let Ok(amount) = dialog.input.parse::<i32>() {
-                                if amount > 0 && amount <= state.inventory.gold {
-                                    if state.ui_state.trade_open {
-                                        commands.push(InputCommand::TradeOfferGold { amount });
-                                    } else {
-                                        commands.push(InputCommand::DropGold { amount });
-                                    }
-                                    state.ui_state.gold_drop_dialog = None;
-                                }
-                            }
-                            return commands;
-                        }
-                        UiElementId::GoldDropCancel => {
-                            state.ui_state.gold_drop_dialog = None;
-                            return commands;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            // Handle keyboard input
-            if is_key_pressed(KeyCode::Escape) {
-                state.ui_state.gold_drop_dialog = None;
-                return commands;
-            }
-
-            if is_key_pressed(KeyCode::Enter) {
-                // Confirm with Enter key
-                let dialog = state.ui_state.gold_drop_dialog.as_ref().unwrap();
-                if let Ok(amount) = dialog.input.parse::<i32>() {
-                    if amount > 0 && amount <= state.inventory.gold {
-                        if state.ui_state.trade_open {
-                            commands.push(InputCommand::TradeOfferGold { amount });
-                        } else {
-                            commands.push(InputCommand::DropGold { amount });
-                        }
-                        state.ui_state.gold_drop_dialog = None;
-                    }
-                }
-                return commands;
-            }
-
-            // Number key input
-            let number_keys = [
-                (KeyCode::Key0, '0'),
-                (KeyCode::Key1, '1'),
-                (KeyCode::Key2, '2'),
-                (KeyCode::Key3, '3'),
-                (KeyCode::Key4, '4'),
-                (KeyCode::Key5, '5'),
-                (KeyCode::Key6, '6'),
-                (KeyCode::Key7, '7'),
-                (KeyCode::Key8, '8'),
-                (KeyCode::Key9, '9'),
-                (KeyCode::Kp0, '0'),
-                (KeyCode::Kp1, '1'),
-                (KeyCode::Kp2, '2'),
-                (KeyCode::Kp3, '3'),
-                (KeyCode::Kp4, '4'),
-                (KeyCode::Kp5, '5'),
-                (KeyCode::Kp6, '6'),
-                (KeyCode::Kp7, '7'),
-                (KeyCode::Kp8, '8'),
-                (KeyCode::Kp9, '9'),
-            ];
-
-            for (key, digit) in &number_keys {
-                if is_key_pressed(*key) {
-                    let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
-                    // Limit input length (max 10 digits for gold amounts)
-                    if dialog.input.len() < 10 {
-                        dialog.input.insert(dialog.cursor, *digit);
-                        dialog.cursor += 1;
-                    }
-                }
-            }
-
-            // Backspace
-            if is_key_pressed(KeyCode::Backspace) {
-                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
-                if dialog.cursor > 0 {
-                    dialog.input.remove(dialog.cursor - 1);
-                    dialog.cursor -= 1;
-                }
-            }
-
-            // Delete
-            if is_key_pressed(KeyCode::Delete) {
-                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
-                if dialog.cursor < dialog.input.len() {
-                    dialog.input.remove(dialog.cursor);
-                }
-            }
-
-            // Left/Right arrow navigation
-            if is_key_pressed(KeyCode::Left) {
-                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
-                if dialog.cursor > 0 {
-                    dialog.cursor -= 1;
-                }
-            }
-            if is_key_pressed(KeyCode::Right) {
-                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
-                if dialog.cursor < dialog.input.len() {
-                    dialog.cursor += 1;
-                }
-            }
-
-            // Home/End
-            if is_key_pressed(KeyCode::Home) {
-                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
-                dialog.cursor = 0;
-            }
-            if is_key_pressed(KeyCode::End) {
-                let dialog = state.ui_state.gold_drop_dialog.as_mut().unwrap();
-                dialog.cursor = dialog.input.len();
-            }
-
-            // Drain character queue to prevent ghost characters
-            while get_char_pressed().is_some() {}
-
-            // Don't process other input while gold drop dialog is open
-            return commands;
-        }
-
-        // Handle stall price dialog
-        if state.ui_state.stall_price_dialog.is_some() {
-            // Handle button clicks
-            if mouse_clicked {
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::StallPriceConfirm => {
-                            let dialog = state.ui_state.stall_price_dialog.as_ref().unwrap();
-                            if let Ok(price) = dialog.input.parse::<i32>() {
-                                if price > 0 {
-                                    let item_id = dialog.item_id.clone();
-                                    commands.push(InputCommand::StallSetItem {
-                                        inventory_slot: dialog.inventory_slot,
-                                        quantity: dialog.quantity,
-                                        price,
-                                    });
-                                    state.ui_state.stall_last_prices.insert(item_id, price);
-                                    state.ui_state.stall_price_dialog = None;
-                                }
-                            }
-                            return commands;
-                        }
-                        UiElementId::StallPriceCancel => {
-                            state.ui_state.stall_price_dialog = None;
-                            return commands;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            // Handle keyboard input
-            if is_key_pressed(KeyCode::Escape) {
-                state.ui_state.stall_price_dialog = None;
-                return commands;
-            }
-
-            if is_key_pressed(KeyCode::Enter) {
-                let dialog = state.ui_state.stall_price_dialog.as_ref().unwrap();
-                if let Ok(price) = dialog.input.parse::<i32>() {
-                    if price > 0 {
-                        let item_id = dialog.item_id.clone();
-                        commands.push(InputCommand::StallSetItem {
-                            inventory_slot: dialog.inventory_slot,
-                            quantity: dialog.quantity,
-                            price,
-                        });
-                        state.ui_state.stall_last_prices.insert(item_id, price);
-                        state.ui_state.stall_price_dialog = None;
-                    }
-                }
-                return commands;
-            }
-
-            // Number keys
-            let number_keys = [
-                (KeyCode::Key0, '0'), (KeyCode::Key1, '1'), (KeyCode::Key2, '2'),
-                (KeyCode::Key3, '3'), (KeyCode::Key4, '4'), (KeyCode::Key5, '5'),
-                (KeyCode::Key6, '6'), (KeyCode::Key7, '7'), (KeyCode::Key8, '8'),
-                (KeyCode::Key9, '9'),
-            ];
-            for (key, digit) in &number_keys {
-                if is_key_pressed(*key) {
-                    let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
-                    if dialog.input.len() < 10 {
-                        dialog.input.insert(dialog.cursor, *digit);
-                        dialog.cursor += 1;
-                    }
-                }
-            }
-
-            // Backspace
-            if is_key_pressed(KeyCode::Backspace) {
-                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
-                if dialog.cursor > 0 {
-                    dialog.input.remove(dialog.cursor - 1);
-                    dialog.cursor -= 1;
-                }
-            }
-
-            // Delete
-            if is_key_pressed(KeyCode::Delete) {
-                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
-                if dialog.cursor < dialog.input.len() {
-                    dialog.input.remove(dialog.cursor);
-                }
-            }
-
-            // Left/Right arrow navigation
-            if is_key_pressed(KeyCode::Left) {
-                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
-                if dialog.cursor > 0 {
-                    dialog.cursor -= 1;
-                }
-            }
-            if is_key_pressed(KeyCode::Right) {
-                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
-                if dialog.cursor < dialog.input.len() {
-                    dialog.cursor += 1;
-                }
-            }
-
-            // Home/End
-            if is_key_pressed(KeyCode::Home) {
-                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
-                dialog.cursor = 0;
-            }
-            if is_key_pressed(KeyCode::End) {
-                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
-                dialog.cursor = dialog.input.len();
-            }
-
-            // Drain character queue
-            while get_char_pressed().is_some() {}
-
-            return commands;
-        }
-
-        // Handle chest panel input (does NOT return early — allows inventory right-click etc.)
-        if state.ui_state.chest_open {
-            // Mouse wheel scroll
-            let (_wheel_x, wheel_y) = mouse_wheel();
-            if wheel_y != 0.0 {
-                if let Some(UiElementId::ChestScrollArea) = &state.ui_state.hovered_element {
-                    let max_scroll = layout
-                        .get_max_scroll(&UiElementId::ChestScrollArea)
-                        .unwrap_or(0.0);
-                    state.ui_state.chest_scroll =
-                        (state.ui_state.chest_scroll - wheel_y * 30.0).clamp(0.0, max_scroll);
-                }
-            }
-
-            let mut chest_handled = false;
-            if mouse_clicked {
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::ChestClose => {
-                            state.ui_state.chest_open = false;
-                            state.pending_sfx.push("enter".to_string());
-                            chest_handled = true;
-                        }
-                        UiElementId::ChestSlot(idx) => {
-                            // Take item from chest slot
-                            if (*idx as usize) < state.ui_state.chest_slots.len() {
-                                if state.ui_state.chest_slots[*idx as usize].is_some() {
-                                    commands.push(InputCommand::ChestTake {
-                                        chest_id: state.ui_state.chest_id.clone(),
-                                        slot: *idx,
-                                    });
-                                }
-                            }
-                            chest_handled = true;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            // Escape to close
-            if is_key_pressed(KeyCode::Escape) {
-                state.ui_state.chest_open = false;
-                return commands;
-            }
-
-            if chest_handled {
-                return commands;
-            }
-        }
-
-        // Handle slayer panel input
-        if state.ui_state.slayer_panel_open {
-            // Mouse wheel scroll
-            let (_wheel_x, wheel_y) = mouse_wheel();
-            if wheel_y != 0.0 {
-                if let Some(UiElementId::SlayerScrollArea) = &state.ui_state.hovered_element {
-                    state.ui_state.slayer_reward_scroll =
-                        (state.ui_state.slayer_reward_scroll - wheel_y * 30.0).max(0.0);
-                }
-            }
-
-            if mouse_clicked {
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::SlayerCloseButton => {
-                            state.ui_state.slayer_panel_open = false;
-                            state.pending_sfx.push("enter".to_string());
-                        }
-                        UiElementId::SlayerGetTaskButton => {
-                            if let Some(ref master_id) = state.ui_state.slayer_master_id.clone() {
-                                commands.push(InputCommand::SlayerGetTask {
-                                    master_id: master_id.clone(),
-                                });
-                            }
-                        }
-                        UiElementId::SlayerCancelTaskButton => {
-                            commands.push(InputCommand::SlayerCancelTask);
-                        }
-                        UiElementId::SlayerRewardTab(idx) => {
-                            state.ui_state.slayer_reward_tab = *idx;
-                            state.ui_state.slayer_reward_scroll = 0.0;
-                        }
-                        UiElementId::SlayerBuyReward(idx) => {
-                            if let Some(reward) = state.ui_state.slayer_rewards.get(*idx) {
-                                if state.ui_state.slayer_points >= reward.cost {
-                                    commands.push(InputCommand::SlayerBuyReward {
-                                        reward_id: reward.id.clone(),
-                                        target_monster_id: reward.target_id.clone(),
-                                    });
-                                }
-                            }
-                        }
-                        UiElementId::SlayerRemoveBlock(idx) => {
-                            if let Some(monster_name) =
-                                state.ui_state.slayer_blocked_monsters.get(*idx)
-                            {
-                                commands.push(InputCommand::SlayerRemoveBlock {
-                                    monster_id: monster_name.clone(),
-                                });
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            // Escape to close
-            if is_key_pressed(KeyCode::Escape) {
-                state.ui_state.slayer_panel_open = false;
-                return commands;
-            }
-
-            return commands;
-        }
-
-        // Handle trade panel input
-        if state.ui_state.trade_open {
-            if mouse_clicked {
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::TradeOfferSlot(i) => {
-                            // Remove item from our offer
-                            commands.push(InputCommand::TradeRemoveItem { offer_index: *i as u8 });
-                        }
-                        UiElementId::TradeGoldInput => {
-                            // Open gold input dialog reusing the gold drop pattern
-                            state.ui_state.gold_drop_dialog = Some(GoldDropDialog {
-                                input: String::new(),
-                                cursor: 0,
-                            });
-                        }
-                        UiElementId::TradeAcceptButton => {
-                            commands.push(InputCommand::TradeAccept);
-                        }
-                        UiElementId::TradeCancelButton => {
-                            commands.push(InputCommand::TradeCancel);
-                        }
-                        UiElementId::InventorySlot(slot_idx) => {
-                            // Offer item from inventory
-                            if let Some(slot) = state.inventory.slots.get(*slot_idx).and_then(|s| s.as_ref()) {
-                                commands.push(InputCommand::TradeOfferItem {
-                                    slot_index: *slot_idx as u8,
-                                    quantity: slot.quantity,
-                                });
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            // Escape to close trade
-            if is_key_pressed(KeyCode::Escape) {
-                commands.push(InputCommand::TradeCancel);
-                return commands;
-            }
-
-            return commands;
-        }
-
-        // Handle trade request popup
-        if state.ui_state.trade_pending_request.is_some() {
-            if mouse_clicked {
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::TradeRequestAccept => {
-                            if let Some((ref requester_id, _)) = state.ui_state.trade_pending_request {
-                                commands.push(InputCommand::TradeAcceptRequest { requester_id: requester_id.clone() });
-                            }
-                            state.ui_state.trade_pending_request = None;
-                        }
-                        UiElementId::TradeRequestDecline => {
-                            if let Some((ref requester_id, _)) = state.ui_state.trade_pending_request {
-                                commands.push(InputCommand::TradeDeclineRequest { requester_id: requester_id.clone() });
-                            }
-                            state.ui_state.trade_pending_request = None;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        // Handle stall setup panel input
-        if state.ui_state.stall_setup_open {
-            if mouse_clicked {
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::StallSetupNameInput => {
-                            state.ui_state.stall_name_editing = true;
-                            state.ui_state.stall_name_cursor = state.ui_state.stall_my_name.len();
-                        }
-                        UiElementId::StallSetupRemove(i) => {
-                            state.ui_state.stall_name_editing = false;
-                            if let Some(slot) = state.ui_state.stall_my_slots.get(*i) {
-                                commands.push(InputCommand::StallRemoveItem { stall_slot: slot.slot });
-                            }
-                        }
-                        UiElementId::StallSetupOpenButton => {
-                            state.ui_state.stall_name_editing = false;
-                            if state.ui_state.stall_active {
-                                commands.push(InputCommand::StallClose);
-                            } else {
-                                let name = if state.ui_state.stall_my_name.is_empty() {
-                                    "My Shop".to_string()
-                                } else {
-                                    state.ui_state.stall_my_name.clone()
-                                };
-                                commands.push(InputCommand::StallOpen { name });
-                            }
-                        }
-                        UiElementId::StallSetupCloseButton => {
-                            state.ui_state.stall_name_editing = false;
-                            state.ui_state.stall_setup_open = false;
-                        }
-                        UiElementId::InventorySlot(slot_idx) => {
-                            state.ui_state.stall_name_editing = false;
-                            if let Some(slot) = state.inventory.slots.get(*slot_idx).and_then(|s| s.as_ref()) {
-                                commands.push(InputCommand::StallSetItem {
-                                    inventory_slot: *slot_idx as u8,
-                                    quantity: slot.quantity,
-                                    price: 1,
-                                });
-                            }
-                        }
-                        _ => {
-                            state.ui_state.stall_name_editing = false;
-                        }
-                    }
-                } else {
-                    // Clicked outside any element — unfocus name input
-                    state.ui_state.stall_name_editing = false;
-                }
-            }
-
-            // Keyboard input for name editing
-            if state.ui_state.stall_name_editing {
-                if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Enter) {
-                    state.ui_state.stall_name_editing = false;
-                    // Drain chars so they don't leak
-                    while get_char_pressed().is_some() {}
-                    return commands;
-                }
-
-                if is_key_pressed(KeyCode::Backspace) {
-                    if state.ui_state.stall_name_cursor > 0 {
-                        state.ui_state.stall_name_cursor -= 1;
-                        state.ui_state.stall_my_name.remove(state.ui_state.stall_name_cursor);
-                    }
-                }
-                if is_key_pressed(KeyCode::Delete) {
-                    if state.ui_state.stall_name_cursor < state.ui_state.stall_my_name.len() {
-                        state.ui_state.stall_my_name.remove(state.ui_state.stall_name_cursor);
-                    }
-                }
-                if is_key_pressed(KeyCode::Left) {
-                    if state.ui_state.stall_name_cursor > 0 {
-                        state.ui_state.stall_name_cursor -= 1;
-                    }
-                }
-                if is_key_pressed(KeyCode::Right) {
-                    if state.ui_state.stall_name_cursor < state.ui_state.stall_my_name.len() {
-                        state.ui_state.stall_name_cursor += 1;
-                    }
-                }
-                if is_key_pressed(KeyCode::Home) {
-                    state.ui_state.stall_name_cursor = 0;
-                }
-                if is_key_pressed(KeyCode::End) {
-                    state.ui_state.stall_name_cursor = state.ui_state.stall_my_name.len();
-                }
-
-                // Typed characters
-                while let Some(ch) = get_char_pressed() {
-                    if ch.is_control() { continue; }
-                    if state.ui_state.stall_my_name.len() < 24 {
-                        state.ui_state.stall_my_name.insert(state.ui_state.stall_name_cursor, ch);
-                        state.ui_state.stall_name_cursor += 1;
-                    }
-                }
-
-                return commands;
-            }
-
-            if is_key_pressed(KeyCode::Escape) {
-                state.ui_state.stall_setup_open = false;
-                state.ui_state.stall_name_editing = false;
-                return commands;
-            }
-
-            return commands;
-        }
-
-        // Handle stall browse panel input
-        if state.ui_state.stall_browse.is_some() {
-            if mouse_clicked {
-                if let Some(ref element) = clicked_element {
-                    match element {
-                        UiElementId::StallBrowseItem(i) => {
-                            state.ui_state.stall_browse_selected = *i;
-                            state.ui_state.stall_buy_quantity = 1;
-                        }
-                        UiElementId::StallBrowseQuantityMinus => {
-                            if state.ui_state.stall_buy_quantity > 1 {
-                                state.ui_state.stall_buy_quantity -= 1;
-                            }
-                        }
-                        UiElementId::StallBrowseQuantityPlus => {
-                            state.ui_state.stall_buy_quantity += 1;
-                            // Clamp to available quantity
-                            if let Some(ref browse) = state.ui_state.stall_browse {
-                                if let Some(item) = browse.items.get(state.ui_state.stall_browse_selected) {
-                                    if state.ui_state.stall_buy_quantity > item.quantity {
-                                        state.ui_state.stall_buy_quantity = item.quantity;
-                                    }
-                                }
-                            }
-                        }
-                        UiElementId::StallBrowseBuyButton => {
-                            if let Some(ref browse) = state.ui_state.stall_browse {
-                                if let Some(item) = browse.items.get(state.ui_state.stall_browse_selected) {
-                                    commands.push(InputCommand::StallBuy {
-                                        seller_id: browse.seller_id.clone(),
-                                        stall_slot: item.slot,
-                                        quantity: state.ui_state.stall_buy_quantity,
-                                    });
-                                }
-                            }
-                        }
-                        UiElementId::StallBrowseCloseButton => {
-                            state.ui_state.stall_browse = None;
-                            state.pending_sfx.push("ui_close".to_string());
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            if is_key_pressed(KeyCode::Escape) {
-                state.ui_state.stall_browse = None;
-                return commands;
-            }
-
+        if Self::handle_modal_panels(
+            state,
+            layout,
+            clicked_element.as_ref(),
+            mouse_clicked,
+            &mut commands,
+        ) {
             return commands;
         }
 
@@ -4508,9 +4884,12 @@ impl InputHandler {
                 // Handle scroll wheel for dialogue choices
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y.abs() > 0.0 {
-                    let max_scroll = layout.get_max_scroll(&UiElementId::DialogueScrollbar).unwrap_or(0.0);
-                    state.ui_state.dialogue_scroll_offset =
-                        (state.ui_state.dialogue_scroll_offset - wheel_y * 20.0).clamp(0.0, max_scroll);
+                    let max_scroll = layout
+                        .get_max_scroll(&UiElementId::DialogueScrollbar)
+                        .unwrap_or(0.0);
+                    state.ui_state.dialogue_scroll_offset = (state.ui_state.dialogue_scroll_offset
+                        - wheel_y * 20.0)
+                        .clamp(0.0, max_scroll);
                 }
             } else {
                 // No choices - Escape, Enter, or Space to continue/close
@@ -4758,14 +5137,18 @@ impl InputHandler {
 
                 match &state.ui_state.hovered_element {
                     Some(UiElementId::BankScrollArea) | Some(UiElementId::BankSlot(_)) => {
-                        let max_scroll = layout.get_max_scroll(&UiElementId::BankScrollbar).unwrap_or(0.0);
+                        let max_scroll = layout
+                            .get_max_scroll(&UiElementId::BankScrollbar)
+                            .unwrap_or(0.0);
                         state.ui_state.bank_scroll = (state.ui_state.bank_scroll
                             - wheel_y * SCROLL_SPEED)
                             .clamp(0.0, max_scroll);
                     }
                     Some(UiElementId::BankInvScrollArea)
                     | Some(UiElementId::BankInventorySlot(_)) => {
-                        let max_scroll = layout.get_max_scroll(&UiElementId::BankInvScrollbar).unwrap_or(0.0);
+                        let max_scroll = layout
+                            .get_max_scroll(&UiElementId::BankInvScrollbar)
+                            .unwrap_or(0.0);
                         state.ui_state.bank_inv_scroll = (state.ui_state.bank_inv_scroll
                             - wheel_y * SCROLL_SPEED)
                             .clamp(0.0, max_scroll);
@@ -4776,7 +5159,9 @@ impl InputHandler {
 
             // Bank scrollbar drag handling
             if let Some(track_bounds) = layout.get_bounds(&UiElementId::BankScrollbar) {
-                let bank_max = layout.get_max_scroll(&UiElementId::BankScrollbar).unwrap_or(0.0);
+                let bank_max = layout
+                    .get_max_scroll(&UiElementId::BankScrollbar)
+                    .unwrap_or(0.0);
                 let bank_content_h = bank_max + track_bounds.h;
                 let clicked_on = matches!(clicked_element, Some(UiElementId::BankScrollbar));
                 crate::ui::scroll::handle_scrollbar_drag(
@@ -4796,7 +5181,9 @@ impl InputHandler {
 
             // Bank inventory scrollbar drag handling
             if let Some(track_bounds) = layout.get_bounds(&UiElementId::BankInvScrollbar) {
-                let inv_max = layout.get_max_scroll(&UiElementId::BankInvScrollbar).unwrap_or(0.0);
+                let inv_max = layout
+                    .get_max_scroll(&UiElementId::BankInvScrollbar)
+                    .unwrap_or(0.0);
                 let inv_content_h = inv_max + track_bounds.h;
                 let clicked_on = matches!(clicked_element, Some(UiElementId::BankInvScrollbar));
                 crate::ui::scroll::handle_scrollbar_drag(
@@ -4822,9 +5209,7 @@ impl InputHandler {
                 let active = drag.active;
 
                 // Cancel on right-click or Escape
-                if is_mouse_button_pressed(MouseButton::Right)
-                    || is_key_pressed(KeyCode::Escape)
-                {
+                if is_mouse_button_pressed(MouseButton::Right) || is_key_pressed(KeyCode::Escape) {
                     state.ui_state.bank_drag = None;
                     return commands;
                 }
@@ -4855,13 +5240,12 @@ impl InputHandler {
                         // Mouse released within dead zone => treat as normal click
                         state.ui_state.bank_drag = None;
                         // Process as withdraw click
-                        if let Some(Some((item_id, qty))) =
-                            state.ui_state.bank_slots.get(from_slot)
+                        if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(from_slot)
                         {
                             let ctrl_held = is_key_down(KeyCode::LeftControl)
                                 || is_key_down(KeyCode::RightControl);
-                            let shift_held = is_key_down(KeyCode::LeftShift)
-                                || is_key_down(KeyCode::RightShift);
+                            let shift_held =
+                                is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
                             if shift_held {
                                 commands.push(InputCommand::BankWithdraw {
                                     item_id: item_id.clone(),
@@ -4869,14 +5253,13 @@ impl InputHandler {
                                 });
                                 state.pending_sfx.push("enter".to_string());
                             } else if ctrl_held && *qty > 1 {
-                                state.ui_state.bank_quantity_dialog =
-                                    Some(BankQuantityDialog {
-                                        input: String::new(),
-                                        cursor: 0,
-                                        action: BankQuantityAction::WithdrawItem,
-                                        item_id: Some(item_id.clone()),
-                                        max_quantity: *qty,
-                                    });
+                                state.ui_state.bank_quantity_dialog = Some(BankQuantityDialog {
+                                    input: String::new(),
+                                    cursor: 0,
+                                    action: BankQuantityAction::WithdrawItem,
+                                    item_id: Some(item_id.clone()),
+                                    max_quantity: *qty,
+                                });
                             } else {
                                 commands.push(InputCommand::BankWithdraw {
                                     item_id: item_id.clone(),
@@ -5132,9 +5515,7 @@ impl InputHandler {
                                         (state.ui_state.shop_buy_scroll + dy)
                                             .clamp(0.0, max_scroll);
                                 } else {
-                                    let inventory_count =
-                                        state.inventory.aggregate_items()
-                                        .len();
+                                    let inventory_count = state.inventory.aggregate_items().len();
                                     let max_scroll =
                                         ((inventory_count as f32) * item_height - 200.0).max(0.0);
                                     state.ui_state.shop_sell_scroll =
@@ -5255,20 +5636,21 @@ impl InputHandler {
                                 .get(selected_idx)
                                 .map(|s| s.as_str())
                                 .unwrap_or("supplies");
-                            let mut recipes_in_category: Vec<&crate::game::RecipeDefinition> = click_filtered
-                                .iter()
-                                .filter(|r| {
-                                    let cat_match = if current_category == "supplies" {
-                                        r.category == "consumables" || r.category == "materials"
-                                    } else {
-                                        r.category == current_category
-                                    };
-                                    // Only include discovered recipes (matching renderer)
-                                    let is_discovered = !r.requires_discovery
-                                        || state.discovered_recipes.contains(&r.id);
-                                    cat_match && is_discovered
-                                })
-                                .collect();
+                            let mut recipes_in_category: Vec<&crate::game::RecipeDefinition> =
+                                click_filtered
+                                    .iter()
+                                    .filter(|r| {
+                                        let cat_match = if current_category == "supplies" {
+                                            r.category == "consumables" || r.category == "materials"
+                                        } else {
+                                            r.category == current_category
+                                        };
+                                        // Only include discovered recipes (matching renderer)
+                                        let is_discovered = !r.requires_discovery
+                                            || state.discovered_recipes.contains(&r.id);
+                                        cat_match && is_discovered
+                                    })
+                                    .collect();
                             // Sort to match renderer order (section → level → name)
                             recipes_in_category.sort_by(|a, b| {
                                 let a_sec = a.section.as_deref().unwrap_or("");
@@ -5343,13 +5725,11 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::ShopSellQuantityMax => {
-                            let inventory_items =
-                                state.inventory.aggregate_items();
+                            let inventory_items = state.inventory.aggregate_items();
                             if let Some(agg_item) =
                                 inventory_items.get(state.ui_state.shop_selected_sell_index)
                             {
-                                state.ui_state.shop_sell_quantity =
-                                    agg_item.total_quantity.max(1);
+                                state.ui_state.shop_sell_quantity = agg_item.total_quantity.max(1);
                             }
                             return commands;
                         }
@@ -5511,20 +5891,21 @@ impl InputHandler {
                         .get(selected_idx)
                         .map(|s| s.as_str())
                         .unwrap_or("supplies");
-                    let mut recipes_in_category: Vec<&crate::game::RecipeDefinition> = filtered_recipes
-                        .iter()
-                        .filter(|r| {
-                            let cat_match = if current_category == "supplies" {
-                                r.category == "consumables" || r.category == "materials"
-                            } else {
-                                r.category == current_category
-                            };
-                            // Only include discovered recipes (matching renderer)
-                            let is_discovered =
-                                !r.requires_discovery || state.discovered_recipes.contains(&r.id);
-                            cat_match && is_discovered
-                        })
-                        .collect();
+                    let mut recipes_in_category: Vec<&crate::game::RecipeDefinition> =
+                        filtered_recipes
+                            .iter()
+                            .filter(|r| {
+                                let cat_match = if current_category == "supplies" {
+                                    r.category == "consumables" || r.category == "materials"
+                                } else {
+                                    r.category == current_category
+                                };
+                                // Only include discovered recipes (matching renderer)
+                                let is_discovered = !r.requires_discovery
+                                    || state.discovered_recipes.contains(&r.id);
+                                cat_match && is_discovered
+                            })
+                            .collect();
                     // Sort to match renderer order (section → level → name)
                     recipes_in_category.sort_by(|a, b| {
                         let a_sec = a.section.as_deref().unwrap_or("");
@@ -5586,14 +5967,13 @@ impl InputHandler {
                         let mut item_top = 0.0_f32;
                         for r in &all_in_category {
                             let recipe_section = r.section.as_deref().unwrap_or("");
-                            if !recipe_section.is_empty()
-                                && current_section != Some(recipe_section)
+                            if !recipe_section.is_empty() && current_section != Some(recipe_section)
                             {
                                 current_section = Some(recipe_section);
                                 pixel_y += section_h;
                             }
-                            let is_disc = !r.requires_discovery
-                                || state.discovered_recipes.contains(&r.id);
+                            let is_disc =
+                                !r.requires_discovery || state.discovered_recipes.contains(&r.id);
                             if is_disc {
                                 if discovered_idx == state.ui_state.crafting_selected_recipe {
                                     item_top = pixel_y;
@@ -5702,10 +6082,19 @@ impl InputHandler {
                 // Crafting scrollbar drag handling
                 if let Some(track_bounds) = layout.get_bounds(&UiElementId::CraftingScrollbar) {
                     let s = state.ui_state.ui_scale;
-                    let line_height = if cfg!(target_os = "android") { 36.0 * s } else { 28.0 * s };
-                    let sel_idx = state.ui_state.crafting_selected_category
+                    let line_height = if cfg!(target_os = "android") {
+                        36.0 * s
+                    } else {
+                        28.0 * s
+                    };
+                    let sel_idx = state
+                        .ui_state
+                        .crafting_selected_category
                         .min(categories.len().saturating_sub(1));
-                    let cur_cat = categories.get(sel_idx).map(|sc| sc.as_str()).unwrap_or("supplies");
+                    let cur_cat = categories
+                        .get(sel_idx)
+                        .map(|sc| sc.as_str())
+                        .unwrap_or("supplies");
                     let recipes_in_cat: Vec<&crate::game::RecipeDefinition> = filtered_recipes
                         .iter()
                         .filter(|r| {
@@ -5721,7 +6110,9 @@ impl InputHandler {
                         let mut seen = std::collections::HashSet::new();
                         for r in &recipes_in_cat {
                             if let Some(ref sec) = r.section {
-                                if !sec.is_empty() { seen.insert(sec.as_str()); }
+                                if !sec.is_empty() {
+                                    seen.insert(sec.as_str());
+                                }
                             }
                         }
                         seen.len()
@@ -5729,7 +6120,8 @@ impl InputHandler {
                     let total_content = drag_total_visible as f32 * line_height
                         + drag_num_sections as f32 * SECTION_HEADER_HEIGHT * s;
                     let max_scroll = (total_content - track_bounds.h).max(0.0);
-                    let clicked_on = matches!(clicked_element, Some(UiElementId::CraftingScrollbar));
+                    let clicked_on =
+                        matches!(clicked_element, Some(UiElementId::CraftingScrollbar));
                     crate::ui::scroll::handle_scrollbar_drag(
                         &mut state.ui_state.crafting_scroll_drag,
                         &mut state.ui_state.crafting_scroll_offset,
@@ -5766,9 +6158,7 @@ impl InputHandler {
                         }
                         Some(UiElementId::ShopSellScrollArea)
                         | Some(UiElementId::ShopSellItem(_)) => {
-                            let inventory_count =
-                                state.inventory.aggregate_items()
-                                .len();
+                            let inventory_count = state.inventory.aggregate_items().len();
                             let max_scroll =
                                 ((inventory_count as f32) * item_height - 200.0).max(0.0);
                             state.ui_state.shop_sell_scroll = (state.ui_state.shop_sell_scroll
@@ -5784,10 +6174,14 @@ impl InputHandler {
                     let item_height = 48.0 + 4.0;
                     // Buy scrollbar
                     if let Some(track_bounds) = layout.get_bounds(&UiElementId::ShopBuyScrollbar) {
-                        let max_scroll = state.ui_state.shop_data.as_ref()
+                        let max_scroll = state
+                            .ui_state
+                            .shop_data
+                            .as_ref()
                             .map(|d| ((d.stock.len() as f32) * item_height - 200.0).max(0.0))
                             .unwrap_or(0.0);
-                        let clicked_on = matches!(clicked_element, Some(UiElementId::ShopBuyScrollbar));
+                        let clicked_on =
+                            matches!(clicked_element, Some(UiElementId::ShopBuyScrollbar));
                         crate::ui::scroll::handle_scrollbar_drag(
                             &mut state.ui_state.shop_buy_scroll_drag,
                             &mut state.ui_state.shop_buy_scroll,
@@ -5806,7 +6200,8 @@ impl InputHandler {
                     if let Some(track_bounds) = layout.get_bounds(&UiElementId::ShopSellScrollbar) {
                         let inventory_count = state.inventory.aggregate_items().len();
                         let max_scroll = ((inventory_count as f32) * item_height - 200.0).max(0.0);
-                        let clicked_on = matches!(clicked_element, Some(UiElementId::ShopSellScrollbar));
+                        let clicked_on =
+                            matches!(clicked_element, Some(UiElementId::ShopSellScrollbar));
                         crate::ui::scroll::handle_scrollbar_drag(
                             &mut state.ui_state.shop_sell_scroll_drag,
                             &mut state.ui_state.shop_sell_scroll,
@@ -5970,13 +6365,23 @@ impl InputHandler {
                             if !state.ui_state.crafting_in_progress {
                                 let station = state.ui_state.furnace_station_type.as_str();
                                 let is_fire_pit = station == "fire_pit";
-                                let section_filter = if is_fire_pit { "fish" } else if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
+                                let section_filter = if is_fire_pit {
+                                    "fish"
+                                } else if state.ui_state.furnace_tab == 0 {
+                                    "materials"
+                                } else {
+                                    "jewelry"
+                                };
                                 let mut furnace_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
                                     .filter(|r| r.station.as_deref() == Some(station))
                                     .filter(|r| {
-                                        if is_fire_pit { true } else { r.section.as_deref() == Some(section_filter) }
+                                        if is_fire_pit {
+                                            true
+                                        } else {
+                                            r.section.as_deref() == Some(section_filter)
+                                        }
                                     })
                                     .filter(|r| {
                                         !r.requires_discovery
@@ -6007,11 +6412,12 @@ impl InputHandler {
                         }
                         UiElementId::FurnaceQuantityX => {
                             // Toggle to a reasonable default (5) or cycle
-                            state.ui_state.furnace_quantity = if state.ui_state.furnace_quantity == 5 {
-                                10
-                            } else {
-                                5
-                            };
+                            state.ui_state.furnace_quantity =
+                                if state.ui_state.furnace_quantity == 5 {
+                                    10
+                                } else {
+                                    5
+                                };
                             return commands;
                         }
                         UiElementId::FurnaceQuantityAll => {
@@ -6079,17 +6485,25 @@ impl InputHandler {
 
                 let station = state.ui_state.furnace_station_type.as_str();
                 let is_fire_pit = station == "fire_pit";
-                let section_filter = if is_fire_pit { "fish" } else if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
+                let section_filter = if is_fire_pit {
+                    "fish"
+                } else if state.ui_state.furnace_tab == 0 {
+                    "materials"
+                } else {
+                    "jewelry"
+                };
                 let mut furnace_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
                     .filter(|r| r.station.as_deref() == Some(station))
                     .filter(|r| {
-                        if is_fire_pit { true } else { r.section.as_deref() == Some(section_filter) }
+                        if is_fire_pit {
+                            true
+                        } else {
+                            r.section.as_deref() == Some(section_filter)
+                        }
                     })
-                    .filter(|r| {
-                        !r.requires_discovery || state.discovered_recipes.contains(&r.id)
-                    })
+                    .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
                     .collect();
                 furnace_recipes.sort_by_key(|r| r.level_required);
                 let recipe_count = furnace_recipes.len();
@@ -6219,7 +6633,11 @@ impl InputHandler {
                         }
                         UiElementId::AnvilSmithButton => {
                             if !state.ui_state.crafting_in_progress {
-                                let section_filter = if state.ui_state.anvil_tab == 0 { "materials" } else { "equipment" };
+                                let section_filter = if state.ui_state.anvil_tab == 0 {
+                                    "materials"
+                                } else {
+                                    "equipment"
+                                };
                                 let mut anvil_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
@@ -6323,7 +6741,11 @@ impl InputHandler {
                     state.pending_sfx.push("enter".to_string());
                 }
 
-                let section_filter = if state.ui_state.anvil_tab == 0 { "materials" } else { "equipment" };
+                let section_filter = if state.ui_state.anvil_tab == 0 {
+                    "materials"
+                } else {
+                    "equipment"
+                };
                 let columns = 4;
 
                 // Get recipe count (drop borrow before navigation)
@@ -6390,9 +6812,7 @@ impl InputHandler {
                         })
                         .collect();
                     anvil_recipes.sort_by_key(|r| r.level_required);
-                    if let Some(recipe) =
-                        anvil_recipes.get(state.ui_state.anvil_selected_recipe)
-                    {
+                    if let Some(recipe) = anvil_recipes.get(state.ui_state.anvil_selected_recipe) {
                         commands.push(InputCommand::AnvilCraft {
                             recipe_id: recipe.id.clone(),
                             quantity: state.ui_state.anvil_quantity,
@@ -6472,7 +6892,8 @@ impl InputHandler {
                         }
                         UiElementId::AlchemyBrewButton => {
                             if !state.ui_state.crafting_in_progress {
-                                let tab_sections = sections_for_tab(state.ui_state.alchemy_station_tab);
+                                let tab_sections =
+                                    sections_for_tab(state.ui_state.alchemy_station_tab);
                                 let mut alchemy_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
@@ -6481,16 +6902,19 @@ impl InputHandler {
                                         !r.requires_discovery
                                             || state.discovered_recipes.contains(&r.id)
                                     })
-                                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
+                                    .filter(|r| {
+                                        tab_sections.contains(&r.section.as_deref().unwrap_or(""))
+                                    })
                                     .collect();
                                 alchemy_recipes.sort_by(|a, b| {
                                     let sa = a.section.as_deref().unwrap_or("");
                                     let sb = b.section.as_deref().unwrap_or("");
-                                    section_sort_key(sa).cmp(&section_sort_key(sb))
+                                    section_sort_key(sa)
+                                        .cmp(&section_sort_key(sb))
                                         .then(a.level_required.cmp(&b.level_required))
                                 });
-                                if let Some(recipe) =
-                                    alchemy_recipes.get(state.ui_state.alchemy_station_selected_recipe)
+                                if let Some(recipe) = alchemy_recipes
+                                    .get(state.ui_state.alchemy_station_selected_recipe)
                                 {
                                     commands.push(InputCommand::AlchemyCraft {
                                         recipe_id: recipe.id.clone(),
@@ -6513,7 +6937,8 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::AlchemyQuantityPlus => {
-                            state.ui_state.alchemy_station_quantity = (state.ui_state.alchemy_station_quantity + 1).min(99);
+                            state.ui_state.alchemy_station_quantity =
+                                (state.ui_state.alchemy_station_quantity + 1).min(99);
                             return commands;
                         }
                         UiElementId::AlchemyTab(idx) => {
@@ -6564,15 +6989,14 @@ impl InputHandler {
                     .recipe_definitions
                     .iter()
                     .filter(|r| r.station.as_deref() == Some("alchemy_station"))
-                    .filter(|r| {
-                        !r.requires_discovery || state.discovered_recipes.contains(&r.id)
-                    })
+                    .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
                     .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
                     .collect();
                 alchemy_recipes.sort_by(|a, b| {
                     let sa = a.section.as_deref().unwrap_or("");
                     let sb = b.section.as_deref().unwrap_or("");
-                    section_sort_key(sa).cmp(&section_sort_key(sb))
+                    section_sort_key(sa)
+                        .cmp(&section_sort_key(sb))
                         .then(a.level_required.cmp(&b.level_required))
                 });
                 let recipe_count = alchemy_recipes.len();
@@ -6588,7 +7012,8 @@ impl InputHandler {
                     }
                     sections.len()
                 };
-                let total_content = recipe_count as f32 * row_h + section_count as f32 * section_header_h;
+                let total_content =
+                    recipe_count as f32 * row_h + section_count as f32 * section_header_h;
 
                 let (_, sh) = crate::util::virtual_screen_size();
                 let panel_h = (520.0 * s).min(sh - 16.0);
@@ -6597,18 +7022,32 @@ impl InputHandler {
                 let tab_h = 28.0 * s;
                 let skill_bar_h = 24.0 * s;
                 let frame = 4.0; // FRAME_THICKNESS
-                // content_y = panel_y + frame + header_h + 2 + tab_h + 2 + skill_bar_h + 4*s
-                // footer_y = panel_y + panel_h - frame - footer_h
-                let total_content_h = panel_h - frame * 2.0 - header_h - 2.0 - tab_h - 2.0
-                    - skill_bar_h - 4.0 * s - 4.0 * s - footer_h;
+                                 // content_y = panel_y + frame + header_h + 2 + tab_h + 2 + skill_bar_h + 4*s
+                                 // footer_y = panel_y + panel_h - frame - footer_h
+                let total_content_h = panel_h
+                    - frame * 2.0
+                    - header_h
+                    - 2.0
+                    - tab_h
+                    - 2.0
+                    - skill_bar_h
+                    - 4.0 * s
+                    - 4.0 * s
+                    - footer_h;
 
                 // Dynamic detail panel height based on selected recipe's ingredient count
                 let ingredient_count = alchemy_recipes
                     .get(state.ui_state.alchemy_station_selected_recipe)
                     .map(|r| r.ingredients.len())
                     .unwrap_or(1);
-                let detail_h = (8.0 * s + 40.0 * s + 8.0 * s + 6.0 * s
-                    + ingredient_count as f32 * 28.0 * s + 10.0 * s + 26.0 * s + 6.0 * s)
+                let detail_h = (8.0 * s
+                    + 40.0 * s
+                    + 8.0 * s
+                    + 6.0 * s
+                    + ingredient_count as f32 * 28.0 * s
+                    + 10.0 * s
+                    + 26.0 * s
+                    + 6.0 * s)
                     .min(total_content_h * 0.65);
                 let recipe_list_h = total_content_h - detail_h - 4.0 * s;
                 let max_scroll = (total_content - recipe_list_h).max(0.0);
@@ -6617,26 +7056,33 @@ impl InputHandler {
                 if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
                     if state.ui_state.alchemy_station_selected_recipe > 0 {
                         state.ui_state.alchemy_station_selected_recipe -= 1;
-                        let item_top = state.ui_state.alchemy_station_selected_recipe as f32 * row_h;
+                        let item_top =
+                            state.ui_state.alchemy_station_selected_recipe as f32 * row_h;
                         if item_top < state.ui_state.alchemy_station_scroll_offset {
                             state.ui_state.alchemy_station_scroll_offset = item_top;
                         }
                     }
                 }
                 if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                    if state.ui_state.alchemy_station_selected_recipe < recipe_count.saturating_sub(1) {
+                    if state.ui_state.alchemy_station_selected_recipe
+                        < recipe_count.saturating_sub(1)
+                    {
                         state.ui_state.alchemy_station_selected_recipe += 1;
                         let item_bottom =
                             (state.ui_state.alchemy_station_selected_recipe + 1) as f32 * row_h;
-                        if item_bottom > state.ui_state.alchemy_station_scroll_offset + recipe_list_h {
-                            state.ui_state.alchemy_station_scroll_offset = item_bottom - recipe_list_h;
+                        if item_bottom
+                            > state.ui_state.alchemy_station_scroll_offset + recipe_list_h
+                        {
+                            state.ui_state.alchemy_station_scroll_offset =
+                                item_bottom - recipe_list_h;
                         }
                     }
                 }
 
                 // +/- to adjust quantity
                 if is_key_pressed(KeyCode::Equal) || is_key_pressed(KeyCode::KpAdd) {
-                    state.ui_state.alchemy_station_quantity = (state.ui_state.alchemy_station_quantity + 1).min(99);
+                    state.ui_state.alchemy_station_quantity =
+                        (state.ui_state.alchemy_station_quantity + 1).min(99);
                 }
                 if is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract) {
                     if state.ui_state.alchemy_station_quantity > 1 {
@@ -6660,9 +7106,9 @@ impl InputHandler {
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
                     const SCROLL_SPEED: f32 = 30.0;
-                    state.ui_state.alchemy_station_scroll_offset = (state.ui_state.alchemy_station_scroll_offset
-                        - wheel_y * SCROLL_SPEED)
-                        .clamp(0.0, max_scroll);
+                    state.ui_state.alchemy_station_scroll_offset =
+                        (state.ui_state.alchemy_station_scroll_offset - wheel_y * SCROLL_SPEED)
+                            .clamp(0.0, max_scroll);
                 }
 
                 // Scrollbar drag handling
@@ -6712,7 +7158,9 @@ impl InputHandler {
                         }
                         UiElementId::WorkbenchCraftButton => {
                             if !state.ui_state.crafting_in_progress {
-                                let tab_sections = crate::render::workbench_sections_for_tab(state.ui_state.workbench_tab);
+                                let tab_sections = crate::render::workbench_sections_for_tab(
+                                    state.ui_state.workbench_tab,
+                                );
                                 let mut workbench_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
@@ -6721,12 +7169,15 @@ impl InputHandler {
                                         !r.requires_discovery
                                             || state.discovered_recipes.contains(&r.id)
                                     })
-                                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
+                                    .filter(|r| {
+                                        tab_sections.contains(&r.section.as_deref().unwrap_or(""))
+                                    })
                                     .collect();
                                 workbench_recipes.sort_by(|a, b| {
                                     let sa = a.section.as_deref().unwrap_or("");
                                     let sb = b.section.as_deref().unwrap_or("");
-                                    section_sort_key(sa).cmp(&section_sort_key(sb))
+                                    section_sort_key(sa)
+                                        .cmp(&section_sort_key(sb))
                                         .then(a.level_required.cmp(&b.level_required))
                                 });
                                 if let Some(recipe) =
@@ -6753,7 +7204,8 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::WorkbenchQuantityPlus => {
-                            state.ui_state.workbench_quantity = (state.ui_state.workbench_quantity + 1).min(99);
+                            state.ui_state.workbench_quantity =
+                                (state.ui_state.workbench_quantity + 1).min(99);
                             return commands;
                         }
                         UiElementId::WorkbenchTab(idx) => {
@@ -6806,20 +7258,20 @@ impl InputHandler {
                     state.pending_sfx.push("enter".to_string());
                 }
 
-                let tab_sections = crate::render::workbench_sections_for_tab(state.ui_state.workbench_tab);
+                let tab_sections =
+                    crate::render::workbench_sections_for_tab(state.ui_state.workbench_tab);
                 let mut workbench_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
                     .filter(|r| r.station.as_deref() == Some("workbench"))
-                    .filter(|r| {
-                        !r.requires_discovery || state.discovered_recipes.contains(&r.id)
-                    })
+                    .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
                     .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
                     .collect();
                 workbench_recipes.sort_by(|a, b| {
                     let sa = a.section.as_deref().unwrap_or("");
                     let sb = b.section.as_deref().unwrap_or("");
-                    section_sort_key(sa).cmp(&section_sort_key(sb))
+                    section_sort_key(sa)
+                        .cmp(&section_sort_key(sb))
                         .then(a.level_required.cmp(&b.level_required))
                 });
                 let recipe_count = workbench_recipes.len();
@@ -6835,7 +7287,8 @@ impl InputHandler {
                     }
                     sections.len()
                 };
-                let total_content = recipe_count as f32 * row_h + section_count as f32 * section_header_h;
+                let total_content =
+                    recipe_count as f32 * row_h + section_count as f32 * section_header_h;
 
                 let (_, sh) = crate::util::virtual_screen_size();
                 let panel_h = (520.0 * s).min(sh - 16.0);
@@ -6844,16 +7297,30 @@ impl InputHandler {
                 let tab_h = 28.0 * s;
                 let skill_bar_h = 24.0 * s;
                 let frame = 4.0; // FRAME_THICKNESS
-                let total_content_h = panel_h - frame * 2.0 - header_h - 2.0 - tab_h - 2.0
-                    - skill_bar_h - 4.0 * s - 4.0 * s - footer_h;
+                let total_content_h = panel_h
+                    - frame * 2.0
+                    - header_h
+                    - 2.0
+                    - tab_h
+                    - 2.0
+                    - skill_bar_h
+                    - 4.0 * s
+                    - 4.0 * s
+                    - footer_h;
 
                 // Dynamic detail panel height based on selected recipe's ingredient count
                 let ingredient_count = workbench_recipes
                     .get(state.ui_state.workbench_selected_recipe)
                     .map(|r| r.ingredients.len())
                     .unwrap_or(1);
-                let detail_h = (8.0 * s + 40.0 * s + 8.0 * s + 6.0 * s
-                    + ingredient_count as f32 * 28.0 * s + 10.0 * s + 26.0 * s + 6.0 * s)
+                let detail_h = (8.0 * s
+                    + 40.0 * s
+                    + 8.0 * s
+                    + 6.0 * s
+                    + ingredient_count as f32 * 28.0 * s
+                    + 10.0 * s
+                    + 26.0 * s
+                    + 6.0 * s)
                     .min(total_content_h * 0.65);
                 let recipe_list_h = total_content_h - detail_h - 4.0 * s;
                 let max_scroll = (total_content - recipe_list_h).max(0.0);
@@ -6881,7 +7348,8 @@ impl InputHandler {
 
                 // +/- to adjust quantity
                 if is_key_pressed(KeyCode::Equal) || is_key_pressed(KeyCode::KpAdd) {
-                    state.ui_state.workbench_quantity = (state.ui_state.workbench_quantity + 1).min(99);
+                    state.ui_state.workbench_quantity =
+                        (state.ui_state.workbench_quantity + 1).min(99);
                 }
                 if is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract) {
                     if state.ui_state.workbench_quantity > 1 {
@@ -6905,14 +7373,15 @@ impl InputHandler {
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
                     const SCROLL_SPEED: f32 = 30.0;
-                    state.ui_state.workbench_scroll_offset = (state.ui_state.workbench_scroll_offset
-                        - wheel_y * SCROLL_SPEED)
-                        .clamp(0.0, max_scroll);
+                    state.ui_state.workbench_scroll_offset =
+                        (state.ui_state.workbench_scroll_offset - wheel_y * SCROLL_SPEED)
+                            .clamp(0.0, max_scroll);
                 }
 
                 // Scrollbar drag handling
                 if let Some(track_bounds) = layout.get_bounds(&UiElementId::WorkbenchScrollbar) {
-                    let clicked_on = matches!(clicked_element, Some(UiElementId::WorkbenchScrollbar));
+                    let clicked_on =
+                        matches!(clicked_element, Some(UiElementId::WorkbenchScrollbar));
                     crate::ui::scroll::handle_scrollbar_drag(
                         &mut state.ui_state.workbench_scroll_drag,
                         &mut state.ui_state.workbench_scroll_offset,
@@ -6956,12 +7425,19 @@ impl InputHandler {
                         }
                         UiElementId::FletchingFletchButton => {
                             if !state.ui_state.crafting_in_progress {
-                                let tab_sections = crate::render::fletching_sections_for_tab(state.ui_state.fletching_tab);
+                                let tab_sections = crate::render::fletching_sections_for_tab(
+                                    state.ui_state.fletching_tab,
+                                );
                                 let mut fletching_recipes: Vec<_> = state
                                     .recipe_definitions
                                     .iter()
-                                    .filter(|r| r.category == "fletching" && r.required_tool.as_deref() == Some("knife"))
-                                    .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
+                                    .filter(|r| {
+                                        r.category == "fletching"
+                                            && r.required_tool.as_deref() == Some("knife")
+                                    })
+                                    .filter(|r| {
+                                        tab_sections.contains(&r.section.as_deref().unwrap_or(""))
+                                    })
                                     .collect();
                                 fletching_recipes.sort_by_key(|r| r.level_required);
                                 if let Some(recipe) =
@@ -7041,11 +7517,14 @@ impl InputHandler {
                     state.pending_sfx.push("enter".to_string());
                 }
 
-                let tab_sections = crate::render::fletching_sections_for_tab(state.ui_state.fletching_tab);
+                let tab_sections =
+                    crate::render::fletching_sections_for_tab(state.ui_state.fletching_tab);
                 let mut fletching_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
-                    .filter(|r| r.category == "fletching" && r.required_tool.as_deref() == Some("knife"))
+                    .filter(|r| {
+                        r.category == "fletching" && r.required_tool.as_deref() == Some("knife")
+                    })
                     .filter(|r| tab_sections.contains(&r.section.as_deref().unwrap_or("")))
                     .collect();
                 fletching_recipes.sort_by_key(|r| r.level_required);
@@ -7061,7 +7540,8 @@ impl InputHandler {
                 let footer_h = 30.0 * s;
                 let tab_h = 28.0 * s;
                 let frame = 4.0;
-                let content_h = panel_h - frame * 2.0 - header_h - 2.0 - tab_h - 4.0 * s - footer_h - 4.0 * s;
+                let content_h =
+                    panel_h - frame * 2.0 - header_h - 2.0 - tab_h - 4.0 * s - footer_h - 4.0 * s;
                 let max_scroll = (total_content - content_h).max(0.0);
 
                 // W/S or Up/Down to navigate recipes
@@ -7112,14 +7592,15 @@ impl InputHandler {
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
                     const SCROLL_SPEED: f32 = 30.0;
-                    state.ui_state.fletching_scroll_offset = (state.ui_state.fletching_scroll_offset
-                        - wheel_y * SCROLL_SPEED)
-                        .clamp(0.0, max_scroll);
+                    state.ui_state.fletching_scroll_offset =
+                        (state.ui_state.fletching_scroll_offset - wheel_y * SCROLL_SPEED)
+                            .clamp(0.0, max_scroll);
                 }
 
                 // Scrollbar drag handling
                 if let Some(track_bounds) = layout.get_bounds(&UiElementId::FletchingScrollbar) {
-                    let clicked_on = matches!(clicked_element, Some(UiElementId::FletchingScrollbar));
+                    let clicked_on =
+                        matches!(clicked_element, Some(UiElementId::FletchingScrollbar));
                     crate::ui::scroll::handle_scrollbar_drag(
                         &mut state.ui_state.fletching_scroll_drag,
                         &mut state.ui_state.fletching_scroll_offset,
@@ -7210,7 +7691,8 @@ impl InputHandler {
             if wheel_y.abs() > 0.1 {
                 let scroll_speed = 30.0;
                 let row_height = 32.0 * state.ui_state.ui_scale; // SOCIAL_ROW_HEIGHT * scale
-                let visible_h = layout.get_bounds(&UiElementId::SocialScrollArea)
+                let visible_h = layout
+                    .get_bounds(&UiElementId::SocialScrollArea)
                     .map(|b| b.h)
                     .unwrap_or(200.0);
                 match state.social_state.active_tab {
@@ -7298,7 +7780,9 @@ impl InputHandler {
             let (_wheel_x, wheel_y) = mouse_wheel();
             if wheel_y != 0.0 {
                 const SCROLL_SPEED: f32 = 40.0; // Pixels per scroll tick
-                let max_scroll = layout.get_max_scroll(&UiElementId::ChatPanelScrollbar).unwrap_or(0.0);
+                let max_scroll = layout
+                    .get_max_scroll(&UiElementId::ChatPanelScrollbar)
+                    .unwrap_or(0.0);
                 let delta = wheel_y * SCROLL_SPEED;
                 state.ui_state.chat_message_scroll =
                     (state.ui_state.chat_message_scroll + delta).clamp(0.0, max_scroll);
@@ -7306,7 +7790,9 @@ impl InputHandler {
 
             // Chat panel scrollbar drag handling
             if let Some(track_bounds) = layout.get_bounds(&UiElementId::ChatPanelScrollbar) {
-                let cp_max = layout.get_max_scroll(&UiElementId::ChatPanelScrollbar).unwrap_or(0.0);
+                let cp_max = layout
+                    .get_max_scroll(&UiElementId::ChatPanelScrollbar)
+                    .unwrap_or(0.0);
                 let cp_content_h = cp_max + track_bounds.h;
                 let clicked_on = matches!(clicked_element, Some(UiElementId::ChatPanelScrollbar));
                 crate::ui::scroll::handle_scrollbar_drag_ex(
@@ -7828,7 +8314,10 @@ impl InputHandler {
                         }
                     } else {
                         let distance = (player_x - tx).abs() + (player_y - ty).abs();
-                        let is_confirmed = state.auto_action_state.as_ref().map_or(false, |a| a.confirmed);
+                        let is_confirmed = state
+                            .auto_action_state
+                            .as_ref()
+                            .map_or(false, |a| a.confirmed);
 
                         // When in active combat (confirmed), stand your ground if the
                         // target is nearby (≤2 tiles). The NPC is aggro'd and will walk
@@ -7856,7 +8345,8 @@ impl InputHandler {
                             // Throttle re-pathing to at most once per 300ms to prevent
                             // jerky direction changes when chasing moving targets.
                             const REPATH_COOLDOWN: f64 = 0.3;
-                            let repath_allowed = current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
+                            let repath_allowed =
+                                current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
 
                             if needs_repath && repath_allowed {
                                 // Exclude chase target from occupied set so the target
@@ -7866,12 +8356,18 @@ impl InputHandler {
                                     match aa.target_type.as_str() {
                                         "npc" => {
                                             if let Some(npc) = state.npcs.get(&aa.target_id) {
-                                                occupied.remove(&(npc.server_x.round() as i32, npc.server_y.round() as i32));
+                                                occupied.remove(&(
+                                                    npc.server_x.round() as i32,
+                                                    npc.server_y.round() as i32,
+                                                ));
                                             }
                                         }
                                         "player" => {
                                             if let Some(p) = state.players.get(&aa.target_id) {
-                                                occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                                                occupied.remove(&(
+                                                    p.server_x.round() as i32,
+                                                    p.server_y.round() as i32,
+                                                ));
                                             }
                                         }
                                         _ => {}
@@ -7879,20 +8375,25 @@ impl InputHandler {
                                 }
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 let preferred = preferred_adjacent_tile_for_target(state, (tx, ty));
-                                if let Some((dest, path)) = find_path_to_adjacent_with_optimistic_splice(
-                                    state,
-                                    (player_x, player_y),
-                                    (tx, ty),
-                                    &occupied,
-                                    MAX_PATH_DISTANCE,
-                                    preferred,
-                                ) {
+                                if let Some((dest, path)) =
+                                    find_path_to_adjacent_with_optimistic_splice(
+                                        state,
+                                        (player_x, player_y),
+                                        (tx, ty),
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                        preferred,
+                                    )
+                                {
                                     state.auto_path = Some(PathState {
                                         path,
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                        interact_target: None,
+                                        interact_object_target: None,
+                                        waystone_target: None,
+                                        browse_stall_target: None,
                                     });
                                     state.last_chase_repath_time = current_time;
                                 }
@@ -7948,15 +8449,28 @@ impl InputHandler {
                                 state.follow_target_move_time = 0.0;
                                 let mut occupied = build_occupied_set(state, true);
                                 if let Some(p) = state.players.get(follow_id) {
-                                    occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                                    occupied.remove(&(
+                                        p.server_x.round() as i32,
+                                        p.server_y.round() as i32,
+                                    ));
                                 }
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                    (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                                    (px, py),
+                                    (tx, ty),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
                                 ) {
                                     state.auto_path = Some(PathState {
-                                        path, current_index: 0, destination: dest,
-                                        pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: None,
+                                        interact_target: None,
+                                        interact_object_target: None,
+                                        waystone_target: None,
+                                        browse_stall_target: None,
                                     });
                                     state.last_chase_repath_time = current_time;
                                 }
@@ -7973,20 +8487,34 @@ impl InputHandler {
                         };
 
                         const REPATH_COOLDOWN: f64 = 0.6;
-                        let repath_allowed = current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
+                        let repath_allowed =
+                            current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
 
                         if needs_repath && repath_allowed {
                             let mut occupied = build_occupied_set(state, true);
                             if let Some(p) = state.players.get(follow_id) {
-                                occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                                occupied.remove(&(
+                                    p.server_x.round() as i32,
+                                    p.server_y.round() as i32,
+                                ));
                             }
                             const MAX_PATH_DISTANCE: i32 = 32;
                             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                (px, py), (tx, ty), &state.chunk_manager, &occupied, MAX_PATH_DISTANCE,
+                                (px, py),
+                                (tx, ty),
+                                &state.chunk_manager,
+                                &occupied,
+                                MAX_PATH_DISTANCE,
                             ) {
                                 state.auto_path = Some(PathState {
-                                    path, current_index: 0, destination: dest,
-                                    pickup_target: None, interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                    path,
+                                    current_index: 0,
+                                    destination: dest,
+                                    pickup_target: None,
+                                    interact_target: None,
+                                    interact_object_target: None,
+                                    waystone_target: None,
+                                    browse_stall_target: None,
                                 });
                                 state.last_chase_repath_time = current_time;
                             }
@@ -8026,12 +8554,18 @@ impl InputHandler {
                             match aa.target_type.as_str() {
                                 "npc" => {
                                     if let Some(npc) = state.npcs.get(&aa.target_id) {
-                                        occupied.remove(&(npc.server_x.round() as i32, npc.server_y.round() as i32));
+                                        occupied.remove(&(
+                                            npc.server_x.round() as i32,
+                                            npc.server_y.round() as i32,
+                                        ));
                                     }
                                 }
                                 "player" => {
                                     if let Some(p) = state.players.get(&aa.target_id) {
-                                        occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                                        occupied.remove(&(
+                                            p.server_x.round() as i32,
+                                            p.server_y.round() as i32,
+                                        ));
                                     }
                                 }
                                 _ => {}
@@ -8039,7 +8573,10 @@ impl InputHandler {
                         }
                         if let Some(ref fid) = state.follow_target {
                             if let Some(p) = state.players.get(fid) {
-                                occupied.remove(&(p.server_x.round() as i32, p.server_y.round() as i32));
+                                occupied.remove(&(
+                                    p.server_x.round() as i32,
+                                    p.server_y.round() as i32,
+                                ));
                             }
                         }
                         if occupied.contains(&(next_x, next_y)) {
@@ -8107,12 +8644,16 @@ impl InputHandler {
                                     altar_npc_id: npc_id.clone(),
                                     altar_name: npc.display_name.clone(),
                                 });
-                            } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
-                                state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
+                            } else if npc.station_type.as_deref() == Some("furnace")
+                                || npc.station_type.as_deref() == Some("fire_pit")
+                            {
+                                state.ui_state.furnace_station_type =
+                                    npc.station_type.clone().unwrap_or_default();
                                 state.ui_state.fletching_open = false;
                                 state.ui_state.workbench_open = false;
                                 state.ui_state.furnace_open = true;
-                                state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                state.ui_state.furnace_tile =
+                                    Some((npc.x.round() as i32, npc.y.round() as i32));
                                 state.ui_state.furnace_selected_recipe = 0;
                                 state.ui_state.furnace_scroll_offset = 0.0;
                                 state.ui_state.furnace_quantity = 1;
@@ -8121,7 +8662,8 @@ impl InputHandler {
                                 state.ui_state.fletching_open = false;
                                 state.ui_state.workbench_open = false;
                                 state.ui_state.anvil_open = true;
-                                state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                state.ui_state.anvil_tile =
+                                    Some((npc.x.round() as i32, npc.y.round() as i32));
                                 state.ui_state.anvil_selected_recipe = 0;
                                 state.ui_state.anvil_scroll_offset = 0.0;
                                 state.ui_state.anvil_quantity = 1;
@@ -8130,7 +8672,8 @@ impl InputHandler {
                                 state.ui_state.fletching_open = false;
                                 state.ui_state.workbench_open = false;
                                 state.ui_state.alchemy_station_open = true;
-                                state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                state.ui_state.alchemy_station_tile =
+                                    Some((npc.x.round() as i32, npc.y.round() as i32));
                                 state.ui_state.alchemy_station_selected_recipe = 0;
                                 state.ui_state.alchemy_station_scroll_offset = 0.0;
                                 state.ui_state.alchemy_station_quantity = 1;
@@ -8139,7 +8682,8 @@ impl InputHandler {
                                 state.ui_state.fletching_open = false;
                                 state.ui_state.alchemy_station_open = false;
                                 state.ui_state.workbench_open = true;
-                                state.ui_state.workbench_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                state.ui_state.workbench_tile =
+                                    Some((npc.x.round() as i32, npc.y.round() as i32));
                                 state.ui_state.workbench_selected_recipe = 0;
                                 state.ui_state.workbench_scroll_offset = 0.0;
                                 state.ui_state.workbench_quantity = 1;
@@ -8165,7 +8709,9 @@ impl InputHandler {
                     }
                     // Handle browse stall target (left-click player with stall)
                     if let Some(ref player_id) = path_state.browse_stall_target {
-                        commands.push(InputCommand::StallBrowse { player_id: player_id.clone() });
+                        commands.push(InputCommand::StallBrowse {
+                            player_id: player_id.clone(),
+                        });
                     }
                 }
                 // Handle chair sit target
@@ -8245,7 +8791,10 @@ impl InputHandler {
             if current_time - self.last_attack_time >= self.attack_cooldown {
                 // Check if we should gather instead of attack
                 let should_gather = if let Some(player) = state.get_local_player() {
-                    if matches!(player.equipped_weapon.as_deref(), Some("fishing_rod" | "maple_rod")) {
+                    if matches!(
+                        player.equipped_weapon.as_deref(),
+                        Some("fishing_rod" | "maple_rod")
+                    ) {
                         let px = player.x.round() as i32;
                         let py = player.y.round() as i32;
                         let (fdx, fdy) = player.direction.to_unit_vector();
@@ -8551,7 +9100,10 @@ impl InputHandler {
                                                 current_index: 0,
                                                 destination: dest,
                                                 pickup_target: Some(item_id.clone()),
-                                                interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                                interact_target: None,
+                                                interact_object_target: None,
+                                                waystone_target: None,
+                                                browse_stall_target: None,
                                             });
                                         }
                                     }
@@ -8622,14 +9174,15 @@ impl InputHandler {
 
                 if is_attackable {
                     // Attackable NPC - target it and set up auto-action chase
-                    commands.push(InputCommand::Target { entity_id: npc_id.clone() });
-                    state.auto_action_state =
-                        Some(crate::game::AutoActionState {
-                            target_type: "npc".to_string(),
-                            target_id: npc_id.clone(),
-                            action: "attack".to_string(),
-                            confirmed: false,
-                        });
+                    commands.push(InputCommand::Target {
+                        entity_id: npc_id.clone(),
+                    });
+                    state.auto_action_state = Some(crate::game::AutoActionState {
+                        target_type: "npc".to_string(),
+                        target_id: npc_id.clone(),
+                        action: "attack".to_string(),
+                        confirmed: false,
+                    });
                     // Pathfind to adjacent tile, or send immediately if already adjacent
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(player) = state.players.get(local_id) {
@@ -8644,21 +9197,22 @@ impl InputHandler {
                                 if (cdx + cdy) != 1 {
                                     let occupied = build_occupied_set(state, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
-                                    if let Some((dest, path)) =
-                                        pathfinding::find_path_to_adjacent(
-                                            (player_x, player_y),
-                                            (npc_x, npc_y),
-                                            &state.chunk_manager,
-                                            &occupied,
-                                            MAX_PATH_DISTANCE,
-                                        )
-                                    {
+                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                        (player_x, player_y),
+                                        (npc_x, npc_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    ) {
                                         state.auto_path = Some(PathState {
                                             path,
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                            interact_target: None,
+                                            interact_object_target: None,
+                                            waystone_target: None,
+                                            browse_stall_target: None,
                                         });
                                     }
                                 } else {
@@ -8699,12 +9253,16 @@ impl InputHandler {
                                                 altar_npc_id: npc_id.clone(),
                                                 altar_name: npc.display_name.clone(),
                                             });
-                                    } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
-                                        state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
+                                    } else if npc.station_type.as_deref() == Some("furnace")
+                                        || npc.station_type.as_deref() == Some("fire_pit")
+                                    {
+                                        state.ui_state.furnace_station_type =
+                                            npc.station_type.clone().unwrap_or_default();
                                         state.ui_state.fletching_open = false;
                                         state.ui_state.workbench_open = false;
                                         state.ui_state.furnace_open = true;
-                                        state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                        state.ui_state.furnace_tile =
+                                            Some((npc.x.round() as i32, npc.y.round() as i32));
                                         state.ui_state.furnace_selected_recipe = 0;
                                         state.ui_state.furnace_scroll_offset = 0.0;
                                         state.ui_state.furnace_quantity = 1;
@@ -8713,16 +9271,19 @@ impl InputHandler {
                                         state.ui_state.fletching_open = false;
                                         state.ui_state.workbench_open = false;
                                         state.ui_state.anvil_open = true;
-                                        state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                        state.ui_state.anvil_tile =
+                                            Some((npc.x.round() as i32, npc.y.round() as i32));
                                         state.ui_state.anvil_selected_recipe = 0;
                                         state.ui_state.anvil_scroll_offset = 0.0;
                                         state.ui_state.anvil_quantity = 1;
                                         state.ui_state.anvil_tab = 0;
-                                    } else if npc.station_type.as_deref() == Some("alchemy_station") {
+                                    } else if npc.station_type.as_deref() == Some("alchemy_station")
+                                    {
                                         state.ui_state.fletching_open = false;
                                         state.ui_state.workbench_open = false;
                                         state.ui_state.alchemy_station_open = true;
-                                        state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                        state.ui_state.alchemy_station_tile =
+                                            Some((npc.x.round() as i32, npc.y.round() as i32));
                                         state.ui_state.alchemy_station_selected_recipe = 0;
                                         state.ui_state.alchemy_station_scroll_offset = 0.0;
                                         state.ui_state.alchemy_station_quantity = 1;
@@ -8731,7 +9292,8 @@ impl InputHandler {
                                         state.ui_state.fletching_open = false;
                                         state.ui_state.alchemy_station_open = false;
                                         state.ui_state.workbench_open = true;
-                                        state.ui_state.workbench_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                        state.ui_state.workbench_tile =
+                                            Some((npc.x.round() as i32, npc.y.round() as i32));
                                         state.ui_state.workbench_selected_recipe = 0;
                                         state.ui_state.workbench_scroll_offset = 0.0;
                                         state.ui_state.workbench_quantity = 1;
@@ -8762,7 +9324,10 @@ impl InputHandler {
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: Some(npc_id), interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                            interact_target: Some(npc_id),
+                                            interact_object_target: None,
+                                            waystone_target: None,
+                                            browse_stall_target: None,
                                         });
                                     }
                                 }
@@ -8787,26 +9352,28 @@ impl InputHandler {
                                 let cdy = (player_y - target_y).abs();
                                 if (cdx + cdy) <= 3 {
                                     // Already in range - browse immediately
-                                    commands.push(InputCommand::StallBrowse { player_id: entity_id.clone() });
+                                    commands.push(InputCommand::StallBrowse {
+                                        player_id: entity_id.clone(),
+                                    });
                                 } else {
                                     // Pathfind to adjacent tile, then browse on arrival
                                     let occupied = build_occupied_set(state, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
-                                    if let Some((dest, path)) =
-                                        pathfinding::find_path_to_adjacent(
-                                            (player_x, player_y),
-                                            (target_x, target_y),
-                                            &state.chunk_manager,
-                                            &occupied,
-                                            MAX_PATH_DISTANCE,
-                                        )
-                                    {
+                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                        (player_x, player_y),
+                                        (target_x, target_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    ) {
                                         state.auto_path = Some(PathState {
                                             path,
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: None, interact_object_target: None, waystone_target: None,
+                                            interact_target: None,
+                                            interact_object_target: None,
+                                            waystone_target: None,
                                             browse_stall_target: Some(entity_id.clone()),
                                         });
                                     }
@@ -8816,14 +9383,15 @@ impl InputHandler {
                     }
                 } else {
                     // Normal player click - target and set up auto-action chase
-                    commands.push(InputCommand::Target { entity_id: entity_id.clone() });
-                    state.auto_action_state =
-                        Some(crate::game::AutoActionState {
-                            target_type: "player".to_string(),
-                            target_id: entity_id.clone(),
-                            action: "attack".to_string(),
-                            confirmed: false,
-                        });
+                    commands.push(InputCommand::Target {
+                        entity_id: entity_id.clone(),
+                    });
+                    state.auto_action_state = Some(crate::game::AutoActionState {
+                        target_type: "player".to_string(),
+                        target_id: entity_id.clone(),
+                        action: "attack".to_string(),
+                        confirmed: false,
+                    });
                     // Pathfind to adjacent tile, or send immediately if already adjacent
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(local_player) = state.players.get(local_id) {
@@ -8838,21 +9406,22 @@ impl InputHandler {
                                 if (cdx + cdy) != 1 {
                                     let occupied = build_occupied_set(state, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
-                                    if let Some((dest, path)) =
-                                        pathfinding::find_path_to_adjacent(
-                                            (player_x, player_y),
-                                            (target_x, target_y),
-                                            &state.chunk_manager,
-                                            &occupied,
-                                            MAX_PATH_DISTANCE,
-                                        )
-                                    {
+                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                        (player_x, player_y),
+                                        (target_x, target_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    ) {
                                         state.auto_path = Some(PathState {
                                             path,
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                            interact_target: None,
+                                            interact_object_target: None,
+                                            waystone_target: None,
+                                            browse_stall_target: None,
                                         });
                                     }
                                 } else {
@@ -8898,13 +9467,12 @@ impl InputHandler {
                     if has_axe {
                         let target_id =
                             format!("{},{},{}", clicked_tile_x, clicked_tile_y, obj_gid);
-                        state.auto_action_state =
-                            Some(crate::game::AutoActionState {
-                                target_type: "resource".to_string(),
-                                target_id: target_id.clone(),
-                                action: "chop".to_string(),
-                                confirmed: false,
-                            });
+                        state.auto_action_state = Some(crate::game::AutoActionState {
+                            target_type: "resource".to_string(),
+                            target_id: target_id.clone(),
+                            action: "chop".to_string(),
+                            confirmed: false,
+                        });
                         // Pathfind to adjacent tile, or send immediately if already adjacent
                         if let Some(player) = state.get_local_player() {
                             let player_x = player.server_x.round() as i32;
@@ -8915,21 +9483,22 @@ impl InputHandler {
                             if (cdx + cdy) != 1 {
                                 let occupied = build_occupied_set(state, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
-                                if let Some((dest, path)) =
-                                    pathfinding::find_path_to_adjacent(
-                                        (player_x, player_y),
-                                        (clicked_tile_x, clicked_tile_y),
-                                        &state.chunk_manager,
-                                        &occupied,
-                                        MAX_PATH_DISTANCE,
-                                    )
-                                {
+                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                    (player_x, player_y),
+                                    (clicked_tile_x, clicked_tile_y),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
+                                ) {
                                     state.auto_path = Some(PathState {
                                         path,
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                        interact_target: None,
+                                        interact_object_target: None,
+                                        waystone_target: None,
+                                        browse_stall_target: None,
                                     });
                                 }
                             } else {
@@ -8964,13 +9533,12 @@ impl InputHandler {
                     if has_pickaxe {
                         let target_id =
                             format!("{},{},{}", clicked_tile_x, clicked_tile_y, obj_gid);
-                        state.auto_action_state =
-                            Some(crate::game::AutoActionState {
-                                target_type: "resource".to_string(),
-                                target_id: target_id.clone(),
-                                action: "mine".to_string(),
-                                confirmed: false,
-                            });
+                        state.auto_action_state = Some(crate::game::AutoActionState {
+                            target_type: "resource".to_string(),
+                            target_id: target_id.clone(),
+                            action: "mine".to_string(),
+                            confirmed: false,
+                        });
                         // Pathfind to adjacent tile, or send immediately if already adjacent
                         if let Some(player) = state.get_local_player() {
                             let player_x = player.server_x.round() as i32;
@@ -8981,21 +9549,22 @@ impl InputHandler {
                             if (cdx + cdy) != 1 {
                                 let occupied = build_occupied_set(state, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
-                                if let Some((dest, path)) =
-                                    pathfinding::find_path_to_adjacent(
-                                        (player_x, player_y),
-                                        (clicked_tile_x, clicked_tile_y),
-                                        &state.chunk_manager,
-                                        &occupied,
-                                        MAX_PATH_DISTANCE,
-                                    )
-                                {
+                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                    (player_x, player_y),
+                                    (clicked_tile_x, clicked_tile_y),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
+                                ) {
                                     state.auto_path = Some(PathState {
                                         path,
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                        interact_target: None,
+                                        interact_object_target: None,
+                                        waystone_target: None,
+                                        browse_stall_target: None,
                                     });
                                 }
                             } else {
@@ -9013,7 +9582,11 @@ impl InputHandler {
                             }
                         }
                     }
-                } else if is_obelisk_gid(obj_gid) || state.chest_positions.contains(&(clicked_tile_x, clicked_tile_y)) {
+                } else if is_obelisk_gid(obj_gid)
+                    || state
+                        .chest_positions
+                        .contains(&(clicked_tile_x, clicked_tile_y))
+                {
                     // Clicked on an obelisk or chest — walk to it and interact
                     if let Some(player) = state.get_local_player() {
                         let player_x = player.server_x.round() as i32;
@@ -9022,20 +9595,21 @@ impl InputHandler {
                         let cdy = (player_y - clicked_tile_y).abs();
                         if cdx <= 1 && cdy <= 1 {
                             // Already adjacent — interact immediately
-                            commands.push(InputCommand::InteractObject { x: clicked_tile_x, y: clicked_tile_y });
+                            commands.push(InputCommand::InteractObject {
+                                x: clicked_tile_x,
+                                y: clicked_tile_y,
+                            });
                         } else {
                             // Pathfind to adjacent tile, then interact
                             let occupied = build_occupied_set(state, true);
                             const MAX_PATH_DISTANCE: i32 = 32;
-                            if let Some((dest, path)) =
-                                pathfinding::find_path_to_adjacent(
-                                    (player_x, player_y),
-                                    (clicked_tile_x, clicked_tile_y),
-                                    &state.chunk_manager,
-                                    &occupied,
-                                    MAX_PATH_DISTANCE,
-                                )
-                            {
+                            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                (player_x, player_y),
+                                (clicked_tile_x, clicked_tile_y),
+                                &state.chunk_manager,
+                                &occupied,
+                                MAX_PATH_DISTANCE,
+                            ) {
                                 state.auto_path = Some(PathState {
                                     path,
                                     current_index: 0,
@@ -9043,7 +9617,8 @@ impl InputHandler {
                                     pickup_target: None,
                                     interact_target: None,
                                     interact_object_target: Some((clicked_tile_x, clicked_tile_y)),
-                                    waystone_target: None, browse_stall_target: None,
+                                    waystone_target: None,
+                                    browse_stall_target: None,
                                 });
                             }
                         }
@@ -9081,7 +9656,10 @@ impl InputHandler {
                                             current_index: 0,
                                             destination: dest,
                                             pickup_target: None,
-                                            interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                            interact_target: None,
+                                            interact_object_target: None,
+                                            waystone_target: None,
+                                            browse_stall_target: None,
                                         });
                                         state.pending_harvest_patch = Some(patch_id);
                                     }
@@ -9124,7 +9702,10 @@ impl InputHandler {
                                         current_index: 0,
                                         destination: dest,
                                         pickup_target: None,
-                                        interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                        interact_target: None,
+                                        interact_object_target: None,
+                                        waystone_target: None,
+                                        browse_stall_target: None,
                                     });
                                     state.pending_chair_sit =
                                         Some((clicked_tile_x, clicked_tile_y));
@@ -9145,20 +9726,21 @@ impl InputHandler {
                     let cdy = (py - clicked_tile_y).abs();
                     if cdx <= 1 && cdy <= 1 {
                         // Already adjacent — interact immediately
-                        commands.push(InputCommand::InteractObject { x: clicked_tile_x, y: clicked_tile_y });
+                        commands.push(InputCommand::InteractObject {
+                            x: clicked_tile_x,
+                            y: clicked_tile_y,
+                        });
                     } else {
                         // Pathfind to adjacent tile, then interact
                         let occupied = build_occupied_set(state, true);
                         const MAX_PATH_DISTANCE: i32 = 32;
-                        if let Some((dest, path)) =
-                            pathfinding::find_path_to_adjacent(
-                                (px, py),
-                                (clicked_tile_x, clicked_tile_y),
-                                &state.chunk_manager,
-                                &occupied,
-                                MAX_PATH_DISTANCE,
-                            )
-                        {
+                        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                            (px, py),
+                            (clicked_tile_x, clicked_tile_y),
+                            &state.chunk_manager,
+                            &occupied,
+                            MAX_PATH_DISTANCE,
+                        ) {
                             state.auto_path = Some(PathState {
                                 path,
                                 current_index: 0,
@@ -9166,7 +9748,8 @@ impl InputHandler {
                                 pickup_target: None,
                                 interact_target: None,
                                 interact_object_target: Some((clicked_tile_x, clicked_tile_y)),
-                                waystone_target: None, browse_stall_target: None,
+                                waystone_target: None,
+                                browse_stall_target: None,
                             });
                         }
                     }
@@ -9211,7 +9794,10 @@ impl InputHandler {
                                 current_index: 0,
                                 destination: (tile_x, tile_y),
                                 pickup_target: None,
-                                interact_target: None, interact_object_target: None, waystone_target: None, browse_stall_target: None,
+                                interact_target: None,
+                                interact_object_target: None,
+                                waystone_target: None,
+                                browse_stall_target: None,
                             });
                         }
                     }
@@ -9263,12 +9849,17 @@ impl InputHandler {
                     let ix = item.x.round() as i32;
                     let iy = item.y.round() as i32;
                     if ix == clicked_tile_x && iy == clicked_tile_y {
-                        break 'find_target ContextMenuTarget::GroundItem { id: item.id.clone() };
+                        break 'find_target ContextMenuTarget::GroundItem {
+                            id: item.id.clone(),
+                        };
                     }
                 }
 
                 // Check map objects (trees/rocks)
-                if let Some(obj) = state.chunk_manager.get_object_at_exact(clicked_tile_x, clicked_tile_y) {
+                if let Some(obj) = state
+                    .chunk_manager
+                    .get_object_at_exact(clicked_tile_x, clicked_tile_y)
+                {
                     let obj_gid = obj.gid;
                     if crate::game::tree_types::is_tree_gid(obj_gid) {
                         break 'find_target ContextMenuTarget::Tree {
@@ -9300,12 +9891,19 @@ impl InputHandler {
                 }
 
                 // Check farming patches
-                if let Some(patch_id) = state.farming_patch_positions.get(&(clicked_tile_x, clicked_tile_y)).cloned() {
+                if let Some(patch_id) = state
+                    .farming_patch_positions
+                    .get(&(clicked_tile_x, clicked_tile_y))
+                    .cloned()
+                {
                     break 'find_target ContextMenuTarget::FarmingPatch { patch_id };
                 }
 
                 // Default: empty tile
-                ContextMenuTarget::Tile { x: clicked_tile_x, y: clicked_tile_y }
+                ContextMenuTarget::Tile {
+                    x: clicked_tile_x,
+                    y: clicked_tile_y,
+                }
             };
 
             state.ui_state.context_menu = Some(ContextMenu {
@@ -9408,7 +10006,9 @@ impl InputHandler {
                     && vmy <= box_bottom;
                 if over_chat {
                     const SCROLL_SPEED: f32 = 40.0; // Pixels per scroll tick
-                    let max_scroll = layout.get_max_scroll(&UiElementId::ChatLogScrollbar).unwrap_or(0.0);
+                    let max_scroll = layout
+                        .get_max_scroll(&UiElementId::ChatLogScrollbar)
+                        .unwrap_or(0.0);
                     let delta = wheel_y * SCROLL_SPEED;
                     state.ui_state.chat_message_scroll =
                         (state.ui_state.chat_message_scroll + delta).clamp(0.0, max_scroll);
@@ -9419,7 +10019,9 @@ impl InputHandler {
         // Chat log scrollbar drag handling
         if state.ui_state.chat_log_visible {
             if let Some(track_bounds) = layout.get_bounds(&UiElementId::ChatLogScrollbar) {
-                let chat_max = layout.get_max_scroll(&UiElementId::ChatLogScrollbar).unwrap_or(0.0);
+                let chat_max = layout
+                    .get_max_scroll(&UiElementId::ChatLogScrollbar)
+                    .unwrap_or(0.0);
                 let chat_content_h = chat_max + track_bounds.h;
                 let clicked_on = matches!(clicked_element, Some(UiElementId::ChatLogScrollbar));
                 crate::ui::scroll::handle_scrollbar_drag_ex(
@@ -9450,15 +10052,20 @@ impl InputHandler {
                 );
                 if over_inventory {
                     const SCROLL_SPEED: f32 = 30.0;
-                    let max_scroll = layout.get_max_scroll(&UiElementId::InventoryScrollbar).unwrap_or(0.0);
+                    let max_scroll = layout
+                        .get_max_scroll(&UiElementId::InventoryScrollbar)
+                        .unwrap_or(0.0);
                     state.ui_state.inventory_scroll_offset =
-                        (state.ui_state.inventory_scroll_offset - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                        (state.ui_state.inventory_scroll_offset - wheel_y * SCROLL_SPEED)
+                            .clamp(0.0, max_scroll);
                 }
             }
 
             // Mouse scrollbar dragging (generic system)
             if let Some(track_bounds) = layout.get_bounds(&UiElementId::InventoryScrollbar) {
-                let inv_max_scroll = layout.get_max_scroll(&UiElementId::InventoryScrollbar).unwrap_or(0.0);
+                let inv_max_scroll = layout
+                    .get_max_scroll(&UiElementId::InventoryScrollbar)
+                    .unwrap_or(0.0);
                 let inv_content_h = inv_max_scroll + track_bounds.h;
                 let clicked_on = matches!(clicked_element, Some(UiElementId::InventoryScrollbar));
                 crate::ui::scroll::handle_scrollbar_drag(
@@ -9573,8 +10180,6 @@ impl InputHandler {
             state.ui_state.minimap_panel_dragging = false;
             return commands;
         }
-
-
 
         // Use/equip items or cast spells via unified hotkey bar (1-5 keys, disabled in classic mode)
         let quick_slot_keys = [
@@ -9692,12 +10297,16 @@ impl InputHandler {
                                             altar_npc_id: npc_id.clone(),
                                             altar_name: npc.display_name.clone(),
                                         });
-                                } else if npc.station_type.as_deref() == Some("furnace") || npc.station_type.as_deref() == Some("fire_pit") {
-                                    state.ui_state.furnace_station_type = npc.station_type.clone().unwrap_or_default();
+                                } else if npc.station_type.as_deref() == Some("furnace")
+                                    || npc.station_type.as_deref() == Some("fire_pit")
+                                {
+                                    state.ui_state.furnace_station_type =
+                                        npc.station_type.clone().unwrap_or_default();
                                     state.ui_state.fletching_open = false;
                                     state.ui_state.workbench_open = false;
                                     state.ui_state.furnace_open = true;
-                                    state.ui_state.furnace_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                    state.ui_state.furnace_tile =
+                                        Some((npc.x.round() as i32, npc.y.round() as i32));
                                     state.ui_state.furnace_selected_recipe = 0;
                                     state.ui_state.furnace_scroll_offset = 0.0;
                                     state.ui_state.furnace_quantity = 1;
@@ -9706,7 +10315,8 @@ impl InputHandler {
                                     state.ui_state.fletching_open = false;
                                     state.ui_state.workbench_open = false;
                                     state.ui_state.anvil_open = true;
-                                    state.ui_state.anvil_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                    state.ui_state.anvil_tile =
+                                        Some((npc.x.round() as i32, npc.y.round() as i32));
                                     state.ui_state.anvil_selected_recipe = 0;
                                     state.ui_state.anvil_scroll_offset = 0.0;
                                     state.ui_state.anvil_quantity = 1;
@@ -9715,7 +10325,8 @@ impl InputHandler {
                                     state.ui_state.fletching_open = false;
                                     state.ui_state.workbench_open = false;
                                     state.ui_state.alchemy_station_open = true;
-                                    state.ui_state.alchemy_station_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                    state.ui_state.alchemy_station_tile =
+                                        Some((npc.x.round() as i32, npc.y.round() as i32));
                                     state.ui_state.alchemy_station_selected_recipe = 0;
                                     state.ui_state.alchemy_station_scroll_offset = 0.0;
                                     state.ui_state.alchemy_station_quantity = 1;
@@ -9724,7 +10335,8 @@ impl InputHandler {
                                     state.ui_state.fletching_open = false;
                                     state.ui_state.alchemy_station_open = false;
                                     state.ui_state.workbench_open = true;
-                                    state.ui_state.workbench_tile = Some((npc.x.round() as i32, npc.y.round() as i32));
+                                    state.ui_state.workbench_tile =
+                                        Some((npc.x.round() as i32, npc.y.round() as i32));
                                     state.ui_state.workbench_selected_recipe = 0;
                                     state.ui_state.workbench_scroll_offset = 0.0;
                                     state.ui_state.workbench_quantity = 1;
@@ -9783,14 +10395,19 @@ impl InputHandler {
             let (_wheel_x, wheel_y) = mouse_wheel();
             if wheel_y != 0.0 {
                 const SCROLL_SPEED: f32 = 30.0;
-                let max_scroll = layout.get_max_scroll(&UiElementId::QuestLogScrollbar).unwrap_or(0.0);
-                state.ui_state.quest_log_scroll =
-                    (state.ui_state.quest_log_scroll - wheel_y * SCROLL_SPEED).clamp(0.0, max_scroll);
+                let max_scroll = layout
+                    .get_max_scroll(&UiElementId::QuestLogScrollbar)
+                    .unwrap_or(0.0);
+                state.ui_state.quest_log_scroll = (state.ui_state.quest_log_scroll
+                    - wheel_y * SCROLL_SPEED)
+                    .clamp(0.0, max_scroll);
             }
 
             // Scrollbar drag handling
             if let Some(track_bounds) = layout.get_bounds(&UiElementId::QuestLogScrollbar) {
-                let ql_max_scroll = layout.get_max_scroll(&UiElementId::QuestLogScrollbar).unwrap_or(0.0);
+                let ql_max_scroll = layout
+                    .get_max_scroll(&UiElementId::QuestLogScrollbar)
+                    .unwrap_or(0.0);
                 let ql_content_h = ql_max_scroll + track_bounds.h;
                 let clicked_on = matches!(clicked_element, Some(UiElementId::QuestLogScrollbar));
                 crate::ui::scroll::handle_scrollbar_drag(

@@ -158,7 +158,12 @@ impl InstanceManager {
     }
 
     /// Get or create a public instance for a map
-    pub fn get_or_create_public(&self, map_id: &str, width: u32, height: u32) -> (Arc<Instance>, bool) {
+    pub fn get_or_create_public(
+        &self,
+        map_id: &str,
+        width: u32,
+        height: u32,
+    ) -> (Arc<Instance>, bool) {
         if let Some(instance) = self.public_instances.get(map_id) {
             return (instance.clone(), false);
         }
@@ -184,7 +189,13 @@ impl InstanceManager {
     }
 
     /// Get or create a private instance for a player
-    pub fn get_or_create_private(&self, map_id: &str, owner_id: &str, width: u32, height: u32) -> (Arc<Instance>, bool) {
+    pub fn get_or_create_private(
+        &self,
+        map_id: &str,
+        owner_id: &str,
+        width: u32,
+        height: u32,
+    ) -> (Arc<Instance>, bool) {
         let key = (owner_id.to_string(), map_id.to_string());
 
         if let Some(instance) = self.private_instances.get(&key) {

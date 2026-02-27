@@ -115,7 +115,13 @@ impl Renderer {
         } else {
             (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
         };
-        draw_rectangle(close_btn_x, close_btn_y, close_btn_size, close_btn_size, close_border);
+        draw_rectangle(
+            close_btn_x,
+            close_btn_y,
+            close_btn_size,
+            close_btn_size,
+            close_border,
+        );
         draw_rectangle(
             close_btn_x + 1.0,
             close_btn_y + 1.0,
@@ -126,9 +132,27 @@ impl Renderer {
         let cx = close_btn_x + close_btn_size / 2.0;
         let cy = close_btn_y + close_btn_size / 2.0;
         let cross = close_btn_size * 0.25;
-        let cross_color = if is_close_hovered { TEXT_TITLE } else { TEXT_DIM };
-        draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
-        draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
+        let cross_color = if is_close_hovered {
+            TEXT_TITLE
+        } else {
+            TEXT_DIM
+        };
+        draw_line(
+            cx - cross,
+            cy - cross,
+            cx + cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
+        draw_line(
+            cx + cross,
+            cy - cross,
+            cx - cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
 
         // ===== TABS =====
         let tab_y = header_y + header_h + 2.0;
@@ -155,21 +179,34 @@ impl Renderer {
 
             // Border between tabs
             if idx > 0 {
-                draw_line(tx, tab_y + 4.0 * s, tx, tab_y + tab_h - 4.0 * s, 1.0, SLOT_BORDER);
+                draw_line(
+                    tx,
+                    tab_y + 4.0 * s,
+                    tx,
+                    tab_y + tab_h - 4.0 * s,
+                    1.0,
+                    SLOT_BORDER,
+                );
             }
 
             // Active tab bottom accent (brown for workbench)
             if is_active {
                 draw_line(
-                    tx + 4.0 * s, tab_y + tab_h - 1.0,
-                    tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0,
-                    2.0, Color::new(0.70, 0.50, 0.25, 1.0),
+                    tx + 4.0 * s,
+                    tab_y + tab_h - 1.0,
+                    tx + tab_w - 4.0 * s,
+                    tab_y + tab_h - 1.0,
+                    2.0,
+                    Color::new(0.70, 0.50, 0.25, 1.0),
                 );
             } else {
                 draw_line(
-                    tx + 4.0 * s, tab_y + tab_h - 1.0,
-                    tx + tab_w - 4.0 * s, tab_y + tab_h - 1.0,
-                    1.0, SLOT_BORDER,
+                    tx + 4.0 * s,
+                    tab_y + tab_h - 1.0,
+                    tx + tab_w - 4.0 * s,
+                    tab_y + tab_h - 1.0,
+                    1.0,
+                    SLOT_BORDER,
                 );
             }
 
@@ -197,7 +234,15 @@ impl Renderer {
 
         // If crafting is in progress, show progress overlay over full content area
         if state.ui_state.crafting_in_progress {
-            self.render_workbench_progress(state, hovered, layout, content_x, content_y, content_w, total_content_h);
+            self.render_workbench_progress(
+                state,
+                hovered,
+                layout,
+                content_x,
+                content_y,
+                content_w,
+                total_content_h,
+            );
         } else {
             // Compute detail panel height dynamically based on ingredient count
             let ingredient_count = {
@@ -212,7 +257,8 @@ impl Renderer {
                 recipes.sort_by(|a, b| {
                     let sa = a.section.as_deref().unwrap_or("");
                     let sb = b.section.as_deref().unwrap_or("");
-                    section_sort_key(sa).cmp(&section_sort_key(sb))
+                    section_sort_key(sa)
+                        .cmp(&section_sort_key(sb))
                         .then(a.level_required.cmp(&b.level_required))
                 });
                 recipes
@@ -228,12 +274,27 @@ impl Renderer {
             let ing_bottom_gap = 10.0 * s;
             let btn_h = 26.0 * s;
             let bottom_pad = 6.0 * s;
-            let detail_h = (top_pad + icon_h + sep_gap + ing_top + ing_rows + ing_bottom_gap + btn_h + bottom_pad)
+            let detail_h = (top_pad
+                + icon_h
+                + sep_gap
+                + ing_top
+                + ing_rows
+                + ing_bottom_gap
+                + btn_h
+                + bottom_pad)
                 .min(total_content_h * 0.65);
             let recipe_list_h = total_content_h - detail_h - 4.0 * s;
             let detail_y = content_y + recipe_list_h + 4.0 * s;
 
-            self.render_workbench_recipe_list(state, hovered, layout, content_x, content_y, content_w, recipe_list_h);
+            self.render_workbench_recipe_list(
+                state,
+                hovered,
+                layout,
+                content_x,
+                content_y,
+                content_w,
+                recipe_list_h,
+            );
 
             // Divider line between panels
             draw_line(
@@ -245,7 +306,9 @@ impl Renderer {
                 HEADER_BORDER,
             );
 
-            self.render_workbench_crafting_detail(state, hovered, layout, content_x, detail_y, content_w, detail_h);
+            self.render_workbench_crafting_detail(
+                state, hovered, layout, content_x, detail_y, content_w, detail_h,
+            );
         }
 
         // ===== FOOTER =====
@@ -262,24 +325,47 @@ impl Renderer {
         );
 
         if state.ui_state.crafting_in_progress {
-            self.draw_text_sharp("[Esc] Cancel", header_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                "[Esc] Cancel",
+                header_x + 10.0 * s,
+                footer_y + footer_h * 0.67,
+                16.0,
+                TEXT_DIM,
+            );
         } else {
-            self.draw_text_sharp("[W/S] Select", header_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[+/-] Qty", header_x + 125.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[Tab] Tab", header_x + 230.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
-            self.draw_text_sharp("[Enter] Craft", header_x + 330.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                "[W/S] Select",
+                header_x + 10.0 * s,
+                footer_y + footer_h * 0.67,
+                16.0,
+                TEXT_DIM,
+            );
+            self.draw_text_sharp(
+                "[+/-] Qty",
+                header_x + 125.0 * s,
+                footer_y + footer_h * 0.67,
+                16.0,
+                TEXT_DIM,
+            );
+            self.draw_text_sharp(
+                "[Tab] Tab",
+                header_x + 230.0 * s,
+                footer_y + footer_h * 0.67,
+                16.0,
+                TEXT_DIM,
+            );
+            self.draw_text_sharp(
+                "[Enter] Craft",
+                header_x + 330.0 * s,
+                footer_y + footer_h * 0.67,
+                16.0,
+                TEXT_DIM,
+            );
         }
     }
 
     /// Render the skill info bar: survivalist level, XP bar, recipe count
-    fn render_workbench_skill_bar(
-        &self,
-        state: &GameState,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-    ) {
+    fn render_workbench_skill_bar(&self, state: &GameState, x: f32, y: f32, w: f32, h: f32) {
         let s = state.ui_state.ui_scale;
 
         draw_rectangle(x, y, w, h, Color::new(0.10, 0.08, 0.06, 1.0));
@@ -341,12 +427,30 @@ impl Renderer {
         let bar_y = y + (h - bar_h) / 2.0;
 
         draw_rectangle(bar_x, bar_y, bar_w, bar_h, SLOT_BORDER);
-        draw_rectangle(bar_x + 1.0, bar_y + 1.0, bar_w - 2.0, bar_h - 2.0, SLOT_BG_EMPTY);
+        draw_rectangle(
+            bar_x + 1.0,
+            bar_y + 1.0,
+            bar_w - 2.0,
+            bar_h - 2.0,
+            SLOT_BG_EMPTY,
+        );
 
         let fill_w = (bar_w - 4.0) * xp_progress;
         if fill_w > 0.0 {
-            draw_rectangle(bar_x + 2.0, bar_y + 2.0, fill_w, bar_h - 4.0, WORKBENCH_PROGRESS_DARK);
-            draw_rectangle(bar_x + 2.0, bar_y + 2.0, fill_w, (bar_h - 4.0) / 2.0, WORKBENCH_PROGRESS_MID);
+            draw_rectangle(
+                bar_x + 2.0,
+                bar_y + 2.0,
+                fill_w,
+                bar_h - 4.0,
+                WORKBENCH_PROGRESS_DARK,
+            );
+            draw_rectangle(
+                bar_x + 2.0,
+                bar_y + 2.0,
+                fill_w,
+                (bar_h - 4.0) / 2.0,
+                WORKBENCH_PROGRESS_MID,
+            );
         }
 
         let xp_text = format!("{}/{}", xp_current, xp_needed);
@@ -365,9 +469,10 @@ impl Renderer {
             .iter()
             .filter(|r| r.station.as_deref() == Some("workbench"))
             .collect();
-        let unlocked = all_workbench.iter().filter(|r| {
-            !r.requires_discovery || state.discovered_recipes.contains(&r.id)
-        }).count();
+        let unlocked = all_workbench
+            .iter()
+            .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
+            .count();
         let total = all_workbench.len();
         let recipe_text = format!("Recipes: {}/{}", unlocked, total);
         let recipe_dims = self.measure_text_sharp(&recipe_text, 16.0);
@@ -407,7 +512,8 @@ impl Renderer {
         workbench_recipes.sort_by(|a, b| {
             let sa = a.section.as_deref().unwrap_or("");
             let sb = b.section.as_deref().unwrap_or("");
-            section_sort_key(sa).cmp(&section_sort_key(sb))
+            section_sort_key(sa)
+                .cmp(&section_sort_key(sb))
                 .then(a.level_required.cmp(&b.level_required))
         });
 
@@ -441,7 +547,10 @@ impl Renderer {
         }
 
         let max_scroll = (total_content - content_h).max(0.0);
-        let scroll_offset = state.ui_state.workbench_scroll_offset.clamp(0.0, max_scroll);
+        let scroll_offset = state
+            .ui_state
+            .workbench_scroll_offset
+            .clamp(0.0, max_scroll);
 
         // Scissor clipping for scrollable area
         let physical_w = screen_width();
@@ -527,12 +636,24 @@ impl Renderer {
             };
 
             if is_selected || is_hovered {
-                draw_rectangle(content_x + 2.0, y + 1.0, content_w - 4.0, row_height - 2.0, row_bg);
+                draw_rectangle(
+                    content_x + 2.0,
+                    y + 1.0,
+                    content_w - 4.0,
+                    row_height - 2.0,
+                    row_bg,
+                );
             }
 
             if is_selected {
                 // Left accent bar (brown for workbench)
-                draw_rectangle(content_x + 2.0, y + 4.0, 3.0, row_height - 8.0, Color::new(0.70, 0.50, 0.25, 1.0));
+                draw_rectangle(
+                    content_x + 2.0,
+                    y + 4.0,
+                    3.0,
+                    row_height - 8.0,
+                    Color::new(0.70, 0.50, 0.25, 1.0),
+                );
             }
 
             // Register click area
@@ -557,11 +678,7 @@ impl Renderer {
 
             // Recipe name
             let text_x = icon_x + icon_size + 10.0 * s;
-            let name_color = if is_selected {
-                TEXT_TITLE
-            } else {
-                TEXT_NORMAL
-            };
+            let name_color = if is_selected { TEXT_TITLE } else { TEXT_NORMAL };
             self.draw_text_sharp(&recipe.display_name, text_x, y + 20.0 * s, 16.0, name_color);
 
             // Draw each ingredient with individual green/red color
@@ -627,11 +744,19 @@ impl Renderer {
 
             let visible_ratio = (content_h / total_content).min(1.0);
             let thumb_h = (scrollbar_track_h * visible_ratio).max(16.0 * s);
-            let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+            let scroll_ratio = if max_scroll > 0.0 {
+                scroll_offset / max_scroll
+            } else {
+                0.0
+            };
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
             let is_dragging = state.ui_state.workbench_scroll_drag.dragging;
             let is_scrollbar_hovered = matches!(hovered, Some(UiElementId::WorkbenchScrollbar));
-            let thumb_color = if is_dragging || is_scrollbar_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
+            let thumb_color = if is_dragging || is_scrollbar_hovered {
+                SLOT_HOVER_BORDER
+            } else {
+                SLOT_BORDER
+            };
             draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
             layout.add_scrollbar(
                 UiElementId::WorkbenchScrollbar,
@@ -666,7 +791,8 @@ impl Renderer {
         workbench_recipes.sort_by(|a, b| {
             let sa = a.section.as_deref().unwrap_or("");
             let sb = b.section.as_deref().unwrap_or("");
-            section_sort_key(sa).cmp(&section_sort_key(sb))
+            section_sort_key(sa)
+                .cmp(&section_sort_key(sb))
                 .then(a.level_required.cmp(&b.level_required))
         });
 
@@ -699,14 +825,23 @@ impl Renderer {
         if let Some(result) = recipe.results.first() {
             self.draw_item_icon(
                 &result.item_id,
-                icon_x, header_y,
-                icon_size, icon_size,
-                state, true,
+                icon_x,
+                header_y,
+                icon_size,
+                icon_size,
+                state,
+                true,
             );
         }
 
         let text_x = icon_x + icon_size + 10.0 * s;
-        self.draw_text_sharp(&recipe.display_name, text_x, header_y + 16.0 * s, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            &recipe.display_name,
+            text_x,
+            header_y + 16.0 * s,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Info line: Lv · XP · time
         let mut info_parts = Vec::new();
@@ -744,11 +879,7 @@ impl Renderer {
 
         // ===== SEPARATOR =====
         let sep_y = header_y + icon_size + 8.0 * s;
-        draw_line(
-            x + pad, sep_y,
-            right_edge, sep_y,
-            1.0, HEADER_BORDER,
-        );
+        draw_line(x + pad, sep_y, right_edge, sep_y, 1.0, HEADER_BORDER);
 
         // ===== INGREDIENT ROWS =====
         let ing_left = icon_x + 8.0;
@@ -776,20 +907,17 @@ impl Renderer {
             let icon_y_centered = row_y + (ing_row_h - ing_icon_size) / 2.0;
             self.draw_item_icon(
                 &ing.item_id,
-                ing_left, icon_y_centered,
-                ing_icon_size, ing_icon_size,
-                state, false,
+                ing_left,
+                icon_y_centered,
+                ing_icon_size,
+                ing_icon_size,
+                state,
+                false,
             );
 
             // Ingredient name
             let name_x = ing_left + ing_icon_size + 18.0;
-            self.draw_text_sharp(
-                name,
-                name_x,
-                row_y + ing_row_h * 0.68,
-                16.0,
-                color,
-            );
+            self.draw_text_sharp(name, name_x, row_y + ing_row_h * 0.68, 16.0, color);
 
             // Have/need count (right-aligned)
             let count_text = format!("{} / {}", have, ing.count);
@@ -828,14 +956,24 @@ impl Renderer {
             (SLOT_BG_EMPTY, SLOT_BORDER)
         };
         draw_rectangle(minus_x, btn_y, qty_btn_size, qty_btn_size, minus_border);
-        draw_rectangle(minus_x + 1.0, btn_y + 1.0, qty_btn_size - 2.0, qty_btn_size - 2.0, minus_bg);
+        draw_rectangle(
+            minus_x + 1.0,
+            btn_y + 1.0,
+            qty_btn_size - 2.0,
+            qty_btn_size - 2.0,
+            minus_bg,
+        );
         let minus_dims = self.measure_text_sharp("-", 16.0);
         self.draw_text_sharp(
             "-",
             minus_x + (qty_btn_size - minus_dims.width) / 2.0,
             btn_y + qty_btn_size * 0.73,
             16.0,
-            if is_minus_hovered { TEXT_TITLE } else { TEXT_NORMAL },
+            if is_minus_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_NORMAL
+            },
         );
 
         // Quantity display
@@ -862,14 +1000,24 @@ impl Renderer {
             (SLOT_BG_EMPTY, SLOT_BORDER)
         };
         draw_rectangle(plus_x, btn_y, qty_btn_size, qty_btn_size, plus_border);
-        draw_rectangle(plus_x + 1.0, btn_y + 1.0, qty_btn_size - 2.0, qty_btn_size - 2.0, plus_bg);
+        draw_rectangle(
+            plus_x + 1.0,
+            btn_y + 1.0,
+            qty_btn_size - 2.0,
+            qty_btn_size - 2.0,
+            plus_bg,
+        );
         let plus_dims = self.measure_text_sharp("+", 16.0);
         self.draw_text_sharp(
             "+",
             plus_x + (qty_btn_size - plus_dims.width) / 2.0,
             btn_y + qty_btn_size * 0.73,
             16.0,
-            if is_plus_hovered { TEXT_TITLE } else { TEXT_NORMAL },
+            if is_plus_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_NORMAL
+            },
         );
 
         // CRAFT button (right-aligned)
@@ -883,16 +1031,29 @@ impl Renderer {
             layout.add(UiElementId::WorkbenchCraftButton, bounds);
         }
 
-        let is_craft_hovered = can_craft && matches!(hovered, Some(UiElementId::WorkbenchCraftButton));
+        let is_craft_hovered =
+            can_craft && matches!(hovered, Some(UiElementId::WorkbenchCraftButton));
         let (btn_bg, btn_border) = if !can_craft {
             (Color::new(0.12, 0.08, 0.06, 1.0), SLOT_BORDER)
         } else if is_craft_hovered {
-            (Color::new(0.50, 0.35, 0.15, 1.0), Color::new(0.70, 0.50, 0.25, 1.0))
+            (
+                Color::new(0.50, 0.35, 0.15, 1.0),
+                Color::new(0.70, 0.50, 0.25, 1.0),
+            )
         } else {
-            (Color::new(0.40, 0.28, 0.12, 1.0), Color::new(0.60, 0.42, 0.20, 1.0))
+            (
+                Color::new(0.40, 0.28, 0.12, 1.0),
+                Color::new(0.60, 0.42, 0.20, 1.0),
+            )
         };
 
-        draw_rectangle(craft_btn_x, craft_btn_y, craft_btn_w, craft_btn_h, btn_border);
+        draw_rectangle(
+            craft_btn_x,
+            craft_btn_y,
+            craft_btn_w,
+            craft_btn_h,
+            btn_border,
+        );
         draw_rectangle(
             craft_btn_x + 1.0,
             craft_btn_y + 1.0,
@@ -912,7 +1073,11 @@ impl Renderer {
             );
         }
 
-        let craft_text = if can_craft { "[ CRAFT ]" } else { "Can't Craft" };
+        let craft_text = if can_craft {
+            "[ CRAFT ]"
+        } else {
+            "Can't Craft"
+        };
         let craft_text_w = self.measure_text_sharp(craft_text, 16.0).width;
         let craft_text_color = if !can_craft {
             Color::new(0.5, 0.3, 0.3, 1.0)
@@ -1001,8 +1166,7 @@ impl Renderer {
         if state.ui_state.batch_total > 1 {
             let batch_text = format!(
                 "{}/{}",
-                state.ui_state.batch_completed,
-                state.ui_state.batch_total
+                state.ui_state.batch_completed, state.ui_state.batch_total
             );
             let batch_dims = self.measure_text_sharp(&batch_text, 16.0);
             self.draw_text_sharp(
@@ -1021,7 +1185,13 @@ impl Renderer {
         let bar_y = area_y + area_h / 2.0 - bar_height / 2.0 + 10.0;
 
         draw_rectangle(bar_x, bar_y, bar_width, bar_height, SLOT_BORDER);
-        draw_rectangle(bar_x + 1.0, bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, SLOT_BG_EMPTY);
+        draw_rectangle(
+            bar_x + 1.0,
+            bar_y + 1.0,
+            bar_width - 2.0,
+            bar_height - 2.0,
+            SLOT_BG_EMPTY,
+        );
         draw_line(
             bar_x + 2.0,
             bar_y + 2.0,
@@ -1038,8 +1208,21 @@ impl Renderer {
             let fill_h = bar_height - 4.0;
 
             draw_rectangle(fill_x, fill_y, fill_width, fill_h, WORKBENCH_PROGRESS_DARK);
-            draw_rectangle(fill_x, fill_y, fill_width, fill_h / 2.0, WORKBENCH_PROGRESS_MID);
-            draw_line(fill_x, fill_y, fill_x + fill_width, fill_y, 1.0, WORKBENCH_PROGRESS_LIGHT);
+            draw_rectangle(
+                fill_x,
+                fill_y,
+                fill_width,
+                fill_h / 2.0,
+                WORKBENCH_PROGRESS_MID,
+            );
+            draw_line(
+                fill_x,
+                fill_y,
+                fill_x + fill_width,
+                fill_y,
+                1.0,
+                WORKBENCH_PROGRESS_LIGHT,
+            );
         }
 
         // Percentage
@@ -1064,13 +1247,25 @@ impl Renderer {
 
         let is_cancel_hovered = matches!(_hovered, Some(UiElementId::WorkbenchCancelButton));
         let (cancel_bg, cancel_border) = if is_cancel_hovered {
-            (Color::new(0.45, 0.15, 0.15, 1.0), Color::new(0.6, 0.2, 0.2, 1.0))
+            (
+                Color::new(0.45, 0.15, 0.15, 1.0),
+                Color::new(0.6, 0.2, 0.2, 1.0),
+            )
         } else {
-            (Color::new(0.35, 0.12, 0.12, 1.0), Color::new(0.5, 0.18, 0.18, 1.0))
+            (
+                Color::new(0.35, 0.12, 0.12, 1.0),
+                Color::new(0.5, 0.18, 0.18, 1.0),
+            )
         };
 
         draw_rectangle(cancel_x, cancel_y, cancel_w, cancel_h, cancel_border);
-        draw_rectangle(cancel_x + 1.0, cancel_y + 1.0, cancel_w - 2.0, cancel_h - 2.0, cancel_bg);
+        draw_rectangle(
+            cancel_x + 1.0,
+            cancel_y + 1.0,
+            cancel_w - 2.0,
+            cancel_h - 2.0,
+            cancel_bg,
+        );
 
         let cancel_text = "[ CANCEL ]";
         let cancel_text_w = self.measure_text_sharp(cancel_text, 16.0).width;

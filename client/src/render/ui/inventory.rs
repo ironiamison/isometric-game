@@ -548,12 +548,31 @@ impl Renderer {
         // Spell drag — render spell icon instead of item sprite
         if let DragSource::Spell(ref spell_id) = drag.source {
             if let Some((texture, source_rect)) = self.spell_icons.get(spell_id.as_str()) {
-                let (iw, ih) = if let Some(r) = source_rect { (r.w, r.h) } else { (texture.width(), texture.height()) };
-                draw_texture_ex(texture, mx - iw / 2.0, my - ih / 2.0, Color::new(1.0, 1.0, 1.0, 0.7), DrawTextureParams { source: source_rect, ..Default::default() });
+                let (iw, ih) = if let Some(r) = source_rect {
+                    (r.w, r.h)
+                } else {
+                    (texture.width(), texture.height())
+                };
+                draw_texture_ex(
+                    texture,
+                    mx - iw / 2.0,
+                    my - ih / 2.0,
+                    Color::new(1.0, 1.0, 1.0, 0.7),
+                    DrawTextureParams {
+                        source: source_rect,
+                        ..Default::default()
+                    },
+                );
             } else {
                 // Fallback: colored square
                 let icon_size = 32.0;
-                draw_rectangle(mx - icon_size / 2.0, my - icon_size / 2.0, icon_size, icon_size, Color::new(0.3, 0.5, 0.9, 0.7));
+                draw_rectangle(
+                    mx - icon_size / 2.0,
+                    my - icon_size / 2.0,
+                    icon_size,
+                    icon_size,
+                    Color::new(0.3, 0.5, 0.9, 0.7),
+                );
             }
             return;
         }

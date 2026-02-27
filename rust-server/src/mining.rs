@@ -80,10 +80,10 @@ pub struct MineResult {
 /// Gem tiers with drop rates (increasingly rare for higher-level gems).
 /// Checked on every successful ore mine.
 const GEM_DROP_TABLE: &[(&str, f64)] = &[
-    ("uncut_sapphire", 1.0 / 64.0),   // ~1.56%
-    ("uncut_emerald", 1.0 / 128.0),    // ~0.78%
-    ("uncut_ruby", 1.0 / 256.0),       // ~0.39%
-    ("uncut_diamond", 1.0 / 512.0),    // ~0.20%
+    ("uncut_sapphire", 1.0 / 64.0), // ~1.56%
+    ("uncut_emerald", 1.0 / 128.0), // ~0.78%
+    ("uncut_ruby", 1.0 / 256.0),    // ~0.39%
+    ("uncut_diamond", 1.0 / 512.0), // ~0.20%
 ];
 
 /// Roll for a bonus gem drop. Returns the item ID if one drops.
@@ -280,7 +280,8 @@ impl MiningSystem {
         let xp_gained = ore_config.xp_per_ore;
         // Effective success = base + tool bonus + 0.3% per level above requirement (capped at 40%)
         let level_bonus = (player_mining_level - ore_config.level_required).max(0) as f32 * 0.003;
-        let success_chance = (ore_config.success_chance + tool_success_bonus + level_bonus).min(0.40);
+        let success_chance =
+            (ore_config.success_chance + tool_success_bonus + level_bonus).min(0.40);
         let depletion_chance = ore_config.depletion_chance;
         let respawn_min = ore_config.respawn_time_min;
         let respawn_max = ore_config.respawn_time_max;

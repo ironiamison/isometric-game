@@ -16,8 +16,12 @@ pub struct SlayerTaskDef {
     pub xp_per_kill: i64,
 }
 
-fn default_weight() -> i32 { 10 }
-fn default_xp_per_kill() -> i64 { 15 }
+fn default_weight() -> i32 {
+    10
+}
+fn default_xp_per_kill() -> i64 {
+    15
+}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SlayerMasterDef {
@@ -33,7 +37,9 @@ pub struct SlayerMasterDef {
     pub tasks: Vec<SlayerTaskDef>,
 }
 
-fn default_points_per_task() -> i32 { 2 }
+fn default_points_per_task() -> i32 {
+    2
+}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SlayerRewardDef {
@@ -48,7 +54,9 @@ pub struct SlayerRewardDef {
     pub quantity: i32,
 }
 
-fn default_quantity() -> i32 { 1 }
+fn default_quantity() -> i32 {
+    1
+}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SlayerMastersFile {

@@ -317,7 +317,10 @@ impl UiLayout {
         const MIN_HIT_WIDTH: f32 = 20.0;
         let extra = (MIN_HIT_WIDTH - bounds.w).max(0.0);
         let hit_bounds = Rect::new(bounds.x - extra, bounds.y, bounds.w + extra, bounds.h);
-        self.elements.push(UiElement { id, bounds: hit_bounds });
+        self.elements.push(UiElement {
+            id,
+            bounds: hit_bounds,
+        });
     }
 
     /// Get bounds for a specific element

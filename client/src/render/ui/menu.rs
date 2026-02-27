@@ -524,7 +524,6 @@ impl Renderer {
             16.0,
             disconnect_text_color,
         );
-
     }
 
     /// Draw a compact slider with label on left

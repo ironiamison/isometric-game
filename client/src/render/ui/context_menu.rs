@@ -137,7 +137,11 @@ impl Renderer {
                     .gathering_markers
                     .get(*marker_index)
                     .map(|m| {
-                        let action = if m.skill == "fishing" { "Fish" } else { "Gather" };
+                        let action = if m.skill == "fishing" {
+                            "Fish"
+                        } else {
+                            "Gather"
+                        };
                         push_option(&mut options, action);
                         m.zone_id.clone()
                     })
@@ -173,7 +177,11 @@ impl Renderer {
                 push_option(&mut options, "Examine");
                 "Farming Patch".to_string()
             }
-            ContextMenuTarget::MapObject { tile_x, tile_y, gid } => {
+            ContextMenuTarget::MapObject {
+                tile_x,
+                tile_y,
+                gid,
+            } => {
                 let is_chest = state.chest_positions.contains(&(*tile_x, *tile_y));
                 let name = crate::input::handler::get_map_object_name(*gid);
                 if crate::input::handler::is_obelisk_gid(*gid) {
@@ -231,7 +239,13 @@ impl Renderer {
         // Background — single dark rect with thin 1px border
         let bg = Color::new(0.08, 0.08, 0.12, 0.95);
         let border = Color::new(0.25, 0.25, 0.30, 0.8);
-        draw_rectangle(menu_x - 1.0, menu_y - 1.0, menu_width + 2.0, menu_height + 2.0, border);
+        draw_rectangle(
+            menu_x - 1.0,
+            menu_y - 1.0,
+            menu_width + 2.0,
+            menu_height + 2.0,
+            border,
+        );
         draw_rectangle(menu_x, menu_y, menu_width, menu_height, bg);
 
         // Header — just the title text, slightly dimmer
@@ -246,7 +260,14 @@ impl Renderer {
 
         // Thin separator line under header
         let sep_y = (menu_y + header_height).floor();
-        draw_line(menu_x + 2.0, sep_y, menu_x + menu_width - 2.0, sep_y, 1.0, border);
+        draw_line(
+            menu_x + 2.0,
+            sep_y,
+            menu_x + menu_width - 2.0,
+            sep_y,
+            1.0,
+            border,
+        );
 
         // Options
         let (mouse_x, mouse_y) = mouse_position();
@@ -263,14 +284,16 @@ impl Renderer {
 
             if is_hovered {
                 let hover_bg = Color::new(0.20, 0.20, 0.28, 0.9);
-                draw_rectangle(option_bounds.x, option_bounds.y, option_bounds.w, option_bounds.h, hover_bg);
+                draw_rectangle(
+                    option_bounds.x,
+                    option_bounds.y,
+                    option_bounds.w,
+                    option_bounds.h,
+                    hover_bg,
+                );
             }
 
-            let text_color = if is_hovered {
-                TEXT_TITLE
-            } else {
-                TEXT_NORMAL
-            };
+            let text_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
             self.draw_text_sharp(
                 label,
                 (menu_x + h_pad).floor(),
@@ -281,6 +304,5 @@ impl Renderer {
 
             y += option_height;
         }
-
     }
 }

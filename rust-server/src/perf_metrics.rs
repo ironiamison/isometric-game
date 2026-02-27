@@ -421,7 +421,8 @@ impl PerfMetrics {
                 ),
                 state_sync_capacity_skip_rate_pct: percent(
                     inner.counters.state_sync_capacity_skips,
-                    inner.counters.state_sync_send_attempts + inner.counters.state_sync_capacity_skips,
+                    inner.counters.state_sync_send_attempts
+                        + inner.counters.state_sync_capacity_skips,
                 ),
                 state_sync_full_share_pct: percent(
                     inner.counters.state_sync_full_sends,

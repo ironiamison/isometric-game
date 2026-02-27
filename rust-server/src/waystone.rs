@@ -59,10 +59,7 @@ impl WaystoneManager {
                 }
             }
         } else {
-            tracing::warn!(
-                "No waystones.toml found at {:?}, no waystones loaded",
-                path
-            );
+            tracing::warn!("No waystones.toml found at {:?}, no waystones loaded", path);
             Vec::new()
         };
 

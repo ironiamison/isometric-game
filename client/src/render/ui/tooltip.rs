@@ -92,13 +92,23 @@ impl Renderer {
 
                 let station = state.ui_state.furnace_station_type.as_str();
                 let is_fire_pit = station == "fire_pit";
-                let section_filter = if is_fire_pit { "fish" } else if state.ui_state.furnace_tab == 0 { "materials" } else { "jewelry" };
+                let section_filter = if is_fire_pit {
+                    "fish"
+                } else if state.ui_state.furnace_tab == 0 {
+                    "materials"
+                } else {
+                    "jewelry"
+                };
                 let mut furnace_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
                     .filter(|r| r.station.as_deref() == Some(station))
                     .filter(|r| {
-                        if is_fire_pit { true } else { r.section.as_deref() == Some(section_filter) }
+                        if is_fire_pit {
+                            true
+                        } else {
+                            r.section.as_deref() == Some(section_filter)
+                        }
                     })
                     .filter(|r| !r.requires_discovery || state.discovered_recipes.contains(&r.id))
                     .collect();
@@ -106,7 +116,9 @@ impl Renderer {
                 if let Some(recipe) = furnace_recipes.get(*idx) {
                     if recipe.level_required > 1 {
                         smithing_req = Some(recipe.level_required);
-                        if is_fire_pit { skill_req_name = "Survivalist"; }
+                        if is_fire_pit {
+                            skill_req_name = "Survivalist";
+                        }
                     }
                     if let Some(result) = recipe.results.first() {
                         (result.item_id.clone(), result.count)
@@ -118,7 +130,11 @@ impl Renderer {
                 }
             }
             Some(UiElementId::AnvilRecipeCell(idx)) if state.ui_state.anvil_open => {
-                let section_filter = if state.ui_state.anvil_tab == 0 { "materials" } else { "equipment" };
+                let section_filter = if state.ui_state.anvil_tab == 0 {
+                    "materials"
+                } else {
+                    "equipment"
+                };
                 let mut anvil_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
@@ -141,7 +157,8 @@ impl Renderer {
                 }
             }
             Some(UiElementId::AlchemyRecipeItem(idx)) if state.ui_state.alchemy_station_open => {
-                let tab_sections = super::alchemy_station::sections_for_tab(state.ui_state.alchemy_station_tab);
+                let tab_sections =
+                    super::alchemy_station::sections_for_tab(state.ui_state.alchemy_station_tab);
                 let mut alchemy_recipes: Vec<_> = state
                     .recipe_definitions
                     .iter()
@@ -152,7 +169,8 @@ impl Renderer {
                 alchemy_recipes.sort_by(|a, b| {
                     let sa = a.section.as_deref().unwrap_or("");
                     let sb = b.section.as_deref().unwrap_or("");
-                    crate::render::ui::crafting::section_sort_key(sa).cmp(&crate::render::ui::crafting::section_sort_key(sb))
+                    crate::render::ui::crafting::section_sort_key(sa)
+                        .cmp(&crate::render::ui::crafting::section_sort_key(sb))
                         .then(a.level_required.cmp(&b.level_required))
                 });
                 if let Some(recipe) = alchemy_recipes.get(*idx) {
@@ -295,10 +313,7 @@ impl Renderer {
                 } else {
                     format!("{} Magic", equip.magic_bonus)
                 };
-                max_w = max_w.max(
-                    self.measure_text_sharp(&magic_text, small_font_size)
-                        .width,
-                );
+                max_w = max_w.max(self.measure_text_sharp(&magic_text, small_font_size).width);
             }
             // Measure requirement text
             let is_weapon = equip.slot_type == "weapon";
@@ -313,22 +328,32 @@ impl Renderer {
                 max_w = max_w.max(self.measure_text_sharp(&req_text, small_font_size).width);
             }
             if equip.woodcutting_level_required > 1 {
-                let wc_req_text = format!("Requires {} Woodcutting", equip.woodcutting_level_required);
+                let wc_req_text =
+                    format!("Requires {} Woodcutting", equip.woodcutting_level_required);
                 max_w = max_w.max(self.measure_text_sharp(&wc_req_text, small_font_size).width);
             }
             if equip.mining_level_required > 1 {
                 let mining_req_text = format!("Requires {} Mining", equip.mining_level_required);
-                max_w = max_w.max(self.measure_text_sharp(&mining_req_text, small_font_size).width);
+                max_w = max_w.max(
+                    self.measure_text_sharp(&mining_req_text, small_font_size)
+                        .width,
+                );
             }
             if equip.magic_level_required > 0 {
                 let magic_req_text = format!("Requires {} Magic", equip.magic_level_required);
-                max_w = max_w.max(self.measure_text_sharp(&magic_req_text, small_font_size).width);
+                max_w = max_w.max(
+                    self.measure_text_sharp(&magic_req_text, small_font_size)
+                        .width,
+                );
             }
         }
 
         if let Some(req) = smithing_req {
             let smithing_req_text = format!("Requires {} {}", req, skill_req_name);
-            max_w = max_w.max(self.measure_text_sharp(&smithing_req_text, small_font_size).width);
+            max_w = max_w.max(
+                self.measure_text_sharp(&smithing_req_text, small_font_size)
+                    .width,
+            );
         }
 
         let tooltip_width = (max_w + padding * 2.0).ceil().min(max_tooltip_width);
@@ -629,7 +654,11 @@ impl Renderer {
             y += 2.0;
             let stat_green = Color::new(0.392, 0.784, 0.392, 1.0);
             let stat_red = Color::new(1.0, 0.392, 0.392, 1.0);
-            let player_level = if skill_req_name == "Survivalist" { player_survivalist_level } else { player_smithing_level };
+            let player_level = if skill_req_name == "Survivalist" {
+                player_survivalist_level
+            } else {
+                player_smithing_level
+            };
             let meets_req = player_level >= req;
             let req_color = if meets_req { stat_green } else { stat_red };
             let req_text = format!("Requires {} {}", req, skill_req_name);

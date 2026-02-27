@@ -88,11 +88,7 @@ impl GroundSpawnManager {
     /// Mark a ground item as picked up by matching its active_ground_item_id.
     pub fn mark_picked_up(&mut self, ground_item_id: &str) {
         for state in self.spawns.values_mut() {
-            if state
-                .active_ground_item_id
-                .as_deref()
-                == Some(ground_item_id)
-            {
+            if state.active_ground_item_id.as_deref() == Some(ground_item_id) {
                 state.picked_up_at = Some(Instant::now());
                 state.active_ground_item_id = None;
                 tracing::debug!(

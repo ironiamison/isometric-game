@@ -189,7 +189,13 @@ impl Renderer {
         layout.add(UiElementId::BankCloseButton, close_rect);
         let close_hovered = matches!(hovered, Some(UiElementId::BankCloseButton));
         let close_color = if close_hovered { TEXT_GOLD } else { TEXT_DIM };
-        self.draw_text_sharp("X", close_x + (close_size - self.measure_text_sharp("X", 16.0).width) / 2.0, close_y + close_size * 0.71, 16.0, close_color);
+        self.draw_text_sharp(
+            "X",
+            close_x + (close_size - self.measure_text_sharp("X", 16.0).width) / 2.0,
+            close_y + close_size * 0.71,
+            16.0,
+            close_color,
+        );
 
         // Content area
         let content_x = panel_x + FRAME_THICKNESS + padding;
@@ -286,7 +292,12 @@ impl Renderer {
         let da_text = "Deposit All";
         let da_text_dims = self.measure_text_sharp(da_text, 16.0);
         let da_text_x = right_x + inv_grid_w - da_text_dims.width - hdr_pad;
-        let da_rect = Rect::new(da_text_x - 2.0, content_y, da_text_dims.width + 4.0, col_header_h);
+        let da_rect = Rect::new(
+            da_text_x - 2.0,
+            content_y,
+            da_text_dims.width + 4.0,
+            col_header_h,
+        );
         layout.add(UiElementId::BankDepositAllButton, da_rect);
         let da_hovered = matches!(hovered, Some(UiElementId::BankDepositAllButton));
         self.draw_text_sharp(
@@ -380,12 +391,7 @@ impl Renderer {
                             mx - drag_slot_size / 2.0 + 2.0 * s,
                             my + drag_slot_size / 2.0 - 5.0 * s,
                             16.0,
-                            Color::new(
-                                TEXT_NORMAL.r,
-                                TEXT_NORMAL.g,
-                                TEXT_NORMAL.b,
-                                0.8,
-                            ),
+                            Color::new(TEXT_NORMAL.r, TEXT_NORMAL.g, TEXT_NORMAL.b, 0.8),
                         );
                     }
                 }
@@ -527,9 +533,7 @@ impl Renderer {
 
                 // If target slot has the same item as source, show merge hint "+"
                 if let Some(drag) = &state.ui_state.bank_drag {
-                    if let Some(Some((target_item_id, _))) =
-                        state.ui_state.bank_slots.get(i)
-                    {
+                    if let Some(Some((target_item_id, _))) = state.ui_state.bank_slots.get(i) {
                         if let Some(Some((source_item_id, _))) =
                             state.ui_state.bank_slots.get(drag.from_slot)
                         {
@@ -551,7 +555,11 @@ impl Renderer {
 
         // Scrollbar
         if needs_scroll {
-            let scrollbar_w: f32 = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let scrollbar_w: f32 = if cfg!(target_os = "android") {
+                12.0
+            } else {
+                8.0
+            };
             let track_x = x + grid_w + 2.0;
             let track_y = grid_y;
             let track_h = grid_height;
@@ -562,12 +570,22 @@ impl Renderer {
             );
 
             // Track
-            draw_rectangle(track_x, track_y, scrollbar_w, track_h, Color::new(0.1, 0.09, 0.12, 0.6));
+            draw_rectangle(
+                track_x,
+                track_y,
+                scrollbar_w,
+                track_h,
+                Color::new(0.1, 0.09, 0.12, 0.6),
+            );
 
             // Thumb
             let thumb_ratio = grid_height / total_grid_height;
             let thumb_h = (track_h * thumb_ratio).max(16.0);
-            let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+            let scroll_ratio = if max_scroll > 0.0 {
+                scroll_offset / max_scroll
+            } else {
+                0.0
+            };
             let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
 
             let is_dragging = state.ui_state.bank_scroll_drag.dragging;
@@ -577,7 +595,13 @@ impl Renderer {
             } else {
                 Color::new(0.35, 0.32, 0.40, 0.7)
             };
-            draw_rectangle(track_x + 1.0, thumb_y, scrollbar_w - 2.0, thumb_h, thumb_color);
+            draw_rectangle(
+                track_x + 1.0,
+                thumb_y,
+                scrollbar_w - 2.0,
+                thumb_h,
+                thumb_color,
+            );
         }
     }
 
@@ -673,7 +697,11 @@ impl Renderer {
 
         // Scrollbar
         if needs_scroll {
-            let scrollbar_w: f32 = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let scrollbar_w: f32 = if cfg!(target_os = "android") {
+                12.0
+            } else {
+                8.0
+            };
             let track_x = x + grid_w + 2.0;
             let track_y = grid_y;
             let track_h = grid_height;
@@ -684,12 +712,22 @@ impl Renderer {
             );
 
             // Track
-            draw_rectangle(track_x, track_y, scrollbar_w, track_h, Color::new(0.1, 0.09, 0.12, 0.6));
+            draw_rectangle(
+                track_x,
+                track_y,
+                scrollbar_w,
+                track_h,
+                Color::new(0.1, 0.09, 0.12, 0.6),
+            );
 
             // Thumb
             let thumb_ratio = grid_height / total_grid_height;
             let thumb_h = (track_h * thumb_ratio).max(16.0);
-            let scroll_ratio = if max_scroll > 0.0 { scroll_offset / max_scroll } else { 0.0 };
+            let scroll_ratio = if max_scroll > 0.0 {
+                scroll_offset / max_scroll
+            } else {
+                0.0
+            };
             let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
 
             let is_dragging = state.ui_state.bank_inv_scroll_drag.dragging;
@@ -699,7 +737,13 @@ impl Renderer {
             } else {
                 Color::new(0.35, 0.32, 0.40, 0.7)
             };
-            draw_rectangle(track_x + 1.0, thumb_y, scrollbar_w - 2.0, thumb_h, thumb_color);
+            draw_rectangle(
+                track_x + 1.0,
+                thumb_y,
+                scrollbar_w - 2.0,
+                thumb_h,
+                thumb_color,
+            );
         }
     }
 
@@ -903,7 +947,13 @@ impl Renderer {
         );
 
         // Title text in gold
-        self.draw_text_sharp(title_text, title_x + 14.0 * s, title_y + title_h * 0.69, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            title_text,
+            title_x + 14.0 * s,
+            title_y + title_h * 0.69,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Small decorative accent on title tab corners
         draw_rectangle(title_x, title_y, 3.0, 1.0, FRAME_ACCENT);

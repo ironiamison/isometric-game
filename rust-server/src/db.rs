@@ -540,10 +540,12 @@ impl Database {
         .unwrap_or(false);
 
         if !bank_consolidated_exists {
-            sqlx::query("ALTER TABLE characters ADD COLUMN bank_stacks_consolidated INTEGER DEFAULT 0")
-                .execute(pool)
-                .await
-                .ok();
+            sqlx::query(
+                "ALTER TABLE characters ADD COLUMN bank_stacks_consolidated INTEGER DEFAULT 0",
+            )
+            .execute(pool)
+            .await
+            .ok();
 
             // Load all characters' bank_json and consolidate duplicate stacks
             let rows: Vec<(i64, String)> = sqlx::query_as(
@@ -572,17 +574,23 @@ impl Database {
                                 if qty > i32::MAX as i64 {
                                     tracing::warn!(
                                         "Character {} item {} quantity overflow: {} clamped to {}",
-                                        char_id, item_id, qty, clamped
+                                        char_id,
+                                        item_id,
+                                        qty,
+                                        clamped
                                     );
                                 }
                                 (idx, item_id, clamped)
                             })
                             .collect();
 
-                        let new_json = serde_json::to_string(&consolidated).unwrap_or_else(|_| "[]".to_string());
+                        let new_json = serde_json::to_string(&consolidated)
+                            .unwrap_or_else(|_| "[]".to_string());
                         tracing::info!(
                             "Bank migration: character {} consolidated {} slots -> {} slots",
-                            char_id, slots.len(), consolidated.len()
+                            char_id,
+                            slots.len(),
+                            consolidated.len()
                         );
 
                         sqlx::query("UPDATE characters SET bank_json = ? WHERE id = ?")
@@ -598,7 +606,10 @@ impl Database {
             }
 
             if migrated > 0 {
-                tracing::info!("Bank stack consolidation migration: updated {} characters", migrated);
+                tracing::info!(
+                    "Bank stack consolidation migration: updated {} characters",
+                    migrated
+                );
             } else {
                 tracing::info!("Bank stack consolidation migration: no duplicate stacks found");
             }
@@ -1959,16 +1970,18 @@ impl Database {
         &self,
         character_id: i64,
     ) -> Result<crate::slayer::PlayerSlayerState, String> {
-        let row = sqlx::query("SELECT slayer_state_json FROM character_slayer WHERE character_id = ?")
-            .bind(character_id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| format!("Failed to load slayer state: {}", e))?;
+        let row =
+            sqlx::query("SELECT slayer_state_json FROM character_slayer WHERE character_id = ?")
+                .bind(character_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| format!("Failed to load slayer state: {}", e))?;
 
         match row {
             Some(row) => {
                 let json: String = sqlx::Row::get(&row, "slayer_state_json");
-                serde_json::from_str(&json).map_err(|e| format!("Failed to parse slayer state: {}", e))
+                serde_json::from_str(&json)
+                    .map_err(|e| format!("Failed to parse slayer state: {}", e))
             }
             None => Ok(crate::slayer::PlayerSlayerState::default()),
         }
@@ -2025,7 +2038,10 @@ impl Database {
     }
 
     /// Bulk save all chest data
-    pub async fn save_all_chests(&self, chests: &HashMap<String, String>) -> Result<(), sqlx::Error> {
+    pub async fn save_all_chests(
+        &self,
+        chests: &HashMap<String, String>,
+    ) -> Result<(), sqlx::Error> {
         for (key, json) in chests {
             self.save_chest(key, json).await?;
         }

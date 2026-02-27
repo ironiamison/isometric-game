@@ -10,8 +10,8 @@ pub struct EquipmentStats {
     pub attack_bonus: i32,               // Accuracy
     pub strength_bonus: i32,             // Max hit
     pub defence_bonus: i32,              // Avoid hits
-    pub magic_bonus: i32,               // Spell accuracy
-    pub magic_level_required: i32,      // For staves/magic items
+    pub magic_bonus: i32,                // Spell accuracy
+    pub magic_level_required: i32,       // For staves/magic items
     pub woodcutting_level_required: i32, // For axes
     pub chop_speed_multiplier: f32,      // Woodcutting speed (0.0 if not an axe)
     pub mining_level_required: i32,      // For pickaxes

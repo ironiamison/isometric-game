@@ -104,7 +104,15 @@ impl Renderer {
 
         // ===== DETAIL VIEW =====
         if state.ui_state.selected_quest_id.is_some() {
-            self.render_quest_detail(state, hovered, layout, panel_x, panel_y, panel_width, panel_height);
+            self.render_quest_detail(
+                state,
+                hovered,
+                layout,
+                panel_x,
+                panel_y,
+                panel_width,
+                panel_height,
+            );
             // Still draw footer
             let footer_x = panel_x + frame_thickness;
             let footer_y = panel_y + panel_height - frame_thickness - footer_h;
@@ -340,7 +348,13 @@ impl Renderer {
 
                 let is_dragging = state.ui_state.quest_log_scroll_drag.dragging;
                 let is_hovered = matches!(hovered, Some(UiElementId::QuestLogScrollbar));
-                let thumb_alpha = if is_dragging { 0.5 } else if is_hovered { 0.4 } else { 0.3 };
+                let thumb_alpha = if is_dragging {
+                    0.5
+                } else if is_hovered {
+                    0.4
+                } else {
+                    0.3
+                };
 
                 // Track
                 draw_rectangle(
@@ -532,10 +546,16 @@ impl Renderer {
         if !entry.objectives.is_empty() {
             total_h += 8.0 * s; // separator
             total_h += line_height; // "Objectives:" label
-            let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == *selected_id);
+            let active_quest = state
+                .ui_state
+                .active_quests
+                .iter()
+                .find(|q| q.id == *selected_id);
             for cat_obj in &entry.objectives {
                 let (current, target) = if let Some(aq) = active_quest {
-                    aq.objectives.iter().find(|o| o.id == cat_obj.id)
+                    aq.objectives
+                        .iter()
+                        .find(|o| o.id == cat_obj.id)
                         .map(|o| (o.current, o.target))
                         .unwrap_or((0, cat_obj.target))
                 } else {
@@ -735,12 +755,18 @@ impl Renderer {
             let obj_complete_text = Color::new(0.392, 0.627, 0.392, 1.0);
             let obj_incomplete_check = Color::new(0.502, 0.502, 0.541, 1.0);
 
-            let active_quest = state.ui_state.active_quests.iter().find(|q| q.id == *selected_id);
+            let active_quest = state
+                .ui_state
+                .active_quests
+                .iter()
+                .find(|q| q.id == *selected_id);
 
             for cat_obj in &entry.objectives {
                 // Overlay progress from active quest if available
                 let (current, target, completed) = if let Some(aq) = active_quest {
-                    aq.objectives.iter().find(|o| o.id == cat_obj.id)
+                    aq.objectives
+                        .iter()
+                        .find(|o| o.id == cat_obj.id)
                         .map(|o| (o.current, o.target, o.completed))
                         .unwrap_or((0, cat_obj.target, false))
                 } else if is_completed {
@@ -761,10 +787,8 @@ impl Renderer {
                     TEXT_DIM
                 };
 
-                let obj_text = format!(
-                    "{} {} ({}/{})",
-                    check, cat_obj.description, current, target
-                );
+                let obj_text =
+                    format!("{} {} ({}/{})", check, cat_obj.description, current, target);
                 let obj_lines = self.wrap_text(&obj_text, wrap_w, 16.0);
 
                 for (idx, line) in obj_lines.iter().enumerate() {
@@ -821,7 +845,13 @@ impl Renderer {
 
             let is_dragging = state.ui_state.quest_log_scroll_drag.dragging;
             let is_hovered = matches!(hovered, Some(UiElementId::QuestLogScrollbar));
-            let thumb_alpha = if is_dragging { 0.5 } else if is_hovered { 0.4 } else { 0.3 };
+            let thumb_alpha = if is_dragging {
+                0.5
+            } else if is_hovered {
+                0.4
+            } else {
+                0.3
+            };
 
             // Track
             draw_rectangle(
@@ -903,7 +933,10 @@ impl Renderer {
                     Color::from_rgba(200, 200, 200, 255)
                 };
                 let check = if obj.completed { "[x]" } else { "[ ]" };
-                let obj_text = format!("{} {} ({}/{})", check, obj.description, obj.current, obj.target);
+                let obj_text = format!(
+                    "{} {} ({}/{})",
+                    check, obj.description, obj.current, obj.target
+                );
                 let w = self.measure_text_sharp(&obj_text, font_size).width;
                 max_text_width = max_text_width.max(w);
                 lines.push(TrackerLine {

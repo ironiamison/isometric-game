@@ -283,11 +283,12 @@ impl QuestRunner {
         ctx_table.set("complete_quest", complete_quest)?;
 
         // Add unlock_waystone method (no-op: waystones gate on quest completion)
-        let unlock_waystone = lua.create_function(|_lua, (_this, _waystone_id): (Table, String)| {
-            // Waystone access is gated by quest completion status,
-            // so this is a no-op. The call exists in scripts for clarity.
-            Ok(())
-        })?;
+        let unlock_waystone =
+            lua.create_function(|_lua, (_this, _waystone_id): (Table, String)| {
+                // Waystone access is gated by quest completion status,
+                // so this is a no-op. The call exists in scripts for clarity.
+                Ok(())
+            })?;
         ctx_table.set("unlock_waystone", unlock_waystone)?;
 
         // Add show_notification method

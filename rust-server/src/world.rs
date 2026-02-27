@@ -6,8 +6,8 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use crate::chunk::{
-    world_to_local, Chunk, ChunkCoord, ChunkLayer, ChunkLayerType, EntitySpawn,
-    GatheringZoneMarker, MapObject, Portal, Wall, WallEdge, CHUNK_SIZE,
+    CHUNK_SIZE, Chunk, ChunkCoord, ChunkLayer, ChunkLayerType, EntitySpawn, GatheringZoneMarker,
+    MapObject, Portal, Wall, WallEdge, world_to_local,
 };
 
 #[derive(Deserialize)]
@@ -160,7 +160,7 @@ impl World {
         coord: ChunkCoord,
         value: &serde_json::Value,
     ) -> Result<Chunk, String> {
-        use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
         let size = value["size"].as_u64().unwrap_or(CHUNK_SIZE as u64) as u32;
         if size != CHUNK_SIZE {
@@ -409,8 +409,18 @@ impl World {
                                 let world_tile_x = coord.x * CHUNK_SIZE as i32 + tile_x;
                                 let world_tile_y = coord.y * CHUNK_SIZE as i32 + tile_y;
 
-                                info!("SERVER Object gid {} | pixel ({:.1}, {:.1}) | local ({}, {}) | chunk ({}, {}) | WORLD ({}, {})",
-                                    gid, pixel_x, pixel_y, tile_x, tile_y, coord.x, coord.y, world_tile_x, world_tile_y);
+                                info!(
+                                    "SERVER Object gid {} | pixel ({:.1}, {:.1}) | local ({}, {}) | chunk ({}, {}) | WORLD ({}, {})",
+                                    gid,
+                                    pixel_x,
+                                    pixel_y,
+                                    tile_x,
+                                    tile_y,
+                                    coord.x,
+                                    coord.y,
+                                    world_tile_x,
+                                    world_tile_y
+                                );
 
                                 chunk.objects.push(MapObject {
                                     gid: gid as u32,

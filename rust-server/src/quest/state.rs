@@ -195,13 +195,15 @@ impl QuestProgress {
         // Add missing objectives
         for (id, target) in current_targets {
             if !self.objectives.contains_key(id) {
-                self.objectives.insert(id.clone(), ObjectiveProgress::new(id, *target));
+                self.objectives
+                    .insert(id.clone(), ObjectiveProgress::new(id, *target));
                 modified = true;
             }
         }
 
         // Remove objectives no longer in the definition
-        let valid_ids: std::collections::HashSet<&String> = current_targets.iter().map(|(id, _)| id).collect();
+        let valid_ids: std::collections::HashSet<&String> =
+            current_targets.iter().map(|(id, _)| id).collect();
         self.objectives.retain(|id, _| {
             let keep = valid_ids.contains(id);
             if !keep {

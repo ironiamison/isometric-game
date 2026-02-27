@@ -240,7 +240,9 @@ pub fn find_path_to_adjacent_prefer(
 
             let better = path_len < best_length
                 || (path_len == best_length && is_preferred && !best_preferred)
-                || (path_len == best_length && is_preferred == best_preferred && secondary < best_secondary);
+                || (path_len == best_length
+                    && is_preferred == best_preferred
+                    && secondary < best_secondary);
 
             if better {
                 best_length = path_len;

@@ -358,20 +358,14 @@ pub fn run_game_frame(
 
                     // For ranged weapons, check if player has arrows
                     if is_ranged {
-                        let has_arrows = game_state
-                            .inventory
-                            .slots
-                            .iter()
-                            .any(|slot| {
-                                slot.as_ref()
-                                    .map_or(false, |s| s.item_id.ends_with("_arrow"))
-                            });
+                        let has_arrows = game_state.inventory.slots.iter().any(|slot| {
+                            slot.as_ref()
+                                .map_or(false, |s| s.item_id.ends_with("_arrow"))
+                        });
                         if !has_arrows {
                             // No arrows - play error sound and show message
                             game_state.pending_sfx.push("error".to_string());
-                            game_state.push_system_chat(
-                                "You have no arrows!".to_string(),
-                            );
+                            game_state.push_system_chat("You have no arrows!".to_string());
                             continue;
                         }
                     }
@@ -449,9 +443,8 @@ pub fn run_game_frame(
                     // Create TutorialManager if it doesn't exist yet
                     // (e.g. player clicked Old Thomas directly instead of auto-start)
                     if game_state.tutorial.is_none() {
-                        game_state.tutorial = Some(TutorialManager::new(
-                            game_state.ui_state.classic_controls,
-                        ));
+                        game_state.tutorial =
+                            Some(TutorialManager::new(game_state.ui_state.classic_controls));
                     }
                     if let Some(tutorial) = &mut game_state.tutorial {
                         if tutorial.phase == crate::game::tutorial::TutorialPhase::AwaitingAccept {
@@ -709,7 +702,10 @@ pub fn run_game_frame(
                 chest_id: chest_id.clone(),
                 slot: *slot,
             },
-            InputCommand::ChestDeposit { chest_id, inventory_slot } => ClientMessage::ChestDeposit {
+            InputCommand::ChestDeposit {
+                chest_id,
+                inventory_slot,
+            } => ClientMessage::ChestDeposit {
                 chest_id: chest_id.clone(),
                 inventory_slot: *inventory_slot,
             },
@@ -723,42 +719,45 @@ pub fn run_game_frame(
                 action: action.clone(),
             },
             InputCommand::CancelAutoAction => ClientMessage::CancelAutoAction,
-            InputCommand::InteractObject { x, y } => ClientMessage::InteractObject {
-                x: *x,
-                y: *y,
-            },
-            InputCommand::UseWaystone { x, y } => ClientMessage::UseWaystone {
-                x: *x,
-                y: *y,
-            },
+            InputCommand::InteractObject { x, y } => ClientMessage::InteractObject { x: *x, y: *y },
+            InputCommand::UseWaystone { x, y } => ClientMessage::UseWaystone { x: *x, y: *y },
             // Trade commands
             InputCommand::TradeRequest { target_id } => ClientMessage::TradeRequest {
                 target_id: target_id.clone(),
             },
-            InputCommand::TradeAcceptRequest { requester_id } => ClientMessage::TradeAcceptRequest {
-                requester_id: requester_id.clone(),
-            },
-            InputCommand::TradeDeclineRequest { requester_id } => ClientMessage::TradeDeclineRequest {
-                requester_id: requester_id.clone(),
-            },
-            InputCommand::TradeOfferItem { slot_index, quantity } => ClientMessage::TradeOfferItem {
+            InputCommand::TradeAcceptRequest { requester_id } => {
+                ClientMessage::TradeAcceptRequest {
+                    requester_id: requester_id.clone(),
+                }
+            }
+            InputCommand::TradeDeclineRequest { requester_id } => {
+                ClientMessage::TradeDeclineRequest {
+                    requester_id: requester_id.clone(),
+                }
+            }
+            InputCommand::TradeOfferItem {
+                slot_index,
+                quantity,
+            } => ClientMessage::TradeOfferItem {
                 slot_index: *slot_index,
                 quantity: *quantity,
             },
             InputCommand::TradeRemoveItem { offer_index } => ClientMessage::TradeRemoveItem {
                 offer_index: *offer_index,
             },
-            InputCommand::TradeOfferGold { amount } => ClientMessage::TradeOfferGold {
-                amount: *amount,
-            },
+            InputCommand::TradeOfferGold { amount } => {
+                ClientMessage::TradeOfferGold { amount: *amount }
+            }
             InputCommand::TradeAccept => ClientMessage::TradeAccept,
             InputCommand::TradeCancel => ClientMessage::TradeCancel,
             // Stall commands
-            InputCommand::StallOpen { name } => ClientMessage::StallOpen {
-                name: name.clone(),
-            },
+            InputCommand::StallOpen { name } => ClientMessage::StallOpen { name: name.clone() },
             InputCommand::StallClose => ClientMessage::StallClose,
-            InputCommand::StallSetItem { inventory_slot, quantity, price } => ClientMessage::StallSetItem {
+            InputCommand::StallSetItem {
+                inventory_slot,
+                quantity,
+                price,
+            } => ClientMessage::StallSetItem {
                 inventory_slot: *inventory_slot,
                 quantity: *quantity,
                 price: *price,
@@ -769,7 +768,11 @@ pub fn run_game_frame(
             InputCommand::StallBrowse { player_id } => ClientMessage::StallBrowse {
                 player_id: player_id.clone(),
             },
-            InputCommand::StallBuy { seller_id, stall_slot, quantity } => ClientMessage::StallBuy {
+            InputCommand::StallBuy {
+                seller_id,
+                stall_slot,
+                quantity,
+            } => ClientMessage::StallBuy {
                 seller_id: seller_id.clone(),
                 stall_slot: *stall_slot,
                 quantity: *quantity,

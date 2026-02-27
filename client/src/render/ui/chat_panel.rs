@@ -94,9 +94,18 @@ impl Renderer {
             (UiElementId::ChatTabGlobal, "Global", ChatChannel::Global),
             (UiElementId::ChatTabSystem, "System", ChatChannel::System),
         ];
-        let latest_local_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::Local);
-        let latest_global_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::Global);
-        let latest_system_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::System);
+        let latest_local_ts = state
+            .ui_state
+            .chat_messages
+            .latest_timestamp(&ChatChannel::Local);
+        let latest_global_ts = state
+            .ui_state
+            .chat_messages
+            .latest_timestamp(&ChatChannel::Global);
+        let latest_system_ts = state
+            .ui_state
+            .chat_messages
+            .latest_timestamp(&ChatChannel::System);
 
         for (i, (id, label, channel)) in tabs.iter().enumerate() {
             let tx = tab_x_start + i as f32 * tab_w;
@@ -155,8 +164,7 @@ impl Renderer {
         // === MESSAGE LIST ===
         let messages_y = tab_y + tab_h + 4.0 * s;
         let input_bar_h = 48.0 * s;
-        let messages_h =
-            panel_y + panel_h - FRAME_THICKNESS - input_bar_h - 4.0 * s - messages_y;
+        let messages_h = panel_y + panel_h - FRAME_THICKNESS - input_bar_h - 4.0 * s - messages_y;
         let messages_x = panel_x + FRAME_THICKNESS + 8.0;
         let messages_w = panel_w - FRAME_THICKNESS * 2.0 - 16.0;
 
@@ -251,7 +259,11 @@ impl Renderer {
 
         // Draw scrollbar
         if max_scroll_px > 0.0 {
-            let scrollbar_w: f32 = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let scrollbar_w: f32 = if cfg!(target_os = "android") {
+                12.0
+            } else {
+                8.0
+            };
             let track_x = messages_x + messages_w - scrollbar_w;
             let track_y = messages_y;
             let track_h = messages_h;
@@ -262,12 +274,22 @@ impl Renderer {
             );
 
             // Track
-            draw_rectangle(track_x, track_y, scrollbar_w, track_h, Color::new(0.1, 0.09, 0.12, 0.6));
+            draw_rectangle(
+                track_x,
+                track_y,
+                scrollbar_w,
+                track_h,
+                Color::new(0.1, 0.09, 0.12, 0.6),
+            );
 
             // Thumb (inverted: bottom = scroll 0, top = max scroll)
             let visible_ratio = (messages_h / total_content_height).min(1.0);
             let thumb_h = (track_h * visible_ratio).max(16.0);
-            let scroll_ratio = if max_scroll_px > 0.0 { scroll_px / max_scroll_px } else { 0.0 };
+            let scroll_ratio = if max_scroll_px > 0.0 {
+                scroll_px / max_scroll_px
+            } else {
+                0.0
+            };
             let thumb_y = track_y + (track_h - thumb_h) * (1.0 - scroll_ratio);
 
             let is_dragging = state.ui_state.chat_scroll_drag.dragging;
@@ -276,7 +298,13 @@ impl Renderer {
             } else {
                 Color::new(0.35, 0.32, 0.40, 0.7)
             };
-            draw_rectangle(track_x + 1.0, thumb_y, scrollbar_w - 2.0, thumb_h, thumb_color);
+            draw_rectangle(
+                track_x + 1.0,
+                thumb_y,
+                scrollbar_w - 2.0,
+                thumb_h,
+                thumb_color,
+            );
         }
 
         // === INPUT BAR ===

@@ -25,7 +25,8 @@ impl Renderer {
         let header_h = HEADER_HEIGHT * s;
         let footer_h = 52.0 * s; // taller footer for buy controls
         let content_h = max_rows as f32 * row_h;
-        let panel_height = (header_h + content_h + footer_h + FRAME_THICKNESS * 2.0 + 4.0).min(sh - 16.0);
+        let panel_height =
+            (header_h + content_h + footer_h + FRAME_THICKNESS * 2.0 + 4.0).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 
@@ -82,8 +83,8 @@ impl Renderer {
         let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
         layout.add(UiElementId::StallBrowseCloseButton, close_bounds);
 
-        let is_close_hovered = state.ui_state.hovered_element.as_ref()
-            == Some(&UiElementId::StallBrowseCloseButton);
+        let is_close_hovered =
+            state.ui_state.hovered_element.as_ref() == Some(&UiElementId::StallBrowseCloseButton);
         let (close_bg, close_border) = if is_close_hovered {
             (
                 Color::new(0.4, 0.15, 0.15, 1.0),
@@ -92,7 +93,13 @@ impl Renderer {
         } else {
             (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
         };
-        draw_rectangle(close_btn_x, close_btn_y, close_btn_size, close_btn_size, close_border);
+        draw_rectangle(
+            close_btn_x,
+            close_btn_y,
+            close_btn_size,
+            close_btn_size,
+            close_border,
+        );
         draw_rectangle(
             close_btn_x + 1.0,
             close_btn_y + 1.0,
@@ -103,9 +110,27 @@ impl Renderer {
         let cx = close_btn_x + close_btn_size / 2.0;
         let cy = close_btn_y + close_btn_size / 2.0;
         let cross = close_btn_size * 0.25;
-        let cross_color = if is_close_hovered { TEXT_TITLE } else { TEXT_DIM };
-        draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
-        draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
+        let cross_color = if is_close_hovered {
+            TEXT_TITLE
+        } else {
+            TEXT_DIM
+        };
+        draw_line(
+            cx - cross,
+            cy - cross,
+            cx + cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
+        draw_line(
+            cx + cross,
+            cy - cross,
+            cx - cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
 
         // ===== CONTENT: Item rows =====
         let content_x = panel_x + FRAME_THICKNESS + 8.0 * s;
@@ -159,19 +184,21 @@ impl Renderer {
 
                 // Selected row: left accent bar (gold theme for commerce)
                 if is_selected {
-                    draw_rectangle(
-                        content_x,
-                        y + 4.0 * s,
-                        3.0,
-                        row_h - 10.0 * s,
-                        FRAME_ACCENT,
-                    );
+                    draw_rectangle(content_x, y + 4.0 * s, 3.0, row_h - 10.0 * s, FRAME_ACCENT);
                 }
 
                 // Item icon
                 let icon_x = content_x + icon_pad;
                 let icon_y = y + (row_h - 2.0 * s - icon_size) / 2.0;
-                self.draw_item_icon(&item.item_id, icon_x, icon_y, icon_size, icon_size, state, false);
+                self.draw_item_icon(
+                    &item.item_id,
+                    icon_x,
+                    icon_y,
+                    icon_size,
+                    icon_size,
+                    state,
+                    false,
+                );
 
                 // Item name
                 let item_def = state.item_registry.get_or_placeholder(&item.item_id);
@@ -232,9 +259,10 @@ impl Renderer {
 
         // Selected item info
         let selected_item = browse.items.get(state.ui_state.stall_browse_selected);
-        let total_price = selected_item
-            .map_or(0, |item| item.price * state.ui_state.stall_buy_quantity);
-        let can_afford = state.inventory.gold >= total_price && selected_item.is_some() && total_price > 0;
+        let total_price =
+            selected_item.map_or(0, |item| item.price * state.ui_state.stall_buy_quantity);
+        let can_afford =
+            state.inventory.gold >= total_price && selected_item.is_some() && total_price > 0;
 
         let ctrl_y = footer_y + (footer_h - 26.0 * s) / 2.0;
         let btn_h = 26.0 * s;
@@ -245,8 +273,8 @@ impl Renderer {
         let minus_x = pad_left;
         let minus_bounds = Rect::new(minus_x, ctrl_y, qty_btn_size, qty_btn_size);
         layout.add(UiElementId::StallBrowseQuantityMinus, minus_bounds);
-        let is_minus_hovered = state.ui_state.hovered_element.as_ref()
-            == Some(&UiElementId::StallBrowseQuantityMinus);
+        let is_minus_hovered =
+            state.ui_state.hovered_element.as_ref() == Some(&UiElementId::StallBrowseQuantityMinus);
         let (minus_bg, minus_border) = if is_minus_hovered {
             (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
         } else {
@@ -266,7 +294,11 @@ impl Renderer {
             minus_x + (qty_btn_size - minus_dims.width) / 2.0,
             ctrl_y + qty_btn_size * 0.73,
             16.0,
-            if is_minus_hovered { TEXT_TITLE } else { TEXT_NORMAL },
+            if is_minus_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_NORMAL
+            },
         );
 
         // Quantity display
@@ -286,8 +318,8 @@ impl Renderer {
         let plus_x = qty_display_x + qty_display_w + 4.0 * s;
         let plus_bounds = Rect::new(plus_x, ctrl_y, qty_btn_size, qty_btn_size);
         layout.add(UiElementId::StallBrowseQuantityPlus, plus_bounds);
-        let is_plus_hovered = state.ui_state.hovered_element.as_ref()
-            == Some(&UiElementId::StallBrowseQuantityPlus);
+        let is_plus_hovered =
+            state.ui_state.hovered_element.as_ref() == Some(&UiElementId::StallBrowseQuantityPlus);
         let (plus_bg, plus_border) = if is_plus_hovered {
             (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
         } else {
@@ -307,7 +339,11 @@ impl Renderer {
             plus_x + (qty_btn_size - plus_dims.width) / 2.0,
             ctrl_y + qty_btn_size * 0.73,
             16.0,
-            if is_plus_hovered { TEXT_TITLE } else { TEXT_NORMAL },
+            if is_plus_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_NORMAL
+            },
         );
 
         // Total price label (center area)

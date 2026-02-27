@@ -160,10 +160,8 @@ impl ChestInstance {
         // Pre-fill spawn items
         for spawn in &def.spawn_items {
             if (spawn.slot as usize) < slots.len() {
-                slots[spawn.slot as usize] = Some(InventorySlot::new(
-                    spawn.item_id.clone(),
-                    spawn.quantity,
-                ));
+                slots[spawn.slot as usize] =
+                    Some(InventorySlot::new(spawn.item_id.clone(), spawn.quantity));
             }
         }
 
@@ -215,8 +213,7 @@ impl ChestInstance {
         if let Ok(tuples) = serde_json::from_str::<Vec<(u8, String, i32)>>(json) {
             for (slot_idx, item_id, quantity) in tuples {
                 if (slot_idx as usize) < self.slots.len() && quantity > 0 {
-                    self.slots[slot_idx as usize] =
-                        Some(InventorySlot::new(item_id, quantity));
+                    self.slots[slot_idx as usize] = Some(InventorySlot::new(item_id, quantity));
                 }
             }
         }
@@ -274,8 +271,7 @@ impl ChestManager {
         for (interior_id, chest_id, x, y) in interior_chests {
             if let Some(def) = registry.get(chest_id) {
                 let key = Self::interior_key(interior_id, *x, *y);
-                self.chests
-                    .insert(key, ChestInstance::new(chest_id, def));
+                self.chests.insert(key, ChestInstance::new(chest_id, def));
             } else {
                 warn!(
                     "Interior '{}' chest spawn references unknown chest_id '{}'",
@@ -343,8 +339,7 @@ impl ChestManager {
             for (slot, item_id, quantity) in to_respawn {
                 chest.spawn_timers.remove(&slot);
                 if (slot as usize) < chest.slots.len() && chest.slots[slot as usize].is_none() {
-                    chest.slots[slot as usize] =
-                        Some(InventorySlot::new(item_id, quantity));
+                    chest.slots[slot as usize] = Some(InventorySlot::new(item_id, quantity));
                 }
             }
         }

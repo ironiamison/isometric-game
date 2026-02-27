@@ -1,6 +1,9 @@
 //! Utility functions shared across the codebase
 
+#[cfg(all(not(test), target_os = "android"))]
 use crate::mobile_scale::VIRTUAL_WIDTH;
+#[cfg(test)]
+use crate::mobile_scale::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use macroquad::file::load_file;
 use macroquad::prelude::*;
 use std::cell::Cell;
@@ -15,31 +18,39 @@ thread_local! {
 /// On Android, returns the virtual resolution used for scaling
 /// On desktop, returns the actual screen dimensions
 pub fn virtual_screen_size() -> (f32, f32) {
-    let current_time = get_time();
-
-    // Check cache - invalidate if more than 1/120th of a second old (handles 120fps)
-    let cached = CACHED_VIRTUAL_SIZE.with(|c| c.get());
-    if current_time - cached.2 < 0.008 {
-        return (cached.0, cached.1);
+    #[cfg(test)]
+    {
+        (VIRTUAL_WIDTH, VIRTUAL_HEIGHT)
     }
 
-    // Calculate fresh values
-    #[cfg(target_os = "android")]
-    let result = {
-        let screen_w = screen_width();
-        let screen_h = screen_height();
-        let aspect = screen_h / screen_w;
-        let virtual_height = (VIRTUAL_WIDTH * aspect).round();
-        (VIRTUAL_WIDTH, virtual_height)
-    };
+    #[cfg(not(test))]
+    {
+        let current_time = get_time();
 
-    #[cfg(not(target_os = "android"))]
-    let result = (screen_width(), screen_height());
+        // Check cache - invalidate if more than 1/120th of a second old (handles 120fps)
+        let cached = CACHED_VIRTUAL_SIZE.with(|c| c.get());
+        if current_time - cached.2 < 0.008 {
+            return (cached.0, cached.1);
+        }
 
-    // Update cache
-    CACHED_VIRTUAL_SIZE.with(|c| c.set((result.0, result.1, current_time)));
+        // Calculate fresh values
+        #[cfg(target_os = "android")]
+        let result = {
+            let screen_w = screen_width();
+            let screen_h = screen_height();
+            let aspect = screen_h / screen_w;
+            let virtual_height = (VIRTUAL_WIDTH * aspect).round();
+            (VIRTUAL_WIDTH, virtual_height)
+        };
 
-    result
+        #[cfg(not(target_os = "android"))]
+        let result = (screen_width(), screen_height());
+
+        // Update cache
+        CACHED_VIRTUAL_SIZE.with(|c| c.set((result.0, result.1, current_time)));
+
+        result
+    }
 }
 
 /// Convert an asset path to the correct format for the current platform.

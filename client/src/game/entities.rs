@@ -315,7 +315,17 @@ impl Player {
 
     /// Set server-authoritative position (convenience method for stopped state)
     pub fn set_server_position(&mut self, new_x: f32, new_y: f32) {
-        self.set_server_state(new_x, new_y, 0.0, 0.0, self.direction, false, false, 1.0, 1.0);
+        self.set_server_state(
+            new_x,
+            new_y,
+            0.0,
+            0.0,
+            self.direction,
+            false,
+            false,
+            1.0,
+            1.0,
+        );
     }
 
     /// Set server state - simple server-authoritative model
@@ -383,11 +393,7 @@ impl Player {
         // we're only a few tiles off, and reserve hard snaps for truly large
         // divergences (map transitions, respawns, etc.).
         let softness = local_reconciliation_softness.clamp(1.0, 2.5);
-        let teleport_snap_distance = if is_local_player {
-            2.0 * softness
-        } else {
-            2.0
-        };
+        let teleport_snap_distance = if is_local_player { 2.0 * softness } else { 2.0 };
         let hard_snap_distance = if is_local_player {
             6.0 * softness
         } else {

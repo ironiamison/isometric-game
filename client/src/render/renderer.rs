@@ -16,8 +16,8 @@ use super::isometric::{
 use super::shaders;
 use super::ui::common::{SlotState, CORNER_ACCENT_SIZE, EXP_BAR_GAP};
 use crate::game::npc::{Npc, NpcState};
-use crate::game::tilemap::get_tile_color;
 use crate::game::ore_types::get_ore_info;
+use crate::game::tilemap::get_tile_color;
 use crate::game::tree_types::get_tree_info;
 use crate::game::{
     Camera, ChatChannel, ChunkLayerType, ConnectionStatus, Direction, DragSource, GameState,
@@ -528,8 +528,7 @@ impl Renderer {
                 for gender in GENDERS {
                     for skin in SKINS {
                         let key = format!("{}_{}", gender, skin);
-                        let path =
-                            format!("assets/sprites/players/player_{}_{}.png", gender, skin);
+                        let path = format!("assets/sprites/players/player_{}_{}.png", gender, skin);
                         if let Ok(tex) = load_texture(&path).await {
                             tex.set_filter(FilterMode::Nearest);
                             sprites.insert(key, tex);
@@ -1028,7 +1027,15 @@ impl Renderer {
                     }
                 } else {
                     let mut sprites = HashMap::new();
-                    for name in &["dark_hand", "lightning_bolt", "dark_eater", "rock_fall", "self_heal", "bubbles_warp", "tornado"] {
+                    for name in &[
+                        "dark_hand",
+                        "lightning_bolt",
+                        "dark_eater",
+                        "rock_fall",
+                        "self_heal",
+                        "bubbles_warp",
+                        "tornado",
+                    ] {
                         let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                         if let Ok(tex) = load_texture(&path).await {
                             tex.set_filter(FilterMode::Nearest);
@@ -1039,7 +1046,15 @@ impl Renderer {
                 }
             } else {
                 let mut sprites = HashMap::new();
-                for name in &["dark_hand", "lightning_bolt", "dark_eater", "rock_fall", "self_heal", "bubbles_warp", "tornado"] {
+                for name in &[
+                    "dark_hand",
+                    "lightning_bolt",
+                    "dark_eater",
+                    "rock_fall",
+                    "self_heal",
+                    "bubbles_warp",
+                    "tornado",
+                ] {
                     let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                     if let Ok(tex) = load_texture(&path).await {
                         tex.set_filter(FilterMode::Nearest);
@@ -1964,12 +1979,7 @@ impl Renderer {
         let height = MINIMAP_PREVIEW_HEIGHT * s;
         let margin = MINIMAP_MARGIN * s;
         let y = MINIMAP_PREVIEW_Y * s;
-        Rect::new(
-            (sw - width - margin).floor(),
-            y.floor(),
-            width,
-            height,
-        )
+        Rect::new((sw - width - margin).floor(), y.floor(), width, height)
     }
 
     fn minimap_preview_enabled(&self, state: &GameState) -> bool {
@@ -2003,7 +2013,10 @@ impl Renderer {
         let _ = bar_width;
         let s = self.font_scale.get();
         let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
-        (name_tag_x.floor(), (name_tag_y + 22.0 * s + 4.0 * s).floor())
+        (
+            name_tag_x.floor(),
+            (name_tag_y + 22.0 * s + 4.0 * s).floor(),
+        )
     }
 
     fn draw_minimap_preview_frame(&self, x: f32, y: f32, w: f32, h: f32) {
@@ -2416,13 +2429,19 @@ impl Renderer {
             let base_x = coord.x * CHUNK_SIZE as i32;
             let base_y = coord.y * CHUNK_SIZE as i32;
             if let Some(b) = bounds {
-                let (chunk_min_x, chunk_min_y, chunk_max_x, chunk_max_y) = if let Some((w, h)) = interior_size {
-                    (0.0f32, 0.0f32, w as f32, h as f32)
-                } else {
-                    let min_x = base_x as f32;
-                    let min_y = base_y as f32;
-                    (min_x, min_y, min_x + CHUNK_SIZE as f32, min_y + CHUNK_SIZE as f32)
-                };
+                let (chunk_min_x, chunk_min_y, chunk_max_x, chunk_max_y) =
+                    if let Some((w, h)) = interior_size {
+                        (0.0f32, 0.0f32, w as f32, h as f32)
+                    } else {
+                        let min_x = base_x as f32;
+                        let min_y = base_y as f32;
+                        (
+                            min_x,
+                            min_y,
+                            min_x + CHUNK_SIZE as f32,
+                            min_y + CHUNK_SIZE as f32,
+                        )
+                    };
                 if chunk_max_x < b.min_x - bounds_margin
                     || chunk_min_x > b.max_x + bounds_margin
                     || chunk_max_y < b.min_y - bounds_margin
@@ -3307,7 +3326,12 @@ impl Renderer {
         {
             let mut tso = self.tree_shake_offsets.borrow_mut();
             tso.clear();
-            tso.extend(state.tree_shake_effects.iter().map(|shake| ((shake.x, shake.y), shake.get_offset())));
+            tso.extend(
+                state
+                    .tree_shake_effects
+                    .iter()
+                    .map(|shake| ((shake.x, shake.y), shake.get_offset())),
+            );
         }
         {
             let mut crp = self.crumbling_rock_positions.borrow_mut();
@@ -3317,7 +3341,12 @@ impl Renderer {
         {
             let mut rso = self.rock_shake_offsets.borrow_mut();
             rso.clear();
-            rso.extend(state.rock_shake_effects.iter().map(|shake| ((shake.x, shake.y), shake.get_offset())));
+            rso.extend(
+                state
+                    .rock_shake_effects
+                    .iter()
+                    .map(|shake| ((shake.x, shake.y), shake.get_offset())),
+            );
         }
         let falling_tree_positions = self.falling_tree_positions.borrow();
         let tree_shake_offsets = self.tree_shake_offsets.borrow();
@@ -3330,13 +3359,14 @@ impl Renderer {
         for (coord, chunk) in state.chunk_manager.chunks().iter() {
             // Chunk-level AABB check: skip entire chunk if outside visible area
             // For interiors, the single chunk at (0,0) covers the full map dimensions
-            let (chunk_min_x, chunk_min_y, chunk_max_x, chunk_max_y) = if let Some((w, h)) = interior_dims {
-                (0.0, 0.0, w as f32, h as f32)
-            } else {
-                let min_x = (coord.x * CHUNK_SIZE as i32) as f32;
-                let min_y = (coord.y * CHUNK_SIZE as i32) as f32;
-                (min_x, min_y, min_x + chunk_size, min_y + chunk_size)
-            };
+            let (chunk_min_x, chunk_min_y, chunk_max_x, chunk_max_y) =
+                if let Some((w, h)) = interior_dims {
+                    (0.0, 0.0, w as f32, h as f32)
+                } else {
+                    let min_x = (coord.x * CHUNK_SIZE as i32) as f32;
+                    let min_y = (coord.y * CHUNK_SIZE as i32) as f32;
+                    (min_x, min_y, min_x + chunk_size, min_y + chunk_size)
+                };
             if chunk_max_x < vis_min_x
                 || chunk_min_x > vis_max_x
                 || chunk_max_y < vis_min_y
@@ -3494,7 +3524,14 @@ impl Renderer {
                 Renderable::Player(player, is_local) => {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&player.id);
                     let is_hovered = state.hovered_entity_id.as_ref() == Some(&player.id);
-                    self.render_player(player, is_local, is_selected, is_hovered, &state.camera, &state.item_registry);
+                    self.render_player(
+                        player,
+                        is_local,
+                        is_selected,
+                        is_hovered,
+                        &state.camera,
+                        &state.item_registry,
+                    );
                 }
                 Renderable::Npc(npc) => {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&npc.id);
@@ -3546,9 +3583,7 @@ impl Renderer {
                     scale,
                     alpha,
                 } => {
-                    self.render_crumbling_rock(
-                        gid, tile_x, tile_y, scale, alpha, &state.camera,
-                    );
+                    self.render_crumbling_rock(gid, tile_x, tile_y, scale, alpha, &state.camera);
                 }
                 Renderable::RockTimer {
                     tile_x,
@@ -3574,113 +3609,125 @@ impl Renderer {
         // Render leaf particles (world-space, after depth-sorted objects)
         // Skip all particles when graphics_low to save draw calls and trig on mobile
         if !state.ui_state.graphics_low {
-        for leaf in &state.leaf_particles {
-            if !is_visible_world(leaf.tile_x, leaf.tile_y) {
-                continue;
+            for leaf in &state.leaf_particles {
+                if !is_visible_world(leaf.tile_x, leaf.tile_y) {
+                    continue;
+                }
+
+                // Convert tile coords to screen coords
+                let (screen_x, base_screen_y) =
+                    world_to_screen(leaf.tile_x, leaf.tile_y, &state.camera);
+
+                // Offset upward by height (height is in unscaled pixels, apply zoom)
+                let screen_y = base_screen_y - leaf.height * state.camera.zoom;
+
+                let alpha = leaf.get_alpha();
+                let color = Color::new(
+                    leaf.color.r,
+                    leaf.color.g,
+                    leaf.color.b,
+                    leaf.color.a * alpha,
+                );
+                let size = leaf.size * state.camera.zoom;
+
+                // Draw a simple leaf shape (small rotated diamond)
+                let cos_r = leaf.rotation.cos();
+                let sin_r = leaf.rotation.sin();
+
+                // Draw as a small diamond/leaf shape
+                let hw = size * 0.5;
+                let hh = size * 0.8;
+
+                let points = [
+                    (
+                        screen_x + cos_r * 0.0 - sin_r * (-hh),
+                        screen_y + sin_r * 0.0 + cos_r * (-hh),
+                    ), // top
+                    (
+                        screen_x + cos_r * hw - sin_r * 0.0,
+                        screen_y + sin_r * hw + cos_r * 0.0,
+                    ), // right
+                    (
+                        screen_x + cos_r * 0.0 - sin_r * hh,
+                        screen_y + sin_r * 0.0 + cos_r * hh,
+                    ), // bottom
+                    (
+                        screen_x + cos_r * (-hw) - sin_r * 0.0,
+                        screen_y + sin_r * (-hw) + cos_r * 0.0,
+                    ), // left
+                ];
+
+                // Draw as two triangles
+                draw_triangle(
+                    Vec2::new(points[0].0, points[0].1),
+                    Vec2::new(points[1].0, points[1].1),
+                    Vec2::new(points[2].0, points[2].1),
+                    color,
+                );
+                draw_triangle(
+                    Vec2::new(points[0].0, points[0].1),
+                    Vec2::new(points[2].0, points[2].1),
+                    Vec2::new(points[3].0, points[3].1),
+                    color,
+                );
             }
 
-            // Convert tile coords to screen coords
-            let (screen_x, base_screen_y) =
-                world_to_screen(leaf.tile_x, leaf.tile_y, &state.camera);
+            // Render rock debris particles (world-space, after depth-sorted objects)
+            for particle in &state.rock_particles {
+                if !is_visible_world(particle.tile_x, particle.tile_y) {
+                    continue;
+                }
 
-            // Offset upward by height (height is in unscaled pixels, apply zoom)
-            let screen_y = base_screen_y - leaf.height * state.camera.zoom;
+                let (screen_x, base_screen_y) =
+                    world_to_screen(particle.tile_x, particle.tile_y, &state.camera);
+                let screen_y = base_screen_y - particle.height * state.camera.zoom;
 
-            let alpha = leaf.get_alpha();
-            let color = Color::new(
-                leaf.color.r,
-                leaf.color.g,
-                leaf.color.b,
-                leaf.color.a * alpha,
-            );
-            let size = leaf.size * state.camera.zoom;
+                let alpha = particle.get_alpha();
+                let color = Color::new(
+                    particle.color.r,
+                    particle.color.g,
+                    particle.color.b,
+                    particle.color.a * alpha,
+                );
+                let size = particle.size * state.camera.zoom;
 
-            // Draw a simple leaf shape (small rotated diamond)
-            let cos_r = leaf.rotation.cos();
-            let sin_r = leaf.rotation.sin();
+                // Draw as a small rotated square (chunkier than leaf diamonds)
+                let cos_r = particle.rotation.cos();
+                let sin_r = particle.rotation.sin();
+                let hs = size * 0.5;
 
-            // Draw as a small diamond/leaf shape
-            let hw = size * 0.5;
-            let hh = size * 0.8;
+                let points = [
+                    (
+                        screen_x + cos_r * (-hs) - sin_r * (-hs),
+                        screen_y + sin_r * (-hs) + cos_r * (-hs),
+                    ),
+                    (
+                        screen_x + cos_r * hs - sin_r * (-hs),
+                        screen_y + sin_r * hs + cos_r * (-hs),
+                    ),
+                    (
+                        screen_x + cos_r * hs - sin_r * hs,
+                        screen_y + sin_r * hs + cos_r * hs,
+                    ),
+                    (
+                        screen_x + cos_r * (-hs) - sin_r * hs,
+                        screen_y + sin_r * (-hs) + cos_r * hs,
+                    ),
+                ];
 
-            let points = [
-                (
-                    screen_x + cos_r * 0.0 - sin_r * (-hh),
-                    screen_y + sin_r * 0.0 + cos_r * (-hh),
-                ), // top
-                (
-                    screen_x + cos_r * hw - sin_r * 0.0,
-                    screen_y + sin_r * hw + cos_r * 0.0,
-                ), // right
-                (
-                    screen_x + cos_r * 0.0 - sin_r * hh,
-                    screen_y + sin_r * 0.0 + cos_r * hh,
-                ), // bottom
-                (
-                    screen_x + cos_r * (-hw) - sin_r * 0.0,
-                    screen_y + sin_r * (-hw) + cos_r * 0.0,
-                ), // left
-            ];
-
-            // Draw as two triangles
-            draw_triangle(
-                Vec2::new(points[0].0, points[0].1),
-                Vec2::new(points[1].0, points[1].1),
-                Vec2::new(points[2].0, points[2].1),
-                color,
-            );
-            draw_triangle(
-                Vec2::new(points[0].0, points[0].1),
-                Vec2::new(points[2].0, points[2].1),
-                Vec2::new(points[3].0, points[3].1),
-                color,
-            );
-        }
-
-        // Render rock debris particles (world-space, after depth-sorted objects)
-        for particle in &state.rock_particles {
-            if !is_visible_world(particle.tile_x, particle.tile_y) {
-                continue;
+                draw_triangle(
+                    Vec2::new(points[0].0, points[0].1),
+                    Vec2::new(points[1].0, points[1].1),
+                    Vec2::new(points[2].0, points[2].1),
+                    color,
+                );
+                draw_triangle(
+                    Vec2::new(points[0].0, points[0].1),
+                    Vec2::new(points[2].0, points[2].1),
+                    Vec2::new(points[3].0, points[3].1),
+                    color,
+                );
             }
-
-            let (screen_x, base_screen_y) =
-                world_to_screen(particle.tile_x, particle.tile_y, &state.camera);
-            let screen_y = base_screen_y - particle.height * state.camera.zoom;
-
-            let alpha = particle.get_alpha();
-            let color = Color::new(
-                particle.color.r,
-                particle.color.g,
-                particle.color.b,
-                particle.color.a * alpha,
-            );
-            let size = particle.size * state.camera.zoom;
-
-            // Draw as a small rotated square (chunkier than leaf diamonds)
-            let cos_r = particle.rotation.cos();
-            let sin_r = particle.rotation.sin();
-            let hs = size * 0.5;
-
-            let points = [
-                (screen_x + cos_r * (-hs) - sin_r * (-hs), screen_y + sin_r * (-hs) + cos_r * (-hs)),
-                (screen_x + cos_r * hs - sin_r * (-hs), screen_y + sin_r * hs + cos_r * (-hs)),
-                (screen_x + cos_r * hs - sin_r * hs, screen_y + sin_r * hs + cos_r * hs),
-                (screen_x + cos_r * (-hs) - sin_r * hs, screen_y + sin_r * (-hs) + cos_r * hs),
-            ];
-
-            draw_triangle(
-                Vec2::new(points[0].0, points[0].1),
-                Vec2::new(points[1].0, points[1].1),
-                Vec2::new(points[2].0, points[2].1),
-                color,
-            );
-            draw_triangle(
-                Vec2::new(points[0].0, points[0].1),
-                Vec2::new(points[2].0, points[2].1),
-                Vec2::new(points[3].0, points[3].1),
-                color,
-            );
-        }
         } // end if !graphics_low (particle rendering)
 
         timings.entities_ms = (get_time() - t1) * 1000.0;
@@ -4924,7 +4971,11 @@ impl Renderer {
             let (sw, sh) = virtual_screen_size();
             let zoom = state.camera.zoom;
             let margin = 100.0 * zoom;
-            if screen_x < -margin || screen_x > sw + margin || screen_y < -margin || screen_y > sh + margin {
+            if screen_x < -margin
+                || screen_x > sw + margin
+                || screen_y < -margin
+                || screen_y > sh + margin
+            {
                 continue;
             }
 
@@ -4993,7 +5044,11 @@ impl Renderer {
             // Viewport culling - skip off-screen damage numbers
             let (sw, sh) = virtual_screen_size();
             let margin = 100.0 * zoom;
-            if screen_x < -margin || screen_x > sw + margin || screen_y < -margin || screen_y > sh + margin {
+            if screen_x < -margin
+                || screen_x > sw + margin
+                || screen_y < -margin
+                || screen_y > sh + margin
+            {
                 continue;
             }
 
@@ -5027,7 +5082,13 @@ impl Renderer {
             let outline_color = Color::new(0.0, 0.0, 0.0, alpha * 0.9);
             if state.ui_state.graphics_low {
                 // Single shadow offset (2 draws total instead of 5)
-                self.draw_text_sharp(&text, draw_x + outline_offset, final_y + outline_offset, font_size, outline_color);
+                self.draw_text_sharp(
+                    &text,
+                    draw_x + outline_offset,
+                    final_y + outline_offset,
+                    font_size,
+                    outline_color,
+                );
             } else {
                 for &(ox, oy) in &[
                     (-outline_offset, -outline_offset),
@@ -5035,7 +5096,13 @@ impl Renderer {
                     (-outline_offset, outline_offset),
                     (outline_offset, outline_offset),
                 ] {
-                    self.draw_text_sharp(&text, draw_x + ox, final_y + oy, font_size, outline_color);
+                    self.draw_text_sharp(
+                        &text,
+                        draw_x + ox,
+                        final_y + oy,
+                        font_size,
+                        outline_color,
+                    );
                 }
             }
 
@@ -5144,48 +5211,53 @@ impl Renderer {
                     let cull_bottom = screen_h + tile_margin;
 
                     // For large interiors, limit tile iteration to visible world-space bounds
-                    let (min_local_x, max_local_x, min_local_y, max_local_y) = if interior_size.is_some() {
-                        let corners = [
-                            screen_to_world(cull_left, cull_top, &state.camera),
-                            screen_to_world(cull_right, cull_top, &state.camera),
-                            screen_to_world(cull_left, cull_bottom, &state.camera),
-                            screen_to_world(cull_right, cull_bottom, &state.camera),
-                        ];
-                        let mut min_world_x = f32::MAX;
-                        let mut max_world_x = f32::MIN;
-                        let mut min_world_y = f32::MAX;
-                        let mut max_world_y = f32::MIN;
-                        for (wx, wy) in corners {
-                            min_world_x = min_world_x.min(wx);
-                            max_world_x = max_world_x.max(wx);
-                            min_world_y = min_world_y.min(wy);
-                            max_world_y = max_world_y.max(wy);
-                        }
+                    let (min_local_x, max_local_x, min_local_y, max_local_y) =
+                        if interior_size.is_some() {
+                            let corners = [
+                                screen_to_world(cull_left, cull_top, &state.camera),
+                                screen_to_world(cull_right, cull_top, &state.camera),
+                                screen_to_world(cull_left, cull_bottom, &state.camera),
+                                screen_to_world(cull_right, cull_bottom, &state.camera),
+                            ];
+                            let mut min_world_x = f32::MAX;
+                            let mut max_world_x = f32::MIN;
+                            let mut min_world_y = f32::MAX;
+                            let mut max_world_y = f32::MIN;
+                            for (wx, wy) in corners {
+                                min_world_x = min_world_x.min(wx);
+                                max_world_x = max_world_x.max(wx);
+                                min_world_y = min_world_y.min(wy);
+                                max_world_y = max_world_y.max(wy);
+                            }
 
-                        // Extra margin (in tiles) to avoid edge pop-in
-                        let world_margin = 2.0;
-                        let min_world_x = (min_world_x - world_margin).floor() as i32;
-                        let max_world_x = (max_world_x + world_margin).ceil() as i32;
-                        let min_world_y = (min_world_y - world_margin).floor() as i32;
-                        let max_world_y = (max_world_y + world_margin).ceil() as i32;
+                            // Extra margin (in tiles) to avoid edge pop-in
+                            let world_margin = 2.0;
+                            let min_world_x = (min_world_x - world_margin).floor() as i32;
+                            let max_world_x = (max_world_x + world_margin).ceil() as i32;
+                            let min_world_y = (min_world_y - world_margin).floor() as i32;
+                            let max_world_y = (max_world_y + world_margin).ceil() as i32;
 
-                        let tile_width_i = tile_width as i32;
-                        let tile_height_i = tile_height as i32;
+                            let tile_width_i = tile_width as i32;
+                            let tile_height_i = tile_height as i32;
 
-                        let min_local_x = (min_world_x - chunk_offset_x).clamp(0, tile_width_i.saturating_sub(1));
-                        let max_local_x = (max_world_x - chunk_offset_x).clamp(0, tile_width_i.saturating_sub(1));
-                        let min_local_y = (min_world_y - chunk_offset_y).clamp(0, tile_height_i.saturating_sub(1));
-                        let max_local_y = (max_world_y - chunk_offset_y).clamp(0, tile_height_i.saturating_sub(1));
+                            let min_local_x = (min_world_x - chunk_offset_x)
+                                .clamp(0, tile_width_i.saturating_sub(1));
+                            let max_local_x = (max_world_x - chunk_offset_x)
+                                .clamp(0, tile_width_i.saturating_sub(1));
+                            let min_local_y = (min_world_y - chunk_offset_y)
+                                .clamp(0, tile_height_i.saturating_sub(1));
+                            let max_local_y = (max_world_y - chunk_offset_y)
+                                .clamp(0, tile_height_i.saturating_sub(1));
 
-                        (min_local_x, max_local_x, min_local_y, max_local_y)
-                    } else {
-                        (
-                            0,
-                            tile_width.saturating_sub(1) as i32,
-                            0,
-                            tile_height.saturating_sub(1) as i32,
-                        )
-                    };
+                            (min_local_x, max_local_x, min_local_y, max_local_y)
+                        } else {
+                            (
+                                0,
+                                tile_width.saturating_sub(1) as i32,
+                                0,
+                                tile_height.saturating_sub(1) as i32,
+                            )
+                        };
 
                     if max_local_x < min_local_x || max_local_y < min_local_y {
                         continue;
@@ -6457,7 +6529,12 @@ impl Renderer {
     /// Renders a semi-transparent silhouette of the player that's always visible.
     /// Composites all layers at full opacity onto an off-screen render target first,
     /// then draws the result with low alpha so equipment properly occludes skin.
-    fn render_player_silhouette(&self, player: &Player, camera: &Camera, item_registry: &crate::game::item_registry::ItemRegistry) {
+    fn render_player_silhouette(
+        &self,
+        player: &Player,
+        camera: &Camera,
+        item_registry: &crate::game::item_registry::ItemRegistry,
+    ) {
         if player.is_dead {
             return;
         }
@@ -6491,7 +6568,8 @@ impl Renderer {
         set_camera(&Camera2D {
             render_target: Some(rt.clone()),
             ..Camera2D::from_display_rect(Rect::new(
-                0.0, 0.0,
+                0.0,
+                0.0,
                 SILHOUETTE_RT_SIZE as f32,
                 SILHOUETTE_RT_SIZE as f32,
             ))
@@ -6679,9 +6757,8 @@ impl Renderer {
                             player_gender,
                             coords.flip_h,
                         );
-                        let hair_draw_x = draw_x
-                            + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0
-                            + hair_pos_offset_x;
+                        let hair_draw_x =
+                            draw_x + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 + hair_pos_offset_x;
                         let hair_draw_y = draw_y + hair_pos_offset_y;
 
                         draw_texture_ex(
@@ -8030,8 +8107,7 @@ impl Renderer {
             let sprite_id = obj.gid.wrapping_sub(OBJECTS_FIRSTGID);
             let (source_rect, tex_width, tex_height) =
                 if let Some(&frames) = self.animated_objects.get(&sprite_id) {
-                    let (anim_rect, frame_w) =
-                        Self::get_animated_source_rect(source_rect, frames);
+                    let (anim_rect, frame_w) = Self::get_animated_source_rect(source_rect, frames);
                     let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
                     (anim_rect, frame_w, h)
                 } else {
@@ -8099,8 +8175,7 @@ impl Renderer {
             let sprite_id = obj.gid.wrapping_sub(OBJECTS_FIRSTGID);
             let (source_rect, tex_width, tex_height) =
                 if let Some(&frames) = self.animated_objects.get(&sprite_id) {
-                    let (anim_rect, frame_w) =
-                        Self::get_animated_source_rect(source_rect, frames);
+                    let (anim_rect, frame_w) = Self::get_animated_source_rect(source_rect, frames);
                     let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
                     (anim_rect, frame_w, h)
                 } else {
@@ -8153,8 +8228,7 @@ impl Renderer {
             let sprite_id = gid.wrapping_sub(OBJECTS_FIRSTGID);
             let (source_rect, tex_width, tex_height) =
                 if let Some(&frames) = self.animated_objects.get(&sprite_id) {
-                    let (anim_rect, frame_w) =
-                        Self::get_animated_source_rect(source_rect, frames);
+                    let (anim_rect, frame_w) = Self::get_animated_source_rect(source_rect, frames);
                     let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
                     (anim_rect, frame_w, h)
                 } else {
@@ -8246,8 +8320,7 @@ impl Renderer {
         alpha: f32,
         camera: &Camera,
     ) {
-        let (base_x, base_y) =
-            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+        let (base_x, base_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
@@ -8255,8 +8328,7 @@ impl Renderer {
             let sprite_id = gid.wrapping_sub(OBJECTS_FIRSTGID);
             let (source_rect, tex_width, tex_height) =
                 if let Some(&frames) = self.animated_objects.get(&sprite_id) {
-                    let (anim_rect, frame_w) =
-                        Self::get_animated_source_rect(source_rect, frames);
+                    let (anim_rect, frame_w) = Self::get_animated_source_rect(source_rect, frames);
                     let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
                     (anim_rect, frame_w, h)
                 } else {
@@ -8310,8 +8382,7 @@ impl Renderer {
             let sprite_id = wall.gid.wrapping_sub(WALLS_FIRSTGID);
             let (source_rect, tex_width, tex_height) =
                 if let Some(&frames) = self.animated_walls.get(&sprite_id) {
-                    let (anim_rect, frame_w) =
-                        Self::get_animated_source_rect(source_rect, frames);
+                    let (anim_rect, frame_w) = Self::get_animated_source_rect(source_rect, frames);
                     let h = source_rect.map(|r| r.h).unwrap_or(texture.height());
                     (anim_rect, frame_w, h)
                 } else {
@@ -8493,9 +8564,18 @@ impl Renderer {
             let num_tabs = 3.0f32;
             let tab_w = (max_chat_width / num_tabs).floor();
             let tab_bar_y = clip_y - tab_h;
-            let latest_local_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::Local);
-            let latest_global_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::Global);
-            let latest_system_ts = state.ui_state.chat_messages.latest_timestamp(&ChatChannel::System);
+            let latest_local_ts = state
+                .ui_state
+                .chat_messages
+                .latest_timestamp(&ChatChannel::Local);
+            let latest_global_ts = state
+                .ui_state
+                .chat_messages
+                .latest_timestamp(&ChatChannel::Global);
+            let latest_system_ts = state
+                .ui_state
+                .chat_messages
+                .latest_timestamp(&ChatChannel::System);
 
             for i in 0..3 {
                 let tx = chat_x + i as f32 * tab_w;
@@ -8581,7 +8661,10 @@ impl Renderer {
             };
 
             if rebuild_chat_cache {
-                let active_msgs = state.ui_state.chat_messages.channel(&state.ui_state.chat_active_tab);
+                let active_msgs = state
+                    .ui_state
+                    .chat_messages
+                    .channel(&state.ui_state.chat_active_tab);
                 let mut rebuilt_lines: Vec<(String, Color)> = Vec::new();
                 rebuilt_lines.reserve(active_msgs.len() * 2);
 
@@ -9004,9 +9087,15 @@ impl Renderer {
 
             // Slayer task chip (below gathering/dash indicators)
             let has_dash_bar = state.dash_cooldown_end > current_time;
-            let slayer_chip_y = prayer_bar_y + bar_height + 4.0 * s
+            let slayer_chip_y = prayer_bar_y
+                + bar_height
+                + 4.0 * s
                 + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
-                + if has_dash_bar { 22.0 * s + 4.0 * s } else { 0.0 };
+                + if has_dash_bar {
+                    22.0 * s + 4.0 * s
+                } else {
+                    0.0
+                };
             let has_slayer_chip = state.ui_state.slayer_current_task.is_some();
             self.render_slayer_task_chip(state, bar_x, slayer_chip_y);
 
@@ -9133,7 +9222,8 @@ impl Renderer {
 
                 // Get visible portion of text that fits
                 let chars_from_offset: String = input_text.chars().skip(scroll_offset).collect();
-                let visible_char_count = measure_chars_that_fit(&chars_from_offset, text_area_width);
+                let visible_char_count =
+                    measure_chars_that_fit(&chars_from_offset, text_area_width);
                 let visible_text: String = input_text
                     .chars()
                     .skip(scroll_offset)
@@ -9175,7 +9265,9 @@ impl Renderer {
                     let cursor_visible_pos = cursor_pos.saturating_sub(scroll_offset);
                     let text_before_cursor: String =
                         visible_text.chars().take(cursor_visible_pos).collect();
-                    let cursor_x = self.measure_text_sharp(&text_before_cursor, font_size).width;
+                    let cursor_x = self
+                        .measure_text_sharp(&text_before_cursor, font_size)
+                        .width;
                     draw_line(
                         text_start_x + cursor_x + 1.0,
                         input_y + 4.0 * scale,
@@ -9405,7 +9497,11 @@ impl Renderer {
                     let (bar_x, stats_y) =
                         self.minimap_stats_stack_position(state, bar_width_contract);
                     // Below 3 stat bars (HP + MP + Prayer, each 18*s + 4*s gap) + extra gap
-                    let slayer_offset = if state.ui_state.slayer_current_task.is_some() { 46.0 * s } else { 0.0 };
+                    let slayer_offset = if state.ui_state.slayer_current_task.is_some() {
+                        46.0 * s
+                    } else {
+                        0.0
+                    };
                     let contract_y = stats_y + 3.0 * (18.0 + 4.0) * s + 14.0 * s + slayer_offset;
                     self.render_farming_contract_tracker(state, bar_x, contract_y, 240.0);
                 }
@@ -9431,9 +9527,15 @@ impl Renderer {
                 let current_time = macroquad::time::get_time();
                 let is_skilling = state.is_gathering || state.is_woodcutting;
                 let has_dash_bar = state.dash_cooldown_end > current_time;
-                let chip_y = prayer_bar_y + bar_height + 4.0 * s
+                let chip_y = prayer_bar_y
+                    + bar_height
+                    + 4.0 * s
                     + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
-                    + if has_dash_bar { 22.0 * s + 4.0 * s } else { 0.0 };
+                    + if has_dash_bar {
+                        22.0 * s + 4.0 * s
+                    } else {
+                        0.0
+                    };
                 self.render_slayer_task_chip_tooltip(state, bar_x, chip_y);
             }
         }
@@ -9449,8 +9551,6 @@ impl Renderer {
                 state.ui_state.dialogue_scroll_drag.dragging,
             );
         }
-
-
 
         // Altar offering panel (when active)
         if let Some(ref panel) = state.ui_state.altar_panel {
@@ -9477,7 +9577,13 @@ impl Renderer {
 
         // Gold drop dialog (when active) - rendered after trade/stall so it appears on top
         if let Some(ref dialog) = state.ui_state.gold_drop_dialog {
-            self.render_gold_drop_dialog(dialog, state.inventory.gold, state.ui_state.trade_open, hovered, &mut layout);
+            self.render_gold_drop_dialog(
+                dialog,
+                state.inventory.gold,
+                state.ui_state.trade_open,
+                hovered,
+                &mut layout,
+            );
         }
 
         // Stall price dialog (when active)

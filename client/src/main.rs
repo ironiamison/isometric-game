@@ -1,8 +1,8 @@
 use macroquad::prelude::*;
 use macroquad::window::set_fullscreen;
+use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 mod audio;
 mod auth;
@@ -133,10 +133,7 @@ impl SpectatorState {
         self.game_state.camera.initialized = true;
 
         // Request chunks around camera position (spectator has no local player)
-        let chunks_to_request = self
-            .game_state
-            .chunk_manager
-            .update_player_position(cx, cy);
+        let chunks_to_request = self.game_state.chunk_manager.update_player_position(cx, cy);
         for coord in chunks_to_request {
             self.network
                 .send(&network::messages::ClientMessage::RequestChunk {
@@ -352,29 +349,21 @@ async fn main() {
                                 let http_url = WS_URL
                                     .replace("ws://", "http://")
                                     .replace("wss://", "https://");
-                                let matchmake_url = format!(
-                                    "{}/matchmake/joinOrCreate/game_room",
-                                    http_url
-                                );
+                                let matchmake_url =
+                                    format!("{}/matchmake/joinOrCreate/game_room", http_url);
                                 let body = serde_json::json!({
                                     "character_id": character_id,
                                 });
                                 let result = ureq::post(&matchmake_url)
-                                    .set(
-                                        "Authorization",
-                                        &format!("Bearer {}", session.token),
-                                    )
+                                    .set("Authorization", &format!("Bearer {}", session.token))
                                     .set("Content-Type", "application/json")
                                     .send_json(&body);
 
                                 match result {
                                     Ok(response) => {
-                                        if let Ok(data) =
-                                            response.into_json::<serde_json::Value>()
+                                        if let Ok(data) = response.into_json::<serde_json::Value>()
                                         {
-                                            if let Some(token) =
-                                                data["session_token"].as_str()
-                                            {
+                                            if let Some(token) = data["session_token"].as_str() {
                                                 // Send upgrade over existing spectator WS
                                                 spec.network.send_spectator_upgrade(token);
 
@@ -383,7 +372,8 @@ async fn main() {
 
                                                 // Reuse spectator's game state (chunks already loaded!)
                                                 let mut game_state = spec.game_state;
-                                                game_state.camera.transition_from = Some((cam_x, cam_y));
+                                                game_state.camera.transition_from =
+                                                    Some((cam_x, cam_y));
                                                 game_state.camera.transition_progress = 0.0;
                                                 game_state.spectator_mode = false;
                                                 game_state.selected_character_name =
@@ -393,15 +383,13 @@ async fn main() {
                                                     audio.music_volume();
                                                 game_state.ui_state.audio_sfx_volume =
                                                     audio.sfx_volume();
-                                                game_state.ui_state.audio_muted =
-                                                    audio.is_muted();
+                                                game_state.ui_state.audio_muted = audio.is_muted();
                                                 game_state.ui_state.classic_controls =
                                                     settings::load_classic_controls();
                                                 // Load persisted UI settings
                                                 let ui_settings = settings::load_ui_settings();
                                                 game_state.camera.zoom = ui_settings.zoom;
-                                                game_state.ui_state.ui_scale =
-                                                    ui_settings.ui_scale;
+                                                game_state.ui_state.ui_scale = ui_settings.ui_scale;
                                                 game_state.ui_state.shift_drop_enabled =
                                                     ui_settings.shift_drop_enabled;
                                                 game_state.ui_state.chat_log_visible =
@@ -437,9 +425,7 @@ async fn main() {
                                                 input_handler.load_touch_icons().await;
 
                                                 // Start background music
-                                                audio
-                                                    .play_music("assets/audio/start.ogg")
-                                                    .await;
+                                                audio.play_music("assets/audio/start.ogg").await;
 
                                                 app_state = AppState::Playing {
                                                     game_state,
@@ -455,10 +441,7 @@ async fn main() {
                                         spec.network.disconnect();
                                     }
                                     Err(e) => {
-                                        log::error!(
-                                            "Matchmake for upgrade failed: {}",
-                                            e
-                                        );
+                                        log::error!("Matchmake for upgrade failed: {}", e);
                                         spec.network.disconnect();
                                     }
                                 }
@@ -840,20 +823,14 @@ fn run_game_frame(
 
                     // For ranged weapons, check if player has arrows
                     if is_ranged {
-                        let has_arrows = game_state
-                            .inventory
-                            .slots
-                            .iter()
-                            .any(|slot| {
-                                slot.as_ref()
-                                    .map_or(false, |s| s.item_id.ends_with("_arrow"))
-                            });
+                        let has_arrows = game_state.inventory.slots.iter().any(|slot| {
+                            slot.as_ref()
+                                .map_or(false, |s| s.item_id.ends_with("_arrow"))
+                        });
                         if !has_arrows {
                             // No arrows - play error sound and show message
                             game_state.pending_sfx.push("error".to_string());
-                            game_state.push_system_chat(
-                                "You have no arrows!".to_string(),
-                            );
+                            game_state.push_system_chat("You have no arrows!".to_string());
                             continue;
                         }
                     }
@@ -931,11 +908,9 @@ fn run_game_frame(
                     game_state.ui_state.active_dialogue = None;
                     // Create TutorialManager if it doesn't exist yet
                     if game_state.tutorial.is_none() {
-                        game_state.tutorial = Some(
-                            game::tutorial::TutorialManager::new(
-                                game_state.ui_state.classic_controls,
-                            ),
-                        );
+                        game_state.tutorial = Some(game::tutorial::TutorialManager::new(
+                            game_state.ui_state.classic_controls,
+                        ));
                     }
                     if let Some(tutorial) = &mut game_state.tutorial {
                         if tutorial.phase == game::tutorial::TutorialPhase::AwaitingAccept {
@@ -1197,7 +1172,10 @@ fn run_game_frame(
                 chest_id: chest_id.clone(),
                 slot: *slot,
             },
-            InputCommand::ChestDeposit { chest_id, inventory_slot } => ClientMessage::ChestDeposit {
+            InputCommand::ChestDeposit {
+                chest_id,
+                inventory_slot,
+            } => ClientMessage::ChestDeposit {
                 chest_id: chest_id.clone(),
                 inventory_slot: *inventory_slot,
             },
@@ -1211,42 +1189,45 @@ fn run_game_frame(
                 action: action.clone(),
             },
             InputCommand::CancelAutoAction => ClientMessage::CancelAutoAction,
-            InputCommand::InteractObject { x, y } => ClientMessage::InteractObject {
-                x: *x,
-                y: *y,
-            },
-            InputCommand::UseWaystone { x, y } => ClientMessage::UseWaystone {
-                x: *x,
-                y: *y,
-            },
+            InputCommand::InteractObject { x, y } => ClientMessage::InteractObject { x: *x, y: *y },
+            InputCommand::UseWaystone { x, y } => ClientMessage::UseWaystone { x: *x, y: *y },
             // Trade commands
             InputCommand::TradeRequest { target_id } => ClientMessage::TradeRequest {
                 target_id: target_id.clone(),
             },
-            InputCommand::TradeAcceptRequest { requester_id } => ClientMessage::TradeAcceptRequest {
-                requester_id: requester_id.clone(),
-            },
-            InputCommand::TradeDeclineRequest { requester_id } => ClientMessage::TradeDeclineRequest {
-                requester_id: requester_id.clone(),
-            },
-            InputCommand::TradeOfferItem { slot_index, quantity } => ClientMessage::TradeOfferItem {
+            InputCommand::TradeAcceptRequest { requester_id } => {
+                ClientMessage::TradeAcceptRequest {
+                    requester_id: requester_id.clone(),
+                }
+            }
+            InputCommand::TradeDeclineRequest { requester_id } => {
+                ClientMessage::TradeDeclineRequest {
+                    requester_id: requester_id.clone(),
+                }
+            }
+            InputCommand::TradeOfferItem {
+                slot_index,
+                quantity,
+            } => ClientMessage::TradeOfferItem {
                 slot_index: *slot_index,
                 quantity: *quantity,
             },
             InputCommand::TradeRemoveItem { offer_index } => ClientMessage::TradeRemoveItem {
                 offer_index: *offer_index,
             },
-            InputCommand::TradeOfferGold { amount } => ClientMessage::TradeOfferGold {
-                amount: *amount,
-            },
+            InputCommand::TradeOfferGold { amount } => {
+                ClientMessage::TradeOfferGold { amount: *amount }
+            }
             InputCommand::TradeAccept => ClientMessage::TradeAccept,
             InputCommand::TradeCancel => ClientMessage::TradeCancel,
             // Stall commands
-            InputCommand::StallOpen { name } => ClientMessage::StallOpen {
-                name: name.clone(),
-            },
+            InputCommand::StallOpen { name } => ClientMessage::StallOpen { name: name.clone() },
             InputCommand::StallClose => ClientMessage::StallClose,
-            InputCommand::StallSetItem { inventory_slot, quantity, price } => ClientMessage::StallSetItem {
+            InputCommand::StallSetItem {
+                inventory_slot,
+                quantity,
+                price,
+            } => ClientMessage::StallSetItem {
                 inventory_slot: *inventory_slot,
                 quantity: *quantity,
                 price: *price,
@@ -1257,7 +1238,11 @@ fn run_game_frame(
             InputCommand::StallBrowse { player_id } => ClientMessage::StallBrowse {
                 player_id: player_id.clone(),
             },
-            InputCommand::StallBuy { seller_id, stall_slot, quantity } => ClientMessage::StallBuy {
+            InputCommand::StallBuy {
+                seller_id,
+                stall_slot,
+                quantity,
+            } => ClientMessage::StallBuy {
                 seller_id: seller_id.clone(),
                 stall_slot: *stall_slot,
                 quantity: *quantity,

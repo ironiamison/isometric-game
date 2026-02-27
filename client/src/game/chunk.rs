@@ -282,14 +282,13 @@ impl ChunkManager {
         // Prioritize nearby chunks first and throttle per-frame requests
         // to avoid large burst loads that cause frame hitches.
         candidates.sort_by_key(|coord| {
-            (coord.x - new_chunk.x).abs().max((coord.y - new_chunk.y).abs())
+            (coord.x - new_chunk.x)
+                .abs()
+                .max((coord.y - new_chunk.y).abs())
         });
 
         let mut to_request = Vec::new();
-        for coord in candidates
-            .into_iter()
-            .take(MAX_CHUNK_REQUESTS_PER_UPDATE)
-        {
+        for coord in candidates.into_iter().take(MAX_CHUNK_REQUESTS_PER_UPDATE) {
             self.pending_requests.insert(coord, current_time);
             to_request.push(coord);
         }
@@ -430,10 +429,7 @@ impl ChunkManager {
         if self.interior_size.is_some() {
             let chunk = self.chunks.get(&ChunkCoord { x: 0, y: 0 })?;
             return chunk.portals.iter().find(|p| {
-                tile_x >= p.x
-                    && tile_x < p.x + p.width
-                    && tile_y >= p.y
-                    && tile_y < p.y + p.height
+                tile_x >= p.x && tile_x < p.x + p.width && tile_y >= p.y && tile_y < p.y + p.height
             });
         }
 

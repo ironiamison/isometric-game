@@ -85,8 +85,8 @@ impl super::super::Renderer {
         let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
         layout.add(UiElementId::TradeCancelButton, close_bounds);
 
-        let is_close_hovered = state.ui_state.hovered_element.as_ref()
-            == Some(&UiElementId::TradeCancelButton);
+        let is_close_hovered =
+            state.ui_state.hovered_element.as_ref() == Some(&UiElementId::TradeCancelButton);
         let (close_bg, close_border) = if is_close_hovered {
             (
                 Color::new(0.4, 0.15, 0.15, 1.0),
@@ -471,13 +471,7 @@ impl super::super::Renderer {
         self.draw_text_sharp(my_status_text, status_x, status_y, 16.0, my_status_color);
         let my_w = self.measure_text_sharp(my_status_text, 16.0).width;
         // Separator dot
-        self.draw_text_sharp(
-            " | ",
-            status_x + my_w,
-            status_y,
-            16.0,
-            TEXT_DIM,
-        );
+        self.draw_text_sharp(" | ", status_x + my_w, status_y, 16.0, TEXT_DIM);
         let sep_w = self.measure_text_sharp(" | ", 16.0).width;
         self.draw_text_sharp(
             partner_status_text,
@@ -496,8 +490,8 @@ impl super::super::Renderer {
         let accept_bounds = Rect::new(accept_btn_x, accept_btn_y, accept_btn_w, accept_btn_h);
         layout.add(UiElementId::TradeAcceptButton, accept_bounds);
 
-        let is_accept_hovered = state.ui_state.hovered_element.as_ref()
-            == Some(&UiElementId::TradeAcceptButton);
+        let is_accept_hovered =
+            state.ui_state.hovered_element.as_ref() == Some(&UiElementId::TradeAcceptButton);
         let already_accepted = state.ui_state.trade_my_accepted;
 
         let (btn_bg, btn_border) = if already_accepted {
@@ -575,7 +569,13 @@ impl super::super::Renderer {
             let popup_y = 40.0 * s;
 
             // Semi-transparent backdrop scrim (subtle, since this is a popup not full modal)
-            draw_rectangle(0.0, 0.0, sw, popup_y + popup_h + 20.0, Color::new(0.0, 0.0, 0.0, 0.3));
+            draw_rectangle(
+                0.0,
+                0.0,
+                sw,
+                popup_y + popup_h + 20.0,
+                Color::new(0.0, 0.0, 0.0, 0.3),
+            );
 
             // Panel frame + corner accents
             self.draw_panel_frame(popup_x, popup_y, popup_w, popup_h);
@@ -645,8 +645,8 @@ impl super::super::Renderer {
             let accept_bounds = Rect::new(accept_x, btn_y, btn_w, btn_h);
             layout.add(UiElementId::TradeRequestAccept, accept_bounds);
 
-            let is_accept_hovered = state.ui_state.hovered_element.as_ref()
-                == Some(&UiElementId::TradeRequestAccept);
+            let is_accept_hovered =
+                state.ui_state.hovered_element.as_ref() == Some(&UiElementId::TradeRequestAccept);
             let (accept_bg, accept_border) = if is_accept_hovered {
                 (
                     Color::new(0.2, 0.5, 0.2, 1.0),
@@ -697,8 +697,8 @@ impl super::super::Renderer {
             let decline_bounds = Rect::new(decline_x, btn_y, btn_w, btn_h);
             layout.add(UiElementId::TradeRequestDecline, decline_bounds);
 
-            let is_decline_hovered = state.ui_state.hovered_element.as_ref()
-                == Some(&UiElementId::TradeRequestDecline);
+            let is_decline_hovered =
+                state.ui_state.hovered_element.as_ref() == Some(&UiElementId::TradeRequestDecline);
             let (decline_bg, decline_border) = if is_decline_hovered {
                 (
                     Color::new(0.5, 0.15, 0.15, 1.0),

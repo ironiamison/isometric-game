@@ -236,7 +236,10 @@ pub enum ClientMessage {
     ChestTake { chest_id: String, slot: u8 },
 
     #[serde(rename = "chestDeposit")]
-    ChestDeposit { chest_id: String, inventory_slot: u8 },
+    ChestDeposit {
+        chest_id: String,
+        inventory_slot: u8,
+    },
 
     #[serde(rename = "startAutoAction")]
     StartAutoAction {
@@ -276,7 +279,11 @@ pub enum ClientMessage {
     #[serde(rename = "stallClose")]
     StallClose,
     #[serde(rename = "stallSetItem")]
-    StallSetItem { inventory_slot: u8, quantity: i32, price: i32 },
+    StallSetItem {
+        inventory_slot: u8,
+        quantity: i32,
+        price: i32,
+    },
     #[serde(rename = "stallRemoveItem")]
     StallRemoveItem { stall_slot: u8 },
     #[serde(rename = "stallUpdatePrice")]
@@ -284,7 +291,11 @@ pub enum ClientMessage {
     #[serde(rename = "stallBrowse")]
     StallBrowse { player_id: String },
     #[serde(rename = "stallBuy")]
-    StallBuy { seller_id: String, stall_slot: u8, quantity: i32 },
+    StallBuy {
+        seller_id: String,
+        stall_slot: u8,
+        quantity: i32,
+    },
 
     /// Spectator upgrades to a full player session
     #[serde(rename = "spectatorUpgrade")]
@@ -583,7 +594,10 @@ impl ClientMessage {
                 data.insert("spell_id".into(), Value::String(spell_id.clone().into()));
                 "castSpell"
             }
-            ClientMessage::StartCraftBatch { recipe_id, quantity } => {
+            ClientMessage::StartCraftBatch {
+                recipe_id,
+                quantity,
+            } => {
                 data.insert("recipe_id".into(), Value::String(recipe_id.clone().into()));
                 data.insert("quantity".into(), Value::from(*quantity as i64));
                 "startCraftBatch"
@@ -607,7 +621,10 @@ impl ClientMessage {
                 "slayerBuyReward"
             }
             ClientMessage::SlayerRemoveBlock { monster_id } => {
-                data.insert("monster_id".into(), Value::String(monster_id.clone().into()));
+                data.insert(
+                    "monster_id".into(),
+                    Value::String(monster_id.clone().into()),
+                );
                 "slayerRemoveBlock"
             }
             ClientMessage::OpenChest { x, y } => {
@@ -620,9 +637,15 @@ impl ClientMessage {
                 data.insert("slot".into(), Value::Integer((*slot as i64).into()));
                 "chestTake"
             }
-            ClientMessage::ChestDeposit { chest_id, inventory_slot } => {
+            ClientMessage::ChestDeposit {
+                chest_id,
+                inventory_slot,
+            } => {
                 data.insert("chest_id".into(), Value::String(chest_id.clone().into()));
-                data.insert("inventory_slot".into(), Value::Integer((*inventory_slot as i64).into()));
+                data.insert(
+                    "inventory_slot".into(),
+                    Value::Integer((*inventory_slot as i64).into()),
+                );
                 "chestDeposit"
             }
             ClientMessage::StartAutoAction {
@@ -634,10 +657,7 @@ impl ClientMessage {
                     "target_type".into(),
                     Value::String(target_type.clone().into()),
                 );
-                data.insert(
-                    "target_id".into(),
-                    Value::String(target_id.clone().into()),
-                );
+                data.insert("target_id".into(), Value::String(target_id.clone().into()));
                 data.insert("action".into(), Value::String(action.clone().into()));
                 "startAutoAction"
             }
@@ -652,20 +672,35 @@ impl ClientMessage {
                 "tradeRequest"
             }
             ClientMessage::TradeAcceptRequest { requester_id } => {
-                data.insert("requester_id".into(), Value::String(requester_id.clone().into()));
+                data.insert(
+                    "requester_id".into(),
+                    Value::String(requester_id.clone().into()),
+                );
                 "tradeAcceptRequest"
             }
             ClientMessage::TradeDeclineRequest { requester_id } => {
-                data.insert("requester_id".into(), Value::String(requester_id.clone().into()));
+                data.insert(
+                    "requester_id".into(),
+                    Value::String(requester_id.clone().into()),
+                );
                 "tradeDeclineRequest"
             }
-            ClientMessage::TradeOfferItem { slot_index, quantity } => {
-                data.insert("slot_index".into(), Value::Integer((*slot_index as i64).into()));
+            ClientMessage::TradeOfferItem {
+                slot_index,
+                quantity,
+            } => {
+                data.insert(
+                    "slot_index".into(),
+                    Value::Integer((*slot_index as i64).into()),
+                );
                 data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
                 "tradeOfferItem"
             }
             ClientMessage::TradeRemoveItem { offer_index } => {
-                data.insert("offer_index".into(), Value::Integer((*offer_index as i64).into()));
+                data.insert(
+                    "offer_index".into(),
+                    Value::Integer((*offer_index as i64).into()),
+                );
                 "tradeRemoveItem"
             }
             ClientMessage::TradeOfferGold { amount } => {
@@ -680,18 +715,31 @@ impl ClientMessage {
                 "stallOpen"
             }
             ClientMessage::StallClose => "stallClose",
-            ClientMessage::StallSetItem { inventory_slot, quantity, price } => {
-                data.insert("inventory_slot".into(), Value::Integer((*inventory_slot as i64).into()));
+            ClientMessage::StallSetItem {
+                inventory_slot,
+                quantity,
+                price,
+            } => {
+                data.insert(
+                    "inventory_slot".into(),
+                    Value::Integer((*inventory_slot as i64).into()),
+                );
                 data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
                 data.insert("price".into(), Value::Integer((*price as i64).into()));
                 "stallSetItem"
             }
             ClientMessage::StallRemoveItem { stall_slot } => {
-                data.insert("stall_slot".into(), Value::Integer((*stall_slot as i64).into()));
+                data.insert(
+                    "stall_slot".into(),
+                    Value::Integer((*stall_slot as i64).into()),
+                );
                 "stallRemoveItem"
             }
             ClientMessage::StallUpdatePrice { stall_slot, price } => {
-                data.insert("stall_slot".into(), Value::Integer((*stall_slot as i64).into()));
+                data.insert(
+                    "stall_slot".into(),
+                    Value::Integer((*stall_slot as i64).into()),
+                );
                 data.insert("price".into(), Value::Integer((*price as i64).into()));
                 "stallUpdatePrice"
             }
@@ -699,14 +747,24 @@ impl ClientMessage {
                 data.insert("player_id".into(), Value::String(player_id.clone().into()));
                 "stallBrowse"
             }
-            ClientMessage::StallBuy { seller_id, stall_slot, quantity } => {
+            ClientMessage::StallBuy {
+                seller_id,
+                stall_slot,
+                quantity,
+            } => {
                 data.insert("seller_id".into(), Value::String(seller_id.clone().into()));
-                data.insert("stall_slot".into(), Value::Integer((*stall_slot as i64).into()));
+                data.insert(
+                    "stall_slot".into(),
+                    Value::Integer((*stall_slot as i64).into()),
+                );
                 data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
                 "stallBuy"
             }
             ClientMessage::SpectatorUpgrade { session_token } => {
-                data.insert("sessionToken".into(), Value::String(session_token.clone().into()));
+                data.insert(
+                    "sessionToken".into(),
+                    Value::String(session_token.clone().into()),
+                );
                 "spectatorUpgrade"
             }
         };

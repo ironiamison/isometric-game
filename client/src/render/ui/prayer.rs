@@ -342,9 +342,16 @@ impl Renderer {
             let is_locked = magic_level < spell.magic_level_req;
 
             self.draw_spell_slot(
-                slot_x, slot_y, slot_size, spell.id, spell.name,
-                spell.mana_cost, spell.magic_level_req,
-                is_locked, is_hovered, scale,
+                slot_x,
+                slot_y,
+                slot_size,
+                spell.id,
+                spell.name,
+                spell.mana_cost,
+                spell.magic_level_req,
+                is_locked,
+                is_hovered,
+                scale,
             );
         }
 
@@ -367,9 +374,16 @@ impl Renderer {
             let is_locked = !state.unlocked_spells.contains(&scroll_spell.id);
 
             self.draw_spell_slot(
-                slot_x, slot_y, slot_size, &scroll_spell.id, &scroll_spell.name,
-                scroll_spell.mana_cost, 0,
-                is_locked, is_hovered, scale,
+                slot_x,
+                slot_y,
+                slot_size,
+                &scroll_spell.id,
+                &scroll_spell.name,
+                scroll_spell.mana_cost,
+                0,
+                is_locked,
+                is_hovered,
+                scale,
             );
         }
 

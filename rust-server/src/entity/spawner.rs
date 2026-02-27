@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use super::prototype::EntityPrototype;
-use crate::item::{GroundItem, GOLD_ITEM_ID};
+use crate::item::{GOLD_ITEM_ID, GroundItem};
 
 /// Generate loot drops from a prototype's loot table
 pub fn generate_loot_from_prototype(

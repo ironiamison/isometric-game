@@ -45,10 +45,10 @@ mod perf_metrics;
 mod prayer;
 mod protocol;
 mod quest;
+mod scroll_spell;
 mod shop;
 mod skills;
 mod slayer;
-mod scroll_spell;
 mod spell;
 mod tilemap;
 mod waystone;
@@ -1223,7 +1223,12 @@ async fn matchmake_join_or_create(
         },
     );
 
-    info!("Tutorial: character '{}' played_time={}, is_new_character={}", character_data.name, character_data.played_time, character_data.played_time == 0);
+    info!(
+        "Tutorial: character '{}' played_time={}, is_new_character={}",
+        character_data.name,
+        character_data.played_time,
+        character_data.played_time == 0
+    );
 
     // Start tracking play time for this character
     state
@@ -1325,8 +1330,7 @@ async fn matchmake_join_or_create(
         Ok(spells) => {
             let count = spells.len();
             let spell_set: std::collections::HashSet<String> = spells.into_iter().collect();
-            room.set_player_unlocked_spells(&player_id, spell_set)
-                .await;
+            room.set_player_unlocked_spells(&player_id, spell_set).await;
             if count > 0 {
                 info!(
                     "Loaded {} unlocked spells for {}",
@@ -1344,8 +1348,13 @@ async fn matchmake_join_or_create(
     }
 
     // Load slayer state from database
-    let slayer_state = state.db.load_character_slayer_state(character_id).await.unwrap_or_default();
-    room.set_player_slayer_state(&player_id, slayer_state.clone()).await;
+    let slayer_state = state
+        .db
+        .load_character_slayer_state(character_id)
+        .await
+        .unwrap_or_default();
+    room.set_player_slayer_state(&player_id, slayer_state.clone())
+        .await;
     if slayer_state.current_task.is_some() || slayer_state.tasks_completed > 0 {
         info!(
             "Loaded slayer state for {}: {} tasks completed, {} points",
@@ -1394,10 +1403,11 @@ async fn stats_overview(State(state): State<AppState>) -> impl IntoResponse {
 
     // Count total characters and accounts from DB
     let pool = state.db.pool();
-    let total_characters: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM characters WHERE is_admin = FALSE")
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
+    let total_characters: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM characters WHERE is_admin = FALSE")
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
     let total_accounts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM accounts")
         .fetch_one(pool)
         .await
@@ -1546,7 +1556,9 @@ fn sort_leaderboard_entries(entries: &mut [LeaderboardEntry], sort: &str) {
         "smithing_level" => entries.sort_by(|a, b| b.smithing_level.cmp(&a.smithing_level)),
         "prayer_level" => entries.sort_by(|a, b| b.prayer_level.cmp(&a.prayer_level)),
         "magic_level" => entries.sort_by(|a, b| b.magic_level.cmp(&a.magic_level)),
-        "woodcutting_level" => entries.sort_by(|a, b| b.woodcutting_level.cmp(&a.woodcutting_level)),
+        "woodcutting_level" => {
+            entries.sort_by(|a, b| b.woodcutting_level.cmp(&a.woodcutting_level))
+        }
         "mining_level" => entries.sort_by(|a, b| b.mining_level.cmp(&a.mining_level)),
         "alchemy_level" => entries.sort_by(|a, b| b.alchemy_level.cmp(&a.alchemy_level)),
         "slayer_level" => entries.sort_by(|a, b| b.slayer_level.cmp(&a.slayer_level)),
@@ -1785,10 +1797,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
     info!("Spectator {} connected", spectator_id);
 
     // Send initial chunks around spawn (5x5 area)
-    let spawn_chunk = chunk::ChunkCoord::from_world(
-        crate::game::WORLD_SPAWN_X,
-        crate::game::WORLD_SPAWN_Y,
-    );
+    let spawn_chunk =
+        chunk::ChunkCoord::from_world(crate::game::WORLD_SPAWN_X, crate::game::WORLD_SPAWN_Y);
     for dy in -2..=2 {
         for dx in -2..=2 {
             let coord = chunk::ChunkCoord::new(spawn_chunk.x + dx, spawn_chunk.y + dy);
@@ -1861,10 +1871,16 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             );
 
                             // --- Step 1: Validate session token ---
-                            let (session_id, room_id) = match recv_state.token_signer.validate_token(&session_token) {
+                            let (session_id, room_id) = match recv_state
+                                .token_signer
+                                .validate_token(&session_token)
+                            {
                                 Some((sid, rid)) => (sid, rid),
                                 None => {
-                                    warn!("Spectator {} upgrade rejected: invalid or expired session token", recv_spectator_id);
+                                    warn!(
+                                        "Spectator {} upgrade rejected: invalid or expired session token",
+                                        recv_spectator_id
+                                    );
                                     let err_msg = ServerMessage::Error {
                                         code: 401,
                                         message: "Invalid or expired session token".to_string(),
@@ -1877,24 +1893,32 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             };
 
                             // --- Step 2: Look up session in state.sessions ---
-                            let session = match recv_state.sessions.get(&session_id).map(|s| s.clone()) {
-                                Some(s) if s.room_id == room_id => s,
-                                _ => {
-                                    warn!("Spectator {} upgrade rejected: invalid session {}", recv_spectator_id, session_id);
-                                    let err_msg = ServerMessage::Error {
-                                        code: 403,
-                                        message: "Invalid session".to_string(),
-                                    };
-                                    if let Ok(bytes) = protocol::encode_server_message(&err_msg) {
-                                        let _ = recv_tx.send(bytes).await;
+                            let session =
+                                match recv_state.sessions.get(&session_id).map(|s| s.clone()) {
+                                    Some(s) if s.room_id == room_id => s,
+                                    _ => {
+                                        warn!(
+                                            "Spectator {} upgrade rejected: invalid session {}",
+                                            recv_spectator_id, session_id
+                                        );
+                                        let err_msg = ServerMessage::Error {
+                                            code: 403,
+                                            message: "Invalid session".to_string(),
+                                        };
+                                        if let Ok(bytes) = protocol::encode_server_message(&err_msg)
+                                        {
+                                            let _ = recv_tx.send(bytes).await;
+                                        }
+                                        continue;
                                     }
-                                    continue;
-                                }
-                            };
+                                };
 
                             // --- Step 3: Verify auth token is still valid ---
                             if !recv_state.auth_sessions.contains_key(&session.auth_token) {
-                                warn!("Spectator {} upgrade rejected: auth token expired for session {}", recv_spectator_id, session_id);
+                                warn!(
+                                    "Spectator {} upgrade rejected: auth token expired for session {}",
+                                    recv_spectator_id, session_id
+                                );
                                 let err_msg = ServerMessage::Error {
                                     code: 401,
                                     message: "Auth token expired. Please login again.".to_string(),
@@ -1915,10 +1939,15 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
 
                             // --- Step 4: Remove spectator registration ---
                             recv_room.remove_spectator(&recv_spectator_id).await;
-                            info!("Spectator {} upgrading to player {} ({})", recv_spectator_id, character_name, player_id);
+                            info!(
+                                "Spectator {} upgrading to player {} ({})",
+                                recv_spectator_id, character_name, player_id
+                            );
 
                             // --- Step 5: Register the existing mpsc sender as the player's sender ---
-                            recv_room.register_player_sender(&player_id, recv_tx.clone()).await;
+                            recv_room
+                                .register_player_sender(&player_id, recv_tx.clone())
+                                .await;
 
                             // --- Step 6: Activate the player entity ---
                             let player_name = recv_room.activate_player(&player_id).await;
@@ -1953,7 +1982,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Discovered recipes
-                            let discovered = recv_room.get_player_discovered_recipes(&player_id).await;
+                            let discovered =
+                                recv_room.get_player_discovered_recipes(&player_id).await;
                             let discovered_msg = ServerMessage::DiscoveredRecipes {
                                 recipes: discovered.into_iter().collect(),
                             };
@@ -1962,8 +1992,11 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Scroll spell definitions
-                            let scroll_spell_defs_msg = recv_room.get_scroll_spell_definitions_message();
-                            if let Ok(bytes) = protocol::encode_server_message(&scroll_spell_defs_msg) {
+                            let scroll_spell_defs_msg =
+                                recv_room.get_scroll_spell_definitions_message();
+                            if let Ok(bytes) =
+                                protocol::encode_server_message(&scroll_spell_defs_msg)
+                            {
                                 let _ = recv_tx.send(bytes).await;
                             }
 
@@ -1983,13 +2016,15 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Farming patches (per-player)
-                            let farming_patches = recv_room.get_farming_patches_message(&player_id).await;
+                            let farming_patches =
+                                recv_room.get_farming_patches_message(&player_id).await;
                             if let Ok(bytes) = protocol::encode_server_message(&farming_patches) {
                                 let _ = recv_tx.send(bytes).await;
                             }
 
                             // Farming contract
-                            let contract_msg = recv_room.get_farming_contract_message(&player_id).await;
+                            let contract_msg =
+                                recv_room.get_farming_contract_message(&player_id).await;
                             if let Ok(bytes) = protocol::encode_server_message(&contract_msg) {
                                 let _ = recv_tx.send(bytes).await;
                             }
@@ -2007,7 +2042,9 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Prayer state
-                            if let Some(prayer_state) = recv_room.get_player_prayer_state(&player_id).await {
+                            if let Some(prayer_state) =
+                                recv_room.get_player_prayer_state(&player_id).await
+                            {
                                 if let Ok(bytes) = protocol::encode_server_message(&prayer_state) {
                                     let _ = recv_tx.send(bytes).await;
                                 }
@@ -2018,13 +2055,23 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
 
                             if !reconnecting_to_instance {
                                 // Send nearby chunks
-                                if let Some((px, py)) = recv_room.get_player_position(&player_id).await {
+                                if let Some((px, py)) =
+                                    recv_room.get_player_position(&player_id).await
+                                {
                                     let player_chunk = chunk::ChunkCoord::from_world(px, py);
                                     for dy in -1..=1 {
                                         for dx in -1..=1 {
-                                            let coord = chunk::ChunkCoord::new(player_chunk.x + dx, player_chunk.y + dy);
-                                            if let Some(chunk_msg) = recv_room.handle_chunk_request(coord.x, coord.y).await {
-                                                if let Ok(bytes) = protocol::encode_server_message(&chunk_msg) {
+                                            let coord = chunk::ChunkCoord::new(
+                                                player_chunk.x + dx,
+                                                player_chunk.y + dy,
+                                            );
+                                            if let Some(chunk_msg) = recv_room
+                                                .handle_chunk_request(coord.x, coord.y)
+                                                .await
+                                            {
+                                                if let Ok(bytes) =
+                                                    protocol::encode_server_message(&chunk_msg)
+                                                {
                                                     let _ = recv_tx.send(bytes).await;
                                                 }
                                             }
@@ -2034,7 +2081,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
 
                                 // Send existing players (only overworld, not instanced)
                                 {
-                                    let instanced_players = recv_state.player_instances.read().await;
+                                    let instanced_players =
+                                        recv_state.player_instances.read().await;
                                     for existing_player in recv_room.get_all_players().await {
                                         if existing_player.id != player_id
                                             && !instanced_players.contains_key(&existing_player.id)
@@ -2049,7 +2097,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                                 hair_style: existing_player.hair_style,
                                                 hair_color: existing_player.hair_color,
                                             };
-                                            if let Ok(bytes) = protocol::encode_server_message(&msg) {
+                                            if let Ok(bytes) = protocol::encode_server_message(&msg)
+                                            {
                                                 let _ = recv_tx.send(bytes).await;
                                             }
                                         }
@@ -2057,7 +2106,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                 }
 
                                 // Send existing overworld ground items
-                                let ground_items = recv_room.get_ground_items_in_instance(None).await;
+                                let ground_items =
+                                    recv_room.get_ground_items_in_instance(None).await;
                                 for item_msg in ground_items {
                                     if let Ok(bytes) = protocol::encode_server_message(&item_msg) {
                                         let _ = recv_tx.send(bytes).await;
@@ -2066,7 +2116,10 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Broadcast PlayerJoined to others
-                            let (x, y) = recv_room.get_player_position(&player_id).await.unwrap_or((0, 0));
+                            let (x, y) = recv_room
+                                .get_player_position(&player_id)
+                                .await
+                                .unwrap_or((0, 0));
                             let (gender, skin) = recv_room
                                 .get_player_appearance(&player_id)
                                 .await
@@ -2092,10 +2145,14 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Notify other overworld players
-                            recv_room.send_to_overworld_players(player_joined_msg, Some(&player_id)).await;
+                            recv_room
+                                .send_to_overworld_players(player_joined_msg, Some(&player_id))
+                                .await;
 
                             // If player was sitting, send SitResult
-                            if let Some((sx, sy, direction)) = recv_room.get_player_sitting_info(&player_id).await {
+                            if let Some((sx, sy, direction)) =
+                                recv_room.get_player_sitting_info(&player_id).await
+                            {
                                 let sit_msg = ServerMessage::SitResult {
                                     success: true,
                                     tile_x: sx,
@@ -2108,7 +2165,9 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Quest progression snapshot
-                            recv_room.process_quest_progression_snapshot(&player_id).await;
+                            recv_room
+                                .process_quest_progression_snapshot(&player_id)
+                                .await;
 
                             // Active quests
                             for quest_msg in recv_room.get_active_quest_messages(&player_id).await {
@@ -2118,7 +2177,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Completed quest sync
-                            let quest_state_sync = recv_room.get_completed_quest_sync_message(&player_id).await;
+                            let quest_state_sync =
+                                recv_room.get_completed_quest_sync_message(&player_id).await;
                             if let Ok(bytes) = protocol::encode_server_message(&quest_state_sync) {
                                 let _ = recv_tx.send(bytes).await;
                             }
@@ -2130,14 +2190,18 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Inventory
-                            if let Some(inv_msg) = recv_room.get_player_inventory_update(&player_id).await {
+                            if let Some(inv_msg) =
+                                recv_room.get_player_inventory_update(&player_id).await
+                            {
                                 if let Ok(bytes) = protocol::encode_server_message(&inv_msg) {
                                     let _ = recv_tx.send(bytes).await;
                                 }
                             }
 
                             // Skills
-                            if let Some(skills_msg) = recv_room.get_player_skills_sync(&player_id).await {
+                            if let Some(skills_msg) =
+                                recv_room.get_player_skills_sync(&player_id).await
+                            {
                                 if let Ok(bytes) = protocol::encode_server_message(&skills_msg) {
                                     let _ = recv_tx.send(bytes).await;
                                 }
@@ -2145,16 +2209,20 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
 
                             // Slayer state
                             {
-                                let slayer_state = recv_room.get_player_slayer_state(&player_id).await;
-                                let slayer_task_data = slayer_state.current_task.as_ref().map(|t| crate::protocol::SlayerTaskData {
-                                    monster_id: t.monster_id.clone(),
-                                    display_name: t.display_name.clone(),
-                                    kills_current: t.kills_current,
-                                    kills_required: t.kills_required,
-                                    xp_per_kill: t.xp_per_kill,
-                                    master_id: t.master_id.clone(),
-                                    points_on_complete: t.points_on_complete,
-                                });
+                                let slayer_state =
+                                    recv_room.get_player_slayer_state(&player_id).await;
+                                let slayer_task_data =
+                                    slayer_state.current_task.as_ref().map(|t| {
+                                        crate::protocol::SlayerTaskData {
+                                            monster_id: t.monster_id.clone(),
+                                            display_name: t.display_name.clone(),
+                                            kills_current: t.kills_current,
+                                            kills_required: t.kills_required,
+                                            xp_per_kill: t.xp_per_kill,
+                                            master_id: t.master_id.clone(),
+                                            points_on_complete: t.points_on_complete,
+                                        }
+                                    });
                                 let slayer_sync = ServerMessage::SlayerStateSync {
                                     current_task: slayer_task_data,
                                     points: slayer_state.points,
@@ -2168,7 +2236,9 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Friends data (must be after sender is registered)
-                            recv_room.send_friends_data(&player_id, &recv_state.online_characters).await;
+                            recv_room
+                                .send_friends_data(&player_id, &recv_state.online_characters)
+                                .await;
 
                             // Notify friends that this player came online
                             recv_room.broadcast_friend_status(&player_id, true).await;
@@ -2179,17 +2249,38 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                     "Auto-re-entering instance '{}' for reconnecting player {}",
                                     map_id, player_id
                                 );
-                                auto_enter_instance(&recv_state, &recv_room, &player_id, map_id, entrance_x, entrance_y).await;
+                                auto_enter_instance(
+                                    &recv_state,
+                                    &recv_room,
+                                    &player_id,
+                                    map_id,
+                                    entrance_x,
+                                    entrance_y,
+                                )
+                                .await;
                             }
 
-                            info!("Spectator {} fully upgraded to player {} ({})", recv_spectator_id, character_name, player_id);
+                            info!(
+                                "Spectator {} fully upgraded to player {} ({})",
+                                recv_spectator_id, character_name, player_id
+                            );
 
                             // --- Phase 2: Normal player message handling loop ---
                             while let Some(Ok(msg)) = receiver.next().await {
                                 match msg {
                                     Message::Binary(data) => {
-                                        if let Err(e) = handle_client_message(&recv_state, &recv_room, &player_id, &data).await {
-                                            warn!("Error handling message from upgraded player {}: {}", player_id, e);
+                                        if let Err(e) = handle_client_message(
+                                            &recv_state,
+                                            &recv_room,
+                                            &player_id,
+                                            &data,
+                                        )
+                                        .await
+                                        {
+                                            warn!(
+                                                "Error handling message from upgraded player {}: {}",
+                                                player_id, e
+                                            );
                                         }
                                     }
                                     Message::Close(_) => break,
@@ -2198,7 +2289,10 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // --- Phase 3: Cleanup (player disconnected) ---
-                            info!("Upgraded player {} ({}) disconnected", character_name, player_id);
+                            info!(
+                                "Upgraded player {} ({}) disconnected",
+                                character_name, player_id
+                            );
 
                             let should_save = recv_state
                                 .sessions
@@ -2221,10 +2315,14 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                     .unwrap_or(0);
 
                                 // Save character state
-                                if let Some(mut save_data) = recv_room.get_player_save_data(&player_id).await {
+                                if let Some(mut save_data) =
+                                    recv_room.get_player_save_data(&player_id).await
+                                {
                                     if save_data.current_map.is_some() {
-                                        let entrance_positions = recv_state.player_entrance_positions.read().await;
-                                        if let Some(&(ex, ey)) = entrance_positions.get(&player_id) {
+                                        let entrance_positions =
+                                            recv_state.player_entrance_positions.read().await;
+                                        if let Some(&(ex, ey)) = entrance_positions.get(&player_id)
+                                        {
                                             save_data.entrance_x = Some(ex as f32);
                                             save_data.entrance_y = Some(ey as f32);
                                         }
@@ -2262,77 +2360,136 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                         )
                                         .await
                                     {
-                                        error!("Failed to save character {} on disconnect: {}", character_name, e);
+                                        error!(
+                                            "Failed to save character {} on disconnect: {}",
+                                            character_name, e
+                                        );
                                     } else {
-                                        info!("Saved character {} to database on disconnect (played_time +{}s)", character_name, played_time_delta);
+                                        info!(
+                                            "Saved character {} to database on disconnect (played_time +{}s)",
+                                            character_name, played_time_delta
+                                        );
                                     }
                                 }
 
                                 // Save quest state
                                 if character_id > 0 {
-                                    if let Some(quest_state) = recv_room.get_player_quest_state(&player_id).await {
+                                    if let Some(quest_state) =
+                                        recv_room.get_player_quest_state(&player_id).await
+                                    {
                                         if let Err(e) = recv_state
                                             .db
                                             .save_character_quest_state(character_id, &quest_state)
                                             .await
                                         {
-                                            error!("Failed to save quest state for {} on disconnect: {}", character_name, e);
-                                        } else if !quest_state.active_quests.is_empty() || !quest_state.completed_quests.is_empty() {
-                                            info!("Saved quest state for {}: {} active, {} completed", character_name, quest_state.active_quests.len(), quest_state.completed_quests.len());
+                                            error!(
+                                                "Failed to save quest state for {} on disconnect: {}",
+                                                character_name, e
+                                            );
+                                        } else if !quest_state.active_quests.is_empty()
+                                            || !quest_state.completed_quests.is_empty()
+                                        {
+                                            info!(
+                                                "Saved quest state for {}: {} active, {} completed",
+                                                character_name,
+                                                quest_state.active_quests.len(),
+                                                quest_state.completed_quests.len()
+                                            );
                                         }
                                     }
                                 }
 
                                 // Save discovered recipes
                                 if character_id > 0 {
-                                    let discovered = recv_room.get_player_discovered_recipes(&player_id).await;
+                                    let discovered =
+                                        recv_room.get_player_discovered_recipes(&player_id).await;
                                     for recipe_id in &discovered {
-                                        if let Err(e) = recv_state.db.save_discovered_recipe(character_id, recipe_id).await {
-                                            error!("Failed to save discovered recipe {} for {}: {}", recipe_id, character_name, e);
+                                        if let Err(e) = recv_state
+                                            .db
+                                            .save_discovered_recipe(character_id, recipe_id)
+                                            .await
+                                        {
+                                            error!(
+                                                "Failed to save discovered recipe {} for {}: {}",
+                                                recipe_id, character_name, e
+                                            );
                                         }
                                     }
                                     if !discovered.is_empty() {
-                                        info!("Saved {} discovered recipes for {}", discovered.len(), character_name);
+                                        info!(
+                                            "Saved {} discovered recipes for {}",
+                                            discovered.len(),
+                                            character_name
+                                        );
                                     }
                                 }
 
                                 // Save unlocked spells
                                 if character_id > 0 {
-                                    let unlocked = recv_room.get_player_unlocked_spells(&player_id).await;
+                                    let unlocked =
+                                        recv_room.get_player_unlocked_spells(&player_id).await;
                                     for spell_id in &unlocked {
-                                        if let Err(e) = recv_state.db.save_unlocked_spell(character_id, spell_id).await {
-                                            error!("Failed to save unlocked spell {} for {}: {}", spell_id, character_name, e);
+                                        if let Err(e) = recv_state
+                                            .db
+                                            .save_unlocked_spell(character_id, spell_id)
+                                            .await
+                                        {
+                                            error!(
+                                                "Failed to save unlocked spell {} for {}: {}",
+                                                spell_id, character_name, e
+                                            );
                                         }
                                     }
                                 }
 
                                 // Save slayer state
                                 if character_id > 0 {
-                                    let slayer_state = recv_room.get_player_slayer_state(&player_id).await;
-                                    if slayer_state.current_task.is_some() || slayer_state.tasks_completed > 0 || slayer_state.points > 0 {
+                                    let slayer_state =
+                                        recv_room.get_player_slayer_state(&player_id).await;
+                                    if slayer_state.current_task.is_some()
+                                        || slayer_state.tasks_completed > 0
+                                        || slayer_state.points > 0
+                                    {
                                         if let Err(e) = recv_state
                                             .db
-                                            .save_character_slayer_state(character_id, &slayer_state)
+                                            .save_character_slayer_state(
+                                                character_id,
+                                                &slayer_state,
+                                            )
                                             .await
                                         {
-                                            error!("Failed to save slayer state for {} on disconnect: {}", character_name, e);
+                                            error!(
+                                                "Failed to save slayer state for {} on disconnect: {}",
+                                                character_name, e
+                                            );
                                         } else {
-                                            info!("Saved slayer state for {}: {} tasks completed, {} points", character_name, slayer_state.tasks_completed, slayer_state.points);
+                                            info!(
+                                                "Saved slayer state for {}: {} tasks completed, {} points",
+                                                character_name,
+                                                slayer_state.tasks_completed,
+                                                slayer_state.points
+                                            );
                                         }
                                     }
                                 }
                             } else {
-                                warn!("Skipping save for {} on disconnect: invalid auth", character_name);
+                                warn!(
+                                    "Skipping save for {} on disconnect: invalid auth",
+                                    character_name
+                                );
                             }
 
                             // Clean up instance tracking
                             {
                                 use crate::interior::InstanceType;
 
-                                let removed_instance_id = recv_state.player_instances.write().await.remove(&player_id);
+                                let removed_instance_id =
+                                    recv_state.player_instances.write().await.remove(&player_id);
                                 recv_room.reset_sync_state(&player_id).await;
                                 if let Some(instance_id) = removed_instance_id {
-                                    if let Some(instance) = recv_state.instance_manager.get_by_instance_id(&instance_id) {
+                                    if let Some(instance) =
+                                        recv_state.instance_manager.get_by_instance_id(&instance_id)
+                                    {
                                         let other_players: Vec<String> = instance
                                             .get_player_ids()
                                             .await
@@ -2343,18 +2500,23 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                         let remaining = instance.remove_player(&player_id).await;
 
                                         for other_id in &other_players {
-                                            recv_room.send_to_player(
-                                                other_id,
-                                                ServerMessage::PlayerLeft {
-                                                    id: player_id.to_string(),
-                                                },
-                                            )
-                                            .await;
+                                            recv_room
+                                                .send_to_player(
+                                                    other_id,
+                                                    ServerMessage::PlayerLeft {
+                                                        id: player_id.to_string(),
+                                                    },
+                                                )
+                                                .await;
                                         }
 
-                                        if remaining == 0 && instance.instance_type == InstanceType::Private {
+                                        if remaining == 0
+                                            && instance.instance_type == InstanceType::Private
+                                        {
                                             if let Some(owner_id) = &instance.owner_id {
-                                                recv_state.instance_manager.remove_private(owner_id, &instance.map_id);
+                                                recv_state
+                                                    .instance_manager
+                                                    .remove_private(owner_id, &instance.map_id);
                                             }
                                         }
                                     }
@@ -2362,7 +2524,11 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Clean up entrance position tracking
-                            recv_state.player_entrance_positions.write().await.remove(&player_id);
+                            recv_state
+                                .player_entrance_positions
+                                .write()
+                                .await
+                                .remove(&player_id);
 
                             // Unregister player sender
                             recv_room.unregister_player_sender(&player_id).await;
@@ -2377,12 +2543,14 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             recv_room.remove_player(&player_id).await;
 
                             // Notify overworld players that this player left
-                            recv_room.send_to_overworld_players(
-                                ServerMessage::PlayerLeft {
-                                    id: player_id.clone(),
-                                },
-                                None,
-                            ).await;
+                            recv_room
+                                .send_to_overworld_players(
+                                    ServerMessage::PlayerLeft {
+                                        id: player_id.clone(),
+                                    },
+                                    None,
+                                )
+                                .await;
 
                             // Return true to indicate upgrade happened (spectator already removed)
                             return true;
@@ -2765,15 +2933,19 @@ async fn handle_socket(
     // Send slayer state sync to this client
     {
         let slayer_state = room.get_player_slayer_state(&player_id).await;
-        let slayer_task_data = slayer_state.current_task.as_ref().map(|t| crate::protocol::SlayerTaskData {
-            monster_id: t.monster_id.clone(),
-            display_name: t.display_name.clone(),
-            kills_current: t.kills_current,
-            kills_required: t.kills_required,
-            xp_per_kill: t.xp_per_kill,
-            master_id: t.master_id.clone(),
-            points_on_complete: t.points_on_complete,
-        });
+        let slayer_task_data =
+            slayer_state
+                .current_task
+                .as_ref()
+                .map(|t| crate::protocol::SlayerTaskData {
+                    monster_id: t.monster_id.clone(),
+                    display_name: t.display_name.clone(),
+                    kills_current: t.kills_current,
+                    kills_required: t.kills_required,
+                    xp_per_kill: t.xp_per_kill,
+                    master_id: t.master_id.clone(),
+                    points_on_complete: t.points_on_complete,
+                });
         let slayer_sync = ServerMessage::SlayerStateSync {
             current_task: slayer_task_data,
             points: slayer_state.points,
@@ -3020,11 +3192,7 @@ async fn handle_socket(
         if character_id > 0 {
             let unlocked = room.get_player_unlocked_spells(&player_id).await;
             for spell_id in &unlocked {
-                if let Err(e) = state
-                    .db
-                    .save_unlocked_spell(character_id, spell_id)
-                    .await
-                {
+                if let Err(e) = state.db.save_unlocked_spell(character_id, spell_id).await {
                     error!(
                         "Failed to save unlocked spell {} for {}: {}",
                         spell_id, character_name, e
@@ -3036,7 +3204,10 @@ async fn handle_socket(
         // Save slayer state to database
         if character_id > 0 {
             let slayer_state = room.get_player_slayer_state(&player_id).await;
-            if slayer_state.current_task.is_some() || slayer_state.tasks_completed > 0 || slayer_state.points > 0 {
+            if slayer_state.current_task.is_some()
+                || slayer_state.tasks_completed > 0
+                || slayer_state.points > 0
+            {
                 if let Err(e) = state
                     .db
                     .save_character_slayer_state(character_id, &slayer_state)
@@ -3049,9 +3220,7 @@ async fn handle_socket(
                 } else {
                     info!(
                         "Saved slayer state for {}: {} tasks completed, {} points",
-                        character_name,
-                        slayer_state.tasks_completed,
-                        slayer_state.points
+                        character_name, slayer_state.tasks_completed, slayer_state.points
                     );
                 }
             }
@@ -3140,7 +3309,14 @@ async fn handle_socket(
 }
 
 /// Auto-enter an instance on reconnect (when current_map was saved in DB)
-async fn auto_enter_instance(state: &AppState, room: &GameRoom, player_id: &str, map_id: &str, entrance_x: Option<f32>, entrance_y: Option<f32>) {
+async fn auto_enter_instance(
+    state: &AppState,
+    room: &GameRoom,
+    player_id: &str,
+    map_id: &str,
+    entrance_x: Option<f32>,
+    entrance_y: Option<f32>,
+) {
     use crate::interior::InstanceType;
     use crate::protocol::{ChunkLayerData, ChunkPortalData};
     use base64::Engine;
@@ -3482,14 +3658,12 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                             portal.target_x, portal.target_y, player_id
                         );
                         // Clean up stored entrance since we're not using it
-                        let mut entrance_positions =
-                            state.player_entrance_positions.write().await;
+                        let mut entrance_positions = state.player_entrance_positions.write().await;
                         entrance_positions.remove(player_id);
                         (portal.target_x, portal.target_y)
                     } else {
                         // Fall back to stored entrance position
-                        let mut entrance_positions =
-                            state.player_entrance_positions.write().await;
+                        let mut entrance_positions = state.player_entrance_positions.write().await;
                         if let Some((x, y)) = entrance_positions.remove(player_id) {
                             info!(
                                 "Using stored entrance position ({}, {}) for player {}",
@@ -3567,7 +3741,6 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                 }
 
                 if portal.target_map == "overworld" {
-
                     // Preload chunks around the overworld spawn before transitioning
                     let spawn_chunk = chunk::ChunkCoord::from_world(
                         spawn_x.floor() as i32,
@@ -4001,7 +4174,12 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
     // Send chest positions for this interior
     let chest_msg = room.get_chest_positions_message(Some(&interior.id)).await;
     if let protocol::ServerMessage::ChestPositions { ref positions } = chest_msg {
-        info!("Sending {} chest positions for interior '{}' to player {}", positions.len(), interior.id, player_id);
+        info!(
+            "Sending {} chest positions for interior '{}' to player {}",
+            positions.len(),
+            interior.id,
+            player_id
+        );
     }
     room.send_to_player(player_id, chest_msg).await;
 }
@@ -4295,8 +4473,11 @@ async fn handle_client_message(
                             .await;
                         room.send_to_player(player_id, room.get_gathering_markers_message().await)
                             .await;
-                        room.send_to_player(player_id, room.get_chest_positions_message(None).await)
-                            .await;
+                        room.send_to_player(
+                            player_id,
+                            room.get_chest_positions_message(None).await,
+                        )
+                        .await;
 
                         // Notify overworld players
                         {
@@ -4376,14 +4557,24 @@ async fn handle_client_message(
         ClientMessage::SlayerCancelTask => {
             room.handle_slayer_cancel_task(player_id).await;
         }
-        ClientMessage::SlayerBuyReward { reward_id, target_monster_id } => {
-            room.handle_slayer_buy_reward(player_id, &reward_id, target_monster_id).await;
+        ClientMessage::SlayerBuyReward {
+            reward_id,
+            target_monster_id,
+        } => {
+            room.handle_slayer_buy_reward(player_id, &reward_id, target_monster_id)
+                .await;
         }
         ClientMessage::SlayerRemoveBlock { monster_id } => {
-            room.handle_slayer_remove_block(player_id, &monster_id).await;
+            room.handle_slayer_remove_block(player_id, &monster_id)
+                .await;
         }
-        ClientMessage::StartAutoAction { target_type, target_id, action } => {
-            room.handle_start_auto_action(player_id, &target_type, &target_id, &action).await;
+        ClientMessage::StartAutoAction {
+            target_type,
+            target_id,
+            action,
+        } => {
+            room.handle_start_auto_action(player_id, &target_type, &target_id, &action)
+                .await;
         }
         ClientMessage::CancelAutoAction => {
             room.handle_cancel_auto_action(player_id).await;
@@ -4395,25 +4586,38 @@ async fn handle_client_message(
         ClientMessage::ChestTake { chest_id, slot } => {
             room.handle_chest_take(player_id, &chest_id, slot).await;
         }
-        ClientMessage::ChestDeposit { chest_id, inventory_slot } => {
-            room.handle_chest_deposit(player_id, &chest_id, inventory_slot).await;
+        ClientMessage::ChestDeposit {
+            chest_id,
+            inventory_slot,
+        } => {
+            room.handle_chest_deposit(player_id, &chest_id, inventory_slot)
+                .await;
         }
         ClientMessage::SpectatorUpgrade { .. } => {
             // Handled by spectator WebSocket handler, not the normal game message dispatch
-            tracing::warn!("SpectatorUpgrade received in normal message handler for player {}", player_id);
+            tracing::warn!(
+                "SpectatorUpgrade received in normal message handler for player {}",
+                player_id
+            );
         }
         // Trade system messages
         ClientMessage::TradeRequest { target_id } => {
             room.handle_trade_request(player_id, &target_id).await;
         }
         ClientMessage::TradeAcceptRequest { requester_id } => {
-            room.handle_trade_accept_request(player_id, &requester_id).await;
+            room.handle_trade_accept_request(player_id, &requester_id)
+                .await;
         }
         ClientMessage::TradeDeclineRequest { requester_id } => {
-            room.handle_trade_decline_request(player_id, &requester_id).await;
+            room.handle_trade_decline_request(player_id, &requester_id)
+                .await;
         }
-        ClientMessage::TradeOfferItem { slot_index, quantity } => {
-            room.handle_trade_offer_item(player_id, slot_index, quantity).await;
+        ClientMessage::TradeOfferItem {
+            slot_index,
+            quantity,
+        } => {
+            room.handle_trade_offer_item(player_id, slot_index, quantity)
+                .await;
         }
         ClientMessage::TradeRemoveItem { offer_index } => {
             room.handle_trade_remove_item(player_id, offer_index).await;
@@ -4434,20 +4638,33 @@ async fn handle_client_message(
         ClientMessage::StallClose => {
             room.handle_stall_close(player_id).await;
         }
-        ClientMessage::StallSetItem { inventory_slot, quantity, price } => {
-            room.handle_stall_set_item(player_id, inventory_slot, quantity, price).await;
+        ClientMessage::StallSetItem {
+            inventory_slot,
+            quantity,
+            price,
+        } => {
+            room.handle_stall_set_item(player_id, inventory_slot, quantity, price)
+                .await;
         }
         ClientMessage::StallRemoveItem { stall_slot } => {
             room.handle_stall_remove_item(player_id, stall_slot).await;
         }
         ClientMessage::StallUpdatePrice { stall_slot, price } => {
-            room.handle_stall_update_price(player_id, stall_slot, price).await;
+            room.handle_stall_update_price(player_id, stall_slot, price)
+                .await;
         }
-        ClientMessage::StallBrowse { player_id: target_id } => {
+        ClientMessage::StallBrowse {
+            player_id: target_id,
+        } => {
             room.handle_stall_browse(player_id, &target_id).await;
         }
-        ClientMessage::StallBuy { seller_id, stall_slot, quantity } => {
-            room.handle_stall_buy(player_id, &seller_id, stall_slot, quantity).await;
+        ClientMessage::StallBuy {
+            seller_id,
+            stall_slot,
+            quantity,
+        } => {
+            room.handle_stall_buy(player_id, &seller_id, stall_slot, quantity)
+                .await;
         }
     }
 
@@ -4588,8 +4805,13 @@ async fn main() {
                     let bulk_data = room.get_bulk_save_data(&player_ids).await;
 
                     for (character_id, character_name, player_id) in players {
-                        if let Some((mut save_data, quest_state, discovered_recipes, slayer_state, unlocked_spells)) =
-                            bulk_data.get(player_id).cloned()
+                        if let Some((
+                            mut save_data,
+                            quest_state,
+                            discovered_recipes,
+                            slayer_state,
+                            unlocked_spells,
+                        )) = bulk_data.get(player_id).cloned()
                         {
                             let played_time_delta = save_state
                                 .play_time_anchors
@@ -4604,9 +4826,7 @@ async fn main() {
                             if save_data.current_map.is_some() {
                                 let entrance_positions =
                                     save_state.player_entrance_positions.read().await;
-                                if let Some(&(ex, ey)) =
-                                    entrance_positions.get(player_id)
-                                {
+                                if let Some(&(ex, ey)) = entrance_positions.get(player_id) {
                                     save_data.entrance_x = Some(ex as f32);
                                     save_data.entrance_y = Some(ey as f32);
                                 }
@@ -4894,7 +5114,11 @@ async fn main() {
                 .collect();
 
             let bulk_data = room.get_bulk_save_data(&player_ids).await;
-            for (player_id, (mut save_data, quest_state, discovered_recipes, slayer_state, unlocked_spells)) in bulk_data {
+            for (
+                player_id,
+                (mut save_data, quest_state, discovered_recipes, slayer_state, unlocked_spells),
+            ) in bulk_data
+            {
                 let character_id = match char_id_map.get(player_id.as_str()) {
                     Some(id) => *id,
                     None => continue,

@@ -59,7 +59,10 @@ impl TutorialManager {
 
     /// Whether the tutorial is actively running (not done, not awaiting accept).
     pub fn is_active(&self) -> bool {
-        !matches!(self.phase, TutorialPhase::Done | TutorialPhase::AwaitingAccept)
+        !matches!(
+            self.phase,
+            TutorialPhase::Done | TutorialPhase::AwaitingAccept
+        )
     }
 
     /// Whether the tutorial is completely finished.

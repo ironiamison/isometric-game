@@ -47,17 +47,22 @@ impl ScrollSpellRegistry {
     }
 
     pub fn load_from_file(&mut self, path: &Path) -> Result<(), String> {
-        let content =
-            std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-        let raw: HashMap<String, RawScrollSpellDef> =
-            toml::from_str(&content).map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+        let raw: HashMap<String, RawScrollSpellDef> = toml::from_str(&content)
+            .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
 
         for (id, raw_def) in raw {
             let spell_type = match raw_def.spell_type.as_str() {
                 "damage" => crate::spell::SpellType::Damage,
                 "heal" => crate::spell::SpellType::Heal,
                 "teleport" => crate::spell::SpellType::Teleport,
-                other => return Err(format!("Unknown spell_type '{}' for scroll spell '{}'", other, id)),
+                other => {
+                    return Err(format!(
+                        "Unknown spell_type '{}' for scroll spell '{}'",
+                        other, id
+                    ));
+                }
             };
 
             self.spells.insert(

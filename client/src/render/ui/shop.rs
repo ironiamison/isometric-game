@@ -98,7 +98,13 @@ impl Renderer {
         );
         let buy_header_dims = self.measure_text_sharp("BUY", 16.0);
         let buy_header_x = left_x + (column_width - buy_header_dims.width) / 2.0;
-        self.draw_text_sharp("BUY", buy_header_x, header_y + header_h * 0.71, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            "BUY",
+            buy_header_x,
+            header_y + header_h * 0.71,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // SELL header
         draw_rectangle(
@@ -118,7 +124,13 @@ impl Renderer {
         );
         let sell_header_dims = self.measure_text_sharp("SELL", 16.0);
         let sell_header_x = right_x + (column_width - sell_header_dims.width) / 2.0;
-        self.draw_text_sharp("SELL", sell_header_x, header_y + header_h * 0.71, 16.0, TEXT_TITLE);
+        self.draw_text_sharp(
+            "SELL",
+            sell_header_x,
+            header_y + header_h * 0.71,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Divider line between buy and sell columns
         let divider_x = left_x + column_width + col_gap / 2.0;

@@ -61,7 +61,6 @@ fn build_categories(recipes: &[RecipeDefinition]) -> Vec<String> {
     cats
 }
 
-
 /// Helper to filter recipes for a given category (matching the supplies grouping)
 fn recipes_for_category<'a>(
     recipes: &'a [RecipeDefinition],
@@ -299,8 +298,7 @@ impl Renderer {
 
         // ===== CONTENT AREA =====
         let content_y = panel_y + FRAME_THICKNESS + header_h + 4.0 * s;
-        let content_height =
-            panel_height - FRAME_THICKNESS * 2.0 - header_h - footer_h - 12.0 * s;
+        let content_height = panel_height - FRAME_THICKNESS * 2.0 - header_h - footer_h - 12.0 * s;
         let content_width = panel_width - FRAME_THICKNESS * 2.0;
 
         // Render appropriate tab content
@@ -353,9 +351,16 @@ impl Renderer {
                 );
             } else {
                 // Recipes tab controls
-                self.draw_text_sharp("[Q] Tab", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+                self.draw_text_sharp(
+                    "[Q] Tab",
+                    footer_x + 10.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
 
-                let has_multiple_categories = build_categories(&state.shop_filtered_recipes()).len() > 1;
+                let has_multiple_categories =
+                    build_categories(&state.shop_filtered_recipes()).len() > 1;
 
                 if has_multiple_categories {
                     self.draw_text_sharp(
@@ -398,7 +403,13 @@ impl Renderer {
             }
         } else {
             // Shop tab controls
-            self.draw_text_sharp("[Q] Tab", footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                "[Q] Tab",
+                footer_x + 10.0 * s,
+                footer_y + footer_h * 0.67,
+                16.0,
+                TEXT_DIM,
+            );
             self.draw_text_sharp(
                 "[Tab] Buy/Sell",
                 footer_x + 100.0 * s,
@@ -543,7 +554,13 @@ impl Renderer {
                 } else {
                     TEXT_DIM
                 };
-                self.draw_text_sharp(&display_name, tab_x + 12.0 * s, tab_y + tab_height * 0.68, 16.0, text_color);
+                self.draw_text_sharp(
+                    &display_name,
+                    tab_x + 12.0 * s,
+                    tab_y + tab_height * 0.68,
+                    16.0,
+                    text_color,
+                );
 
                 tab_x += tab_width + 4.0 * s;
             }
@@ -640,8 +657,8 @@ impl Renderer {
             seen.len()
         };
         // Calculate total content height and clamp scroll offset
-        let total_content = visible_recipes.len() as f32 * line_height
-            + num_sections as f32 * section_header_h;
+        let total_content =
+            visible_recipes.len() as f32 * line_height + num_sections as f32 * section_header_h;
         let max_scroll = (total_content - list_content_height).max(0.0);
         let scroll_offset = state.ui_state.crafting_scroll_offset.clamp(0.0, max_scroll);
 
@@ -676,9 +693,7 @@ impl Renderer {
 
                 // Render section header if visible
                 let header_bottom = y + section_header_h;
-                if header_bottom >= list_content_y
-                    && y <= list_content_y + list_content_height
-                {
+                if header_bottom >= list_content_y && y <= list_content_y + list_content_height {
                     let display = section_display_name(recipe_section);
                     self.draw_text_sharp(
                         display,
@@ -714,7 +729,8 @@ impl Renderer {
             if *is_discovered {
                 let is_selected = selectable_index == state.ui_state.crafting_selected_recipe;
 
-                let item_bounds = Rect::new(list_x + 4.0 * s, y, list_width - 8.0 * s, line_height - 2.0);
+                let item_bounds =
+                    Rect::new(list_x + 4.0 * s, y, list_width - 8.0 * s, line_height - 2.0);
                 layout.add(
                     UiElementId::CraftingRecipeItem(selectable_index),
                     item_bounds,
@@ -820,7 +836,11 @@ impl Renderer {
             let thumb_y = scrollbar_y + scroll_ratio * (scrollbar_track_h - thumb_h);
             let is_dragging = state.ui_state.crafting_scroll_drag.dragging;
             let is_hovered = matches!(hovered, Some(UiElementId::CraftingScrollbar));
-            let thumb_color = if is_dragging || is_hovered { FRAME_ACCENT } else { FRAME_MID };
+            let thumb_color = if is_dragging || is_hovered {
+                FRAME_ACCENT
+            } else {
+                FRAME_MID
+            };
             draw_rectangle(scrollbar_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
             layout.add_scrollbar(
                 UiElementId::CraftingScrollbar,
@@ -1000,7 +1020,9 @@ impl Renderer {
                     let player_level = match recipe.category.as_str() {
                         "smithing" => player.skills.smithing.level,
                         "alchemy" => player.skills.alchemy.level,
-                        "cooking" | "fletching" | "leatherworking" => player.skills.survivalist.level,
+                        "cooking" | "fletching" | "leatherworking" => {
+                            player.skills.survivalist.level
+                        }
                         _ => player.combat_level(),
                     };
                     if player_level >= recipe.level_required {
@@ -1068,7 +1090,9 @@ impl Renderer {
                     let player_level = match recipe.category.as_str() {
                         "smithing" => player.skills.smithing.level,
                         "alchemy" => player.skills.alchemy.level,
-                        "cooking" | "fletching" | "leatherworking" => player.skills.survivalist.level,
+                        "cooking" | "fletching" | "leatherworking" => {
+                            player.skills.survivalist.level
+                        }
                         _ => player.combat_level(),
                     };
                     if player_level < recipe.level_required {
@@ -1178,7 +1202,13 @@ impl Renderer {
                 };
 
                 draw_rectangle(btn_x, btn_y, btn_width, btn_height, btn_border);
-                draw_rectangle(btn_x + 1.0, btn_y + 1.0, btn_width - 2.0, btn_height - 2.0, btn_bg);
+                draw_rectangle(
+                    btn_x + 1.0,
+                    btn_y + 1.0,
+                    btn_width - 2.0,
+                    btn_height - 2.0,
+                    btn_bg,
+                );
 
                 draw_line(
                     btn_x + 2.0,

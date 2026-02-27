@@ -132,8 +132,16 @@ pub fn handle_scrollbar_drag(
     clicked_on_scrollbar: bool,
 ) -> bool {
     handle_scrollbar_drag_ex(
-        drag, scroll_offset, max_scroll, track_bounds, content_height,
-        mouse_y, mouse_down, mouse_clicked, clicked_on_scrollbar, false,
+        drag,
+        scroll_offset,
+        max_scroll,
+        track_bounds,
+        content_height,
+        mouse_y,
+        mouse_down,
+        mouse_clicked,
+        clicked_on_scrollbar,
+        false,
     )
 }
 
@@ -166,7 +174,11 @@ pub fn handle_scrollbar_drag_ex(
     } else if mouse_clicked && clicked_on_scrollbar {
         // Click-to-position: jump scroll to the clicked location on the track
         let click_ratio = ((mouse_y - track_bounds.y) / track_bounds.h).clamp(0.0, 1.0);
-        let ratio = if inverted { 1.0 - click_ratio } else { click_ratio };
+        let ratio = if inverted {
+            1.0 - click_ratio
+        } else {
+            click_ratio
+        };
         *scroll_offset = (ratio * max_scroll).clamp(0.0, max_scroll);
         drag.dragging = true;
         drag.last_y = mouse_y;

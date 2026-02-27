@@ -129,7 +129,14 @@ impl Npc {
 
     pub fn name(&self) -> String {
         // Don't show level for friendly NPCs
-        if self.is_friendly || self.is_quest_giver || self.is_merchant || self.is_altar || self.is_banker || self.is_slayer_master || self.station_type.is_some() {
+        if self.is_friendly
+            || self.is_quest_giver
+            || self.is_merchant
+            || self.is_altar
+            || self.is_banker
+            || self.is_slayer_master
+            || self.station_type.is_some()
+        {
             self.display_name.clone()
         } else {
             format!("{} Lv.{}", self.display_name, self.level)
@@ -143,7 +150,13 @@ impl Npc {
     /// Returns true if this NPC can be attacked/targeted by players.
     /// Friendly NPCs, quest givers, merchants, altars, and bankers cannot be attacked.
     pub fn is_attackable(&self) -> bool {
-        !self.is_friendly && !self.is_quest_giver && !self.is_merchant && !self.is_altar && !self.is_banker && !self.is_slayer_master && self.station_type.is_none()
+        !self.is_friendly
+            && !self.is_quest_giver
+            && !self.is_merchant
+            && !self.is_altar
+            && !self.is_banker
+            && !self.is_slayer_master
+            && self.station_type.is_none()
     }
 
     pub fn is_alive(&self) -> bool {

@@ -893,13 +893,7 @@ impl Screen for LoginScreen {
                 let b = (40.0 - frac * 10.0) as u8;
                 let y = frac * sh;
                 let h = sh / sky_steps as f32 + 1.0;
-                draw_rectangle(
-                    0.0,
-                    y,
-                    sw,
-                    h,
-                    Color::from_rgba(r, g, b, (255.0 * sa) as u8),
-                );
+                draw_rectangle(0.0, y, sw, h, Color::from_rgba(r, g, b, (255.0 * sa) as u8));
             }
 
             // Twinkling stars

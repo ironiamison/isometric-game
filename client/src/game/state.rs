@@ -119,7 +119,7 @@ impl Default for FrameTimings {
             next_frame_max_ms: 0.0,
             next_frame_samples: [0.0; 60],
             next_frame_idx: 0,
-            delta_smoothing: 0.8,  // Default smoothing to reduce visible pacing jitter
+            delta_smoothing: 0.8, // Default smoothing to reduce visible pacing jitter
             smoothed_delta: 1.0 / 120.0, // Start near high-refresh frame pacing
         }
     }
@@ -2424,7 +2424,8 @@ impl GameState {
                 let origin = crate::game::chunk::ChunkCoord { x: 0, y: 0 };
                 self.chunk_manager.chunks().contains_key(&origin)
             } else {
-                let chunk_coord = crate::game::chunk::ChunkCoord::from_world_f32(player.x, player.y);
+                let chunk_coord =
+                    crate::game::chunk::ChunkCoord::from_world_f32(player.x, player.y);
                 self.chunk_manager.chunks().contains_key(&chunk_coord)
             }
         } else {

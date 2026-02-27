@@ -264,7 +264,13 @@ impl Npc {
     /// Returns true if this NPC can be attacked by players.
     /// Friendly NPCs, quest givers, merchants, altars, bankers, and stations cannot be attacked.
     pub fn is_attackable(&self) -> bool {
-        !self.stats.is_friendly && !self.stats.is_quest_giver && !self.stats.is_merchant && !self.stats.is_altar && !self.stats.is_banker && !self.stats.is_slayer_master && self.stats.station_type.is_none()
+        !self.stats.is_friendly
+            && !self.stats.is_quest_giver
+            && !self.stats.is_merchant
+            && !self.stats.is_altar
+            && !self.stats.is_banker
+            && !self.stats.is_slayer_master
+            && self.stats.station_type.is_none()
     }
 
     pub fn name(&self) -> String {

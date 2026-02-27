@@ -38,5 +38,4 @@ impl StationRegistry {
     pub fn exists(&self, id: &str) -> bool {
         self.stations.contains_key(id)
     }
-
 }

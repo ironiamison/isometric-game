@@ -220,7 +220,8 @@ impl QuestRegistry {
 
         for quest_id in quest_ids {
             if let Some(quest) = quests.get(&quest_id) {
-                let current_targets: Vec<(String, i32)> = quest.objectives
+                let current_targets: Vec<(String, i32)> = quest
+                    .objectives
                     .iter()
                     .map(|o| (o.id.clone(), o.count))
                     .collect();
@@ -327,10 +328,7 @@ impl QuestRegistry {
                 );
             }
             QuestEvent::GoldAmountChanged { amount, .. } => {
-                results.extend(
-                    self.update_gold_objectives(player_state, *amount)
-                        .await,
-                );
+                results.extend(self.update_gold_objectives(player_state, *amount).await);
             }
             _ => {}
         }
@@ -645,7 +643,11 @@ impl QuestRegistry {
                 for objective in &quest.objectives {
                     info!(
                         "Checking quest '{}' objective '{}': type={:?}, target='{}' (looking for DepleteTree with target '{}')",
-                        quest_id, objective.id, objective.objective_type, objective.target, tree_type
+                        quest_id,
+                        objective.id,
+                        objective.objective_type,
+                        objective.target,
+                        tree_type
                     );
                     if objective.objective_type == ObjectiveType::DepleteTree
                         && objective.target == tree_type
@@ -690,7 +692,11 @@ impl QuestRegistry {
                 for objective in &quest.objectives {
                     info!(
                         "Checking quest '{}' objective '{}': type={:?}, target='{}' (looking for DepleteRock with target '{}')",
-                        quest_id, objective.id, objective.objective_type, objective.target, rock_type
+                        quest_id,
+                        objective.id,
+                        objective.objective_type,
+                        objective.target,
+                        rock_type
                     );
                     if objective.objective_type == ObjectiveType::DepleteRock
                         && objective.target == rock_type

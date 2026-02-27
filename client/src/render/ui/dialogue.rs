@@ -677,7 +677,13 @@ impl Renderer {
             };
 
             draw_rectangle(hint_x, hint_y, hint_width, btn_h, btn_border);
-            draw_rectangle(hint_x + 1.0, hint_y + 1.0, hint_width - 2.0, btn_h - 2.0, btn_bg);
+            draw_rectangle(
+                hint_x + 1.0,
+                hint_y + 1.0,
+                hint_width - 2.0,
+                btn_h - 2.0,
+                btn_bg,
+            );
 
             if is_hovered {
                 draw_line(
@@ -691,7 +697,13 @@ impl Renderer {
             }
 
             let text_color = if is_hovered { TEXT_TITLE } else { TEXT_NORMAL };
-            self.draw_text_sharp(hint, hint_x + 10.0 * s, hint_y + btn_h * 0.7, 16.0, text_color);
+            self.draw_text_sharp(
+                hint,
+                hint_x + 10.0 * s,
+                hint_y + btn_h * 0.7,
+                16.0,
+                text_color,
+            );
 
             self.draw_text_sharp(
                 "[Enter]",
@@ -1088,7 +1100,13 @@ impl Renderer {
                 16.0,
                 if unlocked { TEXT_NORMAL } else { TEXT_DIM },
             );
-            self.draw_text_sharp(status, status_x, row_bounds.y + row_h * 0.62, 16.0, status_color);
+            self.draw_text_sharp(
+                status,
+                status_x,
+                row_bounds.y + row_h * 0.62,
+                16.0,
+                status_color,
+            );
 
             row_y += row_h + 8.0 * s;
         }
@@ -1171,7 +1189,11 @@ impl Renderer {
             };
 
             if let Some(text) = req_text {
-                for line in self.wrap_text(&text, right_w - 24.0 * s, 16.0).iter().take(2) {
+                for line in self
+                    .wrap_text(&text, right_w - 24.0 * s, 16.0)
+                    .iter()
+                    .take(2)
+                {
                     self.draw_text_sharp(line, right_x + 12.0 * s, desc_y, 16.0, TEXT_DIM);
                     desc_y += 17.0 * s;
                 }
@@ -1254,7 +1276,13 @@ impl Renderer {
         );
         y += 18.0 * s;
         for reward in tier.reward_items.iter().take(3) {
-            self.draw_text_sharp(&format!("* {}", reward), right_x + 14.0 * s, y, 16.0, TEXT_DIM);
+            self.draw_text_sharp(
+                &format!("* {}", reward),
+                right_x + 14.0 * s,
+                y,
+                16.0,
+                TEXT_DIM,
+            );
             y += 16.0 * s;
         }
 
@@ -1265,10 +1293,19 @@ impl Renderer {
                 // Completed tiers intentionally expose no dialogue actions.
             } else if tier_is_active {
                 if dialogue.choices.is_empty() {
-                    let btn_label = if tier_is_completable { "Complete" } else { "Continue" };
+                    let btn_label = if tier_is_completable {
+                        "Complete"
+                    } else {
+                        "Continue"
+                    };
                     let btn_w = 150.0 * s;
                     let btn_h = 30.0 * s;
-                    let btn = Rect::new(right_x + right_w - (btn_w + 20.0 * s), action_base_y, btn_w, btn_h);
+                    let btn = Rect::new(
+                        right_x + right_w - (btn_w + 20.0 * s),
+                        action_base_y,
+                        btn_w,
+                        btn_h,
+                    );
                     layout.add(UiElementId::DialogueContinue, btn);
                     let hovered_continue = matches!(hovered, Some(UiElementId::DialogueContinue));
                     draw_rectangle(
@@ -1308,7 +1345,12 @@ impl Renderer {
             } else if dialogue.choices.is_empty() {
                 let btn_w = 150.0 * s;
                 let btn_h = 30.0 * s;
-                let btn = Rect::new(right_x + right_w - (btn_w + 20.0 * s), action_base_y, btn_w, btn_h);
+                let btn = Rect::new(
+                    right_x + right_w - (btn_w + 20.0 * s),
+                    action_base_y,
+                    btn_w,
+                    btn_h,
+                );
                 layout.add(UiElementId::DialogueContinue, btn);
                 let hovered_continue = matches!(hovered, Some(UiElementId::DialogueContinue));
                 draw_rectangle(
@@ -1350,7 +1392,12 @@ impl Renderer {
                 let mut btn_y =
                     action_base_y - ((dialogue.choices.len().saturating_sub(1) as f32) * 34.0 * s);
                 for (i, choice) in dialogue.choices.iter().enumerate() {
-                    let btn = Rect::new(right_x + right_w - (choice_btn_w + 20.0 * s), btn_y, choice_btn_w, choice_btn_h);
+                    let btn = Rect::new(
+                        right_x + right_w - (choice_btn_w + 20.0 * s),
+                        btn_y,
+                        choice_btn_w,
+                        choice_btn_h,
+                    );
                     layout.add(UiElementId::DialogueChoice(i), btn);
                     let btn_hovered =
                         matches!(hovered, Some(UiElementId::DialogueChoice(idx)) if *idx == i);

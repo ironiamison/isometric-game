@@ -91,7 +91,11 @@ impl Renderer {
         let up_bounds = Rect::new(up_x, up_y, arrow_w, arrow_h);
         layout.add(UiElementId::HotkeyPresetUp, up_bounds);
         let up_hovered = matches!(hovered, Some(UiElementId::HotkeyPresetUp));
-        let up_bg = if up_hovered { SLOT_HOVER_BG } else { SLOT_BG_FILLED };
+        let up_bg = if up_hovered {
+            SLOT_HOVER_BG
+        } else {
+            SLOT_BG_FILLED
+        };
         draw_rectangle(up_x, up_y, arrow_w, arrow_h, up_bg);
         draw_rectangle_lines(up_x, up_y, arrow_w, arrow_h, 1.0, SLOT_BORDER);
         let arrow_char = "\u{25B2}";
@@ -122,7 +126,11 @@ impl Renderer {
         let down_bounds = Rect::new(down_x, down_y, arrow_w, arrow_h);
         layout.add(UiElementId::HotkeyPresetDown, down_bounds);
         let down_hovered = matches!(hovered, Some(UiElementId::HotkeyPresetDown));
-        let down_bg = if down_hovered { SLOT_HOVER_BG } else { SLOT_BG_FILLED };
+        let down_bg = if down_hovered {
+            SLOT_HOVER_BG
+        } else {
+            SLOT_BG_FILLED
+        };
         draw_rectangle(down_x, down_y, arrow_w, arrow_h, down_bg);
         draw_rectangle_lines(down_x, down_y, arrow_w, arrow_h, 1.0, SLOT_BORDER);
         let darrow_char = "\u{25BC}";
@@ -162,7 +170,12 @@ impl Renderer {
                     // Look up item in inventory
                     let inv_slot = state.inventory.find_slot_by_item_id(item_id);
                     let quantity = inv_slot.and_then(|idx| {
-                        state.inventory.slots.get(idx).and_then(|s| s.as_ref()).map(|s| s.quantity)
+                        state
+                            .inventory
+                            .slots
+                            .get(idx)
+                            .and_then(|s| s.as_ref())
+                            .map(|s| s.quantity)
                     });
                     let has_item = quantity.is_some();
                     let is_ghost = !has_item; // Depleted — show at 30% opacity
@@ -173,7 +186,9 @@ impl Renderer {
                     if is_ghost {
                         // Ghost: draw with reduced alpha
                         let tint = Color::new(1.0, 1.0, 1.0, 0.3);
-                        self.draw_item_icon_tinted(item_id, x, y, slot_size, slot_size, state, tint);
+                        self.draw_item_icon_tinted(
+                            item_id, x, y, slot_size, slot_size, state, tint,
+                        );
                     } else {
                         self.draw_item_icon(item_id, x, y, slot_size, slot_size, state, false);
                     }
@@ -202,13 +217,18 @@ impl Renderer {
                 HotkeySlotBinding::Spell { spell_id } => {
                     // Look up spell from static spells or scroll spell definitions
                     let spell_info: Option<(&str, &str, crate::game::spell::SpellType, i32)> =
-                        SPELLS.iter()
+                        SPELLS
+                            .iter()
                             .find(|s| s.id == spell_id)
                             .map(|s| (s.id, s.name, s.spell_type, s.mana_cost))
                             .or_else(|| {
-                                state.scroll_spell_definitions.iter()
+                                state
+                                    .scroll_spell_definitions
+                                    .iter()
                                     .find(|s| s.id == *spell_id)
-                                    .map(|s| (s.id.as_str(), s.name.as_str(), s.spell_type, s.mana_cost))
+                                    .map(|s| {
+                                        (s.id.as_str(), s.name.as_str(), s.spell_type, s.mana_cost)
+                                    })
                             });
 
                     if let Some((id, name, spell_type, mana_cost)) = spell_info {
@@ -281,10 +301,7 @@ impl Renderer {
                         );
 
                         // Cooldown overlay
-                        let on_cooldown = state
-                            .spell_cooldowns
-                            .get(id)
-                            .map_or(false, |&t| now < t);
+                        let on_cooldown = state.spell_cooldowns.get(id).map_or(false, |&t| now < t);
                         let insufficient_mana = player_mp < mana_cost;
 
                         if on_cooldown {
@@ -349,7 +366,15 @@ impl Renderer {
 
         // --- Settings Popup ---
         if state.ui_state.hotkey_settings_open {
-            self.render_hotkey_settings_popup(state, hovered, layout, slots_start_x, slots_start_y, slot_size, spacing);
+            self.render_hotkey_settings_popup(
+                state,
+                hovered,
+                layout,
+                slots_start_x,
+                slots_start_y,
+                slot_size,
+                spacing,
+            );
         }
     }
 
@@ -477,8 +502,17 @@ impl Renderer {
                             },
                         );
                     } else {
-                        let name = SPELLS.iter().find(|s| s.id == spell_id).map(|s| s.name.to_string())
-                            .or_else(|| state.scroll_spell_definitions.iter().find(|s| s.id == *spell_id).map(|s| s.name.clone()));
+                        let name = SPELLS
+                            .iter()
+                            .find(|s| s.id == spell_id)
+                            .map(|s| s.name.to_string())
+                            .or_else(|| {
+                                state
+                                    .scroll_spell_definitions
+                                    .iter()
+                                    .find(|s| s.id == *spell_id)
+                                    .map(|s| s.name.clone())
+                            });
                         if let Some(name) = name {
                             let letter = &name[..1];
                             let lw = self.measure_text_sharp(letter, 16.0).width;
@@ -563,13 +597,7 @@ impl Renderer {
                 &item_def.display_name[..1]
             };
             let lw = self.measure_text_sharp(letter, 16.0).width;
-            self.draw_text_sharp(
-                letter,
-                x + (w - lw) / 2.0,
-                y + h * 0.65,
-                16.0,
-                tint,
-            );
+            self.draw_text_sharp(letter, x + (w - lw) / 2.0, y + h * 0.65, 16.0, tint);
         }
     }
 

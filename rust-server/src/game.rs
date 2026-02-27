@@ -7,15 +7,25 @@ use uuid::Uuid;
 use crate::chunk::ChunkCoord;
 use crate::data::ItemRegistry;
 use crate::data::item_def::WeaponType;
-use crate::entity::{EntityPrototype, EntityRegistry};
+use crate::entity::EntityRegistry;
 use crate::item::{self, GOLD_ITEM_ID, GroundItem, Inventory};
 use crate::npc::{Npc, NpcUpdate};
 use crate::prayer::PrayerRegistry;
 use crate::protocol::{QuestCatalogEntryData, QuestObjectiveData, ServerMessage};
 use crate::quest::{ObjectiveType, PlayerQuestState, QuestEvent, QuestRegistry, QuestRunner};
-use crate::shop::{ShopDefinition, ShopRegistry, ShopStockItem};
+use crate::shop::ShopRegistry;
 use crate::skills::{SkillType, Skills, calculate_hit, calculate_max_hit, roll_damage};
 use crate::world::World;
+
+mod bank;
+mod chat;
+mod crafting;
+mod farming;
+mod prayer;
+mod shop;
+mod slayer;
+mod stall;
+mod trade;
 
 // ============================================================================
 // Constants
@@ -86,8 +96,7 @@ fn direction_from_delta(dx: i32, dy: i32) -> Direction {
 /// Returns true if the food should burn.
 /// Burn chance: 50% at recipe's level_required, linearly decreasing to 0% at burn_stop_level.
 fn check_burn(recipe: &crate::crafting::definition::RecipeDefinition, player_level: i32) -> bool {
-    if let (Some(_burn_result), Some(burn_stop)) = (&recipe.burn_result, recipe.burn_stop_level)
-    {
+    if let (Some(_burn_result), Some(burn_stop)) = (&recipe.burn_result, recipe.burn_stop_level) {
         if player_level >= burn_stop {
             return false;
         }
@@ -417,7 +426,11 @@ pub struct TradeOffer {
 
 impl TradeOffer {
     pub fn new() -> Self {
-        Self { items: Vec::new(), gold: 0, accepted: false }
+        Self {
+            items: Vec::new(),
+            gold: 0,
+            accepted: false,
+        }
     }
 }
 
@@ -1306,13 +1319,17 @@ impl GameRoom {
         }
 
         // Load slayer registry
-        let slayer_registry = match crate::slayer::SlayerRegistry::load(std::path::Path::new("data")) {
-            Ok(r) => Arc::new(r),
-            Err(e) => {
-                tracing::warn!("Failed to load slayer registry: {}, using empty registry", e);
-                Arc::new(crate::slayer::SlayerRegistry::empty())
-            }
-        };
+        let slayer_registry =
+            match crate::slayer::SlayerRegistry::load(std::path::Path::new("data")) {
+                Ok(r) => Arc::new(r),
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to load slayer registry: {}, using empty registry",
+                        e
+                    );
+                    Arc::new(crate::slayer::SlayerRegistry::empty())
+                }
+            };
 
         // Load chair config
         let mut chair_gids: HashMap<u32, Direction> = HashMap::new();
@@ -1380,7 +1397,14 @@ impl GameRoom {
             for (spawn_id, item_id, x, y, quantity, instance_id) in initial_spawns {
                 let ground_item_id = format!("persistent_{}", spawn_id);
                 let ground_item = crate::item::GroundItem::new_in_instance(
-                    &ground_item_id, &item_id, x, y, quantity, None, current_time, instance_id,
+                    &ground_item_id,
+                    &item_id,
+                    x,
+                    y,
+                    quantity,
+                    None,
+                    current_time,
+                    instance_id,
                 );
                 ground_spawn_manager.set_active_ground_item(&spawn_id, ground_item_id.clone());
                 ground_items.insert(ground_item_id, ground_item);
@@ -1398,10 +1422,11 @@ impl GameRoom {
             let spawns_path = std::path::Path::new("data/chest_spawns.toml");
             if spawns_path.exists() {
                 let content = std::fs::read_to_string(spawns_path).unwrap_or_default();
-                let file: crate::chest::ChestSpawnsFile = toml::from_str(&content).unwrap_or_else(|e| {
-                    tracing::warn!("Failed to parse chest_spawns.toml: {}", e);
-                    crate::chest::ChestSpawnsFile { chests: Vec::new() }
-                });
+                let file: crate::chest::ChestSpawnsFile =
+                    toml::from_str(&content).unwrap_or_else(|e| {
+                        tracing::warn!("Failed to parse chest_spawns.toml: {}", e);
+                        crate::chest::ChestSpawnsFile { chests: Vec::new() }
+                    });
                 file.chests
             } else {
                 Vec::new()
@@ -1412,19 +1437,39 @@ impl GameRoom {
         let mut interior_chests = Vec::new();
         for id in interior_registry.list_ids() {
             if let Some(interior) = interior_registry.get(id) {
-                tracing::debug!("Interior '{}' has {} chests defined", id, interior.chests.len());
+                tracing::debug!(
+                    "Interior '{}' has {} chests defined",
+                    id,
+                    interior.chests.len()
+                );
                 for chest_spawn in &interior.chests {
-                    tracing::info!("Interior '{}' chest: {} at ({}, {})", id, chest_spawn.chest_id, chest_spawn.x, chest_spawn.y);
-                    interior_chests.push((id.clone(), chest_spawn.chest_id.clone(), chest_spawn.x, chest_spawn.y));
+                    tracing::info!(
+                        "Interior '{}' chest: {} at ({}, {})",
+                        id,
+                        chest_spawn.chest_id,
+                        chest_spawn.x,
+                        chest_spawn.y
+                    );
+                    interior_chests.push((
+                        id.clone(),
+                        chest_spawn.chest_id.clone(),
+                        chest_spawn.x,
+                        chest_spawn.y,
+                    ));
                 }
             }
         }
-        tracing::info!("Collected {} interior chest placements", interior_chests.len());
+        tracing::info!(
+            "Collected {} interior chest placements",
+            interior_chests.len()
+        );
 
         // Create ChestManager and load saved data
         let mut chest_manager = crate::chest::ChestManager::new();
         chest_manager.init_from_registry(
-            &chest_registry, &overworld_chest_spawns, &interior_chests,
+            &chest_registry,
+            &overworld_chest_spawns,
+            &interior_chests,
         );
         if let Some(ref db) = db {
             match db.load_all_chests().await {
@@ -1476,8 +1521,12 @@ impl GameRoom {
             interior_registry,
             scroll_spell_registry: Arc::new(scroll_spell_registry),
             ground_spawn_manager: RwLock::new(ground_spawn_manager),
-            dig_site_manager: RwLock::new(crate::dig_site::DigSiteManager::load(std::path::Path::new("data"))),
-            waystone_manager: RwLock::new(crate::waystone::WaystoneManager::load(std::path::Path::new("data"))),
+            dig_site_manager: RwLock::new(crate::dig_site::DigSiteManager::load(
+                std::path::Path::new("data"),
+            )),
+            waystone_manager: RwLock::new(crate::waystone::WaystoneManager::load(
+                std::path::Path::new("data"),
+            )),
             chest_registry,
             chest_manager: RwLock::new(chest_manager),
             player_open_chests: RwLock::new(HashMap::new()),
@@ -1494,7 +1543,10 @@ impl GameRoom {
 
     /// Register a spectator's message channel.
     pub async fn add_spectator(&self, spectator_id: &str, sender: mpsc::Sender<Vec<u8>>) {
-        self.spectator_senders.write().await.insert(spectator_id.to_string(), sender);
+        self.spectator_senders
+            .write()
+            .await
+            .insert(spectator_id.to_string(), sender);
     }
 
     /// Remove a spectator's message channel.
@@ -1904,7 +1956,8 @@ impl GameRoom {
         self.close_player_chest(player_id).await;
 
         // Cancel any active trade on disconnect
-        self.cancel_trade_for_player(player_id, "Partner disconnected").await;
+        self.cancel_trade_for_player(player_id, "Partner disconnected")
+            .await;
 
         // Close stall on disconnect, return items to inventory/bank
         self.force_close_stall(player_id).await;
@@ -2019,7 +2072,16 @@ impl GameRoom {
     pub async fn get_bulk_save_data(
         &self,
         player_ids: &[String],
-    ) -> HashMap<String, (PlayerSaveData, Option<PlayerQuestState>, HashSet<String>, Option<crate::slayer::PlayerSlayerState>, HashSet<String>)> {
+    ) -> HashMap<
+        String,
+        (
+            PlayerSaveData,
+            Option<PlayerQuestState>,
+            HashSet<String>,
+            Option<crate::slayer::PlayerSlayerState>,
+            HashSet<String>,
+        ),
+    > {
         struct RawPlayerSnapshot {
             x: i32,
             y: i32,
@@ -2167,7 +2229,10 @@ impl GameRoom {
                 bank_gold: raw.bank_gold,
                 bank_max_slots: raw.bank_max_slots,
             };
-            result.insert(pid, (save_data, None, raw.recipes, None, raw.unlocked_spells));
+            result.insert(
+                pid,
+                (save_data, None, raw.recipes, None, raw.unlocked_spells),
+            );
         }
 
         // Single lock on quest states
@@ -2206,19 +2271,38 @@ impl GameRoom {
     }
 
     /// Set slayer state for a player (called on join / after changes)
-    pub async fn set_player_slayer_state(&self, player_id: &str, state: crate::slayer::PlayerSlayerState) {
-        self.player_slayer_states.write().await.insert(player_id.to_string(), state);
+    pub async fn set_player_slayer_state(
+        &self,
+        player_id: &str,
+        state: crate::slayer::PlayerSlayerState,
+    ) {
+        self.player_slayer_states
+            .write()
+            .await
+            .insert(player_id.to_string(), state);
     }
 
     /// Get slayer state for a player (returns default if none stored)
-    pub async fn get_player_slayer_state(&self, player_id: &str) -> crate::slayer::PlayerSlayerState {
-        let mut state = self.player_slayer_states.read().await.get(player_id).cloned().unwrap_or_default();
+    pub async fn get_player_slayer_state(
+        &self,
+        player_id: &str,
+    ) -> crate::slayer::PlayerSlayerState {
+        let mut state = self
+            .player_slayer_states
+            .read()
+            .await
+            .get(player_id)
+            .cloned()
+            .unwrap_or_default();
         // Migration: fix old "living_rock" task IDs -> "rock"
         if let Some(ref mut task) = state.current_task {
             if task.monster_id == "living_rock" {
                 task.monster_id = "rock".to_string();
                 // Persist the fix
-                self.player_slayer_states.write().await.insert(player_id.to_string(), state.clone());
+                self.player_slayer_states
+                    .write()
+                    .await
+                    .insert(player_id.to_string(), state.clone());
             }
         }
         state
@@ -2366,23 +2450,28 @@ impl GameRoom {
                 .unwrap_or_else(|| quest.giver_npc.clone());
 
             // Resolve prerequisite quest name
-            let (required_quest_id, required_quest_name) = if let Some(ref prev_id) = quest.chain.previous {
-                let prev_name = all_quests
-                    .iter()
-                    .find(|q| q.id == *prev_id)
-                    .map(|q| q.name.clone());
-                (Some(prev_id.clone()), prev_name)
-            } else {
-                (None, None)
-            };
+            let (required_quest_id, required_quest_name) =
+                if let Some(ref prev_id) = quest.chain.previous {
+                    let prev_name = all_quests
+                        .iter()
+                        .find(|q| q.id == *prev_id)
+                        .map(|q| q.name.clone());
+                    (Some(prev_id.clone()), prev_name)
+                } else {
+                    (None, None)
+                };
 
-            let objectives = quest.objectives.iter().map(|o| QuestObjectiveData {
-                id: o.id.clone(),
-                description: o.description.clone(),
-                current: 0,
-                target: o.count,
-                completed: false,
-            }).collect();
+            let objectives = quest
+                .objectives
+                .iter()
+                .map(|o| QuestObjectiveData {
+                    id: o.id.clone(),
+                    description: o.description.clone(),
+                    current: 0,
+                    target: o.count,
+                    completed: false,
+                })
+                .collect();
             entries.push(QuestCatalogEntryData {
                 quest_id: quest.id.clone(),
                 name: quest.name.clone(),
@@ -2517,17 +2606,6 @@ impl GameRoom {
             survivalist_level: p.skills.survivalist.level,
             survivalist_xp: p.skills.survivalist.xp,
         })
-    }
-
-    pub async fn get_player_prayer_state(&self, player_id: &str) -> Option<ServerMessage> {
-        let players = self.players.read().await;
-        players
-            .get(player_id)
-            .map(|p| ServerMessage::PrayerStateUpdate {
-                points: p.prayer_points,
-                max_points: p.max_prayer_points(),
-                active_prayers: p.active_prayers.iter().cloned().collect(),
-            })
     }
 
     pub async fn get_all_npcs(&self) -> Vec<Npc> {
@@ -2844,7 +2922,13 @@ impl GameRoom {
                         .map(|p| (p.x, p.y))
                         .collect();
 
-                    (Some(collision), width, height, Some(npc_pos), Some(player_pos))
+                    (
+                        Some(collision),
+                        width,
+                        height,
+                        Some(npc_pos),
+                        Some(player_pos),
+                    )
                 } else {
                     (None, 0, 0, None, None)
                 }
@@ -2987,949 +3071,6 @@ impl GameRoom {
         }
     }
 
-    pub async fn handle_chat(&self, player_id: &str, text: &str, channel: &str) {
-        let sanitized = text.trim().chars().take(200).collect::<String>();
-        if sanitized.is_empty() {
-            return;
-        }
-
-        // Check for commands (messages starting with /)
-        if sanitized.starts_with('/') {
-            self.handle_chat_command(player_id, &sanitized).await;
-            return;
-        }
-
-        let players = self.players.read().await;
-        let sender = match players.get(player_id) {
-            Some(p) => p,
-            None => return,
-        };
-        let sender_name = sender.name.clone();
-        let sender_x = sender.x as i32;
-        let sender_y = sender.y as i32;
-        drop(players);
-
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-
-        if channel == "global" {
-            let msg = ServerMessage::ChatMessage {
-                sender_id: player_id.to_string(),
-                sender_name,
-                text: sanitized,
-                timestamp,
-                channel: "global".to_string(),
-            };
-            self.broadcast(msg).await;
-        } else {
-            // Public (nearby) chat — send to players within VIEW_DISTANCE
-            let msg = ServerMessage::ChatMessage {
-                sender_id: player_id.to_string(),
-                sender_name,
-                text: sanitized,
-                timestamp,
-                channel: "public".to_string(),
-            };
-
-            let player_instances = self.player_instances.read().await;
-            let sender_instance = player_instances.get(player_id).cloned();
-            let all_players = self.players.read().await;
-            let senders = self.player_senders.read().await;
-
-            if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-                for (pid, sender_ch) in senders.iter() {
-                    // Must be in same instance
-                    if player_instances.get(pid).cloned() != sender_instance {
-                        continue;
-                    }
-                    // Always send to self
-                    if pid == player_id {
-                        let _ = sender_ch.try_send(bytes.clone());
-                        continue;
-                    }
-                    // Check distance
-                    if let Some(other) = all_players.get(pid) {
-                        let dx = (other.x as i32 - sender_x).abs();
-                        let dy = (other.y as i32 - sender_y).abs();
-                        if dx.max(dy) <= VIEW_DISTANCE {
-                            let _ = sender_ch.try_send(bytes.clone());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Handle chat commands (messages starting with /)
-    async fn handle_chat_command(&self, player_id: &str, text: &str) {
-        let parts: Vec<&str> = text.split_whitespace().collect();
-        let command = parts.first().map(|s| s.to_lowercase()).unwrap_or_default();
-
-        // Check if player is admin for privileged commands
-        let is_admin = {
-            let players = self.players.read().await;
-            players.get(player_id).map(|p| p.is_admin).unwrap_or(false)
-        };
-
-        // Admin-only commands check
-        let admin_commands = [
-            "/give",
-            "/setlevel",
-            "/teleport",
-            "/tpto",
-            "/spawn",
-            "/heal",
-            "/kill",
-            "/god",
-            "/announce",
-            "/arena",
-        ];
-        if admin_commands.contains(&command.as_str()) && !is_admin {
-            self.send_system_message(player_id, "This command requires admin privileges.")
-                .await;
-            return;
-        }
-
-        match command.as_str() {
-            "/give" => {
-                // /give item_id [quantity]
-                if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /give <item_id> [quantity]")
-                        .await;
-                    return;
-                }
-
-                let item_id = parts[1];
-                let quantity = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(1);
-
-                // Validate item exists
-                if self.item_registry.get(item_id).is_none() {
-                    self.send_system_message(player_id, &format!("Unknown item: {}", item_id))
-                        .await;
-                    return;
-                }
-
-                // Add item to player's inventory
-                // add_item returns the quantity that DIDN'T fit (0 = all added successfully)
-                let (leftover, inventory_update, gold) = {
-                    let mut players = self.players.write().await;
-                    if let Some(player) = players.get_mut(player_id) {
-                        let leftover =
-                            player
-                                .inventory
-                                .add_item(item_id, quantity, &self.item_registry);
-                        (
-                            leftover,
-                            player.inventory.to_update(),
-                            player.inventory.gold,
-                        )
-                    } else {
-                        (quantity, vec![], 0)
-                    }
-                };
-
-                let added = quantity - leftover;
-                if added > 0 {
-                    tracing::info!("Player {} spawned {}x {}", player_id, added, item_id);
-                    self.send_system_message(player_id, &format!("Gave {}x {}", added, item_id))
-                        .await;
-
-                    // Send inventory update
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::InventoryUpdate {
-                            player_id: player_id.to_string(),
-                            slots: inventory_update,
-                            gold,
-                        },
-                    )
-                    .await;
-                } else {
-                    self.send_system_message(player_id, "Inventory full").await;
-                }
-            }
-            "/setlevel" => {
-                // /setlevel <skill> <level> - Sets a specific skill to the given level
-                // /setlevel <level> - Sets all skills to the given level
-                use crate::skills::{Skill, SkillType};
-
-                if parts.len() < 2 {
-                    self.send_system_message(
-                        player_id,
-                        "Usage: /setlevel <skill> <level> or /setlevel <level>",
-                    )
-                    .await;
-                    return;
-                }
-
-                let (skill_type, level) = if parts.len() >= 3 {
-                    // /setlevel <skill> <level>
-                    let skill_type = match SkillType::from_str(parts[1]) {
-                        Some(st) => st,
-                        None => {
-                            let valid: Vec<&str> =
-                                SkillType::all().iter().map(|s| s.as_str()).collect();
-                            self.send_system_message(
-                                player_id,
-                                &format!(
-                                    "Unknown skill '{}'. Valid skills: {}",
-                                    parts[1],
-                                    valid.join(", ")
-                                ),
-                            )
-                            .await;
-                            return;
-                        }
-                    };
-                    let level: i32 = match parts[2].parse() {
-                        Ok(l) if l >= 1 && l <= 99 => l,
-                        _ => {
-                            self.send_system_message(player_id, "Level must be between 1 and 99")
-                                .await;
-                            return;
-                        }
-                    };
-                    (Some(skill_type), level)
-                } else {
-                    // /setlevel <level>
-                    let level: i32 = match parts[1].parse() {
-                        Ok(l) if l >= 1 && l <= 99 => l,
-                        _ => {
-                            // Maybe they typed a skill name without a level
-                            if SkillType::from_str(parts[1]).is_some() {
-                                self.send_system_message(
-                                    player_id,
-                                    "Usage: /setlevel <skill> <level>",
-                                )
-                                .await;
-                            } else {
-                                self.send_system_message(
-                                    player_id,
-                                    "Level must be between 1 and 99",
-                                )
-                                .await;
-                            }
-                            return;
-                        }
-                    };
-                    (None, level)
-                };
-
-                {
-                    let mut players = self.players.write().await;
-                    if let Some(player) = players.get_mut(player_id) {
-                        if let Some(st) = skill_type {
-                            *player.skills.get_mut(st) = Skill::new(level);
-                            if st == SkillType::Hitpoints {
-                                player.hp = player.max_hp();
-                            }
-                            tracing::info!(
-                                "Player {} set {} to level {}",
-                                player_id,
-                                st.as_str(),
-                                level
-                            );
-                        } else {
-                            for &st in SkillType::all() {
-                                *player.skills.get_mut(st) = Skill::new(level);
-                            }
-                            player.hp = player.max_hp();
-                            tracing::info!(
-                                "Player {} set all skills to level {}",
-                                player_id,
-                                level
-                            );
-                        }
-                    } else {
-                        return;
-                    }
-                };
-
-                if let Some(st) = skill_type {
-                    self.send_system_message(
-                        player_id,
-                        &format!("{} set to level {}", st.as_str(), level),
-                    )
-                    .await;
-                } else {
-                    let combat_level = {
-                        let players = self.players.read().await;
-                        players
-                            .get(player_id)
-                            .map(|p| p.skills.combat_level())
-                            .unwrap_or(0)
-                    };
-                    self.send_system_message(
-                        player_id,
-                        &format!(
-                            "All skills set to level {} (Combat Level: {})",
-                            level, combat_level
-                        ),
-                    )
-                    .await;
-                }
-            }
-            "/help" => {
-                if is_admin {
-                    self.send_system_message(player_id, "Commands: /give <item> [qty], /setlevel [skill] <lvl>, /teleport <x> <y>, /tpto <player>, /spawn <npc> [x] [y], /heal [player], /kill <player>, /god, /announce <msg>, /items, /help").await;
-                } else {
-                    self.send_system_message(player_id, "Commands: /items, /help")
-                        .await;
-                }
-            }
-            "/items" => {
-                // List available items
-                let items: Vec<&String> = self.item_registry.ids().collect();
-                let list = items
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                self.send_system_message(player_id, &format!("Items: {}", list))
-                    .await;
-            }
-            "/teleport" => {
-                // /teleport <x> <y>
-                if parts.len() < 3 {
-                    self.send_system_message(player_id, "Usage: /teleport <x> <y>")
-                        .await;
-                    return;
-                }
-                let x: i32 = match parts[1].parse() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        self.send_system_message(player_id, "Invalid x coordinate")
-                            .await;
-                        return;
-                    }
-                };
-                let y: i32 = match parts[2].parse() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        self.send_system_message(player_id, "Invalid y coordinate")
-                            .await;
-                        return;
-                    }
-                };
-                {
-                    let mut players = self.players.write().await;
-                    if let Some(player) = players.get_mut(player_id) {
-                        player.x = x;
-                        player.y = y;
-                        tracing::info!("Player {} teleported to ({}, {})", player_id, x, y);
-                    }
-                }
-                self.send_system_message(player_id, &format!("Teleported to ({}, {})", x, y))
-                    .await;
-                // Send teleport warp visual effect at the destination
-                self.broadcast_to_zone(
-                    player_id,
-                    ServerMessage::SpellEffect {
-                        caster_id: player_id.to_string(),
-                        target_id: None,
-                        spell_id: "teleport".to_string(),
-                        target_x: x,
-                        target_y: y,
-                    },
-                )
-                .await;
-            }
-            "/tpto" => {
-                // /tpto <player_name>
-                if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /tpto <player_name>")
-                        .await;
-                    return;
-                }
-                let target_name = parts[1];
-
-                let target_info = {
-                    let players = self.players.read().await;
-                    players
-                        .values()
-                        .find(|p| p.name.eq_ignore_ascii_case(target_name))
-                        .map(|t| (t.id.clone(), t.name.clone(), t.x, t.y))
-                };
-
-                let (target_id, target_display, target_x, target_y) = match target_info {
-                    Some(info) => info,
-                    None => {
-                        self.send_system_message(player_id, "Player not found")
-                            .await;
-                        return;
-                    }
-                };
-
-                let target_instance = {
-                    let instances = self.player_instances.read().await;
-                    instances.get(&target_id).cloned()
-                };
-
-                let sender_instance = {
-                    let instances = self.player_instances.read().await;
-                    instances.get(player_id).cloned()
-                };
-
-                if sender_instance != target_instance {
-                    self.send_system_message(
-                        player_id,
-                        "Target is in a different instance. Use a portal to enter that interior.",
-                    )
-                    .await;
-                    return;
-                }
-
-                {
-                    let mut players = self.players.write().await;
-                    if let Some(player) = players.get_mut(player_id) {
-                        player.x = target_x;
-                        player.y = target_y;
-                        tracing::info!(
-                            "Player {} teleported to {} at ({}, {})",
-                            player_id,
-                            target_id,
-                            target_x,
-                            target_y
-                        );
-                    }
-                }
-
-                self.send_system_message(
-                    player_id,
-                    &format!(
-                        "Teleported to {} at ({}, {})",
-                        target_display, target_x, target_y
-                    ),
-                )
-                .await;
-
-                // Send teleport warp visual effect at the destination
-                self.broadcast_to_zone(
-                    player_id,
-                    ServerMessage::SpellEffect {
-                        caster_id: player_id.to_string(),
-                        target_id: None,
-                        spell_id: "teleport".to_string(),
-                        target_x: target_x,
-                        target_y: target_y,
-                    },
-                )
-                .await;
-            }
-            "/spawn" => {
-                // /spawn <npc_id> [x] [y]
-                if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /spawn <npc_id> [x] [y]")
-                        .await;
-                    return;
-                }
-                let npc_id = parts[1];
-
-                // Get spawn position (player position if not specified)
-                let (spawn_x, spawn_y) = {
-                    let players = self.players.read().await;
-                    if let Some(player) = players.get(player_id) {
-                        let x = parts
-                            .get(2)
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(player.x);
-                        let y = parts
-                            .get(3)
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(player.y);
-                        (x, y)
-                    } else {
-                        return;
-                    }
-                };
-
-                // Check if NPC type exists
-                if self.entity_registry.get(npc_id).is_none() {
-                    let available: Vec<&String> = self.entity_registry.ids().collect();
-                    let list = available
-                        .iter()
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    self.send_system_message(
-                        player_id,
-                        &format!("Unknown NPC: {}. Available: {}", npc_id, list),
-                    )
-                    .await;
-                    return;
-                }
-
-                // Spawn the NPC
-                if let Some(spawned_id) = self
-                    .spawn_npc_at(npc_id, spawn_x as f32, spawn_y as f32)
-                    .await
-                {
-                    self.send_system_message(
-                        player_id,
-                        &format!(
-                            "Spawned {} at ({}, {}) [id: {}]",
-                            npc_id, spawn_x, spawn_y, spawned_id
-                        ),
-                    )
-                    .await;
-                    tracing::info!(
-                        "Admin {} spawned {} at ({}, {})",
-                        player_id,
-                        npc_id,
-                        spawn_x,
-                        spawn_y
-                    );
-                }
-            }
-            "/heal" => {
-                // /heal [player_name]
-                let target_name = parts.get(1).map(|s| *s);
-
-                let healed = {
-                    let mut players = self.players.write().await;
-                    if let Some(name) = target_name {
-                        // Find player by name
-                        if let Some(player) = players
-                            .values_mut()
-                            .find(|p| p.name.eq_ignore_ascii_case(name))
-                        {
-                            player.hp = player.max_hp();
-                            player.is_dead = false;
-                            Some(player.name.clone())
-                        } else {
-                            None
-                        }
-                    } else {
-                        // Heal self
-                        if let Some(player) = players.get_mut(player_id) {
-                            player.hp = player.max_hp();
-                            player.is_dead = false;
-                            Some(player.name.clone())
-                        } else {
-                            None
-                        }
-                    }
-                };
-
-                match healed {
-                    Some(name) => {
-                        self.send_system_message(player_id, &format!("Healed {} to full HP", name))
-                            .await
-                    }
-                    None => {
-                        self.send_system_message(player_id, "Player not found")
-                            .await
-                    }
-                }
-            }
-            "/kill" => {
-                // /kill <player_name>
-                if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /kill <player_name>")
-                        .await;
-                    return;
-                }
-                let target_name = parts[1];
-
-                let killed = {
-                    let current_time = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64;
-                    let mut players = self.players.write().await;
-                    if let Some(player) = players
-                        .values_mut()
-                        .find(|p| p.name.eq_ignore_ascii_case(target_name))
-                    {
-                        let id = player.id.clone();
-                        let name = player.name.clone();
-                        player.die(current_time);
-                        Some((id, name))
-                    } else {
-                        None
-                    }
-                };
-
-                match killed {
-                    Some((target_id, name)) => {
-                        self.send_system_message(player_id, &format!("Killed {}", name))
-                            .await;
-                        tracing::info!("Admin {} killed player {}", player_id, name);
-
-                        // Handle arena death if applicable
-                        let arena_death = {
-                            let arena = self.arena_manager.read().await;
-                            arena.is_fighting() && arena.is_in_ring(&target_id)
-                        };
-                        if arena_death {
-                            let (eliminated_name, killer_name, remaining) = {
-                                let mut arena = self.arena_manager.write().await;
-                                arena.on_player_death(&target_id, Some(player_id));
-                                let eliminated_name = arena
-                                    .match_stats
-                                    .fighter_names
-                                    .get(&target_id)
-                                    .cloned()
-                                    .unwrap_or_default();
-                                let killer_name = arena
-                                    .match_stats
-                                    .fighter_names
-                                    .get(player_id)
-                                    .cloned()
-                                    .unwrap_or_default();
-                                let remaining = arena.active_fighters.len() as u32;
-                                (eliminated_name, killer_name, remaining)
-                            };
-
-                            // Teleport to spectator
-                            {
-                                let spectator_spawn = {
-                                    let arena = self.arena_manager.read().await;
-                                    arena.active_spectator_spawn()
-                                };
-                                let mut players = self.players.write().await;
-                                if let Some(p) = players.get_mut(&target_id) {
-                                    p.hp = p.skills.hitpoints.level;
-                                    p.is_dead = false;
-                                    p.x = spectator_spawn.0;
-                                    p.y = spectator_spawn.1;
-                                }
-                            }
-
-                            self.broadcast_to_arena(ServerMessage::ArenaPlayerEliminated {
-                                player_id: target_id.clone(),
-                                player_name: eliminated_name,
-                                killer_id: player_id.to_string(),
-                                killer_name,
-                                remaining,
-                            })
-                            .await;
-
-                            // Check match end
-                            let should_end = {
-                                let arena = self.arena_manager.read().await;
-                                arena.check_match_end()
-                            };
-                            if should_end {
-                                let current_time = std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_millis()
-                                    as u64;
-                                let placements = {
-                                    let mut arena = self.arena_manager.write().await;
-                                    arena.end_match(current_time)
-                                };
-
-                                {
-                                    let mut players = self.players.write().await;
-                                    for placement in &placements {
-                                        if placement.gold_reward > 0 {
-                                            if let Some(p) = players.get_mut(&placement.player_id) {
-                                                p.inventory.gold += placement.gold_reward;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                self.broadcast_to_arena(ServerMessage::ArenaMatchEnd {
-                                    placements: placements
-                                        .iter()
-                                        .map(|p| crate::protocol::ArenaPlacementData {
-                                            rank: p.rank,
-                                            player_id: p.player_id.clone(),
-                                            player_name: p.player_name.clone(),
-                                            kills: p.kills,
-                                            gold_reward: p.gold_reward,
-                                        })
-                                        .collect(),
-                                })
-                                .await;
-
-                                self.broadcast_to_arena(ServerMessage::ArenaStateUpdate {
-                                    state: "results".to_string(),
-                                    countdown_remaining: None,
-                                    queued_count: 0,
-                                    fighter_count: 0,
-                                    entry_fee: {
-                                        let arena = self.arena_manager.read().await;
-                                        arena.config.entry_fee
-                                    },
-                                })
-                                .await;
-                            }
-                        } else {
-                            // Normal death broadcast
-                            self.broadcast(ServerMessage::PlayerDied {
-                                id: target_id,
-                                killer_id: player_id.to_string(),
-                            })
-                            .await;
-                        }
-                    }
-                    None => {
-                        self.send_system_message(player_id, "Player not found")
-                            .await
-                    }
-                }
-            }
-            "/god" => {
-                // Toggle god mode (invincibility)
-                let (enabled, player_name) = {
-                    let mut players = self.players.write().await;
-                    if let Some(player) = players.get_mut(player_id) {
-                        player.is_god_mode = !player.is_god_mode;
-                        (player.is_god_mode, player.name.clone())
-                    } else {
-                        return;
-                    }
-                };
-                let status = if enabled { "enabled" } else { "disabled" };
-                self.send_system_message(player_id, &format!("God mode {}", status))
-                    .await;
-                tracing::info!(
-                    "Admin {} ({}) toggled god mode: {}",
-                    player_name,
-                    player_id,
-                    status
-                );
-            }
-            "/announce" => {
-                // /announce <message>
-                if parts.len() < 2 {
-                    self.send_system_message(player_id, "Usage: /announce <message>")
-                        .await;
-                    return;
-                }
-                let message = parts[1..].join(" ");
-
-                // Broadcast announcement to all players
-                self.broadcast(ServerMessage::Announcement {
-                    text: message.clone(),
-                })
-                .await;
-
-                // Also send as a system chat message so it appears in public chat
-                let timestamp = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64;
-                self.broadcast(ServerMessage::ChatMessage {
-                    sender_id: "system".to_string(),
-                    sender_name: "[Announcement]".to_string(),
-                    text: message.clone(),
-                    timestamp,
-                    channel: "public".to_string(),
-                })
-                .await;
-
-                tracing::info!("Admin {} announced: {}", player_id, message);
-            }
-            "/arena" => {
-                // Arena commands (admin only)
-                if !is_admin {
-                    self.send_system_message(player_id, "Arena commands require admin privileges.")
-                        .await;
-                    return;
-                }
-
-                let sub = parts.get(1).map(|s| s.to_lowercase()).unwrap_or_default();
-                let current_time = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64;
-
-                match sub.as_str() {
-                    "fee" => {
-                        if let Some(fee) = parts.get(2).and_then(|s| s.parse::<i32>().ok()) {
-                            if fee < 0 {
-                                self.send_system_message(player_id, "Fee must be non-negative.")
-                                    .await;
-                                return;
-                            }
-                            let mut arena = self.arena_manager.write().await;
-                            arena.set_entry_fee(fee);
-                            self.send_system_message(
-                                player_id,
-                                &format!("Arena entry fee set to {} gold.", fee),
-                            )
-                            .await;
-                        } else {
-                            self.send_system_message(player_id, "Usage: /arena fee <gold>")
-                                .await;
-                        }
-                    }
-                    "start" => {
-                        let result = {
-                            let mut arena = self.arena_manager.write().await;
-                            arena.start_countdown(current_time, None)
-                        };
-                        match result {
-                            Ok(charges) => {
-                                // Deduct gold from players
-                                {
-                                    let mut players = self.players.write().await;
-                                    for (pid, amount) in &charges {
-                                        if let Some(p) = players.get_mut(pid) {
-                                            p.inventory.gold -= amount;
-                                        }
-                                    }
-                                }
-                                // Send inventory updates and notify
-                                for (pid, _) in &charges {
-                                    let update = {
-                                        let players = self.players.read().await;
-                                        players
-                                            .get(pid)
-                                            .map(|p| (p.inventory.to_update(), p.inventory.gold))
-                                    };
-                                    if let Some((slots, gold)) = update {
-                                        self.send_to_player(
-                                            pid,
-                                            ServerMessage::InventoryUpdate {
-                                                player_id: pid.clone(),
-                                                slots,
-                                                gold,
-                                            },
-                                        )
-                                        .await;
-                                    }
-                                }
-                                self.send_system_message(player_id, "Arena countdown started!")
-                                    .await;
-                            }
-                            Err(e) => {
-                                self.send_system_message(player_id, &e).await;
-                            }
-                        }
-                    }
-                    "timer" => {
-                        if let Some(seconds) = parts.get(2).and_then(|s| s.parse::<u64>().ok()) {
-                            let result = {
-                                let mut arena = self.arena_manager.write().await;
-                                arena.start_countdown(current_time, Some(seconds * 1000))
-                            };
-                            match result {
-                                Ok(charges) => {
-                                    {
-                                        let mut players = self.players.write().await;
-                                        for (pid, amount) in &charges {
-                                            if let Some(p) = players.get_mut(pid) {
-                                                p.inventory.gold -= amount;
-                                            }
-                                        }
-                                    }
-                                    for (pid, _) in &charges {
-                                        let update = {
-                                            let players = self.players.read().await;
-                                            players.get(pid).map(|p| {
-                                                (p.inventory.to_update(), p.inventory.gold)
-                                            })
-                                        };
-                                        if let Some((slots, gold)) = update {
-                                            self.send_to_player(
-                                                pid,
-                                                ServerMessage::InventoryUpdate {
-                                                    player_id: pid.clone(),
-                                                    slots,
-                                                    gold,
-                                                },
-                                            )
-                                            .await;
-                                        }
-                                    }
-                                    self.send_system_message(
-                                        player_id,
-                                        &format!("Arena countdown started ({}s)!", seconds),
-                                    )
-                                    .await;
-                                }
-                                Err(e) => self.send_system_message(player_id, &e).await,
-                            }
-                        } else {
-                            self.send_system_message(player_id, "Usage: /arena timer <seconds>")
-                                .await;
-                        }
-                    }
-                    "cancel" => {
-                        let refunds = {
-                            let mut arena = self.arena_manager.write().await;
-                            arena.cancel()
-                        };
-                        // Refund gold
-                        {
-                            let mut players = self.players.write().await;
-                            for (pid, amount) in &refunds {
-                                if let Some(p) = players.get_mut(pid) {
-                                    p.inventory.gold += amount;
-                                }
-                            }
-                        }
-                        for (pid, _) in &refunds {
-                            let update = {
-                                let players = self.players.read().await;
-                                players
-                                    .get(pid)
-                                    .map(|p| (p.inventory.to_update(), p.inventory.gold))
-                            };
-                            if let Some((slots, gold)) = update {
-                                self.send_to_player(
-                                    pid,
-                                    ServerMessage::InventoryUpdate {
-                                        player_id: pid.clone(),
-                                        slots,
-                                        gold,
-                                    },
-                                )
-                                .await;
-                            }
-                        }
-                        self.send_system_message(player_id, "Arena cancelled. All fees refunded.")
-                            .await;
-                    }
-                    "status" => {
-                        let status = {
-                            let arena = self.arena_manager.read().await;
-                            arena.get_status_text()
-                        };
-                        self.send_system_message(player_id, &status).await;
-                    }
-                    _ => {
-                        self.send_system_message(
-                            player_id,
-                            "Usage: /arena <start|timer|fee|cancel|status>",
-                        )
-                        .await;
-                    }
-                }
-            }
-            _ => {
-                self.send_system_message(
-                    player_id,
-                    &format!("Unknown command: {}. Try /help", command),
-                )
-                .await;
-            }
-        }
-    }
-
-    /// Send a system message to a specific player
-    async fn send_system_message(&self, player_id: &str, text: &str) {
-        let msg = ServerMessage::ChatMessage {
-            sender_id: "system".to_string(),
-            sender_name: "[System]".to_string(),
-            text: text.to_string(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-            channel: "system".to_string(),
-        };
-        self.send_to_player(player_id, msg).await;
-    }
-
     pub async fn handle_attack(&self, player_id: &str, direction_override: Option<Direction>) {
         // Determine attacker's instance context (None = overworld)
         let attacker_instance = self.player_instances.read().await.get(player_id).cloned();
@@ -4032,15 +3173,11 @@ impl GameRoom {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 // Find the first arrow in inventory (any item ending with "_arrow")
-                let arrow_info = player
-                    .inventory
-                    .slots
-                    .iter()
-                    .find_map(|slot| {
-                        slot.as_ref()
-                            .filter(|s| s.item_id.ends_with("_arrow"))
-                            .map(|s| s.item_id.clone())
-                    });
+                let arrow_info = player.inventory.slots.iter().find_map(|slot| {
+                    slot.as_ref()
+                        .filter(|s| s.item_id.ends_with("_arrow"))
+                        .map(|s| s.item_id.clone())
+                });
 
                 if let Some(arrow_id) = arrow_info {
                     player.inventory.remove_item(&arrow_id, 1);
@@ -4154,7 +3291,11 @@ impl GameRoom {
                 if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
                     let npcs = instance.npcs.read().await;
                     for (npc_id, npc) in npcs.iter() {
-                        if npc.is_alive() && npc.is_attackable() && npc.x == check_x && npc.y == check_y {
+                        if npc.is_alive()
+                            && npc.is_attackable()
+                            && npc.x == check_x
+                            && npc.y == check_y
+                        {
                             target_id = Some(npc_id.clone());
                             is_npc = true;
                             is_instance_npc = true;
@@ -4243,8 +3384,11 @@ impl GameRoom {
                             };
                             if let Some(proto_id) = npc_prototype {
                                 let allowed = match &slayer_state.current_task {
-                                    Some(task) => proto_id == task.monster_id
-                                        || proto_id.starts_with(&format!("{}_", task.monster_id)),
+                                    Some(task) => {
+                                        proto_id == task.monster_id
+                                            || proto_id
+                                                .starts_with(&format!("{}_", task.monster_id))
+                                    }
                                     None => false,
                                 };
                                 if !allowed {
@@ -4281,7 +3425,9 @@ impl GameRoom {
         // 2. If hit, calculate max hit from strength and roll damage
         let (target_hp, target_name, target_died, actual_damage) = if is_npc && is_instance_npc {
             // Instance NPC combat
-            let instance = self.instance_manager.get_by_instance_id(attacker_instance.as_ref().unwrap());
+            let instance = self
+                .instance_manager
+                .get_by_instance_id(attacker_instance.as_ref().unwrap());
             if let Some(inst) = instance {
                 let mut npcs = inst.npcs.write().await;
                 if let Some(npc) = npcs.get_mut(&target_id) {
@@ -4311,7 +3457,9 @@ impl GameRoom {
                         // Slayer helmet: 15% damage boost against current slayer task
                         if let Some(ref task_monster) = slayer_task_monster {
                             let proto = &npc.prototype_id;
-                            if proto == task_monster || proto.starts_with(&format!("{}_", task_monster)) {
+                            if proto == task_monster
+                                || proto.starts_with(&format!("{}_", task_monster))
+                            {
                                 max_hit = ((max_hit as f32) * 1.15).floor() as i32;
                             }
                         }
@@ -4369,7 +3517,8 @@ impl GameRoom {
                     // Slayer helmet: 15% damage boost against current slayer task
                     if let Some(ref task_monster) = slayer_task_monster {
                         let proto = &npc.prototype_id;
-                        if proto == task_monster || proto.starts_with(&format!("{}_", task_monster)) {
+                        if proto == task_monster || proto.starts_with(&format!("{}_", task_monster))
+                        {
                             max_hit = ((max_hit as f32) * 1.15).floor() as i32;
                         }
                     }
@@ -4550,7 +3699,9 @@ impl GameRoom {
             if is_npc {
                 // Get NPC info for exp and loot
                 let (prototype_id, npc_level) = if is_instance_npc {
-                    let inst = self.instance_manager.get_by_instance_id(attacker_instance.as_ref().unwrap());
+                    let inst = self
+                        .instance_manager
+                        .get_by_instance_id(attacker_instance.as_ref().unwrap());
                     if let Some(inst) = inst {
                         let npcs = inst.npcs.read().await;
                         npcs.get(&target_id)
@@ -4968,368 +4119,6 @@ impl GameRoom {
         }
     }
 
-    // ========================================================================
-    // Slayer System
-    // ========================================================================
-
-    /// Called when a player interacts with a slayer master NPC.
-    /// Opens the slayer panel with current task, points, rewards, etc.
-    pub async fn handle_slayer_master_interact(&self, player_id: &str, npc_prototype_id: &str) {
-        let master = match self.slayer_registry.get_master_by_prototype(npc_prototype_id) {
-            Some(m) => m,
-            None => return,
-        };
-
-        let state = self.get_player_slayer_state(player_id).await;
-
-        let current_task = state.current_task.as_ref().map(|t| crate::protocol::SlayerTaskData {
-            monster_id: t.monster_id.clone(),
-            display_name: t.display_name.clone(),
-            kills_current: t.kills_current,
-            kills_required: t.kills_required,
-            xp_per_kill: t.xp_per_kill,
-            master_id: t.master_id.clone(),
-            points_on_complete: t.points_on_complete,
-        });
-
-        let rewards: Vec<crate::protocol::SlayerRewardData> = self.slayer_registry.get_rewards().iter().map(|r| {
-            crate::protocol::SlayerRewardData {
-                id: r.id.clone(),
-                display_name: r.display_name.clone(),
-                description: r.description.clone(),
-                cost: r.cost,
-                category: r.category.clone(),
-                target_id: r.target_id.clone(),
-                quantity: r.quantity,
-            }
-        }).collect();
-
-        self.send_to_player(player_id, ServerMessage::SlayerPanelOpen {
-            master_id: master.id.clone(),
-            master_name: master.display_name.clone(),
-            current_task,
-            points: state.points,
-            tasks_completed: state.tasks_completed,
-            rewards,
-            blocked_monsters: state.blocked_monsters.clone(),
-            unlocked_monsters: state.unlocked_monsters.clone(),
-        }).await;
-    }
-
-    /// Assign a new slayer task from a master to a player.
-    pub async fn handle_slayer_get_task(&self, player_id: &str, master_id: &str) {
-        let master = match self.slayer_registry.get_master(master_id) {
-            Some(m) => m,
-            None => {
-                self.send_to_player(player_id, ServerMessage::SlayerResult {
-                    success: false, action: "get_task".to_string(),
-                    message: "Unknown slayer master.".to_string(),
-                    task: None, points: None,
-                }).await;
-                return;
-            }
-        };
-
-        // Check combat level
-        let combat_level = {
-            let players = self.players.read().await;
-            players.get(player_id).map(|p| p.skills.combat_level()).unwrap_or(0)
-        };
-        if combat_level < master.combat_level_required {
-            self.send_to_player(player_id, ServerMessage::SlayerResult {
-                success: false, action: "get_task".to_string(),
-                message: format!("You need combat level {} to get tasks from {}.", master.combat_level_required, master.display_name),
-                task: None, points: None,
-            }).await;
-            return;
-        }
-
-        // Check slayer level
-        let slayer_level = {
-            let players = self.players.read().await;
-            players.get(player_id).map(|p| p.skills.slayer.level).unwrap_or(1)
-        };
-        if slayer_level < master.slayer_level_required {
-            self.send_to_player(player_id, ServerMessage::SlayerResult {
-                success: false, action: "get_task".to_string(),
-                message: format!("You need slayer level {} to get tasks from {}.", master.slayer_level_required, master.display_name),
-                task: None, points: None,
-            }).await;
-            return;
-        }
-
-        let mut state = self.get_player_slayer_state(player_id).await;
-
-        // Check no active task
-        if state.current_task.is_some() {
-            self.send_to_player(player_id, ServerMessage::SlayerResult {
-                success: false, action: "get_task".to_string(),
-                message: "You already have an active slayer task.".to_string(),
-                task: None, points: None,
-            }).await;
-            return;
-        }
-
-        // Assign task
-        match self.slayer_registry.assign_task(master_id, slayer_level, &state) {
-            Some(task) => {
-                let task_data = crate::protocol::SlayerTaskData {
-                    monster_id: task.monster_id.clone(),
-                    display_name: task.display_name.clone(),
-                    kills_current: task.kills_current,
-                    kills_required: task.kills_required,
-                    xp_per_kill: task.xp_per_kill,
-                    master_id: task.master_id.clone(),
-                    points_on_complete: task.points_on_complete,
-                };
-                state.current_task = Some(task);
-                self.set_player_slayer_state(player_id, state).await;
-
-                self.send_to_player(player_id, ServerMessage::SlayerResult {
-                    success: true, action: "get_task".to_string(),
-                    message: format!("New task: Slay {} {}.", task_data.kills_required, task_data.display_name),
-                    task: Some(task_data), points: None,
-                }).await;
-            }
-            None => {
-                self.send_to_player(player_id, ServerMessage::SlayerResult {
-                    success: false, action: "get_task".to_string(),
-                    message: "No eligible tasks available.".to_string(),
-                    task: None, points: None,
-                }).await;
-            }
-        }
-    }
-
-    /// Cancel the player's current slayer task (costs 30 points).
-    pub async fn handle_slayer_cancel_task(&self, player_id: &str) {
-        let mut state = self.get_player_slayer_state(player_id).await;
-
-        if state.current_task.is_none() {
-            self.send_to_player(player_id, ServerMessage::SlayerResult {
-                success: false, action: "cancel_task".to_string(),
-                message: "You don't have an active task.".to_string(),
-                task: None, points: None,
-            }).await;
-            return;
-        }
-
-        if state.points < 30 {
-            self.send_to_player(player_id, ServerMessage::SlayerResult {
-                success: false, action: "cancel_task".to_string(),
-                message: "You need 30 slayer points to cancel a task.".to_string(),
-                task: None, points: Some(state.points),
-            }).await;
-            return;
-        }
-
-        state.points -= 30;
-        state.current_task = None;
-        self.set_player_slayer_state(player_id, state.clone()).await;
-
-        self.send_to_player(player_id, ServerMessage::SlayerResult {
-            success: true, action: "cancel_task".to_string(),
-            message: "Task cancelled. 30 points deducted.".to_string(),
-            task: None, points: Some(state.points),
-        }).await;
-    }
-
-    /// Process an NPC kill for slayer task progress.
-    /// Called when an NPC dies - checks if it matches the player's active task.
-    pub async fn process_slayer_kill(&self, player_id: &str, prototype_id: &str) {
-        let mut state = self.get_player_slayer_state(player_id).await;
-
-        let task = match &mut state.current_task {
-            Some(t) if t.monster_id == prototype_id
-                || prototype_id.starts_with(&format!("{}_", t.monster_id)) => t,
-            _ => return,
-        };
-
-        task.kills_current += 1;
-        let xp_per_kill = task.xp_per_kill;
-        let kills_current = task.kills_current;
-        let kills_required = task.kills_required;
-        let display_name = task.display_name.clone();
-        let monster_id = task.monster_id.clone();
-
-        // Award slayer XP
-        let xp_result = {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                let leveled = player.skills.slayer.add_xp(xp_per_kill);
-                Some((player.skills.slayer.xp, player.skills.slayer.level, leveled))
-            } else {
-                None
-            }
-        };
-
-        if let Some((total_xp, level, leveled_up)) = xp_result {
-            self.send_to_player(player_id, ServerMessage::SkillXp {
-                player_id: player_id.to_string(),
-                skill: "slayer".to_string(),
-                xp_gained: xp_per_kill,
-                total_xp,
-                level,
-            }).await;
-
-            if leveled_up {
-                self.broadcast(ServerMessage::SkillLevelUp {
-                    player_id: player_id.to_string(),
-                    skill: "slayer".to_string(),
-                    new_level: level,
-                }).await;
-            }
-        }
-
-        if kills_current >= kills_required {
-            // Task complete
-            let points_awarded = task.points_on_complete;
-            state.points += points_awarded;
-            state.tasks_completed += 1;
-            state.current_task = None;
-
-            self.set_player_slayer_state(player_id, state.clone()).await;
-
-            self.send_to_player(player_id, ServerMessage::SlayerTaskComplete {
-                monster_id,
-                display_name,
-                points_awarded,
-                total_points: state.points,
-            }).await;
-
-            tracing::info!("Player {} completed slayer task, earned {} points (total: {})",
-                player_id, points_awarded, state.points);
-        } else {
-            self.set_player_slayer_state(player_id, state).await;
-
-            self.send_to_player(player_id, ServerMessage::SlayerTaskProgress {
-                monster_id,
-                display_name,
-                kills_current,
-                kills_required,
-            }).await;
-        }
-    }
-
-    /// Buy a slayer reward with points.
-    pub async fn handle_slayer_buy_reward(&self, player_id: &str, reward_id: &str, target_monster_id: Option<String>) {
-        let reward = match self.slayer_registry.get_reward(reward_id) {
-            Some(r) => r.clone(),
-            None => {
-                self.send_to_player(player_id, ServerMessage::SlayerResult {
-                    success: false, action: "buy_reward".to_string(),
-                    message: "Unknown reward.".to_string(),
-                    task: None, points: None,
-                }).await;
-                return;
-            }
-        };
-
-        let mut state = self.get_player_slayer_state(player_id).await;
-
-        if state.points < reward.cost {
-            self.send_to_player(player_id, ServerMessage::SlayerResult {
-                success: false, action: "buy_reward".to_string(),
-                message: format!("You need {} slayer points.", reward.cost),
-                task: None, points: Some(state.points),
-            }).await;
-            return;
-        }
-
-        match reward.category.as_str() {
-            "unlock" => {
-                if let Some(ref target) = reward.target_id {
-                    if state.unlocked_monsters.contains(target) {
-                        self.send_to_player(player_id, ServerMessage::SlayerResult {
-                            success: false, action: "buy_reward".to_string(),
-                            message: "Already unlocked.".to_string(),
-                            task: None, points: Some(state.points),
-                        }).await;
-                        return;
-                    }
-                    state.points -= reward.cost;
-                    state.unlocked_monsters.push(target.clone());
-                }
-            }
-            "block" => {
-                let monster = target_monster_id.unwrap_or_default();
-                if monster.is_empty() {
-                    self.send_to_player(player_id, ServerMessage::SlayerResult {
-                        success: false, action: "buy_reward".to_string(),
-                        message: "Select a monster to block.".to_string(),
-                        task: None, points: Some(state.points),
-                    }).await;
-                    return;
-                }
-                if state.blocked_monsters.contains(&monster) {
-                    self.send_to_player(player_id, ServerMessage::SlayerResult {
-                        success: false, action: "buy_reward".to_string(),
-                        message: "Already blocked.".to_string(),
-                        task: None, points: Some(state.points),
-                    }).await;
-                    return;
-                }
-                state.points -= reward.cost;
-                state.blocked_monsters.push(monster);
-            }
-            "potion" | "equipment" => {
-                // Grant items to player inventory
-                if let Some(ref item_id) = reward.target_id {
-                    let inv_update = {
-                        let mut players = self.players.write().await;
-                        if let Some(player) = players.get_mut(player_id) {
-                            if !player.inventory.has_space_for(item_id, reward.quantity, &self.item_registry) {
-                                self.send_to_player(player_id, ServerMessage::SlayerResult {
-                                    success: false, action: "buy_reward".to_string(),
-                                    message: "Your inventory is full.".to_string(),
-                                    task: None, points: Some(state.points),
-                                }).await;
-                                return;
-                            }
-                            player.inventory.add_item(item_id, reward.quantity, &self.item_registry);
-                            Some((player.inventory.to_update(), player.inventory.gold))
-                        } else {
-                            None
-                        }
-                    };
-                    if let Some((slots, gold)) = inv_update {
-                        self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                            player_id: player_id.to_string(),
-                            slots,
-                            gold,
-                        }).await;
-                    }
-                }
-                state.points -= reward.cost;
-            }
-            _ => {}
-        }
-
-        self.set_player_slayer_state(player_id, state.clone()).await;
-
-        self.send_to_player(player_id, ServerMessage::SlayerResult {
-            success: true, action: "buy_reward".to_string(),
-            message: format!("Purchased {}.", reward.display_name),
-            task: None, points: Some(state.points),
-        }).await;
-    }
-
-    /// Remove a blocked monster from the player's block list (free).
-    pub async fn handle_slayer_remove_block(&self, player_id: &str, monster_id: &str) {
-        let mut state = self.get_player_slayer_state(player_id).await;
-
-        if let Some(pos) = state.blocked_monsters.iter().position(|m| m == monster_id) {
-            state.blocked_monsters.remove(pos);
-            self.set_player_slayer_state(player_id, state.clone()).await;
-
-            self.send_to_player(player_id, ServerMessage::SlayerResult {
-                success: true, action: "remove_block".to_string(),
-                message: "Block removed.".to_string(),
-                task: None, points: Some(state.points),
-            }).await;
-        }
-    }
-
     /// Process quest item collection event
     async fn process_quest_item_collect(&self, player_id: &str, item_id: &str, count: i32) {
         let mut quest_states = self.player_quest_states.write().await;
@@ -5605,7 +4394,9 @@ impl GameRoom {
                 .or_insert_with(PlayerQuestState::new);
 
             // Reconcile objectives with current quest definitions (handles quest updates)
-            self.quest_registry.reconcile_active_quests(quest_state).await;
+            self.quest_registry
+                .reconcile_active_quests(quest_state)
+                .await;
 
             let mut results = Vec::new();
             for (skill, level) in &skill_levels {
@@ -5621,7 +4412,11 @@ impl GameRoom {
                 player_id: player_id.to_string(),
                 amount: gold,
             };
-            results.extend(self.quest_registry.process_event(&gold_event, quest_state).await);
+            results.extend(
+                self.quest_registry
+                    .process_event(&gold_event, quest_state)
+                    .await,
+            );
             results
         };
 
@@ -5687,18 +4482,25 @@ impl GameRoom {
                 } else {
                     // Check if target is an NPC (overworld first, then instance)
                     let npcs = self.npcs.read().await;
-                    let is_overworld_npc = npcs.get(target_id).map(|n| n.is_alive()).unwrap_or(false);
+                    let is_overworld_npc =
+                        npcs.get(target_id).map(|n| n.is_alive()).unwrap_or(false);
                     drop(npcs);
 
                     if is_overworld_npc {
                         true
                     } else {
                         // Check instance NPCs
-                        let player_inst = self.player_instances.read().await.get(player_id).cloned();
+                        let player_inst =
+                            self.player_instances.read().await.get(player_id).cloned();
                         if let Some(inst_id) = player_inst {
-                            if let Some(instance) = self.instance_manager.get_by_instance_id(&inst_id) {
+                            if let Some(instance) =
+                                self.instance_manager.get_by_instance_id(&inst_id)
+                            {
                                 let inst_npcs = instance.npcs.read().await;
-                                inst_npcs.get(target_id).map(|n| n.is_alive()).unwrap_or(false)
+                                inst_npcs
+                                    .get(target_id)
+                                    .map(|n| n.is_alive())
+                                    .unwrap_or(false)
                             } else {
                                 false
                             }
@@ -5984,7 +4786,6 @@ impl GameRoom {
             return;
         }
 
-        // Altar interaction - show pray option and prayer point restoration
         let is_altar = self
             .entity_registry
             .get(&entity_type)
@@ -5992,54 +4793,8 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_altar {
-            // Get player's current prayer points
-            let (current_points, max_points) = {
-                let players = self.players.read().await;
-                match players.get(player_id) {
-                    Some(p) => (p.prayer_points, p.max_prayer_points()),
-                    None => return,
-                }
-            };
-
-            let altar_name = self
-                .entity_registry
-                .get(&entity_type)
-                .map(|p| p.display_name.clone())
-                .unwrap_or_else(|| "Altar".to_string());
-
-            let text = if current_points < max_points {
-                format!(
-                    "You stand before the sacred altar.\n\nPrayer Points: {}/{}\n\nWould you like to pray and restore your prayer points?",
-                    current_points, max_points
-                )
-            } else {
-                format!(
-                    "You stand before the sacred altar.\n\nPrayer Points: {}/{}\n\nYour prayer is already full. You may offer bones here for enhanced experience.",
-                    current_points, max_points
-                )
-            };
-
-            // Use a special quest_id format "altar:{npc_id}" to identify altar dialogues
-            self.send_to_player(
-                player_id,
-                ServerMessage::ShowDialogue {
-                    quest_id: format!("altar:{}", npc_id),
-                    npc_id: npc_id.to_string(),
-                    speaker: altar_name,
-                    text,
-                    choices: vec![
-                        crate::protocol::DialogueChoice {
-                            id: "pray".to_string(),
-                            text: "Pray".to_string(),
-                        },
-                        crate::protocol::DialogueChoice {
-                            id: "close".to_string(),
-                            text: "Close".to_string(),
-                        },
-                    ],
-                },
-            )
-            .await;
+            self.show_altar_dialogue(player_id, &npc_id, &entity_type)
+                .await;
             return;
         }
 
@@ -6075,136 +4830,23 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_slayer_master {
-            self.handle_slayer_master_interact(player_id, &entity_type).await;
+            self.handle_slayer_master_interact(player_id, &entity_type)
+                .await;
+            return;
+        }
+
+        if self
+            .try_open_merchant_shop(player_id, &npc_id, &entity_type)
+            .await
+        {
             return;
         }
 
         // Check entity prototype for behaviors
         let prototype = self.entity_registry.get(&entity_type);
 
-        // Check if this NPC is a merchant/craftsman
-        let is_merchant = prototype
-            .as_ref()
-            .map(|p| p.behaviors.merchant || p.behaviors.craftsman)
-            .unwrap_or(false);
-
         // Check if this NPC has quests associated with it
         let quests = self.quest_registry.get_quests_for_npc(&entity_type).await;
-
-        // If merchant/craftsman and no quests (or quest_giver behavior is not set), open shop
-        let is_quest_giver = prototype
-            .as_ref()
-            .map(|p| p.behaviors.quest_giver)
-            .unwrap_or(false);
-
-        // Check if all quests for this NPC are completed (for merchant fallback)
-        let all_quests_completed = if is_merchant && is_quest_giver && !quests.is_empty() {
-            let quest_states = self.player_quest_states.read().await;
-            if let Some(quest_state) = quest_states.get(player_id) {
-                quests.iter().all(|q| quest_state.is_quest_completed(&q.id))
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        // Check if merchant has a required_quest that must be completed first
-        let merchant_quest_met = if is_merchant {
-            if let Some(proto) = prototype.as_ref() {
-                if let Some(merchant_config) = &proto.merchant {
-                    if let Some(ref required_quest) = merchant_config.required_quest {
-                        let quest_states = self.player_quest_states.read().await;
-                        quest_states
-                            .get(player_id)
-                            .map(|qs| qs.is_quest_completed(required_quest))
-                            .unwrap_or(false)
-                    } else {
-                        true // No requirement
-                    }
-                } else {
-                    true
-                }
-            } else {
-                true
-            }
-        } else {
-            false
-        };
-
-        if is_merchant
-            && merchant_quest_met
-            && (quests.is_empty() || !is_quest_giver || all_quests_completed)
-        {
-            tracing::info!(
-                "Player {} opening shop with NPC {} ({})",
-                player_id,
-                npc_id,
-                entity_type
-            );
-
-            // Get merchant config to load shop data
-            if let Some(proto) = prototype {
-                if let Some(merchant_config) = &proto.merchant {
-                    // Get shop definition from registry
-                    let shop_registry = self.shop_registry.read().await;
-                    if let Some(shop_def) = shop_registry.get(&merchant_config.shop_id) {
-                        // Build shop data with current prices
-                        let stock = shop_def
-                            .stock
-                            .iter()
-                            .map(|item| {
-                                let base_price = self
-                                    .item_registry
-                                    .get(&item.item_id)
-                                    .map(|def| def.base_price)
-                                    .unwrap_or(10);
-                                let price = (base_price as f32 * merchant_config.sell_multiplier)
-                                    .max(1.0) as i32;
-
-                                crate::protocol::ShopStockItemData {
-                                    item_id: item.item_id.clone(),
-                                    quantity: item.current_quantity,
-                                    price,
-                                }
-                            })
-                            .collect();
-
-                        let shop_data = crate::protocol::ShopData {
-                            shop_id: shop_def.id.clone(),
-                            display_name: shop_def.display_name.clone(),
-                            buy_multiplier: merchant_config.buy_multiplier,
-                            sell_multiplier: merchant_config.sell_multiplier,
-                            crafting_categories: merchant_config.crafting_categories.clone(),
-                            crafting_stations: merchant_config.crafting_stations.clone(),
-                            stock,
-                        };
-
-                        drop(shop_registry);
-
-                        let msg = ServerMessage::ShopData {
-                            npc_id: npc_id.to_string(),
-                            shop: shop_data,
-                        };
-                        self.send_to_player(player_id, msg).await;
-                        return;
-                    } else {
-                        tracing::warn!(
-                            "Shop '{}' not found for merchant NPC {}",
-                            merchant_config.shop_id,
-                            npc_id
-                        );
-                    }
-                }
-            }
-
-            // Fallback: send empty ShopOpen if shop data couldn't be loaded
-            let msg = ServerMessage::ShopOpen {
-                npc_id: npc_id.to_string(),
-            };
-            self.send_to_player(player_id, msg).await;
-            return;
-        }
 
         if quests.is_empty() {
             tracing::debug!("NPC {} ({}) has no quests", npc_id, entity_type);
@@ -6434,23 +5076,25 @@ impl GameRoom {
                             // against the player's current state so they're immediately
                             // marked complete if already met.
                             let mut progression_results = Vec::new();
-                            if let Some(snapshot) = self.players.read().await.get(player_id).map(|p| {
-                                (
-                                    p.inventory.gold,
-                                    vec![
-                                        ("hitpoints", p.skills.hitpoints.level),
-                                        ("combat", p.skills.combat.level),
-                                        ("fishing", p.skills.fishing.level),
-                                        ("farming", p.skills.farming.level),
-                                        ("smithing", p.skills.smithing.level),
-                                        ("prayer", p.skills.prayer.level),
-                                        ("magic", p.skills.magic.level),
-                                        ("woodcutting", p.skills.woodcutting.level),
-                                        ("mining", p.skills.mining.level),
-                                        ("alchemy", p.skills.alchemy.level),
-                                    ],
-                                )
-                            }) {
+                            if let Some(snapshot) =
+                                self.players.read().await.get(player_id).map(|p| {
+                                    (
+                                        p.inventory.gold,
+                                        vec![
+                                            ("hitpoints", p.skills.hitpoints.level),
+                                            ("combat", p.skills.combat.level),
+                                            ("fishing", p.skills.fishing.level),
+                                            ("farming", p.skills.farming.level),
+                                            ("smithing", p.skills.smithing.level),
+                                            ("prayer", p.skills.prayer.level),
+                                            ("magic", p.skills.magic.level),
+                                            ("woodcutting", p.skills.woodcutting.level),
+                                            ("mining", p.skills.mining.level),
+                                            ("alchemy", p.skills.alchemy.level),
+                                        ],
+                                    )
+                                })
+                            {
                                 let (gold, skill_levels) = snapshot;
                                 for (skill, level) in &skill_levels {
                                     let event = QuestEvent::SkillLevelChanged {
@@ -6459,7 +5103,9 @@ impl GameRoom {
                                         level: *level,
                                     };
                                     progression_results.extend(
-                                        self.quest_registry.process_event(&event, quest_state).await,
+                                        self.quest_registry
+                                            .process_event(&event, quest_state)
+                                            .await,
                                     );
                                 }
                                 let gold_event = QuestEvent::GoldAmountChanged {
@@ -6467,7 +5113,9 @@ impl GameRoom {
                                     amount: gold,
                                 };
                                 progression_results.extend(
-                                    self.quest_registry.process_event(&gold_event, quest_state).await,
+                                    self.quest_registry
+                                        .process_event(&gold_event, quest_state)
+                                        .await,
                                 );
                             }
 
@@ -6478,9 +5126,7 @@ impl GameRoom {
                                 .map(|o| {
                                     let (current, completed) = quest_state
                                         .get_quest(&quest_id)
-                                        .and_then(|progress| {
-                                            progress.objectives.get(&o.id)
-                                        })
+                                        .and_then(|progress| progress.objectives.get(&o.id))
                                         .map(|obj| (obj.current, obj.completed))
                                         .unwrap_or((0, false));
                                     QuestObjectiveData {
@@ -6608,7 +5254,12 @@ impl GameRoom {
 
     /// Handle player interacting with a world map object (obelisk, etc.)
     pub async fn handle_interact_object(&self, player_id: &str, x: i32, y: i32) {
-        tracing::debug!("handle_interact_object: player={} x={} y={}", player_id, x, y);
+        tracing::debug!(
+            "handle_interact_object: player={} x={} y={}",
+            player_id,
+            x,
+            y
+        );
 
         // Check for active quest interactions first (takes priority over waystone teleport)
         if self.handle_obelisk_quest_interaction(player_id, x, y).await {
@@ -6629,12 +5280,21 @@ impl GameRoom {
         };
 
         if let Some(ref ws) = waystone {
-            tracing::debug!("handle_interact_object: found waystone '{}' at ({},{})", ws.id, ws.x, ws.y);
+            tracing::debug!(
+                "handle_interact_object: found waystone '{}' at ({},{})",
+                ws.id,
+                ws.x,
+                ws.y
+            );
             self.handle_waystone_interaction(player_id, ws).await;
             return;
         }
 
-        tracing::debug!("handle_interact_object: no waystone or quest interaction found at ({},{})", x, y);
+        tracing::debug!(
+            "handle_interact_object: no waystone or quest interaction found at ({},{})",
+            x,
+            y
+        );
     }
 
     /// Handle interaction with a waystone (show teleport dialogue or lore text)
@@ -6653,7 +5313,10 @@ impl GameRoom {
                 .unwrap_or(false);
             tracing::debug!(
                 "handle_waystone_interaction: waystone='{}' quest_required='{}' has_quest_state={} quest_completed={}",
-                waystone.id, waystone.quest_required, has_state, completed
+                waystone.id,
+                waystone.quest_required,
+                has_state,
+                completed
             );
             completed
         };
@@ -6842,14 +5505,9 @@ impl GameRoom {
             return;
         }
 
-        // Handle altar dialogue choices (format: "altar:{altar_id}")
         if let Some(altar_id) = quest_id.strip_prefix("altar:") {
-            self.send_to_player(player_id, ServerMessage::DialogueClosed)
+            self.handle_altar_dialogue_choice(player_id, altar_id, choice_id)
                 .await;
-            if choice_id == "pray" {
-                self.handle_pray_at_altar(player_id, altar_id).await;
-            }
-            // "close" choice just closes the dialogue (already sent DialogueClosed above)
             return;
         }
 
@@ -6893,12 +5551,14 @@ impl GameRoom {
         // Handle banker dialogue choices (format: "banker:{npc_id}")
         if let Some(npc_id) = quest_id.strip_prefix("banker:") {
             if choice_id == "open_bank" {
-                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
                 self.handle_bank_open(player_id).await;
             } else if choice_id == "upgrade" {
                 self.handle_bank_upgrade(player_id, npc_id).await;
             } else {
-                self.send_to_player(player_id, ServerMessage::DialogueClosed).await;
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
             }
             return;
         }
@@ -7082,7 +5742,8 @@ impl GameRoom {
     pub async fn handle_use_item(&self, player_id: &str, slot_index: u8) {
         // Block using items that are in an active trade offer
         if self.is_slot_in_trade(player_id, slot_index).await {
-            self.send_system_message(player_id, "That item is in a trade offer.").await;
+            self.send_system_message(player_id, "That item is in a trade offer.")
+                .await;
             return;
         }
 
@@ -7116,7 +5777,10 @@ impl GameRoom {
                     }
                     // Check if this is a spell scroll (LearnSpell use effect)
                     if let Some(def) = self.item_registry.get(&slot.item_id) {
-                        if matches!(&def.use_effect, Some(crate::data::UseEffect::LearnSpell { .. })) {
+                        if matches!(
+                            &def.use_effect,
+                            Some(crate::data::UseEffect::LearnSpell { .. })
+                        ) {
                             drop(players);
                             self.handle_use_spell_scroll(player_id, slot_index).await;
                             return;
@@ -7237,107 +5901,6 @@ impl GameRoom {
             };
             self.send_to_player(player_id, inv_msg).await;
         }
-    }
-
-    /// Handle using a recipe scroll item to discover a new recipe
-    async fn handle_use_recipe_scroll(&self, player_id: &str, slot_index: u8) {
-        // Extract item_id, recipe_id, and perform checks
-        let (item_id, recipe_id, inventory_update, gold) = {
-            let mut players = self.players.write().await;
-            let player = match players.get_mut(player_id) {
-                Some(p) if p.active && !p.is_dead => p,
-                _ => return,
-            };
-
-            // Get item from slot
-            let item_id = match player
-                .inventory
-                .slots
-                .get(slot_index as usize)
-                .and_then(|s| s.as_ref())
-            {
-                Some(slot) => slot.item_id.clone(),
-                None => return,
-            };
-
-            // Extract recipe_id by stripping "recipe_" prefix
-            let recipe_id = match item_id.strip_prefix("recipe_") {
-                Some(id) => id.to_string(),
-                None => return,
-            };
-
-            // Verify the recipe exists in the crafting registry
-            if self.crafting_registry.get(&recipe_id).is_none() {
-                drop(players);
-                self.send_system_message(player_id, "This recipe scroll is for an unknown recipe.")
-                    .await;
-                return;
-            }
-
-            // Check if already discovered
-            if player.discovered_recipes.contains(&recipe_id) {
-                drop(players);
-                self.send_system_message(player_id, "You already know this recipe.")
-                    .await;
-                return;
-            }
-
-            // Consume the scroll from inventory
-            if let Some(ref mut slot) = player.inventory.slots[slot_index as usize] {
-                slot.quantity -= 1;
-                if slot.quantity <= 0 {
-                    player.inventory.slots[slot_index as usize] = None;
-                }
-            }
-
-            // Add to discovered recipes
-            player.discovered_recipes.insert(recipe_id.clone());
-
-            let update = player.inventory.to_update();
-            let gold = player.inventory.gold;
-            (item_id, recipe_id, update, gold)
-        };
-
-        let display_name = self
-            .item_registry
-            .get(&item_id)
-            .map(|def| def.display_name.clone())
-            .unwrap_or_else(|| item_id.clone());
-        tracing::info!(
-            "Player {} used recipe scroll {} -> discovered recipe {}",
-            player_id,
-            display_name,
-            recipe_id
-        );
-
-        // Save to database
-        if let Some(ref db) = self.db {
-            if let Some(character_id) = Self::parse_character_id(player_id) {
-                if let Err(e) = db.save_discovered_recipe(character_id, &recipe_id).await {
-                    tracing::warn!("Failed to save discovered recipe to DB: {}", e);
-                }
-            }
-        }
-
-        // Send RecipeDiscovered message
-        self.send_to_player(
-            player_id,
-            ServerMessage::RecipeDiscovered {
-                recipe_id: recipe_id.clone(),
-            },
-        )
-        .await;
-
-        // Send inventory update
-        self.send_to_player(
-            player_id,
-            ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots: inventory_update,
-                gold,
-            },
-        )
-        .await;
     }
 
     /// Handle using a dig tool (shovel) - checks dig sites near player
@@ -7526,11 +6089,8 @@ impl GameRoom {
         .await;
 
         // Send system message
-        self.send_system_message(
-            player_id,
-            &format!("You have learned {}!", spell_name),
-        )
-        .await;
+        self.send_system_message(player_id, &format!("You have learned {}!", spell_name))
+            .await;
 
         // Send inventory update
         self.send_to_player(
@@ -7542,1910 +6102,6 @@ impl GameRoom {
             },
         )
         .await;
-    }
-
-    /// Handle a crafting request from a player
-    pub async fn handle_craft(&self, player_id: &str, recipe_id: &str) {
-        use crate::crafting::definition::RecipeCategory;
-        use crate::protocol::RecipeResult as ProtoRecipeResult;
-
-        // Get recipe definition
-        let recipe = match self.crafting_registry.get(recipe_id) {
-            Some(r) => r.clone(),
-            None => {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftResult {
-                        success: false,
-                        recipe_id: recipe_id.to_string(),
-                        error: Some("Recipe not found".to_string()),
-                        items_gained: vec![],
-                    },
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Get player and perform all checks
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        // Check level requirement - smithing/alchemy/survivalist check their own skill, others use combat level
-        let level_check_passed = match recipe.category {
-            RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
-            RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
-            RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => {
-                player.skills.survivalist.level >= recipe.level_required
-            }
-            _ => player.combat_level() >= recipe.level_required,
-        };
-
-        if !level_check_passed {
-            let skill_name = match recipe.category {
-                RecipeCategory::Smithing => "Smithing",
-                RecipeCategory::Alchemy => "Alchemy",
-                RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => "Survivalist",
-                _ => "Combat",
-            };
-            drop(players);
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftResult {
-                    success: false,
-                    recipe_id: recipe_id.to_string(),
-                    error: Some(format!(
-                        "Requires {} level {}",
-                        skill_name, recipe.level_required
-                    )),
-                    items_gained: vec![],
-                },
-            )
-            .await;
-            return;
-        }
-
-        // Check required tool (e.g. knife for fletching)
-        if let Some(ref tool) = recipe.required_tool {
-            if !player.inventory.has_item(tool, 1) {
-                let tool_name = self
-                    .item_registry
-                    .get(tool)
-                    .map(|d| d.display_name.as_str())
-                    .unwrap_or(tool.as_str());
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftResult {
-                        success: false,
-                        recipe_id: recipe_id.to_string(),
-                        error: Some(format!("You need a {} to do that", tool_name)),
-                        items_gained: vec![],
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // Check all ingredients (using string IDs now)
-        for ingredient in &recipe.ingredients {
-            if !player
-                .inventory
-                .has_item(&ingredient.item_id, ingredient.count)
-            {
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftResult {
-                        success: false,
-                        recipe_id: recipe_id.to_string(),
-                        error: Some("Missing ingredients".to_string()),
-                        items_gained: vec![],
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // Check inventory space for results
-        for result in &recipe.results {
-            if !player
-                .inventory
-                .has_space_for(&result.item_id, result.count, &self.item_registry)
-            {
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftResult {
-                        success: false,
-                        recipe_id: recipe_id.to_string(),
-                        error: Some("Inventory full".to_string()),
-                        items_gained: vec![],
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // All checks passed - consume ingredients
-        for ingredient in &recipe.ingredients {
-            player
-                .inventory
-                .remove_item(&ingredient.item_id, ingredient.count);
-        }
-
-        // Check burn for cooking recipes
-        let burned = check_burn(&recipe, player.skills.survivalist.level);
-
-        // Add results (burnt item if burned)
-        let mut items_gained = Vec::new();
-        if burned {
-            let burn_item = recipe.burn_result.as_ref().unwrap();
-            player
-                .inventory
-                .add_item(burn_item, 1, &self.item_registry);
-            let display_name = self
-                .item_registry
-                .get(burn_item)
-                .map(|def| def.display_name.clone())
-                .unwrap_or_else(|| burn_item.clone());
-            items_gained.push(ProtoRecipeResult {
-                item_id: burn_item.clone(),
-                item_name: display_name,
-                count: 1,
-            });
-        } else {
-            for result in &recipe.results {
-                player
-                    .inventory
-                    .add_item(&result.item_id, result.count, &self.item_registry);
-                let display_name = self
-                    .item_registry
-                    .get(&result.item_id)
-                    .map(|def| def.display_name.clone())
-                    .unwrap_or_else(|| result.item_id.clone());
-                items_gained.push(ProtoRecipeResult {
-                    item_id: result.item_id.clone(),
-                    item_name: display_name,
-                    count: result.count,
-                });
-            }
-        }
-
-        // Award crafting skill XP if applicable (half if burned)
-        let xp_gained = if burned { recipe.xp / 2 } else { recipe.xp };
-        let mut xp_results = Vec::new();
-        if xp_gained > 0 && recipe.category == RecipeCategory::Smithing {
-            let leveled = player.skills.smithing.add_xp(xp_gained as i64);
-            xp_results.push((
-                SkillType::Smithing,
-                xp_gained as i64,
-                player.skills.smithing.xp,
-                player.skills.smithing.level,
-                leveled,
-            ));
-        }
-        if xp_gained > 0 && recipe.category == RecipeCategory::Alchemy {
-            let leveled = player.skills.alchemy.add_xp(xp_gained as i64);
-            xp_results.push((
-                SkillType::Alchemy,
-                xp_gained as i64,
-                player.skills.alchemy.xp,
-                player.skills.alchemy.level,
-                leveled,
-            ));
-        }
-        if xp_gained > 0
-            && matches!(
-                recipe.category,
-                RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking
-            )
-        {
-            let leveled = player.skills.survivalist.add_xp(xp_gained as i64);
-            xp_results.push((
-                SkillType::Survivalist,
-                xp_gained as i64,
-                player.skills.survivalist.xp,
-                player.skills.survivalist.level,
-                leveled,
-            ));
-        }
-
-        // Get inventory update
-        let inventory_update = player.inventory.to_update();
-        let gold = player.inventory.gold;
-        drop(players);
-
-        tracing::info!(
-            "Player {} crafted {} (gained {:?})",
-            player_id,
-            recipe_id,
-            items_gained
-        );
-
-        // Send success result
-        self.send_to_player(
-            player_id,
-            ServerMessage::CraftResult {
-                success: true,
-                recipe_id: recipe_id.to_string(),
-                error: None,
-                items_gained,
-            },
-        )
-        .await;
-
-        // Send inventory update
-        self.send_to_player(
-            player_id,
-            ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots: inventory_update,
-                gold,
-            },
-        )
-        .await;
-
-        // Send XP updates
-        let mut any_leveled = false;
-        for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
-            self.send_to_player(
-                player_id,
-                ServerMessage::SkillXp {
-                    player_id: player_id.to_string(),
-                    skill: skill_type.as_str().to_string(),
-                    xp_gained: xp_amount,
-                    total_xp,
-                    level,
-                },
-            )
-            .await;
-
-            if leveled_up {
-                tracing::info!(
-                    "Player {} leveled up {} to {}",
-                    player_id,
-                    skill_type.as_str(),
-                    level
-                );
-                self.broadcast(ServerMessage::SkillLevelUp {
-                    player_id: player_id.to_string(),
-                    skill: skill_type.as_str().to_string(),
-                    new_level: level,
-                })
-                .await;
-                any_leveled = true;
-            }
-        }
-        if any_leveled {
-            self.process_quest_progression_snapshot(player_id).await;
-        }
-    }
-
-    /// Handle start craft - supports both instant and timed crafting
-    pub async fn handle_start_craft(&self, player_id: &str, recipe_id: &str) {
-        use crate::crafting::definition::RecipeCategory;
-
-        // Get recipe definition
-        let recipe = match self.crafting_registry.get(recipe_id) {
-            Some(r) => r.clone(),
-            None => {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: "Recipe not found".to_string(),
-                    },
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Get player and perform all checks
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        // Check if already crafting
-        if player.crafting_state.is_some() {
-            drop(players);
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingCancelled {
-                    reason: "Already crafting".to_string(),
-                },
-            )
-            .await;
-            return;
-        }
-
-        // Check level requirement - smithing/alchemy/survivalist check their own skill, others use combat level
-        let level_check_passed = match recipe.category {
-            RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
-            RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
-            RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => {
-                player.skills.survivalist.level >= recipe.level_required
-            }
-            _ => player.combat_level() >= recipe.level_required,
-        };
-
-        if !level_check_passed {
-            let skill_name = match recipe.category {
-                RecipeCategory::Smithing => "Smithing",
-                RecipeCategory::Alchemy => "Alchemy",
-                RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => "Survivalist",
-                _ => "Combat",
-            };
-            drop(players);
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingCancelled {
-                    reason: format!("Requires {} level {}", skill_name, recipe.level_required),
-                },
-            )
-            .await;
-            return;
-        }
-
-        // Check required tool (e.g. knife for fletching)
-        if let Some(ref tool) = recipe.required_tool {
-            if !player.inventory.has_item(tool, 1) {
-                let tool_name = self
-                    .item_registry
-                    .get(tool)
-                    .map(|d| d.display_name.as_str())
-                    .unwrap_or(tool.as_str());
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: format!("You need a {} to do that", tool_name),
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // Check recipe discovery requirement
-        if recipe.requires_discovery && !player.discovered_recipes.contains(recipe_id) {
-            drop(players);
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingCancelled {
-                    reason: "Recipe not yet discovered".to_string(),
-                },
-            )
-            .await;
-            return;
-        }
-
-        // Check all ingredients
-        for ingredient in &recipe.ingredients {
-            let have = player.inventory.count_item(&ingredient.item_id);
-            if have < ingredient.count {
-                tracing::warn!(
-                    "Player {} craft {} failed: need {}x '{}' but have {}",
-                    player_id,
-                    recipe_id,
-                    ingredient.count,
-                    ingredient.item_id,
-                    have
-                );
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: format!(
-                            "Missing ingredients: need {}x {} but have {}",
-                            ingredient.count, ingredient.item_id, have
-                        ),
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // Check inventory space for results
-        for result in &recipe.results {
-            if !player
-                .inventory
-                .has_space_for(&result.item_id, result.count, &self.item_registry)
-            {
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: "Inventory full".to_string(),
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // All checks passed - consume ingredients
-        let mut consumed_materials = Vec::new();
-        for ingredient in &recipe.ingredients {
-            player
-                .inventory
-                .remove_item(&ingredient.item_id, ingredient.count);
-            consumed_materials.push((ingredient.item_id.clone(), ingredient.count));
-        }
-
-        if recipe.craft_time_ms == 0 {
-            // Check burn for cooking recipes
-            let burned = check_burn(&recipe, player.skills.survivalist.level);
-
-            // Instant craft - add results immediately (burnt item if burned)
-            let mut items_gained = Vec::new();
-            if burned {
-                let burn_item = recipe.burn_result.as_ref().unwrap();
-                player
-                    .inventory
-                    .add_item(burn_item, 1, &self.item_registry);
-                items_gained.push((burn_item.clone(), 1));
-            } else {
-                for result in &recipe.results {
-                    player
-                        .inventory
-                        .add_item(&result.item_id, result.count, &self.item_registry);
-                    items_gained.push((result.item_id.clone(), result.count as u32));
-                }
-            }
-
-            // Award crafting skill XP if applicable (half if burned)
-            let xp_gained = if burned { recipe.xp / 2 } else { recipe.xp };
-            let mut xp_results = Vec::new();
-            if xp_gained > 0 && recipe.category == RecipeCategory::Smithing {
-                let leveled = player.skills.smithing.add_xp(xp_gained as i64);
-                xp_results.push((
-                    SkillType::Smithing,
-                    xp_gained as i64,
-                    player.skills.smithing.xp,
-                    player.skills.smithing.level,
-                    leveled,
-                ));
-            }
-            if xp_gained > 0 && recipe.category == RecipeCategory::Alchemy {
-                let leveled = player.skills.alchemy.add_xp(xp_gained as i64);
-                xp_results.push((
-                    SkillType::Alchemy,
-                    xp_gained as i64,
-                    player.skills.alchemy.xp,
-                    player.skills.alchemy.level,
-                    leveled,
-                ));
-            }
-            if xp_gained > 0
-                && matches!(
-                    recipe.category,
-                    RecipeCategory::Cooking
-                        | RecipeCategory::Fletching
-                        | RecipeCategory::Leatherworking
-                )
-            {
-                let leveled = player.skills.survivalist.add_xp(xp_gained as i64);
-                xp_results.push((
-                    SkillType::Survivalist,
-                    xp_gained as i64,
-                    player.skills.survivalist.xp,
-                    player.skills.survivalist.level,
-                    leveled,
-                ));
-            }
-
-            let inventory_update = player.inventory.to_update();
-            let gold = player.inventory.gold;
-            drop(players);
-
-            tracing::info!(
-                "Player {} instant-crafted {} (gained {:?})",
-                player_id,
-                recipe_id,
-                items_gained
-            );
-
-            // Send crafting completed
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingCompleted {
-                    recipe_id: recipe_id.to_string(),
-                    items_gained: items_gained.clone(),
-                    xp_gained,
-                },
-            )
-            .await;
-
-            // Process quest item collection for crafted items
-            for (item_id_gained, count) in &items_gained {
-                self.process_quest_item_collect(player_id, item_id_gained, *count as i32)
-                    .await;
-            }
-
-            // Send inventory update
-            self.send_to_player(
-                player_id,
-                ServerMessage::InventoryUpdate {
-                    player_id: player_id.to_string(),
-                    slots: inventory_update,
-                    gold,
-                },
-            )
-            .await;
-
-            // Send XP updates
-            let mut any_leveled = false;
-            for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::SkillXp {
-                        player_id: player_id.to_string(),
-                        skill: skill_type.as_str().to_string(),
-                        xp_gained: xp_amount,
-                        total_xp,
-                        level,
-                    },
-                )
-                .await;
-
-                if leveled_up {
-                    tracing::info!(
-                        "Player {} leveled up {} to {}",
-                        player_id,
-                        skill_type.as_str(),
-                        level
-                    );
-                    self.broadcast(ServerMessage::SkillLevelUp {
-                        player_id: player_id.to_string(),
-                        skill: skill_type.as_str().to_string(),
-                        new_level: level,
-                    })
-                    .await;
-                    any_leveled = true;
-                }
-            }
-            if any_leveled {
-                self.process_quest_progression_snapshot(player_id).await;
-            }
-        } else {
-            // Timed craft - set crafting state, materials already consumed
-            player.crafting_state = Some(CraftingState {
-                recipe_id: recipe_id.to_string(),
-                started_at: std::time::Instant::now(),
-                duration_ms: recipe.craft_time_ms,
-                consumed_materials,
-                batch_remaining: 0,
-                batch_total: 1,
-            });
-
-            let inventory_update = player.inventory.to_update();
-            let gold = player.inventory.gold;
-            drop(players);
-
-            tracing::info!(
-                "Player {} started timed craft {} ({}ms)",
-                player_id,
-                recipe_id,
-                recipe.craft_time_ms
-            );
-
-            // Send inventory update (materials consumed)
-            self.send_to_player(
-                player_id,
-                ServerMessage::InventoryUpdate {
-                    player_id: player_id.to_string(),
-                    slots: inventory_update,
-                    gold,
-                },
-            )
-            .await;
-
-            // Send crafting started
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingStarted {
-                    recipe_id: recipe_id.to_string(),
-                    duration_ms: recipe.craft_time_ms,
-                },
-            )
-            .await;
-        }
-    }
-
-    /// Cancel an active timed craft, refunding materials
-    pub async fn handle_cancel_craft(&self, player_id: &str) {
-        self.cancel_crafting(player_id, "cancelled").await;
-    }
-
-    /// Internal helper to cancel crafting with a reason, refunding materials
-    pub async fn cancel_crafting(&self, player_id: &str, reason: &str) {
-        let refund_result = {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                if let Some(crafting) = player.crafting_state.take() {
-                    // Refund consumed materials
-                    for (item_id, count) in &crafting.consumed_materials {
-                        player
-                            .inventory
-                            .add_item(item_id, *count, &self.item_registry);
-                    }
-                    Some((player.inventory.to_update(), player.inventory.gold))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        };
-
-        if let Some((inv_update, gold)) = refund_result {
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingCancelled {
-                    reason: reason.to_string(),
-                },
-            )
-            .await;
-
-            // Send inventory update (materials refunded)
-            self.send_to_player(
-                player_id,
-                ServerMessage::InventoryUpdate {
-                    player_id: player_id.to_string(),
-                    slots: inv_update,
-                    gold,
-                },
-            )
-            .await;
-        }
-    }
-
-    /// Start a batch craft (smelting with quantity)
-    pub async fn handle_start_craft_batch(&self, player_id: &str, recipe_id: &str, quantity: u32) {
-        use crate::crafting::definition::RecipeCategory;
-
-        let recipe = match self.crafting_registry.get(recipe_id) {
-            Some(r) => r.clone(),
-            None => {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: "Recipe not found".to_string(),
-                    },
-                )
-                .await;
-                return;
-            }
-        };
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        // Check if already crafting
-        if player.crafting_state.is_some() {
-            drop(players);
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingCancelled {
-                    reason: "Already crafting".to_string(),
-                },
-            )
-            .await;
-            return;
-        }
-
-        // Check level requirement
-        let level_check_passed = match recipe.category {
-            RecipeCategory::Smithing => player.skills.smithing.level >= recipe.level_required,
-            RecipeCategory::Alchemy => player.skills.alchemy.level >= recipe.level_required,
-            RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => {
-                player.skills.survivalist.level >= recipe.level_required
-            }
-            _ => player.combat_level() >= recipe.level_required,
-        };
-
-        if !level_check_passed {
-            let skill_name = match recipe.category {
-                RecipeCategory::Smithing => "Smithing",
-                RecipeCategory::Alchemy => "Alchemy",
-                RecipeCategory::Cooking | RecipeCategory::Fletching | RecipeCategory::Leatherworking => "Survivalist",
-                _ => "Combat",
-            };
-            drop(players);
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingCancelled {
-                    reason: format!("Requires {} level {}", skill_name, recipe.level_required),
-                },
-            )
-            .await;
-            return;
-        }
-
-        // Check required tool (e.g. knife for fletching)
-        if let Some(ref tool) = recipe.required_tool {
-            if !player.inventory.has_item(tool, 1) {
-                let tool_name = self
-                    .item_registry
-                    .get(tool)
-                    .map(|d| d.display_name.as_str())
-                    .unwrap_or(tool.as_str());
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: format!("You need a {} to do that", tool_name),
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // Check recipe discovery requirement
-        if recipe.requires_discovery && !player.discovered_recipes.contains(recipe_id) {
-            drop(players);
-            self.send_to_player(
-                player_id,
-                ServerMessage::CraftingCancelled {
-                    reason: "Recipe not yet discovered".to_string(),
-                },
-            )
-            .await;
-            return;
-        }
-
-        // For "All" (u32::MAX), calculate max possible from ingredients
-        let actual_quantity = if quantity == u32::MAX {
-            let mut max_possible = u32::MAX;
-            for ingredient in &recipe.ingredients {
-                let have = player.inventory.count_item(&ingredient.item_id) as u32;
-                let can_make = have / ingredient.count as u32;
-                max_possible = max_possible.min(can_make);
-            }
-            max_possible.max(1)
-        } else {
-            quantity.max(1)
-        };
-
-        // Check ingredients for first craft
-        for ingredient in &recipe.ingredients {
-            if !player
-                .inventory
-                .has_item(&ingredient.item_id, ingredient.count)
-            {
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: "Missing ingredients".to_string(),
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // Check inventory space for results
-        for result in &recipe.results {
-            if !player
-                .inventory
-                .has_space_for(&result.item_id, result.count, &self.item_registry)
-            {
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: "Inventory full".to_string(),
-                    },
-                )
-                .await;
-                return;
-            }
-        }
-
-        // Consume materials for first craft only
-        let mut consumed_materials = Vec::new();
-        for ingredient in &recipe.ingredients {
-            player
-                .inventory
-                .remove_item(&ingredient.item_id, ingredient.count);
-            consumed_materials.push((ingredient.item_id.clone(), ingredient.count));
-        }
-
-        // Set crafting state with batch info
-        player.crafting_state = Some(CraftingState {
-            recipe_id: recipe_id.to_string(),
-            started_at: std::time::Instant::now(),
-            duration_ms: recipe.craft_time_ms,
-            consumed_materials,
-            batch_remaining: actual_quantity - 1,
-            batch_total: actual_quantity,
-        });
-
-        let inventory_update = player.inventory.to_update();
-        let gold = player.inventory.gold;
-        drop(players);
-
-        tracing::info!(
-            "Player {} started batch craft {} x{} ({}ms each)",
-            player_id,
-            recipe_id,
-            actual_quantity,
-            recipe.craft_time_ms
-        );
-
-        // Send inventory update (materials consumed)
-        self.send_to_player(
-            player_id,
-            ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots: inventory_update,
-                gold,
-            },
-        )
-        .await;
-
-        // Send crafting started
-        self.send_to_player(
-            player_id,
-            ServerMessage::CraftingStarted {
-                recipe_id: recipe_id.to_string(),
-                duration_ms: recipe.craft_time_ms,
-            },
-        )
-        .await;
-
-        // Send batch progress
-        self.send_to_player(
-            player_id,
-            ServerMessage::CraftingBatchProgress {
-                completed: 0,
-                total: actual_quantity,
-            },
-        )
-        .await;
-    }
-
-    // =========================================================================
-    // Bank Handlers
-    // =========================================================================
-
-    /// Send full bank contents to the player
-    pub async fn handle_bank_open(&self, player_id: &str) {
-        let players = self.players.read().await;
-        let player = match players.get(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        let msg = ServerMessage::BankOpen {
-            slots: player.bank.to_update(),
-            gold: player.bank.gold,
-            max_slots: player.bank_max_slots,
-        };
-        drop(players);
-        self.send_to_player(player_id, msg).await;
-    }
-
-    /// Show banker dialogue menu with bank access and upgrade options
-    async fn show_banker_dialogue(&self, player_id: &str, npc_id: &str) {
-        let npc_name = {
-            let npcs = self.npcs.read().await;
-            npcs.get(npc_id)
-                .map(|n| {
-                    self.entity_registry
-                        .get(&n.prototype_id)
-                        .map(|p| p.display_name.clone())
-                        .unwrap_or_else(|| "Banker".to_string())
-                })
-                .unwrap_or_else(|| "Banker".to_string())
-        };
-
-        let (bank_max_slots, gold) = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => (p.bank_max_slots, p.inventory.gold),
-                _ => return,
-            }
-        };
-
-        let upgrade_text = if bank_max_slots >= item::BANK_MAX_SIZE as u32 {
-            "Upgrade slots (fully upgraded)".to_string()
-        } else {
-            format!("Upgrade +{} slots ({}gp)", item::BANK_UPGRADE_SLOTS, item::BANK_UPGRADE_COST)
-        };
-
-        let text = format!(
-            "Welcome to the bank! Your vault currently has {}/{} slots.\n\nYour gold: {}gp",
-            bank_max_slots, item::BANK_MAX_SIZE, gold
-        );
-
-        self.send_to_player(player_id, ServerMessage::ShowDialogue {
-            quest_id: format!("banker:{}", npc_id),
-            npc_id: npc_id.to_string(),
-            speaker: npc_name,
-            text,
-            choices: vec![
-                crate::protocol::DialogueChoice {
-                    id: "open_bank".to_string(),
-                    text: "Access my bank".to_string(),
-                },
-                crate::protocol::DialogueChoice {
-                    id: "upgrade".to_string(),
-                    text: upgrade_text,
-                },
-                crate::protocol::DialogueChoice {
-                    id: "close".to_string(),
-                    text: "Nevermind".to_string(),
-                },
-            ],
-        }).await;
-    }
-
-    /// Handle bank slot upgrade purchase
-    async fn handle_bank_upgrade(&self, player_id: &str, npc_id: &str) {
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        if player.bank_max_slots >= item::BANK_MAX_SIZE as u32 {
-            drop(players);
-            self.send_system_message(player_id, "Your bank is already fully upgraded!").await;
-            self.show_banker_dialogue(player_id, npc_id).await;
-            return;
-        }
-
-        if player.inventory.gold < item::BANK_UPGRADE_COST {
-            let current_gold = player.inventory.gold;
-            drop(players);
-            self.send_system_message(player_id, &format!("You need {}gp to upgrade your bank. You only have {}gp.", item::BANK_UPGRADE_COST, current_gold)).await;
-            self.show_banker_dialogue(player_id, npc_id).await;
-            return;
-        }
-
-        // Deduct gold and expand bank
-        player.inventory.gold -= item::BANK_UPGRADE_COST;
-        player.bank_max_slots += item::BANK_UPGRADE_SLOTS as u32;
-        player.bank.expand(item::BANK_UPGRADE_SLOTS);
-
-        let inv_msg = ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: player.inventory.to_update(),
-            gold: player.inventory.gold,
-        };
-        let new_slots = player.bank_max_slots;
-        drop(players);
-
-        self.send_to_player(player_id, inv_msg).await;
-        self.send_system_message(player_id, &format!("Bank upgraded! You now have {} slots.", new_slots)).await;
-        self.show_banker_dialogue(player_id, npc_id).await;
-    }
-
-    /// Deposit an item from inventory into bank
-    pub async fn handle_bank_deposit(&self, player_id: &str, item_id: &str, quantity: i32) {
-        if quantity <= 0 {
-            return;
-        }
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        // Check inventory has the item
-        if !player.inventory.has_item(item_id, quantity) {
-            let msg = ServerMessage::BankResult {
-                success: false,
-                action: "deposit".to_string(),
-                error: Some("Not enough items in inventory.".to_string()),
-            };
-            drop(players);
-            self.send_to_player(player_id, msg).await;
-            return;
-        }
-
-        // Check bank has space
-        if !player
-            .bank
-            .has_space_for(item_id, quantity, &self.item_registry)
-        {
-            let msg = ServerMessage::BankResult {
-                success: false,
-                action: "deposit".to_string(),
-                error: Some("Bank is full.".to_string()),
-            };
-            drop(players);
-            self.send_to_player(player_id, msg).await;
-            return;
-        }
-
-        // Transfer
-        player.inventory.remove_item(item_id, quantity);
-        player.bank.add_item(item_id, quantity, &self.item_registry);
-
-        let inv_msg = ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: player.inventory.to_update(),
-            gold: player.inventory.gold,
-        };
-        let bank_msg = ServerMessage::BankUpdate {
-            slots: player.bank.to_update(),
-            gold: player.bank.gold,
-        };
-        drop(players);
-        self.send_to_player(player_id, inv_msg).await;
-        self.send_to_player(player_id, bank_msg).await;
-    }
-
-    /// Withdraw an item from bank into inventory
-    pub async fn handle_bank_withdraw(&self, player_id: &str, item_id: &str, quantity: i32) {
-        if quantity <= 0 {
-            return;
-        }
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        // Check bank has the item
-        if !player.bank.has_item(item_id, quantity) {
-            let msg = ServerMessage::BankResult {
-                success: false,
-                action: "withdraw".to_string(),
-                error: Some("Not enough items in bank.".to_string()),
-            };
-            drop(players);
-            self.send_to_player(player_id, msg).await;
-            return;
-        }
-
-        // Check inventory has space
-        if !player
-            .inventory
-            .has_space_for(item_id, quantity, &self.item_registry)
-        {
-            let msg = ServerMessage::BankResult {
-                success: false,
-                action: "withdraw".to_string(),
-                error: Some("Inventory is full.".to_string()),
-            };
-            drop(players);
-            self.send_to_player(player_id, msg).await;
-            return;
-        }
-
-        // Transfer
-        player.bank.remove_item(item_id, quantity);
-        player
-            .inventory
-            .add_item(item_id, quantity, &self.item_registry);
-
-        let inv_msg = ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: player.inventory.to_update(),
-            gold: player.inventory.gold,
-        };
-        let bank_msg = ServerMessage::BankUpdate {
-            slots: player.bank.to_update(),
-            gold: player.bank.gold,
-        };
-        drop(players);
-        self.send_to_player(player_id, inv_msg).await;
-        self.send_to_player(player_id, bank_msg).await;
-    }
-
-    /// Deposit gold from inventory into bank
-    pub async fn handle_bank_deposit_gold(&self, player_id: &str, amount: i32) {
-        if amount <= 0 {
-            return;
-        }
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        if player.inventory.gold < amount {
-            let msg = ServerMessage::BankResult {
-                success: false,
-                action: "depositGold".to_string(),
-                error: Some("Not enough gold.".to_string()),
-            };
-            drop(players);
-            self.send_to_player(player_id, msg).await;
-            return;
-        }
-
-        player.inventory.gold -= amount;
-        player.bank.gold += amount;
-
-        let inv_msg = ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: player.inventory.to_update(),
-            gold: player.inventory.gold,
-        };
-        let bank_msg = ServerMessage::BankUpdate {
-            slots: player.bank.to_update(),
-            gold: player.bank.gold,
-        };
-        drop(players);
-        self.send_to_player(player_id, inv_msg).await;
-        self.send_to_player(player_id, bank_msg).await;
-    }
-
-    /// Withdraw gold from bank into inventory
-    pub async fn handle_bank_withdraw_gold(&self, player_id: &str, amount: i32) {
-        if amount <= 0 {
-            return;
-        }
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        if player.bank.gold < amount {
-            let msg = ServerMessage::BankResult {
-                success: false,
-                action: "withdrawGold".to_string(),
-                error: Some("Not enough gold in bank.".to_string()),
-            };
-            drop(players);
-            self.send_to_player(player_id, msg).await;
-            return;
-        }
-
-        player.bank.gold -= amount;
-        player.inventory.gold += amount;
-
-        let inv_msg = ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: player.inventory.to_update(),
-            gold: player.inventory.gold,
-        };
-        let bank_msg = ServerMessage::BankUpdate {
-            slots: player.bank.to_update(),
-            gold: player.bank.gold,
-        };
-        drop(players);
-        self.send_to_player(player_id, inv_msg).await;
-        self.send_to_player(player_id, bank_msg).await;
-    }
-
-    /// Deposit all inventory items into bank
-    pub async fn handle_bank_deposit_all(&self, player_id: &str) {
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        // Collect items to deposit (item_id, quantity pairs)
-        let items_to_deposit: Vec<(String, i32)> = player
-            .inventory
-            .slots
-            .iter()
-            .filter_map(|slot| {
-                slot.as_ref()
-                    .map(|s| (s.item_id.clone(), s.quantity))
-            })
-            .collect();
-
-        if items_to_deposit.is_empty() {
-            return;
-        }
-
-        // Deposit each item, skipping any that don't fit
-        for (item_id, quantity) in &items_to_deposit {
-            if player.bank.has_space_for(item_id, *quantity, &self.item_registry) {
-                player.inventory.remove_item(item_id, *quantity);
-                player.bank.add_item(item_id, *quantity, &self.item_registry);
-            }
-        }
-
-        let inv_msg = ServerMessage::InventoryUpdate {
-            player_id: player_id.to_string(),
-            slots: player.inventory.to_update(),
-            gold: player.inventory.gold,
-        };
-        let bank_msg = ServerMessage::BankUpdate {
-            slots: player.bank.to_update(),
-            gold: player.bank.gold,
-        };
-        drop(players);
-        self.send_to_player(player_id, inv_msg).await;
-        self.send_to_player(player_id, bank_msg).await;
-    }
-
-    /// Swap two bank slots. If both contain the same item, merge stacks (up to 99).
-    pub async fn handle_bank_swap_slots(&self, player_id: &str, slot_a: u32, slot_b: u32) {
-        if slot_a == slot_b {
-            return;
-        }
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        let len = player.bank.slots.len();
-        let a = slot_a as usize;
-        let b = slot_b as usize;
-        if a >= len || b >= len {
-            return;
-        }
-
-        // Check if both slots have the same item (merge case)
-        let should_merge = match (&player.bank.slots[a], &player.bank.slots[b]) {
-            (Some(sa), Some(sb)) => sa.item_id == sb.item_id,
-            _ => false,
-        };
-
-        if should_merge {
-            // Merge: move all quantity from slot_a into slot_b (unlimited stacking)
-            let src_qty = player.bank.slots[a].as_ref().unwrap().quantity;
-            player.bank.slots[b].as_mut().unwrap().quantity =
-                player.bank.slots[b].as_ref().unwrap().quantity.saturating_add(src_qty);
-            player.bank.slots[a] = None;
-        } else {
-            // Swap
-            player.bank.slots.swap(a, b);
-        }
-
-        let bank_msg = ServerMessage::BankUpdate {
-            slots: player.bank.to_update(),
-            gold: player.bank.gold,
-        };
-        drop(players);
-        self.send_to_player(player_id, bank_msg).await;
-    }
-
-    /// Sort bank by item category then alphabetically by display name.
-    pub async fn handle_bank_sort(&self, player_id: &str) {
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.active && !p.is_dead => p,
-            _ => return,
-        };
-
-        // Consolidate: merge duplicate item_ids into single slots
-        let mut merged: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
-        for slot in player.bank.slots.iter().flatten() {
-            *merged.entry(slot.item_id.clone()).or_insert(0) += slot.quantity as i64;
-        }
-        let mut items: Vec<item::InventorySlot> = merged
-            .into_iter()
-            .map(|(item_id, qty)| {
-                let clamped = qty.min(i32::MAX as i64) as i32;
-                item::InventorySlot::new(item_id, clamped)
-            })
-            .collect();
-
-        // Sort by (category_priority, display_name)
-        let registry = &self.item_registry;
-        items.sort_by(|a, b| {
-            let def_a = registry.get(&a.item_id);
-            let def_b = registry.get(&b.item_id);
-            let cat_a = def_a.map(|d| d.category.sort_priority()).unwrap_or(255);
-            let cat_b = def_b.map(|d| d.category.sort_priority()).unwrap_or(255);
-            let name_a = def_a.map(|d| d.display_name.as_str()).unwrap_or(&a.item_id);
-            let name_b = def_b.map(|d| d.display_name.as_str()).unwrap_or(&b.item_id);
-            cat_a.cmp(&cat_b).then_with(|| name_a.cmp(name_b))
-        });
-
-        // Rebuild slots: items packed to front, None for the rest
-        let total = player.bank.slots.len();
-        player.bank.slots = items.into_iter().map(Some).collect();
-        player.bank.slots.resize(total, None);
-
-        let bank_msg = ServerMessage::BankUpdate {
-            slots: player.bank.to_update(),
-            gold: player.bank.gold,
-        };
-        drop(players);
-        self.send_to_player(player_id, bank_msg).await;
-    }
-
-    /// Handle shop buy transaction
-    pub async fn handle_shop_buy(
-        &self,
-        player_id: &str,
-        npc_id: &str,
-        item_id: &str,
-        quantity: i32,
-    ) {
-        // Validate quantity
-        if quantity <= 0 {
-            self.send_shop_result(
-                player_id,
-                false,
-                "buy",
-                item_id,
-                0,
-                0,
-                Some("Invalid quantity"),
-            )
-            .await;
-            return;
-        }
-
-        // Get player position and gold
-        let (player_x, player_y, player_gold) = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => (p.x, p.y, p.inventory.gold),
-                _ => return,
-            }
-        };
-
-        // Check if player is in an instance
-        let instance_id = {
-            let instances = self.player_instances.read().await;
-            instances.get(player_id).cloned()
-        };
-
-        // Get NPC position and prototype ID - check instance NPCs first, then overworld
-        let npc_info = if let Some(ref inst_id) = instance_id {
-            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
-                let npcs = instance.npcs.read().await;
-                npcs.get(npc_id).map(|npc| {
-                    let dx = (npc.x - player_x) as f32;
-                    let dy = (npc.y - player_y) as f32;
-                    let distance = (dx * dx + dy * dy).sqrt();
-                    (npc.prototype_id.clone(), distance, npc.is_alive())
-                })
-            } else {
-                tracing::warn!(
-                    "Player {} in instance {} but instance not found",
-                    player_id,
-                    inst_id
-                );
-                None
-            }
-        } else {
-            let npcs = self.npcs.read().await;
-            npcs.get(npc_id).map(|npc| {
-                let dx = (npc.x - player_x) as f32;
-                let dy = (npc.y - player_y) as f32;
-                let distance = (dx * dx + dy * dy).sqrt();
-                (npc.prototype_id.clone(), distance, npc.is_alive())
-            })
-        };
-
-        let (prototype_id, distance, is_alive) = match npc_info {
-            Some(info) => info,
-            None => {
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "buy",
-                    item_id,
-                    0,
-                    0,
-                    Some("NPC not found"),
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Check distance (must be within 10 tiles — generous to allow for NPC wandering)
-        if distance > 10.0 || !is_alive {
-            self.send_shop_result(
-                player_id,
-                false,
-                "buy",
-                item_id,
-                0,
-                0,
-                Some("Too far from merchant"),
-            )
-            .await;
-            return;
-        }
-
-        // Get prototype and merchant config
-        let merchant_config = match self.entity_registry.get(&prototype_id) {
-            Some(proto) => match &proto.merchant {
-                Some(config) => config.clone(),
-                None => {
-                    self.send_shop_result(
-                        player_id,
-                        false,
-                        "buy",
-                        item_id,
-                        0,
-                        0,
-                        Some("Not a merchant"),
-                    )
-                    .await;
-                    return;
-                }
-            },
-            None => {
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "buy",
-                    item_id,
-                    0,
-                    0,
-                    Some("Invalid merchant"),
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Get shop definition and check stock
-        let mut shop_registry = self.shop_registry.write().await;
-        let shop = match shop_registry.get_mut(&merchant_config.shop_id) {
-            Some(s) => s,
-            None => {
-                drop(shop_registry);
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "buy",
-                    item_id,
-                    0,
-                    0,
-                    Some("Shop not found"),
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Check if item is in stock
-        let stock_item = match shop.get_stock_mut(item_id) {
-            Some(s) => s,
-            None => {
-                drop(shop_registry);
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "buy",
-                    item_id,
-                    0,
-                    0,
-                    Some("Item not sold here"),
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Check stock quantity
-        if stock_item.current_quantity < quantity {
-            drop(shop_registry);
-            self.send_shop_result(
-                player_id,
-                false,
-                "buy",
-                item_id,
-                0,
-                0,
-                Some("Insufficient stock"),
-            )
-            .await;
-            return;
-        }
-
-        // Get item definition for base price
-        let item_def = match self.item_registry.get(item_id) {
-            Some(def) => def.clone(),
-            None => {
-                drop(shop_registry);
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "buy",
-                    item_id,
-                    0,
-                    0,
-                    Some("Item not found"),
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Calculate total cost
-        let base_price = item_def.base_price;
-        let unit_price = (base_price as f32 * merchant_config.sell_multiplier).max(1.0) as i32;
-        let total_cost = unit_price * quantity;
-
-        // Check if player has enough gold
-        if player_gold < total_cost {
-            drop(shop_registry);
-            self.send_shop_result(
-                player_id,
-                false,
-                "buy",
-                item_id,
-                0,
-                0,
-                Some("Not enough gold"),
-            )
-            .await;
-            return;
-        }
-
-        // Check if player has inventory space
-        {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => p,
-                _ => {
-                    drop(shop_registry);
-                    return;
-                }
-            };
-
-            if !player
-                .inventory
-                .has_space_for(item_id, quantity, &self.item_registry)
-            {
-                drop(shop_registry);
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "buy",
-                    item_id,
-                    0,
-                    0,
-                    Some("Inventory full"),
-                )
-                .await;
-                return;
-            }
-        }
-
-        // All checks passed - process transaction
-        stock_item.current_quantity -= quantity;
-        let new_stock = stock_item.current_quantity;
-        drop(shop_registry);
-
-        // Update player inventory
-        {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                player.inventory.gold -= total_cost;
-                player
-                    .inventory
-                    .add_item(item_id, quantity, &self.item_registry);
-
-                let inventory_update = player.inventory.to_update();
-                let gold = player.inventory.gold;
-                drop(players);
-
-                // Send success result
-                self.send_shop_result(player_id, true, "buy", item_id, quantity, -total_cost, None)
-                    .await;
-
-                // Send inventory update
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::InventoryUpdate {
-                        player_id: player_id.to_string(),
-                        slots: inventory_update,
-                        gold,
-                    },
-                )
-                .await;
-
-                // Broadcast stock update to nearby players
-                self.broadcast_shop_stock_update(npc_id, item_id, new_stock)
-                    .await;
-
-                tracing::info!(
-                    "Player {} bought {}x{} from {} for {} gold",
-                    player_id,
-                    quantity,
-                    item_id,
-                    npc_id,
-                    total_cost
-                );
-            }
-        }
-    }
-
-    /// Send shop result message to player
-    async fn send_shop_result(
-        &self,
-        player_id: &str,
-        success: bool,
-        action: &str,
-        item_id: &str,
-        quantity: i32,
-        gold_change: i32,
-        error: Option<&str>,
-    ) {
-        self.send_to_player(
-            player_id,
-            ServerMessage::ShopResult {
-                success,
-                action: action.to_string(),
-                item_id: item_id.to_string(),
-                quantity,
-                gold_change,
-                error: error.map(|s| s.to_string()),
-            },
-        )
-        .await;
-    }
-
-    /// Broadcast shop stock update to all players
-    async fn broadcast_shop_stock_update(&self, npc_id: &str, item_id: &str, new_quantity: i32) {
-        self.broadcast(ServerMessage::ShopStockUpdate {
-            npc_id: npc_id.to_string(),
-            item_id: item_id.to_string(),
-            new_quantity,
-        })
-        .await;
-    }
-
-    /// Handle shop sell transaction
-    pub async fn handle_shop_sell(
-        &self,
-        player_id: &str,
-        npc_id: &str,
-        item_id: &str,
-        quantity: i32,
-    ) {
-        // Validate quantity
-        if quantity <= 0 {
-            self.send_shop_result(
-                player_id,
-                false,
-                "sell",
-                item_id,
-                0,
-                0,
-                Some("Invalid quantity"),
-            )
-            .await;
-            return;
-        }
-
-        // Get player position
-        let (player_x, player_y) = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => (p.x, p.y),
-                _ => return,
-            }
-        };
-
-        // Check if player is in an instance
-        let instance_id = {
-            let instances = self.player_instances.read().await;
-            instances.get(player_id).cloned()
-        };
-
-        // Get NPC position and prototype ID - check instance NPCs first, then overworld
-        let npc_info = if let Some(ref inst_id) = instance_id {
-            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
-                let npcs = instance.npcs.read().await;
-                npcs.get(npc_id).map(|npc| {
-                    let dx = (npc.x - player_x) as f32;
-                    let dy = (npc.y - player_y) as f32;
-                    let distance = (dx * dx + dy * dy).sqrt();
-                    (npc.prototype_id.clone(), distance, npc.is_alive())
-                })
-            } else {
-                tracing::warn!(
-                    "Player {} in instance {} but instance not found",
-                    player_id,
-                    inst_id
-                );
-                None
-            }
-        } else {
-            let npcs = self.npcs.read().await;
-            npcs.get(npc_id).map(|npc| {
-                let dx = (npc.x - player_x) as f32;
-                let dy = (npc.y - player_y) as f32;
-                let distance = (dx * dx + dy * dy).sqrt();
-                (npc.prototype_id.clone(), distance, npc.is_alive())
-            })
-        };
-
-        let (prototype_id, distance, is_alive) = match npc_info {
-            Some(info) => info,
-            None => {
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "sell",
-                    item_id,
-                    0,
-                    0,
-                    Some("NPC not found"),
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Check distance (must be within 10 tiles — generous to allow for NPC wandering)
-        if distance > 10.0 || !is_alive {
-            self.send_shop_result(
-                player_id,
-                false,
-                "sell",
-                item_id,
-                0,
-                0,
-                Some("Too far from merchant"),
-            )
-            .await;
-            return;
-        }
-
-        // Get prototype and merchant config
-        let merchant_config = match self.entity_registry.get(&prototype_id) {
-            Some(proto) => match &proto.merchant {
-                Some(config) => config.clone(),
-                None => {
-                    self.send_shop_result(
-                        player_id,
-                        false,
-                        "sell",
-                        item_id,
-                        0,
-                        0,
-                        Some("Not a merchant"),
-                    )
-                    .await;
-                    return;
-                }
-            },
-            None => {
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "sell",
-                    item_id,
-                    0,
-                    0,
-                    Some("Invalid merchant"),
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Get item definition
-        let item_def = match self.item_registry.get(item_id) {
-            Some(def) => def.clone(),
-            None => {
-                self.send_shop_result(
-                    player_id,
-                    false,
-                    "sell",
-                    item_id,
-                    0,
-                    0,
-                    Some("Item not found"),
-                )
-                .await;
-                return;
-            }
-        };
-
-        // Check if item is sellable
-        if !item_def.sellable {
-            self.send_shop_result(
-                player_id,
-                false,
-                "sell",
-                item_id,
-                0,
-                0,
-                Some("Item cannot be sold"),
-            )
-            .await;
-            return;
-        }
-
-        // Check if player has the item
-        let has_item = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => p.inventory.has_item(item_id, quantity),
-                _ => false,
-            }
-        };
-
-        if !has_item {
-            self.send_shop_result(
-                player_id,
-                false,
-                "sell",
-                item_id,
-                0,
-                0,
-                Some("You don't have enough of that item"),
-            )
-            .await;
-            return;
-        }
-
-        // Calculate sell price
-        let base_price = item_def.base_price;
-        let unit_price = (base_price as f32 * merchant_config.buy_multiplier).max(1.0) as i32;
-        let total_value = unit_price * quantity;
-
-        // Process transaction
-        {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                // Remove items from inventory
-                player.inventory.remove_item(item_id, quantity);
-                // Add gold
-                player.inventory.gold += total_value;
-
-                let inventory_update = player.inventory.to_update();
-                let gold = player.inventory.gold;
-                drop(players);
-
-                // Send success result
-                self.send_shop_result(
-                    player_id,
-                    true,
-                    "sell",
-                    item_id,
-                    quantity,
-                    total_value,
-                    None,
-                )
-                .await;
-
-                // Send inventory update
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::InventoryUpdate {
-                        player_id: player_id.to_string(),
-                        slots: inventory_update,
-                        gold,
-                    },
-                )
-                .await;
-
-                tracing::info!(
-                    "Player {} sold {}x{} to {} for {} gold",
-                    player_id,
-                    quantity,
-                    item_id,
-                    npc_id,
-                    total_value
-                );
-            }
-        }
     }
 
     /// Handle equipping an item from inventory
@@ -9456,7 +6112,8 @@ impl GameRoom {
 
         // Block equipping items that are in an active trade offer
         if self.is_slot_in_trade(player_id, slot_index).await {
-            self.send_system_message(player_id, "That item is in a trade offer.").await;
+            self.send_system_message(player_id, "That item is in a trade offer.")
+                .await;
             return;
         }
 
@@ -9597,9 +6254,7 @@ impl GameRoom {
         }
 
         // Check magic level requirement for staves/magic items
-        if equip_stats.magic_level_required > 0
-            && magic_level < equip_stats.magic_level_required
-        {
+        if equip_stats.magic_level_required > 0 && magic_level < equip_stats.magic_level_required {
             self.send_to_player(
                 player_id,
                 ServerMessage::EquipResult {
@@ -9932,7 +6587,8 @@ impl GameRoom {
 
         // Block dropping items that are in an active trade offer
         if self.is_slot_in_trade(player_id, slot_index).await {
-            self.send_system_message(player_id, "That item is in a trade offer.").await;
+            self.send_system_message(player_id, "That item is in a trade offer.")
+                .await;
             return;
         }
 
@@ -10452,8 +7108,14 @@ impl GameRoom {
 
         // Perform the chop
         let mut woodcutting = self.woodcutting.write().await;
-        let chop_result =
-            woodcutting.chop_once(tree_x, tree_y, tree_gid, woodcutting_level, axe_success_bonus.unwrap_or(0.0), current_time);
+        let chop_result = woodcutting.chop_once(
+            tree_x,
+            tree_y,
+            tree_gid,
+            woodcutting_level,
+            axe_success_bonus.unwrap_or(0.0),
+            current_time,
+        );
         drop(woodcutting);
 
         // Update last_attack_time so auto-action cooldown is enforced
@@ -10707,7 +7369,14 @@ impl GameRoom {
 
         // Perform the mine
         let mut mining = self.mining.write().await;
-        let mine_result = mining.mine_once(rock_x, rock_y, rock_gid, mining_level, pickaxe_success_bonus.unwrap_or(0.0), current_time);
+        let mine_result = mining.mine_once(
+            rock_x,
+            rock_y,
+            rock_gid,
+            mining_level,
+            pickaxe_success_bonus.unwrap_or(0.0),
+            current_time,
+        );
         drop(mining);
 
         // Update last_attack_time so auto-action cooldown is enforced
@@ -10911,7 +7580,11 @@ impl GameRoom {
             None => "ow_".to_string(),
         };
         let all_keys: Vec<&String> = cm.chests.keys().collect();
-        tracing::debug!("get_chest_positions_message: prefix='{}', all keys={:?}", prefix, all_keys);
+        tracing::debug!(
+            "get_chest_positions_message: prefix='{}', all keys={:?}",
+            prefix,
+            all_keys
+        );
         let positions: Vec<(i32, i32)> = cm
             .chests
             .keys()
@@ -11102,1007 +7775,6 @@ impl GameRoom {
                 }
             }
         }
-    }
-
-    pub async fn handle_plant_seed(&self, player_id: &str, patch_id: &str, item_id: &str) {
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-
-        // Get player farming level and check they have the seed
-        let farming_level = {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-            if !player.inventory.has_item(item_id, 1) {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::Error {
-                        code: 400,
-                        message: "You don't have that seed".to_string(),
-                    },
-                )
-                .await;
-                return;
-            }
-            player.skills.farming.level
-        };
-
-        // Try to plant
-        let result = {
-            let mut farming = self.farming.write().await;
-            farming.plant_seed(patch_id, item_id, player_id, farming_level, current_time)
-        };
-
-        match result {
-            Ok((crop_id, xp)) => {
-                // Consume the seed
-                let inv_update = {
-                    let mut players = self.players.write().await;
-                    let player = players.get_mut(player_id).unwrap();
-                    player.inventory.remove_item(item_id, 1);
-
-                    // Grant planting XP
-                    let leveled = player.skills.farming.add_xp(xp);
-                    let skill = &player.skills.farming;
-                    let gold = player.inventory.gold;
-
-                    (
-                        player.inventory.to_update(),
-                        gold,
-                        skill.xp,
-                        skill.level,
-                        leveled,
-                    )
-                };
-
-                // Send inventory update
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::InventoryUpdate {
-                        player_id: player_id.to_string(),
-                        slots: inv_update.0,
-                        gold: inv_update.1,
-                    },
-                )
-                .await;
-
-                // Send XP gain
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::SkillXp {
-                        player_id: player_id.to_string(),
-                        skill: "farming".to_string(),
-                        xp_gained: xp,
-                        total_xp: inv_update.2,
-                        level: inv_update.3,
-                    },
-                )
-                .await;
-
-                if inv_update.4 {
-                    self.broadcast(ServerMessage::SkillLevelUp {
-                        player_id: player_id.to_string(),
-                        skill: "farming".to_string(),
-                        new_level: inv_update.3,
-                    })
-                    .await;
-                    self.process_quest_progression_snapshot(player_id).await;
-                }
-
-                // Persist to database
-                if let Some(ref db) = self.db {
-                    if let Err(e) = db
-                        .save_farming_patch(patch_id, player_id, &crop_id, current_time)
-                        .await
-                    {
-                        tracing::warn!("Failed to save farming patch {}: {}", patch_id, e);
-                    }
-                }
-
-                // Send patch update to this player only (per-player instanced)
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::PatchStateUpdate {
-                        patch_id: patch_id.to_string(),
-                        state: "growing".to_string(),
-                        crop_id,
-                        growth_stage: 0,
-                        owner_id: player_id.to_string(),
-                    },
-                )
-                .await;
-
-                // Fire quest event for planting
-                self.process_quest_item_collect(player_id, &format!("plant_{}", item_id), 1)
-                    .await;
-            }
-            Err(e) => {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::Error {
-                        code: 400,
-                        message: e,
-                    },
-                )
-                .await;
-            }
-        }
-    }
-
-    pub async fn handle_harvest_crop(&self, player_id: &str, patch_id: &str) {
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-
-        let farming_level = {
-            let players = self.players.read().await;
-            players
-                .get(player_id)
-                .map(|p| p.skills.farming.level)
-                .unwrap_or(1)
-        };
-
-        // Check inventory space before harvesting (harvest destroys the crop)
-        {
-            let farming = self.farming.read().await;
-            let key = (patch_id.to_string(), player_id.to_string());
-            if let Some(state) = farming.player_states.get(&key) {
-                if let Some(crop) = farming.crops.get(&state.crop_id) {
-                    let players = self.players.read().await;
-                    if let Some(player) = players.get(player_id) {
-                        // Check for max possible yield to be safe
-                        if !player.inventory.has_space_for(
-                            &crop.produce_item,
-                            crop.harvest_amount_max,
-                            &self.item_registry,
-                        ) {
-                            self.send_system_message(player_id, "Your inventory is full.")
-                                .await;
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-
-        let result = {
-            let mut farming = self.farming.write().await;
-            farming.harvest_crop(patch_id, player_id, current_time, farming_level)
-        };
-
-        match result {
-            Ok(harvest) => {
-                // Add produce + optional seed to inventory, grant XP
-                let inv_update = {
-                    let mut players = self.players.write().await;
-                    let player = players.get_mut(player_id).unwrap();
-
-                    player.inventory.add_item(
-                        &harvest.produce_item,
-                        harvest.amount,
-                        &self.item_registry,
-                    );
-                    if harvest.seed_returned {
-                        player
-                            .inventory
-                            .add_item(&harvest.seed_item, 1, &self.item_registry);
-                    }
-
-                    let leveled = player.skills.farming.add_xp(harvest.xp_gained);
-                    let skill = &player.skills.farming;
-                    let gold = player.inventory.gold;
-
-                    (
-                        player.inventory.to_update(),
-                        gold,
-                        skill.xp,
-                        skill.level,
-                        leveled,
-                    )
-                };
-
-                // Send inventory update
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::InventoryUpdate {
-                        player_id: player_id.to_string(),
-                        slots: inv_update.0,
-                        gold: inv_update.1,
-                    },
-                )
-                .await;
-
-                // Send XP gain
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::SkillXp {
-                        player_id: player_id.to_string(),
-                        skill: "farming".to_string(),
-                        xp_gained: harvest.xp_gained,
-                        total_xp: inv_update.2,
-                        level: inv_update.3,
-                    },
-                )
-                .await;
-
-                if inv_update.4 {
-                    self.broadcast(ServerMessage::SkillLevelUp {
-                        player_id: player_id.to_string(),
-                        skill: "farming".to_string(),
-                        new_level: inv_update.3,
-                    })
-                    .await;
-                    self.process_quest_progression_snapshot(player_id).await;
-                }
-
-                // Send patch reset to this player only (per-player instanced)
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::PatchStateUpdate {
-                        patch_id: patch_id.to_string(),
-                        state: "empty".to_string(),
-                        crop_id: String::new(),
-                        growth_stage: 0,
-                        owner_id: String::new(),
-                    },
-                )
-                .await;
-
-                // Delete from database
-                if let Some(ref db) = self.db {
-                    if let Err(e) = db.delete_farming_patch(patch_id, player_id).await {
-                        tracing::warn!("Failed to delete farming patch {}: {}", patch_id, e);
-                    }
-                }
-
-                // Fire quest event for harvesting (prefixed for farming-specific quests, and raw for general collect quests)
-                self.process_quest_item_collect(
-                    player_id,
-                    &format!("harvest_{}", harvest.produce_item),
-                    harvest.amount,
-                )
-                .await;
-                self.process_quest_item_collect(player_id, &harvest.produce_item, harvest.amount)
-                    .await;
-
-                // Track farming contract progress
-                {
-                    let mut farming = self.farming.write().await;
-                    let crop_id = farming
-                        .crops
-                        .iter()
-                        .find(|(_, c)| c.produce_item == harvest.produce_item)
-                        .map(|(id, _)| id.clone());
-
-                    if let Some(crop_id) = crop_id {
-                        if let Some((harvested, required, complete)) =
-                            farming.record_contract_harvest(player_id, &crop_id, harvest.amount)
-                        {
-                            drop(farming);
-                            if complete {
-                                self.send_system_message(player_id,
-                                    &format!("Contract complete! ({}/{}) Return to the Master Farmer to claim your rewards.", harvested, required)
-                                ).await;
-                            } else {
-                                self.send_system_message(
-                                    player_id,
-                                    &format!(
-                                        "Contract progress: {}/{} harvested.",
-                                        harvested, required
-                                    ),
-                                )
-                                .await;
-                            }
-
-                            // Update database
-                            if let Some(ref db) = self.db {
-                                if let Err(e) = db
-                                    .update_farming_contract_progress(player_id, harvested)
-                                    .await
-                                {
-                                    tracing::warn!("Failed to update contract progress: {}", e);
-                                }
-                            }
-
-                            // Send contract progress to client
-                            self.send_farming_contract_update(player_id).await;
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::Error {
-                        code: 400,
-                        message: e,
-                    },
-                )
-                .await;
-            }
-        }
-    }
-
-    /// Show the plot purchase dialogue with available plots
-    async fn show_plot_purchase_dialogue(&self, player_id: &str, npc_id: &str) {
-        let npc_name = {
-            let npcs = self.npcs.read().await;
-            npcs.get(npc_id)
-                .map(|n| {
-                    self.entity_registry
-                        .get(&n.prototype_id)
-                        .map(|p| p.display_name.clone())
-                        .unwrap_or_else(|| "Master Farmer".to_string())
-                })
-                .unwrap_or_else(|| "Master Farmer".to_string())
-        };
-
-        // Get player's farming level and gold
-        let (farming_level, gold) = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) => (p.skills.farming.level, p.inventory.gold),
-                None => return,
-            }
-        };
-
-        // Get player's unlocked plots
-        let farming = self.farming.read().await;
-        let unlocked = farming.get_unlocked_plots(player_id);
-
-        // Build dialogue choices
-        let mut choices = Vec::new();
-        for req in crate::farming::PLOT_REQUIREMENTS {
-            let owned = unlocked.contains(&req.plot_id);
-            if owned {
-                choices.push(crate::protocol::DialogueChoice {
-                    id: format!("owned_{}", req.plot_id),
-                    text: format!("Plot {} (Owned)", req.plot_id),
-                });
-            } else if farming_level < req.farming_level {
-                choices.push(crate::protocol::DialogueChoice {
-                    id: format!("locked_{}", req.plot_id),
-                    text: format!(
-                        "Plot {} - {}gp (Requires Farming {})",
-                        req.plot_id, req.gold_cost, req.farming_level
-                    ),
-                });
-            } else if gold < req.gold_cost {
-                choices.push(crate::protocol::DialogueChoice {
-                    id: format!("locked_{}", req.plot_id),
-                    text: format!(
-                        "Plot {} - {}gp (Not enough gold)",
-                        req.plot_id, req.gold_cost
-                    ),
-                });
-            } else {
-                choices.push(crate::protocol::DialogueChoice {
-                    id: format!("unlock_{}", req.plot_id),
-                    text: format!("Plot {} - {}gp", req.plot_id, req.gold_cost),
-                });
-            }
-        }
-        choices.push(crate::protocol::DialogueChoice {
-            id: "nevermind".to_string(),
-            text: "Go back".to_string(),
-        });
-
-        let text = format!(
-            "Each allotment plot gives you 16 farming patches to grow crops.\n\nYour gold: {}gp | Farming level: {}",
-            gold, farming_level
-        );
-
-        self.send_to_player(
-            player_id,
-            ServerMessage::ShowDialogue {
-                quest_id: format!("plot_seller:{}", npc_id),
-                npc_id: npc_id.to_string(),
-                speaker: npc_name,
-                text,
-                choices,
-            },
-        )
-        .await;
-    }
-
-    /// Show the main master farmer dialogue menu
-    async fn show_master_farmer_dialogue(&self, player_id: &str, npc_id: &str) {
-        let npc_name = {
-            let npcs = self.npcs.read().await;
-            npcs.get(npc_id)
-                .map(|n| {
-                    self.entity_registry
-                        .get(&n.prototype_id)
-                        .map(|p| p.display_name.clone())
-                        .unwrap_or_else(|| "Master Farmer".to_string())
-                })
-                .unwrap_or_else(|| "Master Farmer".to_string())
-        };
-
-        self.send_to_player(player_id, ServerMessage::ShowDialogue {
-            quest_id: format!("plot_seller:{}", npc_id),
-            npc_id: npc_id.to_string(),
-            speaker: npc_name,
-            text: "Ah, welcome! I've been tending these fields for decades. What can I help you with?".to_string(),
-            choices: vec![
-                crate::protocol::DialogueChoice {
-                    id: "contracts".to_string(),
-                    text: "Farming contracts".to_string(),
-                },
-                crate::protocol::DialogueChoice {
-                    id: "buy_plots".to_string(),
-                    text: "Buy allotment plot".to_string(),
-                },
-                crate::protocol::DialogueChoice {
-                    id: "close".to_string(),
-                    text: "Nevermind".to_string(),
-                },
-            ],
-        }).await;
-    }
-
-    /// Show the farming contract dialogue
-    async fn show_contract_dialogue(&self, player_id: &str, npc_id: &str) {
-        let npc_name = {
-            let npcs = self.npcs.read().await;
-            npcs.get(npc_id)
-                .map(|n| {
-                    self.entity_registry
-                        .get(&n.prototype_id)
-                        .map(|p| p.display_name.clone())
-                        .unwrap_or_else(|| "Master Farmer".to_string())
-                })
-                .unwrap_or_else(|| "Master Farmer".to_string())
-        };
-
-        let farming_level = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) => p.skills.farming.level,
-                None => return,
-            }
-        };
-
-        let farming = self.farming.read().await;
-
-        if let Some(contract) = farming.get_contract(player_id) {
-            let crop_name = farming
-                .crops
-                .get(&contract.crop_id)
-                .map(|c| c.produce_item.clone())
-                .unwrap_or_else(|| contract.crop_id.clone());
-
-            if contract.is_complete() {
-                // Contract completed - show claim dialogue
-                let text = format!(
-                    "Well done! You've completed your {} contract. Harvested: {}/{} {}. Rewards: {} Farming XP, {}gp, and {} bonus seed(s).",
-                    contract.difficulty.display_name(),
-                    contract.amount_harvested,
-                    contract.amount_required,
-                    crop_name,
-                    contract.difficulty.xp_reward(),
-                    contract.difficulty.gold_reward(),
-                    contract.difficulty.seed_reward_count(),
-                );
-
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::ShowDialogue {
-                        quest_id: format!("plot_seller:{}", npc_id),
-                        npc_id: npc_id.to_string(),
-                        speaker: npc_name,
-                        text,
-                        choices: vec![
-                            crate::protocol::DialogueChoice {
-                                id: "claim_contract".to_string(),
-                                text: "Claim rewards".to_string(),
-                            },
-                            crate::protocol::DialogueChoice {
-                                id: "nevermind".to_string(),
-                                text: "Go back".to_string(),
-                            },
-                        ],
-                    },
-                )
-                .await;
-            } else {
-                // Contract in progress - show progress
-                let text = format!(
-                    "You have an active {} contract: Harvest {} {} ({}/{}). Keep at it!",
-                    contract.difficulty.display_name(),
-                    contract.amount_required,
-                    crop_name,
-                    contract.amount_harvested,
-                    contract.amount_required,
-                );
-
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::ShowDialogue {
-                        quest_id: format!("plot_seller:{}", npc_id),
-                        npc_id: npc_id.to_string(),
-                        speaker: npc_name,
-                        text,
-                        choices: vec![
-                            crate::protocol::DialogueChoice {
-                                id: "abandon_contract".to_string(),
-                                text: "Abandon contract".to_string(),
-                            },
-                            crate::protocol::DialogueChoice {
-                                id: "nevermind".to_string(),
-                                text: "Go back".to_string(),
-                            },
-                        ],
-                    },
-                )
-                .await;
-            }
-        } else {
-            // No active contract - show difficulty selection
-            let mut choices = Vec::new();
-            let difficulties = [
-                crate::farming::ContractDifficulty::Easy,
-                crate::farming::ContractDifficulty::Medium,
-                crate::farming::ContractDifficulty::Hard,
-            ];
-
-            for diff in &difficulties {
-                if farming_level >= diff.level_required() {
-                    choices.push(crate::protocol::DialogueChoice {
-                        id: format!("accept_{}", diff.as_str()),
-                        text: format!(
-                            "{} - {}xp, {}gp",
-                            diff.display_name(),
-                            diff.xp_reward(),
-                            diff.gold_reward()
-                        ),
-                    });
-                } else {
-                    choices.push(crate::protocol::DialogueChoice {
-                        id: format!("locked_{}", diff.as_str()),
-                        text: format!(
-                            "{} (Requires Farming {})",
-                            diff.display_name(),
-                            diff.level_required()
-                        ),
-                    });
-                }
-            }
-
-            choices.push(crate::protocol::DialogueChoice {
-                id: "nevermind".to_string(),
-                text: "Go back".to_string(),
-            });
-
-            self.send_to_player(player_id, ServerMessage::ShowDialogue {
-                quest_id: format!("plot_seller:{}", npc_id),
-                npc_id: npc_id.to_string(),
-                speaker: npc_name,
-                text: "I've got work that needs doing. Pick a contract and harvest the crops I need. You can have one active contract at a time.".to_string(),
-                choices,
-            }).await;
-        }
-    }
-
-    /// Handle a player accepting a farming contract
-    async fn handle_accept_contract(&self, player_id: &str, difficulty_str: &str) {
-        let difficulty = match crate::farming::ContractDifficulty::from_str(difficulty_str) {
-            Some(d) => d,
-            None => {
-                self.send_system_message(player_id, "Invalid contract difficulty.")
-                    .await;
-                return;
-            }
-        };
-
-        let farming_level = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) => p.skills.farming.level,
-                None => return,
-            }
-        };
-
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-
-        let (crop_name, amount) = {
-            let mut farming = self.farming.write().await;
-            match farming.generate_contract(player_id, &difficulty, farming_level, current_time) {
-                Ok(contract) => {
-                    let crop_id = contract.crop_id.clone();
-                    let amount = contract.amount_required;
-                    let crop_name = farming
-                        .crops
-                        .get(&crop_id)
-                        .map(|c| c.produce_item.clone())
-                        .unwrap_or_else(|| crop_id);
-                    (crop_name, amount)
-                }
-                Err(e) => {
-                    self.send_system_message(player_id, &e).await;
-                    return;
-                }
-            }
-        };
-
-        // Persist to database
-        if let Some(ref db) = self.db {
-            let farming = self.farming.read().await;
-            if let Some(contract) = farming.get_contract(player_id) {
-                if let Err(e) = db
-                    .save_farming_contract(
-                        player_id,
-                        contract.difficulty.as_str(),
-                        &contract.crop_id,
-                        contract.amount_required,
-                        contract.amount_harvested,
-                        contract.created_at,
-                    )
-                    .await
-                {
-                    tracing::error!("Failed to save farming contract: {}", e);
-                }
-            }
-        }
-
-        self.send_system_message(
-            player_id,
-            &format!("Contract accepted! Harvest {} {}.", amount, crop_name),
-        )
-        .await;
-
-        // Send contract update to client
-        self.send_farming_contract_update(player_id).await;
-    }
-
-    /// Handle a player claiming a completed farming contract
-    async fn handle_claim_contract(&self, player_id: &str) {
-        // Get contract info and verify complete
-        let contract_info = {
-            let farming = self.farming.read().await;
-            match farming.get_contract(player_id) {
-                Some(c) if c.is_complete() => Some((
-                    c.difficulty.xp_reward(),
-                    c.difficulty.gold_reward(),
-                    c.difficulty.seed_reward_count(),
-                    c.difficulty.display_name().to_string(),
-                )),
-                Some(_) => {
-                    drop(farming);
-                    self.send_system_message(player_id, "Your contract isn't complete yet.")
-                        .await;
-                    return;
-                }
-                None => {
-                    drop(farming);
-                    self.send_system_message(player_id, "You don't have an active contract.")
-                        .await;
-                    return;
-                }
-            }
-        };
-
-        let (xp_reward, gold_reward, seed_count, diff_name) = contract_info.unwrap();
-
-        // Grant rewards
-        let farming = self.farming.read().await;
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) => p,
-            None => return,
-        };
-
-        player.inventory.gold += gold_reward;
-
-        let mut seed_names = Vec::new();
-        for _ in 0..seed_count {
-            if let Some(seed_id) = farming.random_seed_for_level(player.skills.farming.level) {
-                let seed_name = self
-                    .item_registry
-                    .get(&seed_id)
-                    .map(|d| d.display_name.clone())
-                    .unwrap_or_else(|| seed_id.clone());
-                player.inventory.add_item(&seed_id, 1, &self.item_registry);
-                seed_names.push(seed_name);
-            }
-        }
-
-        let leveled = player.skills.farming.add_xp(xp_reward);
-        let skill_xp = player.skills.farming.xp;
-        let skill_level = player.skills.farming.level;
-        let inv_slots = player.inventory.to_update();
-        let gold = player.inventory.gold;
-
-        drop(players);
-        drop(farming);
-
-        // Remove contract from memory
-        {
-            let mut farming = self.farming.write().await;
-            farming.remove_contract(player_id);
-        }
-
-        // Delete from database
-        if let Some(ref db) = self.db {
-            if let Err(e) = db.delete_farming_contract(player_id).await {
-                tracing::error!("Failed to delete farming contract: {}", e);
-            }
-        }
-
-        // Send inventory update
-        self.send_to_player(
-            player_id,
-            ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots: inv_slots,
-                gold,
-            },
-        )
-        .await;
-
-        // Send XP gain
-        self.send_to_player(
-            player_id,
-            ServerMessage::SkillXp {
-                player_id: player_id.to_string(),
-                skill: "farming".to_string(),
-                xp_gained: xp_reward,
-                total_xp: skill_xp,
-                level: skill_level,
-            },
-        )
-        .await;
-
-        if leveled {
-            self.broadcast(ServerMessage::SkillLevelUp {
-                player_id: player_id.to_string(),
-                skill: "farming".to_string(),
-                new_level: skill_level,
-            })
-            .await;
-            self.process_quest_progression_snapshot(player_id).await;
-        }
-
-        let seed_text = if seed_names.is_empty() {
-            String::new()
-        } else {
-            format!(" and {}", seed_names.join(", "))
-        };
-
-        self.send_system_message(
-            player_id,
-            &format!(
-                "{} contract complete! Received {} Farming XP, {}gp{}.",
-                diff_name, xp_reward, gold_reward, seed_text
-            ),
-        )
-        .await;
-
-        // Send cleared contract to client
-        self.send_farming_contract_update(player_id).await;
-    }
-
-    /// Handle a player abandoning a farming contract
-    async fn handle_abandon_contract(&self, player_id: &str) {
-        {
-            let mut farming = self.farming.write().await;
-            if farming.remove_contract(player_id).is_none() {
-                self.send_system_message(player_id, "You don't have an active contract.")
-                    .await;
-                return;
-            }
-        }
-
-        if let Some(ref db) = self.db {
-            if let Err(e) = db.delete_farming_contract(player_id).await {
-                tracing::error!("Failed to delete farming contract: {}", e);
-            }
-        }
-
-        self.send_system_message(player_id, "Contract abandoned.")
-            .await;
-
-        // Send cleared contract to client
-        self.send_farming_contract_update(player_id).await;
-    }
-
-    /// Handle a player purchasing a farming plot
-    async fn handle_plot_purchase(&self, player_id: &str, plot_id: u32) {
-        // Find the plot requirement
-        let req = match crate::farming::PLOT_REQUIREMENTS
-            .iter()
-            .find(|r| r.plot_id == plot_id)
-        {
-            Some(r) => r,
-            None => {
-                self.send_system_message(player_id, "Invalid plot.").await;
-                return;
-            }
-        };
-
-        // Check not already unlocked
-        {
-            let farming = self.farming.read().await;
-            if farming.is_plot_unlocked(player_id, plot_id) {
-                self.send_system_message(player_id, "You already own this plot.")
-                    .await;
-                return;
-            }
-        }
-
-        // Check farming level and gold
-        let (farming_level, gold) = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) => (p.skills.farming.level, p.inventory.gold),
-                None => return,
-            }
-        };
-
-        if farming_level < req.farming_level {
-            self.send_system_message(
-                player_id,
-                &format!(
-                    "You need Farming level {} to unlock this plot.",
-                    req.farming_level
-                ),
-            )
-            .await;
-            return;
-        }
-
-        if gold < req.gold_cost {
-            self.send_system_message(
-                player_id,
-                &format!(
-                    "You need {}gp to unlock this plot. You have {}gp.",
-                    req.gold_cost, gold
-                ),
-            )
-            .await;
-            return;
-        }
-
-        // Deduct gold
-        let inv_update = {
-            let mut players = self.players.write().await;
-            let player = match players.get_mut(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-            player.inventory.gold -= req.gold_cost;
-            (player.inventory.to_update(), player.inventory.gold)
-        };
-
-        // Send inventory update (gold changed)
-        self.send_to_player(
-            player_id,
-            ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots: inv_update.0,
-                gold: inv_update.1,
-            },
-        )
-        .await;
-
-        // Unlock the plot
-        {
-            let mut farming = self.farming.write().await;
-            farming.unlock_plot(player_id, plot_id);
-        }
-
-        // Persist to database
-        if let Some(ref db) = self.db {
-            if let Err(e) = db.save_plot_unlock(player_id, plot_id).await {
-                tracing::error!("Failed to save plot unlock: {}", e);
-            }
-        }
-
-        // Send success message
-        self.send_system_message(
-            player_id,
-            &format!(
-                "You've unlocked Plot {}! 16 new allotment patches are now available.",
-                plot_id
-            ),
-        )
-        .await;
-
-        // Send updated farming patches (now includes newly unlocked plot)
-        let patches_msg = self.get_farming_patches_message(player_id).await;
-        self.send_to_player(player_id, patches_msg).await;
-    }
-
-    /// Get farming patch states message for a specific connecting client
-    pub async fn get_farming_patches_message(&self, player_id: &str) -> ServerMessage {
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-        let farming = self.farming.read().await;
-        let updates = farming.get_player_patch_states(player_id, current_time);
-        let patches = updates
-            .into_iter()
-            .map(|u| {
-                let patch = farming.patches.get(&u.patch_id).unwrap();
-                crate::protocol::FarmingPatchData {
-                    patch_id: u.patch_id,
-                    x: patch.x,
-                    y: patch.y,
-                    state: u.state,
-                    crop_id: u.crop_id,
-                    growth_stage: u.growth_stage,
-                    owner_id: u.owner_id,
-                }
-            })
-            .collect();
-        let unlocked_plots = farming.get_unlocked_plots(player_id);
-
-        // Build tile overrides for all farming patches (locked=65, unlocked=62)
-        let tile_overrides = farming
-            .patches
-            .values()
-            .map(|patch| {
-                let tile_id = if farming.is_plot_unlocked(player_id, patch.plot) {
-                    62
-                } else {
-                    65
-                };
-                crate::protocol::TileOverride {
-                    x: patch.x,
-                    y: patch.y,
-                    tile_id,
-                }
-            })
-            .collect();
-
-        ServerMessage::FarmingPatchStates {
-            patches,
-            unlocked_plots,
-            tile_overrides,
-        }
-    }
-
-    /// Build farming contract state message for a player
-    pub async fn get_farming_contract_message(&self, player_id: &str) -> ServerMessage {
-        let farming = self.farming.read().await;
-        match farming.get_contract(player_id) {
-            Some(contract) => {
-                let crop_name = farming
-                    .crops
-                    .get(&contract.crop_id)
-                    .map(|c| c.produce_item.clone())
-                    .unwrap_or_else(|| contract.crop_id.clone());
-                ServerMessage::FarmingContractUpdate {
-                    active: true,
-                    difficulty: contract.difficulty.display_name().to_string(),
-                    crop_name,
-                    amount_required: contract.amount_required,
-                    amount_harvested: contract.amount_harvested,
-                }
-            }
-            None => ServerMessage::FarmingContractUpdate {
-                active: false,
-                difficulty: String::new(),
-                crop_name: String::new(),
-                amount_required: 0,
-                amount_harvested: 0,
-            },
-        }
-    }
-
-    /// Send farming contract state to a player (active contract or cleared)
-    pub async fn send_farming_contract_update(&self, player_id: &str) {
-        let msg = self.get_farming_contract_message(player_id).await;
-        self.send_to_player(player_id, msg).await;
     }
 
     // ========================================================================
@@ -12434,9 +8106,7 @@ impl GameRoom {
                     for other_id in &other_players {
                         self.send_to_player(
                             other_id,
-                            ServerMessage::PlayerLeft {
-                                id: id.to_string(),
-                            },
+                            ServerMessage::PlayerLeft { id: id.to_string() },
                         )
                         .await;
                         self.send_to_player(
@@ -12492,7 +8162,8 @@ impl GameRoom {
         {
             let mut players = self.players.write().await;
             for player in players.values_mut().filter(|p| p.active && !p.is_dead) {
-                if (player.move_dx == 0 && player.move_dy == 0) || player.pending_move_seq.is_none() {
+                if (player.move_dx == 0 && player.move_dy == 0) || player.pending_move_seq.is_none()
+                {
                     continue;
                 }
 
@@ -12818,8 +8489,13 @@ impl GameRoom {
                                     let new_target_y = player.y + new_dy;
                                     let move_dir =
                                         Direction::from_velocity(new_dx as f32, new_dy as f32);
-                                    match check_move(&id, new_target_x, new_target_y, move_dir, true)
-                                    {
+                                    match check_move(
+                                        &id,
+                                        new_target_x,
+                                        new_target_y,
+                                        move_dir,
+                                        true,
+                                    ) {
                                         MoveCheck::Valid => {
                                             player.direction = move_dir;
                                             player.x = new_target_x;
@@ -12828,16 +8504,23 @@ impl GameRoom {
                                             player.mark_move_seq_processed(new_seq);
                                             moved_players.insert(id.clone());
                                             if !self.quest_locations.is_empty() {
-                                                moved_positions
-                                                    .push((id.clone(), new_target_x, new_target_y));
+                                                moved_positions.push((
+                                                    id.clone(),
+                                                    new_target_x,
+                                                    new_target_y,
+                                                ));
                                             }
                                             if player.pending_move_seq == Some(new_seq) {
                                                 player.clear_move_intent();
                                             }
                                         }
                                         MoveCheck::AutoSit => {
-                                            auto_sit_requests
-                                                .push((id.clone(), new_target_x, new_target_y, new_seq));
+                                            auto_sit_requests.push((
+                                                id.clone(),
+                                                new_target_x,
+                                                new_target_y,
+                                                new_seq,
+                                            ));
                                         }
                                         _ => {}
                                     }
@@ -13089,7 +8772,11 @@ impl GameRoom {
                     mp: player.mp,
                     max_mp: player.max_mp(),
                     has_stall: player.stall.as_ref().map_or(false, |s| s.active),
-                    stall_name: player.stall.as_ref().filter(|s| s.active).map(|s| s.name.clone()),
+                    stall_name: player
+                        .stall
+                        .as_ref()
+                        .filter(|s| s.active)
+                        .map(|s| s.name.clone()),
                 });
             }
             player_updates
@@ -13151,372 +8838,7 @@ impl GameRoom {
             }
         }
 
-        // Check timed crafting completions
-        {
-            use crate::crafting::definition::RecipeCategory;
-
-            // Phase 1: Collect completed crafts (write lock for batch continuation)
-            struct CraftCompletion {
-                pid: String,
-                recipe_id: String,
-                items_gained: Vec<(String, u32)>,
-                xp_gained: u32,
-                is_smithing: bool,
-                is_alchemy: bool,
-                is_survivalist: bool,
-                inv_update: Vec<crate::item::InventorySlotUpdate>,
-                gold: i32,
-                smithing_xp: i64,
-                smithing_total_xp: i64,
-                smithing_level: i32,
-                smithing_leveled: bool,
-                alchemy_xp: i64,
-                alchemy_total_xp: i64,
-                alchemy_level: i32,
-                alchemy_leveled: bool,
-                survivalist_xp: i64,
-                survivalist_total_xp: i64,
-                survivalist_level: i32,
-                survivalist_leveled: bool,
-                // Batch info
-                batch_continued: bool, // true if next batch craft was started
-                batch_completed: u32,  // how many have completed so far
-                batch_total: u32,      // original total
-            }
-
-            let completions = {
-                let mut players = self.players.write().await;
-                let mut completions: Vec<CraftCompletion> = Vec::new();
-
-                let player_ids: Vec<String> = players.keys().cloned().collect();
-                for pid in player_ids {
-                    let player = players.get_mut(&pid).unwrap();
-                    if !player.active || player.is_dead {
-                        continue;
-                    }
-
-                    let should_complete = player.crafting_state.as_ref().map_or(false, |cs| {
-                        cs.started_at.elapsed().as_millis() as u64 >= cs.duration_ms
-                    });
-
-                    if !should_complete {
-                        continue;
-                    }
-
-                    let crafting = player.crafting_state.take().unwrap();
-                    let recipe = match self.crafting_registry.get(&crafting.recipe_id) {
-                        Some(r) => r.clone(),
-                        None => continue,
-                    };
-
-                    // Check burn for cooking recipes
-                    let burned = check_burn(&recipe, player.skills.survivalist.level);
-
-                    // Add results to inventory (burnt item if burned)
-                    let mut items_gained = Vec::new();
-                    if burned {
-                        let burn_item = recipe.burn_result.as_ref().unwrap();
-                        player
-                            .inventory
-                            .add_item(burn_item, 1, &self.item_registry);
-                        items_gained.push((burn_item.clone(), 1));
-                    } else {
-                        for result in &recipe.results {
-                            player.inventory.add_item(
-                                &result.item_id,
-                                result.count,
-                                &self.item_registry,
-                            );
-                            items_gained.push((result.item_id.clone(), result.count as u32));
-                        }
-                    }
-
-                    // Award crafting skill XP if applicable (half if burned)
-                    let xp_gained = if burned { recipe.xp / 2 } else { recipe.xp };
-                    let is_smithing = recipe.category == RecipeCategory::Smithing;
-                    let is_alchemy = recipe.category == RecipeCategory::Alchemy;
-                    let is_survivalist = matches!(
-                        recipe.category,
-                        RecipeCategory::Cooking
-                            | RecipeCategory::Fletching
-                            | RecipeCategory::Leatherworking
-                    );
-                    let (smithing_xp, smithing_total_xp, smithing_level, smithing_leveled) =
-                        if xp_gained > 0 && is_smithing {
-                            let leveled = player.skills.smithing.add_xp(xp_gained as i64);
-                            (
-                                xp_gained as i64,
-                                player.skills.smithing.xp,
-                                player.skills.smithing.level,
-                                leveled,
-                            )
-                        } else {
-                            (0, 0, 0, false)
-                        };
-                    let (alchemy_xp, alchemy_total_xp, alchemy_level, alchemy_leveled) =
-                        if xp_gained > 0 && is_alchemy {
-                            let leveled = player.skills.alchemy.add_xp(xp_gained as i64);
-                            (
-                                xp_gained as i64,
-                                player.skills.alchemy.xp,
-                                player.skills.alchemy.level,
-                                leveled,
-                            )
-                        } else {
-                            (0, 0, 0, false)
-                        };
-                    let (
-                        survivalist_xp,
-                        survivalist_total_xp,
-                        survivalist_level,
-                        survivalist_leveled,
-                    ) = if xp_gained > 0 && is_survivalist {
-                        let leveled = player.skills.survivalist.add_xp(xp_gained as i64);
-                        (
-                            xp_gained as i64,
-                            player.skills.survivalist.xp,
-                            player.skills.survivalist.level,
-                            leveled,
-                        )
-                    } else {
-                        (0, 0, 0, false)
-                    };
-
-                    let batch_total = crafting.batch_total;
-                    let completed_count = batch_total - crafting.batch_remaining;
-
-                    // Batch continuation: if more crafts remain, try to start next one
-                    let batch_continued = if crafting.batch_remaining > 0 {
-                        // Check ingredients for next craft
-                        let has_ingredients = recipe
-                            .ingredients
-                            .iter()
-                            .all(|i| player.inventory.has_item(&i.item_id, i.count));
-                        let has_space = recipe.results.iter().all(|r| {
-                            player
-                                .inventory
-                                .has_space_for(&r.item_id, r.count, &self.item_registry)
-                        });
-
-                        if has_ingredients && has_space {
-                            // Consume materials for next craft
-                            let mut next_consumed = Vec::new();
-                            for ingredient in &recipe.ingredients {
-                                player
-                                    .inventory
-                                    .remove_item(&ingredient.item_id, ingredient.count);
-                                next_consumed.push((ingredient.item_id.clone(), ingredient.count));
-                            }
-                            player.crafting_state = Some(CraftingState {
-                                recipe_id: crafting.recipe_id.clone(),
-                                started_at: std::time::Instant::now(),
-                                duration_ms: recipe.craft_time_ms,
-                                consumed_materials: next_consumed,
-                                batch_remaining: crafting.batch_remaining - 1,
-                                batch_total,
-                            });
-                            true
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    };
-
-                    completions.push(CraftCompletion {
-                        pid: pid.clone(),
-                        recipe_id: crafting.recipe_id,
-                        items_gained,
-                        xp_gained,
-                        is_smithing,
-                        is_alchemy,
-                        is_survivalist,
-                        inv_update: player.inventory.to_update(),
-                        gold: player.inventory.gold,
-                        smithing_xp,
-                        smithing_total_xp,
-                        smithing_level,
-                        smithing_leveled,
-                        alchemy_xp,
-                        alchemy_total_xp,
-                        alchemy_level,
-                        alchemy_leveled,
-                        survivalist_xp,
-                        survivalist_total_xp,
-                        survivalist_level,
-                        survivalist_leveled,
-                        batch_continued,
-                        batch_completed: completed_count,
-                        batch_total,
-                    });
-                }
-                completions
-            };
-
-            // Phase 2: Send messages (no locks held)
-            for comp in completions {
-                tracing::info!(
-                    "Player {} completed timed craft {} (gained {:?})",
-                    comp.pid,
-                    comp.recipe_id,
-                    comp.items_gained
-                );
-
-                self.send_to_player(
-                    &comp.pid,
-                    ServerMessage::CraftingCompleted {
-                        recipe_id: comp.recipe_id.clone(),
-                        items_gained: comp.items_gained.clone(),
-                        xp_gained: comp.xp_gained,
-                    },
-                )
-                .await;
-
-                // Process quest item collection for crafted items
-                for (item_id_gained, count) in &comp.items_gained {
-                    self.process_quest_item_collect(&comp.pid, item_id_gained, *count as i32)
-                        .await;
-                }
-
-                self.send_to_player(
-                    &comp.pid,
-                    ServerMessage::InventoryUpdate {
-                        player_id: comp.pid.clone(),
-                        slots: comp.inv_update,
-                        gold: comp.gold,
-                    },
-                )
-                .await;
-
-                // Send smithing XP if applicable
-                if comp.is_smithing && comp.smithing_xp > 0 {
-                    self.send_to_player(
-                        &comp.pid,
-                        ServerMessage::SkillXp {
-                            player_id: comp.pid.clone(),
-                            skill: "smithing".to_string(),
-                            xp_gained: comp.smithing_xp,
-                            total_xp: comp.smithing_total_xp,
-                            level: comp.smithing_level,
-                        },
-                    )
-                    .await;
-
-                    if comp.smithing_leveled {
-                        tracing::info!(
-                            "Player {} leveled up smithing to {}",
-                            comp.pid,
-                            comp.smithing_level
-                        );
-                        self.broadcast(ServerMessage::SkillLevelUp {
-                            player_id: comp.pid.clone(),
-                            skill: "smithing".to_string(),
-                            new_level: comp.smithing_level,
-                        })
-                        .await;
-                    }
-                }
-
-                // Send alchemy XP if applicable
-                if comp.is_alchemy && comp.alchemy_xp > 0 {
-                    self.send_to_player(
-                        &comp.pid,
-                        ServerMessage::SkillXp {
-                            player_id: comp.pid.clone(),
-                            skill: "alchemy".to_string(),
-                            xp_gained: comp.alchemy_xp,
-                            total_xp: comp.alchemy_total_xp,
-                            level: comp.alchemy_level,
-                        },
-                    )
-                    .await;
-
-                    if comp.alchemy_leveled {
-                        tracing::info!(
-                            "Player {} leveled up alchemy to {}",
-                            comp.pid,
-                            comp.alchemy_level
-                        );
-                        self.broadcast(ServerMessage::SkillLevelUp {
-                            player_id: comp.pid.clone(),
-                            skill: "alchemy".to_string(),
-                            new_level: comp.alchemy_level,
-                        })
-                        .await;
-                    }
-                }
-
-                // Send survivalist XP if applicable
-                if comp.is_survivalist && comp.survivalist_xp > 0 {
-                    self.send_to_player(
-                        &comp.pid,
-                        ServerMessage::SkillXp {
-                            player_id: comp.pid.clone(),
-                            skill: "survivalist".to_string(),
-                            xp_gained: comp.survivalist_xp,
-                            total_xp: comp.survivalist_total_xp,
-                            level: comp.survivalist_level,
-                        },
-                    )
-                    .await;
-
-                    if comp.survivalist_leveled {
-                        tracing::info!(
-                            "Player {} leveled up survivalist to {}",
-                            comp.pid,
-                            comp.survivalist_level
-                        );
-                        self.broadcast(ServerMessage::SkillLevelUp {
-                            player_id: comp.pid.clone(),
-                            skill: "survivalist".to_string(),
-                            new_level: comp.survivalist_level,
-                        })
-                        .await;
-                    }
-                }
-
-                // Sync quest objectives on any skill level-up
-                if comp.smithing_leveled || comp.alchemy_leveled || comp.survivalist_leveled {
-                    self.process_quest_progression_snapshot(&comp.pid).await;
-                }
-
-                // Batch continuation: send next crafting started + progress
-                if comp.batch_continued {
-                    // Look up recipe for duration
-                    let duration = self
-                        .crafting_registry
-                        .get(&comp.recipe_id)
-                        .map(|r| r.craft_time_ms)
-                        .unwrap_or(2000);
-                    self.send_to_player(
-                        &comp.pid,
-                        ServerMessage::CraftingStarted {
-                            recipe_id: comp.recipe_id,
-                            duration_ms: duration,
-                        },
-                    )
-                    .await;
-                    self.send_to_player(
-                        &comp.pid,
-                        ServerMessage::CraftingBatchProgress {
-                            completed: comp.batch_completed,
-                            total: comp.batch_total,
-                        },
-                    )
-                    .await;
-                } else if comp.batch_total > 1 {
-                    // Batch ended (ran out of materials/space or completed all)
-                    self.send_to_player(
-                        &comp.pid,
-                        ServerMessage::CraftingBatchProgress {
-                            completed: comp.batch_completed,
-                            total: comp.batch_total,
-                        },
-                    )
-                    .await;
-                }
-            }
-        }
+        self.process_timed_crafting_completions().await;
 
         let pre_npc_ms = pre_npc_start.elapsed().as_millis();
         let npc_world_start = std::time::Instant::now();
@@ -13887,9 +9209,9 @@ impl GameRoom {
                     if let Some(player) = players.get(&target_id) {
                         match &player.auto_action {
                             Some(auto_action) => match &auto_action.target {
-                                AutoActionTarget::Npc { npc_id: action_npc_id } => {
-                                    *action_npc_id != npc_id
-                                }
+                                AutoActionTarget::Npc {
+                                    npc_id: action_npc_id,
+                                } => *action_npc_id != npc_id,
                                 _ => true,
                             },
                             None => false,
@@ -13969,15 +9291,19 @@ impl GameRoom {
 
                         // Validate NPC target is still alive (check instance or overworld)
                         let (npc_alive, npc_pos) = if let Some(ref inst_id) = player_inst {
-                            if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                            if let Some(instance) =
+                                self.instance_manager.get_by_instance_id(inst_id)
+                            {
                                 let npcs = instance.npcs.read().await;
-                                npcs.get(npc_id).map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y))))
+                                npcs.get(npc_id)
+                                    .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y))))
                             } else {
                                 (false, None)
                             }
                         } else {
                             let npcs = self.npcs.read().await;
-                            npcs.get(npc_id).map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y))))
+                            npcs.get(npc_id)
+                                .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y))))
                         };
 
                         if !npc_alive {
@@ -13991,25 +9317,20 @@ impl GameRoom {
                             if let Some(player) = players.get(&pid) {
                                 let dx = (player.x - npc_x).abs();
                                 let dy = (player.y - npc_y).abs();
-                                let weapon_range = if let Some(ref weapon_id) =
-                                    player.equipped_weapon
-                                {
-                                    if let Some(item_def) = self.item_registry.get(weapon_id) {
-                                        item_def
-                                            .equipment
-                                            .as_ref()
-                                            .map_or(1, |e| e.range)
+                                let weapon_range =
+                                    if let Some(ref weapon_id) = player.equipped_weapon {
+                                        if let Some(item_def) = self.item_registry.get(weapon_id) {
+                                            item_def.equipment.as_ref().map_or(1, |e| e.range)
+                                        } else {
+                                            1
+                                        }
                                     } else {
                                         1
-                                    }
-                                } else {
-                                    1
-                                };
+                                    };
                                 let in_range = if weapon_range == 1 {
                                     (dx + dy) == 1
                                 } else {
-                                    dx <= weapon_range && dy <= weapon_range
-                                        && (dx > 0 || dy > 0)
+                                    dx <= weapon_range && dy <= weapon_range && (dx > 0 || dy > 0)
                                 };
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
@@ -14039,7 +9360,12 @@ impl GameRoom {
                         }
                     }
 
-                    (AutoActionTarget::Player { player_id: target_pid }, AutoActionType::Attack) => {
+                    (
+                        AutoActionTarget::Player {
+                            player_id: target_pid,
+                        },
+                        AutoActionType::Attack,
+                    ) => {
                         // Validate player target is still alive and connected
                         let target_valid = {
                             let players = self.players.read().await;
@@ -14070,26 +9396,21 @@ impl GameRoom {
                             {
                                 let dx = (attacker.x - target.x).abs();
                                 let dy = (attacker.y - target.y).abs();
-                                let weapon_range = if let Some(ref weapon_id) =
-                                    attacker.equipped_weapon
-                                {
-                                    if let Some(item_def) = self.item_registry.get(weapon_id) {
-                                        item_def
-                                            .equipment
-                                            .as_ref()
-                                            .map_or(1, |e| e.range)
+                                let weapon_range =
+                                    if let Some(ref weapon_id) = attacker.equipped_weapon {
+                                        if let Some(item_def) = self.item_registry.get(weapon_id) {
+                                            item_def.equipment.as_ref().map_or(1, |e| e.range)
+                                        } else {
+                                            1
+                                        }
                                     } else {
                                         1
-                                    }
-                                } else {
-                                    1
-                                };
+                                    };
                                 // Cardinal adjacency only for melee (dx+dy==range, no diagonal)
                                 let in_range = if weapon_range == 1 {
                                     (dx + dy) == 1
                                 } else {
-                                    dx <= weapon_range && dy <= weapon_range
-                                        && (dx > 0 || dy > 0)
+                                    dx <= weapon_range && dy <= weapon_range && (dx > 0 || dy > 0)
                                 };
                                 let cooldown_ready =
                                     current_time - attacker.last_attack_time >= ATTACK_COOLDOWN_MS;
@@ -14131,8 +9452,8 @@ impl GameRoom {
                         // Check cardinal adjacency, cooldown, and inventory space
                         let (adjacent, cooldown_ready, inventory_full) = {
                             let mining = self.mining.read().await;
-                            let ore_item_id = mining.get_ore_type(*gid)
-                                .map(|c| c.ore_item_id.clone());
+                            let ore_item_id =
+                                mining.get_ore_type(*gid).map(|c| c.ore_item_id.clone());
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
                                 let dx = (player.x - x).abs();
@@ -14141,7 +9462,9 @@ impl GameRoom {
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
                                 let inventory_full = if let Some(ref item_id) = ore_item_id {
-                                    !player.inventory.has_space_for(item_id, 1, &self.item_registry)
+                                    !player
+                                        .inventory
+                                        .has_space_for(item_id, 1, &self.item_registry)
                                 } else {
                                     false
                                 };
@@ -14184,7 +9507,8 @@ impl GameRoom {
                         // Check cardinal adjacency, cooldown, and inventory space
                         let (adjacent, cooldown_ready, inventory_full) = {
                             let woodcutting = self.woodcutting.read().await;
-                            let log_item_id = woodcutting.get_tree_type(*gid)
+                            let log_item_id = woodcutting
+                                .get_tree_type(*gid)
                                 .map(|c| c.log_item_id.clone());
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
@@ -14194,7 +9518,9 @@ impl GameRoom {
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
                                 let inventory_full = if let Some(ref item_id) = log_item_id {
-                                    !player.inventory.has_space_for(item_id, 1, &self.item_registry)
+                                    !player
+                                        .inventory
+                                        .has_space_for(item_id, 1, &self.item_registry)
                                 } else {
                                     false
                                 };
@@ -14236,7 +9562,9 @@ impl GameRoom {
             let items = self.ground_items.read().await;
             items
                 .iter()
-                .filter(|(id, item)| !id.starts_with("persistent_") && item.is_expired(current_time))
+                .filter(|(id, item)| {
+                    !id.starts_with("persistent_") && item.is_expired(current_time)
+                })
                 .map(|(id, _)| id.clone())
                 .collect()
         };
@@ -14267,7 +9595,14 @@ impl GameRoom {
                 for (spawn_id, item_id, x, y, quantity, instance_id) in respawns {
                     let ground_item_id = format!("persistent_{}", spawn_id);
                     let ground_item = crate::item::GroundItem::new_in_instance(
-                        &ground_item_id, &item_id, x, y, quantity, None, current_time, instance_id,
+                        &ground_item_id,
+                        &item_id,
+                        x,
+                        y,
+                        quantity,
+                        None,
+                        current_time,
+                        instance_id,
                     );
                     {
                         let mut items = self.ground_items.write().await;
@@ -14316,7 +9651,11 @@ impl GameRoom {
                             .max(1.0);
                         (
                             pid.clone(),
-                            (p.skills.fishing.level, effects.gather_speed_multiplier(), rod_speed),
+                            (
+                                p.skills.fishing.level,
+                                effects.gather_speed_multiplier(),
+                                rod_speed,
+                            ),
                         )
                     })
                 })
@@ -14336,9 +9675,13 @@ impl GameRoom {
             for pid in &gatherer_ids {
                 let (fishing_level, prayer_speed, rod_speed) =
                     gatherer_stats.get(pid).copied().unwrap_or((1, 1.0, 1.0));
-                if let Some(result) =
-                    gathering.tick_gathering(pid, fishing_level, current_time, prayer_speed, rod_speed)
-                {
+                if let Some(result) = gathering.tick_gathering(
+                    pid,
+                    fishing_level,
+                    current_time,
+                    prayer_speed,
+                    rod_speed,
+                ) {
                     results.push(GatherResult {
                         pid: pid.clone(),
                         item_id: result.item_id,
@@ -15074,12 +10417,19 @@ impl GameRoom {
                     let trades = self.trades.read().await;
                     if let Some(session) = trades.get(&trade_id) {
                         let players = self.players.read().await;
-                        match (players.get(&session.player_a), players.get(&session.player_b)) {
+                        match (
+                            players.get(&session.player_a),
+                            players.get(&session.player_b),
+                        ) {
                             (Some(a), Some(b)) => {
                                 let dx = (a.x - b.x).abs();
                                 let dy = (a.y - b.y).abs();
-                                dx > TRADE_MAX_DISTANCE || dy > TRADE_MAX_DISTANCE
-                                    || a.is_dead || b.is_dead || !a.active || !b.active
+                                dx > TRADE_MAX_DISTANCE
+                                    || dy > TRADE_MAX_DISTANCE
+                                    || a.is_dead
+                                    || b.is_dead
+                                    || !a.active
+                                    || !b.active
                             }
                             _ => true,
                         }
@@ -15098,7 +10448,9 @@ impl GameRoom {
                             pt.remove(&session.player_a);
                             pt.remove(&session.player_b);
                         }
-                        let msg = ServerMessage::TradeCancelled { reason: "Too far apart.".to_string() };
+                        let msg = ServerMessage::TradeCancelled {
+                            reason: "Too far apart.".to_string(),
+                        };
                         self.send_to_player(&session.player_a, msg.clone()).await;
                         self.send_to_player(&session.player_b, msg).await;
                     }
@@ -15116,16 +10468,21 @@ impl GameRoom {
         {
             let stall_owners: Vec<String> = {
                 let players = self.players.read().await;
-                players.values()
+                players
+                    .values()
                     .filter(|p| p.stall.as_ref().map_or(false, |s| s.active) && p.is_dead)
                     .map(|p| p.id.clone())
                     .collect()
             };
             for pid in stall_owners {
                 self.force_close_stall(&pid).await;
-                self.send_to_player(&pid, ServerMessage::StallClosed {
-                    reason: "Shop closed (you died).".to_string(),
-                }).await;
+                self.send_to_player(
+                    &pid,
+                    ServerMessage::StallClosed {
+                        reason: "Shop closed (you died).".to_string(),
+                    },
+                )
+                .await;
             }
         }
 
@@ -15383,60 +10740,6 @@ impl GameRoom {
                     }
                 }
             }
-        }
-    }
-
-    /// Restock all shops that have restock intervals
-    async fn restock_shops(&self) {
-        let mut shop_registry = self.shop_registry.write().await;
-        let npcs = self.npcs.read().await;
-
-        // Collect shops that need restocking by checking NPCs with merchant configs
-        let mut restocked_shops = Vec::new();
-
-        for proto in self.entity_registry.all() {
-            if let Some(merchant_config) = &proto.merchant {
-                // Check if this merchant has a restock interval
-                if merchant_config.restock_interval_minutes.is_some() {
-                    // Get and restock the shop
-                    if let Some(shop) = shop_registry.get_mut(&merchant_config.shop_id) {
-                        let changed_stock = shop.restock();
-                        if changed_stock.is_empty() {
-                            continue;
-                        }
-
-                        // Find all NPCs of this type to broadcast stock updates
-                        let npc_ids: Vec<String> = npcs
-                            .iter()
-                            .filter(|(_, npc)| npc.prototype_id == proto.id)
-                            .map(|(npc_id, _)| npc_id.clone())
-                            .collect();
-
-                        // Collect stock updates for broadcasting
-                        for npc_id in npc_ids {
-                            for (item_id, quantity) in &changed_stock {
-                                restocked_shops.push((npc_id.clone(), item_id.clone(), *quantity));
-                            }
-                        }
-
-                        tracing::info!(
-                            "Restocked shop '{}' for entity type '{}' ({} stock entries changed)",
-                            merchant_config.shop_id,
-                            proto.id,
-                            changed_stock.len(),
-                        );
-                    }
-                }
-            }
-        }
-
-        drop(shop_registry);
-        drop(npcs);
-
-        // Broadcast all stock updates
-        for (npc_id, item_id, quantity) in restocked_shops {
-            self.broadcast_shop_stock_update(&npc_id, &item_id, quantity)
-                .await;
         }
     }
 
@@ -16056,389 +11359,6 @@ impl GameRoom {
         }
     }
 
-    // =========================================================================
-    // Prayer System
-    // =========================================================================
-
-    /// Handle toggling a prayer on/off
-    pub async fn handle_toggle_prayer(&self, player_id: &str, prayer_id: &str) {
-        // Get prayer definition
-        let prayer = match self.prayer_registry.get(prayer_id) {
-            Some(p) => p.clone(),
-            None => {
-                tracing::warn!(
-                    "Player {} tried to toggle unknown prayer: {}",
-                    player_id,
-                    prayer_id
-                );
-                return;
-            }
-        };
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) => p,
-            None => return,
-        };
-
-        // Check if player is dead
-        if player.is_dead {
-            return;
-        }
-
-        // If prayer is already active, deactivate it
-        if player.active_prayers.contains(prayer_id) {
-            player.active_prayers.remove(prayer_id);
-            tracing::debug!("Player {} deactivated prayer: {}", player_id, prayer_id);
-        } else {
-            // Check prayer level requirement
-            if player.skills.prayer.level < prayer.level_req {
-                drop(players);
-                self.send_system_message(
-                    player_id,
-                    &format!(
-                        "You need Prayer level {} to use {}",
-                        prayer.level_req, prayer.name
-                    ),
-                )
-                .await;
-                return;
-            }
-
-            // Check if player has prayer points
-            if player.prayer_points <= 0 {
-                drop(players);
-                self.send_system_message(player_id, "You have no prayer points remaining")
-                    .await;
-                return;
-            }
-
-            // Check for category conflicts and deactivate conflicting prayer
-            let mut conflicting_prayer: Option<String> = None;
-            for active_id in &player.active_prayers {
-                if let Some(active_prayer) = self.prayer_registry.get(active_id) {
-                    if active_prayer.category == prayer.category {
-                        conflicting_prayer = Some(active_id.clone());
-                        break;
-                    }
-                }
-            }
-
-            // Deactivate conflicting prayer if any
-            if let Some(conflict_id) = conflicting_prayer {
-                player.active_prayers.remove(&conflict_id);
-                tracing::debug!(
-                    "Player {} deactivated conflicting prayer {} to activate {}",
-                    player_id,
-                    conflict_id,
-                    prayer_id
-                );
-            }
-
-            // Activate the new prayer
-            player.active_prayers.insert(prayer_id.to_string());
-            tracing::debug!("Player {} activated prayer: {}", player_id, prayer_id);
-        }
-
-        // Build and send prayer state update
-        let points = player.prayer_points;
-        let max_points = player.max_prayer_points();
-        let active_prayers: Vec<String> = player.active_prayers.iter().cloned().collect();
-        drop(players);
-
-        self.send_to_player(
-            player_id,
-            ServerMessage::PrayerStateUpdate {
-                points,
-                max_points,
-                active_prayers,
-            },
-        )
-        .await;
-    }
-
-    /// Handle burying bones from inventory
-    pub async fn handle_bury_bones(&self, player_id: &str, slot: usize) {
-        tracing::debug!("Player {} burying bones from slot: {}", player_id, slot);
-
-        // Get item info and validate it's bones
-        let (item_id, item_name, prayer_xp) = {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-
-            // Check if slot is valid and has an item
-            let slot_item = match player.inventory.slots.get(slot).and_then(|s| s.as_ref()) {
-                Some(item) => item,
-                None => {
-                    drop(players);
-                    self.send_system_message(player_id, "There's nothing in that slot.")
-                        .await;
-                    return;
-                }
-            };
-
-            let item_id = slot_item.item_id.clone();
-
-            // Get item definition
-            let item_def = match self.item_registry.get(&item_id) {
-                Some(def) => def,
-                None => {
-                    drop(players);
-                    self.send_system_message(player_id, "Unknown item.").await;
-                    return;
-                }
-            };
-
-            // Check if it's bones (has prayer_xp > 0)
-            if !item_def.is_bones() {
-                drop(players);
-                self.send_system_message(player_id, "You can only bury bones.")
-                    .await;
-                return;
-            }
-
-            (item_id, item_def.display_name.clone(), item_def.prayer_xp)
-        };
-
-        // Remove bones from inventory and award XP
-        let (inv_update, xp_result) = {
-            let mut players = self.players.write().await;
-            let player = match players.get_mut(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-
-            // Remove one bone from the slot
-            if let Some(ref mut slot_item) = player.inventory.slots[slot] {
-                slot_item.quantity -= 1;
-                if slot_item.quantity <= 0 {
-                    player.inventory.slots[slot] = None;
-                }
-            }
-
-            // Award Prayer XP
-            let leveled = player.skills.prayer.add_xp(prayer_xp as i64);
-            let xp_result = (
-                prayer_xp as i64,
-                player.skills.prayer.xp,
-                player.skills.prayer.level,
-                leveled,
-            );
-
-            // If leveled up, update max prayer points
-            if leveled {
-                player.prayer_points = player.max_prayer_points();
-            }
-
-            let inv_update = (player.inventory.to_update(), player.inventory.gold);
-
-            (inv_update, xp_result)
-        };
-
-        // Send chat message
-        self.send_system_message(
-            player_id,
-            &format!("You bury the {}.", item_name.to_lowercase()),
-        )
-        .await;
-
-        // Send inventory update
-        self.send_to_player(
-            player_id,
-            ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots: inv_update.0,
-                gold: inv_update.1,
-            },
-        )
-        .await;
-
-        // Send XP update
-        self.send_to_player(
-            player_id,
-            ServerMessage::SkillXp {
-                player_id: player_id.to_string(),
-                skill: "prayer".to_string(),
-                xp_gained: xp_result.0,
-                total_xp: xp_result.1,
-                level: xp_result.2,
-            },
-        )
-        .await;
-
-        // Broadcast level up if applicable
-        if xp_result.3 {
-            tracing::info!("Player {} leveled up Prayer to {}", player_id, xp_result.2);
-            self.broadcast(ServerMessage::SkillLevelUp {
-                player_id: player_id.to_string(),
-                skill: "prayer".to_string(),
-                new_level: xp_result.2,
-            })
-            .await;
-
-            // Send updated prayer state with new max points
-            let (points, max_points, active_prayers) = {
-                let players = self.players.read().await;
-                if let Some(player) = players.get(player_id) {
-                    (
-                        player.prayer_points,
-                        player.max_prayer_points(),
-                        player.active_prayers.iter().cloned().collect::<Vec<_>>(),
-                    )
-                } else {
-                    return;
-                }
-            };
-
-            self.send_to_player(
-                player_id,
-                ServerMessage::PrayerStateUpdate {
-                    points,
-                    max_points,
-                    active_prayers,
-                },
-            )
-            .await;
-
-            self.process_quest_progression_snapshot(player_id).await;
-        }
-    }
-
-    /// Handle praying at an altar to restore prayer points
-    pub async fn handle_pray_at_altar(&self, player_id: &str, altar_id: &str) {
-        tracing::debug!("Player {} praying at altar: {}", player_id, altar_id);
-
-        // Get player position
-        let player_pos = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => (p.x, p.y),
-                _ => return,
-            }
-        };
-
-        // Check if player is in an instance
-        let instance_id = {
-            let instances = self.player_instances.read().await;
-            instances.get(player_id).cloned()
-        };
-
-        // Get altar info and validate it's an altar
-        let altar_info = if let Some(ref _inst_id) = instance_id {
-            // Check instance NPCs
-            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
-                let npcs = instance.npcs.read().await;
-                npcs.get(altar_id).map(|npc| {
-                    let dx = (npc.x - player_pos.0) as f32;
-                    let dy = (npc.y - player_pos.1) as f32;
-                    let distance = (dx * dx + dy * dy).sqrt();
-                    (npc.prototype_id.clone(), distance)
-                })
-            } else {
-                None
-            }
-        } else {
-            // Check overworld NPCs
-            let npcs = self.npcs.read().await;
-            npcs.get(altar_id).map(|npc| {
-                let dx = (npc.x - player_pos.0) as f32;
-                let dy = (npc.y - player_pos.1) as f32;
-                let distance = (dx * dx + dy * dy).sqrt();
-                (npc.prototype_id.clone(), distance)
-            })
-        };
-
-        let (entity_type, distance) = match altar_info {
-            Some(info) => info,
-            None => {
-                self.send_system_message(player_id, "Altar not found.")
-                    .await;
-                return;
-            }
-        };
-
-        // Check distance
-        if distance > 2.5 {
-            self.send_system_message(player_id, "You need to be closer to the altar.")
-                .await;
-            return;
-        }
-
-        // Validate it's actually an altar
-        let is_altar = self
-            .entity_registry
-            .get(&entity_type)
-            .map(|proto| proto.behaviors.altar)
-            .unwrap_or(false);
-
-        if !is_altar {
-            self.send_system_message(player_id, "That's not an altar.")
-                .await;
-            return;
-        }
-
-        // Restore prayer points
-        let (restored, points, max_points, active_prayers) = {
-            let mut players = self.players.write().await;
-            let player = match players.get_mut(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-
-            let max_points = player.max_prayer_points();
-            let old_points = player.prayer_points;
-
-            if player.prayer_points >= max_points {
-                (
-                    0,
-                    max_points,
-                    max_points,
-                    player.active_prayers.iter().cloned().collect::<Vec<_>>(),
-                )
-            } else {
-                player.prayer_points = max_points;
-                let restored = max_points - old_points;
-                (
-                    restored,
-                    max_points,
-                    max_points,
-                    player.active_prayers.iter().cloned().collect::<Vec<_>>(),
-                )
-            }
-        };
-
-        if restored > 0 {
-            self.send_system_message(
-                player_id,
-                &format!(
-                    "You pray at the altar. Your prayer points have been restored. (+{} points)",
-                    restored
-                ),
-            )
-            .await;
-        } else {
-            self.send_system_message(
-                player_id,
-                "You pray at the altar. Your prayer is already full.",
-            )
-            .await;
-        }
-
-        // Send prayer state update
-        self.send_to_player(
-            player_id,
-            ServerMessage::PrayerStateUpdate {
-                points,
-                max_points,
-                active_prayers,
-            },
-        )
-        .await;
-    }
-
     /// Handle casting a spell
     pub async fn handle_cast_spell(&self, player_id: &str, spell_id: &str) {
         // 1. Resolve spell: check static spells first, then scroll spell registry
@@ -16576,7 +11496,15 @@ impl GameRoom {
         current_time: u64,
     ) {
         // 1. Get attacker info and target
-        let (caster_name, caster_x, caster_y, target_id_opt, magic_level, combat_level, magic_bonus) = {
+        let (
+            caster_name,
+            caster_x,
+            caster_y,
+            target_id_opt,
+            magic_level,
+            combat_level,
+            magic_bonus,
+        ) = {
             let players = self.players.read().await;
             let player = match players.get(player_id) {
                 Some(p) if !p.is_dead && p.active => p,
@@ -17619,458 +12547,31 @@ impl GameRoom {
         true
     }
 
-    /// Handle offering bones at an altar for bonus XP
-    pub async fn handle_offer_bones(&self, player_id: &str, slot: usize, altar_id: &str) {
-        tracing::debug!(
-            "Player {} offering bones at altar {} from slot {}",
-            player_id,
-            altar_id,
-            slot
-        );
-
-        // Get player position
-        let player_pos = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => (p.x, p.y),
-                _ => return,
-            }
-        };
-
-        // Check if player is in an instance
-        let instance_id = {
-            let instances = self.player_instances.read().await;
-            instances.get(player_id).cloned()
-        };
-
-        // Get altar info and validate it's an altar
-        let altar_info = if let Some(ref _inst_id) = instance_id {
-            // Check instance NPCs
-            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
-                let npcs = instance.npcs.read().await;
-                npcs.get(altar_id).map(|npc| {
-                    let dx = (npc.x - player_pos.0) as f32;
-                    let dy = (npc.y - player_pos.1) as f32;
-                    let distance = (dx * dx + dy * dy).sqrt();
-                    (npc.prototype_id.clone(), distance)
-                })
-            } else {
-                None
-            }
-        } else {
-            // Check overworld NPCs
-            let npcs = self.npcs.read().await;
-            npcs.get(altar_id).map(|npc| {
-                let dx = (npc.x - player_pos.0) as f32;
-                let dy = (npc.y - player_pos.1) as f32;
-                let distance = (dx * dx + dy * dy).sqrt();
-                (npc.prototype_id.clone(), distance)
-            })
-        };
-
-        let (entity_type, distance) = match altar_info {
-            Some(info) => info,
-            None => {
-                self.send_system_message(player_id, "Altar not found.")
-                    .await;
-                return;
-            }
-        };
-
-        // Check distance
-        if distance > 2.5 {
-            self.send_system_message(player_id, "You need to be closer to the altar.")
-                .await;
-            return;
-        }
-
-        // Validate it's actually an altar
-        let is_altar = self
-            .entity_registry
-            .get(&entity_type)
-            .map(|proto| proto.behaviors.altar)
-            .unwrap_or(false);
-
-        if !is_altar {
-            self.send_system_message(player_id, "That's not an altar.")
-                .await;
-            return;
-        }
-
-        // Get item info and validate it's bones
-        let (item_id, item_name, base_prayer_xp) = {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-
-            // Check if slot is valid and has an item
-            let slot_item = match player.inventory.slots.get(slot).and_then(|s| s.as_ref()) {
-                Some(item) => item,
-                None => {
-                    drop(players);
-                    self.send_system_message(player_id, "There's nothing in that slot.")
-                        .await;
-                    return;
-                }
-            };
-
-            let item_id = slot_item.item_id.clone();
-
-            // Get item definition
-            let item_def = match self.item_registry.get(&item_id) {
-                Some(def) => def,
-                None => {
-                    drop(players);
-                    self.send_system_message(player_id, "Unknown item.").await;
-                    return;
-                }
-            };
-
-            // Check if it's bones (has prayer_xp > 0)
-            if !item_def.is_bones() {
-                drop(players);
-                self.send_system_message(player_id, "You can only offer bones at the altar.")
-                    .await;
-                return;
-            }
-
-            (item_id, item_def.display_name.clone(), item_def.prayer_xp)
-        };
-
-        // Calculate altar XP bonus (~2.5x normal bury XP)
-        // Regular bones: 5 -> 12, Big bones: 15 -> 37, Dragon bones: 72 -> 180
-        let altar_xp = match item_id.as_str() {
-            "regular_bones" => 12,
-            "big_bones" => 37,
-            "dragon_bones" => 180,
-            _ => (base_prayer_xp as f32 * 2.5) as i32, // Fallback for other bone types
-        };
-
-        // Remove bones from inventory and award XP
-        let (inv_update, xp_result) = {
-            let mut players = self.players.write().await;
-            let player = match players.get_mut(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-
-            // Remove one bone from the slot
-            if let Some(ref mut slot_item) = player.inventory.slots[slot] {
-                slot_item.quantity -= 1;
-                if slot_item.quantity <= 0 {
-                    player.inventory.slots[slot] = None;
-                }
-            }
-
-            // Award Prayer XP (altar bonus)
-            let leveled = player.skills.prayer.add_xp(altar_xp as i64);
-            let xp_result = (
-                altar_xp as i64,
-                player.skills.prayer.xp,
-                player.skills.prayer.level,
-                leveled,
-            );
-
-            // If leveled up, update max prayer points
-            if leveled {
-                player.prayer_points = player.max_prayer_points();
-            }
-
-            let inv_update = (player.inventory.to_update(), player.inventory.gold);
-
-            (inv_update, xp_result)
-        };
-
-        // Send chat message
-        self.send_system_message(
-            player_id,
-            &format!(
-                "The gods are pleased with your offering. (+{} Prayer XP)",
-                altar_xp
-            ),
-        )
-        .await;
-
-        // Send inventory update
-        self.send_to_player(
-            player_id,
-            ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots: inv_update.0,
-                gold: inv_update.1,
-            },
-        )
-        .await;
-
-        // Send XP update
-        self.send_to_player(
-            player_id,
-            ServerMessage::SkillXp {
-                player_id: player_id.to_string(),
-                skill: "prayer".to_string(),
-                xp_gained: xp_result.0,
-                total_xp: xp_result.1,
-                level: xp_result.2,
-            },
-        )
-        .await;
-
-        // Broadcast level up if applicable
-        if xp_result.3 {
-            tracing::info!("Player {} leveled up Prayer to {}", player_id, xp_result.2);
-            self.broadcast(ServerMessage::SkillLevelUp {
-                player_id: player_id.to_string(),
-                skill: "prayer".to_string(),
-                new_level: xp_result.2,
-            })
-            .await;
-
-            // Send updated prayer state with new max points
-            let (points, max_points, active_prayers) = {
-                let players = self.players.read().await;
-                if let Some(player) = players.get(player_id) {
-                    (
-                        player.prayer_points,
-                        player.max_prayer_points(),
-                        player.active_prayers.iter().cloned().collect::<Vec<_>>(),
-                    )
-                } else {
-                    return;
-                }
-            };
-
-            self.send_to_player(
-                player_id,
-                ServerMessage::PrayerStateUpdate {
-                    points,
-                    max_points,
-                    active_prayers,
-                },
-            )
-            .await;
-
-            self.process_quest_progression_snapshot(player_id).await;
-        }
-    }
-
-    pub async fn handle_offer_all_bones(&self, player_id: &str, item_id: &str, altar_id: &str) {
-        tracing::debug!(
-            "Player {} offering all {} at altar {}",
-            player_id,
-            item_id,
-            altar_id
-        );
-
-        // Get player position
-        let player_pos = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => (p.x, p.y),
-                _ => return,
-            }
-        };
-
-        // Check if player is in an instance
-        let instance_id = {
-            let instances = self.player_instances.read().await;
-            instances.get(player_id).cloned()
-        };
-
-        // Get altar info and validate it's an altar
-        let altar_info = if let Some(ref _inst_id) = instance_id {
-            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
-                let npcs = instance.npcs.read().await;
-                npcs.get(altar_id).map(|npc| {
-                    let dx = (npc.x - player_pos.0) as f32;
-                    let dy = (npc.y - player_pos.1) as f32;
-                    let distance = (dx * dx + dy * dy).sqrt();
-                    (npc.prototype_id.clone(), distance)
-                })
-            } else {
-                None
-            }
-        } else {
-            let npcs = self.npcs.read().await;
-            npcs.get(altar_id).map(|npc| {
-                let dx = (npc.x - player_pos.0) as f32;
-                let dy = (npc.y - player_pos.1) as f32;
-                let distance = (dx * dx + dy * dy).sqrt();
-                (npc.prototype_id.clone(), distance)
-            })
-        };
-
-        let (entity_type, distance) = match altar_info {
-            Some(info) => info,
-            None => {
-                self.send_system_message(player_id, "Altar not found.")
-                    .await;
-                return;
-            }
-        };
-
-        if distance > 2.5 {
-            self.send_system_message(player_id, "You need to be closer to the altar.")
-                .await;
-            return;
-        }
-
-        let is_altar = self
-            .entity_registry
-            .get(&entity_type)
-            .map(|proto| proto.behaviors.altar)
-            .unwrap_or(false);
-
-        if !is_altar {
-            self.send_system_message(player_id, "That's not an altar.")
-                .await;
-            return;
-        }
-
-        // Validate item is bones
-        let (item_name, base_prayer_xp) = match self.item_registry.get(item_id) {
-            Some(def) if def.is_bones() => (def.display_name.clone(), def.prayer_xp),
-            _ => {
-                self.send_system_message(player_id, "You can only offer bones at the altar.")
-                    .await;
-                return;
-            }
-        };
-
-        // Calculate altar XP per bone (matches handle_offer_bones logic)
-        let altar_xp_per = match item_id {
-            "regular_bones" => 12,
-            "big_bones" => 37,
-            "dragon_bones" => 180,
-            _ => (base_prayer_xp as f32 * 2.5) as i32,
-        };
-
-        // Count and remove all bones of this type, award XP
-        let (total_bones, inv_update, xp_result) = {
-            let mut players = self.players.write().await;
-            let player = match players.get_mut(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-
-            // Count total bones of this type across all slots
-            let mut total = 0i32;
-            for i in 0..player.inventory.slots.len() {
-                if let Some(ref s) = player.inventory.slots[i] {
-                    if s.item_id == item_id {
-                        total += s.quantity;
-                        player.inventory.slots[i] = None;
-                    }
-                }
-            }
-
-            if total == 0 {
-                drop(players);
-                self.send_system_message(player_id, "You don't have any of those bones.")
-                    .await;
-                return;
-            }
-
-            let total_xp = altar_xp_per as i64 * total as i64;
-            let leveled = player.skills.prayer.add_xp(total_xp);
-            let xp_result = (
-                total_xp,
-                player.skills.prayer.xp,
-                player.skills.prayer.level,
-                leveled,
-            );
-
-            if leveled {
-                player.prayer_points = player.max_prayer_points();
-            }
-
-            let inv_update = (player.inventory.to_update(), player.inventory.gold);
-            (total, inv_update, xp_result)
-        };
-
-        self.send_system_message(
-            player_id,
-            &format!(
-                "The gods are pleased with your offering of {} {}. (+{} Prayer XP)",
-                total_bones, item_name, xp_result.0
-            ),
-        )
-        .await;
-
-        self.send_to_player(
-            player_id,
-            ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots: inv_update.0,
-                gold: inv_update.1,
-            },
-        )
-        .await;
-
-        self.send_to_player(
-            player_id,
-            ServerMessage::SkillXp {
-                player_id: player_id.to_string(),
-                skill: "prayer".to_string(),
-                xp_gained: xp_result.0,
-                total_xp: xp_result.1,
-                level: xp_result.2,
-            },
-        )
-        .await;
-
-        if xp_result.3 {
-            tracing::info!("Player {} leveled up Prayer to {}", player_id, xp_result.2);
-            self.broadcast(ServerMessage::SkillLevelUp {
-                player_id: player_id.to_string(),
-                skill: "prayer".to_string(),
-                new_level: xp_result.2,
-            })
-            .await;
-
-            // Send updated prayer state with new max points
-            let (points, max_points, active_prayers) = {
-                let players = self.players.read().await;
-                if let Some(player) = players.get(player_id) {
-                    (
-                        player.prayer_points,
-                        player.max_prayer_points(),
-                        player.active_prayers.iter().cloned().collect::<Vec<_>>(),
-                    )
-                } else {
-                    return;
-                }
-            };
-
-            self.send_to_player(
-                player_id,
-                ServerMessage::PrayerStateUpdate {
-                    points,
-                    max_points,
-                    active_prayers,
-                },
-            )
-            .await;
-
-            self.process_quest_progression_snapshot(player_id).await;
-        }
-    }
-
     // ===== Chest System Handlers =====
 
-    fn chest_slot_updates(chest: &crate::chest::ChestInstance, item_registry: &crate::data::ItemRegistry) -> Vec<crate::protocol::ChestSlotUpdate> {
-        chest.slots.iter().enumerate().filter_map(|(i, slot)| {
-            slot.as_ref().map(|s| {
-                let base_price = item_registry.get(&s.item_id).map(|d| d.base_price).unwrap_or(0);
-                crate::protocol::ChestSlotUpdate {
-                    slot: i as u8,
-                    item_id: s.item_id.clone(),
-                    quantity: s.quantity,
-                    value: base_price * s.quantity,
-                }
+    fn chest_slot_updates(
+        chest: &crate::chest::ChestInstance,
+        item_registry: &crate::data::ItemRegistry,
+    ) -> Vec<crate::protocol::ChestSlotUpdate> {
+        chest
+            .slots
+            .iter()
+            .enumerate()
+            .filter_map(|(i, slot)| {
+                slot.as_ref().map(|s| {
+                    let base_price = item_registry
+                        .get(&s.item_id)
+                        .map(|d| d.base_price)
+                        .unwrap_or(0);
+                    crate::protocol::ChestSlotUpdate {
+                        slot: i as u8,
+                        item_id: s.item_id.clone(),
+                        quantity: s.quantity,
+                        value: base_price * s.quantity,
+                    }
+                })
             })
-        }).collect()
+            .collect()
     }
 
     /// Check if a chest exists at the given position and open it if so.
@@ -18129,7 +12630,9 @@ impl GameRoom {
             chest.viewers.insert(player_id.to_string());
             let slots = Self::chest_slot_updates(chest, &self.item_registry);
             let total_value = chest.total_value(&self.item_registry);
-            let name = self.chest_registry.get(&chest.chest_def_id)
+            let name = self
+                .chest_registry
+                .get(&chest.chest_def_id)
                 .map(|d| d.name.clone())
                 .unwrap_or_else(|| "Chest".to_string());
 
@@ -18143,12 +12646,20 @@ impl GameRoom {
             self.send_to_player(player_id, msg).await;
 
             // Track which chest this player has open
-            self.player_open_chests.write().await.insert(player_id.to_string(), chest_key);
+            self.player_open_chests
+                .write()
+                .await
+                .insert(player_id.to_string(), chest_key);
         }
     }
 
     pub async fn handle_chest_take(&self, player_id: &str, chest_id: &str, slot: u8) {
-        tracing::info!("handle_chest_take: player={}, chest={}, slot={}", player_id, chest_id, slot);
+        tracing::info!(
+            "handle_chest_take: player={}, chest={}, slot={}",
+            player_id,
+            chest_id,
+            slot
+        );
         // Take item from chest (hold chest lock briefly)
         let taken_item = {
             let mut cm = self.chest_manager.write().await;
@@ -18177,10 +12688,18 @@ impl GameRoom {
         let add_success = {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                if !player.inventory.has_space_for(&taken_item.item_id, taken_item.quantity, &self.item_registry) {
+                if !player.inventory.has_space_for(
+                    &taken_item.item_id,
+                    taken_item.quantity,
+                    &self.item_registry,
+                ) {
                     false
                 } else {
-                    player.inventory.add_item(&taken_item.item_id, taken_item.quantity, &self.item_registry);
+                    player.inventory.add_item(
+                        &taken_item.item_id,
+                        taken_item.quantity,
+                        &self.item_registry,
+                    );
 
                     // Send inventory update
                     let inv_update = crate::protocol::ServerMessage::InventoryUpdate {
@@ -18239,7 +12758,12 @@ impl GameRoom {
     }
 
     pub async fn handle_chest_deposit(&self, player_id: &str, chest_id: &str, inventory_slot: u8) {
-        tracing::info!("handle_chest_deposit: player={}, chest={}, slot={}", player_id, chest_id, inventory_slot);
+        tracing::info!(
+            "handle_chest_deposit: player={}, chest={}, slot={}",
+            player_id,
+            chest_id,
+            inventory_slot
+        );
         // Take item from player inventory first (hold players lock briefly)
         let taken_item = {
             let mut players = self.players.write().await;
@@ -18352,1110 +12876,5 @@ impl GameRoom {
                 chest.viewers.remove(player_id);
             }
         }
-    }
-
-    // ========================================================================
-    // Trade System Handlers
-    // ========================================================================
-
-    /// Check if a player's inventory slot is locked in an active trade offer
-    async fn is_slot_in_trade(&self, player_id: &str, slot_index: u8) -> bool {
-        let player_trades = self.player_trades.read().await;
-        if let Some(trade_id) = player_trades.get(player_id) {
-            let trades = self.trades.read().await;
-            if let Some(session) = trades.get(trade_id) {
-                let offer = if session.player_a == player_id {
-                    &session.offer_a
-                } else {
-                    &session.offer_b
-                };
-                return offer.items.iter().any(|item| item.inv_slot == slot_index);
-            }
-        }
-        false
-    }
-
-    fn make_trade_offer_items(offer: &TradeOffer) -> Vec<crate::protocol::TradeOfferItemData> {
-        offer.items.iter().map(|e| crate::protocol::TradeOfferItemData {
-            slot_index: e.inv_slot,
-            item_id: e.item_id.clone(),
-            quantity: e.quantity,
-        }).collect()
-    }
-
-    async fn cancel_trade_for_player(&self, player_id: &str, reason: &str) {
-        let trade_id = {
-            let pt = self.player_trades.read().await;
-            pt.get(player_id).cloned()
-        };
-        if let Some(trade_id) = trade_id {
-            let session = {
-                let mut trades = self.trades.write().await;
-                trades.remove(&trade_id)
-            };
-            if let Some(session) = session {
-                {
-                    let mut pt = self.player_trades.write().await;
-                    pt.remove(&session.player_a);
-                    pt.remove(&session.player_b);
-                }
-                let msg = ServerMessage::TradeCancelled { reason: reason.to_string() };
-                self.send_to_player(&session.player_a, msg.clone()).await;
-                self.send_to_player(&session.player_b, msg).await;
-            }
-        }
-        // Also clean up any pending requests FROM this player
-        let mut requests = self.trade_requests.write().await;
-        requests.retain(|_, (requester, _)| requester != player_id);
-    }
-
-    pub async fn handle_trade_request(&self, player_id: &str, target_id: &str) {
-        // Validate both players exist and are active
-        let (requester_name, valid) = {
-            let players = self.players.read().await;
-            let requester = match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => p,
-                _ => return,
-            };
-            let target = match players.get(target_id) {
-                Some(p) if p.active && !p.is_dead => p,
-                _ => {
-                    return;
-                }
-            };
-            // Check proximity
-            let dx = (requester.x - target.x).abs();
-            let dy = (requester.y - target.y).abs();
-            if dx > TRADE_MAX_DISTANCE || dy > TRADE_MAX_DISTANCE {
-                return;
-            }
-            // Check not already trading
-            let name = requester.name.clone();
-            // Check stall
-            if target.stall.as_ref().map_or(false, |s| s.active) {
-                drop(players);
-                self.send_system_message(player_id, "That player is running a shop.").await;
-                return;
-            }
-            if requester.stall.as_ref().map_or(false, |s| s.active) {
-                drop(players);
-                self.send_system_message(player_id, "Close your shop before trading.").await;
-                return;
-            }
-            (name, true)
-        };
-        if !valid { return; }
-
-        // Check not already in a trade
-        {
-            let pt = self.player_trades.read().await;
-            if pt.contains_key(player_id) {
-                self.send_system_message(player_id, "You are already in a trade.").await;
-                return;
-            }
-            if pt.contains_key(target_id) {
-                self.send_system_message(player_id, "That player is already trading.").await;
-                return;
-            }
-        }
-
-        // Store the request
-        let current_tick = *self.tick.read().await;
-        {
-            let mut requests = self.trade_requests.write().await;
-            requests.insert(target_id.to_string(), (player_id.to_string(), current_tick));
-        }
-
-        self.send_to_player(target_id, ServerMessage::TradeRequestReceived {
-            requester_id: player_id.to_string(),
-            requester_name,
-        }).await;
-    }
-
-    pub async fn handle_trade_accept_request(&self, player_id: &str, requester_id: &str) {
-        // Validate the pending request
-        let valid_request = {
-            let requests = self.trade_requests.read().await;
-            requests.get(player_id)
-                .map(|(rid, _)| rid == requester_id)
-                .unwrap_or(false)
-        };
-        if !valid_request {
-            self.send_system_message(player_id, "No pending trade request from that player.").await;
-            return;
-        }
-
-        // Remove the request
-        {
-            let mut requests = self.trade_requests.write().await;
-            requests.remove(player_id);
-        }
-
-        // Check both players aren't already trading and are still valid
-        {
-            let pt = self.player_trades.read().await;
-            if pt.contains_key(player_id) || pt.contains_key(requester_id) {
-                self.send_system_message(player_id, "Trade no longer available.").await;
-                return;
-            }
-        }
-
-        // Validate proximity again
-        let (name_a, name_b) = {
-            let players = self.players.read().await;
-            let pa = match players.get(requester_id) {
-                Some(p) if p.active && !p.is_dead => p,
-                _ => return,
-            };
-            let pb = match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => p,
-                _ => return,
-            };
-            let dx = (pa.x - pb.x).abs();
-            let dy = (pa.y - pb.y).abs();
-            if dx > TRADE_MAX_DISTANCE || dy > TRADE_MAX_DISTANCE {
-                self.send_system_message(player_id, "Too far away to trade.").await;
-                return;
-            }
-            (pa.name.clone(), pb.name.clone())
-        };
-
-        // Create trade session
-        let trade_id = format!("trade_{}_{}", requester_id, player_id);
-        let session = TradeSession {
-            player_a: requester_id.to_string(),
-            player_b: player_id.to_string(),
-            offer_a: TradeOffer::new(),
-            offer_b: TradeOffer::new(),
-        };
-
-        {
-            let mut trades = self.trades.write().await;
-            trades.insert(trade_id.clone(), session);
-        }
-        {
-            let mut pt = self.player_trades.write().await;
-            pt.insert(requester_id.to_string(), trade_id.clone());
-            pt.insert(player_id.to_string(), trade_id.clone());
-        }
-
-        // Notify both players
-        self.send_to_player(requester_id, ServerMessage::TradeOpened {
-            trade_id: trade_id.clone(),
-            partner_id: player_id.to_string(),
-            partner_name: name_b,
-        }).await;
-        self.send_to_player(player_id, ServerMessage::TradeOpened {
-            trade_id,
-            partner_id: requester_id.to_string(),
-            partner_name: name_a,
-        }).await;
-    }
-
-    pub async fn handle_trade_decline_request(&self, player_id: &str, requester_id: &str) {
-        let removed = {
-            let mut requests = self.trade_requests.write().await;
-            if requests.get(player_id).map(|(rid, _)| rid == requester_id).unwrap_or(false) {
-                requests.remove(player_id);
-                true
-            } else {
-                false
-            }
-        };
-        if removed {
-            self.send_system_message(requester_id, "Trade request declined.").await;
-        }
-    }
-
-    pub async fn handle_trade_offer_item(&self, player_id: &str, slot_index: u8, quantity: i32) {
-        if quantity <= 0 { return; }
-
-        let trade_id = {
-            let pt = self.player_trades.read().await;
-            match pt.get(player_id) {
-                Some(id) => id.clone(),
-                None => return,
-            }
-        };
-
-        // Validate the item exists in inventory
-        let item_info = {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-            match player.inventory.slots.get(slot_index as usize) {
-                Some(Some(slot)) => {
-                    let available_qty = slot.quantity;
-                    Some((slot.item_id.clone(), available_qty))
-                }
-                _ => None,
-            }
-        };
-
-        let (item_id, available_qty) = match item_info {
-            Some(info) => info,
-            None => {
-                self.send_system_message(player_id, "No item in that slot.").await;
-                return;
-            }
-        };
-
-        let qty = quantity.min(available_qty);
-
-        let mut trades = self.trades.write().await;
-        if let Some(session) = trades.get_mut(&trade_id) {
-            let (my_offer, partner_id) = if session.player_a == player_id {
-                (&mut session.offer_a, session.player_b.clone())
-            } else {
-                (&mut session.offer_b, session.player_a.clone())
-            };
-
-            // Check if this slot is already offered
-            if my_offer.items.iter().any(|e| e.inv_slot == slot_index) {
-                drop(trades);
-                self.send_system_message(player_id, "That slot is already in the offer.").await;
-                return;
-            }
-
-            my_offer.items.push(TradeOfferEntry {
-                inv_slot: slot_index,
-                item_id: item_id.clone(),
-                quantity: qty,
-            });
-
-            // Reset both accepted flags
-            session.offer_a.accepted = false;
-            session.offer_b.accepted = false;
-
-            // Send updates to both players
-            // my_items = the current player's offer (shown to them as "your offer")
-            // partner_view_items = the current player's offer (shown to partner as "their offer")
-            let (my_offer, partner_offer) = if session.player_a == player_id {
-                (&session.offer_a, &session.offer_b)
-            } else {
-                (&session.offer_b, &session.offer_a)
-            };
-            let my_items = Self::make_trade_offer_items(my_offer);
-            let my_gold = my_offer.gold;
-            // Send our offer to the partner so they see what we're offering
-            let partner_view_items = Self::make_trade_offer_items(my_offer);
-            let partner_view_gold = my_offer.gold;
-
-            drop(trades);
-
-            self.send_to_player(player_id, ServerMessage::TradeMyOfferUpdate {
-                my_items,
-                my_gold,
-                my_accepted: false,
-            }).await;
-            self.send_to_player(&partner_id, ServerMessage::TradeOfferUpdate {
-                partner_items: partner_view_items,
-                partner_gold: partner_view_gold,
-                partner_accepted: false,
-            }).await;
-        }
-    }
-
-    pub async fn handle_trade_remove_item(&self, player_id: &str, offer_index: u8) {
-        let trade_id = {
-            let pt = self.player_trades.read().await;
-            match pt.get(player_id) {
-                Some(id) => id.clone(),
-                None => return,
-            }
-        };
-
-        let mut trades = self.trades.write().await;
-        if let Some(session) = trades.get_mut(&trade_id) {
-            let (my_offer, partner_id) = if session.player_a == player_id {
-                (&mut session.offer_a, session.player_b.clone())
-            } else {
-                (&mut session.offer_b, session.player_a.clone())
-            };
-
-            if (offer_index as usize) < my_offer.items.len() {
-                my_offer.items.remove(offer_index as usize);
-            } else {
-                return;
-            }
-
-            // Reset both accepted flags
-            session.offer_a.accepted = false;
-            session.offer_b.accepted = false;
-
-            let my_offer_ref = if session.player_a == player_id { &session.offer_a } else { &session.offer_b };
-            let my_items = Self::make_trade_offer_items(my_offer_ref);
-            let my_gold = my_offer_ref.gold;
-            // Send our updated offer to partner so they see changes in real-time
-            let partner_view_items = Self::make_trade_offer_items(my_offer_ref);
-            let partner_view_gold = my_offer_ref.gold;
-
-            drop(trades);
-
-            self.send_to_player(player_id, ServerMessage::TradeMyOfferUpdate {
-                my_items,
-                my_gold,
-                my_accepted: false,
-            }).await;
-            self.send_to_player(&partner_id, ServerMessage::TradeOfferUpdate {
-                partner_items: partner_view_items,
-                partner_gold: partner_view_gold,
-                partner_accepted: false,
-            }).await;
-        }
-    }
-
-    pub async fn handle_trade_offer_gold(&self, player_id: &str, amount: i32) {
-        if amount < 0 { return; }
-
-        let trade_id = {
-            let pt = self.player_trades.read().await;
-            match pt.get(player_id) {
-                Some(id) => id.clone(),
-                None => return,
-            }
-        };
-
-        // Validate gold amount
-        let max_gold = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(p) => p.inventory.gold,
-                None => return,
-            }
-        };
-        let gold = amount.min(max_gold);
-
-        let mut trades = self.trades.write().await;
-        if let Some(session) = trades.get_mut(&trade_id) {
-            let (my_offer, partner_id) = if session.player_a == player_id {
-                (&mut session.offer_a, session.player_b.clone())
-            } else {
-                (&mut session.offer_b, session.player_a.clone())
-            };
-
-            my_offer.gold = gold;
-
-            // Reset both accepted flags
-            session.offer_a.accepted = false;
-            session.offer_b.accepted = false;
-
-            let my_offer_ref = if session.player_a == player_id { &session.offer_a } else { &session.offer_b };
-            let my_items = Self::make_trade_offer_items(my_offer_ref);
-            let my_gold = my_offer_ref.gold;
-            // Send our updated offer to partner so they see changes in real-time
-            let partner_view_items = Self::make_trade_offer_items(my_offer_ref);
-            let partner_view_gold = my_offer_ref.gold;
-
-            drop(trades);
-
-            self.send_to_player(player_id, ServerMessage::TradeMyOfferUpdate {
-                my_items,
-                my_gold,
-                my_accepted: false,
-            }).await;
-            self.send_to_player(&partner_id, ServerMessage::TradeOfferUpdate {
-                partner_items: partner_view_items,
-                partner_gold: partner_view_gold,
-                partner_accepted: false,
-            }).await;
-        }
-    }
-
-    pub async fn handle_trade_accept(&self, player_id: &str) {
-        let trade_id = {
-            let pt = self.player_trades.read().await;
-            match pt.get(player_id) {
-                Some(id) => id.clone(),
-                None => return,
-            }
-        };
-
-        let should_complete;
-        let partner_id;
-        {
-            let mut trades = self.trades.write().await;
-            if let Some(session) = trades.get_mut(&trade_id) {
-                let (my_offer, other_offer, pid) = if session.player_a == player_id {
-                    (&mut session.offer_a, &session.offer_b, session.player_b.clone())
-                } else {
-                    (&mut session.offer_b, &session.offer_a, session.player_a.clone())
-                };
-                partner_id = pid;
-
-                my_offer.accepted = true;
-                should_complete = other_offer.accepted;
-
-                if !should_complete {
-                    // Notify partner of acceptance status
-                    let partner_items = Self::make_trade_offer_items(my_offer);
-                    let partner_gold = my_offer.gold;
-                    drop(trades);
-
-                    self.send_to_player(&partner_id, ServerMessage::TradeOfferUpdate {
-                        partner_items,
-                        partner_gold,
-                        partner_accepted: true,
-                    }).await;
-
-                    // Also update own status
-                    let trade_id2 = {
-                        let pt = self.player_trades.read().await;
-                        pt.get(player_id).cloned()
-                    };
-                    if let Some(tid) = trade_id2 {
-                        let trades = self.trades.read().await;
-                        if let Some(session) = trades.get(&tid) {
-                            let my_items = Self::make_trade_offer_items(if session.player_a == player_id { &session.offer_a } else { &session.offer_b });
-                            let my_gold = if session.player_a == player_id { session.offer_a.gold } else { session.offer_b.gold };
-                            drop(trades);
-                            self.send_to_player(player_id, ServerMessage::TradeMyOfferUpdate {
-                                my_items,
-                                my_gold,
-                                my_accepted: true,
-                            }).await;
-                        }
-                    }
-                    return;
-                }
-            } else {
-                return;
-            }
-        }
-
-        // Both accepted - execute the trade!
-        self.execute_trade(&trade_id).await;
-    }
-
-    async fn execute_trade(&self, trade_id: &str) {
-        let session = {
-            let mut trades = self.trades.write().await;
-            match trades.remove(trade_id) {
-                Some(s) => s,
-                None => return,
-            }
-        };
-
-        {
-            let mut pt = self.player_trades.write().await;
-            pt.remove(&session.player_a);
-            pt.remove(&session.player_b);
-        }
-
-        let registry = self.item_registry.clone();
-
-        // Validate and execute the trade
-        let mut players = self.players.write().await;
-        let (pa, pb) = match (players.get(&session.player_a), players.get(&session.player_b)) {
-            (Some(a), Some(b)) => {
-                // Validate items still exist
-                for item in &session.offer_a.items {
-                    match a.inventory.slots.get(item.inv_slot as usize) {
-                        Some(Some(slot)) if slot.item_id == item.item_id && slot.quantity >= item.quantity => {}
-                        _ => {
-                            drop(players);
-                            let msg = ServerMessage::TradeCancelled { reason: "Items changed during trade.".to_string() };
-                            self.send_to_player(&session.player_a, msg.clone()).await;
-                            self.send_to_player(&session.player_b, msg).await;
-                            return;
-                        }
-                    }
-                }
-                for item in &session.offer_b.items {
-                    match b.inventory.slots.get(item.inv_slot as usize) {
-                        Some(Some(slot)) if slot.item_id == item.item_id && slot.quantity >= item.quantity => {}
-                        _ => {
-                            drop(players);
-                            let msg = ServerMessage::TradeCancelled { reason: "Items changed during trade.".to_string() };
-                            self.send_to_player(&session.player_a, msg.clone()).await;
-                            self.send_to_player(&session.player_b, msg).await;
-                            return;
-                        }
-                    }
-                }
-                // Validate gold
-                if a.inventory.gold < session.offer_a.gold || b.inventory.gold < session.offer_b.gold {
-                    drop(players);
-                    let msg = ServerMessage::TradeCancelled { reason: "Insufficient gold.".to_string() };
-                    self.send_to_player(&session.player_a, msg.clone()).await;
-                    self.send_to_player(&session.player_b, msg).await;
-                    return;
-                }
-                (session.player_a.clone(), session.player_b.clone())
-            }
-            _ => return,
-        };
-
-        // Remove items from both players
-        // Player A's offered items
-        for item in session.offer_a.items.iter().rev() {
-            if let Some(player) = players.get_mut(&pa) {
-                if let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize) {
-                    slot.quantity -= item.quantity;
-                    if slot.quantity <= 0 {
-                        player.inventory.slots[item.inv_slot as usize] = None;
-                    }
-                }
-            }
-        }
-        // Player B's offered items
-        for item in session.offer_b.items.iter().rev() {
-            if let Some(player) = players.get_mut(&pb) {
-                if let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize) {
-                    slot.quantity -= item.quantity;
-                    if slot.quantity <= 0 {
-                        player.inventory.slots[item.inv_slot as usize] = None;
-                    }
-                }
-            }
-        }
-
-        // Transfer gold
-        if let Some(player_a) = players.get_mut(&pa) {
-            player_a.inventory.gold -= session.offer_a.gold;
-            player_a.inventory.gold += session.offer_b.gold;
-        }
-        if let Some(player_b) = players.get_mut(&pb) {
-            player_b.inventory.gold -= session.offer_b.gold;
-            player_b.inventory.gold += session.offer_a.gold;
-        }
-
-        // Add received items
-        // Player A receives Player B's items
-        for item in &session.offer_b.items {
-            if let Some(player) = players.get_mut(&pa) {
-                player.inventory.add_item(&item.item_id, item.quantity, &registry);
-            }
-        }
-        // Player B receives Player A's items
-        for item in &session.offer_a.items {
-            if let Some(player) = players.get_mut(&pb) {
-                player.inventory.add_item(&item.item_id, item.quantity, &registry);
-            }
-        }
-
-        // Get inventory updates
-        let inv_a = players.get(&pa).map(|p| (p.inventory.to_update(), p.inventory.gold));
-        let inv_b = players.get(&pb).map(|p| (p.inventory.to_update(), p.inventory.gold));
-        drop(players);
-
-        // Send trade completed messages
-        let items_a_received: Vec<crate::protocol::TradeOfferItemData> = session.offer_b.items.iter().map(|e| {
-            crate::protocol::TradeOfferItemData {
-                slot_index: e.inv_slot,
-                item_id: e.item_id.clone(),
-                quantity: e.quantity,
-            }
-        }).collect();
-        let items_b_received: Vec<crate::protocol::TradeOfferItemData> = session.offer_a.items.iter().map(|e| {
-            crate::protocol::TradeOfferItemData {
-                slot_index: e.inv_slot,
-                item_id: e.item_id.clone(),
-                quantity: e.quantity,
-            }
-        }).collect();
-
-        self.send_to_player(&pa, ServerMessage::TradeCompleted {
-            items_received: items_a_received,
-            gold_received: session.offer_b.gold,
-        }).await;
-        self.send_to_player(&pb, ServerMessage::TradeCompleted {
-            items_received: items_b_received,
-            gold_received: session.offer_a.gold,
-        }).await;
-
-        // Send inventory updates
-        if let Some((slots, gold)) = inv_a {
-            self.send_to_player(&pa, ServerMessage::InventoryUpdate {
-                player_id: pa.clone(),
-                slots,
-                gold,
-            }).await;
-        }
-        if let Some((slots, gold)) = inv_b {
-            self.send_to_player(&pb, ServerMessage::InventoryUpdate {
-                player_id: pb.clone(),
-                slots,
-                gold,
-            }).await;
-        }
-    }
-
-    pub async fn handle_trade_cancel(&self, player_id: &str) {
-        self.cancel_trade_for_player(player_id, "Trade cancelled.").await;
-    }
-
-    // ========================================================================
-    // Player Stall Handlers
-    // ========================================================================
-
-    async fn force_close_stall(&self, player_id: &str) {
-        let stall_data = {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                player.stall.take()
-            } else {
-                None
-            }
-        };
-
-        if let Some(stall) = stall_data {
-            let registry = self.item_registry.clone();
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                // Return items to inventory, overflow to bank
-                for slot in &stall.slots {
-                    if let Some(stall_slot) = slot {
-                        let leftover = player.inventory.add_item(&stall_slot.item_id, stall_slot.quantity, &registry);
-                        if leftover > 0 {
-                            player.bank.add_item(&stall_slot.item_id, leftover, &registry);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn stall_slots_to_data(stall: &PlayerStall) -> Vec<crate::protocol::StallSlotData> {
-        stall.slots.iter().enumerate().filter_map(|(i, slot)| {
-            slot.as_ref().map(|s| crate::protocol::StallSlotData {
-                slot: i as u8,
-                item_id: s.item_id.clone(),
-                quantity: s.quantity,
-                price: s.price,
-            })
-        }).collect()
-    }
-
-    pub async fn handle_stall_open(&self, player_id: &str, name: &str) {
-        // Validate player state
-        {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
-                Some(p) if p.active && !p.is_dead => p,
-                _ => return,
-            };
-            if player.stall.as_ref().map_or(false, |s| s.active) {
-                drop(players);
-                self.send_system_message(player_id, "You already have a shop open.").await;
-                return;
-            }
-        }
-
-        // Check not in trade
-        {
-            let pt = self.player_trades.read().await;
-            if pt.contains_key(player_id) {
-                self.send_system_message(player_id, "Cannot open shop while trading.").await;
-                return;
-            }
-        }
-
-        // Check not in instance
-        {
-            let instances = self.player_instances.read().await;
-            if instances.contains_key(player_id) {
-                self.send_system_message(player_id, "Cannot open shop in an instance.").await;
-                return;
-            }
-        }
-
-        let stall_name = if name.trim().is_empty() { "Shop".to_string() } else {
-            name.chars().take(32).collect::<String>()
-        };
-
-        let slots;
-        {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                if let Some(ref mut stall) = player.stall {
-                    // Stall already has items staged — just activate it
-                    stall.name = stall_name.clone();
-                    stall.active = true;
-                    slots = Self::stall_slots_to_data(stall);
-                } else {
-                    let mut stall = PlayerStall::new(stall_name.clone());
-                    stall.active = true;
-                    slots = Self::stall_slots_to_data(&stall);
-                    player.stall = Some(stall);
-                }
-            } else {
-                return;
-            }
-        }
-
-        self.send_to_player(player_id, ServerMessage::StallOpened {
-            name: stall_name,
-            slots,
-        }).await;
-    }
-
-    pub async fn handle_stall_close(&self, player_id: &str) {
-        // Check if items fit back into inventory
-        {
-            let players = self.players.read().await;
-            let player = match players.get(player_id) {
-                Some(p) => p,
-                None => return,
-            };
-            let stall = match &player.stall {
-                Some(s) => s,
-                None => return,
-            };
-
-            // Count how many slots we need
-            let item_count = stall.slots.iter().filter(|s| s.is_some()).count();
-            let empty_inv_slots = player.inventory.slots.iter().filter(|s| s.is_none()).count();
-            if item_count > empty_inv_slots {
-                drop(players);
-                self.send_system_message(player_id, "Not enough inventory space. Remove items first.").await;
-                return;
-            }
-        }
-
-        // Return items to inventory
-        let registry = self.item_registry.clone();
-        {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                if let Some(stall) = player.stall.take() {
-                    for slot in &stall.slots {
-                        if let Some(stall_slot) = slot {
-                            player.inventory.add_item(&stall_slot.item_id, stall_slot.quantity, &registry);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Send inventory update and stall closed
-        let inv_update = {
-            let players = self.players.read().await;
-            players.get(player_id).map(|p| (p.inventory.to_update(), p.inventory.gold))
-        };
-        if let Some((slots, gold)) = inv_update {
-            self.send_to_player(player_id, ServerMessage::InventoryUpdate {
-                player_id: player_id.to_string(),
-                slots,
-                gold,
-            }).await;
-        }
-        self.send_to_player(player_id, ServerMessage::StallClosed {
-            reason: "Shop closed.".to_string(),
-        }).await;
-    }
-
-    pub async fn handle_stall_set_item(&self, player_id: &str, inventory_slot: u8, quantity: i32, price: i32) {
-        if quantity <= 0 || price < 0 { return; }
-
-        let registry = self.item_registry.clone();
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) => p,
-            None => return,
-        };
-
-        // Auto-create stall storage if not yet opened
-        if player.stall.is_none() {
-            player.stall = Some(PlayerStall {
-                name: String::new(),
-                slots: std::iter::repeat_with(|| None).take(STALL_MAX_SLOTS).collect(),
-                active: false,
-            });
-        }
-
-        // Get item from inventory
-        let (item_id, available) = match player.inventory.slots.get(inventory_slot as usize) {
-            Some(Some(slot)) => (slot.item_id.clone(), slot.quantity),
-            _ => {
-                drop(players);
-                self.send_system_message(player_id, "No item in that slot.").await;
-                return;
-            }
-        };
-
-        let qty = quantity.min(available);
-
-        // Find empty stall slot
-        let stall = player.stall.as_mut().unwrap();
-        let empty_slot = stall.slots.iter().position(|s| s.is_none());
-        let slot_idx = match empty_slot {
-            Some(i) => i,
-            None => {
-                drop(players);
-                self.send_system_message(player_id, "Shop is full (max 10 slots).").await;
-                return;
-            }
-        };
-
-        // Remove from inventory
-        if let Some(Some(inv_slot)) = player.inventory.slots.get_mut(inventory_slot as usize) {
-            inv_slot.quantity -= qty;
-            if inv_slot.quantity <= 0 {
-                player.inventory.slots[inventory_slot as usize] = None;
-            }
-        }
-
-        // Add to stall
-        stall.slots[slot_idx] = Some(StallSlot {
-            item_id,
-            quantity: qty,
-            price,
-        });
-
-        let stall_data = Self::stall_slots_to_data(stall);
-        let inv_slots = player.inventory.to_update();
-        let gold = player.inventory.gold;
-        let pid = player_id.to_string();
-        drop(players);
-
-        self.send_to_player(&pid, ServerMessage::StallUpdate { slots: stall_data }).await;
-        self.send_to_player(&pid, ServerMessage::InventoryUpdate {
-            player_id: pid.clone(),
-            slots: inv_slots,
-            gold,
-        }).await;
-    }
-
-    pub async fn handle_stall_remove_item(&self, player_id: &str, stall_slot: u8) {
-        let registry = self.item_registry.clone();
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.stall.is_some() => p,
-            _ => return,
-        };
-
-        let stall = player.stall.as_mut().unwrap();
-        let slot_data = match stall.slots.get(stall_slot as usize) {
-            Some(Some(s)) => s.clone(),
-            _ => return,
-        };
-
-        // Check inventory space
-        if !player.inventory.has_space_for(&slot_data.item_id, slot_data.quantity, &registry) {
-            drop(players);
-            self.send_system_message(player_id, "Inventory full.").await;
-            return;
-        }
-
-        // Remove from stall
-        stall.slots[stall_slot as usize] = None;
-
-        // Add to inventory
-        player.inventory.add_item(&slot_data.item_id, slot_data.quantity, &registry);
-
-        let stall_data = Self::stall_slots_to_data(stall);
-        let inv_slots = player.inventory.to_update();
-        let gold = player.inventory.gold;
-        let pid = player_id.to_string();
-        drop(players);
-
-        self.send_to_player(&pid, ServerMessage::StallUpdate { slots: stall_data }).await;
-        self.send_to_player(&pid, ServerMessage::InventoryUpdate {
-            player_id: pid.clone(),
-            slots: inv_slots,
-            gold,
-        }).await;
-    }
-
-    pub async fn handle_stall_update_price(&self, player_id: &str, stall_slot: u8, price: i32) {
-        if price < 0 { return; }
-
-        let mut players = self.players.write().await;
-        let player = match players.get_mut(player_id) {
-            Some(p) if p.stall.is_some() => p,
-            _ => return,
-        };
-
-        let stall = player.stall.as_mut().unwrap();
-        if let Some(Some(slot)) = stall.slots.get_mut(stall_slot as usize) {
-            slot.price = price;
-        }
-
-        let stall_data = Self::stall_slots_to_data(stall);
-        drop(players);
-
-        self.send_to_player(player_id, ServerMessage::StallUpdate { slots: stall_data }).await;
-    }
-
-    pub async fn handle_stall_browse(&self, player_id: &str, seller_id: &str) {
-        let players = self.players.read().await;
-        let seller = match players.get(seller_id) {
-            Some(p) if p.active && p.stall.as_ref().map_or(false, |s| s.active) => p,
-            _ => {
-                drop(players);
-                self.send_system_message(player_id, "That player doesn't have a shop open.").await;
-                return;
-            }
-        };
-
-        let stall = seller.stall.as_ref().unwrap();
-        let items = Self::stall_slots_to_data(stall);
-        let seller_name = seller.name.clone();
-        let stall_name = stall.name.clone();
-        drop(players);
-
-        self.send_to_player(player_id, ServerMessage::StallBrowseData {
-            seller_id: seller_id.to_string(),
-            seller_name,
-            stall_name,
-            items,
-        }).await;
-    }
-
-    pub async fn handle_stall_buy(&self, buyer_id: &str, seller_id: &str, stall_slot: u8, quantity: i32) {
-        if quantity <= 0 { return; }
-
-        let registry = self.item_registry.clone();
-
-        let mut players = self.players.write().await;
-
-        // Validate seller has active stall
-        let (item_id, available_qty, price_per, seller_name) = {
-            let seller = match players.get(seller_id) {
-                Some(p) if p.active && p.stall.as_ref().map_or(false, |s| s.active) => p,
-                _ => {
-                    drop(players);
-                    self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
-                        success: false,
-                        item_id: String::new(),
-                        quantity: 0,
-                        total_price: 0,
-                        error: Some("Shop no longer available.".to_string()),
-                    }).await;
-                    return;
-                }
-            };
-            let stall = seller.stall.as_ref().unwrap();
-            match stall.slots.get(stall_slot as usize) {
-                Some(Some(slot)) => (slot.item_id.clone(), slot.quantity, slot.price, seller.name.clone()),
-                _ => {
-                    drop(players);
-                    self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
-                        success: false,
-                        item_id: String::new(),
-                        quantity: 0,
-                        total_price: 0,
-                        error: Some("Item no longer available.".to_string()),
-                    }).await;
-                    return;
-                }
-            }
-        };
-
-        let buy_qty = quantity.min(available_qty);
-        let total_price = price_per * buy_qty;
-
-        // Validate buyer has gold and inventory space
-        let buyer = match players.get(buyer_id) {
-            Some(p) if p.active => p,
-            _ => return,
-        };
-
-        if buyer.inventory.gold < total_price {
-            drop(players);
-            self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
-                success: false,
-                item_id: item_id.clone(),
-                quantity: buy_qty,
-                total_price,
-                error: Some("Not enough gold.".to_string()),
-            }).await;
-            return;
-        }
-
-        if !buyer.inventory.has_space_for(&item_id, buy_qty, &registry) {
-            drop(players);
-            self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
-                success: false,
-                item_id: item_id.clone(),
-                quantity: buy_qty,
-                total_price,
-                error: Some("Inventory full.".to_string()),
-            }).await;
-            return;
-        }
-
-        // Execute the purchase
-        // Deduct from seller's stall
-        if let Some(seller) = players.get_mut(seller_id) {
-            if let Some(stall) = seller.stall.as_mut() {
-                if let Some(Some(slot)) = stall.slots.get_mut(stall_slot as usize) {
-                    slot.quantity -= buy_qty;
-                    if slot.quantity <= 0 {
-                        stall.slots[stall_slot as usize] = None;
-                    }
-                }
-            }
-            seller.inventory.gold += total_price;
-        }
-
-        // Add to buyer
-        if let Some(buyer) = players.get_mut(buyer_id) {
-            buyer.inventory.gold -= total_price;
-            buyer.inventory.add_item(&item_id, buy_qty, &registry);
-        }
-
-        // Gather update data
-        let buyer_inv = players.get(buyer_id).map(|p| (p.inventory.to_update(), p.inventory.gold));
-        let seller_inv = players.get(seller_id).map(|p| (p.inventory.to_update(), p.inventory.gold));
-        let stall_update = players.get(seller_id).and_then(|p| p.stall.as_ref()).map(|s| Self::stall_slots_to_data(s));
-        let new_qty = players.get(seller_id)
-            .and_then(|p| p.stall.as_ref())
-            .and_then(|s| s.slots.get(stall_slot as usize))
-            .map(|s| s.as_ref().map_or(0, |slot| slot.quantity))
-            .unwrap_or(0);
-        let buyer_name = players.get(buyer_id).map(|p| p.name.clone()).unwrap_or_default();
-
-        drop(players);
-
-        // Send buy result to buyer
-        self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
-            success: true,
-            item_id: item_id.clone(),
-            quantity: buy_qty,
-            total_price,
-            error: None,
-        }).await;
-
-        // Send inventory updates
-        if let Some((slots, gold)) = buyer_inv {
-            self.send_to_player(buyer_id, ServerMessage::InventoryUpdate {
-                player_id: buyer_id.to_string(),
-                slots,
-                gold,
-            }).await;
-        }
-        if let Some((slots, gold)) = seller_inv {
-            self.send_to_player(seller_id, ServerMessage::InventoryUpdate {
-                player_id: seller_id.to_string(),
-                slots,
-                gold,
-            }).await;
-        }
-
-        // Send stall update to seller
-        if let Some(slots) = stall_update {
-            self.send_to_player(seller_id, ServerMessage::StallUpdate { slots }).await;
-        }
-
-        // Send sale notification to seller
-        self.send_to_player(seller_id, ServerMessage::StallSaleNotification {
-            item_id: item_id.clone(),
-            quantity: buy_qty,
-            gold_received: total_price,
-            buyer_name,
-        }).await;
-
-        // Send live update to any browsers
-        self.send_to_player(buyer_id, ServerMessage::StallItemUpdate {
-            seller_id: seller_id.to_string(),
-            stall_slot,
-            new_quantity: new_qty,
-        }).await;
     }
 }

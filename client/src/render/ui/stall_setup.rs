@@ -59,8 +59,13 @@ impl Renderer {
         } else {
             0.0
         };
-        let panel_height = (header_h + name_section_h + slots_area_h + hint_row_h + footer_h
-            + FRAME_THICKNESS * 2.0 + 16.0 * s)
+        let panel_height = (header_h
+            + name_section_h
+            + slots_area_h
+            + hint_row_h
+            + footer_h
+            + FRAME_THICKNESS * 2.0
+            + 16.0 * s)
             .min(sh - 16.0);
         let panel_x = ((sw - panel_width) / 2.0).floor();
         let panel_y = ((sh - panel_height) / 2.0).floor();
@@ -146,7 +151,11 @@ impl Renderer {
         let cx = close_btn_x + close_btn_size / 2.0;
         let cy = close_btn_y + close_btn_size / 2.0;
         let cross = close_btn_size * 0.25;
-        let cross_color = if is_close_hovered { TEXT_TITLE } else { TEXT_DIM };
+        let cross_color = if is_close_hovered {
+            TEXT_TITLE
+        } else {
+            TEXT_DIM
+        };
         draw_line(
             cx - cross,
             cy - cross,
@@ -211,24 +220,24 @@ impl Renderer {
         // Display current name or placeholder
         let text_x = input_x + 6.0 * s;
         let text_y = input_y + input_h * 0.70;
-        let (name_display, name_color) = if state.ui_state.stall_my_name.is_empty() && !is_name_editing {
-            ("My Shop".to_string(), TEXT_DIM)
-        } else {
-            (state.ui_state.stall_my_name.clone(), TEXT_NORMAL)
-        };
-        self.draw_text_sharp(
-            &name_display,
-            text_x,
-            text_y,
-            16.0,
-            name_color,
-        );
+        let (name_display, name_color) =
+            if state.ui_state.stall_my_name.is_empty() && !is_name_editing {
+                ("My Shop".to_string(), TEXT_DIM)
+            } else {
+                (state.ui_state.stall_my_name.clone(), TEXT_NORMAL)
+            };
+        self.draw_text_sharp(&name_display, text_x, text_y, 16.0, name_color);
 
         // Blinking cursor when editing
         if is_name_editing {
             let cursor_visible = (macroquad::time::get_time() * 2.0) as i32 % 2 == 0;
             if cursor_visible {
-                let text_before: String = state.ui_state.stall_my_name.chars().take(state.ui_state.stall_name_cursor).collect();
+                let text_before: String = state
+                    .ui_state
+                    .stall_my_name
+                    .chars()
+                    .take(state.ui_state.stall_name_cursor)
+                    .collect();
                 let cursor_x = text_x + self.measure_text_sharp(&text_before, 16.0).width;
                 draw_rectangle(cursor_x, input_y + 4.0, 2.0, input_h - 8.0, TEXT_NORMAL);
             }
@@ -271,7 +280,13 @@ impl Renderer {
                 SLOT_BORDER
             };
 
-            draw_rectangle(row_bounds.x, row_bounds.y, row_bounds.w, row_bounds.h, row_border);
+            draw_rectangle(
+                row_bounds.x,
+                row_bounds.y,
+                row_bounds.w,
+                row_bounds.h,
+                row_border,
+            );
             draw_rectangle(
                 row_bounds.x + 1.0,
                 row_bounds.y + 1.0,
@@ -307,22 +322,13 @@ impl Renderer {
             let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
             let name_x = icon_x + icon_size + 6.0 * s;
             let text_y = row_bounds.y + row_bounds.h * 0.45;
-            self.draw_text_sharp(
-                &item_def.display_name,
-                name_x,
-                text_y,
-                16.0,
-                TEXT_NORMAL,
-            );
+            self.draw_text_sharp(&item_def.display_name, name_x, text_y, 16.0, TEXT_NORMAL);
 
             // Quantity
             let qty_text = format!("x{}", slot.quantity);
             let qty_dims = self.measure_text_sharp(&qty_text, 16.0);
-            let qty_x = name_x
-                + self
-                    .measure_text_sharp(&item_def.display_name, 16.0)
-                    .width
-                + 6.0 * s;
+            let qty_x =
+                name_x + self.measure_text_sharp(&item_def.display_name, 16.0).width + 6.0 * s;
             self.draw_text_sharp(&qty_text, qty_x, text_y, 16.0, TEXT_DIM);
 
             // Price
@@ -338,11 +344,15 @@ impl Renderer {
             let remove_bounds = Rect::new(remove_x, remove_y, remove_w, remove_h);
             layout.add(UiElementId::StallSetupRemove(i), remove_bounds);
 
-            let is_remove_hovered = state.ui_state.hovered_element.as_ref()
-                == Some(&UiElementId::StallSetupRemove(i));
+            let is_remove_hovered =
+                state.ui_state.hovered_element.as_ref() == Some(&UiElementId::StallSetupRemove(i));
 
             let (rm_bg, rm_border, rm_text_color) = if is_remove_hovered {
-                (REMOVE_BTN_BG_HOVER, REMOVE_BTN_BORDER, REMOVE_BTN_TEXT_HOVER)
+                (
+                    REMOVE_BTN_BG_HOVER,
+                    REMOVE_BTN_BORDER,
+                    REMOVE_BTN_TEXT_HOVER,
+                )
             } else {
                 (REMOVE_BTN_BG, REMOVE_BTN_BORDER, REMOVE_BTN_TEXT)
             };
@@ -370,8 +380,7 @@ impl Renderer {
         // Empty slot hint
         if state.ui_state.stall_my_slots.len() < MAX_STALL_SLOTS {
             let hint_y = slots_y + state.ui_state.stall_my_slots.len() as f32 * slot_row_h;
-            let hint_bounds =
-                Rect::new(inner_x + slot_pad, hint_y, row_w, slot_row_h - 2.0 * s);
+            let hint_bounds = Rect::new(inner_x + slot_pad, hint_y, row_w, slot_row_h - 2.0 * s);
 
             // Dashed-border empty slot feel
             draw_rectangle(
@@ -436,8 +445,8 @@ impl Renderer {
             let btn_bounds = Rect::new(shop_btn_x, shop_btn_y, shop_btn_w, shop_btn_h);
             layout.add(UiElementId::StallSetupOpenButton, btn_bounds);
 
-            let is_btn_hovered = state.ui_state.hovered_element.as_ref()
-                == Some(&UiElementId::StallSetupOpenButton);
+            let is_btn_hovered =
+                state.ui_state.hovered_element.as_ref() == Some(&UiElementId::StallSetupOpenButton);
 
             let (bg, border, text_color) = if is_btn_hovered {
                 (
@@ -488,8 +497,8 @@ impl Renderer {
             let btn_bounds = Rect::new(shop_btn_x, shop_btn_y, shop_btn_w, shop_btn_h);
             layout.add(UiElementId::StallSetupOpenButton, btn_bounds);
 
-            let is_btn_hovered = state.ui_state.hovered_element.as_ref()
-                == Some(&UiElementId::StallSetupOpenButton);
+            let is_btn_hovered =
+                state.ui_state.hovered_element.as_ref() == Some(&UiElementId::StallSetupOpenButton);
 
             let (bg, border, text_color) = if is_btn_hovered {
                 (

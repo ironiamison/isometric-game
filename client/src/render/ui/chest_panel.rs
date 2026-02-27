@@ -100,8 +100,22 @@ impl Renderer {
         } else {
             TEXT_DIM
         };
-        draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
-        draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
+        draw_line(
+            cx - cross,
+            cy - cross,
+            cx + cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
+        draw_line(
+            cx + cross,
+            cy - cross,
+            cx - cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
 
         // ===== FOOTER (total value) =====
         let footer_h = FOOTER_HEIGHT * s;
@@ -184,8 +198,7 @@ impl Renderer {
             let row_bounds = Rect::new(content_x + 2.0, item_y, content_w - 4.0, row_h);
             layout.add(UiElementId::ChestSlot(idx as u8), row_bounds);
 
-            let is_hovered =
-                matches!(hovered, Some(UiElementId::ChestSlot(i)) if *i == idx as u8);
+            let is_hovered = matches!(hovered, Some(UiElementId::ChestSlot(i)) if *i == idx as u8);
 
             // Row background with alternating shade and hover highlight
             let row_bg = if is_hovered {

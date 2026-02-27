@@ -585,14 +585,18 @@ drain_rate = 1.0
         registry.load_from_file(&prayers_file).unwrap();
 
         // Valid: different categories
-        assert!(registry
-            .validate_prayer_set(&["clarity".to_string(), "thick_skin".to_string(),])
-            .is_ok());
+        assert!(
+            registry
+                .validate_prayer_set(&["clarity".to_string(), "thick_skin".to_string(),])
+                .is_ok()
+        );
 
         // Invalid: same category (attack)
-        assert!(registry
-            .validate_prayer_set(&["clarity".to_string(), "improved_clarity".to_string(),])
-            .is_err());
+        assert!(
+            registry
+                .validate_prayer_set(&["clarity".to_string(), "improved_clarity".to_string(),])
+                .is_err()
+        );
     }
 
     #[test]
