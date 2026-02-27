@@ -3,7 +3,7 @@ use crate::audio::AudioManager;
 use crate::game::{
     pathfinding, BankDrag, BankQuantityAction, BankQuantityDialog, ChatChannel, ContextMenu,
     ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState,
-    QuestCatalogEntry, quest_status_order, CHUNK_SIZE,
+    QuestCatalogEntry, StallPriceDialog, quest_status_order, CHUNK_SIZE,
 };
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
@@ -1772,12 +1772,25 @@ impl InputHandler {
                                 return commands;
                             }
 
-                            // If stall setup is open, add item to stall instead of dragging
-                            if state.ui_state.stall_setup_open && !state.ui_state.stall_active {
-                                commands.push(InputCommand::StallSetItem {
+                            // If stall setup is open, open price dialog before adding
+                            if state.ui_state.stall_setup_open {
+                                let item_id = slot.item_id.clone();
+                                let last_price = state.ui_state.stall_last_prices
+                                    .get(&item_id)
+                                    .copied()
+                                    .unwrap_or(0);
+                                let prefill = if last_price > 0 {
+                                    last_price.to_string()
+                                } else {
+                                    String::new()
+                                };
+                                let cursor = prefill.len();
+                                state.ui_state.stall_price_dialog = Some(StallPriceDialog {
+                                    input: prefill,
+                                    cursor,
                                     inventory_slot: *idx as u8,
                                     quantity: slot.quantity,
-                                    price: 1,
+                                    item_id,
                                 });
                                 return commands;
                             }
@@ -3564,6 +3577,124 @@ impl InputHandler {
             return commands;
         }
 
+        // Handle stall price dialog
+        if state.ui_state.stall_price_dialog.is_some() {
+            // Handle button clicks
+            if mouse_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::StallPriceConfirm => {
+                            let dialog = state.ui_state.stall_price_dialog.as_ref().unwrap();
+                            if let Ok(price) = dialog.input.parse::<i32>() {
+                                if price > 0 {
+                                    let item_id = dialog.item_id.clone();
+                                    commands.push(InputCommand::StallSetItem {
+                                        inventory_slot: dialog.inventory_slot,
+                                        quantity: dialog.quantity,
+                                        price,
+                                    });
+                                    state.ui_state.stall_last_prices.insert(item_id, price);
+                                    state.ui_state.stall_price_dialog = None;
+                                }
+                            }
+                            return commands;
+                        }
+                        UiElementId::StallPriceCancel => {
+                            state.ui_state.stall_price_dialog = None;
+                            return commands;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Handle keyboard input
+            if is_key_pressed(KeyCode::Escape) {
+                state.ui_state.stall_price_dialog = None;
+                return commands;
+            }
+
+            if is_key_pressed(KeyCode::Enter) {
+                let dialog = state.ui_state.stall_price_dialog.as_ref().unwrap();
+                if let Ok(price) = dialog.input.parse::<i32>() {
+                    if price > 0 {
+                        let item_id = dialog.item_id.clone();
+                        commands.push(InputCommand::StallSetItem {
+                            inventory_slot: dialog.inventory_slot,
+                            quantity: dialog.quantity,
+                            price,
+                        });
+                        state.ui_state.stall_last_prices.insert(item_id, price);
+                        state.ui_state.stall_price_dialog = None;
+                    }
+                }
+                return commands;
+            }
+
+            // Number keys
+            let number_keys = [
+                (KeyCode::Key0, '0'), (KeyCode::Key1, '1'), (KeyCode::Key2, '2'),
+                (KeyCode::Key3, '3'), (KeyCode::Key4, '4'), (KeyCode::Key5, '5'),
+                (KeyCode::Key6, '6'), (KeyCode::Key7, '7'), (KeyCode::Key8, '8'),
+                (KeyCode::Key9, '9'),
+            ];
+            for (key, digit) in &number_keys {
+                if is_key_pressed(*key) {
+                    let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                    if dialog.input.len() < 10 {
+                        dialog.input.insert(dialog.cursor, *digit);
+                        dialog.cursor += 1;
+                    }
+                }
+            }
+
+            // Backspace
+            if is_key_pressed(KeyCode::Backspace) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                if dialog.cursor > 0 {
+                    dialog.input.remove(dialog.cursor - 1);
+                    dialog.cursor -= 1;
+                }
+            }
+
+            // Delete
+            if is_key_pressed(KeyCode::Delete) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                if dialog.cursor < dialog.input.len() {
+                    dialog.input.remove(dialog.cursor);
+                }
+            }
+
+            // Left/Right arrow navigation
+            if is_key_pressed(KeyCode::Left) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                if dialog.cursor > 0 {
+                    dialog.cursor -= 1;
+                }
+            }
+            if is_key_pressed(KeyCode::Right) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                if dialog.cursor < dialog.input.len() {
+                    dialog.cursor += 1;
+                }
+            }
+
+            // Home/End
+            if is_key_pressed(KeyCode::Home) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                dialog.cursor = 0;
+            }
+            if is_key_pressed(KeyCode::End) {
+                let dialog = state.ui_state.stall_price_dialog.as_mut().unwrap();
+                dialog.cursor = dialog.input.len();
+            }
+
+            // Drain character queue
+            while get_char_pressed().is_some() {}
+
+            return commands;
+        }
+
         // Handle chest panel input (does NOT return early — allows inventory right-click etc.)
         if state.ui_state.chest_open {
             // Mouse wheel scroll
@@ -3753,39 +3884,105 @@ impl InputHandler {
             if mouse_clicked {
                 if let Some(ref element) = clicked_element {
                     match element {
+                        UiElementId::StallSetupNameInput => {
+                            state.ui_state.stall_name_editing = true;
+                            state.ui_state.stall_name_cursor = state.ui_state.stall_my_name.len();
+                        }
                         UiElementId::StallSetupRemove(i) => {
+                            state.ui_state.stall_name_editing = false;
                             if let Some(slot) = state.ui_state.stall_my_slots.get(*i) {
                                 commands.push(InputCommand::StallRemoveItem { stall_slot: slot.slot });
                             }
                         }
                         UiElementId::StallSetupOpenButton => {
-                            let name = if state.ui_state.stall_my_name.is_empty() {
-                                "My Shop".to_string()
+                            state.ui_state.stall_name_editing = false;
+                            if state.ui_state.stall_active {
+                                commands.push(InputCommand::StallClose);
                             } else {
-                                state.ui_state.stall_my_name.clone()
-                            };
-                            commands.push(InputCommand::StallOpen { name });
+                                let name = if state.ui_state.stall_my_name.is_empty() {
+                                    "My Shop".to_string()
+                                } else {
+                                    state.ui_state.stall_my_name.clone()
+                                };
+                                commands.push(InputCommand::StallOpen { name });
+                            }
                         }
                         UiElementId::StallSetupCloseButton => {
-                            commands.push(InputCommand::StallClose);
+                            state.ui_state.stall_name_editing = false;
+                            state.ui_state.stall_setup_open = false;
                         }
                         UiElementId::InventorySlot(slot_idx) => {
-                            // Add item to stall from inventory
+                            state.ui_state.stall_name_editing = false;
                             if let Some(slot) = state.inventory.slots.get(*slot_idx).and_then(|s| s.as_ref()) {
                                 commands.push(InputCommand::StallSetItem {
                                     inventory_slot: *slot_idx as u8,
                                     quantity: slot.quantity,
-                                    price: 1, // Default price; player can edit later
+                                    price: 1,
                                 });
                             }
                         }
-                        _ => {}
+                        _ => {
+                            state.ui_state.stall_name_editing = false;
+                        }
+                    }
+                } else {
+                    // Clicked outside any element — unfocus name input
+                    state.ui_state.stall_name_editing = false;
+                }
+            }
+
+            // Keyboard input for name editing
+            if state.ui_state.stall_name_editing {
+                if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::Enter) {
+                    state.ui_state.stall_name_editing = false;
+                    // Drain chars so they don't leak
+                    while get_char_pressed().is_some() {}
+                    return commands;
+                }
+
+                if is_key_pressed(KeyCode::Backspace) {
+                    if state.ui_state.stall_name_cursor > 0 {
+                        state.ui_state.stall_name_cursor -= 1;
+                        state.ui_state.stall_my_name.remove(state.ui_state.stall_name_cursor);
                     }
                 }
+                if is_key_pressed(KeyCode::Delete) {
+                    if state.ui_state.stall_name_cursor < state.ui_state.stall_my_name.len() {
+                        state.ui_state.stall_my_name.remove(state.ui_state.stall_name_cursor);
+                    }
+                }
+                if is_key_pressed(KeyCode::Left) {
+                    if state.ui_state.stall_name_cursor > 0 {
+                        state.ui_state.stall_name_cursor -= 1;
+                    }
+                }
+                if is_key_pressed(KeyCode::Right) {
+                    if state.ui_state.stall_name_cursor < state.ui_state.stall_my_name.len() {
+                        state.ui_state.stall_name_cursor += 1;
+                    }
+                }
+                if is_key_pressed(KeyCode::Home) {
+                    state.ui_state.stall_name_cursor = 0;
+                }
+                if is_key_pressed(KeyCode::End) {
+                    state.ui_state.stall_name_cursor = state.ui_state.stall_my_name.len();
+                }
+
+                // Typed characters
+                while let Some(ch) = get_char_pressed() {
+                    if ch.is_control() { continue; }
+                    if state.ui_state.stall_my_name.len() < 24 {
+                        state.ui_state.stall_my_name.insert(state.ui_state.stall_name_cursor, ch);
+                        state.ui_state.stall_name_cursor += 1;
+                    }
+                }
+
+                return commands;
             }
 
             if is_key_pressed(KeyCode::Escape) {
                 state.ui_state.stall_setup_open = false;
+                state.ui_state.stall_name_editing = false;
                 return commands;
             }
 
@@ -8263,6 +8460,16 @@ impl InputHandler {
                     }
                     return commands;
                 }
+                UiElementId::CharacterOpenShopButton => {
+                    if mouse_clicked {
+                        audio.play_sfx("enter");
+                        state.ui_state.stall_setup_open = !state.ui_state.stall_setup_open;
+                        if state.ui_state.stall_setup_open {
+                            state.ui_state.inventory_open = true;
+                        }
+                    }
+                    return commands;
+                }
                 UiElementId::GoldDisplay => {
                     if mouse_right_clicked && state.inventory.gold > 0 {
                         // Right-click on gold display opens context menu
@@ -9292,11 +9499,7 @@ impl InputHandler {
             return commands;
         }
 
-        // Toggle stall setup panel (Y key)
-        if !classic && is_key_pressed(KeyCode::Y) {
-            audio.play_sfx("enter");
-            state.ui_state.stall_setup_open = !state.ui_state.stall_setup_open;
-        }
+
 
         // Use/equip items or cast spells via unified hotkey bar (1-5 keys, disabled in classic mode)
         let quick_slot_keys = [

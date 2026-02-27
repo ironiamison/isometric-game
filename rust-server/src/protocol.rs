@@ -6055,7 +6055,9 @@ fn extract_i64(value: &rmpv::Value, key: &str) -> Option<i64> {
 // Binary Compression (for StateSync bandwidth reduction)
 // ============================================================================
 
-const COMPRESSION_THRESHOLD: usize = 128;
+// Deflate setup overhead is noticeable for tiny high-frequency deltas.
+// Keep small payloads uncompressed to reduce server-side sync CPU spikes.
+const COMPRESSION_THRESHOLD: usize = 1024;
 
 /// Wrap a MessagePack payload with a compression prefix.
 /// - 0x00 prefix: uncompressed data follows

@@ -273,11 +273,18 @@ pub fn run_game_frame(
     let network_ms = (get_time() - network_start) * 1000.0;
 
     // 1.5. Play any pending sound effects queued by message handlers
-    for sfx_name in game_state.pending_sfx.drain(..) {
-        audio.play_sfx(&sfx_name);
-    }
-    for attack_type in game_state.pending_attack_sounds.drain(..) {
-        audio.play_attack_sound(attack_type);
+    // If we were backgrounded (tab inactive), the delta will be huge — clear queues
+    // instead of playing all accumulated sounds at once
+    if delta > 0.5 {
+        game_state.pending_sfx.clear();
+        game_state.pending_attack_sounds.clear();
+    } else {
+        for sfx_name in game_state.pending_sfx.drain(..) {
+            audio.play_sfx(&sfx_name);
+        }
+        for attack_type in game_state.pending_attack_sounds.drain(..) {
+            audio.play_attack_sound(attack_type);
+        }
     }
 
     // 2. Render and get UI layout for hit detection

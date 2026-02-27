@@ -1024,6 +1024,16 @@ pub struct GoldDropDialog {
     pub cursor: usize,
 }
 
+/// Dialog for entering stall item price
+#[derive(Debug, Clone)]
+pub struct StallPriceDialog {
+    pub input: String,
+    pub cursor: usize,
+    pub inventory_slot: u8,
+    pub quantity: i32,
+    pub item_id: String,
+}
+
 /// What action the bank quantity dialog will perform on confirm
 #[derive(Debug, Clone, PartialEq)]
 pub enum BankQuantityAction {
@@ -1428,6 +1438,10 @@ pub struct UiState {
     pub stall_my_slots: Vec<StallSlotInfo>,
     /// Our stall name
     pub stall_my_name: String,
+    /// Whether we're editing the stall name
+    pub stall_name_editing: bool,
+    /// Cursor position in stall name input
+    pub stall_name_cursor: usize,
     /// Whether we have an active stall
     pub stall_active: bool,
     /// Stall browse data (when browsing another player's stall)
@@ -1436,6 +1450,10 @@ pub struct UiState {
     pub stall_buy_quantity: i32,
     /// Selected stall browse slot index
     pub stall_browse_selected: usize,
+    /// Stall price input dialog
+    pub stall_price_dialog: Option<StallPriceDialog>,
+    /// Last prices entered per item_id (for auto-fill)
+    pub stall_last_prices: std::collections::HashMap<String, i32>,
 }
 
 impl Default for UiState {
@@ -1638,10 +1656,14 @@ impl Default for UiState {
             stall_setup_open: false,
             stall_my_slots: Vec::new(),
             stall_my_name: String::new(),
+            stall_name_editing: false,
+            stall_name_cursor: 0,
             stall_active: false,
             stall_browse: None,
             stall_buy_quantity: 1,
             stall_browse_selected: 0,
+            stall_price_dialog: None,
+            stall_last_prices: std::collections::HashMap::new(),
         }
     }
 }

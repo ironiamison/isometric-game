@@ -4135,7 +4135,7 @@ impl Renderer {
     /// Render overhead stall indicator for players with active stalls
     fn render_stall_indicators(&self, state: &GameState) {
         let zoom = state.camera.zoom;
-        let font_size = 13.0 * zoom;
+        let font_size = 16.0 * zoom;
         let scaled_sprite_height = SPRITE_HEIGHT * zoom;
 
         for player in state.players.values() {
@@ -4160,23 +4160,24 @@ impl Renderer {
             // Position above the name tag area
             let stall_label = player.stall_name.as_deref().unwrap_or("Shop");
             let label_w = self.measure_text_sharp(stall_label, font_size).width;
-            let tag_h = 16.0 * zoom;
             let padding = 4.0 * zoom;
-            let tag_x = screen_x - (label_w + padding * 2.0) / 2.0;
-            let tag_y = screen_y - name_y_offset - tag_h - 4.0 * zoom;
+            let bar_height = 18.0 * zoom;
+            let tag_x = (screen_x - (label_w + padding * 2.0) / 2.0).floor();
+            let name_y = (screen_y - name_y_offset + 2.0 * zoom).floor();
+            let tag_y = (name_y - 14.0 * zoom - bar_height - 2.0 * zoom).floor();
 
             // Green background bar
             draw_rectangle(
                 tag_x,
                 tag_y,
                 label_w + padding * 2.0,
-                tag_h,
+                bar_height,
                 Color::new(0.1, 0.45, 0.1, 0.85),
             );
             self.draw_text_sharp(
                 stall_label,
-                tag_x + padding,
-                tag_y + tag_h - 3.0 * zoom,
+                (tag_x + padding).floor(),
+                (tag_y + bar_height - 4.0 * zoom).floor(),
                 font_size,
                 Color::new(0.9, 1.0, 0.9, 1.0),
             );
@@ -9477,6 +9478,11 @@ impl Renderer {
         // Gold drop dialog (when active) - rendered after trade/stall so it appears on top
         if let Some(ref dialog) = state.ui_state.gold_drop_dialog {
             self.render_gold_drop_dialog(dialog, state.inventory.gold, state.ui_state.trade_open, hovered, &mut layout);
+        }
+
+        // Stall price dialog (when active)
+        if let Some(ref dialog) = state.ui_state.stall_price_dialog {
+            self.render_stall_price_dialog(dialog, hovered, &mut layout);
         }
 
         // Quest completion notifications (on top of dialogue/panels)

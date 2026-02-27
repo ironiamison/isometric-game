@@ -3978,6 +3978,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.stall_active = true;
                 state.ui_state.stall_my_name = name;
                 state.ui_state.stall_setup_open = true;
+                state.ui_state.inventory_open = true;
                 state.push_system_chat("Your shop is now open!".to_string());
             }
         }

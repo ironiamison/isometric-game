@@ -13,11 +13,14 @@ const CHARACTER_HEADER_HEIGHT: f32 = 24.0;
 const CHARACTER_GRID_WIDTH: f32 = 3.0 * EQUIP_SLOT_SIZE + 2.0 * EQUIP_SLOT_SPACING; // 122
 const CHARACTER_GRID_HEIGHT: f32 = 4.0 * EQUIP_SLOT_SIZE + 3.0 * EQUIP_SLOT_SPACING + 26.0; // 190
 const CHARACTER_PANEL_WIDTH: f32 = 240.0; // Unified width to match inventory and other UI panels
+const SHOP_BUTTON_HEIGHT: f32 = 26.0;
 const CHARACTER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
     + CHARACTER_HEADER_HEIGHT
     + CHARACTER_PANEL_PADDING
     + CHARACTER_GRID_HEIGHT
-    + CHARACTER_PANEL_PADDING; // ~262
+    + CHARACTER_PANEL_PADDING
+    + SHOP_BUTTON_HEIGHT
+    + CHARACTER_PANEL_PADDING; // ~300
 const STATS_SECTION_GAP: f32 = 8.0; // Gap between equipment grid and stats
 
 impl Renderer {
@@ -203,5 +206,57 @@ impl Renderer {
             let def_val = format!("+{}", def_bonus);
             self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
         }
+
+        // ===== OPEN SHOP BUTTON =====
+        let btn_height = 26.0 * scale;
+        let btn_width = panel_width - frame_thickness * 2.0 - panel_padding * 2.0;
+        let btn_x = panel_x + frame_thickness + panel_padding;
+        let btn_y = panel_y + panel_height - frame_thickness - panel_padding - btn_height;
+
+        let btn_bounds = Rect::new(btn_x, btn_y, btn_width, btn_height);
+        layout.add(UiElementId::CharacterOpenShopButton, btn_bounds);
+
+        let btn_hovered = matches!(hovered, Some(UiElementId::CharacterOpenShopButton));
+        let btn_label = if state.ui_state.stall_setup_open || state.ui_state.stall_active {
+            "Close Shop"
+        } else {
+            "Open Shop"
+        };
+
+        let (btn_bg, btn_border) = if btn_hovered {
+            (Color::new(0.235, 0.204, 0.141, 1.0), FRAME_ACCENT)
+        } else {
+            (Color::new(0.157, 0.141, 0.110, 1.0), FRAME_MID)
+        };
+
+        draw_rectangle(btn_x, btn_y, btn_width, btn_height, btn_border);
+        draw_rectangle(
+            btn_x + 1.0,
+            btn_y + 1.0,
+            btn_width - 2.0,
+            btn_height - 2.0,
+            btn_bg,
+        );
+
+        if btn_hovered {
+            draw_line(
+                btn_x + 2.0,
+                btn_y + 2.0,
+                btn_x + btn_width - 2.0,
+                btn_y + 2.0,
+                1.0,
+                FRAME_INNER,
+            );
+        }
+
+        let btn_text_color = if btn_hovered { TEXT_TITLE } else { TEXT_NORMAL };
+        let btn_text_w = self.measure_text_sharp(btn_label, 16.0).width;
+        self.draw_text_sharp(
+            btn_label,
+            btn_x + (btn_width - btn_text_w) / 2.0,
+            btn_y + 18.0 * scale,
+            16.0,
+            btn_text_color,
+        );
     }
 }

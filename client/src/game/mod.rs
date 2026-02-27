@@ -35,7 +35,7 @@ pub use state::{
     BankDrag, BankQuantityAction, BankQuantityDialog, BonusTile, Camera, ChatBubble, ChatChannel,
     ChatMessage, ConnectionStatus, ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice,
     DoubleClickState, DragSource, DragState, FarmingContractInfo, FarmingPatch, FrameTimings,
-    FriendInfo, GameState, GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent,
+    FriendInfo, GameState, GatheringBuff, GatheringMarker, GoldDropDialog, LevelUpEvent, StallPriceDialog,
     MapTransition, OnlinePlayerInfo, PendingRequestInfo, Projectile, CatalogObjective,
     QuestCatalogEntry, QuestCompletedEvent, QuestObjective, SkillXpEvent, SocialState, SocialTab,
     SpellEffect, StallBrowseInfo, StallSlotInfo, TradeOfferItem, TransitionState, UiState,

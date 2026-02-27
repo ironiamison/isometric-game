@@ -111,6 +111,10 @@ pub enum UiElementId {
     GoldDropConfirm,
     GoldDropCancel,
 
+    // Stall Price Dialog
+    StallPriceConfirm,
+    StallPriceCancel,
+
     // Bank Quantity Dialog
     BankQuantityConfirm,
     BankQuantityCancel,
@@ -257,6 +261,9 @@ pub enum UiElementId {
     TradeCancelButton,
     TradeRequestAccept,
     TradeRequestDecline,
+
+    // Character panel
+    CharacterOpenShopButton,
 
     // Stall Setup Panel (owner)
     StallSetupSlot(usize),

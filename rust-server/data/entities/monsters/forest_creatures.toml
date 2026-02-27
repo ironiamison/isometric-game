@@ -435,13 +435,13 @@ gold_max = 6
 
 [[sheep.loot]]
 item_id = "scrap_leather"
-drop_chance = 0.20
+drop_chance = 0.10
 quantity_min = 1
 quantity_max = 1
 
 [[sheep.loot]]
 item_id = "wool"
-drop_chance = 0.60
+drop_chance = 0.50
 quantity_min = 1
 quantity_max = 2
 

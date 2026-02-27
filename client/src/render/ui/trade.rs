@@ -19,16 +19,13 @@ impl super::super::Renderer {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
 
-        let panel_width = (480.0 * s).min(sw - 16.0);
-        let panel_height = (420.0 * s).min(sh - 16.0);
+        let panel_width = (520.0 * s).min(sw - 16.0);
+        let panel_height = (500.0 * s).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 
         let header_h = HEADER_HEIGHT * s;
         let footer_h = FOOTER_HEIGHT * s;
-
-        // Semi-transparent overlay
-        draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
 
         // Panel frame + corner accents
         self.draw_panel_frame(panel_x, panel_y, panel_width, panel_height);
@@ -152,7 +149,7 @@ impl super::super::Renderer {
 
         // Column sub-header height
         let col_header_h = 24.0 * s;
-        let slot_h = 40.0 * s;
+        let slot_h = 52.0 * s;
         let slot_gap = 3.0 * s;
         let max_slots = 6;
         let gold_row_h = 32.0 * s;
@@ -211,7 +208,7 @@ impl super::super::Renderer {
 
         // ===== LEFT COLUMN ITEMS =====
         let items_start_y = content_y + col_header_h + 4.0 * s;
-        let icon_size = 32.0 * s;
+        let icon_size = 46.0 * s;
 
         for i in 0..max_slots {
             let slot_y = items_start_y + i as f32 * (slot_h + slot_gap);
@@ -260,7 +257,7 @@ impl super::super::Renderer {
                     icon_size,
                     icon_size,
                     state,
-                    true,
+                    false,
                 );
 
                 // Item name
@@ -375,7 +372,7 @@ impl super::super::Renderer {
                     icon_size,
                     icon_size,
                     state,
-                    true,
+                    false,
                 );
 
                 // Item name

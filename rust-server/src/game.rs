@@ -438,6 +438,7 @@ pub struct StallSlot {
 pub struct PlayerStall {
     pub name: String,
     pub slots: Vec<Option<StallSlot>>,
+    pub active: bool,
 }
 
 impl PlayerStall {
@@ -445,6 +446,7 @@ impl PlayerStall {
         Self {
             name,
             slots: (0..STALL_MAX_SLOTS).map(|_| None).collect(),
+            active: false,
         }
     }
 }
@@ -2565,7 +2567,7 @@ impl GameRoom {
                 player.last_received_move_seq = move_seq;
 
                 // Block movement while stall is active
-                if player.stall.is_some() {
+                if player.stall.as_ref().map_or(false, |s| s.active) {
                     return;
                 }
 
@@ -5146,14 +5148,22 @@ impl GameRoom {
                 state.blocked_monsters.push(monster);
             }
             "potion" | "equipment" => {
-                state.points -= reward.cost;
                 // Grant items to player inventory
                 if let Some(ref item_id) = reward.target_id {
                     let mut players = self.players.write().await;
                     if let Some(player) = players.get_mut(player_id) {
+                        if !player.inventory.has_space_for(item_id, reward.quantity, &self.item_registry) {
+                            self.send_to_player(player_id, ServerMessage::SlayerResult {
+                                success: false, action: "buy_reward".to_string(),
+                                message: "Your inventory is full.".to_string(),
+                                task: None, points: Some(state.points),
+                            }).await;
+                            return;
+                        }
                         player.inventory.add_item(item_id, reward.quantity, &self.item_registry);
                     }
                 }
+                state.points -= reward.cost;
             }
             _ => {}
         }
@@ -12914,8 +12924,8 @@ impl GameRoom {
                     dashing: player.is_dashing,
                     mp: player.mp,
                     max_mp: player.max_mp(),
-                    has_stall: player.stall.is_some(),
-                    stall_name: player.stall.as_ref().map(|s| s.name.clone()),
+                    has_stall: player.stall.as_ref().map_or(false, |s| s.active),
+                    stall_name: player.stall.as_ref().filter(|s| s.active).map(|s| s.name.clone()),
                 });
             }
             player_updates
@@ -14401,6 +14411,21 @@ impl GameRoom {
             // Both read locks released here
         };
 
+        // Build quest lookup snapshots once per tick so StateSync avoids repeated async
+        // registry lookups while evaluating per-player quest marker visibility.
+        let all_quests = self.quest_registry.all_quests().await;
+        let mut quest_by_id = HashMap::new();
+        let mut npc_quest_ids: HashMap<String, Vec<String>> = HashMap::new();
+        for quest in all_quests {
+            if !quest.giver_npc.is_empty() {
+                npc_quest_ids
+                    .entry(quest.giver_npc.clone())
+                    .or_default()
+                    .push(quest.id.clone());
+            }
+            quest_by_id.insert(quest.id.clone(), quest);
+        }
+
         // Per-player lookup: quest giver prototype IDs that should show turn-in check icons.
         // Includes:
         // 1) Quests already in ReadyToComplete
@@ -14408,29 +14433,23 @@ impl GameRoom {
         //    remaining step is "talk_to" the giver (return-to-giver prompt)
         let ready_turnin_npc_types_by_player: HashMap<String, HashSet<String>> = {
             let mut out: HashMap<String, HashSet<String>> = HashMap::new();
-            let mut quest_to_giver_cache: HashMap<String, Option<String>> = HashMap::new();
 
             let quest_states = self.player_quest_states.read().await;
             for (player_id, state) in quest_states.iter() {
                 let mut givers: HashSet<String> = HashSet::new();
 
                 for (quest_id, progress) in state.active_quests.iter() {
+                    let Some(quest_def) = quest_by_id.get(quest_id) else {
+                        continue;
+                    };
+
+                    if quest_def.giver_npc.is_empty() {
+                        continue;
+                    }
+
                     // Fast path: quest already ready to complete
                     if progress.status == crate::quest::QuestStatus::ReadyToComplete {
-                        let giver_npc = if let Some(cached) = quest_to_giver_cache.get(quest_id) {
-                            cached.clone()
-                        } else {
-                            let resolved = self
-                                .quest_registry
-                                .get(quest_id)
-                                .await
-                                .map(|q| q.giver_npc.clone());
-                            quest_to_giver_cache.insert(quest_id.clone(), resolved.clone());
-                            resolved
-                        };
-                        if let Some(giver) = giver_npc {
-                            givers.insert(giver);
-                        }
+                        givers.insert(quest_def.giver_npc.clone());
                         continue;
                     }
 
@@ -14438,15 +14457,7 @@ impl GameRoom {
                         continue;
                     }
 
-                    let Some(quest_def) = self.quest_registry.get(quest_id).await else {
-                        continue;
-                    };
-
-                    let giver_npc = quest_def.giver_npc.clone();
-                    if giver_npc.is_empty() {
-                        continue;
-                    }
-
+                    let giver_npc = quest_def.giver_npc.as_str();
                     let mut has_incomplete_return_to_giver = false;
                     let mut all_other_objectives_complete = true;
 
@@ -14471,7 +14482,7 @@ impl GameRoom {
                     }
 
                     if has_incomplete_return_to_giver && all_other_objectives_complete {
-                        givers.insert(giver_npc);
+                        givers.insert(quest_def.giver_npc.clone());
                     }
                 }
 
@@ -14486,17 +14497,6 @@ impl GameRoom {
         // For merchant+quest_giver NPCs, hide is_quest_giver when all quests are done.
         // Build NPC -> quest IDs, then check per-player completion.
         let all_npc_quests_done_by_player: HashMap<String, HashSet<String>> = {
-            let quests = self.quest_registry.all_quests().await;
-            let mut npc_quest_ids: HashMap<String, Vec<String>> = HashMap::new();
-            for q in &quests {
-                if !q.giver_npc.is_empty() {
-                    npc_quest_ids
-                        .entry(q.giver_npc.clone())
-                        .or_default()
-                        .push(q.id.clone());
-                }
-            }
-
             let mut out: HashMap<String, HashSet<String>> = HashMap::new();
             let quest_states = self.player_quest_states.read().await;
             for (player_id, state) in quest_states.iter() {
@@ -14953,7 +14953,7 @@ impl GameRoom {
             let stall_owners: Vec<String> = {
                 let players = self.players.read().await;
                 players.values()
-                    .filter(|p| p.stall.is_some() && p.is_dead)
+                    .filter(|p| p.stall.as_ref().map_or(false, |s| s.active) && p.is_dead)
                     .map(|p| p.id.clone())
                     .collect()
             };
@@ -18268,12 +18268,12 @@ impl GameRoom {
             // Check not already trading
             let name = requester.name.clone();
             // Check stall
-            if target.stall.is_some() {
+            if target.stall.as_ref().map_or(false, |s| s.active) {
                 drop(players);
                 self.send_system_message(player_id, "That player is running a shop.").await;
                 return;
             }
-            if requester.stall.is_some() {
+            if requester.stall.as_ref().map_or(false, |s| s.active) {
                 drop(players);
                 self.send_system_message(player_id, "Close your shop before trading.").await;
                 return;
@@ -18873,7 +18873,7 @@ impl GameRoom {
                 Some(p) if p.active && !p.is_dead => p,
                 _ => return,
             };
-            if player.stall.is_some() {
+            if player.stall.as_ref().map_or(false, |s| s.active) {
                 drop(players);
                 self.send_system_message(player_id, "You already have a shop open.").await;
                 return;
@@ -18902,13 +18902,23 @@ impl GameRoom {
             name.chars().take(32).collect::<String>()
         };
 
-        let stall = PlayerStall::new(stall_name.clone());
-        let slots = Self::stall_slots_to_data(&stall);
-
+        let slots;
         {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                player.stall = Some(stall);
+                if let Some(ref mut stall) = player.stall {
+                    // Stall already has items staged — just activate it
+                    stall.name = stall_name.clone();
+                    stall.active = true;
+                    slots = Self::stall_slots_to_data(stall);
+                } else {
+                    let mut stall = PlayerStall::new(stall_name.clone());
+                    stall.active = true;
+                    slots = Self::stall_slots_to_data(&stall);
+                    player.stall = Some(stall);
+                }
+            } else {
+                return;
             }
         }
 
@@ -18980,9 +18990,18 @@ impl GameRoom {
 
         let mut players = self.players.write().await;
         let player = match players.get_mut(player_id) {
-            Some(p) if p.stall.is_some() => p,
-            _ => return,
+            Some(p) => p,
+            None => return,
         };
+
+        // Auto-create stall storage if not yet opened
+        if player.stall.is_none() {
+            player.stall = Some(PlayerStall {
+                name: String::new(),
+                slots: std::iter::repeat_with(|| None).take(STALL_MAX_SLOTS).collect(),
+                active: false,
+            });
+        }
 
         // Get item from inventory
         let (item_id, available) = match player.inventory.slots.get(inventory_slot as usize) {
@@ -19102,7 +19121,7 @@ impl GameRoom {
     pub async fn handle_stall_browse(&self, player_id: &str, seller_id: &str) {
         let players = self.players.read().await;
         let seller = match players.get(seller_id) {
-            Some(p) if p.active && p.stall.is_some() => p,
+            Some(p) if p.active && p.stall.as_ref().map_or(false, |s| s.active) => p,
             _ => {
                 drop(players);
                 self.send_system_message(player_id, "That player doesn't have a shop open.").await;
@@ -19131,10 +19150,10 @@ impl GameRoom {
 
         let mut players = self.players.write().await;
 
-        // Validate seller has stall
+        // Validate seller has active stall
         let (item_id, available_qty, price_per, seller_name) = {
             let seller = match players.get(seller_id) {
-                Some(p) if p.active && p.stall.is_some() => p,
+                Some(p) if p.active && p.stall.as_ref().map_or(false, |s| s.active) => p,
                 _ => {
                     drop(players);
                     self.send_to_player(buyer_id, ServerMessage::StallBuyResult {
