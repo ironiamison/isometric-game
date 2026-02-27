@@ -31,8 +31,8 @@ use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, Scre
 // const SERVER_URL: &str = "https://aeven.xyz";
 // const WS_URL: &str = "wss://aeven.xyz";
 
-const SERVER_URL: &str = "http://localhost:2567";
-const WS_URL: &str = "ws://localhost:2567";
+const SERVER_URL: &str = "https://aeven.xyz";
+const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
