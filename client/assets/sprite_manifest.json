@@ -28667,1088 +28667,1106 @@
         "w": 46,
         "h": 32
       },
-      "firewood_staff": {
+      "feather": {
         "x": 3365,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "fishing_rod": {
+      "firewood_staff": {
         "x": 3411,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "goblin_axe": {
+      "fishing_rod": {
         "x": 3457,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "goblin_ear": {
+      "goblin_axe": {
         "x": 3503,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "goblin_spear": {
+      "goblin_ear": {
         "x": 3549,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "gold_ring": {
+      "goblin_spear": {
         "x": 3595,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "gold_satchel": {
+      "gold_ring": {
         "x": 3641,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "great_axe": {
+      "gold_satchel": {
         "x": 3687,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "great_gold_ring": {
+      "great_axe": {
         "x": 3733,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "great_silver_ring": {
+      "great_gold_ring": {
         "x": 3779,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "gutter_blade": {
+      "great_silver_ring": {
         "x": 3825,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "hard_casket": {
+      "gutter_blade": {
         "x": 3871,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "hard_clue": {
+      "hard_casket": {
         "x": 3917,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "hatchet": {
+      "hard_clue": {
         "x": 3963,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "health_potion": {
+      "hatchet": {
         "x": 4009,
         "y": 0,
         "w": 46,
         "h": 32
       },
-      "hedgehog_spine": {
+      "health_potion": {
         "x": 0,
+        "y": 64,
+        "w": 46,
+        "h": 32
+      },
+      "hedgehog_spine": {
+        "x": 46,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "helmet_of_darkness": {
-        "x": 46,
+        "x": 92,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "hero_armor": {
-        "x": 92,
+        "x": 138,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "hood_black": {
-        "x": 138,
+        "x": 184,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "hood_brown": {
-        "x": 184,
+        "x": 230,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "ice_necklace": {
-        "x": 230,
+        "x": 276,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "ice_ring": {
-        "x": 276,
+        "x": 322,
+        "y": 64,
+        "w": 46,
+        "h": 32
+      },
+      "improved_attractor": {
+        "x": 368,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_arrowhead": {
-        "x": 322,
+        "x": 414,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_arrows": {
-        "x": 368,
+        "x": 460,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_axe": {
-        "x": 414,
+        "x": 506,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_bar": {
-        "x": 460,
+        "x": 552,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_boots": {
-        "x": 506,
+        "x": 598,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_gloves": {
-        "x": 552,
+        "x": 644,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_ore": {
-        "x": 598,
+        "x": 690,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_platebody_female": {
-        "x": 644,
+        "x": 736,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_platebody_male": {
-        "x": 690,
+        "x": 782,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "iron_sword": {
-        "x": 736,
+        "x": 828,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "knife": {
-        "x": 782,
+        "x": 874,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "leather": {
-        "x": 828,
+        "x": 920,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "leather_armor_female": {
-        "x": 874,
+        "x": 966,
+        "y": 64,
+        "w": 46,
+        "h": 32
+      },
+      "leather_attractor": {
+        "x": 1012,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "leather_belt": {
-        "x": 920,
+        "x": 1058,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "leather_body": {
-        "x": 966,
+        "x": 1104,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "leather_boots": {
-        "x": 1012,
+        "x": 1150,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "leather_gloves": {
-        "x": 1058,
+        "x": 1196,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "leather_hat": {
-        "x": 1104,
+        "x": 1242,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "logs": {
-        "x": 1150,
+        "x": 1288,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "long_bow": {
-        "x": 1196,
+        "x": 1334,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "machete": {
-        "x": 1242,
+        "x": 1380,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "magic_necklace": {
-        "x": 1288,
+        "x": 1426,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "magic_staff": {
-        "x": 1334,
+        "x": 1472,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "mana_potion": {
-        "x": 1380,
+        "x": 1518,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "mana_ring": {
-        "x": 1426,
+        "x": 1564,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "maple_bow": {
-        "x": 1472,
+        "x": 1610,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "maple_bow_unstrung": {
-        "x": 1518,
+        "x": 1656,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "maple_rod": {
-        "x": 1564,
+        "x": 1702,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "medium_casket": {
-        "x": 1610,
+        "x": 1748,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "medium_clue": {
-        "x": 1656,
+        "x": 1794,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "mini_health_potion": {
-        "x": 1702,
+        "x": 1840,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "mithril_axe": {
-        "x": 1748,
+        "x": 1886,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "necklace_of_vitality": {
-        "x": 1794,
+        "x": 1932,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "normal_quiver": {
-        "x": 1840,
+        "x": 1978,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "oak_bow": {
-        "x": 1886,
+        "x": 2024,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "oak_bow_unstrung": {
-        "x": 1932,
+        "x": 2070,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "oak_log": {
-        "x": 1978,
+        "x": 2116,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "oblon_armor": {
-        "x": 2024,
+        "x": 2162,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "onion": {
-        "x": 2070,
+        "x": 2208,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "onion_seed": {
-        "x": 2116,
+        "x": 2254,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "oyster": {
-        "x": 2162,
+        "x": 2300,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "parchment": {
-        "x": 2208,
+        "x": 2346,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "peasant_boots": {
-        "x": 2254,
+        "x": 2392,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "peasant_dress": {
-        "x": 2300,
+        "x": 2438,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "peasant_garb": {
-        "x": 2346,
+        "x": 2484,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "peasant_suit": {
-        "x": 2392,
+        "x": 2530,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "peasant_suit_female": {
-        "x": 2438,
+        "x": 2576,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "pickaxe": {
-        "x": 2484,
+        "x": 2622,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "piglet": {
-        "x": 2530,
+        "x": 2668,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "potato": {
-        "x": 2576,
+        "x": 2714,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "potato_seed": {
-        "x": 2622,
+        "x": 2760,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "prayer_potion": {
-        "x": 2668,
+        "x": 2806,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "rapier": {
-        "x": 2714,
+        "x": 2852,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "raw_herring": {
-        "x": 2760,
+        "x": 2898,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "raw_lobster": {
-        "x": 2806,
+        "x": 2944,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "raw_sardine": {
-        "x": 2852,
+        "x": 2990,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "raw_shark": {
-        "x": 2898,
+        "x": 3036,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "raw_shrimp": {
-        "x": 2944,
+        "x": 3082,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "raw_trout": {
-        "x": 2990,
+        "x": 3128,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "regular_bones": {
-        "x": 3036,
+        "x": 3174,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "ring_of_life": {
-        "x": 3082,
+        "x": 3220,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "rogue_garb": {
-        "x": 3128,
+        "x": 3266,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "royal_boots": {
-        "x": 3174,
+        "x": 3312,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "royal_protector": {
-        "x": 3220,
+        "x": 3358,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "ruby_pendant": {
-        "x": 3266,
+        "x": 3404,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "ruby_ring": {
-        "x": 3312,
+        "x": 3450,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "rune_axe": {
-        "x": 3358,
+        "x": 3496,
         "y": 64,
         "w": 46,
         "h": 32
       },
       "runic_belt": {
-        "x": 3404,
-        "y": 64,
-        "w": 46,
-        "h": 32
-      },
-      "rusty_boots": {
-        "x": 3450,
-        "y": 64,
-        "w": 46,
-        "h": 32
-      },
-      "salvaged_sword": {
-        "x": 3496,
-        "y": 64,
-        "w": 46,
-        "h": 32
-      },
-      "salvaged_tunic": {
         "x": 3542,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "sapphire_pendant": {
+      "rusty_boots": {
         "x": 3588,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "sapphire_ring": {
+      "salvaged_sword": {
         "x": 3634,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "scavenger_boots": {
+      "salvaged_tunic": {
         "x": 3680,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "scavenger_bow": {
+      "sapphire_pendant": {
         "x": 3726,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "scavenger_tunic": {
+      "sapphire_ring": {
         "x": 3772,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "scavenger_tunic_female": {
+      "scavenger_boots": {
         "x": 3818,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "scavenger_tunic_male": {
+      "scavenger_bow": {
         "x": 3864,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "scrap_leather": {
+      "scavenger_tunic": {
         "x": 3910,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "shades": {
+      "scavenger_tunic_female": {
         "x": 3956,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "sheep_wool": {
+      "scavenger_tunic_male": {
         "x": 4002,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "shell_pendant": {
+      "scrap_leather": {
         "x": 4048,
         "y": 64,
         "w": 46,
         "h": 32
       },
-      "shell_plate": {
+      "shades": {
         "x": 0,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "shiny_trout": {
+      "sheep_wool": {
         "x": 46,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "shovel": {
+      "shell_pendant": {
         "x": 92,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "silver_ring": {
+      "shell_plate": {
         "x": 138,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "slayer_helmet": {
+      "shiny_trout": {
         "x": 184,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "slime": {
+      "shovel": {
         "x": 230,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "slime_core": {
+      "silver_ring": {
         "x": 276,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "snail_shell": {
+      "slayer_helmet": {
         "x": 322,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "snake_rattle": {
+      "slime": {
         "x": 368,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "sorcerer_robe": {
+      "slime_core": {
         "x": 414,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "spider_fang": {
+      "snail_shell": {
         "x": 460,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "spider_silk": {
+      "snake_rattle": {
         "x": 506,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "spinach": {
+      "sorcerer_robe": {
         "x": 552,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "spinach_seed": {
+      "spider_fang": {
         "x": 598,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "spoiled_meat": {
+      "spider_silk": {
         "x": 644,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "spring_coil": {
+      "spinach": {
         "x": 690,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_arrowhead": {
+      "spinach_seed": {
         "x": 736,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_arrows": {
+      "spoiled_meat": {
         "x": 782,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_axe": {
+      "spring_coil": {
         "x": 828,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_bar": {
+      "steel_arrowhead": {
         "x": 874,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_boots": {
+      "steel_arrows": {
         "x": 920,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_gloves": {
+      "steel_axe": {
         "x": 966,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_ore": {
+      "steel_bar": {
         "x": 1012,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_platebody_female": {
+      "steel_boots": {
         "x": 1058,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_platebody_male": {
+      "steel_gloves": {
         "x": 1104,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "steel_sword": {
+      "steel_ore": {
         "x": 1150,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "stone_armor": {
+      "steel_platebody_female": {
         "x": 1196,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "stone_belt": {
+      "steel_platebody_male": {
         "x": 1242,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "stone_ring": {
+      "steel_sword": {
         "x": 1288,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "strawberry": {
+      "stone_armor": {
         "x": 1334,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "strawberry_seed": {
+      "stone_belt": {
         "x": 1380,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "strength_potion": {
+      "stone_ring": {
         "x": 1426,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "strong_health_potion": {
+      "strawberry": {
         "x": 1472,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "strong_mana_potion": {
+      "strawberry_seed": {
         "x": 1518,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "super_attack_potion": {
+      "strength_potion": {
         "x": 1564,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "super_defence_potion": {
+      "strong_health_potion": {
         "x": 1610,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "super_strength_potion": {
+      "strong_mana_potion": {
         "x": 1656,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "sweater": {
+      "super_attack_potion": {
         "x": 1702,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "sweetcorn": {
+      "super_defence_potion": {
         "x": 1748,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "sweetcorn_seed": {
+      "super_strength_potion": {
         "x": 1794,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "tainted_hide": {
+      "sweater": {
         "x": 1840,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "thread": {
+      "sweetcorn": {
         "x": 1886,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "tin_ore": {
+      "sweetcorn_seed": {
         "x": 1932,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "tomato": {
+      "tainted_hide": {
         "x": 1978,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "tomato_seed": {
+      "thread": {
         "x": 2024,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "torn_clothes": {
+      "tin_ore": {
         "x": 2070,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "training_boots": {
+      "tomato": {
         "x": 2116,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "training_gloves": {
+      "tomato_seed": {
         "x": 2162,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "trout": {
+      "torn_clothes": {
         "x": 2208,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "twin_blade": {
+      "training_boots": {
         "x": 2254,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "uncut_diamond": {
+      "training_gloves": {
         "x": 2300,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "uncut_emerald": {
+      "trout": {
         "x": 2346,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "uncut_ruby": {
+      "twin_blade": {
         "x": 2392,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "uncut_sapphire": {
+      "uncut_diamond": {
         "x": 2438,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "undead_armor": {
+      "uncut_emerald": {
         "x": 2484,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "undead_gloves": {
+      "uncut_ruby": {
         "x": 2530,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "undead_ring": {
+      "uncut_sapphire": {
         "x": 2576,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "used_belt": {
+      "undead_armor": {
         "x": 2622,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "vial_of_water": {
+      "undead_gloves": {
         "x": 2668,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "weak_health_potion": {
+      "undead_ring": {
         "x": 2714,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "weak_mana_potion": {
+      "used_belt": {
         "x": 2760,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "wheat": {
+      "vial_of_water": {
         "x": 2806,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "wheat_seed": {
+      "weak_health_potion": {
         "x": 2852,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "willow_bow": {
+      "weak_mana_potion": {
         "x": 2898,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "willow_bow_unstrung": {
+      "wheat": {
         "x": 2944,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "willow_log": {
+      "wheat_seed": {
         "x": 2990,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "wizard_robes": {
+      "willow_bow": {
         "x": 3036,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "wizard_robes_female": {
+      "willow_bow_unstrung": {
         "x": 3082,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "wool": {
+      "willow_log": {
         "x": 3128,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "worm_segment": {
+      "wizard_robes": {
         "x": 3174,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "worn_belt": {
+      "wizard_robes_female": {
         "x": 3220,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "worn_boots": {
+      "wool": {
         "x": 3266,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "worn_sandals": {
+      "worm_segment": {
         "x": 3312,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "yew_bow": {
+      "worn_belt": {
         "x": 3358,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "yew_bow_unstrung": {
+      "worn_boots": {
         "x": 3404,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "yew_log": {
+      "worn_sandals": {
         "x": 3450,
         "y": 96,
         "w": 46,
         "h": 32
       },
-      "gold_1": {
+      "yew_bow": {
         "x": 3496,
+        "y": 96,
+        "w": 46,
+        "h": 32
+      },
+      "yew_bow_unstrung": {
+        "x": 3542,
+        "y": 96,
+        "w": 46,
+        "h": 32
+      },
+      "yew_log": {
+        "x": 3588,
+        "y": 96,
+        "w": 46,
+        "h": 32
+      },
+      "gold_1": {
+        "x": 3634,
         "y": 96,
         "w": 16,
         "h": 16
@@ -30104,98 +30122,110 @@
         "w": 100,
         "h": 63
       },
-      "normal_quiver": {
+      "improved_attractor": {
         "x": 2956,
         "y": 385,
         "w": 100,
         "h": 63
       },
-      "royal_protector": {
+      "leather_attractor": {
         "x": 3056,
+        "y": 385,
+        "w": 100,
+        "h": 63
+      },
+      "normal_quiver": {
+        "x": 3156,
+        "y": 385,
+        "w": 100,
+        "h": 63
+      },
+      "royal_protector": {
+        "x": 3256,
         "y": 385,
         "w": 616,
         "h": 38
       },
       "steel_helmet": {
-        "x": 3672,
+        "x": 3872,
         "y": 385,
         "w": 90,
         "h": 34
       },
       "helmet_of_darkness": {
-        "x": 3762,
+        "x": 3962,
         "y": 385,
         "w": 60,
         "h": 34
       },
       "hood_black": {
-        "x": 3822,
+        "x": 4022,
         "y": 385,
         "w": 60,
         "h": 34
       },
       "hood_brown": {
-        "x": 3882,
-        "y": 385,
-        "w": 60,
-        "h": 34
-      },
-      "leather_hat": {
-        "x": 3942,
-        "y": 385,
-        "w": 60,
-        "h": 34
-      },
-      "shades": {
-        "x": 4002,
-        "y": 385,
-        "w": 60,
-        "h": 34
-      },
-      "slayer_helmet": {
         "x": 0,
         "y": 462,
         "w": 60,
         "h": 34
       },
-      "wizard_hat": {
+      "leather_hat": {
         "x": 60,
         "y": 462,
         "w": 60,
         "h": 34
       },
-      "ancient_boots": {
+      "shades": {
         "x": 120,
+        "y": 462,
+        "w": 60,
+        "h": 34
+      },
+      "slayer_helmet": {
+        "x": 180,
+        "y": 462,
+        "w": 60,
+        "h": 34
+      },
+      "wizard_hat": {
+        "x": 240,
+        "y": 462,
+        "w": 60,
+        "h": 34
+      },
+      "ancient_boots": {
+        "x": 300,
         "y": 462,
         "w": 612,
         "h": 27
       },
       "leather_boots": {
-        "x": 732,
+        "x": 912,
         "y": 462,
         "w": 612,
         "h": 27
       },
       "steel_boots": {
-        "x": 1344,
+        "x": 1524,
         "y": 462,
         "w": 612,
         "h": 27
       },
       "bronze_boots": {
-        "x": 1956,
+        "x": 2136,
         "y": 462,
         "w": 544,
         "h": 27
       },
       "iron_boots": {
-        "x": 2500,
+        "x": 2680,
         "y": 462,
         "w": 544,
         "h": 27
       },
       "peasant_boots": {
-        "x": 3044,
+        "x": 3224,
         "y": 462,
         "w": 544,
         "h": 27
