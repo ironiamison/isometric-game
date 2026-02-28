@@ -8313,23 +8313,10 @@ impl InputHandler {
                             }
                         }
                     } else {
-                        let distance = (player_x - tx).abs() + (player_y - ty).abs();
-                        let is_confirmed = state
-                            .auto_action_state
-                            .as_ref()
-                            .map_or(false, |a| a.confirmed);
-
-                        // When in active combat (confirmed), stand your ground if the
-                        // target is nearby (≤2 tiles). The NPC is aggro'd and will walk
-                        // back to us. Only re-path if the target is far away (fleeing,
-                        // returning to spawn, etc.) or we haven't started combat yet.
-                        let should_chase = if is_confirmed {
-                            distance > 3
-                        } else {
-                            true // Initial approach — always chase
-                        };
-
-                        if should_chase {
+                        // Always chase if not cardinally adjacent — melee attacks
+                        // require cardinal adjacency (dx+dy==1), so standing your
+                        // ground at a diagonal position just deadlocks combat.
+                        {
                             let needs_repath = if let Some(ref path_state) = state.auto_path {
                                 // Destination no longer adjacent to the target (target moved).
                                 // Use a tolerance of 2 so we don't re-path every time the
