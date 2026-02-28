@@ -4734,6 +4734,12 @@ async fn main() {
                     tick_telemetry.rejected_chair_blocked,
                     tick_telemetry.rejected_arena_blocked,
                 );
+                tick_state.perf_metrics.record_movement_anomalies(
+                    tick_telemetry.movement_stale_packets_ignored,
+                    tick_telemetry.movement_seq_gap_events,
+                    tick_telemetry.movement_input_gap_events,
+                    tick_telemetry.movement_stale_intent_clears,
+                );
                 tick_state.perf_metrics.record_state_sync(
                     tick_telemetry.state_sync_send_attempts,
                     tick_telemetry.state_sync_capacity_skips,
@@ -4983,7 +4989,7 @@ async fn main() {
             interval.tick().await;
             let perf = perf_state.perf_metrics.snapshot(3, 0);
             info!(
-                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%)) state_sync(drop_rate={}%, skip_rate={}%, attempts={}, capacity_skips={}, drops={}, full={}({}%), delta={}({}%), fallback_self={}, raw_bytes={}, wire_bytes={}, wire_vs_raw={}%) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
+                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%), stale_packets={}({}%) seq_gaps={}({}%) input_gaps={}({}%) stale_intent_clears={}({}%)) state_sync(drop_rate={}%, skip_rate={}%, attempts={}, capacity_skips={}, drops={}, full={}({}%), delta={}({}%), fallback_self={}, raw_bytes={}, wire_bytes={}, wire_vs_raw={}%) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
                 perf.uptime_seconds,
                 perf.tick_loop_ms.p95_ms,
                 perf.tick_loop_ms.p99_ms,
@@ -5010,6 +5016,14 @@ async fn main() {
                 perf.derived_rates.movement_reject_chair_share_pct,
                 perf.counters.movement_rejections_arena_blocked,
                 perf.derived_rates.movement_reject_arena_share_pct,
+                perf.counters.movement_stale_packets_ignored,
+                perf.derived_rates.movement_stale_packet_rate_pct,
+                perf.counters.movement_seq_gap_events,
+                perf.derived_rates.movement_seq_gap_rate_pct,
+                perf.counters.movement_input_gap_events,
+                perf.derived_rates.movement_input_gap_rate_pct,
+                perf.counters.movement_stale_intent_clears,
+                perf.derived_rates.movement_stale_intent_clear_rate_pct,
                 perf.derived_rates.state_sync_drop_rate_pct,
                 perf.derived_rates.state_sync_capacity_skip_rate_pct,
                 perf.counters.state_sync_send_attempts,

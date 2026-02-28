@@ -56,6 +56,7 @@ impl GameRoom {
                 if movement_intent_is_stale(current_time, player.last_move_input_ms) {
                     let stale_ms = current_time.saturating_sub(player.last_move_input_ms);
                     let seq = player.pending_move_seq;
+                    tick_telemetry.movement_stale_intent_clears += 1;
                     tracing::warn!(
                         "Clearing stale move intent for {} after {}ms without input (seq={:?} pos=({}, {}) intent=({}, {}))",
                         player.id,

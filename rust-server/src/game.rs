@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 use tokio::sync::{RwLock, broadcast, mpsc};
 use uuid::Uuid;
 
@@ -852,6 +855,17 @@ pub struct TickTelemetry {
     pub state_sync_fallback_self_only_sends: usize,
     pub state_sync_raw_bytes: usize,
     pub state_sync_bytes_sent: usize,
+    pub movement_stale_packets_ignored: usize,
+    pub movement_seq_gap_events: usize,
+    pub movement_input_gap_events: usize,
+    pub movement_stale_intent_clears: usize,
+}
+
+#[derive(Default)]
+struct MovementAnomalyCounters {
+    stale_packets_ignored: AtomicU64,
+    seq_gap_events: AtomicU64,
+    input_gap_events: AtomicU64,
 }
 
 // ============================================================================
@@ -999,6 +1013,8 @@ pub struct GameRoom {
     player_trades: RwLock<HashMap<String, String>>,
     /// Pending trade requests: target_id -> (requester_id, tick_when_sent)
     trade_requests: RwLock<HashMap<String, (String, u64)>>,
+    /// Movement anomaly counters exported through /api/perf.
+    movement_anomalies: MovementAnomalyCounters,
 }
 
 impl GameRoom {
@@ -1491,6 +1507,7 @@ impl GameRoom {
             trades: RwLock::new(HashMap::new()),
             player_trades: RwLock::new(HashMap::new()),
             trade_requests: RwLock::new(HashMap::new()),
+            movement_anomalies: MovementAnomalyCounters::default(),
         }
     }
 
@@ -2612,6 +2629,9 @@ impl GameRoom {
                     seq.unwrap_or_else(|| player.last_received_move_seq.saturating_add(1));
                 let prev_seq = player.last_received_move_seq;
                 if move_seq <= player.last_received_move_seq {
+                    self.movement_anomalies
+                        .stale_packets_ignored
+                        .fetch_add(1, Ordering::Relaxed);
                     // Out-of-order/duplicate move packet. This is especially useful when
                     // diagnosing "continued movement after key-up" reports.
                     if now_ms.saturating_sub(player.last_move_input_warn_ms)
@@ -2637,35 +2657,18 @@ impl GameRoom {
 
                 // Detect missing move packets from client/network path.
                 let seq_gap = move_seq.saturating_sub(prev_seq);
-                if seq_gap > 4
-                    && now_ms.saturating_sub(player.last_move_input_warn_ms)
+                if seq_gap > 4 {
+                    self.movement_anomalies
+                        .seq_gap_events
+                        .fetch_add(1, Ordering::Relaxed);
+                    if now_ms.saturating_sub(player.last_move_input_warn_ms)
                         >= MOVE_INPUT_WARN_THROTTLE_MS
-                {
-                    tracing::warn!(
-                        "Move seq gap {} for {} (prev={} recv={} pos=({}, {}) intent=({}, {}))",
-                        seq_gap,
-                        player_id,
-                        prev_seq,
-                        move_seq,
-                        player.x,
-                        player.y,
-                        player.move_dx,
-                        player.move_dy
-                    );
-                    player.last_move_input_warn_ms = now_ms;
-                }
-
-                // Track movement-input cadence for diagnostics.
-                if player.last_move_input_ms > 0 && (player.move_dx != 0 || player.move_dy != 0) {
-                    let gap_ms = now_ms.saturating_sub(player.last_move_input_ms);
-                    if gap_ms > MOVE_INPUT_GAP_WARN_MS
-                        && now_ms.saturating_sub(player.last_move_input_warn_ms)
-                            >= MOVE_INPUT_WARN_THROTTLE_MS
                     {
                         tracing::warn!(
-                            "Move input gap {}ms for {} (seq={} pos=({}, {}) intent=({}, {}))",
-                            gap_ms,
+                            "Move seq gap {} for {} (prev={} recv={} pos=({}, {}) intent=({}, {}))",
+                            seq_gap,
                             player_id,
+                            prev_seq,
                             move_seq,
                             player.x,
                             player.y,
@@ -2673,6 +2676,31 @@ impl GameRoom {
                             player.move_dy
                         );
                         player.last_move_input_warn_ms = now_ms;
+                    }
+                }
+
+                // Track movement-input cadence for diagnostics.
+                if player.last_move_input_ms > 0 && (player.move_dx != 0 || player.move_dy != 0) {
+                    let gap_ms = now_ms.saturating_sub(player.last_move_input_ms);
+                    if gap_ms > MOVE_INPUT_GAP_WARN_MS {
+                        self.movement_anomalies
+                            .input_gap_events
+                            .fetch_add(1, Ordering::Relaxed);
+                        if now_ms.saturating_sub(player.last_move_input_warn_ms)
+                            >= MOVE_INPUT_WARN_THROTTLE_MS
+                        {
+                            tracing::warn!(
+                                "Move input gap {}ms for {} (seq={} pos=({}, {}) intent=({}, {}))",
+                                gap_ms,
+                                player_id,
+                                move_seq,
+                                player.x,
+                                player.y,
+                                player.move_dx,
+                                player.move_dy
+                            );
+                            player.last_move_input_warn_ms = now_ms;
+                        }
                     }
                 }
                 player.last_move_input_ms = now_ms;
@@ -4482,7 +4510,21 @@ impl GameRoom {
     // ========================================================================
 
     pub async fn tick(&self) -> TickTelemetry {
-        let mut tick_telemetry = TickTelemetry::default();
+        let mut tick_telemetry = TickTelemetry {
+            movement_stale_packets_ignored: self
+                .movement_anomalies
+                .stale_packets_ignored
+                .swap(0, Ordering::Relaxed) as usize,
+            movement_seq_gap_events: self
+                .movement_anomalies
+                .seq_gap_events
+                .swap(0, Ordering::Relaxed) as usize,
+            movement_input_gap_events: self
+                .movement_anomalies
+                .input_gap_events
+                .swap(0, Ordering::Relaxed) as usize,
+            ..TickTelemetry::default()
+        };
         let tick_start = std::time::Instant::now();
         let mut chunk_unload_ms = 0u128;
         let mut restock_ms = 0u128;

@@ -56,6 +56,10 @@ pub struct PerfCounters {
     pub movement_rejections_npc_blocked: u64,
     pub movement_rejections_chair_blocked: u64,
     pub movement_rejections_arena_blocked: u64,
+    pub movement_stale_packets_ignored: u64,
+    pub movement_seq_gap_events: u64,
+    pub movement_input_gap_events: u64,
+    pub movement_stale_intent_clears: u64,
     pub state_sync_send_attempts: u64,
     pub state_sync_capacity_skips: u64,
     pub state_sync_try_send_drops: u64,
@@ -129,6 +133,10 @@ pub struct PerfDerivedRates {
     pub movement_reject_npc_share_pct: f64,
     pub movement_reject_chair_share_pct: f64,
     pub movement_reject_arena_share_pct: f64,
+    pub movement_stale_packet_rate_pct: f64,
+    pub movement_seq_gap_rate_pct: f64,
+    pub movement_input_gap_rate_pct: f64,
+    pub movement_stale_intent_clear_rate_pct: f64,
     pub state_sync_drop_rate_pct: f64,
     pub state_sync_capacity_skip_rate_pct: f64,
     pub state_sync_full_share_pct: f64,
@@ -304,6 +312,28 @@ impl PerfMetrics {
         inner.counters.movement_rejections_arena_blocked += rejected_arena_blocked as u64;
     }
 
+    pub fn record_movement_anomalies(
+        &self,
+        stale_packets_ignored: usize,
+        seq_gap_events: usize,
+        input_gap_events: usize,
+        stale_intent_clears: usize,
+    ) {
+        if stale_packets_ignored == 0
+            && seq_gap_events == 0
+            && input_gap_events == 0
+            && stale_intent_clears == 0
+        {
+            return;
+        }
+
+        let mut inner = self.inner.lock().unwrap();
+        inner.counters.movement_stale_packets_ignored += stale_packets_ignored as u64;
+        inner.counters.movement_seq_gap_events += seq_gap_events as u64;
+        inner.counters.movement_input_gap_events += input_gap_events as u64;
+        inner.counters.movement_stale_intent_clears += stale_intent_clears as u64;
+    }
+
     pub fn record_state_sync(
         &self,
         send_attempts: usize,
@@ -414,6 +444,22 @@ impl PerfMetrics {
                 movement_reject_arena_share_pct: percent(
                     inner.counters.movement_rejections_arena_blocked,
                     inner.counters.movement_rejections,
+                ),
+                movement_stale_packet_rate_pct: percent(
+                    inner.counters.movement_stale_packets_ignored,
+                    inner.counters.movement_attempts,
+                ),
+                movement_seq_gap_rate_pct: percent(
+                    inner.counters.movement_seq_gap_events,
+                    inner.counters.movement_attempts,
+                ),
+                movement_input_gap_rate_pct: percent(
+                    inner.counters.movement_input_gap_events,
+                    inner.counters.movement_attempts,
+                ),
+                movement_stale_intent_clear_rate_pct: percent(
+                    inner.counters.movement_stale_intent_clears,
+                    inner.counters.movement_attempts,
                 ),
                 state_sync_drop_rate_pct: percent(
                     inner.counters.state_sync_try_send_drops,
