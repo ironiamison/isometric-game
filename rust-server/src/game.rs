@@ -70,7 +70,7 @@ const STARTING_HP: i32 = 100;
 
 // Combat constants
 const ATTACK_RANGE: i32 = 1; // Maximum distance to attack (in tiles)
-const ATTACK_COOLDOWN_MS: u64 = 800; // Universal cooldown for attacks and gathering (matches client)
+const ATTACK_COOLDOWN_MS: u64 = 700; // Slightly shorter than client's 800ms to absorb network jitter
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
 const REGEN_INTERVAL_MS: u64 = 15000;
 
