@@ -17,10 +17,10 @@ const TAB_CATEGORIES: [&str; 4] = ["potion", "unlock", "equipment", "block"];
 
 impl Renderer {
     /// Render a small HUD chip below the stat bars showing current slayer task
-    pub(crate) fn render_slayer_task_chip(&self, state: &GameState, x: f32, y: f32) {
+    pub(crate) fn render_slayer_task_chip(&self, state: &GameState, x: f32, y: f32) -> (f32, f32) {
         let task = match &state.ui_state.slayer_current_task {
             Some(t) => t,
-            None => return,
+            None => return (0.0, 0.0),
         };
 
         let s = state.ui_state.ui_scale;
@@ -74,6 +74,8 @@ impl Renderer {
             font_sz,
             TEXT_NORMAL,
         );
+
+        (chip_w, chip_h)
     }
 
     /// Render a small HUD chip showing the player's active combat style.
@@ -130,36 +132,6 @@ impl Renderer {
             font_sz,
             color,
         );
-
-        (chip_w, chip_h)
-    }
-
-    /// Measure the combat style chip dimensions without drawing.
-    /// Returns `(width, height)`, or `(0, 0)` if no local player.
-    pub(crate) fn measure_combat_style_chip(&self, state: &GameState) -> (f32, f32) {
-        let style_raw = match state.get_local_player() {
-            Some(p) => p.combat_style.clone(),
-            None => return (0.0, 0.0),
-        };
-
-        let abbrev = match style_raw.as_str() {
-            "accurate" => "Acc",
-            "aggressive" => "Agg",
-            "defensive" => "Def",
-            "controlled" => "Ctrl",
-            _ => "Acc",
-        };
-
-        let s = state.ui_state.ui_scale;
-        let font_sz = 16.0;
-        let padding = 3.0 * s;
-
-        let label_dims = self.measure_text_sharp("Style", font_sz);
-        let abbrev_dims = self.measure_text_sharp(abbrev, font_sz);
-        let text_w = label_dims.width.max(abbrev_dims.width);
-        let chip_w = text_w + padding * 2.0;
-        let line_h = label_dims.height + 2.0 * s;
-        let chip_h = padding + line_h + abbrev_dims.height + padding;
 
         (chip_w, chip_h)
     }

@@ -51,6 +51,18 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    to: '/bestiary',
+    label: 'Bestiary',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 2C6.5 2 4.5 4 4.5 6.5c0 1.5.7 2.8 1.8 3.7L9 16l2.7-5.8c1.1-.9 1.8-2.2 1.8-3.7C13.5 4 11.5 2 9 2z" />
+        <circle cx="7.5" cy="6" r="1" />
+        <circle cx="10.5" cy="6" r="1" />
+        <path d="M7.5 8.5c.5.5 2.5.5 3 0" />
+      </svg>
+    ),
+  },
 ]
 
 export function Layout() {

@@ -5,6 +5,8 @@ import { Dashboard } from './pages/Dashboard'
 import { OnlinePlayers } from './pages/OnlinePlayers'
 import { Leaderboards } from './pages/Leaderboards'
 import { ItemRegistry } from './pages/ItemRegistry'
+import { Bestiary } from './pages/Bestiary'
+import { MonsterDetail } from './pages/MonsterDetail'
 import { PlayerProfile } from './pages/PlayerProfile'
 
 const queryClient = new QueryClient({
@@ -22,6 +24,8 @@ export default function App() {
             <Route path="/leaderboards" element={<Leaderboards />} />
             <Route path="/player/:name" element={<PlayerProfile />} />
             <Route path="/items" element={<ItemRegistry />} />
+            <Route path="/bestiary" element={<Bestiary />} />
+            <Route path="/bestiary/:id" element={<MonsterDetail />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

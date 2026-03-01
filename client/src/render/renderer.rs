@@ -266,7 +266,7 @@ const MINIMAP_PREVIEW_Y: f32 = 8.0;
 const MINIMAP_PREVIEW_WIDTH: f32 = 188.0;
 const MINIMAP_PREVIEW_HEIGHT: f32 = 140.0;
 const MINIMAP_WORLD_TEXT_SIZE: f32 = 16.0;
-const MINIMAP_VISIBLE_CHUNK_RADIUS: f32 = 1.2;
+const MINIMAP_VISIBLE_CHUNK_RADIUS: f32 = 0.8;
 const MINIMAP_PREVIEW_TILE_BUDGET: usize = 9_000;
 const MINIMAP_PANEL_TILE_BUDGET: usize = 16_000;
 const MINIMAP_PANEL_MIN_ZOOM: f32 = 1.0;
@@ -9325,20 +9325,21 @@ impl Renderer {
             let mut chip_cursor_x = bar_x;
             let mut chip_row_h: f32 = 0.0;
 
-            // Combat style chip (always visible when we have a local player)
+            // Slayer task chip (first, if active)
+            let has_slayer_chip = state.ui_state.slayer_current_task.is_some();
+            let slayer_chip_x = chip_cursor_x;
+            let (slayer_w, slayer_h) =
+                self.render_slayer_task_chip(state, slayer_chip_x, chip_row_y);
+            if slayer_w > 0.0 {
+                chip_cursor_x += slayer_w + chip_gap;
+                chip_row_h = chip_row_h.max(slayer_h);
+            }
+
+            // Combat style chip (to the right of slayer task chip)
             let (combat_w, combat_h) =
                 self.render_combat_style_chip(state, chip_cursor_x, chip_row_y);
             if combat_w > 0.0 {
-                chip_cursor_x += combat_w + chip_gap;
                 chip_row_h = chip_row_h.max(combat_h);
-            }
-
-            // Slayer task chip
-            let has_slayer_chip = state.ui_state.slayer_current_task.is_some();
-            let slayer_chip_x = chip_cursor_x;
-            self.render_slayer_task_chip(state, slayer_chip_x, chip_row_y);
-            if has_slayer_chip {
-                chip_row_h = chip_row_h.max(46.0 * s);
             }
 
             let has_any_chip = combat_w > 0.0 || has_slayer_chip;
@@ -9783,15 +9784,8 @@ impl Renderer {
                     } else {
                         0.0
                     };
-                // Offset slayer chip x when combat style chip is also visible
-                let (combat_chip_w, _) =
-                    self.measure_combat_style_chip(state);
-                let slayer_tooltip_x = if combat_chip_w > 0.0 {
-                    bar_x + combat_chip_w + 4.0 * s
-                } else {
-                    bar_x
-                };
-                self.render_slayer_task_chip_tooltip(state, slayer_tooltip_x, chip_y);
+                // Slayer chip is now first (leftmost), so tooltip x = bar_x
+                self.render_slayer_task_chip_tooltip(state, bar_x, chip_y);
             }
         }
 

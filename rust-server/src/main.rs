@@ -64,7 +64,7 @@ use instance::InstanceManager;
 use interior_registry::InteriorRegistry;
 use prayer::PrayerRegistry;
 use protocol::{ClientMessage, ServerMessage};
-use quest::QuestRegistry;
+use quest::{ObjectiveType, QuestRegistry};
 
 // ============================================================================
 // App State
@@ -1682,6 +1682,36 @@ struct StatsItem {
     equipment: Option<StatsEquipment>,
 }
 
+#[derive(Serialize)]
+struct StatsEntityLoot {
+    item_id: String,
+    drop_chance: f32,
+    quantity_min: i32,
+    quantity_max: i32,
+}
+
+#[derive(Serialize)]
+struct StatsEntity {
+    id: String,
+    display_name: String,
+    sprite: String,
+    description: String,
+    level: i32,
+    max_hp: i32,
+    damage: i32,
+    attack_bonus: i32,
+    defence_bonus: i32,
+    attack_range: i32,
+    aggro_range: i32,
+    respawn_time_ms: u64,
+    hostile: bool,
+    exp_base: i32,
+    gold_min: i32,
+    gold_max: i32,
+    loot: Vec<StatsEntityLoot>,
+    quest_ids: Vec<String>,
+}
+
 async fn stats_items(State(state): State<AppState>) -> impl IntoResponse {
     let items: Vec<StatsItem> = state
         .item_registry
@@ -1714,6 +1744,51 @@ async fn stats_items(State(state): State<AppState>) -> impl IntoResponse {
         })
         .collect();
     Json(items)
+}
+
+async fn stats_entities(State(state): State<AppState>) -> impl IntoResponse {
+    // Collect quest kill-objective targets
+    let all_quests = state.quest_registry.all_quests().await;
+    let mut quest_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for quest in &all_quests {
+        for obj in &quest.objectives {
+            if obj.objective_type == ObjectiveType::KillMonster {
+                quest_map.entry(obj.target.clone()).or_default().push(quest.id.clone());
+            }
+        }
+    }
+
+    let entities: Vec<StatsEntity> = state
+        .entity_registry
+        .all()
+        .filter(|e| e.is_hostile())
+        .map(|e| StatsEntity {
+            id: e.id.clone(),
+            display_name: e.display_name.clone(),
+            sprite: e.sprite.clone(),
+            description: e.description.clone(),
+            level: e.stats.level,
+            max_hp: e.stats.max_hp,
+            damage: e.stats.damage,
+            attack_bonus: e.stats.attack_bonus,
+            defence_bonus: e.stats.defence_bonus,
+            attack_range: e.stats.attack_range,
+            aggro_range: e.stats.aggro_range,
+            respawn_time_ms: e.stats.respawn_time_ms,
+            hostile: e.behaviors.hostile,
+            exp_base: e.rewards.exp_base,
+            gold_min: e.rewards.gold_min,
+            gold_max: e.rewards.gold_max,
+            loot: e.loot.iter().map(|l| StatsEntityLoot {
+                item_id: l.item_id.clone(),
+                drop_chance: l.drop_chance,
+                quantity_min: l.quantity_min,
+                quantity_max: l.quantity_max,
+            }).collect(),
+            quest_ids: quest_map.get(&e.id).cloned().unwrap_or_default(),
+        })
+        .collect();
+    Json(entities)
 }
 
 async fn health_check() -> impl IntoResponse {
@@ -5150,6 +5225,7 @@ async fn main() {
         .route("/api/stats/leaderboard", get(stats_leaderboard))
         .route("/api/stats/player/:name", get(stats_player_profile))
         .route("/api/stats/items", get(stats_items))
+        .route("/api/stats/entities", get(stats_entities))
         .route("/api/perf", get(api_perf))
         // Server logs (admin)
         .route("/api/logs", get(api_logs))

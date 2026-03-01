@@ -109,6 +109,34 @@ export interface Item {
   equipment: Equipment | null
 }
 
+export interface EntityLoot {
+  item_id: string
+  drop_chance: number
+  quantity_min: number
+  quantity_max: number
+}
+
+export interface Entity {
+  id: string
+  display_name: string
+  sprite: string
+  description: string
+  level: number
+  max_hp: number
+  damage: number
+  attack_bonus: number
+  defence_bonus: number
+  attack_range: number
+  aggro_range: number
+  respawn_time_ms: number
+  hostile: boolean
+  exp_base: number
+  gold_min: number
+  gold_max: number
+  loot: EntityLoot[]
+  quest_ids: string[]
+}
+
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${BASE}${path}`)
   if (!r.ok) throw new Error(`API error: ${r.status}`)
@@ -123,4 +151,5 @@ export const api = {
   playerProfile: (name: string) =>
     get<PlayerProfileResponse>(`/player/${encodeURIComponent(name)}`),
   items: () => get<Item[]>('/items'),
+  entities: () => get<Entity[]>('/entities'),
 }
