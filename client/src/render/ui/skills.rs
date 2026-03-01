@@ -33,11 +33,12 @@ const UI_ICON_SIZE: f32 = 24.0;
 const UI_ICON_COLS: usize = 10;
 
 /// Active skills in display order
-const ACTIVE_SKILLS: [SkillType; 14] = [
+const ACTIVE_SKILLS: [SkillType; 15] = [
     SkillType::Hitpoints,
     SkillType::Attack,
     SkillType::Strength,
     SkillType::Defence,
+    SkillType::Ranged,
     SkillType::Fishing,
     SkillType::Woodcutting,
     SkillType::Farming,
@@ -227,8 +228,9 @@ impl Renderer {
             let (icon_col, icon_row) = match skill_type {
                 SkillType::Hitpoints => (0, 6),
                 SkillType::Attack => (5, 5),    // Attack icon
-                SkillType::Strength => (8, 6),  // Fist/strength icon
-                SkillType::Defence => (5, 4),   // Defence icon
+                SkillType::Strength => (2, 6),  // Fist/strength icon
+                SkillType::Defence => (4, 5),   // Defence icon
+                SkillType::Ranged => (3, 5),    // Ranged icon
                 SkillType::Fishing => (4, 6),
                 SkillType::Farming => (4, 6),
                 SkillType::Mining => (0, 5),
@@ -277,6 +279,7 @@ impl Renderer {
                 SkillType::Alchemy => "Al",
                 SkillType::Slayer => "Sl",
                 SkillType::Survivalist => "Sv",
+                SkillType::Ranged => "Ra",
             };
             let icon_color = self.get_skill_icon_color(skill_type);
             let letter_dims = self.measure_text_sharp(letter, 16.0);
@@ -367,6 +370,7 @@ impl Renderer {
             SkillType::Alchemy => Color::new(0.5, 0.8, 0.4, 1.0),   // Potion green
             SkillType::Slayer => Color::new(0.6, 0.15, 0.15, 1.0),  // Dark red
             SkillType::Survivalist => Color::new(0.45, 0.55, 0.25, 1.0), // Olive/forest green
+            SkillType::Ranged => Color::new(0.2, 0.7, 0.6, 1.0), // Teal
         }
     }
 

@@ -832,13 +832,14 @@ impl Database {
                     .try_get::<String, _>("skills_json")
                     .ok()
                     .and_then(|json| {
-                        // First try the new format (hitpoints + attack + strength + defence)
-                        if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
-                            return Some(skills);
-                        }
-                        // Fall back to combined combat format (split ÷ 3)
+                        // Try combined combat format first (has required `combat` field)
+                        // Must be checked before Skills since Skills accepts any JSON via #[serde(default)]
                         if let Ok(legacy) = serde_json::from_str::<LegacyCombatSkills>(&json) {
                             return Some(legacy.to_skills());
+                        }
+                        // Then try the current format (attack + strength + defence separate)
+                        if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
+                            return Some(skills);
                         }
                         // Fall back to ancient format (hitpoints + attack + strength + defence only)
                         if let Ok(legacy) = serde_json::from_str::<LegacySkills>(&json) {
@@ -1059,13 +1060,14 @@ impl Database {
                 .try_get::<String, _>("skills_json")
                 .ok()
                 .and_then(|json| {
-                    // First try the new format (hitpoints + attack + strength + defence)
-                    if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
-                        return Some(skills);
-                    }
-                    // Fall back to combined combat format (split ÷ 3)
+                    // Try combined combat format first (has required `combat` field)
+                    // Must be checked before Skills since Skills accepts any JSON via #[serde(default)]
                     if let Ok(legacy) = serde_json::from_str::<LegacyCombatSkills>(&json) {
                         return Some(legacy.to_skills());
+                    }
+                    // Then try the current format (attack + strength + defence separate)
+                    if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
+                        return Some(skills);
                     }
                     // Fall back to ancient format (hitpoints + attack + strength + defence only)
                     if let Ok(legacy) = serde_json::from_str::<LegacySkills>(&json) {

@@ -637,6 +637,8 @@ pub enum ServerMessage {
         strength_xp: i64,
         defence_level: i32,
         defence_xp: i64,
+        ranged_level: i32,
+        ranged_xp: i64,
         fishing_level: i32,
         fishing_xp: i64,
         farming_level: i32,
@@ -1465,6 +1467,7 @@ pub struct ClientItemDef {
     pub equipment_slot: Option<String>,
     pub attack_level_required: Option<i32>,
     pub defence_level_required: Option<i32>,
+    pub ranged_level_required: Option<i32>,
     pub woodcutting_level_required: Option<i32>,
     pub mining_level_required: Option<i32>,
     pub attack_bonus: Option<i32>,
@@ -1783,6 +1786,10 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
     pmap.push((
         Value::String("defenceLevel".into()),
         Value::Integer((p.defence_level as i64).into()),
+    ));
+    pmap.push((
+        Value::String("rangedLevel".into()),
+        Value::Integer((p.ranged_level as i64).into()),
     ));
     pmap.push((
         Value::String("gold".into()),
@@ -2328,6 +2335,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::Integer((p.defence_level as i64).into()),
                     ));
                     pmap.push((
+                        Value::String("rangedLevel".into()),
+                        Value::Integer((p.ranged_level as i64).into()),
+                    ));
+                    pmap.push((
                         Value::String("gold".into()),
                         Value::Integer((p.gold as i64).into()),
                     ));
@@ -2769,6 +2780,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             strength_xp,
             defence_level,
             defence_xp,
+            ranged_level,
+            ranged_xp,
             fishing_level,
             fishing_xp,
             farming_level,
@@ -2826,6 +2839,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("defence_xp".into()),
                 Value::Integer((*defence_xp).into()),
+            ));
+            map.push((
+                Value::String("ranged_level".into()),
+                Value::Integer((*ranged_level as i64).into()),
+            ));
+            map.push((
+                Value::String("ranged_xp".into()),
+                Value::Integer((*ranged_xp).into()),
             ));
             map.push((
                 Value::String("fishing_level".into()),
@@ -3497,6 +3518,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     if let Some(level) = i.defence_level_required {
                         imap.push((
                             Value::String("defence_level_required".into()),
+                            Value::Integer((level as i64).into()),
+                        ));
+                    }
+                    if let Some(level) = i.ranged_level_required {
+                        imap.push((
+                            Value::String("ranged_level_required".into()),
                             Value::Integer((level as i64).into()),
                         ));
                     }

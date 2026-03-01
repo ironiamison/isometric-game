@@ -1,5 +1,5 @@
 use super::GameRoom;
-use crate::data::item_def::{EquipmentSlot, UseEffect};
+use crate::data::item_def::{EquipmentSlot, UseEffect, WeaponType};
 use crate::item::{self, GOLD_ITEM_ID, GroundItem, InventorySlotUpdate};
 use crate::protocol::ServerMessage;
 
@@ -475,6 +475,7 @@ impl GameRoom {
                     player.skills.defence.level,
                     player.skills.woodcutting.level,
                     player.skills.magic.level,
+                    player.skills.ranged.level,
                     (
                         player.equipped_head.clone(),
                         player.equipped_body.clone(),
@@ -491,7 +492,7 @@ impl GameRoom {
             }
         };
 
-        let (item_id, attack_level, defence_level, woodcutting_level, magic_level, current_equipment) =
+        let (item_id, attack_level, defence_level, woodcutting_level, magic_level, ranged_level, current_equipment) =
             match item_info {
                 Some(info) => info,
                 None => {
@@ -617,6 +618,25 @@ impl GameRoom {
             return;
         }
 
+        if equip_stats.ranged_level_required > 0
+            && ranged_level < equip_stats.ranged_level_required
+        {
+            self.send_to_player(
+                player_id,
+                ServerMessage::EquipResult {
+                    success: false,
+                    slot_type,
+                    item_id: None,
+                    error: Some(format!(
+                        "Requires Ranged level {}",
+                        equip_stats.ranged_level_required
+                    )),
+                },
+            )
+            .await;
+            return;
+        }
+
         let currently_equipped = match equip_slot {
             EquipmentSlot::Head => current_equipment.0,
             EquipmentSlot::Body => current_equipment.1,
@@ -689,6 +709,26 @@ impl GameRoom {
             if is_gathering {
                 self.handle_stop_gathering(player_id).await;
             }
+        }
+
+        // Auto-fallback: if equipping a weapon, check if current combat style is valid
+        if equip_slot == EquipmentSlot::Weapon {
+            use crate::game::CombatStyle;
+            let new_weapon_type = equip_stats.weapon_type;
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                if !player.combat_style.is_valid_for(new_weapon_type) {
+                    let available = CombatStyle::available_styles(new_weapon_type);
+                    player.combat_style = available[0];
+                    tracing::info!(
+                        "Player {} combat style auto-reset to {} for {:?} weapon",
+                        player_id,
+                        player.combat_style.as_str(),
+                        new_weapon_type
+                    );
+                }
+            }
+            drop(players);
         }
 
         self.send_to_player(
@@ -845,6 +885,17 @@ impl GameRoom {
             if is_gathering {
                 self.handle_stop_gathering(player_id).await;
             }
+
+            // Auto-fallback: unequipping weapon means unarmed (melee)
+            use crate::game::CombatStyle;
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                if !player.combat_style.is_valid_for(WeaponType::Melee) {
+                    let available = CombatStyle::available_styles(WeaponType::Melee);
+                    player.combat_style = available[0];
+                }
+            }
+            drop(players);
         }
 
         self.send_to_player(

@@ -100,6 +100,7 @@ impl ItemRegistry {
                     equipment_slot,
                     attack_level_required,
                     defence_level_required,
+                    ranged_level_required,
                     woodcutting_level_required,
                     mining_level_required,
                     attack_bonus,
@@ -115,6 +116,7 @@ impl ItemRegistry {
                             Some(equip.slot_type.as_str().to_string()),
                             Some(equip.attack_level_required),
                             Some(equip.defence_level_required),
+                            Some(equip.ranged_level_required),
                             Some(equip.woodcutting_level_required),
                             Some(equip.mining_level_required),
                             Some(equip.attack_bonus),
@@ -135,12 +137,12 @@ impl ItemRegistry {
                         )
                     } else {
                         (
-                            None, None, None, None, None, None, None, None, None, None, None, None,
+                            None, None, None, None, None, None, None, None, None, None, None, None, None,
                         )
                     }
                 } else {
                     (
-                        None, None, None, None, None, None, None, None, None, None, None, None,
+                        None, None, None, None, None, None, None, None, None, None, None, None, None,
                     )
                 };
 
@@ -156,6 +158,7 @@ impl ItemRegistry {
                     equipment_slot,
                     attack_level_required,
                     defence_level_required,
+                    ranged_level_required,
                     woodcutting_level_required,
                     mining_level_required,
                     attack_bonus,

@@ -97,6 +97,10 @@ pub struct EquipmentStats {
     #[serde(default)]
     pub defence_level_required: i32,
 
+    /// Ranged level required to equip (for bows)
+    #[serde(default)]
+    pub ranged_level_required: i32,
+
     /// Woodcutting level required to equip (for axes)
     #[serde(default)]
     pub woodcutting_level_required: i32,

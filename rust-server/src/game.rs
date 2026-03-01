@@ -292,6 +292,8 @@ pub enum CombatStyle {
     Aggressive,
     Defensive,
     Controlled,
+    Rapid,
+    Longrange,
 }
 
 impl Default for CombatStyle {
@@ -307,6 +309,8 @@ impl CombatStyle {
             CombatStyle::Aggressive => "aggressive",
             CombatStyle::Defensive => "defensive",
             CombatStyle::Controlled => "controlled",
+            CombatStyle::Rapid => "rapid",
+            CombatStyle::Longrange => "longrange",
         }
     }
 
@@ -316,8 +320,23 @@ impl CombatStyle {
             "aggressive" => Some(CombatStyle::Aggressive),
             "defensive" => Some(CombatStyle::Defensive),
             "controlled" => Some(CombatStyle::Controlled),
+            "rapid" => Some(CombatStyle::Rapid),
+            "longrange" => Some(CombatStyle::Longrange),
             _ => None,
         }
+    }
+
+    /// Get available combat styles for a weapon type
+    pub fn available_styles(weapon_type: WeaponType) -> &'static [CombatStyle] {
+        match weapon_type {
+            WeaponType::Melee => &[CombatStyle::Accurate, CombatStyle::Aggressive, CombatStyle::Defensive, CombatStyle::Controlled],
+            WeaponType::Ranged => &[CombatStyle::Accurate, CombatStyle::Rapid, CombatStyle::Longrange],
+        }
+    }
+
+    /// Check if this style is valid for the given weapon type
+    pub fn is_valid_for(&self, weapon_type: WeaponType) -> bool {
+        CombatStyle::available_styles(weapon_type).contains(self)
     }
 }
 
@@ -665,12 +684,15 @@ impl Player {
 
     /// Award combat XP based on damage dealt and active combat style.
     /// Focused styles: 4 XP/dmg to one skill. Controlled: 1.33 XP/dmg to each of atk/str/def.
+    /// Rapid: 4 XP/dmg to Ranged. Longrange: 2 XP/dmg to Ranged + 2 XP/dmg to Defence.
+    /// Accurate with ranged weapon: 4 XP/dmg to Ranged (not Attack).
     /// Hitpoints always gets 1.33 XP per damage.
     /// Returns a vector of (SkillType, xp_gained, total_xp, level, leveled_up) for skills that gained XP.
-    pub fn award_combat_xp(&mut self, damage: i32, style: CombatStyle) -> Vec<(SkillType, i64, i64, i32, bool)> {
+    pub fn award_combat_xp(&mut self, damage: i32, style: CombatStyle, weapon_type: WeaponType) -> Vec<(SkillType, i64, i64, i32, bool)> {
         use crate::skills::{
             ATTACK_XP_PER_DAMAGE, STRENGTH_XP_PER_DAMAGE, DEFENCE_XP_PER_DAMAGE,
             CONTROLLED_XP_PER_DAMAGE, HITPOINTS_XP_PER_DAMAGE,
+            RANGED_XP_PER_DAMAGE, LONGRANGE_RANGED_XP_PER_DAMAGE, LONGRANGE_DEFENCE_XP_PER_DAMAGE,
         };
 
         let mut results = Vec::new();
@@ -681,12 +703,22 @@ impl Player {
         // Award combat XP based on style
         match style {
             CombatStyle::Accurate => {
-                let xp = (damage as f64 * ATTACK_XP_PER_DAMAGE) as i64;
-                let leveled = self.skills.attack.add_xp(xp);
-                if leveled {
-                    tracing::info!("{} leveled up Attack to {}!", self.name, self.skills.attack.level);
+                if weapon_type == WeaponType::Ranged {
+                    // Accurate with bow gives Ranged XP
+                    let xp = (damage as f64 * RANGED_XP_PER_DAMAGE) as i64;
+                    let leveled = self.skills.ranged.add_xp(xp);
+                    if leveled {
+                        tracing::info!("{} leveled up Ranged to {}!", self.name, self.skills.ranged.level);
+                    }
+                    results.push((SkillType::Ranged, xp, self.skills.ranged.xp, self.skills.ranged.level, leveled));
+                } else {
+                    let xp = (damage as f64 * ATTACK_XP_PER_DAMAGE) as i64;
+                    let leveled = self.skills.attack.add_xp(xp);
+                    if leveled {
+                        tracing::info!("{} leveled up Attack to {}!", self.name, self.skills.attack.level);
+                    }
+                    results.push((SkillType::Attack, xp, self.skills.attack.xp, self.skills.attack.level, leveled));
                 }
-                results.push((SkillType::Attack, xp, self.skills.attack.xp, self.skills.attack.level, leveled));
             }
             CombatStyle::Aggressive => {
                 let xp = (damage as f64 * STRENGTH_XP_PER_DAMAGE) as i64;
@@ -717,6 +749,29 @@ impl Player {
                     }
                     results.push((skill_type, xp, skill.xp, skill.level, leveled));
                 }
+            }
+            CombatStyle::Rapid => {
+                let xp = (damage as f64 * RANGED_XP_PER_DAMAGE) as i64;
+                let leveled = self.skills.ranged.add_xp(xp);
+                if leveled {
+                    tracing::info!("{} leveled up Ranged to {}!", self.name, self.skills.ranged.level);
+                }
+                results.push((SkillType::Ranged, xp, self.skills.ranged.xp, self.skills.ranged.level, leveled));
+            }
+            CombatStyle::Longrange => {
+                let ranged_xp = (damage as f64 * LONGRANGE_RANGED_XP_PER_DAMAGE) as i64;
+                let ranged_leveled = self.skills.ranged.add_xp(ranged_xp);
+                if ranged_leveled {
+                    tracing::info!("{} leveled up Ranged to {}!", self.name, self.skills.ranged.level);
+                }
+                results.push((SkillType::Ranged, ranged_xp, self.skills.ranged.xp, self.skills.ranged.level, ranged_leveled));
+
+                let def_xp = (damage as f64 * LONGRANGE_DEFENCE_XP_PER_DAMAGE) as i64;
+                let def_leveled = self.skills.defence.add_xp(def_xp);
+                if def_leveled {
+                    tracing::info!("{} leveled up Defence to {}!", self.name, self.skills.defence.level);
+                }
+                results.push((SkillType::Defence, def_xp, self.skills.defence.xp, self.skills.defence.level, def_leveled));
             }
         }
 
@@ -880,6 +935,7 @@ pub struct PlayerUpdate {
     pub attack_level: i32,
     pub strength_level: i32,
     pub defence_level: i32,
+    pub ranged_level: i32,
     pub gold: i32,
     // Character appearance
     pub gender: String,
@@ -2570,7 +2626,17 @@ impl GameRoom {
     pub async fn set_combat_style(&self, player_id: &str, style: CombatStyle) {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
-            player.combat_style = style;
+            // Get current weapon type to validate style
+            let weapon_type = player.equipped_weapon.as_ref()
+                .and_then(|wid| self.item_registry.get(wid))
+                .and_then(|def| def.equipment.as_ref())
+                .map(|eq| eq.weapon_type)
+                .unwrap_or(WeaponType::Melee);
+
+            // Only set if style is valid for current weapon type
+            if style.is_valid_for(weapon_type) {
+                player.combat_style = style;
+            }
         }
     }
 
@@ -2641,6 +2707,8 @@ impl GameRoom {
             strength_xp: p.skills.strength.xp,
             defence_level: p.skills.defence.level,
             defence_xp: p.skills.defence.xp,
+            ranged_level: p.skills.ranged.level,
+            ranged_xp: p.skills.ranged.xp,
             fishing_level: p.skills.fishing.level,
             fishing_xp: p.skills.fishing.xp,
             farming_level: p.skills.farming.level,
@@ -3218,7 +3286,7 @@ impl GameRoom {
         }
 
         // Get weapon range and type
-        let (weapon_range, weapon_type) = {
+        let (mut weapon_range, weapon_type) = {
             let players = self.players.read().await;
             if let Some(player) = players.get(player_id) {
                 if let Some(ref weapon_id) = player.equipped_weapon {
@@ -3237,6 +3305,28 @@ impl GameRoom {
             } else {
                 return;
             }
+        };
+
+        // For ranged weapons, override attack/strength with ranged level and apply style bonuses
+        let (attack_level, strength_level) = if weapon_type == WeaponType::Ranged {
+            let ranged_level = {
+                let players = self.players.read().await;
+                players.get(player_id).map(|p| p.skills.ranged.level).unwrap_or(1)
+            };
+            // Accurate style: +3 to effective ranged level for accuracy
+            let effective_ranged = if combat_style == CombatStyle::Accurate {
+                ranged_level + 3
+            } else {
+                ranged_level
+            };
+            // Longrange style: +2 to weapon range
+            if combat_style == CombatStyle::Longrange {
+                weapon_range += 2;
+            }
+            // Ranged uses ranged_level for both accuracy and max hit
+            (effective_ranged, ranged_level)
+        } else {
+            (attack_level, strength_level)
         };
 
         // For ranged weapons, check and consume 1 arrow before allowing the attack
@@ -3716,7 +3806,7 @@ impl GameRoom {
                 let mut players = self.players.write().await;
                 if let Some(attacker) = players.get_mut(player_id) {
                     let style = attacker.combat_style;
-                    Some(attacker.award_combat_xp(actual_damage, style))
+                    Some(attacker.award_combat_xp(actual_damage, style, weapon_type))
                 } else {
                     None
                 }

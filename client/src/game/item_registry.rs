@@ -7,6 +7,7 @@ pub struct EquipmentStats {
     pub slot_type: String,
     pub attack_level_required: i32,      // For weapons
     pub defence_level_required: i32,     // For armor
+    pub ranged_level_required: i32,      // For bows
     pub attack_bonus: i32,               // Accuracy
     pub strength_bonus: i32,             // Max hit
     pub defence_bonus: i32,              // Avoid hits

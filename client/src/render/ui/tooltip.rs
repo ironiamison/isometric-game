@@ -240,6 +240,10 @@ impl Renderer {
             .get_local_player()
             .map(|p| p.skills.magic.level)
             .unwrap_or(1);
+        let player_ranged_level = state
+            .get_local_player()
+            .map(|p| p.skills.ranged.level)
+            .unwrap_or(1);
         let player_smithing_level = state
             .get_local_player()
             .map(|p| p.skills.smithing.level)
@@ -321,7 +325,9 @@ impl Renderer {
             }
             // Measure requirement text
             let is_weapon = equip.slot_type == "weapon";
-            let req_text = if is_weapon && equip.attack_level_required > 1 {
+            let req_text = if is_weapon && equip.ranged_level_required > 0 {
+                format!("Requires {} Ranged", equip.ranged_level_required)
+            } else if is_weapon && equip.attack_level_required > 1 {
                 format!("Requires {} Attack", equip.attack_level_required)
             } else if !is_weapon && equip.defence_level_required > 1 {
                 format!("Requires {} Defence", equip.defence_level_required)
@@ -391,7 +397,9 @@ impl Renderer {
                 }
                 // Level requirement lines (only if > 1)
                 let is_weapon = equip.slot_type == "weapon";
-                if (is_weapon && equip.attack_level_required > 1)
+                if is_weapon && equip.ranged_level_required > 0 {
+                    total_h += line_height;
+                } else if (is_weapon && equip.attack_level_required > 1)
                     || (!is_weapon && equip.defence_level_required > 1)
                 {
                     total_h += line_height;
@@ -589,8 +597,22 @@ impl Renderer {
                 y += line_height;
             }
 
-            // Attack level requirement (weapons)
-            if equip.attack_level_required > 1 {
+            // Ranged level requirement (bows)
+            if equip.ranged_level_required > 0 {
+                let meets_req = player_ranged_level >= equip.ranged_level_required;
+                let req_color = if meets_req { stat_green } else { stat_red };
+                let req_text = format!("Requires {} Ranged", equip.ranged_level_required);
+                self.draw_text_sharp(
+                    &req_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    req_color,
+                );
+                y += line_height;
+            }
+            // Attack level requirement (melee weapons)
+            else if equip.attack_level_required > 1 {
                 let meets_req = player_attack_level >= equip.attack_level_required;
                 let req_color = if meets_req { stat_green } else { stat_red };
                 let req_text = format!("Requires {} Attack", equip.attack_level_required);

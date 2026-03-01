@@ -2033,6 +2033,7 @@ impl InputHandler {
                                 .map(|p| {
                                     p.skills.attack.level >= equip.attack_level_required
                                         && p.skills.defence.level >= equip.defence_level_required
+                                        && p.skills.ranged.level >= equip.ranged_level_required
                                 })
                                 .unwrap_or(false);
                             slot_matches && level_ok
@@ -9337,7 +9338,19 @@ impl InputHandler {
                 }
                 UiElementId::CombatStyleButton(idx) => {
                     if mouse_clicked {
-                        let styles = ["accurate", "aggressive", "defensive", "controlled"];
+                        // Dynamic styles based on equipped weapon type
+                        let is_ranged = state
+                            .get_local_player()
+                            .and_then(|p| p.equipped_weapon.as_ref())
+                            .and_then(|wid| state.item_registry.get(wid))
+                            .and_then(|def| def.weapon_type.as_ref())
+                            .map(|wt| wt == "ranged")
+                            .unwrap_or(false);
+                        let styles: &[&str] = if is_ranged {
+                            &["accurate", "rapid", "longrange"]
+                        } else {
+                            &["accurate", "aggressive", "defensive", "controlled"]
+                        };
                         if let Some(style) = styles.get(*idx) {
                             audio.play_sfx("click");
                             commands.push(InputCommand::SetCombatStyle {

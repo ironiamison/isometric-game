@@ -1,10 +1,11 @@
 //! Skills system following RuneScape-style mechanics.
 //!
-//! Skills: Hitpoints, Attack, Strength, Defence, Fishing, Farming, Smithing, Prayer, Magic, Alchemy, Mining, Slayer
+//! Skills: Hitpoints, Attack, Strength, Defence, Ranged, Fishing, Farming, Smithing, Prayer, Magic, Alchemy, Mining, Slayer
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Attack: Accuracy in melee combat (starts at 1)
 //! - Strength: Max hit in melee combat (starts at 1)
 //! - Defence: Evasion rolls in combat (starts at 1)
+//! - Ranged: Accuracy and damage with bows (starts at 1)
 //! - Fishing: Gathering skill for catching fish
 //! - Smithing: Crafting skill for forging weapons and armor
 //! - Prayer: Max prayer points (1 point per level, starts at 1)
@@ -25,6 +26,7 @@ pub enum SkillType {
     Attack,
     Strength,
     Defence,
+    Ranged,
     Fishing,
     Farming,
     Smithing,
@@ -44,6 +46,7 @@ impl SkillType {
             SkillType::Attack => "attack",
             SkillType::Strength => "strength",
             SkillType::Defence => "defence",
+            SkillType::Ranged => "ranged",
             SkillType::Fishing => "fishing",
             SkillType::Farming => "farming",
             SkillType::Smithing => "smithing",
@@ -63,6 +66,7 @@ impl SkillType {
             "attack" => Some(SkillType::Attack),
             "strength" => Some(SkillType::Strength),
             "defence" => Some(SkillType::Defence),
+            "ranged" => Some(SkillType::Ranged),
             "fishing" => Some(SkillType::Fishing),
             "farming" => Some(SkillType::Farming),
             "smithing" => Some(SkillType::Smithing),
@@ -83,6 +87,7 @@ impl SkillType {
             SkillType::Attack,
             SkillType::Strength,
             SkillType::Defence,
+            SkillType::Ranged,
             SkillType::Fishing,
             SkillType::Farming,
             SkillType::Smithing,
@@ -198,6 +203,8 @@ pub struct Skills {
     #[serde(default)]
     pub defence: Skill,
     #[serde(default)]
+    pub ranged: Skill,
+    #[serde(default)]
     pub fishing: Skill,
     #[serde(default)]
     pub farming: Skill,
@@ -226,7 +233,7 @@ impl Default for Skills {
 }
 
 impl Skills {
-    /// Create new skills with starting values (HP 10, Attack/Strength/Defence 1, others 1)
+    /// Create new skills with starting values (HP 10, Attack/Strength/Defence/Ranged 1, others 1)
     /// New character = combat level 3 (same as legacy)
     pub fn new() -> Self {
         Self {
@@ -234,6 +241,7 @@ impl Skills {
             attack: Skill::new(1),
             strength: Skill::new(1),
             defence: Skill::new(1),
+            ranged: Skill::new(1),
             fishing: Skill::new(1),
             farming: Skill::new(1),
             smithing: Skill::new(1),
@@ -249,14 +257,15 @@ impl Skills {
 
     /// Calculate combat level using OSRS-style formula:
     /// base = (Defence + Hitpoints + floor(Prayer/2)) / 4
-    /// combat_level = floor(base + max((Attack+Strength)*0.325, Magic*0.325))
+    /// combat_level = floor(base + max((Attack+Strength)*0.325, Ranged*0.4875, Magic*0.4875))
     pub fn combat_level(&self) -> i32 {
         let base = (self.defence.level as f64 + self.hitpoints.level as f64
             + (self.prayer.level as f64 / 2.0).floor())
             / 4.0;
         let melee = (self.attack.level + self.strength.level) as f64 * 0.325;
-        let magic = self.magic.level as f64 * 0.325;
-        (base + melee.max(magic)).floor() as i32
+        let ranged = self.ranged.level as f64 * 0.4875;
+        let magic = self.magic.level as f64 * 0.4875;
+        (base + melee.max(ranged).max(magic)).floor() as i32
     }
 
     /// Get a skill by type
@@ -266,6 +275,7 @@ impl Skills {
             SkillType::Attack => &self.attack,
             SkillType::Strength => &self.strength,
             SkillType::Defence => &self.defence,
+            SkillType::Ranged => &self.ranged,
             SkillType::Fishing => &self.fishing,
             SkillType::Farming => &self.farming,
             SkillType::Smithing => &self.smithing,
@@ -286,6 +296,7 @@ impl Skills {
             SkillType::Attack => &mut self.attack,
             SkillType::Strength => &mut self.strength,
             SkillType::Defence => &mut self.defence,
+            SkillType::Ranged => &mut self.ranged,
             SkillType::Fishing => &mut self.fishing,
             SkillType::Farming => &mut self.farming,
             SkillType::Smithing => &mut self.smithing,
@@ -305,6 +316,7 @@ impl Skills {
             + self.attack.level
             + self.strength.level
             + self.defence.level
+            + self.ranged.level
             + self.fishing.level
             + self.farming.level
             + self.smithing.level
@@ -360,6 +372,7 @@ impl LegacyCombatSkills {
             attack: split_skill.clone(),
             strength: split_skill.clone(),
             defence: split_skill,
+            ranged: Skill::new(1),
             fishing: self.fishing,
             farming: self.farming,
             smithing: self.smithing,
@@ -392,6 +405,7 @@ impl LegacySkills {
             attack: self.attack,
             strength: self.strength,
             defence: self.defence,
+            ranged: Skill::new(1),
             fishing: Skill::new(1),
             farming: Skill::new(1),
             smithing: Skill::new(1),
@@ -467,6 +481,11 @@ pub const DEFENCE_XP_PER_DAMAGE: f64 = 4.0;
 pub const CONTROLLED_XP_PER_DAMAGE: f64 = 1.33;
 pub const HITPOINTS_XP_PER_DAMAGE: f64 = 1.33;
 
+/// Ranged XP constants
+pub const RANGED_XP_PER_DAMAGE: f64 = 4.0;
+pub const LONGRANGE_RANGED_XP_PER_DAMAGE: f64 = 2.0;
+pub const LONGRANGE_DEFENCE_XP_PER_DAMAGE: f64 = 2.0;
+
 /// Magic XP constants
 pub const MAGIC_XP_PER_DAMAGE: f64 = 4.0;
 pub const MAGIC_XP_PER_HEAL: f64 = 2.0;
@@ -513,10 +532,11 @@ mod tests {
     #[test]
     fn test_combat_level() {
         let skills = Skills::new();
-        // New character: HP 10, Atk 1, Str 1, Def 1, Prayer 1, Magic 1
+        // New character: HP 10, Atk 1, Str 1, Def 1, Ranged 1, Prayer 1, Magic 1
         // base = (1 + 10 + floor(1/2)) / 4 = (1 + 10 + 0) / 4 = 2.75
         // melee = (1 + 1) * 0.325 = 0.65
-        // magic = 1 * 0.325 = 0.325
+        // ranged = 1 * 0.4875 = 0.4875
+        // magic = 1 * 0.4875 = 0.4875
         // combat_level = floor(2.75 + 0.65) = floor(3.4) = 3
         assert_eq!(skills.combat_level(), 3);
 
@@ -533,13 +553,26 @@ mod tests {
         // melee = (99 + 99) * 0.325 = 64.35
         // combat_level = floor(61.75 + 64.35) = floor(126.1) = 126
         assert_eq!(max_skills.combat_level(), 126);
+
+        // Max ranged stats
+        let ranged_skills = Skills {
+            hitpoints: Skill::new(99),
+            ranged: Skill::new(99),
+            defence: Skill::new(99),
+            prayer: Skill::new(99),
+            ..Skills::new()
+        };
+        // base = (99 + 99 + 49) / 4 = 61.75
+        // ranged = 99 * 0.4875 = 48.2625
+        // combat_level = floor(61.75 + 48.2625) = floor(110.0125) = 110
+        assert_eq!(ranged_skills.combat_level(), 110);
     }
 
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Atk 1 + Str 1 + Def 1 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 + Alchemy 1 + Mining 1 + Slayer 1 + Survivalist 1 = 23
-        assert_eq!(skills.total_level(), 23);
+        // HP 10 + Atk 1 + Str 1 + Def 1 + Ranged 1 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 + Alchemy 1 + Mining 1 + Slayer 1 + Survivalist 1 = 24
+        assert_eq!(skills.total_level(), 24);
     }
 
     #[test]

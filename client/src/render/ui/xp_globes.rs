@@ -345,8 +345,9 @@ impl Renderer {
             let (icon_col, icon_row) = match skill_type {
                 SkillType::Hitpoints => (0, 6),
                 SkillType::Attack => (5, 5),
-                SkillType::Strength => (8, 6),
-                SkillType::Defence => (5, 4),
+                SkillType::Strength => (2, 6),
+                SkillType::Defence => (4, 5),
+                SkillType::Ranged => (3, 5),
                 SkillType::Fishing => (4, 6),
                 SkillType::Farming => (4, 6),
                 SkillType::Mining => (0, 5),
@@ -395,6 +396,7 @@ impl Renderer {
                 SkillType::Alchemy => "Al",
                 SkillType::Slayer => "Sl",
                 SkillType::Survivalist => "Sv",
+                SkillType::Ranged => "Ra",
             };
             let color = self.get_xp_globe_skill_color(skill_type);
             let dims = self.measure_text_sharp(letter, 18.0);
@@ -414,6 +416,7 @@ impl Renderer {
             SkillType::Attack => Color::new(0.85, 0.65, 0.15, 1.0),
             SkillType::Strength => Color::new(0.75, 0.25, 0.25, 1.0),
             SkillType::Defence => Color::new(0.3, 0.5, 0.8, 1.0),
+            SkillType::Ranged => Color::new(0.2, 0.7, 0.6, 1.0),
             SkillType::Fishing => Color::new(0.2, 0.6, 0.85, 1.0),
             SkillType::Farming => Color::new(0.3, 0.75, 0.3, 1.0),
             SkillType::Mining => Color::new(0.5, 0.5, 0.6, 1.0),

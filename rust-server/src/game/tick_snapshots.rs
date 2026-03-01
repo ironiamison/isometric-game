@@ -45,6 +45,7 @@ fn player_update_from_player(
         attack_level: player.skills.attack.level,
         strength_level: player.skills.strength.level,
         defence_level: player.skills.defence.level,
+        ranged_level: player.skills.ranged.level,
         gold: player.inventory.gold,
         gender: player.gender.clone(),
         skin: player.skin.clone(),

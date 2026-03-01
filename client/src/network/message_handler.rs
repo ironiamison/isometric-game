@@ -368,6 +368,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             let attack_level = extract_i32(player_value, "attackLevel");
             let strength_level = extract_i32(player_value, "strengthLevel");
             let defence_level = extract_i32(player_value, "defenceLevel");
+            let ranged_level = extract_i32(player_value, "rangedLevel");
             let combat_style = extract_string(player_value, "combatStyle");
             let gold = extract_i32(player_value, "gold");
             let gender =
@@ -483,6 +484,9 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 }
                 if let Some(level) = defence_level {
                     player.skills.defence.level = level;
+                }
+                if let Some(level) = ranged_level {
+                    player.skills.ranged.level = level;
                 }
                 if let Some(ref style) = combat_style {
                     player.combat_style = style.clone();
@@ -1224,6 +1228,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(xp) = extract_i32(value, "defence_xp") {
                             player.skills.defence.xp = xp as i64;
                         }
+                        if let Some(level) = extract_i32(value, "ranged_level") {
+                            player.skills.ranged.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "ranged_xp") {
+                            player.skills.ranged.xp = xp as i64;
+                        }
                         if let Some(level) = extract_i32(value, "fishing_level") {
                             player.skills.fishing.level = level;
                         }
@@ -1285,12 +1295,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.skills.survivalist.xp = xp as i64;
                         }
 
-                        log::info!("Skills synced for player {}: HP {}, Atk {}, Str {}, Def {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}, Slayer {}, Survivalist {}",
+                        log::info!("Skills synced for player {}: HP {}, Atk {}, Str {}, Def {}, Ranged {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}, Slayer {}, Survivalist {}",
                             player_id,
                             player.skills.hitpoints.level,
                             player.skills.attack.level,
                             player.skills.strength.level,
                             player.skills.defence.level,
+                            player.skills.ranged.level,
                             player.skills.fishing.level,
                             player.skills.farming.level,
                             player.skills.smithing.level,
@@ -1925,6 +1936,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                         "defence_level_required",
                                     )
                                     .unwrap_or(1),
+                                    ranged_level_required: extract_i32(
+                                        item_value,
+                                        "ranged_level_required",
+                                    )
+                                    .unwrap_or(0),
                                     attack_bonus: extract_i32(item_value, "attack_bonus")
                                         .unwrap_or(0),
                                     strength_bonus: extract_i32(item_value, "strength_bonus")

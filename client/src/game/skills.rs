@@ -3,11 +3,12 @@
 //! This is a simplified version that tracks skill data received from the server.
 //! All calculations happen server-side.
 //!
-//! Skills: Hitpoints, Attack, Strength, Defence, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting, Alchemy, Mining, Slayer, Survivalist
+//! Skills: Hitpoints, Attack, Strength, Defence, Ranged, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting, Alchemy, Mining, Slayer, Survivalist
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
 //! - Attack: Accuracy in melee combat (starts at 1)
 //! - Strength: Max hit in melee combat (starts at 1)
 //! - Defence: Evasion rolls in combat (starts at 1)
+//! - Ranged: Accuracy and damage with bows (starts at 1)
 //! - Fishing: Gathering skill for catching fish
 //! - Smithing: Crafting skill for forging weapons and armor
 //! - Prayer: Enables prayer abilities that provide combat buffs
@@ -27,6 +28,7 @@ pub enum SkillType {
     Attack,
     Strength,
     Defence,
+    Ranged,
     Fishing,
     Farming,
     Smithing,
@@ -46,6 +48,7 @@ impl SkillType {
             SkillType::Attack => "attack",
             SkillType::Strength => "strength",
             SkillType::Defence => "defence",
+            SkillType::Ranged => "ranged",
             SkillType::Fishing => "fishing",
             SkillType::Farming => "farming",
             SkillType::Smithing => "smithing",
@@ -65,6 +68,7 @@ impl SkillType {
             "attack" => Some(SkillType::Attack),
             "strength" => Some(SkillType::Strength),
             "defence" => Some(SkillType::Defence),
+            "ranged" => Some(SkillType::Ranged),
             "fishing" => Some(SkillType::Fishing),
             "farming" => Some(SkillType::Farming),
             "smithing" => Some(SkillType::Smithing),
@@ -85,6 +89,7 @@ impl SkillType {
             SkillType::Attack => "Attack",
             SkillType::Strength => "Strength",
             SkillType::Defence => "Defence",
+            SkillType::Ranged => "Ranged",
             SkillType::Fishing => "Fishing",
             SkillType::Farming => "Farming",
             SkillType::Smithing => "Smithing",
@@ -104,6 +109,7 @@ impl SkillType {
             SkillType::Attack,
             SkillType::Strength,
             SkillType::Defence,
+            SkillType::Ranged,
             SkillType::Fishing,
             SkillType::Farming,
             SkillType::Smithing,
@@ -184,6 +190,8 @@ pub struct Skills {
     #[serde(default)]
     pub defence: Skill,
     #[serde(default)]
+    pub ranged: Skill,
+    #[serde(default)]
     pub fishing: Skill,
     #[serde(default)]
     pub farming: Skill,
@@ -212,13 +220,14 @@ impl Default for Skills {
 }
 
 impl Skills {
-    /// Create new skills with starting values (HP 10, Attack/Strength/Defence 1, others 1)
+    /// Create new skills with starting values (HP 10, Attack/Strength/Defence/Ranged 1, others 1)
     pub fn new() -> Self {
         Self {
             hitpoints: Skill::new(10),
             attack: Skill::new(1),
             strength: Skill::new(1),
             defence: Skill::new(1),
+            ranged: Skill::new(1),
             fishing: Skill::new(1),
             farming: Skill::new(1),
             smithing: Skill::new(1),
@@ -234,14 +243,15 @@ impl Skills {
 
     /// Calculate combat level using OSRS-style formula:
     /// base = (Defence + Hitpoints + floor(Prayer/2)) / 4
-    /// combat_level = floor(base + max((Attack+Strength)*0.325, Magic*0.325))
+    /// combat_level = floor(base + max((Attack+Strength)*0.325, Ranged*0.4875, Magic*0.4875))
     pub fn combat_level(&self) -> i32 {
         let base = (self.defence.level as f64 + self.hitpoints.level as f64
             + (self.prayer.level as f64 / 2.0).floor())
             / 4.0;
         let melee = (self.attack.level + self.strength.level) as f64 * 0.325;
-        let magic = self.magic.level as f64 * 0.325;
-        (base + melee.max(magic)).floor() as i32
+        let ranged = self.ranged.level as f64 * 0.4875;
+        let magic = self.magic.level as f64 * 0.4875;
+        (base + melee.max(ranged).max(magic)).floor() as i32
     }
 
     /// Get a skill by type
@@ -251,6 +261,7 @@ impl Skills {
             SkillType::Attack => &self.attack,
             SkillType::Strength => &self.strength,
             SkillType::Defence => &self.defence,
+            SkillType::Ranged => &self.ranged,
             SkillType::Fishing => &self.fishing,
             SkillType::Farming => &self.farming,
             SkillType::Smithing => &self.smithing,
@@ -271,6 +282,7 @@ impl Skills {
             SkillType::Attack => &mut self.attack,
             SkillType::Strength => &mut self.strength,
             SkillType::Defence => &mut self.defence,
+            SkillType::Ranged => &mut self.ranged,
             SkillType::Fishing => &mut self.fishing,
             SkillType::Farming => &mut self.farming,
             SkillType::Smithing => &mut self.smithing,
@@ -297,6 +309,7 @@ impl Skills {
             + self.attack.level
             + self.strength.level
             + self.defence.level
+            + self.ranged.level
             + self.fishing.level
             + self.farming.level
             + self.smithing.level

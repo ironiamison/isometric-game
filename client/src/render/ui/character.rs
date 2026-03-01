@@ -26,13 +26,37 @@ const CHARACTER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
     + CHARACTER_PANEL_PADDING; // ~338
 const STATS_SECTION_GAP: f32 = 8.0; // Gap between equipment grid and stats
 
-/// Combat style labels and short forms
-const COMBAT_STYLES: [(&str, &str); 4] = [
+/// Melee combat style labels and short forms
+const MELEE_COMBAT_STYLES: [(&str, &str); 4] = [
     ("accurate", "Acc"),
     ("aggressive", "Agg"),
     ("defensive", "Def"),
     ("controlled", "Ctrl"),
 ];
+
+/// Ranged combat style labels and short forms
+const RANGED_COMBAT_STYLES: [(&str, &str); 3] = [
+    ("accurate", "Acc"),
+    ("rapid", "Rapid"),
+    ("longrange", "Long"),
+];
+
+/// Get the combat styles for the currently equipped weapon type
+fn get_combat_styles_for_weapon(state: &GameState) -> &'static [(&'static str, &'static str)] {
+    let is_ranged = state
+        .get_local_player()
+        .and_then(|p| p.equipped_weapon.as_ref())
+        .and_then(|wid| state.item_registry.get(wid))
+        .and_then(|def| def.weapon_type.as_ref())
+        .map(|wt| wt == "ranged")
+        .unwrap_or(false);
+
+    if is_ranged {
+        &RANGED_COMBAT_STYLES
+    } else {
+        &MELEE_COMBAT_STYLES
+    }
+}
 
 impl Renderer {
     /// Render the character panel when open
@@ -240,18 +264,20 @@ impl Renderer {
             TEXT_DIM,
         );
 
-        // 4 style buttons filling the remaining width
+        // Dynamic style buttons filling the remaining width
+        let combat_styles = get_combat_styles_for_weapon(state);
         let buttons_x = style_x + label_w + 6.0;
         let buttons_width = style_area_width - label_w - 6.0;
         let gap = 3.0 * scale;
-        let btn_w = ((buttons_width - gap * 3.0) / 4.0).floor();
+        let num_styles = combat_styles.len() as f32;
+        let btn_w = ((buttons_width - gap * (num_styles - 1.0)) / num_styles).floor();
 
         let current_style = state
             .get_local_player()
             .map(|p| p.combat_style.clone())
             .unwrap_or_else(|| "accurate".to_string());
 
-        for (i, (style_id, style_label)) in COMBAT_STYLES.iter().enumerate() {
+        for (i, (style_id, style_label)) in combat_styles.iter().enumerate() {
             let bx = buttons_x + i as f32 * (btn_w + gap);
             let by = style_y;
             let bounds = Rect::new(bx, by, btn_w, style_row_height);
