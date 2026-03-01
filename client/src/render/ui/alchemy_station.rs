@@ -1021,6 +1021,38 @@ impl Renderer {
             },
         );
 
+        // Max button
+        let max_x = plus_x + qty_btn_size + 6.0 * s;
+        let max_btn_w = 36.0 * s;
+        let max_bounds = Rect::new(max_x, btn_y, max_btn_w, qty_btn_size);
+        layout.add(UiElementId::AlchemyQuantityMax, max_bounds);
+        let is_max_hovered = matches!(hovered, Some(UiElementId::AlchemyQuantityMax));
+        let (max_bg, max_border) = if is_max_hovered {
+            (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
+        } else {
+            (SLOT_BG_EMPTY, SLOT_BORDER)
+        };
+        draw_rectangle(max_x, btn_y, max_btn_w, qty_btn_size, max_border);
+        draw_rectangle(
+            max_x + 1.0,
+            btn_y + 1.0,
+            max_btn_w - 2.0,
+            qty_btn_size - 2.0,
+            max_bg,
+        );
+        let max_dims = self.measure_text_sharp("Max", 16.0);
+        self.draw_text_sharp(
+            "Max",
+            max_x + (max_btn_w - max_dims.width) / 2.0,
+            btn_y + qty_btn_size * 0.73,
+            16.0,
+            if is_max_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_NORMAL
+            },
+        );
+
         // BREW button (right-aligned)
         let brew_btn_w = 120.0 * s;
         let brew_btn_h = btn_h;

@@ -215,6 +215,7 @@ pub enum UiElementId {
     AlchemyCancelButton,
     AlchemyQuantityMinus,
     AlchemyQuantityPlus,
+    AlchemyQuantityMax,
 
     // Workbench
     WorkbenchCloseButton,

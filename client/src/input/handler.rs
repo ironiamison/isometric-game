@@ -7186,6 +7186,43 @@ impl InputHandler {
                                 (state.ui_state.alchemy_station_quantity + 1).min(99);
                             return commands;
                         }
+                        UiElementId::AlchemyQuantityMax => {
+                            let tab_sections =
+                                sections_for_tab(state.ui_state.alchemy_station_tab);
+                            let mut alchemy_recipes: Vec<_> = state
+                                .recipe_definitions
+                                .iter()
+                                .filter(|r| r.station.as_deref() == Some("alchemy_station"))
+                                .filter(|r| {
+                                    !r.requires_discovery
+                                        || state.discovered_recipes.contains(&r.id)
+                                })
+                                .filter(|r| {
+                                    tab_sections.contains(&r.section.as_deref().unwrap_or(""))
+                                })
+                                .collect();
+                            alchemy_recipes.sort_by(|a, b| {
+                                let sa = a.section.as_deref().unwrap_or("");
+                                let sb = b.section.as_deref().unwrap_or("");
+                                section_sort_key(sa)
+                                    .cmp(&section_sort_key(sb))
+                                    .then(a.level_required.cmp(&b.level_required))
+                            });
+                            if let Some(recipe) = alchemy_recipes
+                                .get(state.ui_state.alchemy_station_selected_recipe)
+                            {
+                                let mut max_possible = 99i32;
+                                for ing in &recipe.ingredients {
+                                    let have = state.inventory.count_item_by_id(&ing.item_id);
+                                    if ing.count > 0 {
+                                        max_possible = max_possible.min(have / ing.count);
+                                    }
+                                }
+                                state.ui_state.alchemy_station_quantity =
+                                    (max_possible.max(1) as u32).min(99);
+                            }
+                            return commands;
+                        }
                         UiElementId::AlchemyTab(idx) => {
                             // Allow switching to tabs that have content (0=Potions, 1=Scrolls)
                             if (*idx == 0 || *idx == 1) && !state.ui_state.crafting_in_progress {
