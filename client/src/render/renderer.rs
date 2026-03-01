@@ -266,7 +266,7 @@ const MINIMAP_PREVIEW_Y: f32 = 8.0;
 const MINIMAP_PREVIEW_WIDTH: f32 = 188.0;
 const MINIMAP_PREVIEW_HEIGHT: f32 = 140.0;
 const MINIMAP_WORLD_TEXT_SIZE: f32 = 16.0;
-const MINIMAP_VISIBLE_CHUNK_RADIUS: f32 = 2.0;
+const MINIMAP_VISIBLE_CHUNK_RADIUS: f32 = 1.2;
 const MINIMAP_PREVIEW_TILE_BUDGET: usize = 9_000;
 const MINIMAP_PANEL_TILE_BUDGET: usize = 16_000;
 const MINIMAP_PANEL_MIN_ZOOM: f32 = 1.0;
@@ -288,6 +288,8 @@ struct MinimapMarker {
     x: f32,
     y: f32,
     label: String,
+    /// Index into map-icons.png sprite sheet (0-9). Used for icon rendering.
+    icon_index: u8,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -390,6 +392,8 @@ pub struct Renderer {
     animated_objects: HashMap<u32, u32>,
     /// Animated wall sprites: sprite_id -> frame_count
     animated_walls: HashMap<u32, u32>,
+    /// Map icons sprite sheet (16x16 icons: dead_tree, oak, oak2, willow, maple, yew, quest, portal, enemy, station)
+    map_icons: Option<Texture2D>,
     /// Reusable lookup tables for tree/rock effects (cleared + rebuilt each frame to avoid allocations)
     falling_tree_positions: RefCell<HashSet<(i32, i32)>>,
     tree_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
@@ -1449,6 +1453,18 @@ impl Renderer {
             }
         };
 
+        let map_icons = match load_texture(&asset_path("assets/ui/map-icons.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                log::info!("Loaded map icons: {}x{}", tex.width(), tex.height());
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load map icons: {}", e);
+                None
+            }
+        };
+
         // Load exit portal arrow textures
         let exit_arrow_up = match load_texture(&asset_path("assets/ui/up_arrow.png")).await {
             Ok(tex) => {
@@ -1660,6 +1676,7 @@ impl Renderer {
             fishing_skill_icon,
             chat_small_icon,
             coin_small_icon,
+            map_icons,
             farming_sprites,
             prayer_icons,
             spell_icons,
@@ -2034,13 +2051,6 @@ impl Renderer {
             y + 1.0,
             w - 2.0,
             h - 2.0,
-            Color::new(0.31, 0.25, 0.16, 0.95),
-        );
-        draw_rectangle(
-            x + 2.0,
-            y + 2.0,
-            w - 4.0,
-            h - 4.0,
             Color::new(0.09, 0.11, 0.13, 0.95),
         );
         draw_line(
@@ -2420,6 +2430,7 @@ impl Renderer {
                 x: player.x,
                 y: player.y,
                 label: "You".to_string(),
+                icon_index: 255, // Player uses dot, not icon
             });
         }
 
@@ -2462,6 +2473,7 @@ impl Renderer {
                     x: world_x,
                     y: world_y,
                     label: format!("Teleport, {}", target),
+                    icon_index: 7,
                 });
             }
         }
@@ -2490,6 +2502,7 @@ impl Renderer {
                     x: npc.x,
                     y: npc.y,
                     label: format!("Station, {}", npc.display_name),
+                    icon_index: 9,
                 });
             } else if npc.is_quest_giver {
                 quest_markers.push(MinimapMarker {
@@ -2497,6 +2510,7 @@ impl Renderer {
                     x: npc.x,
                     y: npc.y,
                     label: format!("Quest, {}", npc.display_name),
+                    icon_index: 6,
                 });
             } else if npc.is_hostile() {
                 enemy_markers.push((
@@ -2506,6 +2520,7 @@ impl Renderer {
                         x: npc.x,
                         y: npc.y,
                         label: format!("Enemy, {}", npc.display_name),
+                        icon_index: 8,
                     },
                 ));
             }
@@ -2535,6 +2550,12 @@ impl Renderer {
                     if !in_bounds(wx, wy) {
                         continue;
                     }
+                    let tree_icon = match tree_info.name {
+                        "Willow Tree" => 3,
+                        "Maple Tree" => 4,
+                        "Yew Tree" => 5,
+                        _ => 1, // Oak and any unknown default to oak icon
+                    };
                     tree_markers.push((
                         distance_sq(wx, wy),
                         MinimapMarker {
@@ -2545,6 +2566,7 @@ impl Renderer {
                                 "Tree, {} (Lv.{})",
                                 tree_info.name, tree_info.level_required
                             ),
+                            icon_index: tree_icon,
                         },
                     ));
                 }
@@ -2784,6 +2806,24 @@ impl Renderer {
 
         let mut hitboxes: Vec<(usize, Rect)> =
             Vec::with_capacity(if capture_hitboxes { markers.len() } else { 0 });
+
+        // Scissor clip markers to the map rect so icons don't bleed over bevels
+        let physical_w = screen_width();
+        let physical_h = screen_height();
+        let (vw, vh) = virtual_screen_size();
+        let clip_sx = physical_w / vw;
+        let clip_sy = physical_h / vh;
+        {
+            let mut gl = unsafe { get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(Some((
+                (map_rect.x * clip_sx) as i32,
+                (map_rect.y * clip_sy) as i32,
+                (map_rect.w * clip_sx) as i32,
+                (map_rect.h * clip_sy) as i32,
+            )));
+        }
+
         // Draw player markers in a second pass so they always stay above other marker types.
         for draw_player_pass in [false, true] {
             for (idx, marker) in markers.iter().enumerate() {
@@ -2801,12 +2841,44 @@ impl Renderer {
                 let (sx, sy) = self.minimap_world_to_screen(bounds, map_rect, marker.x, marker.y);
                 let (color, base_radius) = Self::minimap_marker_style(marker.kind);
                 let hovered = hovered_marker == Some(idx);
-                let radius = base_radius * marker_scale + if hovered { 1.4 } else { 0.0 };
 
-                draw_circle(sx, sy, radius + 1.2, Color::new(0.0, 0.0, 0.0, 0.65));
-                draw_circle(sx, sy, radius, color);
-                if hovered {
-                    draw_circle_lines(sx, sy, radius + 1.6, 1.0, Color::new(1.0, 1.0, 1.0, 0.9));
+                let use_icon = marker.icon_index < 10 && self.map_icons.is_some();
+                let radius;
+                if use_icon {
+                    let tex = self.map_icons.as_ref().unwrap();
+                    let icon_size = 16.0;
+                    radius = icon_size * 0.5;
+                    let src = Rect::new(marker.icon_index as f32 * 16.0, 0.0, 16.0, 16.0);
+                    let dest_x = sx - icon_size * 0.5;
+                    let dest_y = sy - icon_size * 0.5;
+                    draw_texture_ex(
+                        tex,
+                        dest_x,
+                        dest_y,
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some(macroquad::math::Vec2::new(icon_size, icon_size)),
+                            source: Some(src),
+                            ..Default::default()
+                        },
+                    );
+                    if hovered {
+                        draw_rectangle_lines(
+                            dest_x - 1.0,
+                            dest_y - 1.0,
+                            icon_size + 2.0,
+                            icon_size + 2.0,
+                            1.0,
+                            Color::new(1.0, 1.0, 1.0, 0.9),
+                        );
+                    }
+                } else {
+                    radius = base_radius * marker_scale + if hovered { 1.4 } else { 0.0 };
+                    draw_circle(sx, sy, radius + 1.2, Color::new(0.0, 0.0, 0.0, 0.65));
+                    draw_circle(sx, sy, radius, color);
+                    if hovered {
+                        draw_circle_lines(sx, sy, radius + 1.6, 1.0, Color::new(1.0, 1.0, 1.0, 0.9));
+                    }
                 }
 
                 if capture_hitboxes {
@@ -2821,6 +2893,13 @@ impl Renderer {
                     ));
                 }
             }
+        }
+
+        // Disable scissor clipping
+        {
+            let mut gl = unsafe { get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(None);
         }
 
         draw_rectangle_lines(
@@ -3005,27 +3084,49 @@ impl Renderer {
             let footer_text_size = MINIMAP_WORLD_TEXT_SIZE;
             let status_y = panel_rect.y + panel_rect.h - 34.0;
             let legend_y = panel_rect.y + panel_rect.h - 14.0;
-            let legend_items = [
-                (MinimapMarkerKind::Teleport, "Teleport"),
-                (MinimapMarkerKind::Enemy, "Enemy"),
-                (MinimapMarkerKind::Tree, "Tree"),
-                (MinimapMarkerKind::Quest, "Quest"),
-                (MinimapMarkerKind::Station, "Station"),
+            // Legend items: (icon_index, label)
+            let legend_items: [(u8, &str); 5] = [
+                (7, "Teleport"),
+                (8, "Enemy"),
+                (1, "Tree"),
+                (6, "Quest"),
+                (9, "Station"),
             ];
             let slot_width = footer_width / legend_items.len() as f32;
-            let icon_radius = 3.0;
-            let icon_gap = 6.0;
+            let legend_icon_size = 10.0;
+            let icon_gap = 4.0;
 
-            for (idx, (kind, label)) in legend_items.iter().enumerate() {
-                let (color, _) = Self::minimap_marker_style(*kind);
+            for (idx, (icon_idx, label)) in legend_items.iter().enumerate() {
                 let label_w = self.measure_text_sharp(label, footer_text_size).width;
                 let slot_center_x = footer_left + slot_width * (idx as f32 + 0.5);
-                let group_w = icon_radius * 2.0 + icon_gap + label_w;
+                let group_w = legend_icon_size + icon_gap + label_w;
                 let group_left = slot_center_x - group_w / 2.0;
-                let icon_x = group_left + icon_radius;
-                let text_x = icon_x + icon_radius + icon_gap;
+                let icon_x = group_left;
+                let text_x = icon_x + legend_icon_size + icon_gap;
 
-                draw_circle(icon_x, legend_y - 4.0, icon_radius, color);
+                if let Some(tex) = &self.map_icons {
+                    let src = Rect::new(*icon_idx as f32 * 16.0, 0.0, 16.0, 16.0);
+                    draw_texture_ex(
+                        tex,
+                        icon_x,
+                        legend_y - legend_icon_size + 1.0,
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some(macroquad::math::Vec2::new(legend_icon_size, legend_icon_size)),
+                            source: Some(src),
+                            ..Default::default()
+                        },
+                    );
+                } else {
+                    let (color, _) = Self::minimap_marker_style(match *icon_idx {
+                        7 => MinimapMarkerKind::Teleport,
+                        8 => MinimapMarkerKind::Enemy,
+                        6 => MinimapMarkerKind::Quest,
+                        9 => MinimapMarkerKind::Station,
+                        _ => MinimapMarkerKind::Tree,
+                    });
+                    draw_circle(icon_x + 3.0, legend_y - 4.0, 3.0, color);
+                }
                 self.draw_text_sharp(label, text_x, legend_y, footer_text_size, TEXT_NORMAL);
             }
 

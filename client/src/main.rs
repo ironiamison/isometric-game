@@ -352,7 +352,7 @@ async fn main() {
                                 let matchmake_url =
                                     format!("{}/matchmake/joinOrCreate/game_room", http_url);
                                 let body = serde_json::json!({
-                                    "character_id": character_id,
+                                    "characterId": character_id,
                                 });
                                 let result = ureq::post(&matchmake_url)
                                     .set("Authorization", &format!("Bearer {}", session.token))

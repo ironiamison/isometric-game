@@ -622,7 +622,11 @@ struct SpliceCandidate {
     prefix_range: Option<(usize, usize)>,
 }
 
-fn splice_candidates(state: &GameState, start: (i32, i32)) -> Vec<SpliceCandidate> {
+fn splice_candidates(
+    state: &GameState,
+    start: (i32, i32),
+    max_splice_ahead: usize,
+) -> Vec<SpliceCandidate> {
     let mut candidates = Vec::new();
     candidates.push(SpliceCandidate {
         pos: start,
@@ -638,8 +642,7 @@ fn splice_candidates(state: &GameState, start: (i32, i32)) -> Vec<SpliceCandidat
         return candidates;
     }
 
-    const MAX_SPLICE_AHEAD: usize = 6;
-    let max_idx = (path_state.current_index + MAX_SPLICE_AHEAD).min(path_state.path.len() - 1);
+    let max_idx = (path_state.current_index + max_splice_ahead).min(path_state.path.len() - 1);
     let start_is_next = path_state.path[path_state.current_index] == start;
     let base_steps: i32 = if start_is_next { 0 } else { 1 };
 
@@ -666,7 +669,31 @@ fn find_path_with_optimistic_splice(
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
 ) -> Option<Vec<(i32, i32)>> {
-    let candidates = splice_candidates(state, start);
+    find_path_with_limited_splice(state, start, goal, occupied, max_distance, 6)
+}
+
+// For plain click-to-move, only preserve the currently committed next tile.
+// Splicing too far ahead into an old route can create loops/backtracking when
+// the player rapidly retargets destinations.
+fn find_path_with_committed_step_splice(
+    state: &GameState,
+    start: (i32, i32),
+    goal: (i32, i32),
+    occupied: &HashSet<(i32, i32)>,
+    max_distance: i32,
+) -> Option<Vec<(i32, i32)>> {
+    find_path_with_limited_splice(state, start, goal, occupied, max_distance, 1)
+}
+
+fn find_path_with_limited_splice(
+    state: &GameState,
+    start: (i32, i32),
+    goal: (i32, i32),
+    occupied: &HashSet<(i32, i32)>,
+    max_distance: i32,
+    max_splice_ahead: usize,
+) -> Option<Vec<(i32, i32)>> {
+    let candidates = splice_candidates(state, start, max_splice_ahead);
     let path_state = state.auto_path.as_ref();
 
     let mut best: Option<(i32, SpliceCandidate, Vec<(i32, i32)>)> = None;
@@ -715,7 +742,7 @@ fn find_path_to_adjacent_with_optimistic_splice(
     max_distance: i32,
     preferred_adjacent: Option<(i32, i32)>,
 ) -> Option<((i32, i32), Vec<(i32, i32)>)> {
-    let candidates = splice_candidates(state, start);
+    let candidates = splice_candidates(state, start, 6);
     let path_state = state.auto_path.as_ref();
 
     let mut best: Option<(i32, SpliceCandidate, (i32, i32), Vec<(i32, i32)>)> = None;
@@ -1033,10 +1060,10 @@ fn pathfind_to_tile(
                 .is_walkable(tile_x as f32, tile_y as f32)
         {
             let occupied = build_occupied_set(state, true);
-            if let Some(path) = find_path_with_optimistic_splice(
-                state,
+            if let Some(path) = pathfinding::find_path(
                 (px, py),
                 (tile_x, tile_y),
+                &state.chunk_manager,
                 &occupied,
                 MAX_PATH_DISTANCE,
             ) {
@@ -1053,6 +1080,214 @@ fn pathfind_to_tile(
             }
         }
     }
+}
+
+fn rebuild_path_state(template: &PathState, path: Vec<(i32, i32)>, destination: (i32, i32)) -> PathState {
+    let mut next = template.clone();
+    next.path = path;
+    next.current_index = 0;
+    next.destination = destination;
+    next
+}
+
+fn rebuild_current_auto_path(state: &mut GameState) -> bool {
+    const MAX_PATH_DISTANCE: i32 = 32;
+
+    let Some(template) = state.auto_path.clone() else {
+        return false;
+    };
+    let Some(player) = state.get_local_player() else {
+        return false;
+    };
+    let start = (
+        player.server_x.round() as i32,
+        player.server_y.round() as i32,
+    );
+
+    if let Some(aa) = state.auto_action_state.clone() {
+        if let Some((txf, tyf)) = auto_action_target_pos(&aa, state) {
+            let target = (txf.round() as i32, tyf.round() as i32);
+            let mut occupied = build_occupied_set(state, true);
+            match aa.target_type.as_str() {
+                "npc" => {
+                    occupied.remove(&target);
+                }
+                "player" => {
+                    occupied.remove(&target);
+                }
+                _ => {}
+            }
+            let preferred = preferred_adjacent_tile_for_target(state, target);
+            if let Some((dest, path)) = pathfinding::find_path_to_adjacent_prefer(
+                start,
+                target,
+                &state.chunk_manager,
+                &occupied,
+                MAX_PATH_DISTANCE,
+                preferred,
+            ) {
+                state.auto_path = Some(rebuild_path_state(&template, path, dest));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if let Some(follow_id) = state.follow_target.clone() {
+        if let Some(target) = state.players.get(&follow_id) {
+            let target_tile = (
+                target.server_x.round() as i32,
+                target.server_y.round() as i32,
+            );
+            let mut occupied = build_occupied_set(state, true);
+            occupied.remove(&target_tile);
+            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                start,
+                target_tile,
+                &state.chunk_manager,
+                &occupied,
+                MAX_PATH_DISTANCE,
+            ) {
+                state.auto_path = Some(rebuild_path_state(&template, path, dest));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if let Some(item_id) = template.pickup_target.clone() {
+        if let Some(item) = state.ground_items.get(&item_id) {
+            let target = (item.x.round() as i32, item.y.round() as i32);
+            let occupied = build_occupied_set(state, true);
+            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                start,
+                target,
+                &state.chunk_manager,
+                &occupied,
+                MAX_PATH_DISTANCE,
+            ) {
+                state.auto_path = Some(rebuild_path_state(&template, path, dest));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if let Some(npc_id) = template.interact_target.clone() {
+        if let Some(npc) = state.npcs.get(&npc_id) {
+            let target = (npc.server_x.round() as i32, npc.server_y.round() as i32);
+            let occupied = build_occupied_set(state, false);
+            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                start,
+                target,
+                &state.chunk_manager,
+                &occupied,
+                MAX_PATH_DISTANCE,
+            ) {
+                state.auto_path = Some(rebuild_path_state(&template, path, dest));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if let Some(target) = template.interact_object_target {
+        let occupied = build_occupied_set(state, true);
+        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+            start,
+            target,
+            &state.chunk_manager,
+            &occupied,
+            MAX_PATH_DISTANCE,
+        ) {
+            state.auto_path = Some(rebuild_path_state(&template, path, dest));
+            return true;
+        }
+        return false;
+    }
+
+    if let Some(target) = template.waystone_target {
+        let occupied = build_occupied_set(state, true);
+        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+            start,
+            target,
+            &state.chunk_manager,
+            &occupied,
+            MAX_PATH_DISTANCE,
+        ) {
+            state.auto_path = Some(rebuild_path_state(&template, path, dest));
+            return true;
+        }
+        return false;
+    }
+
+    if let Some(player_id) = template.browse_stall_target.clone() {
+        if let Some(target) = state.players.get(&player_id) {
+            let target_tile = (
+                target.server_x.round() as i32,
+                target.server_y.round() as i32,
+            );
+            let mut occupied = build_occupied_set(state, true);
+            occupied.remove(&target_tile);
+            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                start,
+                target_tile,
+                &state.chunk_manager,
+                &occupied,
+                MAX_PATH_DISTANCE,
+            ) {
+                state.auto_path = Some(rebuild_path_state(&template, path, dest));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if let Some((chair_x, chair_y)) = state.pending_chair_sit {
+        let occupied = build_occupied_set(state, true);
+        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+            start,
+            (chair_x, chair_y),
+            &state.chunk_manager,
+            &occupied,
+            MAX_PATH_DISTANCE,
+        ) {
+            state.auto_path = Some(rebuild_path_state(&template, path, dest));
+            return true;
+        }
+        return false;
+    }
+
+    if let Some(patch_id) = state.pending_harvest_patch.clone() {
+        if let Some(patch) = state.farming_patches.get(&patch_id) {
+            let occupied = build_occupied_set(state, true);
+            if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                start,
+                (patch.x, patch.y),
+                &state.chunk_manager,
+                &occupied,
+                MAX_PATH_DISTANCE,
+            ) {
+                state.auto_path = Some(rebuild_path_state(&template, path, dest));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    let goal = template.destination;
+    if !state.chunk_manager.is_walkable(goal.0 as f32, goal.1 as f32) {
+        return false;
+    }
+    let occupied = build_occupied_set(state, true);
+    if let Some(path) =
+        pathfinding::find_path(start, goal, &state.chunk_manager, &occupied, MAX_PATH_DISTANCE)
+    {
+        state.auto_path = Some(rebuild_path_state(&template, path, goal));
+        return true;
+    }
+
+    false
 }
 
 /// Returns (combat_level_required, slayer_level_required) for a slayer master entity type.
@@ -1556,6 +1791,9 @@ pub struct InputHandler {
     dir_press_time: f64,
     // Track if we've sent a move command for the current key press
     move_sent: bool,
+    // Auto-path movement is step-driven: one move per waypoint transition.
+    auto_path_sent_waypoint: Option<(i32, i32)>,
+    auto_path_sent_dir: Option<(f32, f32)>,
     // Touch controls for mobile devices
     pub touch_controls: TouchControls,
 }
@@ -1573,6 +1811,8 @@ impl InputHandler {
             attack_cooldown: 0.8, // 800 ms (matches server ATTACK_COOLDOWN_MS)
             dir_press_time: 0.0,
             move_sent: false,
+            auto_path_sent_waypoint: None,
+            auto_path_sent_dir: None,
             touch_controls: TouchControls::new(),
         }
     }
@@ -1580,6 +1820,11 @@ impl InputHandler {
     /// Load touch control icons (call once after creation in async context)
     pub async fn load_touch_icons(&mut self) {
         self.touch_controls.load_icons().await;
+    }
+
+    fn reset_auto_path_motion_state(&mut self) {
+        self.auto_path_sent_waypoint = None;
+        self.auto_path_sent_dir = None;
     }
 
     fn update_touch_controls(&mut self, state: &GameState, current_time: f64) {
@@ -6824,7 +7069,7 @@ impl InputHandler {
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
                     const SCROLL_SPEED: f32 = 30.0;
-                    let cell_h = 90.0_f32;
+                    let cell_h = 106.0_f32;
                     let gap = 6.0_f32;
                     let rows = (recipe_count + columns - 1) / columns;
                     let total_content = rows as f32 * (cell_h + gap);
@@ -6839,7 +7084,7 @@ impl InputHandler {
 
                 // Scrollbar drag handling
                 if let Some(track_bounds) = layout.get_bounds(&UiElementId::AnvilScrollbar) {
-                    let cell_h = 90.0_f32;
+                    let cell_h = 106.0_f32;
                     let gap = 6.0_f32;
                     let rows = (recipe_count + columns - 1) / columns;
                     let total_content = rows as f32 * (cell_h + gap);
@@ -7978,6 +8223,7 @@ impl InputHandler {
         // Cancel auto-path if any movement input (keyboard or D-pad)
         if up || down || left || right || has_dpad_input {
             state.clear_auto_path();
+            self.reset_auto_path_motion_state();
         }
 
         // Determine new direction from keyboard - only one direction at a time
@@ -8516,6 +8762,10 @@ impl InputHandler {
             }
         }
 
+        if state.auto_path.is_none() {
+            self.reset_auto_path_motion_state();
+        }
+
         // Path following - generate movement commands when auto-pathing
         // Only follow path if not manually moving and not attacking
         if dx == 0.0 && dy == 0.0 && !is_attacking {
@@ -8574,37 +8824,54 @@ impl InputHandler {
             }
 
             if path_blocked {
-                if state.auto_action_state.is_some() || state.follow_target.is_some() {
-                    // Clear the blocked path — chase/follow re-path will recalculate next frame
-                    state.auto_path = None;
-                } else {
-                    state.auto_path = None;
-                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
-                    return commands;
+                self.reset_auto_path_motion_state();
+                if !rebuild_current_auto_path(state) {
+                    if state.auto_action_state.is_some() || state.follow_target.is_some() {
+                        // Clear the blocked path — chase/follow re-path will recalculate next frame
+                        state.auto_path = None;
+                        self.reset_auto_path_motion_state();
+                    } else {
+                        state.auto_path = None;
+                        self.reset_auto_path_motion_state();
+                        commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                        return commands;
+                    }
                 }
             }
 
             if let (Some((player_x, player_y)), Some(ref mut path_state)) =
                 (player_pos, &mut state.auto_path)
             {
-                // Generate movement toward current waypoint
+                // Auto-path is step-driven: send one move when a new waypoint becomes active.
                 if path_state.current_index < path_state.path.len() {
                     let (next_x, next_y) = path_state.path[path_state.current_index];
                     let move_dx = (next_x - player_x).signum() as f32;
                     let move_dy = (next_y - player_y).signum() as f32;
 
-                    // Only move in one direction at a time (grid-based movement)
-                    if move_dx != 0.0 {
-                        commands.push(InputCommand::Move {
-                            dx: move_dx,
-                            dy: 0.0,
-                        });
+                    let desired_dir = if move_dx != 0.0 {
+                        Some((move_dx, 0.0))
                     } else if move_dy != 0.0 {
-                        commands.push(InputCommand::Move {
-                            dx: 0.0,
-                            dy: move_dy,
-                        });
+                        Some((0.0, move_dy))
+                    } else {
+                        None
+                    };
+
+                    if let Some((send_dx, send_dy)) = desired_dir {
+                        let waypoint_changed =
+                            self.auto_path_sent_waypoint != Some((next_x, next_y));
+                        let dir_changed = self.auto_path_sent_dir != Some((send_dx, send_dy));
+
+                        if waypoint_changed || dir_changed {
+                            commands.push(InputCommand::Move {
+                                dx: send_dx,
+                                dy: send_dy,
+                            });
+                            self.auto_path_sent_waypoint = Some((next_x, next_y));
+                            self.auto_path_sent_dir = Some((send_dx, send_dy));
+                        }
                     }
+                } else {
+                    self.reset_auto_path_motion_state();
                 }
             }
 
@@ -8747,6 +9014,7 @@ impl InputHandler {
                     }
                 }
                 state.auto_path = None;
+                self.reset_auto_path_motion_state();
 
                 // Send stop command so we don't keep moving in the last direction
                 // (but not during auto-action — that would interrupt it on the server)
@@ -8770,6 +9038,7 @@ impl InputHandler {
             }
             // Cancel auto-path and auto-action when manually attacking
             state.clear_auto_path();
+            self.reset_auto_path_motion_state();
             if state.auto_action_state.is_some() {
                 state.auto_action_state = None;
                 commands.push(InputCommand::CancelAutoAction);
@@ -9769,10 +10038,10 @@ impl InputHandler {
                         let occupied = build_occupied_set(state, true);
 
                         // Calculate path using A*
-                        if let Some(path) = find_path_with_optimistic_splice(
-                            state,
+                        if let Some(path) = pathfinding::find_path(
                             (player_x, player_y),
                             (tile_x, tile_y),
+                            &state.chunk_manager,
                             &occupied,
                             MAX_PATH_DISTANCE,
                         ) {
@@ -10443,7 +10712,7 @@ impl InputHandler {
     /// Auto-scroll anvil grid to keep selected recipe in view
     fn auto_scroll_anvil_grid(&self, state: &mut crate::game::GameState) {
         let columns = 4;
-        let cell_h = 90.0_f32;
+        let cell_h = 106.0_f32;
         let gap = 6.0_f32;
         let row = state.ui_state.anvil_selected_recipe / columns;
         let item_top = row as f32 * (cell_h + gap);

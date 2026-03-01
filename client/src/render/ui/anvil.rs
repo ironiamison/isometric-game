@@ -328,7 +328,7 @@ impl Renderer {
         let columns = 4;
         let gap = 6.0 * s;
         let cell_w = (content_w - (columns as f32 - 1.0) * gap) / columns as f32;
-        let cell_h = 90.0 * s;
+        let cell_h = 106.0 * s;
 
         let rows = (anvil_recipes.len() + columns - 1) / columns;
         let total_content = rows as f32 * (cell_h + gap);
@@ -409,9 +409,13 @@ impl Renderer {
                 SLOT_INNER_SHADOW,
             );
 
-            // Register click area
-            let cell_bounds = Rect::new(cell_x, cell_y, cell_w, cell_h);
-            layout.add(UiElementId::AnvilRecipeCell(i), cell_bounds);
+            // Register click area (clamped to visible content so scrolled cells don't steal tab clicks)
+            let visible_top = cell_y.max(content_y);
+            let visible_bottom = (cell_y + cell_h).min(content_y + content_h);
+            if visible_bottom > visible_top {
+                let cell_bounds = Rect::new(cell_x, visible_top, cell_w, visible_bottom - visible_top);
+                layout.add(UiElementId::AnvilRecipeCell(i), cell_bounds);
+            }
 
             // Smithing level badge (top-left corner)
             if recipe.level_required > 0 {
@@ -528,27 +532,77 @@ impl Renderer {
             } else {
                 Color::new(0.784, 0.314, 0.314, 1.0)
             };
-            // Truncate ingredients if too wide
-            let ing_display = if self.measure_text_sharp(&ing_text, 16.0).width > cell_w - 8.0 {
-                let mut truncated = ing_text.clone();
-                while self.measure_text_sharp(&truncated, 16.0).width > cell_w - 16.0
-                    && truncated.len() > 3
-                {
-                    truncated.pop();
-                }
-                truncated.push_str("..");
-                truncated
+            let max_line_w = cell_w - 8.0;
+            // Word-wrap ingredients across up to 2 lines, splitting at ", " boundaries
+            if self.measure_text_sharp(&ing_text, 16.0).width <= max_line_w {
+                // Fits on one line
+                let ing_dims = self.measure_text_sharp(&ing_text, 16.0);
+                self.draw_text_sharp(
+                    &ing_text,
+                    cell_x + (cell_w - ing_dims.width) / 2.0,
+                    cell_y + icon_size + 34.0 * s,
+                    16.0,
+                    ing_color,
+                );
             } else {
-                ing_text
-            };
-            let ing_dims = self.measure_text_sharp(&ing_display, 16.0);
-            self.draw_text_sharp(
-                &ing_display,
-                cell_x + (cell_w - ing_dims.width) / 2.0,
-                cell_y + icon_size + 34.0 * s,
-                16.0,
-                ing_color,
-            );
+                // Split at last ", " that fits on line 1
+                let mut split_at = 0;
+                for (idx, _) in ing_text.match_indices(", ") {
+                    let candidate = &ing_text[..idx + 1]; // include comma
+                    if self.measure_text_sharp(candidate, 16.0).width <= max_line_w {
+                        split_at = idx + 1; // after the comma
+                    } else {
+                        break;
+                    }
+                }
+
+                let (line1, line2) = if split_at > 0 {
+                    (ing_text[..split_at].to_string(), ing_text[split_at..].trim_start().to_string())
+                } else {
+                    // No comma break fits; hard-truncate line 1
+                    let mut trunc = ing_text.clone();
+                    while self.measure_text_sharp(&format!("{}..", trunc), 16.0).width > max_line_w
+                        && trunc.len() > 3
+                    {
+                        trunc.pop();
+                    }
+                    (format!("{}..", trunc), String::new())
+                };
+
+                // Truncate line 2 if needed
+                let line2_display = if !line2.is_empty()
+                    && self.measure_text_sharp(&line2, 16.0).width > max_line_w
+                {
+                    let mut trunc = line2.clone();
+                    while self.measure_text_sharp(&format!("{}..", trunc), 16.0).width > max_line_w
+                        && trunc.len() > 3
+                    {
+                        trunc.pop();
+                    }
+                    format!("{}..", trunc)
+                } else {
+                    line2
+                };
+
+                let l1_dims = self.measure_text_sharp(&line1, 16.0);
+                self.draw_text_sharp(
+                    &line1,
+                    cell_x + (cell_w - l1_dims.width) / 2.0,
+                    cell_y + icon_size + 34.0 * s,
+                    16.0,
+                    ing_color,
+                );
+                if !line2_display.is_empty() {
+                    let l2_dims = self.measure_text_sharp(&line2_display, 16.0);
+                    self.draw_text_sharp(
+                        &line2_display,
+                        cell_x + (cell_w - l2_dims.width) / 2.0,
+                        cell_y + icon_size + 48.0 * s,
+                        16.0,
+                        ing_color,
+                    );
+                }
+            }
         }
 
         // Disable scissor
