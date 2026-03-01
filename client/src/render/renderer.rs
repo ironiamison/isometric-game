@@ -4332,10 +4332,7 @@ impl Renderer {
             if !player.has_stall {
                 continue;
             }
-            // Skip local player
-            if state.local_player_id.as_ref() == Some(&player.id) {
-                continue;
-            }
+            // Show for local player too (so they see their shop is open)
 
             let (screen_x, screen_y) = world_to_screen(player.x, player.y, &state.camera);
             let has_sprite = self
@@ -9176,12 +9173,32 @@ impl Renderer {
                 );
             }
 
-            // ===== Dash cooldown indicator (below gathering status or prayer bar) =====
-            let dash_bar_y = if is_skilling {
-                prayer_bar_y + bar_height + 4.0 * s + 22.0 * s + 4.0 * s // Below gathering bar
-            } else {
-                prayer_bar_y + bar_height + 4.0 * s // Below prayer bar
-            };
+            // ===== Store Open status indicator (below gathering status or prayer bar) =====
+            let has_stall_bar = state.ui_state.stall_active;
+            if has_stall_bar {
+                let stall_bar_y = prayer_bar_y + bar_height + 4.0 * s
+                    + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 };
+                let stall_h = 22.0 * s;
+                let bg_color = Color::new(0.05, 0.18, 0.08, 0.7);
+                let border_color = Color::new(0.2, 0.55, 0.25, 0.5);
+                let text_color = Color::new(0.5, 0.9, 0.55, 0.9);
+                draw_rectangle(bar_x, stall_bar_y, bar_width, stall_h, bg_color);
+                draw_rectangle_lines(bar_x, stall_bar_y, bar_width, stall_h, 1.0, border_color);
+                let label = "Store Open";
+                let label_w = self.measure_text_sharp(label, 16.0).width;
+                self.draw_text_sharp(
+                    label,
+                    (bar_x + (bar_width - label_w) / 2.0).floor(),
+                    (stall_bar_y + stall_h * 0.68).floor(),
+                    16.0,
+                    text_color,
+                );
+            }
+
+            // ===== Dash cooldown indicator (below stall/gathering status or prayer bar) =====
+            let status_bars_offset = if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
+                + if has_stall_bar { 22.0 * s + 4.0 * s } else { 0.0 };
+            let dash_bar_y = prayer_bar_y + bar_height + 4.0 * s + status_bars_offset;
             let current_time = macroquad::time::get_time();
             if state.dash_cooldown_end > current_time {
                 let remaining = (state.dash_cooldown_end - current_time) as f32;
@@ -9228,12 +9245,13 @@ impl Renderer {
             let globe_stats_y = preview.y + 20.0;
             self.render_xp_globes(&state.xp_globes, globe_anchor_x, globe_stats_y);
 
-            // HUD chips (below gathering/dash indicators): combat style + slayer task side-by-side
+            // HUD chips (below gathering/stall/dash indicators): combat style + slayer task side-by-side
             let has_dash_bar = state.dash_cooldown_end > current_time;
             let chip_row_y = prayer_bar_y
                 + bar_height
                 + 4.0 * s
                 + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
+                + if has_stall_bar { 22.0 * s + 4.0 * s } else { 0.0 }
                 + if has_dash_bar {
                     22.0 * s + 4.0 * s
                 } else {
@@ -9261,8 +9279,9 @@ impl Renderer {
 
             let has_any_chip = combat_w > 0.0 || has_slayer_chip;
 
-            // XP Drop Feed (below gathering status or MP bar)
+            // XP Drop Feed (below gathering/stall status or MP bar)
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 }
+                + if has_stall_bar { 22.0 + 4.0 } else { 0.0 }
                 + if has_dash_bar { 22.0 + 4.0 } else { 0.0 }
                 + if has_any_chip { chip_row_h / s + 4.0 } else { 0.0 };
             let drop_start_y = mp_bar_y + bar_height + extra_offset + 145.0;
@@ -9688,11 +9707,13 @@ impl Renderer {
                 let prayer_bar_y = mp_bar_y + bar_height + 4.0 * s;
                 let current_time = macroquad::time::get_time();
                 let is_skilling = state.is_gathering || state.is_woodcutting;
+                let has_stall_bar = state.ui_state.stall_active;
                 let has_dash_bar = state.dash_cooldown_end > current_time;
                 let chip_y = prayer_bar_y
                     + bar_height
                     + 4.0 * s
                     + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
+                    + if has_stall_bar { 22.0 * s + 4.0 * s } else { 0.0 }
                     + if has_dash_bar {
                         22.0 * s + 4.0 * s
                     } else {
