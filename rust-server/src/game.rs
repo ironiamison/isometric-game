@@ -3454,36 +3454,17 @@ impl GameRoom {
             (attack_level, strength_level)
         };
 
-        // For ranged weapons, check and consume 1 arrow before allowing the attack
+        // For ranged weapons, check the player has arrows (but don't consume yet —
+        // arrows are only consumed when an actual target is found)
         if weapon_type == WeaponType::Ranged {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                // Find the first arrow in inventory (any item ending with "_arrow")
-                let arrow_info = player.inventory.slots.iter().find_map(|slot| {
+            let players = self.players.read().await;
+            if let Some(player) = players.get(player_id) {
+                let has_arrows = player.inventory.slots.iter().any(|slot| {
                     slot.as_ref()
-                        .filter(|s| s.item_id.ends_with("_arrow"))
-                        .map(|s| s.item_id.clone())
+                        .map_or(false, |s| s.item_id.ends_with("_arrow"))
                 });
-
-                if let Some(arrow_id) = arrow_info {
-                    player.inventory.remove_item(&arrow_id, 1);
-                    let inv_update = player.inventory.to_update();
-                    let gold = player.inventory.gold;
+                if !has_arrows {
                     drop(players);
-
-                    // Send inventory update to reflect consumed arrow
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::InventoryUpdate {
-                            player_id: player_id.to_string(),
-                            slots: inv_update,
-                            gold,
-                        },
-                    )
-                    .await;
-                } else {
-                    drop(players);
-                    // No arrows available - reject the attack
                     self.send_to_player(
                         player_id,
                         ServerMessage::AttackResult {
@@ -3744,6 +3725,38 @@ impl GameRoom {
                         }
                     }
                 }
+            }
+        }
+
+        // Now that we have a confirmed target, consume 1 arrow for ranged weapons
+        if weapon_type == WeaponType::Ranged {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                let arrow_id = player.inventory.slots.iter().find_map(|slot| {
+                    slot.as_ref()
+                        .filter(|s| s.item_id.ends_with("_arrow"))
+                        .map(|s| s.item_id.clone())
+                });
+                if let Some(arrow_id) = arrow_id {
+                    player.inventory.remove_item(&arrow_id, 1);
+                    let inv_update = player.inventory.to_update();
+                    let gold = player.inventory.gold;
+                    drop(players);
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::InventoryUpdate {
+                            player_id: player_id.to_string(),
+                            slots: inv_update,
+                            gold,
+                        },
+                    )
+                    .await;
+                } else {
+                    // Arrows ran out between check and consumption (unlikely but safe)
+                    return;
+                }
+            } else {
+                return;
             }
         }
 
