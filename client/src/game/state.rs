@@ -1883,6 +1883,8 @@ pub struct GameState {
 
     /// Timestamp when last ping was sent (for latency measurement)
     pub ping_sent_at: Option<f64>,
+    /// Whether the pending ping was a manual /ping command
+    pub manual_ping: bool,
 
     /// Continuous ping tracking (for debug menu)
     pub ping_stats: PingStats,
@@ -1999,6 +2001,7 @@ impl GameState {
             max_prayer_points: 1,
             active_prayers: Vec::new(),
             ping_sent_at: None,
+            manual_ping: false,
             ping_stats: PingStats::default(),
             world_fade_in: 0.0,
             world_was_ready: false,

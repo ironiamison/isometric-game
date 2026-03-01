@@ -1882,7 +1882,15 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
     let recv_tx = tx.clone();
     let mut recv_task = tokio::spawn(async move {
         // Phase 1: Spectator mode — wait for upgrade request
-        while let Some(Ok(msg)) = receiver.next().await {
+        loop {
+            let msg = match tokio::time::timeout(Duration::from_secs(30), receiver.next()).await {
+                Ok(Some(Ok(msg))) => msg,
+                Ok(Some(Err(_))) | Ok(None) => break,
+                Err(_) => {
+                    warn!("Spectator {} connection timed out (no data for 30s)", recv_spectator_id);
+                    break;
+                }
+            };
             match msg {
                 Message::Binary(data) => {
                     match protocol::decode_client_message(&data) {
@@ -2298,25 +2306,32 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             );
 
                             // --- Phase 2: Normal player message handling loop ---
-                            while let Some(Ok(msg)) = receiver.next().await {
-                                match msg {
-                                    Message::Binary(data) => {
-                                        if let Err(e) = handle_client_message(
-                                            &recv_state,
-                                            &recv_room,
-                                            &player_id,
-                                            &data,
-                                        )
-                                        .await
-                                        {
-                                            warn!(
-                                                "Error handling message from upgraded player {}: {}",
-                                                player_id, e
-                                            );
+                            loop {
+                                match tokio::time::timeout(Duration::from_secs(30), receiver.next()).await {
+                                    Ok(Some(Ok(msg))) => match msg {
+                                        Message::Binary(data) => {
+                                            if let Err(e) = handle_client_message(
+                                                &recv_state,
+                                                &recv_room,
+                                                &player_id,
+                                                &data,
+                                            )
+                                            .await
+                                            {
+                                                warn!(
+                                                    "Error handling message from upgraded player {}: {}",
+                                                    player_id, e
+                                                );
+                                            }
                                         }
+                                        Message::Close(_) => break,
+                                        _ => {}
+                                    },
+                                    Ok(Some(Err(_))) | Ok(None) => break,
+                                    Err(_) => {
+                                        warn!("Upgraded player {} connection timed out (no data for 30s)", player_id);
+                                        break;
                                     }
-                                    Message::Close(_) => break,
-                                    _ => {}
                                 }
                             }
 
@@ -3078,18 +3093,25 @@ async fn handle_socket(
     let player_id_clone = player_id.clone();
     let state_clone = state.clone();
     let mut recv_task = tokio::spawn(async move {
-        while let Some(Ok(msg)) = receiver.next().await {
-            match msg {
-                Message::Binary(data) => {
-                    if let Err(e) =
-                        handle_client_message(&state_clone, &room_clone, &player_id_clone, &data)
-                            .await
-                    {
-                        warn!("Error handling message: {}", e);
+        loop {
+            match tokio::time::timeout(Duration::from_secs(30), receiver.next()).await {
+                Ok(Some(Ok(msg))) => match msg {
+                    Message::Binary(data) => {
+                        if let Err(e) =
+                            handle_client_message(&state_clone, &room_clone, &player_id_clone, &data)
+                                .await
+                        {
+                            warn!("Error handling message: {}", e);
+                        }
                     }
+                    Message::Close(_) => break,
+                    _ => {}
+                },
+                Ok(Some(Err(_))) | Ok(None) => break,
+                Err(_) => {
+                    warn!("Player {} connection timed out (no data for 30s)", player_id_clone);
+                    break;
                 }
-                Message::Close(_) => break,
-                _ => {}
             }
         }
     });

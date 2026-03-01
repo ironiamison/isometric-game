@@ -161,7 +161,7 @@ impl GameRoom {
             }
         }
 
-        let (used_item_id, effect, inventory_update, gold, prayer_state) = {
+        let (used_item_id, effect, inventory_update, gold, prayer_state, teleport_pos) = {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 if player.is_dead {
@@ -173,6 +173,7 @@ impl GameRoom {
                     .use_item(slot_index as usize, &self.item_registry)
                 {
                     let mut prayer_state = None;
+                    let mut teleport_pos: Option<(i32, i32)> = None;
                     let effect = if let Some(definition) = self.item_registry.get(&item_id) {
                         match &definition.use_effect {
                             Some(UseEffect::Heal { amount }) => {
@@ -216,6 +217,7 @@ impl GameRoom {
                                 player.y = *y;
                                 player.move_dx = 0;
                                 player.move_dy = 0;
+                                teleport_pos = Some((*x, *y));
                                 format!("teleport:{}", destination)
                             }
                             Some(UseEffect::LearnSpell { .. }) | Some(UseEffect::Dig) | None => {
@@ -232,6 +234,7 @@ impl GameRoom {
                         player.inventory.to_update(),
                         player.inventory.gold,
                         prayer_state,
+                        teleport_pos,
                     )
                 } else {
                     return;
@@ -268,6 +271,70 @@ impl GameRoom {
 
             if let Some(prayer_update) = prayer_state {
                 self.send_to_player(player_id, prayer_update).await;
+            }
+
+            // Post-teleport: preload chunks and handle instance exit
+            if let Some((tx, ty)) = teleport_pos {
+                use crate::chunk::ChunkCoord;
+
+                // If player was in an instance, exit them to overworld
+                let was_in_instance = self.player_instances.write().await.remove(player_id);
+                if let Some(instance_id) = was_in_instance {
+                    self.reset_sync_state(player_id).await;
+                    if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                        let other_players: Vec<String> = instance
+                            .get_player_ids()
+                            .await
+                            .into_iter()
+                            .filter(|id| id != player_id)
+                            .collect();
+
+                        let remaining = instance.remove_player(player_id).await;
+                        if remaining == 0
+                            && instance.instance_type == crate::interior::InstanceType::Private
+                        {
+                            if let Some(owner_id) = &instance.owner_id {
+                                self.instance_manager
+                                    .remove_private(owner_id, &instance.map_id);
+                            }
+                        }
+
+                        for other_id in &other_players {
+                            self.send_to_player(
+                                other_id,
+                                ServerMessage::PlayerLeft {
+                                    id: player_id.to_string(),
+                                },
+                            )
+                            .await;
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::PlayerLeft {
+                                    id: other_id.clone(),
+                                },
+                            )
+                            .await;
+                        }
+                    }
+
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::MapTransition {
+                            map_type: "overworld".to_string(),
+                            map_id: "world_0".to_string(),
+                            spawn_x: tx as f32,
+                            spawn_y: ty as f32,
+                            instance_id: String::new(),
+                        },
+                    )
+                    .await;
+                }
+
+                // Preload chunks around the teleport destination
+                let spawn_chunk = ChunkCoord::from_world(tx, ty);
+                self.world()
+                    .preload_chunks(spawn_chunk, super::SPAWN_PRELOAD_RADIUS)
+                    .await;
             }
         }
     }

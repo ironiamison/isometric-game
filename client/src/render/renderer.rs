@@ -394,6 +394,8 @@ pub struct Renderer {
     animated_walls: HashMap<u32, u32>,
     /// Map icons sprite sheet (16x16 icons: dead_tree, oak, oak2, willow, maple, yew, quest, portal, enemy, station)
     map_icons: Option<Texture2D>,
+    /// Pre-computed pixel-perfect outline textures for map icon hover state (18x18 per icon to accommodate 1px border)
+    map_icons_outlines: Option<Texture2D>,
     /// Reusable lookup tables for tree/rock effects (cleared + rebuilt each frame to avoid allocations)
     falling_tree_positions: RefCell<HashSet<(i32, i32)>>,
     tree_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
@@ -1465,6 +1467,56 @@ impl Renderer {
             }
         };
 
+        // Pre-compute pixel-perfect outline textures for map icon hover state.
+        // For each icon, we find transparent pixels adjacent to opaque pixels and
+        // paint them white. The outline texture uses 18x18 per icon (1px border).
+        let map_icons_outlines = map_icons.as_ref().map(|tex| {
+            let img = tex.get_texture_data();
+            let icon_count = (img.width / 16) as i32;
+            let out_w = (icon_count * 18) as u16;
+            let out_h = 18u16;
+            let mut outline = Image::gen_image_color(out_w, out_h, Color::new(0.0, 0.0, 0.0, 0.0));
+            let outline_color = Color::new(1.0, 1.0, 1.0, 0.9);
+
+            for icon_idx in 0..icon_count {
+                let src_x0 = icon_idx * 16;
+                let dst_x0 = icon_idx * 18;
+                for oy in 0..18i32 {
+                    for ox in 0..18i32 {
+                        let lx = ox - 1; // local coord in icon space
+                        let ly = oy - 1;
+                        // Current pixel: transparent if outside icon bounds
+                        let is_transparent = if lx >= 0 && lx < 16 && ly >= 0 && ly < 16 {
+                            img.get_pixel((src_x0 + lx) as u32, ly as u32).a < 0.5
+                        } else {
+                            true
+                        };
+                        if is_transparent {
+                            // Check 4 cardinal neighbors for opaque pixels within icon bounds
+                            for &(dx, dy) in &[(-1i32, 0i32), (1, 0), (0, -1), (0, 1)] {
+                                let nlx = lx + dx;
+                                let nly = ly + dy;
+                                if nlx >= 0 && nlx < 16 && nly >= 0 && nly < 16 {
+                                    if img.get_pixel((src_x0 + nlx) as u32, nly as u32).a >= 0.5 {
+                                        outline.set_pixel(
+                                            (dst_x0 + ox) as u32,
+                                            oy as u32,
+                                            outline_color,
+                                        );
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let outline_tex = Texture2D::from_image(&outline);
+            outline_tex.set_filter(FilterMode::Nearest);
+            outline_tex
+        });
+
         // Load exit portal arrow textures
         let exit_arrow_up = match load_texture(&asset_path("assets/ui/up_arrow.png")).await {
             Ok(tex) => {
@@ -1677,6 +1729,7 @@ impl Renderer {
             chat_small_icon,
             coin_small_icon,
             map_icons,
+            map_icons_outlines,
             farming_sprites,
             prayer_icons,
             spell_icons,
@@ -2863,14 +2916,25 @@ impl Renderer {
                         },
                     );
                     if hovered {
-                        draw_rectangle_lines(
-                            dest_x - 1.0,
-                            dest_y - 1.0,
-                            icon_size + 2.0,
-                            icon_size + 2.0,
-                            1.0,
-                            Color::new(1.0, 1.0, 1.0, 0.9),
-                        );
+                        if let Some(outline_tex) = &self.map_icons_outlines {
+                            let outline_src = Rect::new(
+                                marker.icon_index as f32 * 18.0,
+                                0.0,
+                                18.0,
+                                18.0,
+                            );
+                            draw_texture_ex(
+                                outline_tex,
+                                dest_x - 1.0,
+                                dest_y - 1.0,
+                                WHITE,
+                                DrawTextureParams {
+                                    dest_size: Some(macroquad::math::Vec2::new(18.0, 18.0)),
+                                    source: Some(outline_src),
+                                    ..Default::default()
+                                },
+                            );
+                        }
                     }
                 } else {
                     radius = base_radius * marker_scale + if hovered { 1.4 } else { 0.0 };

@@ -399,6 +399,7 @@ pub fn run_game_frame(
                 if text.trim().eq_ignore_ascii_case("/ping") {
                     let timestamp = get_time();
                     game_state.ping_sent_at = Some(timestamp);
+                    game_state.manual_ping = true;
                     ClientMessage::Ping { timestamp }
                 } else {
                     ClientMessage::Chat {
@@ -789,10 +790,11 @@ pub fn run_game_frame(
         network.send(&crate::network::messages::ClientMessage::EnterPortal { portal_id });
     }
 
-    // Auto-ping every 2 seconds when debug mode is active
-    if game_state.debug_mode && network.is_connected() && game_state.ping_sent_at.is_none() {
+    // Auto-ping: 2s in debug mode (for stats), 20s otherwise (keepalive)
+    if network.is_connected() && game_state.ping_sent_at.is_none() {
+        let interval = if game_state.debug_mode { 2.0 } else { 20.0 };
         let now = get_time();
-        if now - game_state.ping_stats.last_auto_ping >= 2.0 {
+        if now - game_state.ping_stats.last_auto_ping >= interval {
             game_state.ping_stats.last_auto_ping = now;
             game_state.ping_sent_at = Some(now);
             network.send(&crate::network::messages::ClientMessage::Ping { timestamp: now });

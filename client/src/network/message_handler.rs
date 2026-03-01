@@ -3856,8 +3856,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let latency_ms = (now - sent_at) * 1000.0;
                 state.ping_stats.record(latency_ms);
                 state.refresh_high_ping_movement_mode();
-                // Only show in chat if it was a manual /ping (not auto-ping)
-                if !state.debug_mode {
+                // Only show in chat if it was a manual /ping command
+                if state.manual_ping {
+                    state.manual_ping = false;
                     state.push_system_chat(format!("Ping: {}ms", latency_ms.round() as i32));
                 }
             }

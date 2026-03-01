@@ -661,6 +661,14 @@ impl World {
         (-30, 19)
     }
 
+    /// Check if a chunk file exists on disk (ignores generate_missing flag).
+    /// Used for validating saved player positions on login.
+    pub fn chunk_file_exists(&self, coord: ChunkCoord) -> bool {
+        let filename = format!("chunk_{}_{}.json", coord.x, coord.y);
+        let path = Path::new(&self.chunk_dir).join(&filename);
+        path.exists()
+    }
+
     /// Check if a chunk exists (either loaded or loadable)
     pub async fn chunk_exists(&self, coord: ChunkCoord) -> bool {
         // Check cache

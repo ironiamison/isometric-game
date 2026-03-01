@@ -1976,7 +1976,21 @@ impl GameRoom {
         bank_gold: i32,
         bank_max_slots: u32,
     ) {
-        let mut player = Player::new(player_id, name, x, y, gender, skin, hair_style, hair_color);
+        // Validate saved position — if the chunk doesn't exist on disk, reset to spawn
+        let (safe_x, safe_y) = {
+            let coord = ChunkCoord::from_world(x, y);
+            if self.world.chunk_file_exists(coord) {
+                (x, y)
+            } else {
+                tracing::warn!(
+                    "Player {} has invalid position ({}, {}) — chunk {:?} missing on disk, resetting to spawn",
+                    player_id, x, y, coord
+                );
+                (WORLD_SPAWN_X, WORLD_SPAWN_Y)
+            }
+        };
+
+        let mut player = Player::new(player_id, name, safe_x, safe_y, gender, skin, hair_style, hair_color);
         player.bank_max_slots = bank_max_slots;
         player.bank = item::Bank::new_with_size(bank_max_slots as usize);
 
