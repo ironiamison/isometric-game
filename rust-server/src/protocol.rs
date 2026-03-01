@@ -1309,6 +1309,11 @@ pub enum ServerMessage {
         stall_slot: u8,
         new_quantity: i32,
     },
+    /// Notify clients of the all-time top total level players (for trophy icons)
+    TopPlayerChanged {
+        player_name: Option<String>,
+        second_player_name: Option<String>,
+    },
 }
 
 /// Scroll spell definition sent to clients
@@ -1713,6 +1718,7 @@ impl ServerMessage {
             ServerMessage::StallBuyResult { .. } => "stallBuyResult",
             ServerMessage::StallSaleNotification { .. } => "stallSaleNotification",
             ServerMessage::StallItemUpdate { .. } => "stallItemUpdate",
+            ServerMessage::TopPlayerChanged { .. } => "topPlayerChanged",
         }
     }
 }
@@ -6136,6 +6142,24 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("new_quantity".into()),
                 Value::Integer((*new_quantity as i64).into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::TopPlayerChanged { player_name, second_player_name } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("player_name".into()),
+                match player_name {
+                    Some(name) => Value::String(name.clone().into()),
+                    None => Value::Nil,
+                },
+            ));
+            map.push((
+                Value::String("second_player_name".into()),
+                match second_player_name {
+                    Some(name) => Value::String(name.clone().into()),
+                    None => Value::Nil,
+                },
             ));
             Value::Map(map)
         }

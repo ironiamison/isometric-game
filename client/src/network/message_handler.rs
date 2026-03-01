@@ -4215,6 +4215,13 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "topPlayerChanged" => {
+            if let Some(value) = data {
+                state.top_level_player_name = extract_string(value, "player_name");
+                state.second_level_player_name = extract_string(value, "second_player_name");
+            }
+        }
+
         _ => {
             log::debug!("Unhandled message type: {}", msg_type);
         }

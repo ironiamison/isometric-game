@@ -4129,7 +4129,24 @@ impl Renderer {
             } else {
                 0.0
             };
-            let total_width = name_width + gm_width;
+            let is_top_player = state
+                .top_level_player_name
+                .as_deref()
+                == Some(player.name.as_str());
+            let is_second_player = !is_top_player
+                && state
+                    .second_level_player_name
+                    .as_deref()
+                    == Some(player.name.as_str());
+            let has_trophy = (is_top_player || is_second_player) && self.ui_icons.is_some();
+            let trophy_icon_size = 16.0 * zoom;
+            let trophy_gap = 4.0 * zoom;
+            let trophy_width = if has_trophy {
+                trophy_icon_size + trophy_gap
+            } else {
+                0.0
+            };
+            let total_width = trophy_width + name_width + gm_width;
             let name_x = screen_x - total_width / 2.0;
             let name_y = screen_y - name_y_offset + 2.0 * zoom;
 
@@ -4143,11 +4160,36 @@ impl Renderer {
                 Color::from_rgba(0, 0, 0, 180),
             );
 
-            self.draw_text_sharp(&player.name, name_x, name_y, font_size, WHITE);
+            // Draw trophy icon: gold for #1, silver for #2
+            if has_trophy {
+                if let Some(ref texture) = self.ui_icons {
+                    // Row 3 (1-indexed): col 1 = silver trophy, col 2 = gold trophy
+                    let src_rect = if is_top_player {
+                        Rect::new(24.0, 48.0, 24.0, 24.0)
+                    } else {
+                        Rect::new(0.0, 48.0, 24.0, 24.0)
+                    };
+                    let bar_top = name_y - 14.0 * zoom;
+                    let icon_y = bar_top + (bar_height - trophy_icon_size) / 2.0;
+                    draw_texture_ex(
+                        texture,
+                        name_x,
+                        icon_y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(src_rect),
+                            dest_size: Some(Vec2::new(trophy_icon_size, trophy_icon_size)),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+
+            self.draw_text_sharp(&player.name, name_x + trophy_width, name_y, font_size, WHITE);
 
             if player.is_admin {
                 let gold_color = Color::from_rgba(255, 215, 0, 255);
-                self.draw_text_sharp(" (GM)", name_x + name_width, name_y, font_size, gold_color);
+                self.draw_text_sharp(" (GM)", name_x + trophy_width + name_width, name_y, font_size, gold_color);
             }
         }
 

@@ -250,6 +250,7 @@ impl AppState {
             )
             .await,
         );
+        room.init_top_level_player().await;
         self.rooms.insert(room.id.clone(), room.clone());
         room
     }
@@ -2230,6 +2231,14 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                 }
                             }
 
+                            // Top total level player (trophy icon)
+                            {
+                                let top_msg = recv_room.get_top_player_message().await;
+                                if let Ok(bytes) = protocol::encode_server_message(&top_msg) {
+                                    let _ = recv_tx.send(bytes).await;
+                                }
+                            }
+
                             // Slayer state
                             {
                                 let slayer_state =
@@ -2952,6 +2961,14 @@ async fn handle_socket(
     // Send initial skills to this client
     if let Some(skills_msg) = room.get_player_skills_sync(&player_id).await {
         if let Ok(bytes) = protocol::encode_server_message(&skills_msg) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
+    // Send current top total level player (for trophy icon)
+    {
+        let top_msg = room.get_top_player_message().await;
+        if let Ok(bytes) = protocol::encode_server_message(&top_msg) {
             let _ = sender.send(Message::Binary(bytes)).await;
         }
     }

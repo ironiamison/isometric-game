@@ -1142,6 +1142,14 @@ pub struct GameRoom {
     trade_requests: RwLock<HashMap<String, (String, u64)>>,
     /// Movement anomaly counters exported through /api/perf.
     movement_anomalies: MovementAnomalyCounters,
+    /// Cached name of the all-time highest total level player (gold trophy)
+    top_level_player_name: RwLock<Option<String>>,
+    /// Cached total level value of the #1 player
+    top_level_value: RwLock<i32>,
+    /// Cached name of the 2nd highest total level player (silver trophy)
+    second_level_player_name: RwLock<Option<String>>,
+    /// Cached total level value of the #2 player
+    second_level_value: RwLock<i32>,
 }
 
 impl GameRoom {
@@ -1635,6 +1643,102 @@ impl GameRoom {
             player_trades: RwLock::new(HashMap::new()),
             trade_requests: RwLock::new(HashMap::new()),
             movement_anomalies: MovementAnomalyCounters::default(),
+            top_level_player_name: RwLock::new(None),
+            top_level_value: RwLock::new(0),
+            second_level_player_name: RwLock::new(None),
+            second_level_value: RwLock::new(0),
+        }
+    }
+
+    /// Load the top two total level players from the database at startup.
+    pub async fn init_top_level_player(&self) {
+        if let Some(ref db) = self.db {
+            let (first, second) = db.get_top_total_level_players().await;
+            if let Some((name, total)) = first {
+                tracing::info!("Top total level player: {} (level {})", name, total);
+                *self.top_level_player_name.write().await = Some(name);
+                *self.top_level_value.write().await = total;
+            } else {
+                tracing::info!("No characters found for top level player");
+            }
+            if let Some((name, total)) = second {
+                tracing::info!("2nd total level player: {} (level {})", name, total);
+                *self.second_level_player_name.write().await = Some(name);
+                *self.second_level_value.write().await = total;
+            }
+        }
+    }
+
+    /// Check if a player's new total level changes the #1 or #2 rankings and broadcast if so.
+    pub async fn check_top_player_after_level_up(&self, player_name: &str, new_total_level: i32) {
+        let current_top = *self.top_level_value.read().await;
+        let current_second = *self.second_level_value.read().await;
+        let is_current_top = self.top_level_player_name.read().await.as_deref() == Some(player_name);
+        let is_current_second = self.second_level_player_name.read().await.as_deref() == Some(player_name);
+
+        let mut changed = false;
+
+        if new_total_level > current_top {
+            // New #1 — old #1 becomes #2 (unless it's the same player updating their own score)
+            if !is_current_top {
+                let old_first_name = self.top_level_player_name.read().await.clone();
+                let old_first_val = current_top;
+                *self.second_level_player_name.write().await = old_first_name;
+                *self.second_level_value.write().await = old_first_val;
+            }
+            *self.top_level_player_name.write().await = Some(player_name.to_string());
+            *self.top_level_value.write().await = new_total_level;
+            changed = true;
+        } else if is_current_top {
+            // Current #1 leveled up but still #1 — just update value
+            *self.top_level_value.write().await = new_total_level;
+        } else if new_total_level > current_second {
+            // New #2
+            *self.second_level_player_name.write().await = Some(player_name.to_string());
+            *self.second_level_value.write().await = new_total_level;
+            changed = true;
+        } else if is_current_second {
+            // Current #2 leveled up but still #2 — just update value
+            *self.second_level_value.write().await = new_total_level;
+        }
+
+        if changed {
+            let first = self.top_level_player_name.read().await.clone();
+            let second = self.second_level_player_name.read().await.clone();
+            self.broadcast(ServerMessage::TopPlayerChanged {
+                player_name: first,
+                second_player_name: second,
+            })
+            .await;
+        }
+    }
+
+    /// Broadcast a SkillLevelUp and check if it changes the top total level players.
+    pub async fn broadcast_skill_level_up(&self, player_id: &str, skill: &str, new_level: i32) {
+        self.broadcast(ServerMessage::SkillLevelUp {
+            player_id: player_id.to_string(),
+            skill: skill.to_string(),
+            new_level,
+        })
+        .await;
+
+        // Check if this level-up changes the rankings
+        let players = self.players.read().await;
+        if let Some(player) = players.get(player_id) {
+            let name = player.name.clone();
+            let total = player.skills.total_level();
+            drop(players);
+            self.check_top_player_after_level_up(&name, total).await;
+        }
+    }
+
+    /// Get the current top players message for sending to newly connecting players.
+    pub async fn get_top_player_message(&self) -> ServerMessage {
+        let first = self.top_level_player_name.read().await.clone();
+        let second = self.second_level_player_name.read().await.clone();
+        ServerMessage::TopPlayerChanged {
+            player_name: first,
+            second_player_name: second,
         }
     }
 
@@ -3834,12 +3938,7 @@ impl GameRoom {
                             skill_type.as_str(),
                             level
                         );
-                        self.broadcast(ServerMessage::SkillLevelUp {
-                            player_id: player_id.to_string(),
-                            skill: skill_type.as_str().to_string(),
-                            new_level: level,
-                        })
-                        .await;
+                        self.broadcast_skill_level_up(player_id, skill_type.as_str(), level).await;
                         progression_needs_sync = true;
                     }
                 }
@@ -6899,12 +6998,7 @@ impl GameRoom {
                             skill_type.as_str(),
                             level
                         );
-                        self.broadcast(ServerMessage::SkillLevelUp {
-                            player_id: player_id.to_string(),
-                            skill: skill_type.as_str().to_string(),
-                            new_level: level,
-                        })
-                        .await;
+                        self.broadcast_skill_level_up(player_id, skill_type.as_str(), level).await;
                         progression_needs_sync = true;
                     }
                 }
@@ -7356,12 +7450,7 @@ impl GameRoom {
                         skill_type.as_str(),
                         level
                     );
-                    self.broadcast(ServerMessage::SkillLevelUp {
-                        player_id: player_id.to_string(),
-                        skill: skill_type.as_str().to_string(),
-                        new_level: level,
-                    })
-                    .await;
+                    self.broadcast_skill_level_up(player_id, skill_type.as_str(), level).await;
                     self.process_quest_progression_snapshot(player_id).await;
                 }
             }

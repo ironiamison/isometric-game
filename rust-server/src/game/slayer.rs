@@ -372,12 +372,7 @@ impl GameRoom {
             .await;
 
             if leveled_up {
-                self.broadcast(ServerMessage::SkillLevelUp {
-                    player_id: player_id.to_string(),
-                    skill: "slayer".to_string(),
-                    new_level: level,
-                })
-                .await;
+                self.broadcast_skill_level_up(player_id, "slayer", level).await;
             }
         }
 

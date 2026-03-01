@@ -1899,6 +1899,11 @@ pub struct GameState {
 
     /// Whether this GameState is in spectator mode (login screen world view)
     pub spectator_mode: bool,
+
+    /// Name of the all-time highest total level player (gold trophy)
+    pub top_level_player_name: Option<String>,
+    /// Name of the 2nd highest total level player (silver trophy)
+    pub second_level_player_name: Option<String>,
 }
 
 impl GameState {
@@ -2000,6 +2005,8 @@ impl GameState {
             tutorial: None,
             tutorial_pending: false,
             spectator_mode: false,
+            top_level_player_name: None,
+            second_level_player_name: None,
         }
     }
 

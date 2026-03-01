@@ -329,12 +329,7 @@ impl GameRoom {
         .await;
 
         if leveled_up {
-            self.broadcast(ServerMessage::SkillLevelUp {
-                player_id: player_id.to_string(),
-                skill: "farming".to_string(),
-                new_level: skill_level,
-            })
-            .await;
+            self.broadcast_skill_level_up(player_id, "farming", skill_level).await;
             self.process_quest_progression_snapshot(player_id).await;
         }
 

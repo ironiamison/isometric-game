@@ -2055,4 +2055,32 @@ impl Database {
         }
         Ok(())
     }
+
+    /// Get the top two non-admin characters by total level.
+    /// Returns (first_place, second_place) where each is Option<(name, total_level)>.
+    pub async fn get_top_total_level_players(&self) -> (Option<(String, i32)>, Option<(String, i32)>) {
+        let rows = sqlx::query("SELECT name, skills_json FROM characters WHERE is_admin = FALSE")
+            .fetch_all(&self.pool)
+            .await
+            .unwrap_or_default();
+
+        let mut first: Option<(String, i32)> = None;
+        let mut second: Option<(String, i32)> = None;
+        for row in rows {
+            let name: String = match row.try_get("name") {
+                Ok(n) => n,
+                Err(_) => continue,
+            };
+            let skills_json: String = row.try_get("skills_json").unwrap_or_default();
+            let skills: Skills = serde_json::from_str(&skills_json).unwrap_or_default();
+            let total = skills.total_level();
+            if first.as_ref().map_or(true, |(_, b)| total > *b) {
+                second = first.take();
+                first = Some((name, total));
+            } else if second.as_ref().map_or(true, |(_, b)| total > *b) {
+                second = Some((name, total));
+            }
+        }
+        (first, second)
+    }
 }

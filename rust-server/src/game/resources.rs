@@ -340,12 +340,7 @@ impl GameRoom {
                             .await;
 
                         if leveled_up {
-                            self.broadcast(ServerMessage::SkillLevelUp {
-                                player_id: player_id.to_string(),
-                                skill: "woodcutting".to_string(),
-                                new_level,
-                            })
-                            .await;
+                            self.broadcast_skill_level_up(player_id, "woodcutting", new_level).await;
                             self.process_quest_progression_snapshot(player_id).await;
                         }
                     }
@@ -632,12 +627,7 @@ impl GameRoom {
                             .await;
 
                         if leveled_up {
-                            self.broadcast(ServerMessage::SkillLevelUp {
-                                player_id: player_id.to_string(),
-                                skill: "mining".to_string(),
-                                new_level,
-                            })
-                            .await;
+                            self.broadcast_skill_level_up(player_id, "mining", new_level).await;
                             self.process_quest_progression_snapshot(player_id).await;
                         }
                     }
@@ -814,12 +804,7 @@ impl GameRoom {
             )
             .await;
             if tick.leveled {
-                self.broadcast(ServerMessage::SkillLevelUp {
-                    player_id: tick.pid.clone(),
-                    skill: "fishing".to_string(),
-                    new_level: tick.level,
-                })
-                .await;
+                self.broadcast_skill_level_up(&tick.pid, "fishing", tick.level).await;
                 self.process_quest_progression_snapshot(&tick.pid).await;
             }
         }

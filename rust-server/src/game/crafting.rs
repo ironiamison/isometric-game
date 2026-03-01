@@ -137,12 +137,7 @@ impl GameRoom {
                     skill_type.as_str(),
                     level
                 );
-                self.broadcast(ServerMessage::SkillLevelUp {
-                    player_id: player_id.to_string(),
-                    skill: skill_type.as_str().to_string(),
-                    new_level: level,
-                })
-                .await;
+                self.broadcast_skill_level_up(player_id, skill_type.as_str(), level).await;
                 any_leveled = true;
             }
         }
