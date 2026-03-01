@@ -25,7 +25,10 @@ const METRIC_GROUPS: { title: string; metrics: Metric[] }[] = [
   {
     title: 'Combat',
     metrics: [
-      { label: 'Combat Skill', sort: 'combat_skill_level', field: 'combat_skill_level', hint: 'Melee level' },
+      { label: 'Attack', sort: 'attack_level', field: 'attack_level', hint: 'Melee accuracy' },
+      { label: 'Strength', sort: 'strength_level', field: 'strength_level', hint: 'Melee damage' },
+      { label: 'Defence', sort: 'defence_level', field: 'defence_level', hint: 'Evasion' },
+      { label: 'Ranged', sort: 'ranged_level', field: 'ranged_level', hint: 'Ranged combat' },
       { label: 'Hitpoints', sort: 'hitpoints_level', field: 'hitpoints_level', hint: 'HP level' },
       { label: 'Prayer', sort: 'prayer_level', field: 'prayer_level', hint: 'Prayer level' },
       { label: 'Magic', sort: 'magic_level', field: 'magic_level', hint: 'Magic level' },

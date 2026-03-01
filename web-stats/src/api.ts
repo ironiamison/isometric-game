@@ -10,7 +10,10 @@ export interface OnlinePlayer {
   name: string
   combat_level: number
   hitpoints_level: number
-  combat_skill_level: number
+  attack_level: number
+  strength_level: number
+  defence_level: number
+  ranged_level: number
   total_level: number
 }
 
@@ -18,7 +21,10 @@ export interface LeaderboardEntry {
   name: string
   combat_level: number
   hitpoints_level: number
-  combat_skill_level: number
+  attack_level: number
+  strength_level: number
+  defence_level: number
+  ranged_level: number
   fishing_level: number
   farming_level: number
   smithing_level: number
@@ -36,7 +42,10 @@ export interface LeaderboardEntry {
 export type LeaderboardSort =
   | 'combat_level'
   | 'hitpoints_level'
-  | 'combat_skill_level'
+  | 'attack_level'
+  | 'strength_level'
+  | 'defence_level'
+  | 'ranged_level'
   | 'fishing_level'
   | 'farming_level'
   | 'smithing_level'
@@ -54,7 +63,10 @@ export interface PlayerProfileRanks {
   total_level: number
   combat_level: number
   hitpoints_level: number
-  combat_skill_level: number
+  attack_level: number
+  strength_level: number
+  defence_level: number
+  ranged_level: number
   fishing_level: number
   farming_level: number
   smithing_level: number

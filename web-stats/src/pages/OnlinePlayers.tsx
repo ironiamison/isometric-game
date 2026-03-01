@@ -41,7 +41,10 @@ export function OnlinePlayers() {
     { key: 'name', label: 'Name' },
     { key: 'combat_level', label: 'Combat Lv' },
     { key: 'hitpoints_level', label: 'Hitpoints' },
-    { key: 'combat_skill_level', label: 'Combat' },
+    { key: 'attack_level', label: 'Attack' },
+    { key: 'strength_level', label: 'Strength' },
+    { key: 'defence_level', label: 'Defence' },
+    { key: 'ranged_level', label: 'Ranged' },
     { key: 'total_level', label: 'Total Lv' },
   ]
 
@@ -104,7 +107,10 @@ export function OnlinePlayers() {
                   </td>
                   <td className="px-4 py-3 font-mono text-[var(--text)]">{player.combat_level}</td>
                   <td className="px-4 py-3 font-mono text-[var(--text)]">{player.hitpoints_level}</td>
-                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.combat_skill_level}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.attack_level}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.strength_level}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.defence_level}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--text)]">{player.ranged_level}</td>
                   <td className="px-4 py-3 font-mono text-[var(--text)]">{player.total_level}</td>
                 </tr>
               ))

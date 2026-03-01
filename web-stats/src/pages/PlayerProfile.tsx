@@ -12,7 +12,10 @@ type ProfileStat = {
 const PROFILE_STATS: ProfileStat[] = [
   { label: 'Total Level', value: (player) => player.total_level.toLocaleString(), rank: (ranks) => ranks.total_level },
   { label: 'Combat Level', value: (player) => player.combat_level.toLocaleString(), rank: (ranks) => ranks.combat_level },
-  { label: 'Combat Skill', value: (player) => player.combat_skill_level.toLocaleString(), rank: (ranks) => ranks.combat_skill_level },
+  { label: 'Attack', value: (player) => player.attack_level.toLocaleString(), rank: (ranks) => ranks.attack_level },
+  { label: 'Strength', value: (player) => player.strength_level.toLocaleString(), rank: (ranks) => ranks.strength_level },
+  { label: 'Defence', value: (player) => player.defence_level.toLocaleString(), rank: (ranks) => ranks.defence_level },
+  { label: 'Ranged', value: (player) => player.ranged_level.toLocaleString(), rank: (ranks) => ranks.ranged_level },
   { label: 'Hitpoints', value: (player) => player.hitpoints_level.toLocaleString(), rank: (ranks) => ranks.hitpoints_level },
   { label: 'Fishing', value: (player) => player.fishing_level.toLocaleString(), rank: (ranks) => ranks.fishing_level },
   { label: 'Farming', value: (player) => player.farming_level.toLocaleString(), rank: (ranks) => ranks.farming_level },
