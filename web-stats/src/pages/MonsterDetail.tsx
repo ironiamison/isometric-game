@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { api, type Entity } from '../api'
+import { api } from '../api'
 
 function scaleHp(baseHp: number, level: number) {
   return Math.round(baseHp * (1 + 0.10 * Math.max(0, level - 1)))
