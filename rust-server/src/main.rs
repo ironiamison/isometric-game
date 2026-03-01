@@ -2239,9 +2239,11 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                 }
                             }
 
-                            // Top total level player (trophy icon)
+                            // Top total level player (trophy icon) — refresh from DB and broadcast to all
+                            recv_room.init_top_level_player().await;
                             {
                                 let top_msg = recv_room.get_top_player_message().await;
+                                recv_room.broadcast(top_msg.clone()).await;
                                 if let Ok(bytes) = protocol::encode_server_message(&top_msg) {
                                     let _ = recv_tx.send(bytes).await;
                                 }
@@ -2980,9 +2982,11 @@ async fn handle_socket(
         }
     }
 
-    // Send current top total level player (for trophy icon)
+    // Send current top total level player (for trophy icon) — refresh from DB and broadcast to all
+    room.init_top_level_player().await;
     {
         let top_msg = room.get_top_player_message().await;
+        room.broadcast(top_msg.clone()).await;
         if let Ok(bytes) = protocol::encode_server_message(&top_msg) {
             let _ = sender.send(Message::Binary(bytes)).await;
         }

@@ -283,6 +283,11 @@ impl GameRoom {
                     )
                     .await;
                 }
+
+                // Re-initialize rankings from DB and broadcast to all clients
+                self.init_top_level_player().await;
+                let top_msg = self.get_top_player_message().await;
+                self.broadcast(top_msg).await;
             }
             "/help" => {
                 if is_admin {

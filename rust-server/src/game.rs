@@ -1722,13 +1722,15 @@ impl GameRoom {
         })
         .await;
 
-        // Check if this level-up changes the rankings
+        // Check if this level-up changes the rankings (skip admins — they're excluded from rankings)
         let players = self.players.read().await;
         if let Some(player) = players.get(player_id) {
-            let name = player.name.clone();
-            let total = player.skills.total_level();
-            drop(players);
-            self.check_top_player_after_level_up(&name, total).await;
+            if !player.is_admin {
+                let name = player.name.clone();
+                let total = player.skills.total_level();
+                drop(players);
+                self.check_top_player_after_level_up(&name, total).await;
+            }
         }
     }
 
