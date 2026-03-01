@@ -1203,8 +1203,9 @@ async fn matchmake_join_or_create(
     let session_id = Uuid::new_v4().to_string();
     let player_id = format!("char_{}", character_id);
 
-    // Mark character as online
-    state.online_characters.insert(character_id);
+    // NOTE: We do NOT mark the character as online here. That happens when the
+    // WebSocket actually connects (in handle_socket or spectator upgrade).
+    // This prevents orphaned online_characters entries if the client never connects.
 
     // Reserve the session with character info
     state.sessions.insert(
@@ -1949,7 +1950,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                 .register_player_sender(&player_id, recv_tx.clone())
                                 .await;
 
-                            // --- Step 6: Activate the player entity ---
+                            // --- Step 6: Mark online and activate the player entity ---
+                            recv_state.online_characters.insert(character_id);
                             let player_name = recv_room.activate_player(&player_id).await;
 
                             // --- Step 7: Send all initial data via the mpsc channel ---
@@ -2697,6 +2699,9 @@ async fn handle_socket(
             return;
         }
     };
+
+    // Mark character as online now that WebSocket is actually connected
+    state.online_characters.insert(character_id);
 
     // Activate the player
     let player_name = room.activate_player(&player_id).await;

@@ -28,8 +28,8 @@ use auth::AuthSession;
 #[cfg(not(target_arch = "wasm32"))]
 use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
-// const SERVER_URL: &str = "https://aeven.xyz";
-// const WS_URL: &str = "wss://aeven.xyz";
+// const SERVER_URL: &str = "http://localhost:2567";
+// const WS_URL: &str = "ws://localhost:2567";
 
 const SERVER_URL: &str = "https://aeven.xyz";
 const WS_URL: &str = "wss://aeven.xyz";
@@ -329,12 +329,18 @@ async fn main() {
                     let result = screen.update(&audio);
 
                     // Render: world backdrop first (if spectator ready), then screen on top
-                    if let Some(spec) = spectator.as_mut() {
+                    let has_backdrop = if let Some(spec) = spectator.as_mut() {
                         if spec.world_ready {
                             clear_background(Color::from_rgba(30, 30, 40, 255));
                             renderer.render(&spec.game_state);
+                            true
+                        } else {
+                            false
                         }
-                    }
+                    } else {
+                        false
+                    };
+                    screen.has_spectator_backdrop = has_backdrop;
                     screen.render();
 
                     match result {
@@ -363,7 +369,7 @@ async fn main() {
                                     Ok(response) => {
                                         if let Ok(data) = response.into_json::<serde_json::Value>()
                                         {
-                                            if let Some(token) = data["session_token"].as_str() {
+                                            if let Some(token) = data["sessionToken"].as_str() {
                                                 // Send upgrade over existing spectator WS
                                                 spec.network.send_spectator_upgrade(token);
 

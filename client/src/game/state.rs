@@ -2167,17 +2167,26 @@ impl GameState {
         if let Some(local_id) = &self.local_player_id {
             if let Some(player) = self.players.get(local_id) {
                 if let Some((from_x, from_y)) = self.camera.transition_from {
-                    // Smooth transition from spectator position to player
-                    let dt = macroquad::time::get_frame_time();
-                    self.camera.transition_progress += dt * 1.5; // ~0.67 seconds
-                    if self.camera.transition_progress >= 1.0 {
+                    // Only pan if within ~5 chunks (160 tiles) and in overworld
+                    let dx = (player.x - from_x).abs();
+                    let dy = (player.y - from_y).abs();
+                    if dx > 160.0 || dy > 160.0 || self.current_instance.is_some() {
                         self.camera.transition_from = None;
                         self.camera.x = player.x;
                         self.camera.y = player.y;
                     } else {
-                        let t = smooth_step(self.camera.transition_progress);
-                        self.camera.x = from_x + (player.x - from_x) * t;
-                        self.camera.y = from_y + (player.y - from_y) * t;
+                        // Smooth transition from spectator position to player
+                        let dt = macroquad::time::get_frame_time();
+                        self.camera.transition_progress += dt * 1.5; // ~0.67 seconds
+                        if self.camera.transition_progress >= 1.0 {
+                            self.camera.transition_from = None;
+                            self.camera.x = player.x;
+                            self.camera.y = player.y;
+                        } else {
+                            let t = smooth_step(self.camera.transition_progress);
+                            self.camera.x = from_x + (player.x - from_x) * t;
+                            self.camera.y = from_y + (player.y - from_y) * t;
+                        }
                     }
                 } else {
                     self.camera.x = player.x;

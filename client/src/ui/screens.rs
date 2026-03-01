@@ -1272,6 +1272,8 @@ pub struct CharacterSelectScreen {
     list_scroll_offset: f32,
     touch_scroll_id: Option<u64>,
     touch_scroll_last_y: f32,
+    /// When true, spectator world is rendered behind this screen — use dark overlay instead of solid bg
+    pub has_spectator_backdrop: bool,
     #[cfg(target_arch = "wasm32")]
     loading: bool,
     #[cfg(target_arch = "wasm32")]
@@ -1301,6 +1303,7 @@ impl CharacterSelectScreen {
             list_scroll_offset: 0.0,
             touch_scroll_id: None,
             touch_scroll_last_y: 0.0,
+            has_spectator_backdrop: false,
             #[cfg(target_arch = "wasm32")]
             loading: false,
             #[cfg(target_arch = "wasm32")]
@@ -1773,13 +1776,18 @@ impl Screen for CharacterSelectScreen {
         let my = input_pos.y;
 
         // Background
-        clear_background(Color::from_rgba(25, 25, 35, 255));
+        if self.has_spectator_backdrop {
+            // Dark overlay over the live spectator world
+            draw_rectangle(0.0, 0.0, sw, sh, Color::from_rgba(15, 15, 25, 160));
+        } else {
+            clear_background(Color::from_rgba(25, 25, 35, 255));
 
-        // Draw decorative elements
-        for i in 0..15 {
-            let alpha = 0.03 + (i as f32 * 0.005);
-            let color = Color::new(0.2, 0.3, 0.4, alpha);
-            draw_line(0.0, i as f32 * 50.0, sw, i as f32 * 50.0, 1.0, color);
+            // Draw decorative elements (only without spectator backdrop)
+            for i in 0..15 {
+                let alpha = 0.03 + (i as f32 * 0.005);
+                let color = Color::new(0.2, 0.3, 0.4, alpha);
+                draw_line(0.0, i as f32 * 50.0, sw, i as f32 * 50.0, 1.0, color);
+            }
         }
 
         // Title (aligned vertically with account info, horizontally centered)
@@ -1936,15 +1944,12 @@ impl Screen for CharacterSelectScreen {
             }
         }
 
-        // Solid background below the list to cleanly separate from buttons
-        let button_zone_y = list_y + list_visible_height;
-        draw_rectangle(
-            0.0,
-            button_zone_y,
-            sw,
-            sh - button_zone_y,
-            Color::from_rgba(25, 25, 35, 255),
-        );
+        // Background below the list to cleanly separate from buttons
+        // (skip when spectator backdrop is active — the full-screen overlay already covers it)
+        if !self.has_spectator_backdrop {
+            let button_zone_y = list_y + list_visible_height;
+            draw_rectangle(0.0, button_zone_y, sw, sh - button_zone_y, Color::from_rgba(25, 25, 35, 255));
+        }
 
         // Error message
         if let Some(ref error) = self.error_message {
