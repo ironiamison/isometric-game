@@ -3326,7 +3326,12 @@ impl GameRoom {
         }
     }
 
-    pub async fn handle_attack(&self, player_id: &str, direction_override: Option<Direction>) {
+    pub async fn handle_attack(
+        &self,
+        player_id: &str,
+        direction_override: Option<Direction>,
+        forced_target_id: Option<&str>,
+    ) {
         // Determine attacker's instance context (None = overworld)
         let attacker_instance = self.player_instances.read().await.get(player_id).cloned();
 
@@ -3502,8 +3507,20 @@ impl GameRoom {
         self.broadcast(ServerMessage::PlayerAttack {
             player_id: player_id.to_string(),
             attack_type: attack_type.to_string(),
+            direction: attacker_dir as u8,
         })
         .await;
+
+        // Update attacker's last attack time and stop movement BEFORE target scan.
+        // This prevents rapid-fire when attacks miss (no target found in scan direction).
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.last_attack_time = current_time;
+                // Stop movement when attacking (player must stand still to attack)
+                player.reject_pending_move();
+            }
+        }
 
         // Find target based on weapon range
         let mut target_id: Option<String> = None;
@@ -3512,65 +3529,86 @@ impl GameRoom {
         let mut target_tile_x = attacker_x;
         let mut target_tile_y = attacker_y;
 
-        // Direction vectors for 8 directions
-        let (dir_dx, dir_dy): (i32, i32) = match attacker_dir {
-            Direction::Up => (0, -1),
-            Direction::Down => (0, 1),
-            Direction::Left => (-1, 0),
-            Direction::Right => (1, 0),
-            Direction::UpLeft => (-1, -1),
-            Direction::UpRight => (1, -1),
-            Direction::DownLeft => (-1, 1),
-            Direction::DownRight => (1, 1),
-        };
-
-        // Scan tiles in facing direction up to weapon range
-        for dist in 1..=weapon_range {
-            let check_x = attacker_x + dir_dx * dist;
-            let check_y = attacker_y + dir_dy * dist;
-
-            // For ranged weapons, check line of sight
-            if weapon_range > 1
-                && !self
-                    .world
-                    .has_line_of_sight(attacker_x, attacker_y, check_x, check_y)
-                    .await
-            {
-                tracing::debug!(
-                    "{} ranged attack blocked by wall at ({}, {})",
-                    attacker_name,
-                    check_x,
-                    check_y
-                );
-                break;
-            }
-
-            // Check NPCs at this tile
+        if let Some(forced_id) = forced_target_id {
+            // Auto-action: directly target the known entity (bypasses directional scan
+            // which can miss targets not on a cardinal/diagonal line)
             if attacker_instance.is_none() {
-                // Overworld NPCs
                 let npcs = self.npcs.read().await;
-                for (npc_id, npc) in npcs.iter() {
-                    if npc.is_alive() && npc.is_attackable() && npc.x == check_x && npc.y == check_y
-                    {
-                        target_id = Some(npc_id.clone());
+                if let Some(npc) = npcs.get(forced_id) {
+                    if npc.is_alive() && npc.is_attackable() {
+                        target_id = Some(forced_id.to_string());
                         is_npc = true;
-                        target_tile_x = check_x;
-                        target_tile_y = check_y;
-                        tracing::info!(
-                            "{} found NPC target: {} at ({}, {}) range {}",
-                            attacker_name,
-                            npc.name(),
-                            check_x,
-                            check_y,
-                            dist
-                        );
-                        break;
+                        target_tile_x = npc.x;
+                        target_tile_y = npc.y;
                     }
                 }
             } else if let Some(ref inst_id) = attacker_instance {
-                // Instance NPCs
                 if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
                     let npcs = instance.npcs.read().await;
+                    if let Some(npc) = npcs.get(forced_id) {
+                        if npc.is_alive() && npc.is_attackable() {
+                            target_id = Some(forced_id.to_string());
+                            is_npc = true;
+                            is_instance_npc = true;
+                            target_tile_x = npc.x;
+                            target_tile_y = npc.y;
+                        }
+                    }
+                }
+            }
+            // Also check players as forced target
+            if target_id.is_none() {
+                let players = self.players.read().await;
+                if let Some(player) = players.get(forced_id) {
+                    if player.active && player.hp > 0 {
+                        let instances = self.player_instances.read().await;
+                        let target_instance = instances.get(forced_id).cloned();
+                        if target_instance == attacker_instance {
+                            target_id = Some(forced_id.to_string());
+                            is_npc = false;
+                            target_tile_x = player.x;
+                            target_tile_y = player.y;
+                        }
+                    }
+                }
+            }
+        } else {
+            // Manual attack: scan tiles in facing direction up to weapon range
+            let (dir_dx, dir_dy): (i32, i32) = match attacker_dir {
+                Direction::Up => (0, -1),
+                Direction::Down => (0, 1),
+                Direction::Left => (-1, 0),
+                Direction::Right => (1, 0),
+                Direction::UpLeft => (-1, -1),
+                Direction::UpRight => (1, -1),
+                Direction::DownLeft => (-1, 1),
+                Direction::DownRight => (1, 1),
+            };
+
+            for dist in 1..=weapon_range {
+                let check_x = attacker_x + dir_dx * dist;
+                let check_y = attacker_y + dir_dy * dist;
+
+                // For ranged weapons, check line of sight
+                if weapon_range > 1
+                    && !self
+                        .world
+                        .has_line_of_sight(attacker_x, attacker_y, check_x, check_y)
+                        .await
+                {
+                    tracing::debug!(
+                        "{} ranged attack blocked by wall at ({}, {})",
+                        attacker_name,
+                        check_x,
+                        check_y
+                    );
+                    break;
+                }
+
+                // Check NPCs at this tile
+                if attacker_instance.is_none() {
+                    // Overworld NPCs
+                    let npcs = self.npcs.read().await;
                     for (npc_id, npc) in npcs.iter() {
                         if npc.is_alive()
                             && npc.is_attackable()
@@ -3579,11 +3617,10 @@ impl GameRoom {
                         {
                             target_id = Some(npc_id.clone());
                             is_npc = true;
-                            is_instance_npc = true;
                             target_tile_x = check_x;
                             target_tile_y = check_y;
                             tracing::info!(
-                                "{} found instance NPC target: {} at ({}, {}) range {}",
+                                "{} found NPC target: {} at ({}, {}) range {}",
                                 attacker_name,
                                 npc.name(),
                                 check_x,
@@ -3593,46 +3630,73 @@ impl GameRoom {
                             break;
                         }
                     }
-                }
-            }
-            if target_id.is_some() {
-                break;
-            }
-
-            // Check players at this tile (must be in same instance context)
-            {
-                let players = self.players.read().await;
-                let instances = self.player_instances.read().await;
-                for (pid, player) in players.iter() {
-                    if pid != player_id
-                        && player.active
-                        && player.hp > 0
-                        && player.x == check_x
-                        && player.y == check_y
-                    {
-                        // Only target players in the same context (both overworld, or same instance)
-                        let target_instance = instances.get(pid.as_str()).cloned();
-                        if target_instance != attacker_instance {
-                            continue;
+                } else if let Some(ref inst_id) = attacker_instance {
+                    // Instance NPCs
+                    if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                        let npcs = instance.npcs.read().await;
+                        for (npc_id, npc) in npcs.iter() {
+                            if npc.is_alive()
+                                && npc.is_attackable()
+                                && npc.x == check_x
+                                && npc.y == check_y
+                            {
+                                target_id = Some(npc_id.clone());
+                                is_npc = true;
+                                is_instance_npc = true;
+                                target_tile_x = check_x;
+                                target_tile_y = check_y;
+                                tracing::info!(
+                                    "{} found instance NPC target: {} at ({}, {}) range {}",
+                                    attacker_name,
+                                    npc.name(),
+                                    check_x,
+                                    check_y,
+                                    dist
+                                );
+                                break;
+                            }
                         }
-                        target_id = Some(pid.clone());
-                        is_npc = false;
-                        target_tile_x = check_x;
-                        target_tile_y = check_y;
-                        tracing::info!(
-                            "{} found player target: {} at ({}, {}) range {}",
-                            attacker_name,
-                            player.name,
-                            check_x,
-                            check_y,
-                            dist
-                        );
-                        break;
                     }
                 }
-            }
-            if target_id.is_some() {
-                break;
+                if target_id.is_some() {
+                    break;
+                }
+
+                // Check players at this tile (must be in same instance context)
+                {
+                    let players = self.players.read().await;
+                    let instances = self.player_instances.read().await;
+                    for (pid, player) in players.iter() {
+                        if pid != player_id
+                            && player.active
+                            && player.hp > 0
+                            && player.x == check_x
+                            && player.y == check_y
+                        {
+                            // Only target players in the same context (both overworld, or same instance)
+                            let target_instance = instances.get(pid.as_str()).cloned();
+                            if target_instance != attacker_instance {
+                                continue;
+                            }
+                            target_id = Some(pid.clone());
+                            is_npc = false;
+                            target_tile_x = check_x;
+                            target_tile_y = check_y;
+                            tracing::info!(
+                                "{} found player target: {} at ({}, {}) range {}",
+                                attacker_name,
+                                player.name,
+                                check_x,
+                                check_y,
+                                dist
+                            );
+                            break;
+                        }
+                    }
+                }
+                if target_id.is_some() {
+                    break;
+                }
             }
         }
 
@@ -3680,16 +3744,6 @@ impl GameRoom {
                         }
                     }
                 }
-            }
-        }
-
-        // Update attacker's last attack time and stop movement
-        {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                player.last_attack_time = current_time;
-                // Stop movement when attacking (player must stand still to attack)
-                player.reject_pending_move();
             }
         }
 
@@ -5141,7 +5195,7 @@ impl GameRoom {
                             } else {
                                 None
                             };
-                            self.handle_attack(&pid, face_dir).await;
+                            self.handle_attack(&pid, face_dir, Some(npc_id)).await;
                         }
                     }
 
@@ -5219,7 +5273,7 @@ impl GameRoom {
                                 }
                             };
                             // Direction override is applied atomically inside handle_attack
-                            self.handle_attack(&pid, face_dir).await;
+                            self.handle_attack(&pid, face_dir, Some(target_pid)).await;
                         }
                     }
 
@@ -6651,11 +6705,13 @@ impl GameRoom {
         }
 
         // 5. Broadcast casting animation
+        let face_dir = direction_from_delta(target_x - caster_x, target_y - caster_y);
         self.broadcast_to_zone(
             player_id,
             ServerMessage::PlayerAttack {
                 player_id: player_id.to_string(),
                 attack_type: "spell".to_string(),
+                direction: face_dir as u8,
             },
         )
         .await;
@@ -7365,7 +7421,7 @@ impl GameRoom {
         current_time: u64,
     ) {
         // Get caster info
-        let (caster_x, caster_y, magic_level, current_hp, max_hp) = {
+        let (caster_x, caster_y, caster_direction, magic_level, current_hp, max_hp) = {
             let players = self.players.read().await;
             let player = match players.get(player_id) {
                 Some(p) if !p.is_dead && p.active => p,
@@ -7374,6 +7430,7 @@ impl GameRoom {
             (
                 player.x,
                 player.y,
+                player.direction,
                 player.skills.magic.level,
                 player.hp,
                 player.max_hp(),
@@ -7422,6 +7479,7 @@ impl GameRoom {
             ServerMessage::PlayerAttack {
                 player_id: player_id.to_string(),
                 attack_type: "spell".to_string(),
+                direction: caster_direction as u8,
             },
         )
         .await;

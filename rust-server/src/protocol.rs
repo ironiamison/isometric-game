@@ -581,6 +581,7 @@ pub enum ServerMessage {
     PlayerAttack {
         player_id: String,
         attack_type: String, // "melee", "ranged", "spell"
+        direction: u8,
     },
     DamageEvent {
         source_id: String,
@@ -2611,6 +2612,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         ServerMessage::PlayerAttack {
             player_id,
             attack_type,
+            direction,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -2620,6 +2622,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("attack_type".into()),
                 Value::String(attack_type.clone().into()),
+            ));
+            map.push((
+                Value::String("direction".into()),
+                Value::Integer((*direction as i64).into()),
             ));
             Value::Map(map)
         }

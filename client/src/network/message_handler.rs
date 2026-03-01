@@ -904,6 +904,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let player_id = extract_string(value, "player_id").unwrap_or_default();
                 let attack_type =
                     extract_string(value, "attack_type").unwrap_or_else(|| "melee".to_string());
+                let direction = extract_u8(value, "direction");
 
                 let is_local = state.local_player_id.as_ref() == Some(&player_id);
 
@@ -922,6 +923,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     });
 
                 if let Some(player) = state.players.get_mut(&player_id) {
+                    // Update facing direction from server (fixes visual mismatch
+                    // during auto-action ranged/spell attacks)
+                    if let Some(dir) = direction {
+                        let new_dir = crate::game::Direction::from_u8(dir);
+                        player.direction = new_dir;
+                        player.animation.direction = new_dir;
+                    }
+
                     match attack_type.as_str() {
                         "ranged" => player.play_shoot_bow(),
                         "spell" => player.play_cast(),

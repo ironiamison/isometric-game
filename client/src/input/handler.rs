@@ -734,6 +734,94 @@ fn find_path_with_limited_splice(
     Some(path)
 }
 
+/// Get the attack range for the local player's equipped weapon (1 for melee/unarmed, >1 for ranged).
+fn get_local_weapon_range(state: &GameState) -> i32 {
+    let weapon_id = state
+        .local_player_id
+        .as_ref()
+        .and_then(|id| state.players.get(id))
+        .and_then(|p| p.equipped_weapon.as_ref());
+    if let Some(weapon_id) = weapon_id {
+        if let Some(item_def) = state.item_registry.get(weapon_id) {
+            return item_def.range.unwrap_or(1);
+        }
+    }
+    1
+}
+
+/// Check if a position is within attack range of a target (matches server logic).
+fn in_attack_range(px: i32, py: i32, tx: i32, ty: i32, weapon_range: i32) -> bool {
+    let dx = (px - tx).abs();
+    let dy = (py - ty).abs();
+    if weapon_range == 1 {
+        (dx + dy) == 1 // Cardinal adjacency for melee
+    } else {
+        dx <= weapon_range && dy <= weapon_range && (dx > 0 || dy > 0) // Chebyshev for ranged
+    }
+}
+
+fn find_path_to_attack_with_optimistic_splice(
+    state: &GameState,
+    start: (i32, i32),
+    target: (i32, i32),
+    occupied: &HashSet<(i32, i32)>,
+    max_distance: i32,
+    weapon_range: i32,
+) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+    if weapon_range <= 1 {
+        let preferred = preferred_adjacent_tile_for_target(state, target);
+        return find_path_to_adjacent_with_optimistic_splice(
+            state, start, target, occupied, max_distance, preferred,
+        );
+    }
+
+    // For ranged: use optimistic splice candidates with range-based pathfinding
+    let candidates = splice_candidates(state, start, 6);
+
+    let mut best: Option<(i32, SpliceCandidate, (i32, i32), Vec<(i32, i32)>)> = None;
+
+    for cand in candidates {
+        if let Some((dest, path)) = pathfinding::find_path_within_range(
+            cand.pos,
+            target,
+            &state.chunk_manager,
+            occupied,
+            max_distance,
+            weapon_range,
+        ) {
+            let steps_from_pos = path.len().saturating_sub(1) as i32;
+            let total_steps = cand.steps_to_pos + steps_from_pos;
+            let better = match &best {
+                None => true,
+                Some((best_total, best_cand, _, _)) => {
+                    total_steps < *best_total
+                        || (total_steps == *best_total
+                            && cand.steps_to_pos > best_cand.steps_to_pos)
+                }
+            };
+            if better {
+                best = Some((total_steps, cand.clone(), dest, path));
+            }
+        }
+    }
+
+    let Some((_, cand, dest, path)) = best else {
+        return None;
+    };
+
+    let path_state = state.auto_path.as_ref();
+    if let (Some((start_idx, end_idx)), Some(path_state)) = (cand.prefix_range, path_state) {
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&path_state.path[start_idx..=end_idx]);
+        if path.len() > 1 {
+            combined.extend_from_slice(&path[1..]);
+        }
+        return Some((dest, combined));
+    }
+
+    Some((dest, path))
+}
+
 fn find_path_to_adjacent_with_optimistic_splice(
     state: &GameState,
     start: (i32, i32),
@@ -805,7 +893,7 @@ fn face_target_if_needed(
     queue_face(state, commands, dir as u8);
 }
 
-/// Pathfind to adjacent tile of a player and set up attack, or attack immediately if adjacent.
+/// Pathfind to within attack range of a player and set up attack, or attack immediately if in range.
 fn pathfind_and_attack_player(
     state: &mut GameState,
     commands: &mut Vec<InputCommand>,
@@ -818,19 +906,17 @@ fn pathfind_and_attack_player(
                 let py = local_player.server_y.round() as i32;
                 let tx = target.server_x.round() as i32;
                 let ty = target.server_y.round() as i32;
-                let cdx = (px - tx).abs();
-                let cdy = (py - ty).abs();
-                if (cdx + cdy) != 1 {
+                let weapon_range = get_local_weapon_range(state);
+                if !in_attack_range(px, py, tx, ty, weapon_range) {
                     let occupied = build_occupied_set(state, true);
-                    let preferred = preferred_adjacent_tile_for_target(state, (tx, ty));
                     const MAX_PATH_DISTANCE: i32 = 32;
-                    if let Some((dest, path)) = find_path_to_adjacent_with_optimistic_splice(
+                    if let Some((dest, path)) = find_path_to_attack_with_optimistic_splice(
                         state,
                         (px, py),
                         (tx, ty),
                         &occupied,
                         MAX_PATH_DISTANCE,
-                        preferred,
+                        weapon_range,
                     ) {
                         state.auto_path = Some(PathState {
                             path,
@@ -860,7 +946,7 @@ fn pathfind_and_attack_player(
     }
 }
 
-/// Pathfind to adjacent tile of an NPC and set up attack, or attack immediately if adjacent.
+/// Pathfind to within attack range of an NPC and set up attack, or attack immediately if in range.
 fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputCommand>, npc_id: &str) {
     if let Some(local_id) = &state.local_player_id.clone() {
         if let Some(player) = state.players.get(local_id) {
@@ -869,19 +955,17 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                 let py = player.server_y.round() as i32;
                 let nx = npc.server_x.round() as i32;
                 let ny = npc.server_y.round() as i32;
-                let cdx = (px - nx).abs();
-                let cdy = (py - ny).abs();
-                if (cdx + cdy) != 1 {
+                let weapon_range = get_local_weapon_range(state);
+                if !in_attack_range(px, py, nx, ny, weapon_range) {
                     let occupied = build_occupied_set(state, true);
-                    let preferred = preferred_adjacent_tile_for_target(state, (nx, ny));
                     const MAX_PATH_DISTANCE: i32 = 32;
-                    if let Some((dest, path)) = find_path_to_adjacent_with_optimistic_splice(
+                    if let Some((dest, path)) = find_path_to_attack_with_optimistic_splice(
                         state,
                         (px, py),
                         (nx, ny),
                         &occupied,
                         MAX_PATH_DISTANCE,
-                        preferred,
+                        weapon_range,
                     ) {
                         state.auto_path = Some(PathState {
                             path,
@@ -9511,7 +9595,7 @@ impl InputHandler {
                         action: "attack".to_string(),
                         confirmed: false,
                     });
-                    // Pathfind to adjacent tile, or send immediately if already adjacent
+                    // Pathfind to within attack range, or send immediately if already in range
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(player) = state.players.get(local_id) {
                             if let Some(npc) = state.npcs.get(&npc_id) {
@@ -9519,19 +9603,29 @@ impl InputHandler {
                                 let player_y = player.server_y.round() as i32;
                                 let npc_x = npc.server_x.round() as i32;
                                 let npc_y = npc.server_y.round() as i32;
-                                let cdx = (player_x - npc_x).abs();
-                                let cdy = (player_y - npc_y).abs();
-                                // Cardinal adjacency only (no diagonal)
-                                if (cdx + cdy) != 1 {
+                                let weapon_range = get_local_weapon_range(state);
+                                if !in_attack_range(player_x, player_y, npc_x, npc_y, weapon_range) {
                                     let occupied = build_occupied_set(state, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
-                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                        (player_x, player_y),
-                                        (npc_x, npc_y),
-                                        &state.chunk_manager,
-                                        &occupied,
-                                        MAX_PATH_DISTANCE,
-                                    ) {
+                                    let path_result = if weapon_range > 1 {
+                                        pathfinding::find_path_within_range(
+                                            (player_x, player_y),
+                                            (npc_x, npc_y),
+                                            &state.chunk_manager,
+                                            &occupied,
+                                            MAX_PATH_DISTANCE,
+                                            weapon_range,
+                                        )
+                                    } else {
+                                        pathfinding::find_path_to_adjacent(
+                                            (player_x, player_y),
+                                            (npc_x, npc_y),
+                                            &state.chunk_manager,
+                                            &occupied,
+                                            MAX_PATH_DISTANCE,
+                                        )
+                                    };
+                                    if let Some((dest, path)) = path_result {
                                         state.auto_path = Some(PathState {
                                             path,
                                             current_index: 0,
@@ -9544,7 +9638,7 @@ impl InputHandler {
                                         });
                                     }
                                 } else {
-                                    // Already cardinal-adjacent - face target and send immediately
+                                    // Already in range - face target and send immediately
                                     let dir = crate::game::Direction::from_velocity(
                                         npc_x as f32 - player_x as f32,
                                         npc_y as f32 - player_y as f32,
@@ -9720,7 +9814,7 @@ impl InputHandler {
                         action: "attack".to_string(),
                         confirmed: false,
                     });
-                    // Pathfind to adjacent tile, or send immediately if already adjacent
+                    // Pathfind to within attack range, or send immediately if already in range
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(local_player) = state.players.get(local_id) {
                             if let Some(target_player) = state.players.get(&entity_id) {
@@ -9728,19 +9822,29 @@ impl InputHandler {
                                 let player_y = local_player.server_y.round() as i32;
                                 let target_x = target_player.server_x.round() as i32;
                                 let target_y = target_player.server_y.round() as i32;
-                                let cdx = (player_x - target_x).abs();
-                                let cdy = (player_y - target_y).abs();
-                                // Cardinal adjacency only (no diagonal)
-                                if (cdx + cdy) != 1 {
+                                let weapon_range = get_local_weapon_range(state);
+                                if !in_attack_range(player_x, player_y, target_x, target_y, weapon_range) {
                                     let occupied = build_occupied_set(state, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
-                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                        (player_x, player_y),
-                                        (target_x, target_y),
-                                        &state.chunk_manager,
-                                        &occupied,
-                                        MAX_PATH_DISTANCE,
-                                    ) {
+                                    let path_result = if weapon_range > 1 {
+                                        pathfinding::find_path_within_range(
+                                            (player_x, player_y),
+                                            (target_x, target_y),
+                                            &state.chunk_manager,
+                                            &occupied,
+                                            MAX_PATH_DISTANCE,
+                                            weapon_range,
+                                        )
+                                    } else {
+                                        pathfinding::find_path_to_adjacent(
+                                            (player_x, player_y),
+                                            (target_x, target_y),
+                                            &state.chunk_manager,
+                                            &occupied,
+                                            MAX_PATH_DISTANCE,
+                                        )
+                                    };
+                                    if let Some((dest, path)) = path_result {
                                         state.auto_path = Some(PathState {
                                             path,
                                             current_index: 0,
@@ -9753,7 +9857,7 @@ impl InputHandler {
                                         });
                                     }
                                 } else {
-                                    // Already adjacent - face target and send to server immediately
+                                    // Already in range - face target and send to server immediately
                                     let dir = crate::game::Direction::from_velocity(
                                         target_x as f32 - player_x as f32,
                                         target_y as f32 - player_y as f32,

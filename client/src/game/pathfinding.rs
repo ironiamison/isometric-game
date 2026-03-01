@@ -199,6 +199,114 @@ pub fn find_path_to_adjacent(
     best_path
 }
 
+/// Find the shortest path to any walkable tile within Chebyshev distance `range` of the target.
+/// Used for ranged weapon attacks where the player doesn't need to be adjacent.
+/// Returns the destination tile and the path to it, or None if no path exists.
+pub fn find_path_within_range(
+    start: (i32, i32),
+    target: (i32, i32),
+    chunk_manager: &ChunkManager,
+    occupied: &HashSet<(i32, i32)>,
+    max_distance: i32,
+    range: i32,
+) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+    // Already in range?
+    let dx = (start.0 - target.0).abs();
+    let dy = (start.1 - target.1).abs();
+    if dx <= range && dy <= range && (dx > 0 || dy > 0) {
+        return Some((start, vec![start]));
+    }
+
+    // A* with modified goal: any tile within Chebyshev distance `range` of target
+    let mut open_set = BinaryHeap::new();
+    let mut came_from: HashMap<(i32, i32), (i32, i32)> = HashMap::new();
+    let mut g_score: HashMap<(i32, i32), i32> = HashMap::new();
+
+    // Heuristic: distance to edge of the "in range" zone
+    let range_heuristic = |pos: (i32, i32)| -> i32 {
+        let cdx = (pos.0 - target.0).abs();
+        let cdy = (pos.1 - target.1).abs();
+        // How many steps to get within range (Chebyshev) - cardinal movement only
+        let steps_x = (cdx - range).max(0);
+        let steps_y = (cdy - range).max(0);
+        steps_x + steps_y
+    };
+
+    g_score.insert(start, 0);
+    open_set.push(Node {
+        pos: start,
+        g_cost: 0,
+        f_cost: range_heuristic(start),
+    });
+
+    let neighbors = [(0, -1), (0, 1), (-1, 0), (1, 0)];
+    const MAX_ITERATIONS: i32 = 1000;
+    let mut iterations = 0;
+
+    while let Some(current) = open_set.pop() {
+        iterations += 1;
+        if iterations > MAX_ITERATIONS {
+            return None;
+        }
+
+        // Check if we've reached a tile within range
+        let cdx = (current.pos.0 - target.0).abs();
+        let cdy = (current.pos.1 - target.1).abs();
+        if cdx <= range && cdy <= range && (cdx > 0 || cdy > 0) {
+            // Reconstruct path
+            let mut path = vec![current.pos];
+            let mut pos = current.pos;
+            while let Some(&prev) = came_from.get(&pos) {
+                path.push(prev);
+                pos = prev;
+            }
+            path.reverse();
+            return Some((current.pos, path));
+        }
+
+        let current_g = *g_score.get(&current.pos).unwrap_or(&i32::MAX);
+        if current.g_cost > current_g {
+            continue;
+        }
+
+        for (ndx, ndy) in neighbors {
+            let neighbor = (current.pos.0 + ndx, current.pos.1 + ndy);
+
+            if !chunk_manager.is_walkable(neighbor.0 as f32, neighbor.1 as f32) {
+                continue;
+            }
+
+            // Don't walk onto the target tile itself
+            if neighbor == target {
+                continue;
+            }
+
+            if occupied.contains(&neighbor) {
+                continue;
+            }
+
+            // Check max distance from start
+            let dist_from_start = (neighbor.0 - start.0).abs().max((neighbor.1 - start.1).abs());
+            if dist_from_start > max_distance {
+                continue;
+            }
+
+            let tentative_g = current_g + 1;
+            if tentative_g < *g_score.get(&neighbor).unwrap_or(&i32::MAX) {
+                came_from.insert(neighbor, current.pos);
+                g_score.insert(neighbor, tentative_g);
+                open_set.push(Node {
+                    pos: neighbor,
+                    g_cost: tentative_g,
+                    f_cost: tentative_g + range_heuristic(neighbor),
+                });
+            }
+        }
+    }
+
+    None
+}
+
 /// Find the best adjacent tile with a preferred approach side.
 /// Preference is used only as a tie-breaker among equally short paths.
 pub fn find_path_to_adjacent_prefer(

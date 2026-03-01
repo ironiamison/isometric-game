@@ -4352,7 +4352,7 @@ async fn handle_client_message(
             room.handle_chat(player_id, &text, &channel).await;
         }
         ClientMessage::Attack => {
-            room.handle_attack(player_id, None).await;
+            room.handle_attack(player_id, None, None).await;
         }
         ClientMessage::Target { entity_id } => {
             room.handle_target(player_id, &entity_id).await;
