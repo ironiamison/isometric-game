@@ -28,11 +28,11 @@ use auth::AuthSession;
 #[cfg(not(target_arch = "wasm32"))]
 use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
-// const SERVER_URL: &str = "http://localhost:2567";
-// const WS_URL: &str = "ws://localhost:2567";
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+// const SERVER_URL: &str = "https://aeven.xyz";
+// const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -1252,6 +1252,9 @@ fn run_game_frame(
                 seller_id: seller_id.clone(),
                 stall_slot: *stall_slot,
                 quantity: *quantity,
+            },
+            InputCommand::SetCombatStyle { style } => ClientMessage::SetCombatStyle {
+                style: style.clone(),
             },
         };
         network.send(&msg);

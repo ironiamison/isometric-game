@@ -265,6 +265,7 @@ pub enum UiElementId {
 
     // Character panel
     CharacterOpenShopButton,
+    CombatStyleButton(usize), // 0=Accurate, 1=Aggressive, 2=Defensive, 3=Controlled
 
     // Stall Setup Panel (owner)
     StallSetupSlot(usize),

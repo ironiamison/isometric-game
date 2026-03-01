@@ -383,6 +383,10 @@ pub enum ClientMessage {
         stall_slot: u8,
         quantity: i32,
     },
+
+    /// Set the player's combat style
+    #[serde(rename = "setCombatStyle")]
+    SetCombatStyle { style: String },
 }
 
 impl ClientMessage {
@@ -471,6 +475,7 @@ impl ClientMessage {
             ClientMessage::StallBrowse { .. } => "StallBrowse",
             ClientMessage::StallBuy { .. } => "StallBuy",
             ClientMessage::SpectatorUpgrade { .. } => "SpectatorUpgrade",
+            ClientMessage::SetCombatStyle { .. } => "SetCombatStyle",
         }
     }
 }
@@ -626,8 +631,12 @@ pub enum ServerMessage {
         player_id: String,
         hitpoints_level: i32,
         hitpoints_xp: i64,
-        combat_level: i32,
-        combat_xp: i64,
+        attack_level: i32,
+        attack_xp: i64,
+        strength_level: i32,
+        strength_xp: i64,
+        defence_level: i32,
+        defence_xp: i64,
         fishing_level: i32,
         fishing_xp: i64,
         farming_level: i32,
@@ -1764,8 +1773,16 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
         Value::Integer((p.hitpoints_level as i64).into()),
     ));
     pmap.push((
-        Value::String("combatSkillLevel".into()),
-        Value::Integer((p.combat_skill_level as i64).into()),
+        Value::String("attackLevel".into()),
+        Value::Integer((p.attack_level as i64).into()),
+    ));
+    pmap.push((
+        Value::String("strengthLevel".into()),
+        Value::Integer((p.strength_level as i64).into()),
+    ));
+    pmap.push((
+        Value::String("defenceLevel".into()),
+        Value::Integer((p.defence_level as i64).into()),
     ));
     pmap.push((
         Value::String("gold".into()),
@@ -1873,6 +1890,10 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
             Some(name) => Value::String(name.clone().into()),
             None => Value::Nil,
         },
+    ));
+    pmap.push((
+        Value::String("combatStyle".into()),
+        Value::String(p.combat_style.clone().into()),
     ));
     pmap.push((
         Value::String("mp".into()),
@@ -2295,8 +2316,16 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         Value::Integer((p.hitpoints_level as i64).into()),
                     ));
                     pmap.push((
-                        Value::String("combatSkillLevel".into()),
-                        Value::Integer((p.combat_skill_level as i64).into()),
+                        Value::String("attackLevel".into()),
+                        Value::Integer((p.attack_level as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("strengthLevel".into()),
+                        Value::Integer((p.strength_level as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("defenceLevel".into()),
+                        Value::Integer((p.defence_level as i64).into()),
                     ));
                     pmap.push((
                         Value::String("gold".into()),
@@ -2404,6 +2433,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                             Some(name) => Value::String(name.clone().into()),
                             None => Value::Nil,
                         },
+                    ));
+                    pmap.push((
+                        Value::String("combatStyle".into()),
+                        Value::String(p.combat_style.clone().into()),
                     ));
                     pmap.push((
                         Value::String("mp".into()),
@@ -2730,8 +2763,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             player_id,
             hitpoints_level,
             hitpoints_xp,
-            combat_level,
-            combat_xp,
+            attack_level,
+            attack_xp,
+            strength_level,
+            strength_xp,
+            defence_level,
+            defence_xp,
             fishing_level,
             fishing_xp,
             farming_level,
@@ -2767,12 +2804,28 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::Integer((*hitpoints_xp).into()),
             ));
             map.push((
-                Value::String("combat_level".into()),
-                Value::Integer((*combat_level as i64).into()),
+                Value::String("attack_level".into()),
+                Value::Integer((*attack_level as i64).into()),
             ));
             map.push((
-                Value::String("combat_xp".into()),
-                Value::Integer((*combat_xp).into()),
+                Value::String("attack_xp".into()),
+                Value::Integer((*attack_xp).into()),
+            ));
+            map.push((
+                Value::String("strength_level".into()),
+                Value::Integer((*strength_level as i64).into()),
+            ));
+            map.push((
+                Value::String("strength_xp".into()),
+                Value::Integer((*strength_xp).into()),
+            ));
+            map.push((
+                Value::String("defence_level".into()),
+                Value::Integer((*defence_level as i64).into()),
+            ));
+            map.push((
+                Value::String("defence_xp".into()),
+                Value::Integer((*defence_xp).into()),
             ));
             map.push((
                 Value::String("fishing_level".into()),
@@ -6523,6 +6576,10 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
                 stall_slot,
                 quantity,
             })
+        }
+        "setCombatStyle" => {
+            let style = extract_string(msg_data, "style").unwrap_or_default();
+            Ok(ClientMessage::SetCombatStyle { style })
         }
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }

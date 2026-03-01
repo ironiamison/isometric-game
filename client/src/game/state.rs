@@ -1394,6 +1394,8 @@ pub struct UiState {
     pub prayer_help_open: bool,
     /// Whether spell help overlay is open
     pub spell_help_open: bool,
+    /// Whether combat style selector panel is open
+    pub combat_style_open: bool,
     /// Graphics quality: true = low (no water shaders), false = high
     pub graphics_low: bool,
     // Slayer panel
@@ -1626,6 +1628,7 @@ impl Default for UiState {
             hotkey_settings_open: false,
             prayer_help_open: false,
             spell_help_open: false,
+            combat_style_open: false,
             #[cfg(target_os = "android")]
             graphics_low: true,
             #[cfg(not(target_os = "android"))]

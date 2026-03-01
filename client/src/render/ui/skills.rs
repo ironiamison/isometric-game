@@ -1,5 +1,5 @@
-//! Skills panel rendering - compact 4x3 grid showing skill levels
-//! 11 active skills, 1 locked placeholder slot
+//! Skills panel rendering - compact 4x4 grid showing skill levels
+//! 14 active skills, 2 locked placeholder slots
 
 use super::super::Renderer;
 use super::common::*;
@@ -8,34 +8,36 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
-/// Skills panel dimensions (compact: just fits the 4x3 grid with padding)
+/// Skills panel dimensions (compact: just fits the 4x4 grid with padding)
 const SKILLS_PANEL_PADDING: f32 = 8.0;
-const SKILLS_GRID_WIDTH: f32 = 3.0 * SKILL_SLOT_SIZE + 2.0 * SKILL_SLOT_SPACING; // 128
+const SKILLS_GRID_WIDTH: f32 = 4.0 * SKILL_SLOT_SIZE + 3.0 * SKILL_SLOT_SPACING; // 172
 const SKILLS_GRID_HEIGHT: f32 = 4.0 * SKILL_SLOT_SIZE + 3.0 * SKILL_SLOT_SPACING; // 172
 const SKILLS_PANEL_WIDTH: f32 =
-    SKILLS_GRID_WIDTH + SKILLS_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0; // 152
+    SKILLS_GRID_WIDTH + SKILLS_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0; // 196
 const SKILLS_HEADER_HEIGHT: f32 = 24.0;
 const SKILLS_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
     + SKILLS_HEADER_HEIGHT
     + SKILLS_PANEL_PADDING
     + SKILLS_GRID_HEIGHT
-    + SKILLS_PANEL_PADDING; // ~220
+    + SKILLS_PANEL_PADDING;
 
 /// Skill slot dimensions
 const SKILL_SLOT_SIZE: f32 = 40.0;
 const SKILL_SLOT_SPACING: f32 = 4.0;
-const SKILL_GRID_COLS: usize = 3;
+const SKILL_GRID_COLS: usize = 4;
 const SKILL_GRID_ROWS: usize = 4;
-const TOTAL_SKILL_SLOTS: usize = 12;
+const TOTAL_SKILL_SLOTS: usize = 16;
 
 /// UI icons sprite sheet: 24x24 icons in 10 columns
 const UI_ICON_SIZE: f32 = 24.0;
 const UI_ICON_COLS: usize = 10;
 
 /// Active skills in display order
-const ACTIVE_SKILLS: [SkillType; 12] = [
+const ACTIVE_SKILLS: [SkillType; 14] = [
     SkillType::Hitpoints,
-    SkillType::Combat,
+    SkillType::Attack,
+    SkillType::Strength,
+    SkillType::Defence,
     SkillType::Fishing,
     SkillType::Woodcutting,
     SkillType::Farming,
@@ -224,7 +226,9 @@ impl Renderer {
         } else if let Some(ref texture) = self.ui_icons {
             let (icon_col, icon_row) = match skill_type {
                 SkillType::Hitpoints => (0, 6),
-                SkillType::Combat => (2, 6),
+                SkillType::Attack => (5, 5),    // Attack icon
+                SkillType::Strength => (8, 6),  // Fist/strength icon
+                SkillType::Defence => (5, 4),   // Defence icon
                 SkillType::Fishing => (4, 6),
                 SkillType::Farming => (4, 6),
                 SkillType::Mining => (0, 5),
@@ -260,7 +264,9 @@ impl Renderer {
             // Fallback to letter if texture not loaded (native font size)
             let letter = match skill_type {
                 SkillType::Hitpoints => "H",
-                SkillType::Combat => "C",
+                SkillType::Attack => "At",
+                SkillType::Strength => "St",
+                SkillType::Defence => "De",
                 SkillType::Fishing => "F",
                 SkillType::Farming => "Fm",
                 SkillType::Mining => "Mi",
@@ -348,7 +354,9 @@ impl Renderer {
     fn get_skill_icon_color(&self, skill_type: SkillType) -> Color {
         match skill_type {
             SkillType::Hitpoints => Color::new(0.8, 0.2, 0.2, 1.0), // Red
-            SkillType::Combat => Color::new(0.85, 0.65, 0.15, 1.0), // Gold/orange
+            SkillType::Attack => Color::new(0.85, 0.65, 0.15, 1.0), // Gold/orange (accuracy)
+            SkillType::Strength => Color::new(0.75, 0.25, 0.25, 1.0), // Dark red (power)
+            SkillType::Defence => Color::new(0.3, 0.5, 0.8, 1.0),   // Steel blue (shield)
             SkillType::Fishing => Color::new(0.2, 0.6, 0.85, 1.0),  // Blue
             SkillType::Farming => Color::new(0.3, 0.75, 0.3, 1.0),  // Green
             SkillType::Mining => Color::new(0.5, 0.5, 0.6, 1.0),    // Gray/stone

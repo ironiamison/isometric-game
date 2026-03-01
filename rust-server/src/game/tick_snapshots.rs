@@ -42,7 +42,9 @@ fn player_update_from_player(
         max_hp: player.max_hp(),
         combat_level: player.combat_level(),
         hitpoints_level: player.skills.hitpoints.level,
-        combat_skill_level: player.skills.combat.level,
+        attack_level: player.skills.attack.level,
+        strength_level: player.skills.strength.level,
+        defence_level: player.skills.defence.level,
         gold: player.inventory.gold,
         gender: player.gender.clone(),
         skin: player.skin.clone(),
@@ -66,6 +68,7 @@ fn player_update_from_player(
         max_mp: player.max_mp(),
         has_stall: player.stall.as_ref().is_some_and(|stall| stall.active),
         stall_name: active_stall_name(player.stall.as_ref()),
+        combat_style: player.combat_style.as_str().to_string(),
     }
 }
 

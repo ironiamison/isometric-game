@@ -159,6 +159,8 @@ pub struct Player {
     pub has_stall: bool,
     /// Name of the player's stall (if has_stall)
     pub stall_name: Option<String>,
+    /// Combat style: "accurate", "aggressive", "defensive", "controlled"
+    pub combat_style: String,
     /// True for the local player (set from state sync calls)
     is_local_player: bool,
 }
@@ -212,6 +214,7 @@ impl Player {
             is_dashing: false,
             has_stall: false,
             stall_name: None,
+            combat_style: "accurate".to_string(),
             is_local_player: false,
         }
     }

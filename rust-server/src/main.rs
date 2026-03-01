@@ -1426,7 +1426,9 @@ struct OnlinePlayer {
     name: String,
     combat_level: i32,
     hitpoints_level: i32,
-    combat_skill_level: i32,
+    attack_level: i32,
+    strength_level: i32,
+    defence_level: i32,
     total_level: i32,
 }
 
@@ -1441,7 +1443,9 @@ async fn stats_online(State(state): State<AppState>) -> impl IntoResponse {
                 name: p.name.clone(),
                 combat_level: p.skills.combat_level(),
                 hitpoints_level: p.skills.hitpoints.level,
-                combat_skill_level: p.skills.combat.level,
+                attack_level: p.skills.attack.level,
+                strength_level: p.skills.strength.level,
+                defence_level: p.skills.defence.level,
                 total_level: p.skills.total_level(),
             });
         }
@@ -1469,7 +1473,9 @@ struct LeaderboardEntry {
     name: String,
     combat_level: i32,
     hitpoints_level: i32,
-    combat_skill_level: i32,
+    attack_level: i32,
+    strength_level: i32,
+    defence_level: i32,
     fishing_level: i32,
     farming_level: i32,
     smithing_level: i32,
@@ -1489,7 +1495,9 @@ struct PlayerProfileRanks {
     total_level: usize,
     combat_level: usize,
     hitpoints_level: usize,
-    combat_skill_level: usize,
+    attack_level: usize,
+    strength_level: usize,
+    defence_level: usize,
     fishing_level: usize,
     farming_level: usize,
     smithing_level: usize,
@@ -1527,7 +1535,9 @@ async fn load_leaderboard_entries(state: &AppState) -> Vec<LeaderboardEntry> {
                 name,
                 combat_level: skills.combat_level(),
                 hitpoints_level: skills.hitpoints.level,
-                combat_skill_level: skills.combat.level,
+                attack_level: skills.attack.level,
+                strength_level: skills.strength.level,
+                defence_level: skills.defence.level,
                 fishing_level: skills.fishing.level,
                 farming_level: skills.farming.level,
                 smithing_level: skills.smithing.level,
@@ -1549,9 +1559,9 @@ fn sort_leaderboard_entries(entries: &mut [LeaderboardEntry], sort: &str) {
     match sort {
         "combat_level" => entries.sort_by(|a, b| b.combat_level.cmp(&a.combat_level)),
         "hitpoints_level" => entries.sort_by(|a, b| b.hitpoints_level.cmp(&a.hitpoints_level)),
-        "combat_skill_level" => {
-            entries.sort_by(|a, b| b.combat_skill_level.cmp(&a.combat_skill_level))
-        }
+        "attack_level" => entries.sort_by(|a, b| b.attack_level.cmp(&a.attack_level)),
+        "strength_level" => entries.sort_by(|a, b| b.strength_level.cmp(&a.strength_level)),
+        "defence_level" => entries.sort_by(|a, b| b.defence_level.cmp(&a.defence_level)),
         "fishing_level" => entries.sort_by(|a, b| b.fishing_level.cmp(&a.fishing_level)),
         "farming_level" => entries.sort_by(|a, b| b.farming_level.cmp(&a.farming_level)),
         "smithing_level" => entries.sort_by(|a, b| b.smithing_level.cmp(&a.smithing_level)),
@@ -1614,7 +1624,9 @@ async fn stats_player_profile(
         total_level: stat_rank(&entries, &player, |entry| entry.total_level as i64),
         combat_level: stat_rank(&entries, &player, |entry| entry.combat_level as i64),
         hitpoints_level: stat_rank(&entries, &player, |entry| entry.hitpoints_level as i64),
-        combat_skill_level: stat_rank(&entries, &player, |entry| entry.combat_skill_level as i64),
+        attack_level: stat_rank(&entries, &player, |entry| entry.attack_level as i64),
+        strength_level: stat_rank(&entries, &player, |entry| entry.strength_level as i64),
+        defence_level: stat_rank(&entries, &player, |entry| entry.defence_level as i64),
         fishing_level: stat_rank(&entries, &player, |entry| entry.fishing_level as i64),
         farming_level: stat_rank(&entries, &player, |entry| entry.farming_level as i64),
         smithing_level: stat_rank(&entries, &player, |entry| entry.smithing_level as i64),
@@ -4670,6 +4682,13 @@ async fn handle_client_message(
         } => {
             room.handle_stall_buy(player_id, &seller_id, stall_slot, quantity)
                 .await;
+        }
+        ClientMessage::SetCombatStyle { style } => {
+            if let Some(combat_style) = crate::game::CombatStyle::from_str(&style) {
+                room.set_combat_style(player_id, combat_style).await;
+            } else {
+                tracing::warn!("Player {} sent invalid combat style: {}", player_id, style);
+            }
         }
     }
 

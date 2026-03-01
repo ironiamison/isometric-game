@@ -1012,7 +1012,9 @@ mod tests {
         player.skills.smithing.level = 9;
         player.skills.alchemy.level = 7;
         player.skills.survivalist.level = 5;
-        player.skills.combat.level = 20;
+        player.skills.attack.level = 20;
+        player.skills.strength.level = 20;
+        player.skills.defence.level = 20;
         player.skills.hitpoints.level = 20;
 
         assert!(recipe_level_check_passed(

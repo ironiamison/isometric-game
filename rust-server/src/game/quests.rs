@@ -23,7 +23,9 @@ fn player_progression_snapshot(player: &super::Player) -> (i32, Vec<(&'static st
         player.inventory.gold,
         vec![
             ("hitpoints", player.skills.hitpoints.level),
-            ("combat", player.skills.combat.level),
+            ("attack", player.skills.attack.level),
+            ("strength", player.skills.strength.level),
+            ("defence", player.skills.defence.level),
             ("fishing", player.skills.fishing.level),
             ("farming", player.skills.farming.level),
             ("smithing", player.skills.smithing.level),
@@ -936,10 +938,12 @@ mod tests {
         let (gold, entries) = player_progression_snapshot(&player);
 
         assert_eq!(gold, 250);
-        assert!(entries.contains(&("combat", player.skills.combat.level)));
+        assert!(entries.contains(&("attack", player.skills.attack.level)));
+        assert!(entries.contains(&("strength", player.skills.strength.level)));
+        assert!(entries.contains(&("defence", player.skills.defence.level)));
         assert!(entries.contains(&("fishing", player.skills.fishing.level)));
         assert!(entries.contains(&("alchemy", player.skills.alchemy.level)));
-        assert_eq!(entries.len(), 10);
+        assert_eq!(entries.len(), 12);
     }
 
     #[test]

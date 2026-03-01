@@ -1574,6 +1574,10 @@ pub enum InputCommand {
         stall_slot: u8,
         quantity: i32,
     },
+    // Combat style
+    SetCombatStyle {
+        style: String,
+    },
 }
 
 /// Cardinal directions for isometric movement (no diagonals)
@@ -2024,12 +2028,12 @@ impl InputHandler {
                         let item_def = state.item_registry.get_or_placeholder(&drag.item_id);
                         let can_equip = if let Some(ref equip) = item_def.equipment {
                             let slot_matches = equip.slot_type == *target_slot_type;
-                            let level_required = equip
-                                .attack_level_required
-                                .max(equip.defence_level_required);
                             let level_ok = state
                                 .get_local_player()
-                                .map(|p| p.skills.combat.level >= level_required)
+                                .map(|p| {
+                                    p.skills.attack.level >= equip.attack_level_required
+                                        && p.skills.defence.level >= equip.defence_level_required
+                                })
                                 .unwrap_or(false);
                             slot_matches && level_ok
                         } else {
@@ -9327,6 +9331,24 @@ impl InputHandler {
                                 x: mx,
                                 y: my,
                             });
+                        }
+                    }
+                    return commands;
+                }
+                UiElementId::CombatStyleButton(idx) => {
+                    if mouse_clicked {
+                        let styles = ["accurate", "aggressive", "defensive", "controlled"];
+                        if let Some(style) = styles.get(*idx) {
+                            audio.play_sfx("click");
+                            commands.push(InputCommand::SetCombatStyle {
+                                style: style.to_string(),
+                            });
+                            // Optimistically update local state
+                            if let Some(local_id) = state.local_player_id.clone() {
+                                if let Some(player) = state.players.get_mut(&local_id) {
+                                    player.combat_style = style.to_string();
+                                }
+                            }
                         }
                     }
                     return commands;

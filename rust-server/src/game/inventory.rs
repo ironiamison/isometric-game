@@ -471,7 +471,8 @@ impl GameRoom {
             match player.inventory.slots.get(slot_index_usize) {
                 Some(Some(slot)) => Some((
                     slot.item_id.clone(),
-                    player.skills.combat.level,
+                    player.skills.attack.level,
+                    player.skills.defence.level,
                     player.skills.woodcutting.level,
                     player.skills.magic.level,
                     (
@@ -490,7 +491,7 @@ impl GameRoom {
             }
         };
 
-        let (item_id, combat_level, woodcutting_level, magic_level, current_equipment) =
+        let (item_id, attack_level, defence_level, woodcutting_level, magic_level, current_equipment) =
             match item_info {
                 Some(info) => info,
                 None => {
@@ -543,17 +544,37 @@ impl GameRoom {
         };
 
         let slot_type = equip_slot.as_str().to_string();
-        let level_required = equip_stats
-            .attack_level_required
-            .max(equip_stats.defence_level_required);
-        if level_required > 0 && combat_level < level_required {
+        if equip_stats.attack_level_required > 0
+            && attack_level < equip_stats.attack_level_required
+        {
             self.send_to_player(
                 player_id,
                 ServerMessage::EquipResult {
                     success: false,
                     slot_type,
                     item_id: None,
-                    error: Some(format!("Requires Combat level {}", level_required)),
+                    error: Some(format!(
+                        "Requires Attack level {}",
+                        equip_stats.attack_level_required
+                    )),
+                },
+            )
+            .await;
+            return;
+        }
+        if equip_stats.defence_level_required > 0
+            && defence_level < equip_stats.defence_level_required
+        {
+            self.send_to_player(
+                player_id,
+                ServerMessage::EquipResult {
+                    success: false,
+                    slot_type,
+                    item_id: None,
+                    error: Some(format!(
+                        "Requires Defence level {}",
+                        equip_stats.defence_level_required
+                    )),
                 },
             )
             .await;

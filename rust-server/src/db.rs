@@ -18,7 +18,7 @@ pub struct AccountData {
     pub last_login: Option<String>,
 }
 
-use crate::skills::{LegacySkills, Skills};
+use crate::skills::{LegacyCombatSkills, LegacySkills, Skills};
 
 /// Character data - belongs to an account
 #[derive(Debug, Clone)]
@@ -832,12 +832,15 @@ impl Database {
                     .try_get::<String, _>("skills_json")
                     .ok()
                     .and_then(|json| {
-                        // First try the new format (hitpoints + combat)
+                        // First try the new format (hitpoints + attack + strength + defence)
                         if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
                             return Some(skills);
                         }
-                        // Fall back to legacy format (hitpoints + attack + strength + defence)
-                        // and convert to new format by summing combat XP
+                        // Fall back to combined combat format (split ÷ 3)
+                        if let Ok(legacy) = serde_json::from_str::<LegacyCombatSkills>(&json) {
+                            return Some(legacy.to_skills());
+                        }
+                        // Fall back to ancient format (hitpoints + attack + strength + defence only)
                         if let Ok(legacy) = serde_json::from_str::<LegacySkills>(&json) {
                             return Some(legacy.to_skills());
                         }
@@ -1056,12 +1059,15 @@ impl Database {
                 .try_get::<String, _>("skills_json")
                 .ok()
                 .and_then(|json| {
-                    // First try the new format (hitpoints + combat)
+                    // First try the new format (hitpoints + attack + strength + defence)
                     if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
                         return Some(skills);
                     }
-                    // Fall back to legacy format (hitpoints + attack + strength + defence)
-                    // and convert to new format by summing combat XP
+                    // Fall back to combined combat format (split ÷ 3)
+                    if let Ok(legacy) = serde_json::from_str::<LegacyCombatSkills>(&json) {
+                        return Some(legacy.to_skills());
+                    }
+                    // Fall back to ancient format (hitpoints + attack + strength + defence only)
                     if let Ok(legacy) = serde_json::from_str::<LegacySkills>(&json) {
                         return Some(legacy.to_skills());
                     }

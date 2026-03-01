@@ -1,8 +1,10 @@
 //! Skills system following RuneScape-style mechanics.
 //!
-//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic, Alchemy, Mining, Slayer
+//! Skills: Hitpoints, Attack, Strength, Defence, Fishing, Farming, Smithing, Prayer, Magic, Alchemy, Mining, Slayer
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
-//! - Combat: Combined attack/strength/defence skill for all combat
+//! - Attack: Accuracy in melee combat (starts at 1)
+//! - Strength: Max hit in melee combat (starts at 1)
+//! - Defence: Evasion rolls in combat (starts at 1)
 //! - Fishing: Gathering skill for catching fish
 //! - Smithing: Crafting skill for forging weapons and armor
 //! - Prayer: Max prayer points (1 point per level, starts at 1)
@@ -20,7 +22,9 @@ pub const MAX_LEVEL: i32 = 99;
 #[serde(rename_all = "lowercase")]
 pub enum SkillType {
     Hitpoints,
-    Combat,
+    Attack,
+    Strength,
+    Defence,
     Fishing,
     Farming,
     Smithing,
@@ -37,7 +41,9 @@ impl SkillType {
     pub fn as_str(&self) -> &'static str {
         match self {
             SkillType::Hitpoints => "hitpoints",
-            SkillType::Combat => "combat",
+            SkillType::Attack => "attack",
+            SkillType::Strength => "strength",
+            SkillType::Defence => "defence",
             SkillType::Fishing => "fishing",
             SkillType::Farming => "farming",
             SkillType::Smithing => "smithing",
@@ -54,7 +60,9 @@ impl SkillType {
     pub fn from_str(s: &str) -> Option<SkillType> {
         match s.to_lowercase().as_str() {
             "hitpoints" | "hp" => Some(SkillType::Hitpoints),
-            "combat" => Some(SkillType::Combat),
+            "attack" => Some(SkillType::Attack),
+            "strength" => Some(SkillType::Strength),
+            "defence" => Some(SkillType::Defence),
             "fishing" => Some(SkillType::Fishing),
             "farming" => Some(SkillType::Farming),
             "smithing" => Some(SkillType::Smithing),
@@ -72,7 +80,9 @@ impl SkillType {
     pub fn all() -> &'static [SkillType] {
         &[
             SkillType::Hitpoints,
-            SkillType::Combat,
+            SkillType::Attack,
+            SkillType::Strength,
+            SkillType::Defence,
             SkillType::Fishing,
             SkillType::Farming,
             SkillType::Smithing,
@@ -181,7 +191,12 @@ impl Default for Skill {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Skills {
     pub hitpoints: Skill,
-    pub combat: Skill,
+    #[serde(default)]
+    pub attack: Skill,
+    #[serde(default)]
+    pub strength: Skill,
+    #[serde(default)]
+    pub defence: Skill,
     #[serde(default)]
     pub fishing: Skill,
     #[serde(default)]
@@ -211,11 +226,14 @@ impl Default for Skills {
 }
 
 impl Skills {
-    /// Create new skills with starting values (HP 10, Combat 3, others 1)
+    /// Create new skills with starting values (HP 10, Attack/Strength/Defence 1, others 1)
+    /// New character = combat level 3 (same as legacy)
     pub fn new() -> Self {
         Self {
             hitpoints: Skill::new(10),
-            combat: Skill::new(3),
+            attack: Skill::new(1),
+            strength: Skill::new(1),
+            defence: Skill::new(1),
             fishing: Skill::new(1),
             farming: Skill::new(1),
             smithing: Skill::new(1),
@@ -229,17 +247,25 @@ impl Skills {
         }
     }
 
-    /// Calculate combat level: (Combat + Hitpoints) / 2
-    /// Range: 5 (Combat 1 + HP 10) to 99 (both 99)
+    /// Calculate combat level using OSRS-style formula:
+    /// base = (Defence + Hitpoints + floor(Prayer/2)) / 4
+    /// combat_level = floor(base + max((Attack+Strength)*0.325, Magic*0.325))
     pub fn combat_level(&self) -> i32 {
-        ((self.combat.level + self.hitpoints.level) as f64 / 2.0).floor() as i32
+        let base = (self.defence.level as f64 + self.hitpoints.level as f64
+            + (self.prayer.level as f64 / 2.0).floor())
+            / 4.0;
+        let melee = (self.attack.level + self.strength.level) as f64 * 0.325;
+        let magic = self.magic.level as f64 * 0.325;
+        (base + melee.max(magic)).floor() as i32
     }
 
     /// Get a skill by type
     pub fn get(&self, skill_type: SkillType) -> &Skill {
         match skill_type {
             SkillType::Hitpoints => &self.hitpoints,
-            SkillType::Combat => &self.combat,
+            SkillType::Attack => &self.attack,
+            SkillType::Strength => &self.strength,
+            SkillType::Defence => &self.defence,
             SkillType::Fishing => &self.fishing,
             SkillType::Farming => &self.farming,
             SkillType::Smithing => &self.smithing,
@@ -257,7 +283,9 @@ impl Skills {
     pub fn get_mut(&mut self, skill_type: SkillType) -> &mut Skill {
         match skill_type {
             SkillType::Hitpoints => &mut self.hitpoints,
-            SkillType::Combat => &mut self.combat,
+            SkillType::Attack => &mut self.attack,
+            SkillType::Strength => &mut self.strength,
+            SkillType::Defence => &mut self.defence,
             SkillType::Fishing => &mut self.fishing,
             SkillType::Farming => &mut self.farming,
             SkillType::Smithing => &mut self.smithing,
@@ -274,7 +302,9 @@ impl Skills {
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
         self.hitpoints.level
-            + self.combat.level
+            + self.attack.level
+            + self.strength.level
+            + self.defence.level
             + self.fishing.level
             + self.farming.level
             + self.smithing.level
@@ -288,7 +318,64 @@ impl Skills {
     }
 }
 
-/// Legacy skills format for database migration
+/// Legacy skills format with combined `combat` field (previous format).
+/// Migrates by splitting combat XP equally into attack/strength/defence.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LegacyCombatSkills {
+    pub hitpoints: Skill,
+    pub combat: Skill,
+    #[serde(default)]
+    pub fishing: Skill,
+    #[serde(default)]
+    pub farming: Skill,
+    #[serde(default)]
+    pub smithing: Skill,
+    #[serde(default)]
+    pub prayer: Skill,
+    #[serde(default)]
+    pub magic: Skill,
+    #[serde(default)]
+    pub woodcutting: Skill,
+    #[serde(default)]
+    pub alchemy: Skill,
+    #[serde(default)]
+    pub mining: Skill,
+    #[serde(default)]
+    pub slayer: Skill,
+    #[serde(default)]
+    pub survivalist: Skill,
+}
+
+impl LegacyCombatSkills {
+    /// Convert from combined combat to split attack/strength/defence by dividing XP ÷ 3
+    pub fn to_skills(self) -> Skills {
+        let split_xp = self.combat.xp / 3;
+        let split_level = level_for_xp(split_xp);
+        let split_skill = Skill {
+            level: split_level,
+            xp: split_xp,
+        };
+        Skills {
+            hitpoints: self.hitpoints,
+            attack: split_skill.clone(),
+            strength: split_skill.clone(),
+            defence: split_skill,
+            fishing: self.fishing,
+            farming: self.farming,
+            smithing: self.smithing,
+            prayer: self.prayer,
+            magic: self.magic,
+            woodcutting: self.woodcutting,
+            alchemy: self.alchemy,
+            mining: self.mining,
+            slayer: self.slayer,
+            survivalist: self.survivalist,
+        }
+    }
+}
+
+/// Ancient legacy skills format (hitpoints + attack + strength + defence only).
+/// Converts to new format directly.
 #[derive(Debug, Clone, Deserialize)]
 pub struct LegacySkills {
     pub hitpoints: Skill,
@@ -298,16 +385,13 @@ pub struct LegacySkills {
 }
 
 impl LegacySkills {
-    /// Convert legacy skills to new format by summing combat XP
+    /// Convert ancient legacy format to new format
     pub fn to_skills(self) -> Skills {
-        let total_combat_xp = self.attack.xp + self.strength.xp + self.defence.xp;
-        let combat_level = level_for_xp(total_combat_xp);
         Skills {
             hitpoints: self.hitpoints,
-            combat: Skill {
-                level: combat_level,
-                xp: total_combat_xp,
-            },
+            attack: self.attack,
+            strength: self.strength,
+            defence: self.defence,
             fishing: Skill::new(1),
             farming: Skill::new(1),
             smithing: Skill::new(1),
@@ -325,23 +409,23 @@ impl LegacySkills {
 /// Calculate whether an attack hits using attack roll vs defence roll.
 /// Returns true if the attack hits.
 ///
-/// Formula: Roll attacker's combat (0 to (combat_level + 20) * (attack_bonus + 20))
-///          Roll defender's combat (0 to (combat_level + 20) * (defence_bonus + 20))
+/// Formula: Roll attacker's accuracy (0 to (attack_level + 20) * (attack_bonus + 20))
+///          Roll defender's evasion  (0 to (defence_level + 20) * (defence_bonus + 20))
 ///          Hit if attack_roll > defence_roll
 ///
 /// The +20 base on level dampens level gaps so low-level NPCs can still
 /// land hits on higher-level players (and vice versa). Same-level fights
 /// remain 50/50 when bonuses are equal.
 pub fn calculate_hit(
-    attacker_combat_level: i32,
+    attacker_attack_level: i32,
     attack_bonus: i32,
-    defender_combat_level: i32,
+    defender_defence_level: i32,
     defence_bonus: i32,
 ) -> bool {
     let mut rng = rand::thread_rng();
 
-    let attack_max = (attacker_combat_level + 20) * (attack_bonus + 20);
-    let defence_max = (defender_combat_level + 20) * (defence_bonus + 20);
+    let attack_max = (attacker_attack_level + 20) * (attack_bonus + 20);
+    let defence_max = (defender_defence_level + 20) * (defence_bonus + 20);
 
     let attack_roll = rng.gen_range(0..=attack_max.max(1));
     let defence_roll = rng.gen_range(0..=defence_max.max(1));
@@ -349,17 +433,17 @@ pub fn calculate_hit(
     attack_roll > defence_roll
 }
 
-/// Calculate maximum hit based on combat level and equipment bonus.
+/// Calculate maximum hit based on strength level and equipment bonus.
 ///
-/// Formula: 1 + (combat_level / 16) + (strength_bonus / 4)
+/// Formula: 1 + (strength_level / 16) + (strength_bonus / 4)
 /// This gives roughly:
 /// - Level 1, no bonus: 1
 /// - Level 25, no bonus: 2
 /// - Level 25, +10 bonus: 5
 /// - Level 50, +20 bonus: 9
 /// - Level 70, +25 bonus: 11
-pub fn calculate_max_hit(combat_level: i32, strength_bonus: i32) -> i32 {
-    let base = 1.0 + (combat_level as f64 / 16.0);
+pub fn calculate_max_hit(strength_level: i32, strength_bonus: i32) -> i32 {
+    let base = 1.0 + (strength_level as f64 / 16.0);
     let bonus = strength_bonus as f64 / 4.0;
     ((base + bonus).floor() as i32).max(1)
 }
@@ -373,10 +457,14 @@ pub fn roll_damage(max_hit: i32) -> i32 {
     rand::thread_rng().gen_range(1..=max_hit)
 }
 
-/// XP awarded per damage dealt.
-/// Combat skill XP = damage * 4
-/// Hitpoints XP = damage * 1.33 (1/3 of combat XP)
-pub const COMBAT_XP_PER_DAMAGE: f64 = 4.0;
+/// XP awarded per damage dealt by combat style.
+/// Focused styles (Accurate/Aggressive/Defensive): 4.0 XP per damage to one skill.
+/// Controlled: 1.33 XP per damage to each of Attack, Strength, Defence.
+/// Hitpoints always gets 1.33 XP per damage.
+pub const ATTACK_XP_PER_DAMAGE: f64 = 4.0;
+pub const STRENGTH_XP_PER_DAMAGE: f64 = 4.0;
+pub const DEFENCE_XP_PER_DAMAGE: f64 = 4.0;
+pub const CONTROLLED_XP_PER_DAMAGE: f64 = 1.33;
 pub const HITPOINTS_XP_PER_DAMAGE: f64 = 1.33;
 
 /// Magic XP constants
@@ -425,33 +513,32 @@ mod tests {
     #[test]
     fn test_combat_level() {
         let skills = Skills::new();
-        // HP 10, Combat 3
-        // combat_level = floor((3 + 10) / 2) = 6
-        assert_eq!(skills.combat_level(), 6);
+        // New character: HP 10, Atk 1, Str 1, Def 1, Prayer 1, Magic 1
+        // base = (1 + 10 + floor(1/2)) / 4 = (1 + 10 + 0) / 4 = 2.75
+        // melee = (1 + 1) * 0.325 = 0.65
+        // magic = 1 * 0.325 = 0.325
+        // combat_level = floor(2.75 + 0.65) = floor(3.4) = 3
+        assert_eq!(skills.combat_level(), 3);
 
-        // Max stats
+        // Max melee stats
         let max_skills = Skills {
             hitpoints: Skill::new(99),
-            combat: Skill::new(99),
-            fishing: Skill::new(1),
-            farming: Skill::new(1),
-            smithing: Skill::new(1),
-            prayer: Skill::new(1),
-            magic: Skill::new(1),
-            woodcutting: Skill::new(1),
-            alchemy: Skill::new(1),
-            mining: Skill::new(1),
-            slayer: Skill::new(1),
-            survivalist: Skill::new(1),
+            attack: Skill::new(99),
+            strength: Skill::new(99),
+            defence: Skill::new(99),
+            prayer: Skill::new(99),
+            ..Skills::new()
         };
-        // combat_level = floor((99 + 99) / 2) = 99
-        assert_eq!(max_skills.combat_level(), 99);
+        // base = (99 + 99 + floor(99/2)) / 4 = (99 + 99 + 49) / 4 = 61.75
+        // melee = (99 + 99) * 0.325 = 64.35
+        // combat_level = floor(61.75 + 64.35) = floor(126.1) = 126
+        assert_eq!(max_skills.combat_level(), 126);
     }
 
     #[test]
     fn test_total_level() {
         let skills = Skills::new();
-        // HP 10 + Combat 3 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 + Alchemy 1 + Mining 1 + Slayer 1 + Survivalist 1 = 23
+        // HP 10 + Atk 1 + Str 1 + Def 1 + Fishing 1 + Farming 1 + Smithing 1 + Prayer 1 + Magic 1 + Woodcutting 1 + Alchemy 1 + Mining 1 + Slayer 1 + Survivalist 1 = 23
         assert_eq!(skills.total_level(), 23);
     }
 
@@ -460,7 +547,7 @@ mod tests {
         // Level 1, no bonus
         assert_eq!(calculate_max_hit(1, 0), 1);
 
-        // Formula is 1 + floor(combat / 16) + floor(strength_bonus / 4) after summing.
+        // Formula is 1 + floor(strength_level / 16) + floor(strength_bonus / 4) after summing.
         // At level 50 with no bonus: floor(1 + 50/16) = 4.
         assert_eq!(calculate_max_hit(50, 0), 4);
 
@@ -472,7 +559,38 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_migration() {
+    fn test_legacy_combat_migration() {
+        // Test migration from combined combat format
+        let legacy = LegacyCombatSkills {
+            hitpoints: Skill::new(50),
+            combat: Skill::new(90),
+            fishing: Skill::new(30),
+            farming: Skill::new(1),
+            smithing: Skill::new(1),
+            prayer: Skill::new(1),
+            magic: Skill::new(1),
+            woodcutting: Skill::new(1),
+            alchemy: Skill::new(1),
+            mining: Skill::new(1),
+            slayer: Skill::new(1),
+            survivalist: Skill::new(1),
+        };
+
+        let skills = legacy.to_skills();
+
+        // Hitpoints preserved
+        assert_eq!(skills.hitpoints.level, 50);
+        // Fishing preserved
+        assert_eq!(skills.fishing.level, 30);
+        // Combat XP split ÷ 3
+        let expected_xp = total_xp_for_level(90) / 3;
+        assert_eq!(skills.attack.xp, expected_xp);
+        assert_eq!(skills.strength.xp, expected_xp);
+        assert_eq!(skills.defence.xp, expected_xp);
+    }
+
+    #[test]
+    fn test_ancient_legacy_migration() {
         let legacy = LegacySkills {
             hitpoints: Skill::new(50),
             attack: Skill::new(40),
@@ -482,11 +600,10 @@ mod tests {
 
         let skills = legacy.to_skills();
 
-        // Hitpoints preserved
+        // All skills preserved directly
         assert_eq!(skills.hitpoints.level, 50);
-
-        // Combat XP is sum of attack + strength + defence XP
-        let expected_xp = total_xp_for_level(40) + total_xp_for_level(35) + total_xp_for_level(45);
-        assert_eq!(skills.combat.xp, expected_xp);
+        assert_eq!(skills.attack.level, 40);
+        assert_eq!(skills.strength.level, 35);
+        assert_eq!(skills.defence.level, 45);
     }
 }

@@ -363,9 +363,12 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             let max_hp = extract_i32(player_value, "maxHp");
             let mp = extract_i32(player_value, "mp");
             let max_mp = extract_i32(player_value, "maxMp");
-            // Skill levels (consolidated combat system)
+            // Skill levels
             let hitpoints_level = extract_i32(player_value, "hitpointsLevel");
-            let combat_skill_level = extract_i32(player_value, "combatSkillLevel");
+            let attack_level = extract_i32(player_value, "attackLevel");
+            let strength_level = extract_i32(player_value, "strengthLevel");
+            let defence_level = extract_i32(player_value, "defenceLevel");
+            let combat_style = extract_string(player_value, "combatStyle");
             let gold = extract_i32(player_value, "gold");
             let gender =
                 extract_string(player_value, "gender").unwrap_or_else(|| "male".to_string());
@@ -472,8 +475,17 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 if let Some(level) = hitpoints_level {
                     player.skills.hitpoints.level = level;
                 }
-                if let Some(level) = combat_skill_level {
-                    player.skills.combat.level = level;
+                if let Some(level) = attack_level {
+                    player.skills.attack.level = level;
+                }
+                if let Some(level) = strength_level {
+                    player.skills.strength.level = level;
+                }
+                if let Some(level) = defence_level {
+                    player.skills.defence.level = level;
+                }
+                if let Some(ref style) = combat_style {
+                    player.combat_style = style.clone();
                 }
                 // Update hair
                 player.hair_style = hair_style;
@@ -1194,11 +1206,23 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         if let Some(xp) = extract_i32(value, "hitpoints_xp") {
                             player.skills.hitpoints.xp = xp as i64;
                         }
-                        if let Some(level) = extract_i32(value, "combat_level") {
-                            player.skills.combat.level = level;
+                        if let Some(level) = extract_i32(value, "attack_level") {
+                            player.skills.attack.level = level;
                         }
-                        if let Some(xp) = extract_i32(value, "combat_xp") {
-                            player.skills.combat.xp = xp as i64;
+                        if let Some(xp) = extract_i32(value, "attack_xp") {
+                            player.skills.attack.xp = xp as i64;
+                        }
+                        if let Some(level) = extract_i32(value, "strength_level") {
+                            player.skills.strength.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "strength_xp") {
+                            player.skills.strength.xp = xp as i64;
+                        }
+                        if let Some(level) = extract_i32(value, "defence_level") {
+                            player.skills.defence.level = level;
+                        }
+                        if let Some(xp) = extract_i32(value, "defence_xp") {
+                            player.skills.defence.xp = xp as i64;
                         }
                         if let Some(level) = extract_i32(value, "fishing_level") {
                             player.skills.fishing.level = level;
@@ -1261,10 +1285,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.skills.survivalist.xp = xp as i64;
                         }
 
-                        log::info!("Skills synced for player {}: HP {}, Combat {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}, Slayer {}, Survivalist {}",
+                        log::info!("Skills synced for player {}: HP {}, Atk {}, Str {}, Def {}, Fishing {}, Farming {}, Smithing {}, Prayer {}, Magic {}, Woodcutting {}, Alchemy {}, Mining {}, Slayer {}, Survivalist {}",
                             player_id,
                             player.skills.hitpoints.level,
-                            player.skills.combat.level,
+                            player.skills.attack.level,
+                            player.skills.strength.level,
+                            player.skills.defence.level,
                             player.skills.fishing.level,
                             player.skills.farming.level,
                             player.skills.smithing.level,

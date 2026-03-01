@@ -300,6 +300,10 @@ pub enum ClientMessage {
     /// Spectator upgrades to a full player session
     #[serde(rename = "spectatorUpgrade")]
     SpectatorUpgrade { session_token: String },
+
+    /// Set combat style (accurate, aggressive, defensive, controlled)
+    #[serde(rename = "setCombatStyle")]
+    SetCombatStyle { style: String },
 }
 
 impl ClientMessage {
@@ -766,6 +770,10 @@ impl ClientMessage {
                     Value::String(session_token.clone().into()),
                 );
                 "spectatorUpgrade"
+            }
+            ClientMessage::SetCombatStyle { style } => {
+                data.insert("style".into(), Value::String(style.clone().into()));
+                "setCombatStyle"
             }
         };
 

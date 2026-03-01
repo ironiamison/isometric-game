@@ -220,9 +220,13 @@ impl Renderer {
         let item_def = state.item_registry.get_or_placeholder(&item_id);
 
         // Get player skill levels for requirement checking
-        let player_combat_level = state
+        let player_attack_level = state
             .get_local_player()
-            .map(|p| p.skills.combat.level)
+            .map(|p| p.skills.attack.level)
+            .unwrap_or(1);
+        let player_defence_level = state
+            .get_local_player()
+            .map(|p| p.skills.defence.level)
             .unwrap_or(1);
         let player_woodcutting_level = state
             .get_local_player()
@@ -585,14 +589,25 @@ impl Renderer {
                 y += line_height;
             }
 
-            // Level requirements - check highest requirement against combat level
-            let level_required = equip
-                .attack_level_required
-                .max(equip.defence_level_required);
-            if level_required > 1 {
-                let meets_req = player_combat_level >= level_required;
+            // Attack level requirement (weapons)
+            if equip.attack_level_required > 1 {
+                let meets_req = player_attack_level >= equip.attack_level_required;
                 let req_color = if meets_req { stat_green } else { stat_red };
-                let req_text = format!("Requires {} Combat", level_required);
+                let req_text = format!("Requires {} Attack", equip.attack_level_required);
+                self.draw_text_sharp(
+                    &req_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    req_color,
+                );
+                y += line_height;
+            }
+            // Defence level requirement (armor)
+            if equip.defence_level_required > 1 {
+                let meets_req = player_defence_level >= equip.defence_level_required;
+                let req_color = if meets_req { stat_green } else { stat_red };
+                let req_text = format!("Requires {} Defence", equip.defence_level_required);
                 self.draw_text_sharp(
                     &req_text,
                     tooltip_x + padding,

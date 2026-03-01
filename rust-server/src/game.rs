@@ -282,6 +282,46 @@ pub struct AutoAction {
 }
 
 // ============================================================================
+// Combat Styles
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CombatStyle {
+    Accurate,
+    Aggressive,
+    Defensive,
+    Controlled,
+}
+
+impl Default for CombatStyle {
+    fn default() -> Self {
+        CombatStyle::Accurate
+    }
+}
+
+impl CombatStyle {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CombatStyle::Accurate => "accurate",
+            CombatStyle::Aggressive => "aggressive",
+            CombatStyle::Defensive => "defensive",
+            CombatStyle::Controlled => "controlled",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<CombatStyle> {
+        match s.to_lowercase().as_str() {
+            "accurate" => Some(CombatStyle::Accurate),
+            "aggressive" => Some(CombatStyle::Aggressive),
+            "defensive" => Some(CombatStyle::Defensive),
+            "controlled" => Some(CombatStyle::Controlled),
+            _ => None,
+        }
+    }
+}
+
+// ============================================================================
 // Player
 // ============================================================================
 
@@ -306,6 +346,7 @@ pub struct Player {
     pub direction: Direction,
     pub hp: i32,
     pub skills: Skills,            // Combat skills (Hitpoints determines max HP)
+    pub combat_style: CombatStyle, // Active combat style for XP distribution
     pub active: bool,              // Whether WebSocket is connected
     pub target_id: Option<String>, // Currently targeted entity (player or NPC)
     pub last_attack_time: u64,     // Timestamp of last attack (ms)
@@ -488,6 +529,7 @@ impl Player {
             prayer_points: 10 + skills.prayer.level, // Prayer points = 10 + Prayer level
             mp: 10 + skills.magic.level * 2, // Mana = 10 + magic_level * 2
             skills,
+            combat_style: CombatStyle::default(),
             active: false,
             target_id: None,
             last_attack_time: 0,
@@ -621,36 +663,62 @@ impl Player {
         bonus + self.buff_bonus("magic")
     }
 
-    /// Award combat XP based on damage dealt.
-    /// Combat skill gets 4 XP per damage.
-    /// Hitpoints gets 1.33 XP per damage (1/3 of combat rate).
+    /// Award combat XP based on damage dealt and active combat style.
+    /// Focused styles: 4 XP/dmg to one skill. Controlled: 1.33 XP/dmg to each of atk/str/def.
+    /// Hitpoints always gets 1.33 XP per damage.
     /// Returns a vector of (SkillType, xp_gained, total_xp, level, leveled_up) for skills that gained XP.
-    pub fn award_combat_xp(&mut self, damage: i32) -> Vec<(SkillType, i64, i64, i32, bool)> {
-        use crate::skills::{COMBAT_XP_PER_DAMAGE, HITPOINTS_XP_PER_DAMAGE};
+    pub fn award_combat_xp(&mut self, damage: i32, style: CombatStyle) -> Vec<(SkillType, i64, i64, i32, bool)> {
+        use crate::skills::{
+            ATTACK_XP_PER_DAMAGE, STRENGTH_XP_PER_DAMAGE, DEFENCE_XP_PER_DAMAGE,
+            CONTROLLED_XP_PER_DAMAGE, HITPOINTS_XP_PER_DAMAGE,
+        };
 
         let mut results = Vec::new();
 
-        // Combat XP = 4 per damage (full amount to single Combat skill)
-        let combat_xp = (damage as f64 * COMBAT_XP_PER_DAMAGE) as i64;
         // Hitpoints XP = 1.33 per damage
         let hp_xp = (damage as f64 * HITPOINTS_XP_PER_DAMAGE) as i64;
 
-        // Award Combat XP
-        let combat_leveled = self.skills.combat.add_xp(combat_xp);
-        if combat_leveled {
-            tracing::info!(
-                "{} leveled up Combat to {}!",
-                self.name,
-                self.skills.combat.level
-            );
+        // Award combat XP based on style
+        match style {
+            CombatStyle::Accurate => {
+                let xp = (damage as f64 * ATTACK_XP_PER_DAMAGE) as i64;
+                let leveled = self.skills.attack.add_xp(xp);
+                if leveled {
+                    tracing::info!("{} leveled up Attack to {}!", self.name, self.skills.attack.level);
+                }
+                results.push((SkillType::Attack, xp, self.skills.attack.xp, self.skills.attack.level, leveled));
+            }
+            CombatStyle::Aggressive => {
+                let xp = (damage as f64 * STRENGTH_XP_PER_DAMAGE) as i64;
+                let leveled = self.skills.strength.add_xp(xp);
+                if leveled {
+                    tracing::info!("{} leveled up Strength to {}!", self.name, self.skills.strength.level);
+                }
+                results.push((SkillType::Strength, xp, self.skills.strength.xp, self.skills.strength.level, leveled));
+            }
+            CombatStyle::Defensive => {
+                let xp = (damage as f64 * DEFENCE_XP_PER_DAMAGE) as i64;
+                let leveled = self.skills.defence.add_xp(xp);
+                if leveled {
+                    tracing::info!("{} leveled up Defence to {}!", self.name, self.skills.defence.level);
+                }
+                results.push((SkillType::Defence, xp, self.skills.defence.xp, self.skills.defence.level, leveled));
+            }
+            CombatStyle::Controlled => {
+                let xp = (damage as f64 * CONTROLLED_XP_PER_DAMAGE) as i64;
+                for (skill_type, skill) in [
+                    (SkillType::Attack, &mut self.skills.attack),
+                    (SkillType::Strength, &mut self.skills.strength),
+                    (SkillType::Defence, &mut self.skills.defence),
+                ] {
+                    let leveled = skill.add_xp(xp);
+                    if leveled {
+                        tracing::info!("{} leveled up {} to {}!", self.name, skill_type.as_str(), skill.level);
+                    }
+                    results.push((skill_type, xp, skill.xp, skill.level, leveled));
+                }
+            }
         }
-        results.push((
-            SkillType::Combat,
-            combat_xp,
-            self.skills.combat.xp,
-            self.skills.combat.level,
-            combat_leveled,
-        ));
 
         // Award Hitpoints XP
         let old_hp_level = self.skills.hitpoints.level;
@@ -809,7 +877,9 @@ pub struct PlayerUpdate {
     pub combat_level: i32,
     // Individual skill levels
     pub hitpoints_level: i32,
-    pub combat_skill_level: i32,
+    pub attack_level: i32,
+    pub strength_level: i32,
+    pub defence_level: i32,
     pub gold: i32,
     // Character appearance
     pub gender: String,
@@ -836,6 +906,7 @@ pub struct PlayerUpdate {
     pub max_mp: i32,
     pub has_stall: bool,
     pub stall_name: Option<String>,
+    pub combat_style: String,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -2496,6 +2567,13 @@ impl GameRoom {
         }
     }
 
+    pub async fn set_combat_style(&self, player_id: &str, style: CombatStyle) {
+        let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            player.combat_style = style;
+        }
+    }
+
     pub async fn get_player_appearance(&self, player_id: &str) -> Option<(String, String)> {
         let players = self.players.read().await;
         players
@@ -2557,8 +2635,12 @@ impl GameRoom {
             player_id: player_id.to_string(),
             hitpoints_level: p.skills.hitpoints.level,
             hitpoints_xp: p.skills.hitpoints.xp,
-            combat_level: p.skills.combat.level,
-            combat_xp: p.skills.combat.xp,
+            attack_level: p.skills.attack.level,
+            attack_xp: p.skills.attack.xp,
+            strength_level: p.skills.strength.level,
+            strength_xp: p.skills.strength.xp,
+            defence_level: p.skills.defence.level,
+            defence_xp: p.skills.defence.xp,
             fishing_level: p.skills.fishing.level,
             fishing_xp: p.skills.fishing.xp,
             farming_level: p.skills.farming.level,
@@ -3074,10 +3156,12 @@ impl GameRoom {
             attacker_y,
             attacker_dir,
             last_attack,
-            combat_level,
+            attack_level,
+            strength_level,
             attack_bonus,
             strength_bonus,
             equipped_head,
+            combat_style,
         ) = {
             let mut players = self.players.write().await;
             let player = match players.get_mut(player_id) {
@@ -3113,10 +3197,12 @@ impl GameRoom {
                 player.y,
                 player.direction,
                 player.last_attack_time,
-                player.skills.combat.level,
+                player.skills.attack.level,
+                player.skills.strength.level,
                 atk_bonus,
                 str_bonus,
                 player.equipped_head.clone(),
+                player.combat_style,
             )
         };
 
@@ -3420,7 +3506,7 @@ impl GameRoom {
                     let npc_defence_bonus = npc.stats.defence_bonus;
 
                     if !calculate_hit(
-                        combat_level,
+                        attack_level,
                         attack_bonus,
                         npc_defence_level,
                         npc_defence_bonus,
@@ -3431,14 +3517,14 @@ impl GameRoom {
                             "{} misses instance NPC {} (atk {} + {} vs def {} + {})",
                             attacker_name,
                             name,
-                            combat_level,
+                            attack_level,
                             attack_bonus,
                             npc_defence_level,
                             npc_defence_bonus
                         );
                         (npc.hp, name, false, 0)
                     } else {
-                        let mut max_hit = calculate_max_hit(combat_level, strength_bonus);
+                        let mut max_hit = calculate_max_hit(strength_level, strength_bonus);
                         // Slayer helmet: 15% damage boost against current slayer task
                         if let Some(ref task_monster) = slayer_task_monster {
                             let proto = &npc.prototype_id;
@@ -3475,9 +3561,9 @@ impl GameRoom {
                 let npc_defence_level = npc.level;
                 let npc_defence_bonus = npc.stats.defence_bonus;
 
-                // Check if attack hits (combat_level used for both attack and strength)
+                // Check if attack hits (attack_level for accuracy)
                 if !calculate_hit(
-                    combat_level,
+                    attack_level,
                     attack_bonus,
                     npc_defence_level,
                     npc_defence_bonus,
@@ -3490,7 +3576,7 @@ impl GameRoom {
                         "{} misses {} (atk {} + {} vs def {} + {})",
                         attacker_name,
                         name,
-                        combat_level,
+                        attack_level,
                         attack_bonus,
                         npc_defence_level,
                         npc_defence_bonus
@@ -3498,7 +3584,7 @@ impl GameRoom {
                     (npc.hp, name, false, 0)
                 } else {
                     // Hit - calculate and apply damage
-                    let mut max_hit = calculate_max_hit(combat_level, strength_bonus);
+                    let mut max_hit = calculate_max_hit(strength_level, strength_bonus);
                     // Slayer helmet: 15% damage boost against current slayer task
                     if let Some(ref task_monster) = slayer_task_monster {
                         let proto = &npc.prototype_id;
@@ -3535,8 +3621,8 @@ impl GameRoom {
                     return;
                 }
 
-                // Get target's defence stats (uses combat level for defence)
-                let target_combat_level = target.skills.combat.level;
+                // Get target's defence stats
+                let target_defence_level = target.skills.defence.level;
                 let base_defence_bonus = target.defence_bonus(&self.item_registry);
 
                 // Apply prayer bonuses to target's defence
@@ -3549,26 +3635,26 @@ impl GameRoom {
 
                 // Check if attack hits
                 if !calculate_hit(
-                    combat_level,
+                    attack_level,
                     attack_bonus,
-                    target_combat_level,
+                    target_defence_level,
                     target_defence_bonus,
                 ) {
                     // Miss - deal 0 damage
                     let name = target.name.clone();
                     tracing::info!(
-                        "{} misses {} (cmb {} + {} vs cmb {} + {})",
+                        "{} misses {} (atk {} + {} vs def {} + {})",
                         attacker_name,
                         name,
-                        combat_level,
+                        attack_level,
                         attack_bonus,
-                        target_combat_level,
+                        target_defence_level,
                         target_defence_bonus
                     );
                     (target.hp, name, false, 0)
                 } else {
                     // Hit - calculate and apply damage
-                    let max_hit = calculate_max_hit(combat_level, strength_bonus);
+                    let max_hit = calculate_max_hit(strength_level, strength_bonus);
                     let raw_damage = roll_damage(max_hit);
                     // Apply prayer damage reduction
                     let damage = target_prayer_effects.apply_damage_reduction(raw_damage);
@@ -3629,7 +3715,8 @@ impl GameRoom {
             let xp_results = {
                 let mut players = self.players.write().await;
                 if let Some(attacker) = players.get_mut(player_id) {
-                    Some(attacker.award_combat_xp(actual_damage))
+                    let style = attacker.combat_style;
+                    Some(attacker.award_combat_xp(actual_damage, style))
                 } else {
                     None
                 }
@@ -4641,8 +4728,8 @@ impl GameRoom {
                     // NPC uses its level as attack level
                     let npc_attack_level = npc_level;
 
-                    // Player uses their combat skill level and equipment bonus
-                    let player_defence_level = target.skills.combat.level;
+                    // Player uses their defence skill level and equipment bonus
+                    let player_defence_level = target.skills.defence.level;
                     let base_defence_bonus = target.defence_bonus(&self.item_registry);
 
                     // Apply prayer bonuses to player's defence
@@ -6224,7 +6311,7 @@ impl GameRoom {
             caster_y,
             target_id_opt,
             magic_level,
-            combat_level,
+            attack_level,
             magic_bonus,
         ) = {
             let players = self.players.read().await;
@@ -6238,13 +6325,13 @@ impl GameRoom {
                 player.y,
                 player.target_id.clone(),
                 player.skills.magic.level,
-                player.skills.combat.level,
+                player.skills.attack.level,
                 player.magic_bonus(&self.item_registry),
             )
         };
 
-        // Effective attack level for spells: blend of combat and magic so low-magic is still usable
-        let effective_level = (combat_level + magic_level) / 2;
+        // Effective attack level for spells: blend of attack and magic
+        let effective_level = (attack_level + magic_level) / 2;
 
         // Must have a target
         let target_id = match target_id_opt {
@@ -6387,11 +6474,11 @@ impl GameRoom {
                     $npc.take_damage(0, current_time, Some(player_id));
                     let name = $npc.name();
                     tracing::info!(
-                        "{} spell misses {} (eff {} [cmb{}+mag{}] vs def {})",
+                        "{} spell misses {} (eff {} [atk{}+mag{}] vs def {})",
                         caster_name,
                         name,
                         effective_level,
-                        combat_level,
+                        attack_level,
                         magic_level,
                         npc_defence_level
                     );
@@ -6447,7 +6534,7 @@ impl GameRoom {
                     return;
                 }
 
-                let target_combat_level = target.skills.combat.level;
+                let target_defence_level = target.skills.defence.level;
                 let base_defence_bonus = target.defence_bonus(&self.item_registry);
 
                 // Apply prayer bonuses to target's defence
@@ -6461,19 +6548,19 @@ impl GameRoom {
                 if !crate::skills::calculate_hit(
                     effective_level,
                     attack_bonus,
-                    target_combat_level,
+                    target_defence_level,
                     target_defence_bonus,
                 ) {
                     // Miss
                     let name = target.name.clone();
                     tracing::info!(
-                        "{} spell misses {} (eff {} [cmb{}+mag{}] vs cmb {} + {})",
+                        "{} spell misses {} (eff {} [atk{}+mag{}] vs def {} + {})",
                         caster_name,
                         name,
                         effective_level,
-                        combat_level,
+                        attack_level,
                         magic_level,
-                        target_combat_level,
+                        target_defence_level,
                         target_defence_bonus
                     );
                     (target.hp, name, false, 0)

@@ -3,9 +3,11 @@
 //! This is a simplified version that tracks skill data received from the server.
 //! All calculations happen server-side.
 //!
-//! Skills: Hitpoints, Combat, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting, Alchemy, Mining
+//! Skills: Hitpoints, Attack, Strength, Defence, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting, Alchemy, Mining, Slayer, Survivalist
 //! - Hitpoints: Max HP (1 HP per level, starts at 10)
-//! - Combat: Combined attack/strength/defence skill for all combat
+//! - Attack: Accuracy in melee combat (starts at 1)
+//! - Strength: Max hit in melee combat (starts at 1)
+//! - Defence: Evasion rolls in combat (starts at 1)
 //! - Fishing: Gathering skill for catching fish
 //! - Smithing: Crafting skill for forging weapons and armor
 //! - Prayer: Enables prayer abilities that provide combat buffs
@@ -22,7 +24,9 @@ pub const MAX_LEVEL: i32 = 99;
 #[serde(rename_all = "lowercase")]
 pub enum SkillType {
     Hitpoints,
-    Combat,
+    Attack,
+    Strength,
+    Defence,
     Fishing,
     Farming,
     Smithing,
@@ -39,7 +43,9 @@ impl SkillType {
     pub fn as_str(&self) -> &'static str {
         match self {
             SkillType::Hitpoints => "hitpoints",
-            SkillType::Combat => "combat",
+            SkillType::Attack => "attack",
+            SkillType::Strength => "strength",
+            SkillType::Defence => "defence",
             SkillType::Fishing => "fishing",
             SkillType::Farming => "farming",
             SkillType::Smithing => "smithing",
@@ -56,7 +62,9 @@ impl SkillType {
     pub fn from_str(s: &str) -> Option<SkillType> {
         match s.to_lowercase().as_str() {
             "hitpoints" => Some(SkillType::Hitpoints),
-            "combat" => Some(SkillType::Combat),
+            "attack" => Some(SkillType::Attack),
+            "strength" => Some(SkillType::Strength),
+            "defence" => Some(SkillType::Defence),
             "fishing" => Some(SkillType::Fishing),
             "farming" => Some(SkillType::Farming),
             "smithing" => Some(SkillType::Smithing),
@@ -74,7 +82,9 @@ impl SkillType {
     pub fn display_name(&self) -> &'static str {
         match self {
             SkillType::Hitpoints => "Hitpoints",
-            SkillType::Combat => "Combat",
+            SkillType::Attack => "Attack",
+            SkillType::Strength => "Strength",
+            SkillType::Defence => "Defence",
             SkillType::Fishing => "Fishing",
             SkillType::Farming => "Farming",
             SkillType::Smithing => "Smithing",
@@ -91,7 +101,9 @@ impl SkillType {
     pub fn all() -> &'static [SkillType] {
         &[
             SkillType::Hitpoints,
-            SkillType::Combat,
+            SkillType::Attack,
+            SkillType::Strength,
+            SkillType::Defence,
             SkillType::Fishing,
             SkillType::Farming,
             SkillType::Smithing,
@@ -165,7 +177,12 @@ impl Default for Skill {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Skills {
     pub hitpoints: Skill,
-    pub combat: Skill,
+    #[serde(default)]
+    pub attack: Skill,
+    #[serde(default)]
+    pub strength: Skill,
+    #[serde(default)]
+    pub defence: Skill,
     #[serde(default)]
     pub fishing: Skill,
     #[serde(default)]
@@ -195,11 +212,13 @@ impl Default for Skills {
 }
 
 impl Skills {
-    /// Create new skills with starting values (HP 10, Combat 3, others 1)
+    /// Create new skills with starting values (HP 10, Attack/Strength/Defence 1, others 1)
     pub fn new() -> Self {
         Self {
             hitpoints: Skill::new(10),
-            combat: Skill::new(3),
+            attack: Skill::new(1),
+            strength: Skill::new(1),
+            defence: Skill::new(1),
             fishing: Skill::new(1),
             farming: Skill::new(1),
             smithing: Skill::new(1),
@@ -213,17 +232,25 @@ impl Skills {
         }
     }
 
-    /// Calculate combat level: (Combat + Hitpoints) / 2
-    /// Range: 5 (Combat 1 + HP 10) to 99 (both 99)
+    /// Calculate combat level using OSRS-style formula:
+    /// base = (Defence + Hitpoints + floor(Prayer/2)) / 4
+    /// combat_level = floor(base + max((Attack+Strength)*0.325, Magic*0.325))
     pub fn combat_level(&self) -> i32 {
-        ((self.combat.level + self.hitpoints.level) as f64 / 2.0).floor() as i32
+        let base = (self.defence.level as f64 + self.hitpoints.level as f64
+            + (self.prayer.level as f64 / 2.0).floor())
+            / 4.0;
+        let melee = (self.attack.level + self.strength.level) as f64 * 0.325;
+        let magic = self.magic.level as f64 * 0.325;
+        (base + melee.max(magic)).floor() as i32
     }
 
     /// Get a skill by type
     pub fn get(&self, skill_type: SkillType) -> &Skill {
         match skill_type {
             SkillType::Hitpoints => &self.hitpoints,
-            SkillType::Combat => &self.combat,
+            SkillType::Attack => &self.attack,
+            SkillType::Strength => &self.strength,
+            SkillType::Defence => &self.defence,
             SkillType::Fishing => &self.fishing,
             SkillType::Farming => &self.farming,
             SkillType::Smithing => &self.smithing,
@@ -241,7 +268,9 @@ impl Skills {
     pub fn get_mut(&mut self, skill_type: SkillType) -> &mut Skill {
         match skill_type {
             SkillType::Hitpoints => &mut self.hitpoints,
-            SkillType::Combat => &mut self.combat,
+            SkillType::Attack => &mut self.attack,
+            SkillType::Strength => &mut self.strength,
+            SkillType::Defence => &mut self.defence,
             SkillType::Fishing => &mut self.fishing,
             SkillType::Farming => &mut self.farming,
             SkillType::Smithing => &mut self.smithing,
@@ -265,7 +294,9 @@ impl Skills {
     /// Total level (sum of all skill levels)
     pub fn total_level(&self) -> i32 {
         self.hitpoints.level
-            + self.combat.level
+            + self.attack.level
+            + self.strength.level
+            + self.defence.level
             + self.fishing.level
             + self.farming.level
             + self.smithing.level

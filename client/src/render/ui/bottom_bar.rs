@@ -44,13 +44,15 @@ impl Renderer {
         // Get player skill data - show total level and combat level
         let (combat_level, total_level, avg_progress) =
             if let Some(player) = state.get_local_player() {
-                // Calculate average progress across combat skills (HP + Combat)
+                // Calculate average progress across combat skills (HP, Atk, Str, Def)
                 let hp_prog = player.skills.hitpoints.level_progress();
-                let combat_prog = player.skills.combat.level_progress();
-                let avg = (hp_prog + combat_prog) / 2.0;
+                let atk_prog = player.skills.attack.level_progress();
+                let str_prog = player.skills.strength.level_progress();
+                let def_prog = player.skills.defence.level_progress();
+                let avg = (hp_prog + atk_prog + str_prog + def_prog) / 4.0;
                 (player.combat_level(), player.skills.total_level(), avg)
             } else {
-                (6, 13, 0.0) // Default: HP 10 + Combat 3 = 13, combat level = (10+3)/2 = 6
+                (3, 23, 0.0) // Default: new character combat level 3, total 23
             };
 
         // Draw fill bar showing average skill progress (matching HP bar style)

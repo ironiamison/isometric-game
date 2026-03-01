@@ -14,14 +14,25 @@ const CHARACTER_GRID_WIDTH: f32 = 3.0 * EQUIP_SLOT_SIZE + 2.0 * EQUIP_SLOT_SPACI
 const CHARACTER_GRID_HEIGHT: f32 = 4.0 * EQUIP_SLOT_SIZE + 3.0 * EQUIP_SLOT_SPACING + 26.0; // 190
 const CHARACTER_PANEL_WIDTH: f32 = 240.0; // Unified width to match inventory and other UI panels
 const SHOP_BUTTON_HEIGHT: f32 = 26.0;
+const COMBAT_STYLE_ROW_HEIGHT: f32 = 26.0;
 const CHARACTER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
     + CHARACTER_HEADER_HEIGHT
     + CHARACTER_PANEL_PADDING
     + CHARACTER_GRID_HEIGHT
     + CHARACTER_PANEL_PADDING
+    + COMBAT_STYLE_ROW_HEIGHT
+    + CHARACTER_PANEL_PADDING
     + SHOP_BUTTON_HEIGHT
-    + CHARACTER_PANEL_PADDING; // ~300
+    + CHARACTER_PANEL_PADDING; // ~338
 const STATS_SECTION_GAP: f32 = 8.0; // Gap between equipment grid and stats
+
+/// Combat style labels and short forms
+const COMBAT_STYLES: [(&str, &str); 4] = [
+    ("accurate", "Acc"),
+    ("aggressive", "Agg"),
+    ("defensive", "Def"),
+    ("controlled", "Ctrl"),
+];
 
 impl Renderer {
     /// Render the character panel when open
@@ -205,6 +216,76 @@ impl Renderer {
             self.draw_text_sharp("DEF", label_x, text_y, 16.0, CATEGORY_MATERIAL);
             let def_val = format!("+{}", def_bonus);
             self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
+        }
+
+        // ===== COMBAT STYLE SELECTOR =====
+        let style_row_height = COMBAT_STYLE_ROW_HEIGHT * scale;
+        let style_area_width = panel_width - frame_thickness * 2.0 - panel_padding * 2.0;
+        let style_x = panel_x + frame_thickness + panel_padding;
+        let style_y = panel_y + panel_height
+            - frame_thickness
+            - panel_padding
+            - SHOP_BUTTON_HEIGHT * scale
+            - panel_padding
+            - style_row_height;
+
+        // Label
+        let label = "Style:";
+        let label_w = self.measure_text_sharp(label, 16.0).width;
+        self.draw_text_sharp(
+            label,
+            style_x,
+            style_y + 17.0 * scale,
+            16.0,
+            TEXT_DIM,
+        );
+
+        // 4 style buttons filling the remaining width
+        let buttons_x = style_x + label_w + 6.0;
+        let buttons_width = style_area_width - label_w - 6.0;
+        let gap = 3.0 * scale;
+        let btn_w = ((buttons_width - gap * 3.0) / 4.0).floor();
+
+        let current_style = state
+            .get_local_player()
+            .map(|p| p.combat_style.clone())
+            .unwrap_or_else(|| "accurate".to_string());
+
+        for (i, (style_id, style_label)) in COMBAT_STYLES.iter().enumerate() {
+            let bx = buttons_x + i as f32 * (btn_w + gap);
+            let by = style_y;
+            let bounds = Rect::new(bx, by, btn_w, style_row_height);
+            layout.add(UiElementId::CombatStyleButton(i), bounds);
+
+            let is_active = current_style == *style_id;
+            let is_hovered = matches!(hovered, Some(UiElementId::CombatStyleButton(idx)) if *idx == i);
+
+            let (bg, border) = if is_active {
+                (SLOT_HOVER_BG, SLOT_SELECTED_BORDER)
+            } else if is_hovered {
+                (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
+            } else {
+                (SLOT_BG_EMPTY, SLOT_BORDER)
+            };
+
+            draw_rectangle(bx, by, btn_w, style_row_height, border);
+            draw_rectangle(bx + 1.0, by + 1.0, btn_w - 2.0, style_row_height - 2.0, bg);
+
+            let text_color = if is_active {
+                TEXT_GOLD
+            } else if is_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_NORMAL
+            };
+            let tw = self.measure_text_sharp(style_label, 16.0).width;
+            self.draw_text_sharp(
+                style_label,
+                bx + (btn_w - tw) / 2.0,
+                by + 17.0 * scale,
+                16.0,
+                text_color,
+            );
         }
 
         // ===== OPEN SHOP BUTTON =====

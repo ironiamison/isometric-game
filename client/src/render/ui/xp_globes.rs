@@ -344,7 +344,9 @@ impl Renderer {
         } else if let Some(ref texture) = self.ui_icons {
             let (icon_col, icon_row) = match skill_type {
                 SkillType::Hitpoints => (0, 6),
-                SkillType::Combat => (2, 6),
+                SkillType::Attack => (5, 5),
+                SkillType::Strength => (8, 6),
+                SkillType::Defence => (5, 4),
                 SkillType::Fishing => (4, 6),
                 SkillType::Farming => (4, 6),
                 SkillType::Mining => (0, 5),
@@ -380,7 +382,9 @@ impl Renderer {
             // Fallback to letter
             let letter = match skill_type {
                 SkillType::Hitpoints => "H",
-                SkillType::Combat => "C",
+                SkillType::Attack => "At",
+                SkillType::Strength => "St",
+                SkillType::Defence => "De",
                 SkillType::Fishing => "F",
                 SkillType::Farming => "Fm",
                 SkillType::Mining => "Mi",
@@ -407,7 +411,9 @@ impl Renderer {
     fn get_xp_globe_skill_color(&self, skill_type: SkillType) -> Color {
         match skill_type {
             SkillType::Hitpoints => Color::new(0.8, 0.2, 0.2, 1.0),
-            SkillType::Combat => Color::new(0.85, 0.65, 0.15, 1.0),
+            SkillType::Attack => Color::new(0.85, 0.65, 0.15, 1.0),
+            SkillType::Strength => Color::new(0.75, 0.25, 0.25, 1.0),
+            SkillType::Defence => Color::new(0.3, 0.5, 0.8, 1.0),
             SkillType::Fishing => Color::new(0.2, 0.6, 0.85, 1.0),
             SkillType::Farming => Color::new(0.3, 0.75, 0.3, 1.0),
             SkillType::Mining => Color::new(0.5, 0.5, 0.6, 1.0),
