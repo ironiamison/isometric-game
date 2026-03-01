@@ -161,7 +161,7 @@ impl GameRoom {
             }
         }
 
-        let (used_item_id, effect, inventory_update, gold) = {
+        let (used_item_id, effect, inventory_update, gold, prayer_state) = {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 if player.is_dead {
@@ -172,6 +172,7 @@ impl GameRoom {
                     .inventory
                     .use_item(slot_index as usize, &self.item_registry)
                 {
+                    let mut prayer_state = None;
                     let effect = if let Some(definition) = self.item_registry.get(&item_id) {
                         match &definition.use_effect {
                             Some(UseEffect::Heal { amount }) => {
@@ -191,6 +192,15 @@ impl GameRoom {
                                 player.prayer_points = (player.prayer_points + restore_amount)
                                     .min(player.max_prayer_points());
                                 let restored = player.prayer_points - old_points;
+                                prayer_state = Some(ServerMessage::PrayerStateUpdate {
+                                    points: player.prayer_points,
+                                    max_points: player.max_prayer_points(),
+                                    active_prayers: player
+                                        .active_prayers
+                                        .iter()
+                                        .cloned()
+                                        .collect(),
+                                });
                                 format!("prayer:{}", restored)
                             }
                             Some(UseEffect::Buff {
@@ -221,6 +231,7 @@ impl GameRoom {
                         effect,
                         player.inventory.to_update(),
                         player.inventory.gold,
+                        prayer_state,
                     )
                 } else {
                     return;
@@ -254,6 +265,10 @@ impl GameRoom {
                 inventory_update_message(player_id, inventory_update, gold),
             )
             .await;
+
+            if let Some(prayer_update) = prayer_state {
+                self.send_to_player(player_id, prayer_update).await;
+            }
         }
     }
 

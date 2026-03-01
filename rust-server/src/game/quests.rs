@@ -232,45 +232,6 @@ impl GameRoom {
         }
     }
 
-    async fn accept_quest_from_dialogue_choice(
-        &self,
-        player_id: &str,
-        quest_id: &str,
-        quest_state: &mut PlayerQuestState,
-    ) {
-        if let Some(quest) = self.quest_registry.get(quest_id).await {
-            let objective_targets: Vec<(String, i32)> = quest
-                .objectives
-                .iter()
-                .map(|objective| (objective.id.clone(), objective.count))
-                .collect();
-            quest_state.start_quest(quest_id, &objective_targets);
-            tracing::info!("Player {} accepted quest {}", player_id, quest_id);
-
-            let objectives: Vec<QuestObjectiveData> = quest
-                .objectives
-                .iter()
-                .map(|objective| QuestObjectiveData {
-                    id: objective.id.clone(),
-                    description: objective.description.clone(),
-                    current: 0,
-                    target: objective.count,
-                    completed: false,
-                })
-                .collect();
-
-            self.send_to_player(
-                player_id,
-                ServerMessage::QuestAccepted {
-                    quest_id: quest_id.to_string(),
-                    quest_name: quest.name.clone(),
-                    objectives,
-                },
-            )
-            .await;
-        }
-    }
-
     async fn complete_quest_and_grant_rewards(
         &self,
         player_id: &str,
@@ -544,7 +505,7 @@ impl GameRoom {
                 .await;
 
                 if script_result.quest_accepted {
-                    self.accept_quest_from_dialogue_choice(player_id, quest_id, quest_state)
+                    self.accept_quest_with_snapshot_progress(player_id, quest_id, quest_state)
                         .await;
                 }
 
