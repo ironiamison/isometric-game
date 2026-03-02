@@ -70,7 +70,8 @@ const STARTING_HP: i32 = 100;
 
 // Combat constants
 const ATTACK_RANGE: i32 = 1; // Maximum distance to attack (in tiles)
-const ATTACK_COOLDOWN_MS: u64 = 700; // Slightly shorter than client's 800ms to absorb network jitter
+const ATTACK_COOLDOWN_MS: u64 = 700; // Melee: slightly shorter than client's 800ms to absorb jitter
+const RANGED_ATTACK_COOLDOWN_MS: u64 = 1000; // Ranged: slower to balance range advantage
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
 const REGEN_INTERVAL_MS: u64 = 15000;
 
@@ -3399,18 +3400,7 @@ impl GameRoom {
             )
         };
 
-        // Check cooldown
-        if current_time - last_attack < ATTACK_COOLDOWN_MS {
-            tracing::info!(
-                "[ATTACK] Cooldown not met: current_time={}, last_attack={}, ATTACK_COOLDOWN_MS={}",
-                current_time,
-                last_attack,
-                ATTACK_COOLDOWN_MS
-            );
-            return;
-        }
-
-        // Get weapon range and type
+        // Get weapon range and type (needed before cooldown check)
         let (mut weapon_range, weapon_type) = {
             let players = self.players.read().await;
             if let Some(player) = players.get(player_id) {
@@ -3431,6 +3421,16 @@ impl GameRoom {
                 return;
             }
         };
+
+        // Check cooldown (ranged has a longer cooldown to balance range advantage)
+        let cooldown = if weapon_type == WeaponType::Ranged {
+            RANGED_ATTACK_COOLDOWN_MS
+        } else {
+            ATTACK_COOLDOWN_MS
+        };
+        if current_time - last_attack < cooldown {
+            return;
+        }
 
         // For ranged weapons, override attack/strength with ranged level and apply style bonuses
         let (attack_level, strength_level) = if weapon_type == WeaponType::Ranged {
@@ -3729,7 +3729,8 @@ impl GameRoom {
         }
 
         // Now that we have a confirmed target, consume 1 arrow for ranged weapons
-        if weapon_type == WeaponType::Ranged {
+        // and add the arrow's ranged_strength bonus to damage
+        let arrow_strength_bonus = if weapon_type == WeaponType::Ranged {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 let arrow_id = player.inventory.slots.iter().find_map(|slot| {
@@ -3751,6 +3752,8 @@ impl GameRoom {
                         },
                     )
                     .await;
+                    // Look up arrow's ranged_strength bonus
+                    self.item_registry.get(&arrow_id).map(|def| def.ranged_strength).unwrap_or(0)
                 } else {
                     // Arrows ran out between check and consumption (unlikely but safe)
                     return;
@@ -3758,7 +3761,10 @@ impl GameRoom {
             } else {
                 return;
             }
-        }
+        } else {
+            0
+        };
+        let strength_bonus = strength_bonus + arrow_strength_bonus;
 
         // Fetch slayer state for helmet damage boost check (only if wearing slayer helmet)
         let slayer_task_monster = if equipped_head.as_deref() == Some("slayer_helmet") {
@@ -5169,23 +5175,26 @@ impl GameRoom {
                             if let Some(player) = players.get(&pid) {
                                 let dx = (player.x - npc_x).abs();
                                 let dy = (player.y - npc_y).abs();
-                                let weapon_range =
+                                let (weapon_range, weapon_is_ranged) =
                                     if let Some(ref weapon_id) = player.equipped_weapon {
                                         if let Some(item_def) = self.item_registry.get(weapon_id) {
-                                            item_def.equipment.as_ref().map_or(1, |e| e.range)
+                                            item_def.equipment.as_ref().map_or((1, false), |e| {
+                                                (e.range, e.weapon_type == WeaponType::Ranged)
+                                            })
                                         } else {
-                                            1
+                                            (1, false)
                                         }
                                     } else {
-                                        1
+                                        (1, false)
                                     };
                                 let in_range = if weapon_range == 1 {
                                     (dx + dy) == 1
                                 } else {
-                                    dx <= weapon_range && dy <= weapon_range && (dx > 0 || dy > 0)
+                                    (dx + dy) <= weapon_range && (dx > 0 || dy > 0)
                                 };
+                                let cd = if weapon_is_ranged { RANGED_ATTACK_COOLDOWN_MS } else { ATTACK_COOLDOWN_MS };
                                 let cooldown_ready =
-                                    current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
+                                    current_time - player.last_attack_time >= cd;
                                 (in_range, cooldown_ready)
                             } else {
                                 (false, false)
@@ -5248,24 +5257,27 @@ impl GameRoom {
                             {
                                 let dx = (attacker.x - target.x).abs();
                                 let dy = (attacker.y - target.y).abs();
-                                let weapon_range =
+                                let (weapon_range, weapon_is_ranged) =
                                     if let Some(ref weapon_id) = attacker.equipped_weapon {
                                         if let Some(item_def) = self.item_registry.get(weapon_id) {
-                                            item_def.equipment.as_ref().map_or(1, |e| e.range)
+                                            item_def.equipment.as_ref().map_or((1, false), |e| {
+                                                (e.range, e.weapon_type == WeaponType::Ranged)
+                                            })
                                         } else {
-                                            1
+                                            (1, false)
                                         }
                                     } else {
-                                        1
+                                        (1, false)
                                     };
-                                // Cardinal adjacency only for melee (dx+dy==range, no diagonal)
+                                // Manhattan distance for all ranges (diamond shape)
                                 let in_range = if weapon_range == 1 {
                                     (dx + dy) == 1
                                 } else {
-                                    dx <= weapon_range && dy <= weapon_range && (dx > 0 || dy > 0)
+                                    (dx + dy) <= weapon_range && (dx > 0 || dy > 0)
                                 };
+                                let cd = if weapon_is_ranged { RANGED_ATTACK_COOLDOWN_MS } else { ATTACK_COOLDOWN_MS };
                                 let cooldown_ready =
-                                    current_time - attacker.last_attack_time >= ATTACK_COOLDOWN_MS;
+                                    current_time - attacker.last_attack_time >= cd;
                                 (in_range, cooldown_ready)
                             } else {
                                 (false, false)

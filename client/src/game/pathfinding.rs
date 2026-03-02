@@ -213,23 +213,21 @@ pub fn find_path_within_range(
     // Already in range?
     let dx = (start.0 - target.0).abs();
     let dy = (start.1 - target.1).abs();
-    if dx <= range && dy <= range && (dx > 0 || dy > 0) {
+    if (dx + dy) <= range && (dx > 0 || dy > 0) {
         return Some((start, vec![start]));
     }
 
-    // A* with modified goal: any tile within Chebyshev distance `range` of target
+    // A* with modified goal: any tile within Manhattan distance `range` of target
     let mut open_set = BinaryHeap::new();
     let mut came_from: HashMap<(i32, i32), (i32, i32)> = HashMap::new();
     let mut g_score: HashMap<(i32, i32), i32> = HashMap::new();
 
-    // Heuristic: distance to edge of the "in range" zone
+    // Heuristic: distance to edge of the "in range" zone (Manhattan)
     let range_heuristic = |pos: (i32, i32)| -> i32 {
         let cdx = (pos.0 - target.0).abs();
         let cdy = (pos.1 - target.1).abs();
-        // How many steps to get within range (Chebyshev) - cardinal movement only
-        let steps_x = (cdx - range).max(0);
-        let steps_y = (cdy - range).max(0);
-        steps_x + steps_y
+        // How many steps to get within Manhattan range
+        ((cdx + cdy) - range).max(0)
     };
 
     g_score.insert(start, 0);
@@ -249,10 +247,10 @@ pub fn find_path_within_range(
             return None;
         }
 
-        // Check if we've reached a tile within range
+        // Check if we've reached a tile within Manhattan range
         let cdx = (current.pos.0 - target.0).abs();
         let cdy = (current.pos.1 - target.1).abs();
-        if cdx <= range && cdy <= range && (cdx > 0 || cdy > 0) {
+        if (cdx + cdy) <= range && (cdx > 0 || cdy > 0) {
             // Reconstruct path
             let mut path = vec![current.pos];
             let mut pos = current.pos;

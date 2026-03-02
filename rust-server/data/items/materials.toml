@@ -498,6 +498,7 @@ category = "material"
 max_stack = 999999
 base_price = 2
 sellable = true
+ranged_strength = 0
 
 # =============================================================================
 # Scroll Crafting Materials
@@ -651,7 +652,7 @@ display_name = "Arrow Shaft"
 sprite = "arrow_shaft"
 description = "A straight wooden shaft, ready to be tipped and fletched."
 category = "material"
-max_stack = 100
+max_stack = 999999
 base_price = 2
 sellable = true
 
@@ -669,7 +670,7 @@ display_name = "Bronze Arrowhead"
 sprite = "bronze_arrowhead"
 description = "A sharp bronze arrowhead for tipping arrows."
 category = "material"
-max_stack = 100
+max_stack = 999999
 base_price = 3
 sellable = true
 
@@ -678,7 +679,7 @@ display_name = "Iron Arrowhead"
 sprite = "iron_arrowhead"
 description = "A sturdy iron arrowhead for tipping arrows."
 category = "material"
-max_stack = 100
+max_stack = 999999
 base_price = 8
 sellable = true
 
@@ -687,7 +688,7 @@ display_name = "Steel Arrowhead"
 sprite = "steel_arrowhead"
 description = "A keen steel arrowhead for tipping arrows."
 category = "material"
-max_stack = 100
+max_stack = 999999
 base_price = 15
 sellable = true
 
@@ -699,6 +700,7 @@ category = "material"
 max_stack = 999999
 base_price = 5
 sellable = true
+ranged_strength = 2
 
 [iron_arrow]
 display_name = "Iron Arrow"
@@ -708,6 +710,7 @@ category = "material"
 max_stack = 999999
 base_price = 12
 sellable = true
+ranged_strength = 4
 
 [steel_arrow]
 display_name = "Steel Arrow"
@@ -717,6 +720,64 @@ category = "material"
 max_stack = 999999
 base_price = 20
 sellable = true
+ranged_strength = 6
+
+[mithril_arrowhead]
+display_name = "Mithril Arrowhead"
+sprite = "mithril_arrowhead"
+description = "A lightweight mithril arrowhead for tipping arrows."
+category = "material"
+max_stack = 999999
+base_price = 25
+sellable = true
+
+[adamant_arrowhead]
+display_name = "Adamant Arrowhead"
+sprite = "adamant_arrowhead"
+description = "A tough adamant arrowhead for tipping arrows."
+category = "material"
+max_stack = 999999
+base_price = 40
+sellable = true
+
+[rune_arrowhead]
+display_name = "Rune Arrowhead"
+sprite = "rune_arrowhead"
+description = "A razor-sharp rune arrowhead for tipping arrows."
+category = "material"
+max_stack = 999999
+base_price = 65
+sellable = true
+
+[mithril_arrow]
+display_name = "Mithril Arrow"
+sprite = "mithril_arrows"
+description = "Arrows tipped with mithril arrowheads."
+category = "material"
+max_stack = 999999
+base_price = 35
+sellable = true
+ranged_strength = 8
+
+[adamant_arrow]
+display_name = "Adamant Arrow"
+sprite = "adamant_arrows"
+description = "Arrows tipped with adamant arrowheads."
+category = "material"
+max_stack = 999999
+base_price = 55
+sellable = true
+ranged_strength = 10
+
+[rune_arrow]
+display_name = "Rune Arrow"
+sprite = "rune_arrows"
+description = "Arrows tipped with rune arrowheads. The finest ammunition."
+category = "material"
+max_stack = 999999
+base_price = 85
+sellable = true
+ranged_strength = 12
 
 [oak_bow_u]
 display_name = "Oak Bow (u)"

@@ -211,6 +211,9 @@ pub struct RawItemDefinition {
     /// Prayer XP granted when burying bones (only for bone items)
     #[serde(default)]
     pub prayer_xp: i32,
+    /// Ranged strength bonus for ammunition (arrows) — added to max hit for ranged attacks
+    #[serde(default)]
+    pub ranged_strength: i32,
 }
 
 fn default_true() -> bool {
@@ -239,6 +242,8 @@ pub struct ItemDefinition {
     pub equipment: Option<EquipmentStats>,
     /// Prayer XP granted when burying bones (only for bone items)
     pub prayer_xp: i32,
+    /// Ranged strength bonus for ammunition (arrows)
+    pub ranged_strength: i32,
 }
 
 impl ItemDefinition {
@@ -255,6 +260,7 @@ impl ItemDefinition {
             use_effect: raw.use_effect.clone(),
             equipment: raw.equipment.clone(),
             prayer_xp: raw.prayer_xp,
+            ranged_strength: raw.ranged_strength,
         }
     }
 

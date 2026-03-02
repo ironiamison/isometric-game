@@ -358,6 +358,12 @@ impl Renderer {
             }
         }
 
+        // Ammo ranged strength (for arrows)
+        if item_def.ranged_strength > 0 {
+            let rs_text = format!("+{} Ranged Str", item_def.ranged_strength);
+            max_w = max_w.max(self.measure_text_sharp(&rs_text, small_font_size).width);
+        }
+
         if let Some(req) = smithing_req {
             let smithing_req_text = format!("Requires {} {}", req, skill_req_name);
             max_w = max_w.max(
@@ -414,6 +420,10 @@ impl Renderer {
                     total_h += line_height;
                 }
             }
+        }
+        if item_def.ranged_strength > 0 {
+            total_h += 2.0; // Small gap
+            total_h += line_height;
         }
         if smithing_req.is_some() {
             total_h += 2.0; // Small gap
@@ -684,6 +694,15 @@ impl Renderer {
                 );
                 y += line_height;
             }
+        }
+
+        // Ranged strength (for arrows/ammo)
+        if item_def.ranged_strength > 0 {
+            y += 2.0;
+            let stat_green = Color::new(0.392, 0.784, 0.392, 1.0);
+            let rs_text = format!("+{} Ranged Str", item_def.ranged_strength);
+            self.draw_text_sharp(&rs_text, tooltip_x + padding, y, small_font_size, stat_green);
+            y += line_height;
         }
 
         // Skill level requirement (from recipe, for furnace/anvil/fire_pit tooltips)

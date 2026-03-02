@@ -570,7 +570,7 @@ sellable = true
 [long_bow.equipment]
 slot_type = "weapon"
 weapon_type = "ranged"
-range = 8
+range = 6
 ranged_level_required = 20
 attack_bonus = 8
 strength_bonus = 6
@@ -587,7 +587,7 @@ sellable = true
 [dark_bow.equipment]
 slot_type = "weapon"
 weapon_type = "ranged"
-range = 10
+range = 8
 ranged_level_required = 50
 attack_bonus = 20
 strength_bonus = 14
@@ -1532,7 +1532,7 @@ sellable = true
 [scavenger_bow.equipment]
 slot_type = "weapon"
 weapon_type = "ranged"
-range = 6
+range = 4
 ranged_level_required = 1
 attack_bonus = 3
 strength_bonus = 2
@@ -1747,7 +1747,7 @@ sellable = true
 [oak_bow.equipment]
 slot_type = "weapon"
 weapon_type = "ranged"
-range = 6
+range = 4
 ranged_level_required = 1
 attack_bonus = 4
 strength_bonus = 3
@@ -1764,7 +1764,7 @@ sellable = true
 [willow_bow.equipment]
 slot_type = "weapon"
 weapon_type = "ranged"
-range = 7
+range = 5
 ranged_level_required = 10
 attack_bonus = 8
 strength_bonus = 6
@@ -1781,7 +1781,7 @@ sellable = true
 [maple_bow.equipment]
 slot_type = "weapon"
 weapon_type = "ranged"
-range = 8
+range = 6
 ranged_level_required = 20
 attack_bonus = 12
 strength_bonus = 9
@@ -1798,7 +1798,7 @@ sellable = true
 [yew_bow.equipment]
 slot_type = "weapon"
 weapon_type = "ranged"
-range = 9
+range = 7
 ranged_level_required = 30
 attack_bonus = 16
 strength_bonus = 12

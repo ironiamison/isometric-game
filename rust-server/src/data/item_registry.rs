@@ -174,6 +174,7 @@ impl ItemRegistry {
                     chop_speed_multiplier,
                     mine_speed_multiplier,
                     prayer_xp: item.prayer_xp,
+                    ranged_strength: item.ranged_strength,
                     use_effect_type: item.use_effect.as_ref().map(|e| match e {
                         super::UseEffect::Heal { .. } => "heal".to_string(),
                         super::UseEffect::RestoreMana { .. } => "restore_mana".to_string(),

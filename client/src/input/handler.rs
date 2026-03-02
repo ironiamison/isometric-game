@@ -750,13 +750,14 @@ fn get_local_weapon_range(state: &GameState) -> i32 {
 }
 
 /// Check if a position is within attack range of a target (matches server logic).
+/// Uses Manhattan distance (diamond shape) for all ranges.
 fn in_attack_range(px: i32, py: i32, tx: i32, ty: i32, weapon_range: i32) -> bool {
     let dx = (px - tx).abs();
     let dy = (py - ty).abs();
     if weapon_range == 1 {
         (dx + dy) == 1 // Cardinal adjacency for melee
     } else {
-        dx <= weapon_range && dy <= weapon_range && (dx > 0 || dy > 0) // Chebyshev for ranged
+        (dx + dy) <= weapon_range && (dx > 0 || dy > 0) // Manhattan for ranged
     }
 }
 
@@ -1874,7 +1875,6 @@ pub struct InputHandler {
     send_interval: f64,
     // Attack cooldown tracking (matches server cooldown)
     last_attack_time: f64,
-    attack_cooldown: f64,
     // Track when current direction key was pressed (for face vs move)
     dir_press_time: f64,
     // Track if we've sent a move command for the current key press
@@ -1896,7 +1896,6 @@ impl InputHandler {
             last_send_time: 0.0,
             send_interval: 0.05, // 50ms keeps facing/move intent responsive
             last_attack_time: 0.0,
-            attack_cooldown: 0.8, // 800 ms (matches server ATTACK_COOLDOWN_MS)
             dir_press_time: 0.0,
             move_sent: false,
             auto_path_sent_waypoint: None,
@@ -8646,11 +8645,11 @@ impl InputHandler {
                 }
 
                 if let Some((tx, ty)) = target_pos {
-                    // Cardinal adjacency only (no diagonal)
-                    let is_adjacent = ((player_x - tx).abs() + (player_y - ty).abs()) == 1;
+                    let weapon_range = get_local_weapon_range(state);
+                    let is_in_range = in_attack_range(player_x, player_y, tx, ty, weapon_range);
 
-                    // If already adjacent and auto-action not yet sent, send now
-                    if is_adjacent {
+                    // If already in range and auto-action not yet sent, send now
+                    if is_in_range {
                         let auto_action_data = state.auto_action_state.as_ref().map(|aa| {
                             (
                                 aa.confirmed,
@@ -8685,12 +8684,12 @@ impl InputHandler {
                             }
                         }
                     } else {
-                        // Always chase if not cardinally adjacent — melee attacks
-                        // require cardinal adjacency (dx+dy==1), so standing your
-                        // ground at a diagonal position just deadlocks combat.
+                        // Not in range — chase toward target.
+                        // Clear any stale auto_path if we just entered range on a
+                        // previous tick but target moved back out.
                         {
                             let needs_repath = if let Some(ref path_state) = state.auto_path {
-                                // Destination no longer adjacent to the target (target moved).
+                                // Destination no longer close to the target (target moved).
                                 // Use a tolerance of 2 so we don't re-path every time the
                                 // NPC moves a single tile — finish the current path first.
                                 let dest_dist = (path_state.destination.0 - tx).abs()
@@ -8733,8 +8732,17 @@ impl InputHandler {
                                     }
                                 }
                                 const MAX_PATH_DISTANCE: i32 = 32;
-                                let preferred = preferred_adjacent_tile_for_target(state, (tx, ty));
-                                if let Some((dest, path)) =
+                                let path_result = if weapon_range > 1 {
+                                    find_path_to_attack_with_optimistic_splice(
+                                        state,
+                                        (player_x, player_y),
+                                        (tx, ty),
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                        weapon_range,
+                                    )
+                                } else {
+                                    let preferred = preferred_adjacent_tile_for_target(state, (tx, ty));
                                     find_path_to_adjacent_with_optimistic_splice(
                                         state,
                                         (player_x, player_y),
@@ -8743,7 +8751,8 @@ impl InputHandler {
                                         MAX_PATH_DISTANCE,
                                         preferred,
                                     )
-                                {
+                                };
+                                if let Some((dest, path)) = path_result {
                                     state.auto_path = Some(PathState {
                                         path,
                                         current_index: 0,
@@ -9170,7 +9179,12 @@ impl InputHandler {
                 commands.push(InputCommand::CancelAutoAction);
             }
 
-            if current_time - self.last_attack_time >= self.attack_cooldown {
+            // Ranged weapons have a longer cooldown to balance range advantage
+            let attack_cooldown = {
+                let weapon_range = get_local_weapon_range(state);
+                if weapon_range > 1 { 1.1 } else { 0.8 }
+            };
+            if current_time - self.last_attack_time >= attack_cooldown {
                 // Check if we should gather instead of attack
                 let should_gather = if let Some(player) = state.get_local_player() {
                     if matches!(

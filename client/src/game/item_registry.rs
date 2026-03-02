@@ -38,6 +38,8 @@ pub struct ItemDefinition {
     pub range: Option<i32>,
     /// Prayer XP granted when offered at an altar
     pub prayer_xp: i32,
+    /// Ranged strength bonus for ammunition (arrows)
+    pub ranged_strength: i32,
     /// Use effect type (e.g. "dig", "heal") - determines context menu actions
     pub use_effect: Option<String>,
 }
@@ -99,6 +101,7 @@ impl ItemRegistry {
                 weapon_type: None,
                 range: None,
                 prayer_xp: 0,
+                ranged_strength: 0,
                 use_effect: None,
             })
     }

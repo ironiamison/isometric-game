@@ -1486,6 +1486,8 @@ pub struct ClientItemDef {
     pub chop_speed_multiplier: Option<f32>,
     pub mine_speed_multiplier: Option<f32>,
     pub prayer_xp: i32,
+    /// Ranged strength bonus for ammunition (arrows)
+    pub ranged_strength: i32,
     /// Use effect type string (e.g. "dig", "heal") - lets client show context menu actions
     pub use_effect_type: Option<String>,
 }
@@ -3585,6 +3587,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                         imap.push((
                             Value::String("prayer_xp".into()),
                             Value::Integer((i.prayer_xp as i64).into()),
+                        ));
+                    }
+                    if i.ranged_strength > 0 {
+                        imap.push((
+                            Value::String("ranged_strength".into()),
+                            Value::Integer((i.ranged_strength as i64).into()),
                         ));
                     }
                     // Woodcutting-specific fields
