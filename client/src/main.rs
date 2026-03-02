@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use macroquad::prelude::*;
 use macroquad::window::set_fullscreen;
 use std::sync::atomic::{AtomicBool, Ordering};

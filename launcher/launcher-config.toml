@@ -7,3 +7,6 @@ manifest_path = "manifest.json"
 
 # Used only for the launcher data directory name.
 app_name = "new_aeven"
+
+# Game server URL for fetching stats, leaderboard, and online player count.
+server_url = "https://aeven.xyz"
