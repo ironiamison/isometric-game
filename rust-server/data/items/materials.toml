@@ -495,7 +495,7 @@ display_name = "Bone Arrow"
 sprite = "bone_arrow"
 description = "Arrows crafted from bone and feather."
 category = "material"
-max_stack = 999
+max_stack = 999999
 base_price = 2
 sellable = true
 
@@ -696,7 +696,7 @@ display_name = "Bronze Arrow"
 sprite = "bronze_arrows"
 description = "Arrows tipped with bronze arrowheads."
 category = "material"
-max_stack = 100
+max_stack = 999999
 base_price = 5
 sellable = true
 
@@ -705,7 +705,7 @@ display_name = "Iron Arrow"
 sprite = "iron_arrows"
 description = "Arrows tipped with iron arrowheads."
 category = "material"
-max_stack = 100
+max_stack = 999999
 base_price = 12
 sellable = true
 
@@ -714,7 +714,7 @@ display_name = "Steel Arrow"
 sprite = "steel_arrows"
 description = "Arrows tipped with steel arrowheads."
 category = "material"
-max_stack = 100
+max_stack = 999999
 base_price = 20
 sellable = true
 
