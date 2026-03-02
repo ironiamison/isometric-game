@@ -3817,7 +3817,7 @@ impl GameRoom {
                                 max_hit = ((max_hit as f32) * 1.15).floor() as i32;
                             }
                         }
-                        let damage = roll_damage(max_hit);
+                        let damage = roll_damage(max_hit).min(npc.hp);
                         let died = npc.take_damage(damage, current_time, Some(player_id));
                         let name = npc.name();
                         tracing::info!(
@@ -3876,7 +3876,7 @@ impl GameRoom {
                             max_hit = ((max_hit as f32) * 1.15).floor() as i32;
                         }
                     }
-                    let damage = roll_damage(max_hit);
+                    let damage = roll_damage(max_hit).min(npc.hp);
                     let died = npc.take_damage(damage, current_time, Some(player_id));
                     let name = npc.name();
                     tracing::info!(
@@ -3939,9 +3939,9 @@ impl GameRoom {
                     // Hit - calculate and apply damage
                     let max_hit = calculate_max_hit(strength_level, strength_bonus);
                     let raw_damage = roll_damage(max_hit);
-                    // Apply prayer damage reduction
-                    let damage = target_prayer_effects.apply_damage_reduction(raw_damage);
-                    target.hp = (target.hp - damage).max(0);
+                    // Apply prayer damage reduction, then clamp to remaining HP
+                    let damage = target_prayer_effects.apply_damage_reduction(raw_damage).min(target.hp);
+                    target.hp -= damage;
                     let name = target.name.clone();
                     let died = target.hp <= 0;
                     if died {
