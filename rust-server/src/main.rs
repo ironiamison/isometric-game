@@ -1185,16 +1185,110 @@ async fn matchmake_join_or_create(
         }
     };
 
-    // Check if character is already online
+    // Check if character is already online — attempt session takeover
     if state.online_characters.contains(&character_id) {
-        warn!(
-            "Matchmaking rejected: Character {} is already online",
-            character_id
-        );
-        return (
-            StatusCode::CONFLICT,
-            Json(serde_json::json!({ "error": "This character is already logged in from another session" }))
-        ).into_response();
+        // Find the old session for this character
+        let old_session_id = state
+            .sessions
+            .iter()
+            .find(|entry| entry.value().character_id == character_id)
+            .map(|entry| entry.key().clone());
+
+        if let Some(old_sid) = old_session_id {
+            // Atomically remove old session — whoever removes it owns cleanup
+            if let Some((_, old_sess)) = state.sessions.remove(&old_sid) {
+                warn!(
+                    "Session takeover: evicting old session {} for character {} ({})",
+                    old_sid, old_sess.character_name, character_id
+                );
+
+                let old_player_id = old_sess.player_id.clone();
+
+                // Clean up old session state (skip DB save — auto-save covers it)
+                if let Some(old_room) = state.rooms.get(&old_sess.room_id) {
+                    let old_room = old_room.clone();
+
+                    // Clean up instance tracking
+                    {
+                        use crate::interior::InstanceType;
+                        let removed_instance_id =
+                            state.player_instances.write().await.remove(&old_player_id);
+                        old_room.reset_sync_state(&old_player_id).await;
+                        if let Some(instance_id) = removed_instance_id {
+                            if let Some(instance) =
+                                state.instance_manager.get_by_instance_id(&instance_id)
+                            {
+                                let other_players: Vec<String> = instance
+                                    .get_player_ids()
+                                    .await
+                                    .into_iter()
+                                    .filter(|id| id != &old_player_id)
+                                    .collect();
+                                let remaining = instance.remove_player(&old_player_id).await;
+                                for other_id in &other_players {
+                                    old_room
+                                        .send_to_player(
+                                            other_id,
+                                            ServerMessage::PlayerLeft {
+                                                id: old_player_id.clone(),
+                                            },
+                                        )
+                                        .await;
+                                }
+                                if remaining == 0
+                                    && instance.instance_type == InstanceType::Private
+                                {
+                                    if let Some(owner_id) = &instance.owner_id {
+                                        state
+                                            .instance_manager
+                                            .remove_private(owner_id, &instance.map_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Clean up entrance positions
+                    state
+                        .player_entrance_positions
+                        .write()
+                        .await
+                        .remove(&old_player_id);
+
+                    // Unregister player sender (closes old WebSocket send task)
+                    old_room.unregister_player_sender(&old_player_id).await;
+
+                    // Notify friends offline
+                    old_room
+                        .broadcast_friend_status(&old_player_id, false)
+                        .await;
+
+                    // Remove from room and notify overworld
+                    old_room.remove_player(&old_player_id).await;
+                    old_room
+                        .send_to_overworld_players(
+                            ServerMessage::PlayerLeft {
+                                id: old_player_id.clone(),
+                            },
+                            None,
+                        )
+                        .await;
+                }
+
+                // Clean up play time anchor (skip saving — auto-save covers it)
+                state.play_time_anchors.remove(&character_id);
+
+                // Mark offline (will be re-marked online when new socket connects)
+                state.online_characters.remove(&character_id);
+            }
+        } else {
+            // Character marked online but no session found — clean up stale state
+            warn!(
+                "Session takeover: character {} marked online but no session found, cleaning up",
+                character_id
+            );
+            state.online_characters.remove(&character_id);
+        }
     }
 
     let room = state.get_or_create_room(&room_name).await;
@@ -1920,6 +2014,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
     // Spawn send loop task (forward mpsc + broadcast to WebSocket)
     let send_spectator_id = spectator_id.clone();
     let mut send_task = tokio::spawn(async move {
+        let mut ping_interval = tokio::time::interval(Duration::from_secs(15));
+        ping_interval.tick().await; // consume immediate first tick
         loop {
             tokio::select! {
                 biased;
@@ -1942,6 +2038,12 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             tracing::warn!("Broadcast lagged for spectator {}: skipped {} messages", send_spectator_id, n);
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+                // Server-side WebSocket ping to keep connection alive (browsers auto-pong)
+                _ = ping_interval.tick() => {
+                    if sender.send(Message::Ping(vec![])).await.is_err() {
+                        break;
                     }
                 }
                 else => break,
@@ -2384,7 +2486,7 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
 
                             // --- Phase 2: Normal player message handling loop ---
                             loop {
-                                match tokio::time::timeout(Duration::from_secs(30), receiver.next()).await {
+                                match tokio::time::timeout(Duration::from_secs(45), receiver.next()).await {
                                     Ok(Some(Ok(msg))) => match msg {
                                         Message::Binary(data) => {
                                             if let Err(e) = handle_client_message(
@@ -2406,35 +2508,37 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                     },
                                     Ok(Some(Err(_))) | Ok(None) => break,
                                     Err(_) => {
-                                        warn!("Upgraded player {} connection timed out (no data for 30s)", player_id);
+                                        warn!("Upgraded player {} connection timed out (no data for 45s)", player_id);
                                         break;
                                     }
                                 }
                             }
 
                             // --- Phase 3: Cleanup (player disconnected) ---
+                            // Atomically claim session ownership first.
+                            // If another handler already took over, skip cleanup.
+                            let removed_session = recv_state.sessions.remove(&session_id);
+                            if removed_session.is_none() {
+                                info!(
+                                    "Session {} for {} was superseded by takeover, skipping cleanup",
+                                    session_id, character_name
+                                );
+                                return true;
+                            }
+                            let (_, removed_sess) = removed_session.unwrap();
+                            let character_id = removed_sess.character_id;
+                            let should_save = recv_state.auth_sessions.contains_key(&removed_sess.auth_token);
+
                             info!(
                                 "Upgraded player {} ({}) disconnected",
                                 character_name, player_id
                             );
 
-                            let should_save = recv_state
-                                .sessions
-                                .get(&session_id)
-                                .map(|s| recv_state.auth_sessions.contains_key(&s.auth_token))
-                                .unwrap_or(false);
-
                             if should_save {
-                                let character_id_for_save = recv_state
-                                    .sessions
-                                    .get(&session_id)
-                                    .map(|s| s.character_id)
-                                    .unwrap_or(0);
-
                                 // Compute played time delta
                                 let played_time_delta = recv_state
                                     .play_time_anchors
-                                    .remove(&character_id_for_save)
+                                    .remove(&character_id)
                                     .map(|(_, anchor)| anchor.elapsed().as_secs() as i64)
                                     .unwrap_or(0);
 
@@ -2663,7 +2767,6 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             // Mark character as offline
                             recv_state.online_characters.remove(&character_id);
 
-                            recv_state.sessions.remove(&session_id);
                             recv_room.remove_player(&player_id).await;
 
                             // Notify overworld players that this player left
@@ -3121,6 +3224,8 @@ async fn handle_socket(
     let send_player_id = player_id.clone();
     let send_perf = state.perf_metrics.clone();
     let mut send_task = tokio::spawn(async move {
+        let mut ping_interval = tokio::time::interval(Duration::from_secs(15));
+        ping_interval.tick().await; // consume immediate first tick
         loop {
             tokio::select! {
                 // Bias toward unicast (StateSync) over broadcasts to prevent
@@ -3162,6 +3267,12 @@ async fn handle_socket(
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     }
                 }
+                // Server-side WebSocket ping to keep connection alive (browsers auto-pong)
+                _ = ping_interval.tick() => {
+                    if sender.send(Message::Ping(vec![])).await.is_err() {
+                        break;
+                    }
+                }
                 else => break,
             }
         }
@@ -3173,7 +3284,7 @@ async fn handle_socket(
     let state_clone = state.clone();
     let mut recv_task = tokio::spawn(async move {
         loop {
-            match tokio::time::timeout(Duration::from_secs(30), receiver.next()).await {
+            match tokio::time::timeout(Duration::from_secs(45), receiver.next()).await {
                 Ok(Some(Ok(msg))) => match msg {
                     Message::Binary(data) => {
                         if let Err(e) =
@@ -3188,7 +3299,7 @@ async fn handle_socket(
                 },
                 Ok(Some(Err(_))) | Ok(None) => break,
                 Err(_) => {
-                    warn!("Player {} connection timed out (no data for 30s)", player_id_clone);
+                    warn!("Player {} connection timed out (no data for 45s)", player_id_clone);
                     break;
                 }
             }
@@ -3201,26 +3312,26 @@ async fn handle_socket(
         _ = &mut recv_task => send_task.abort(),
     }
 
-    // Cleanup - save character data before removing
+    // Cleanup — atomically claim session ownership first.
+    // If another handler already took over this session, skip all cleanup.
+    let removed_session = state.sessions.remove(&session_id);
+    if removed_session.is_none() {
+        info!(
+            "Session {} for {} was superseded by takeover, skipping cleanup",
+            session_id, character_name
+        );
+        return;
+    }
+    let (_, removed_sess) = removed_session.unwrap();
+    let character_id = removed_sess.character_id;
+    let should_save = state.auth_sessions.contains_key(&removed_sess.auth_token);
+
     info!(
         "Character {} disconnected from room {}",
         character_name, room_id
     );
 
-    let should_save = state
-        .sessions
-        .get(&session_id)
-        .map(|s| state.auth_sessions.contains_key(&s.auth_token))
-        .unwrap_or(false);
-
     if should_save {
-        // Get character_id from session
-        let character_id = state
-            .sessions
-            .get(&session_id)
-            .map(|s| s.character_id)
-            .unwrap_or(0);
-
         // Compute played time delta from anchor
         let played_time_delta = state
             .play_time_anchors
@@ -3436,7 +3547,6 @@ async fn handle_socket(
     // Mark character as offline
     state.online_characters.remove(&character_id);
 
-    state.sessions.remove(&session_id);
     room.remove_player(&player_id).await;
 
     // Notify overworld players that this player left.
