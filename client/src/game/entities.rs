@@ -9,6 +9,10 @@ pub enum Direction {
     Left = 1,
     Up = 2,
     Right = 3,
+    DownLeft = 4,
+    DownRight = 5,
+    UpLeft = 6,
+    UpRight = 7,
 }
 
 impl Default for Direction {
@@ -24,25 +28,39 @@ impl Direction {
             1 => Direction::Left,
             2 => Direction::Up,
             3 => Direction::Right,
+            4 => Direction::DownLeft,
+            5 => Direction::DownRight,
+            6 => Direction::UpLeft,
+            7 => Direction::UpRight,
             _ => Direction::Down,
         }
     }
-}
 
-impl Direction {
     pub fn from_velocity(dx: f32, dy: f32) -> Self {
         if dx == 0.0 && dy == 0.0 {
             return Direction::Down;
         }
 
-        // 4 quadrants: vertical takes priority when |dy| > |dx|
-        if dy.abs() > dx.abs() {
+        let adx = dx.abs();
+        let ady = dy.abs();
+
+        // Diagonal when both axes are significant (within 2:1 ratio)
+        if adx > 0.01 && ady > 0.01 && adx < ady * 2.0 && ady < adx * 2.0 {
+            match (dx > 0.0, dy > 0.0) {
+                (false, true) => Direction::DownLeft,
+                (true, true) => Direction::DownRight,
+                (false, false) => Direction::UpLeft,
+                (true, false) => Direction::UpRight,
+            }
+        } else if ady > adx {
+            // Cardinal vertical
             if dy < 0.0 {
                 Direction::Up
             } else {
                 Direction::Down
             }
         } else {
+            // Cardinal horizontal
             if dx < 0.0 {
                 Direction::Left
             } else {
@@ -57,6 +75,10 @@ impl Direction {
             Direction::Up => (0.0, -1.0),
             Direction::Left => (-1.0, 0.0),
             Direction::Right => (1.0, 0.0),
+            Direction::DownLeft => (-1.0, 1.0),
+            Direction::DownRight => (1.0, 1.0),
+            Direction::UpLeft => (-1.0, -1.0),
+            Direction::UpRight => (1.0, -1.0),
         }
     }
 }
@@ -372,12 +394,26 @@ impl Player {
         if !is_local_player || is_sitting {
             self.direction = dir;
         } else if server_moved {
-            // Local facing is committed from authoritative server tile steps,
-            // not from speculative/correction interpolation.
-            let adx = step_dx.abs();
-            let ady = step_dy.abs();
-            if (adx - ady).abs() > DIRECTION_AMBIGUITY_EPS {
-                self.direction = Direction::from_velocity(step_dx, step_dy);
+            // During attack/cast animations, trust the server's authoritative direction
+            // which includes the attack-facing override. Otherwise the movement-derived
+            // direction from the last walk step would snap the player back to the walk
+            // direction instead of keeping the attack-facing direction.
+            let in_attack = matches!(
+                self.animation.state,
+                crate::render::animation::AnimationState::Attacking
+                    | crate::render::animation::AnimationState::Casting
+                    | crate::render::animation::AnimationState::ShootingBow
+            );
+            if in_attack {
+                self.direction = dir;
+            } else {
+                // Local facing is committed from authoritative server tile steps,
+                // not from speculative/correction interpolation.
+                let adx = step_dx.abs();
+                let ady = step_dy.abs();
+                if (adx - ady).abs() > DIRECTION_AMBIGUITY_EPS {
+                    self.direction = Direction::from_velocity(step_dx, step_dy);
+                }
             }
         }
 

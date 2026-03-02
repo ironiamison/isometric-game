@@ -115,14 +115,26 @@ pub fn get_animation_config(state: AnimationState) -> AnimationConfig {
 }
 
 /// Check if direction uses up/left animations (row 1 for walking, frames 2-3 for attack)
+/// Back-facing sprites for directions with an upward or leftward component only.
+/// Diagonal directions map to the cardinal they pair with for rendering:
+///   DownLeft → Down (front), DownRight → Right (front),
+///   UpLeft → Left (back), UpRight → Up (back)
 pub fn is_up_or_left_direction(direction: Direction) -> bool {
-    matches!(direction, Direction::Up | Direction::Left)
+    matches!(
+        direction,
+        Direction::Up | Direction::Left | Direction::UpLeft | Direction::UpRight
+    )
 }
 
-/// Whether to flip the sprite horizontally for this direction
-/// Flip for Up and Right directions
+/// Whether to flip the sprite horizontally for this direction.
+/// Flip for directions facing the right side of the screen in isometric view.
+/// Diagonal directions map to the cardinal they pair with for rendering:
+///   DownRight → Right (flip), UpRight → Up (flip)
 pub fn should_flip_horizontal(direction: Direction) -> bool {
-    matches!(direction, Direction::Up | Direction::Right)
+    matches!(
+        direction,
+        Direction::Up | Direction::Right | Direction::DownRight | Direction::UpRight
+    )
 }
 
 /// Player animation controller
@@ -1169,7 +1181,10 @@ pub struct BackStaticFrameResult {
 pub fn get_back_static_frame(direction: Direction) -> BackStaticFrameResult {
     let use_back_view = is_up_or_left_direction(direction);
     // Flip for Down and Up directions (Right and Left show unflipped)
-    let flip_h = matches!(direction, Direction::Down | Direction::Up);
+    let flip_h = matches!(
+        direction,
+        Direction::Down | Direction::Up | Direction::DownLeft | Direction::UpRight
+    );
 
     BackStaticFrameResult {
         // When player faces up/left (we see their back), use frame 0
@@ -1198,10 +1213,10 @@ pub fn get_back_static_offset(
     // Quiver is 50 wide, 63 tall
     // Right/Up show on left side (mirrored), Down/Left show on right side
     let (base_x, base_y) = match direction {
-        Direction::Up => (-6.0, -10.0),     // +2px right, +1px down
-        Direction::Left => (-10.0, -10.0),  // -2px left (mirrored), +1px down
-        Direction::Right => (-16.0, -15.0), // Left side for Right
-        Direction::Down => (0.0, -15.0),    // Right side for Down
+        Direction::Up | Direction::UpRight => (-6.0, -10.0),
+        Direction::Left | Direction::UpLeft => (-10.0, -10.0),
+        Direction::Right | Direction::DownRight => (-16.0, -15.0),
+        Direction::Down | Direction::DownLeft => (0.0, -15.0),
     };
 
     // Per-state offsets (static for idle/walking, only moves for attacks)
@@ -1220,10 +1235,10 @@ pub fn get_back_static_offset(
         AnimationState::ShootingBow => {
             // Direction-specific shift when drawing bow
             match direction {
-                Direction::Up => (-1.0, 0.0),   // Left 1px
-                Direction::Left => (1.0, 0.0),  // Right 1px (mirrored from Up)
-                Direction::Down => (-1.0, 0.0), // Left 1px
-                Direction::Right => (1.0, 0.0), // Right 1px (mirrored from Down)
+                Direction::Up | Direction::UpRight => (-1.0, 0.0),
+                Direction::Left | Direction::UpLeft => (1.0, 0.0),
+                Direction::Down | Direction::DownLeft => (-1.0, 0.0),
+                Direction::Right | Direction::DownRight => (1.0, 0.0),
             }
         }
         AnimationState::SittingChair => (0.0, 7.0),

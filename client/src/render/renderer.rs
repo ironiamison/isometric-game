@@ -6412,8 +6412,9 @@ impl Renderer {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
                     if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
-                        let is_back =
-                            matches!(player.animation.direction, Direction::Up | Direction::Left);
+                        let is_back = crate::render::animation::is_up_or_left_direction(
+                            player.animation.direction,
+                        );
                         let frame_index = color * 2 + if is_back { 1 } else { 0 };
                         let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
                         let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
@@ -6947,8 +6948,9 @@ impl Renderer {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
                     if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
-                        let is_back =
-                            matches!(player.animation.direction, Direction::Up | Direction::Left);
+                        let is_back = crate::render::animation::is_up_or_left_direction(
+                            player.animation.direction,
+                        );
                         let frame_index = color * 2 + if is_back { 1 } else { 0 };
                         let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
                         let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
@@ -7540,10 +7542,10 @@ impl Renderer {
         // Rod tip position within the weapon frame (in unscaled pixels)
         // These are the approximate pixel positions of the rod tip in each frame
         let (tip_px, tip_py) = match player.animation.direction {
-            Direction::Down => (14.0, 61.0), // frame 0: rod points down, tip is lower (+2x, -2y adjust)
-            Direction::Left => (16.0, 38.0), // frame 1: mirrored adjustment (+4x, +8y)
-            Direction::Up => (16.0, 38.0),   // frame 1 flipped: (-4 screen-left, +8y down)
-            Direction::Right => (10.0, 61.0), // frame 0 flipped: mirrored down adjust (-2x, -2y)
+            Direction::Down | Direction::DownLeft => (14.0, 61.0),
+            Direction::Left | Direction::UpLeft => (16.0, 38.0),
+            Direction::Up | Direction::UpRight => (16.0, 38.0),
+            Direction::Right | Direction::DownRight => (10.0, 61.0),
         };
 
         // Account for horizontal flip
@@ -7561,6 +7563,10 @@ impl Renderer {
             Direction::Up => (0.0, -cast_dist),
             Direction::Left => (-cast_dist, 0.0),
             Direction::Right => (cast_dist, 0.0),
+            Direction::DownLeft => (-cast_dist * 0.707, cast_dist * 0.707),
+            Direction::DownRight => (cast_dist * 0.707, cast_dist * 0.707),
+            Direction::UpLeft => (-cast_dist * 0.707, -cast_dist * 0.707),
+            Direction::UpRight => (cast_dist * 0.707, -cast_dist * 0.707),
         };
 
         let (land_base_x, land_base_y) =
