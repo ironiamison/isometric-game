@@ -8661,13 +8661,32 @@ impl InputHandler {
                         });
 
                         if auto_action_data.is_some() {
-                            // Always face the target while adjacent so client visuals
-                            // stay aligned even if the target is still moving.
-                            let face_delta = state
-                                .get_local_player()
-                                .map(|player| (tx as f32 - player.x, ty as f32 - player.y));
-                            if let Some((dx, dy)) = face_delta {
-                                face_target_if_needed(state, &mut commands, dx, dy);
+                            // Face the target while in range, but skip during attack
+                            // animations — the playerAttack message already set the
+                            // authoritative direction and re-computing from visual
+                            // positions causes rapid flip-flop on diagonal angles.
+                            let in_attack_anim =
+                                state.get_local_player().map_or(false, |p| {
+                                    matches!(
+                                        p.animation.state,
+                                        AnimationState::Attacking
+                                            | AnimationState::Casting
+                                            | AnimationState::ShootingBow
+                                    )
+                                });
+                            if !in_attack_anim {
+                                // Use server (grid) positions for both player and target
+                                // to match the server's direction computation and avoid
+                                // jitter from visual interpolation.
+                                let face_delta = state.get_local_player().map(|player| {
+                                    (
+                                        tx as f32 - player.server_x.round(),
+                                        ty as f32 - player.server_y.round(),
+                                    )
+                                });
+                                if let Some((dx, dy)) = face_delta {
+                                    face_target_if_needed(state, &mut commands, dx, dy);
+                                }
                             }
                         }
 
