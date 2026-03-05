@@ -513,6 +513,7 @@ pub struct ActiveBuff {
     pub stat: String, // "attack", "strength", "defence"
     pub amount: i32,
     pub expires_at: u64, // millisecond timestamp when buff expires
+    pub source_item_id: String,
 }
 
 const PLAYER_RESPAWN_TIME_MS: u64 = 5000; // 5 seconds to respawn
@@ -900,12 +901,14 @@ impl Player {
         amount: i32,
         duration_ms: u64,
         current_time_ms: u64,
+        source_item_id: String,
     ) {
         self.active_buffs.retain(|b| b.stat != stat);
         self.active_buffs.push(ActiveBuff {
             stat,
             amount,
             expires_at: current_time_ms + duration_ms,
+            source_item_id,
         });
     }
 

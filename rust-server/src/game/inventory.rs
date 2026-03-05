@@ -209,7 +209,7 @@ impl GameRoom {
                                 amount,
                                 duration_ms,
                             }) => {
-                                player.apply_buff(stat.clone(), *amount, *duration_ms, now_ms());
+                                player.apply_buff(stat.clone(), *amount, *duration_ms, now_ms(), item_id.clone());
                                 format!("buff:{}:{}:{}", stat, amount, duration_ms)
                             }
                             Some(UseEffect::Teleport { destination, x, y }) => {
