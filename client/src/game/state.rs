@@ -2159,6 +2159,10 @@ impl GameState {
     pub fn update(&mut self, delta: f32) {
         self.refresh_high_ping_movement_mode();
 
+        // Prune expired potion buffs
+        let now = macroquad::time::get_time();
+        self.active_potion_buffs.retain(|b| b.expires_at > now);
+
         // Trigger fade-in when world first becomes ready
         if !self.world_was_ready && self.is_world_ready() {
             self.world_was_ready = true;

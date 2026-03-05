@@ -9350,16 +9350,18 @@ impl Renderer {
             }
 
             // Potion buff chips (after combat style)
+            let mut has_buff_chip = false;
             for buff in &state.active_potion_buffs {
                 let (buff_w, buff_h) =
                     self.render_potion_buff_chip(state, buff, chip_cursor_x, chip_row_y);
                 if buff_w > 0.0 {
+                    has_buff_chip = true;
                     chip_cursor_x += buff_w + chip_gap;
                     chip_row_h = chip_row_h.max(buff_h);
                 }
             }
 
-            let has_any_chip = combat_w > 0.0 || has_slayer_chip || !state.active_potion_buffs.is_empty();
+            let has_any_chip = combat_w > 0.0 || has_slayer_chip || has_buff_chip;
 
             // XP Drop Feed (below gathering/stall status or MP bar)
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 }

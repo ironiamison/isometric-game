@@ -252,6 +252,8 @@ impl GameRoom {
                 .unwrap_or(&item_id);
             tracing::debug!("Player {} used {} ({})", player_id, display_name, effect);
 
+            let is_buff_effect = effect.starts_with("buff:");
+
             self.send_to_player(
                 player_id,
                 ServerMessage::ItemUsed {
@@ -273,8 +275,8 @@ impl GameRoom {
                 self.send_to_player(player_id, prayer_update).await;
             }
 
-            // Send updated potion buffs to client
-            {
+            // Send updated potion buffs to client (only for buff-applying items)
+            if is_buff_effect {
                 let players = self.players.read().await;
                 if let Some(player) = players.get(player_id) {
                     let buffs_msg = Self::build_potion_buffs_sync(player_id, player);
