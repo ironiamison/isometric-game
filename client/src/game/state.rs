@@ -989,6 +989,15 @@ pub struct GatheringBuff {
     pub duration: f64,
 }
 
+/// An active potion buff (attack/strength/defence boost)
+#[derive(Debug, Clone)]
+pub struct ActivePotionBuff {
+    pub stat: String,
+    pub amount: i32,
+    pub expires_at: f64, // local macroquad time when buff expires
+    pub source_item_id: String,
+}
+
 /// Target for context menu - what was right-clicked
 #[derive(Debug, Clone)]
 pub enum ContextMenuTarget {
@@ -1742,6 +1751,8 @@ pub struct GameState {
     pub bonus_tiles: Vec<BonusTile>,
     /// Active gathering buff on local player
     pub gathering_buff: Option<GatheringBuff>,
+    /// Active potion buffs (attack/strength/defence boosts with timers)
+    pub active_potion_buffs: Vec<ActivePotionBuff>,
 
     /// Depleted trees (position -> info for respawn timer)
     pub depleted_trees: HashMap<(i32, i32), DepletedTreeInfo>,
@@ -1940,6 +1951,7 @@ impl GameState {
             gathering_started_at: 0.0,
             bonus_tiles: Vec::new(),
             gathering_buff: None,
+            active_potion_buffs: Vec::new(),
             dash_cooldown_end: 0.0,
             depleted_trees: HashMap::new(),
             depleted_rocks: HashMap::new(),

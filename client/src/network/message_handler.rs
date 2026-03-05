@@ -4,7 +4,7 @@ use super::protocol::{
 };
 use crate::game::npc::{Npc, NpcState};
 use crate::game::{
-    ActiveDialogue, ActiveQuest, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
+    ActiveDialogue, ActivePotionBuff, ActiveQuest, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
     FriendInfo, GameState, GatheringBuff, GatheringMarker, GroundItem, InventorySlot,
     ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal,
@@ -3029,6 +3029,29 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         start_time: macroquad::time::get_time(),
                         duration,
                     });
+                }
+            }
+        }
+
+        "potionBuffsSync" => {
+            if let Some(value) = data {
+                if let Some(buffs_arr) = extract_array(value, "buffs") {
+                    let now = macroquad::time::get_time();
+                    state.active_potion_buffs = buffs_arr
+                        .iter()
+                        .filter_map(|b| {
+                            let stat = extract_string(b, "stat")?;
+                            let amount = extract_i32(b, "amount").unwrap_or(0);
+                            let remaining_ms = extract_u64(b, "remaining_ms").unwrap_or(0);
+                            let source_item_id = extract_string(b, "source_item_id").unwrap_or_default();
+                            Some(ActivePotionBuff {
+                                stat,
+                                amount,
+                                expires_at: now + (remaining_ms as f64 / 1000.0),
+                                source_item_id,
+                            })
+                        })
+                        .collect();
                 }
             }
         }
