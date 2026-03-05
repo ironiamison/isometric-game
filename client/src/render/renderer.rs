@@ -9345,10 +9345,21 @@ impl Renderer {
             let (combat_w, combat_h) =
                 self.render_combat_style_chip(state, chip_cursor_x, chip_row_y);
             if combat_w > 0.0 {
+                chip_cursor_x += combat_w + chip_gap;
                 chip_row_h = chip_row_h.max(combat_h);
             }
 
-            let has_any_chip = combat_w > 0.0 || has_slayer_chip;
+            // Potion buff chips (after combat style)
+            for buff in &state.active_potion_buffs {
+                let (buff_w, buff_h) =
+                    self.render_potion_buff_chip(state, buff, chip_cursor_x, chip_row_y);
+                if buff_w > 0.0 {
+                    chip_cursor_x += buff_w + chip_gap;
+                    chip_row_h = chip_row_h.max(buff_h);
+                }
+            }
+
+            let has_any_chip = combat_w > 0.0 || has_slayer_chip || !state.active_potion_buffs.is_empty();
 
             // XP Drop Feed (below gathering/stall status or MP bar)
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 }

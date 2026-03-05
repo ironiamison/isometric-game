@@ -136,6 +136,94 @@ impl Renderer {
         (chip_w, chip_h)
     }
 
+    /// Render a single potion buff HUD chip with sprite + countdown timer.
+    /// Returns `(chip_width, chip_height)`.
+    pub(crate) fn render_potion_buff_chip(
+        &self,
+        state: &GameState,
+        buff: &crate::game::ActivePotionBuff,
+        x: f32,
+        y: f32,
+    ) -> (f32, f32) {
+        let s = state.ui_state.ui_scale;
+        let font_sz = 16.0;
+        let padding = 3.0 * s;
+        let sprite_area = 24.0 * s;
+
+        // Calculate remaining time
+        let now = macroquad::time::get_time();
+        let remaining = (buff.expires_at - now).max(0.0);
+        if remaining <= 0.0 {
+            return (0.0, 0.0);
+        }
+
+        let remaining_secs = remaining as u64;
+        let timer_text = if remaining_secs >= 60 {
+            format!("{}:{:02}", remaining_secs / 60, remaining_secs % 60)
+        } else {
+            format!("{}s", remaining_secs)
+        };
+
+        let timer_dims = self.measure_text_sharp(&timer_text, font_sz);
+        let chip_w = (sprite_area + padding * 2.0).max(timer_dims.width + padding * 2.0);
+        let chip_h = padding + sprite_area + 2.0 * s + timer_dims.height + padding;
+
+        // Border color by stat
+        let border_color = match buff.stat.as_str() {
+            "attack" => Color::from_rgba(100, 200, 100, 180),
+            "strength" => Color::from_rgba(220, 80, 80, 180),
+            "defence" => Color::from_rgba(80, 140, 220, 180),
+            _ => Color::from_rgba(80, 70, 55, 180),
+        };
+
+        // Background + border
+        draw_rectangle(x, y, chip_w, chip_h, Color::from_rgba(0, 0, 0, 180));
+        draw_rectangle_lines(x, y, chip_w, chip_h, 1.0, border_color);
+
+        // Draw potion sprite using item_sprites
+        let sprite_key = state.item_registry.get_sprite_key(&buff.source_item_id);
+        if let Some((texture, source_rect)) = self.item_sprites.get(sprite_key) {
+            let (icon_w, icon_h) = if let Some(r) = source_rect {
+                (r.w, r.h)
+            } else {
+                (texture.width(), texture.height())
+            };
+            let scale = (sprite_area / icon_w).min(sprite_area / icon_h);
+            let draw_w = icon_w * scale;
+            let draw_h = icon_h * scale;
+            let draw_x = x + (chip_w - draw_w) / 2.0;
+            let draw_y = y + padding + (sprite_area - draw_h) / 2.0;
+
+            draw_texture_ex(
+                texture,
+                draw_x,
+                draw_y,
+                WHITE,
+                DrawTextureParams {
+                    source: source_rect,
+                    dest_size: Some(Vec2::new(draw_w, draw_h)),
+                    ..Default::default()
+                },
+            );
+        }
+
+        // Timer text centered below sprite
+        let timer_color = if remaining_secs <= 10 {
+            Color::from_rgba(255, 100, 100, 255)
+        } else {
+            TEXT_NORMAL
+        };
+        self.draw_text_sharp(
+            &timer_text,
+            (x + (chip_w - timer_dims.width) / 2.0).floor(),
+            (y + padding + sprite_area + 2.0 * s + timer_dims.height * 0.9).floor(),
+            font_sz,
+            timer_color,
+        );
+
+        (chip_w, chip_h)
+    }
+
     /// Render hover tooltip for slayer task chip (called after other overlapping UI)
     pub(crate) fn render_slayer_task_chip_tooltip(&self, state: &GameState, x: f32, y: f32) {
         let task = match &state.ui_state.slayer_current_task {
