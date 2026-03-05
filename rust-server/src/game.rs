@@ -4757,7 +4757,19 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_banker {
-            self.show_banker_dialogue(player_id, &npc_id).await;
+            // Skip dialogue and open bank directly if fully upgraded
+            let fully_upgraded = {
+                let players = self.players.read().await;
+                players
+                    .get(player_id)
+                    .map(|p| p.bank_max_slots >= item::BANK_MAX_SIZE as u32)
+                    .unwrap_or(false)
+            };
+            if fully_upgraded {
+                self.handle_bank_open(player_id).await;
+            } else {
+                self.show_banker_dialogue(player_id, &npc_id).await;
+            }
             return;
         }
 
