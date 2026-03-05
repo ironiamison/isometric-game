@@ -2416,6 +2416,15 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                 }
                             }
 
+                            // Potion buffs
+                            if let Some(buffs_msg) =
+                                recv_room.get_player_potion_buffs_sync(&player_id).await
+                            {
+                                if let Ok(bytes) = protocol::encode_server_message(&buffs_msg) {
+                                    let _ = recv_tx.send(bytes).await;
+                                }
+                            }
+
                             // Top total level player (trophy icon) — refresh from DB and broadcast to all
                             recv_room.init_top_level_player().await;
                             {
@@ -3156,6 +3165,13 @@ async fn handle_socket(
     // Send initial skills to this client
     if let Some(skills_msg) = room.get_player_skills_sync(&player_id).await {
         if let Ok(bytes) = protocol::encode_server_message(&skills_msg) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
+    // Send active potion buffs
+    if let Some(buffs_msg) = room.get_player_potion_buffs_sync(&player_id).await {
+        if let Ok(bytes) = protocol::encode_server_message(&buffs_msg) {
             let _ = sender.send(Message::Binary(bytes)).await;
         }
     }

@@ -484,7 +484,7 @@ impl ClientMessage {
 // Chest Data Structs
 // ============================================================================
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PotionBuffEntry {
     pub stat: String,
     pub amount: i32,

@@ -2856,6 +2856,36 @@ impl GameRoom {
         })
     }
 
+    /// Build a PotionBuffsSync message for a player's current active buffs
+    fn build_potion_buffs_sync(player_id: &str, player: &Player) -> ServerMessage {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        ServerMessage::PotionBuffsSync {
+            player_id: player_id.to_string(),
+            buffs: player
+                .active_buffs
+                .iter()
+                .map(|b| crate::protocol::PotionBuffEntry {
+                    stat: b.stat.clone(),
+                    amount: b.amount,
+                    remaining_ms: b.expires_at.saturating_sub(now),
+                    source_item_id: b.source_item_id.clone(),
+                })
+                .collect(),
+        }
+    }
+
+    /// Get potion buffs sync for initial login
+    pub async fn get_player_potion_buffs_sync(&self, player_id: &str) -> Option<ServerMessage> {
+        let players = self.players.read().await;
+        players
+            .get(player_id)
+            .filter(|p| !p.active_buffs.is_empty())
+            .map(|p| Self::build_potion_buffs_sync(player_id, p))
+    }
+
     pub async fn get_all_npcs(&self) -> Vec<Npc> {
         let npcs = self.npcs.read().await;
         npcs.values().cloned().collect()

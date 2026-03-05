@@ -325,6 +325,7 @@ impl GameRoom {
 
         let mut moved_players = HashSet::new();
         let mut moved_positions = Vec::new();
+        let mut buff_sync_messages: Vec<(String, crate::protocol::ServerMessage)> = Vec::new();
 
         {
             let mut players = self.players.write().await;
@@ -422,9 +423,18 @@ impl GameRoom {
 
             for player in players.values_mut() {
                 if player.active {
-                    player.tick_buffs(current_time);
+                    if player.tick_buffs(current_time) {
+                        buff_sync_messages.push((
+                            player.id.clone(),
+                            Self::build_potion_buffs_sync(&player.id, player),
+                        ));
+                    }
                 }
             }
+        }
+
+        for (pid, msg) in buff_sync_messages {
+            self.send_to_player(&pid, msg).await;
         }
 
         drop(chunks_guard);

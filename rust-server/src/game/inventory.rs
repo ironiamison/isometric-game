@@ -273,6 +273,16 @@ impl GameRoom {
                 self.send_to_player(player_id, prayer_update).await;
             }
 
+            // Send updated potion buffs to client
+            {
+                let players = self.players.read().await;
+                if let Some(player) = players.get(player_id) {
+                    let buffs_msg = Self::build_potion_buffs_sync(player_id, player);
+                    drop(players);
+                    self.send_to_player(player_id, buffs_msg).await;
+                }
+            }
+
             // Post-teleport: preload chunks and handle instance exit
             if let Some((tx, ty)) = teleport_pos {
                 use crate::chunk::ChunkCoord;
