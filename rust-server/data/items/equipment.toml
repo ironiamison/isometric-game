@@ -1150,7 +1150,7 @@ defence_bonus = 12
 # --- Bronze Tier (Level 5) ---
 
 [bronze_body]
-display_name = "Bronze Platebody (M)"
+display_name = "Bronze Platemail (M)"
 sprite = "bronze_platebody_male"
 description = "A sturdy chestplate hammered from bronze. Reliable protection for new adventurers."
 category = "equipment"
@@ -1165,7 +1165,7 @@ strength_bonus = 0
 defence_bonus = 4
 
 [bronze_body_female]
-display_name = "Bronze Platebody (F)"
+display_name = "Bronze Platemail (F)"
 sprite = "bronze_platebody_female"
 description = "A sturdy chestplate hammered from bronze. Reliable protection for new adventurers."
 category = "equipment"
@@ -1227,7 +1227,7 @@ defence_bonus = 0
 # --- Iron Tier (Level 15) ---
 
 [iron_body]
-display_name = "Iron Platebody (M)"
+display_name = "Iron Platemail (M)"
 sprite = "iron_platebody_male"
 description = "Solid iron armor that can withstand serious punishment."
 category = "equipment"
@@ -1242,7 +1242,7 @@ strength_bonus = 0
 defence_bonus = 8
 
 [iron_body_female]
-display_name = "Iron Platebody (F)"
+display_name = "Iron Platemail (F)"
 sprite = "iron_platebody_female"
 description = "Solid iron armor that can withstand serious punishment."
 category = "equipment"
@@ -1302,10 +1302,10 @@ strength_bonus = 4
 defence_bonus = 0
 
 # --- Steel Tier (Level 25) ---
-# Note: steel_sword is defined in the WEAPONS section above (replaced from starter to tier 3)
+# Note: steel_sword is defined in the WEAPONS section above
 
 [steel_body]
-display_name = "Steel Platebody (M)"
+display_name = "Steel Platemail (M)"
 sprite = "steel_platebody_male"
 description = "Gleaming steel armor. The standard of any serious fighter."
 category = "equipment"
@@ -1320,7 +1320,7 @@ strength_bonus = 0
 defence_bonus = 12
 
 [steel_body_female]
-display_name = "Steel Platebody (F)"
+display_name = "Steel Platemail (F)"
 sprite = "steel_platebody_female"
 description = "Gleaming steel armor. The standard of any serious fighter."
 category = "equipment"
@@ -1368,7 +1368,7 @@ defence_bonus = 4
 # Note: ancient_boots is defined in the FEET section above (replaced from level 20 to tier 4)
 
 [ancient_body]
-display_name = "Ancient Platebody (M)"
+display_name = "Ancient Platemail (M)"
 sprite = "ancient_platebody_male"
 description = "Armor from a lost age, reforged from fragments of immense power."
 category = "equipment"
@@ -1383,7 +1383,7 @@ strength_bonus = 2
 defence_bonus = 17
 
 [ancient_body_female]
-display_name = "Ancient Platebody (F)"
+display_name = "Ancient Platemail (F)"
 sprite = "ancient_platebody_female"
 description = "Armor from a lost age, reforged from fragments of immense power."
 category = "equipment"

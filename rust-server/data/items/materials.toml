@@ -84,6 +84,60 @@ max_stack = 99
 base_price = 160
 sellable = true
 
+[mithril_ore]
+display_name = "Mithril Ore"
+sprite = "mithril_ore"
+description = "A chunk of lightweight mithril. Requires coal to smelt into bars."
+category = "material"
+max_stack = 5
+base_price = 60
+sellable = true
+
+[adamant_ore]
+display_name = "Adamantite Ore"
+sprite = "adamant_ore"
+description = "Dense green ore. Extremely tough to work with."
+category = "material"
+max_stack = 5
+base_price = 100
+sellable = true
+
+[rune_ore]
+display_name = "Runite Ore"
+sprite = "rune_ore"
+description = "A rare blue ore pulsing with magical energy. The finest smithing material."
+category = "material"
+max_stack = 5
+base_price = 200
+sellable = true
+
+[mithril_bar]
+display_name = "Mithril Bar"
+sprite = "mithril_bar"
+description = "A bar of smelted mithril. Light yet incredibly strong."
+category = "material"
+max_stack = 99
+base_price = 240
+sellable = true
+
+[adamant_bar]
+display_name = "Adamant Bar"
+sprite = "adamant_bar"
+description = "A bar of smelted adamant. Used to smith adamant equipment."
+category = "material"
+max_stack = 99
+base_price = 480
+sellable = true
+
+[rune_bar]
+display_name = "Rune Bar"
+sprite = "rune_bar"
+description = "A bar of smelted runite. The finest metal for master smiths."
+category = "material"
+max_stack = 99
+base_price = 1000
+sellable = true
+
 [ancient_fragment]
 display_name = "Ancient Fragment"
 sprite = "ancient_fragment"
@@ -295,6 +349,14 @@ description = "A venomous fang from a giant spider."
 category = "material"
 max_stack = 99
 base_price = 25
+
+[feather]
+display_name = "Feather"
+sprite = "feather"
+description = "A plain feather. Used for fletching."
+category = "material"
+max_stack = 99
+base_price = 2
 
 [crow_feather]
 display_name = "Crow Feather"

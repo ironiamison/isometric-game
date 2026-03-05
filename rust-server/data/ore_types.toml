@@ -48,3 +48,36 @@ success_chance = 0.08
 depletion_chance = 0.10
 respawn_time_min = 8000
 respawn_time_max = 16000
+
+[rocks.mithril]
+# Mithril ore rocks (assign GIDs when placed on map)
+gids = []
+level_required = 30
+ore_item_id = "mithril_ore"
+xp_per_ore = 80
+success_chance = 0.06
+depletion_chance = 0.08
+respawn_time_min = 12000
+respawn_time_max = 24000
+
+[rocks.adamant]
+# Adamantite ore rocks (assign GIDs when placed on map)
+gids = []
+level_required = 40
+ore_item_id = "adamant_ore"
+xp_per_ore = 120
+success_chance = 0.04
+depletion_chance = 0.06
+respawn_time_min = 20000
+respawn_time_max = 40000
+
+[rocks.rune]
+# Runite ore rocks (assign GIDs when placed on map)
+gids = []
+level_required = 50
+ore_item_id = "rune_ore"
+xp_per_ore = 175
+success_chance = 0.03
+depletion_chance = 0.05
+respawn_time_min = 60000
+respawn_time_max = 120000

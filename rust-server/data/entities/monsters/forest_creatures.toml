@@ -729,3 +729,103 @@ wander_pause_min_ms = 2000
 wander_pause_max_ms = 5000
 
 # Piglet is defined in pig.toml (sprite = "piglet", stronger/defensive variant)
+
+# =============================================================================
+# Chicken
+# =============================================================================
+
+[chicken]
+display_name = "Chicken"
+sprite = "chicken"
+animation_type = "standard"
+description = "A plucky chicken pecking at the ground."
+
+[chicken.stats]
+level = 1
+max_hp = 8
+damage = 1
+attack_bonus = 0
+defence_bonus = -1
+attack_range = 1
+aggro_range = 3
+chase_range = 4
+move_cooldown_ms = 500
+attack_cooldown_ms = 2000
+respawn_time_ms = 8000
+
+[chicken.rewards]
+exp_base = 12
+gold_min = 1
+gold_max = 5
+
+[[chicken.loot]]
+item_id = "feather"
+drop_chance = 0.40
+quantity_min = 1
+quantity_max = 3
+
+[[chicken.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[chicken.behaviors]
+hostile = false
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
+# Goat
+# =============================================================================
+
+[goat]
+display_name = "Goat"
+sprite = "goat"
+animation_type = "standard"
+description = "A stubborn goat that headbutts anything nearby."
+
+[goat.stats]
+level = 3
+max_hp = 18
+damage = 2
+attack_bonus = 1
+defence_bonus = 1
+attack_range = 1
+aggro_range = 4
+chase_range = 5
+move_cooldown_ms = 550
+attack_cooldown_ms = 2000
+respawn_time_ms = 10000
+
+[goat.rewards]
+exp_base = 20
+gold_min = 3
+gold_max = 8
+
+[[goat.loot]]
+item_id = "scrap_leather"
+drop_chance = 0.20
+quantity_min = 1
+quantity_max = 1
+
+[[goat.loot]]
+item_id = "regular_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[goat.loot]]
+item_id = "health_potion"
+drop_chance = 0.10
+quantity_min = 1
+quantity_max = 1
+
+[goat.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2500
+wander_pause_max_ms = 6000

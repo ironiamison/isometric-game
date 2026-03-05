@@ -66,13 +66,79 @@ count = 1
 item_id = "steel_bar"
 count = 1
 
+[mithril_bar]
+display_name = "Mithril Bar"
+description = "Smelt mithril ore with coal into a mithril bar."
+category = "smithing"
+section = "materials"
+level_required = 30
+station = "furnace"
+craft_time_ms = 2500
+xp = 55
+
+[[mithril_bar.ingredients]]
+item_id = "mithril_ore"
+count = 1
+
+[[mithril_bar.ingredients]]
+item_id = "coal_ore"
+count = 2
+
+[[mithril_bar.results]]
+item_id = "mithril_bar"
+count = 1
+
+[adamant_bar]
+display_name = "Adamant Bar"
+description = "Smelt adamantite ore with coal into an adamant bar."
+category = "smithing"
+section = "materials"
+level_required = 45
+station = "furnace"
+craft_time_ms = 3000
+xp = 75
+
+[[adamant_bar.ingredients]]
+item_id = "adamant_ore"
+count = 1
+
+[[adamant_bar.ingredients]]
+item_id = "coal_ore"
+count = 3
+
+[[adamant_bar.results]]
+item_id = "adamant_bar"
+count = 1
+
+[rune_bar]
+display_name = "Rune Bar"
+description = "Smelt runite ore with coal into a rune bar."
+category = "smithing"
+section = "materials"
+level_required = 60
+station = "furnace"
+craft_time_ms = 4000
+xp = 100
+
+[[rune_bar.ingredients]]
+item_id = "rune_ore"
+count = 1
+
+[[rune_bar.ingredients]]
+item_id = "coal_ore"
+count = 4
+
+[[rune_bar.results]]
+item_id = "rune_bar"
+count = 1
+
 # =============================================================================
 # Bronze Gear (Smithing Level 5)
 # =============================================================================
 
 [bronze_body]
-display_name = "Bronze Platebody (M)"
-description = "Hammer bronze bars into a sturdy platebody."
+display_name = "Bronze Platemail (M)"
+description = "Hammer bronze bars into a sturdy platemail."
 category = "smithing"
 section = "equipment"
 level_required = 5
@@ -89,8 +155,8 @@ item_id = "bronze_body"
 count = 1
 
 [bronze_body_female]
-display_name = "Bronze Platebody (F)"
-description = "Hammer bronze bars into a sturdy platebody."
+display_name = "Bronze Platemail (F)"
+description = "Hammer bronze bars into a sturdy platemail."
 category = "smithing"
 section = "equipment"
 level_required = 5
@@ -165,7 +231,7 @@ count = 1
 # =============================================================================
 
 [iron_body]
-display_name = "Iron Platebody (M)"
+display_name = "Iron Platemail (M)"
 description = "Hammer iron bars into solid plate armor."
 category = "smithing"
 section = "equipment"
@@ -183,7 +249,7 @@ item_id = "iron_body"
 count = 1
 
 [iron_body_female]
-display_name = "Iron Platebody (F)"
+display_name = "Iron Platemail (F)"
 description = "Hammer iron bars into solid plate armor."
 category = "smithing"
 section = "equipment"
@@ -259,7 +325,7 @@ count = 1
 # =============================================================================
 
 [steel_body]
-display_name = "Steel Platebody (M)"
+display_name = "Steel Platemail (M)"
 description = "Forge gleaming steel plate armor."
 category = "smithing"
 section = "equipment"
@@ -277,7 +343,7 @@ item_id = "steel_body"
 count = 1
 
 [steel_body_female]
-display_name = "Steel Platebody (F)"
+display_name = "Steel Platemail (F)"
 description = "Forge gleaming steel plate armor."
 category = "smithing"
 section = "equipment"
@@ -353,7 +419,7 @@ count = 1
 # =============================================================================
 
 [ancient_body]
-display_name = "Ancient Platebody (M)"
+display_name = "Ancient Platemail (M)"
 description = "Reforge ancient fragments into legendary plate armor."
 category = "smithing"
 section = "equipment"
@@ -371,7 +437,7 @@ item_id = "ancient_body"
 count = 1
 
 [ancient_body_female]
-display_name = "Ancient Platebody (F)"
+display_name = "Ancient Platemail (F)"
 description = "Reforge ancient fragments into legendary plate armor."
 category = "smithing"
 section = "equipment"
@@ -1016,4 +1082,58 @@ count = 1
 
 [[smith_steel_arrowheads.results]]
 item_id = "steel_arrowhead"
+count = 15
+
+[smith_mithril_arrowheads]
+display_name = "Mithril Arrowheads"
+description = "Smith mithril arrowheads from a mithril bar."
+category = "smithing"
+section = "materials"
+level_required = 35
+station = "anvil"
+craft_time_ms = 3000
+xp = 65
+
+[[smith_mithril_arrowheads.ingredients]]
+item_id = "mithril_bar"
+count = 1
+
+[[smith_mithril_arrowheads.results]]
+item_id = "mithril_arrowhead"
+count = 15
+
+[smith_adamant_arrowheads]
+display_name = "Adamant Arrowheads"
+description = "Smith adamant arrowheads from an adamant bar."
+category = "smithing"
+section = "materials"
+level_required = 50
+station = "anvil"
+craft_time_ms = 4000
+xp = 85
+
+[[smith_adamant_arrowheads.ingredients]]
+item_id = "adamant_bar"
+count = 1
+
+[[smith_adamant_arrowheads.results]]
+item_id = "adamant_arrowhead"
+count = 15
+
+[smith_rune_arrowheads]
+display_name = "Rune Arrowheads"
+description = "Smith rune arrowheads from a rune bar."
+category = "smithing"
+section = "materials"
+level_required = 65
+station = "anvil"
+craft_time_ms = 5000
+xp = 110
+
+[[smith_rune_arrowheads.ingredients]]
+item_id = "rune_bar"
+count = 1
+
+[[smith_rune_arrowheads.results]]
+item_id = "rune_arrowhead"
 count = 15
