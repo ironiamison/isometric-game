@@ -484,6 +484,14 @@ impl ClientMessage {
 // Chest Data Structs
 // ============================================================================
 
+#[derive(Debug, Clone)]
+pub struct PotionBuffEntry {
+    pub stat: String,
+    pub amount: i32,
+    pub remaining_ms: u64,
+    pub source_item_id: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ChestSlotUpdate {
     pub slot: u8,
@@ -904,6 +912,10 @@ pub enum ServerMessage {
     BuffExpired {
         player_id: String,
         buff_type: String,
+    },
+    PotionBuffsSync {
+        player_id: String,
+        buffs: Vec<PotionBuffEntry>,
     },
     ChairPositions {
         positions: Vec<(i32, i32)>,
@@ -1641,6 +1653,7 @@ impl ServerMessage {
             ServerMessage::BonusTileExpired { .. } => "bonusTileExpired",
             ServerMessage::BuffApplied { .. } => "buffApplied",
             ServerMessage::BuffExpired { .. } => "buffExpired",
+            ServerMessage::PotionBuffsSync { .. } => "potionBuffsSync",
             ServerMessage::ChairPositions { .. } => "chairPositions",
             ServerMessage::ChestPositions { .. } => "chestPositions",
             ServerMessage::SitResult { .. } => "sitResult",
@@ -4561,6 +4574,38 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::String("buff_type".into()),
                 Value::String(buff_type.clone().into()),
             ));
+            Value::Map(map)
+        }
+        ServerMessage::PotionBuffsSync { player_id, buffs } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("player_id".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            let buff_values: Vec<Value> = buffs
+                .iter()
+                .map(|b| {
+                    let mut bmap = Vec::new();
+                    bmap.push((
+                        Value::String("stat".into()),
+                        Value::String(b.stat.clone().into()),
+                    ));
+                    bmap.push((
+                        Value::String("amount".into()),
+                        Value::Integer((b.amount as i64).into()),
+                    ));
+                    bmap.push((
+                        Value::String("remaining_ms".into()),
+                        Value::Integer((b.remaining_ms as i64).into()),
+                    ));
+                    bmap.push((
+                        Value::String("source_item_id".into()),
+                        Value::String(b.source_item_id.clone().into()),
+                    ));
+                    Value::Map(bmap)
+                })
+                .collect();
+            map.push((Value::String("buffs".into()), Value::Array(buff_values)));
             Value::Map(map)
         }
         ServerMessage::ChairPositions { positions } => {
