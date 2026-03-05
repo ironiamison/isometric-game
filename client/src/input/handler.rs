@@ -8564,7 +8564,7 @@ impl InputHandler {
                         let tile_walkable = state
                             .chunk_manager
                             .is_walkable(target_x as f32, target_y as f32);
-                        let occupied = build_occupied_set(state, true);
+                        let occupied = build_occupied_set(state, false);
                         let not_occupied = !occupied.contains(&(target_x, target_y));
                         tile_walkable && not_occupied
                     } else {
@@ -9906,6 +9906,52 @@ impl InputHandler {
                         }
                     }
                 }
+            } else if state
+                .chair_positions
+                .contains(&(clicked_tile_x, clicked_tile_y))
+            {
+                // Clicked on a chair - try to sit
+                if !state.is_sitting {
+                    if let Some(local_id) = &state.local_player_id {
+                        if let Some(player) = state.players.get(local_id) {
+                            let px = player.server_x.round() as i32;
+                            let py = player.server_y.round() as i32;
+                            let cdx = (px - clicked_tile_x).abs();
+                            let cdy = (py - clicked_tile_y).abs();
+                            if cdx <= 1 && cdy <= 1 {
+                                // Within range - sit immediately
+                                commands.push(InputCommand::SitChair {
+                                    tile_x: clicked_tile_x,
+                                    tile_y: clicked_tile_y,
+                                });
+                            } else {
+                                // Out of range - pathfind to adjacent tile, then sit
+                                let occupied = build_occupied_set(state, true);
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                    (px, py),
+                                    (clicked_tile_x, clicked_tile_y),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
+                                ) {
+                                    state.auto_path = Some(PathState {
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: None,
+                                        interact_target: None,
+                                        interact_object_target: None,
+                                        waystone_target: None,
+                                        browse_stall_target: None,
+                                    });
+                                    state.pending_chair_sit =
+                                        Some((clicked_tile_x, clicked_tile_y));
+                                }
+                            }
+                        }
+                    }
+                }
             } else if let Some(obj) = state
                 .chunk_manager
                 .get_object_at_exact(clicked_tile_x, clicked_tile_y)
@@ -10128,52 +10174,6 @@ impl InputHandler {
                                         });
                                         state.pending_harvest_patch = Some(patch_id);
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-            } else if state
-                .chair_positions
-                .contains(&(clicked_tile_x, clicked_tile_y))
-            {
-                // Clicked on a chair - try to sit
-                if !state.is_sitting {
-                    if let Some(local_id) = &state.local_player_id {
-                        if let Some(player) = state.players.get(local_id) {
-                            let px = player.server_x.round() as i32;
-                            let py = player.server_y.round() as i32;
-                            let cdx = (px - clicked_tile_x).abs();
-                            let cdy = (py - clicked_tile_y).abs();
-                            if cdx <= 1 && cdy <= 1 {
-                                // Within range - sit immediately
-                                commands.push(InputCommand::SitChair {
-                                    tile_x: clicked_tile_x,
-                                    tile_y: clicked_tile_y,
-                                });
-                            } else {
-                                // Out of range - pathfind to adjacent tile, then sit
-                                let occupied = build_occupied_set(state, true);
-                                const MAX_PATH_DISTANCE: i32 = 32;
-                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                    (px, py),
-                                    (clicked_tile_x, clicked_tile_y),
-                                    &state.chunk_manager,
-                                    &occupied,
-                                    MAX_PATH_DISTANCE,
-                                ) {
-                                    state.auto_path = Some(PathState {
-                                        path,
-                                        current_index: 0,
-                                        destination: dest,
-                                        pickup_target: None,
-                                        interact_target: None,
-                                        interact_object_target: None,
-                                        waystone_target: None,
-                                        browse_stall_target: None,
-                                    });
-                                    state.pending_chair_sit =
-                                        Some((clicked_tile_x, clicked_tile_y));
                                 }
                             }
                         }
