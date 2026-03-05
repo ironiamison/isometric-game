@@ -11,9 +11,9 @@
       381,
       381,
       381,
-      381,
-      381,
-      381,
+      386,
+      386,
+      386,
       381,
       381,
       381,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "/////xFAgIABIACAAQAAgAEEAIABABCABQAAgAECAIABAACAAQAAgAEAAIEBAACAAQAAgAEBAIABAACAAQAA4AEA/y8IgAAgAIDwYACA8OABgLBsAYTwaAGA8GwBgPBsAYBA5AGAQEwBgMBJAYD/SAMg+E8GAAz/CQAI7d//90o=",
+  "collision": "/3/+/xFAgIABIACAAQAAgAEEAIABABCABQAAgAECAIABAACAAQAAgAEAAIEBAACAAQAAgAEBAIABAACAAQAA4AEA/y8IgAAgAIDwYACA8OABgLBsAYTwaAGA8GwBgPBsAYBA5AGAQFwBgMBFAYD/SQMg+EcGAAz3CQAI5d//90I=",
   "entities": [],
   "mapObjects": [
     {
@@ -3099,20 +3099,6 @@
       "gid": 1679,
       "x": 26,
       "y": 30,
-      "width": 64,
-      "height": 39
-    },
-    {
-      "gid": 1679,
-      "x": 27,
-      "y": 30,
-      "width": 64,
-      "height": 39
-    },
-    {
-      "gid": 1679,
-      "x": 27,
-      "y": 31,
       "width": 64,
       "height": 39
     },
@@ -3370,36 +3356,8 @@
     },
     {
       "gid": 1685,
-      "x": 27,
-      "y": 29,
-      "width": 64,
-      "height": 39
-    },
-    {
-      "gid": 1685,
       "x": 26,
       "y": 29,
-      "width": 64,
-      "height": 39
-    },
-    {
-      "gid": 1680,
-      "x": 27,
-      "y": 28,
-      "width": 64,
-      "height": 39
-    },
-    {
-      "gid": 1680,
-      "x": 27,
-      "y": 26,
-      "width": 64,
-      "height": 39
-    },
-    {
-      "gid": 1680,
-      "x": 27,
-      "y": 27,
       "width": 64,
       "height": 39
     },
@@ -3493,13 +3451,6 @@
       "y": 27,
       "width": 29,
       "height": 25
-    },
-    {
-      "gid": 2060,
-      "x": 27,
-      "y": 23,
-      "width": 33,
-      "height": 38
     },
     {
       "gid": 2059,
@@ -3742,13 +3693,6 @@
     {
       "gid": 1494,
       "x": 17,
-      "y": 0,
-      "width": 32,
-      "height": 50
-    },
-    {
-      "gid": 1494,
-      "x": 16,
       "y": 0,
       "width": 32,
       "height": 50
@@ -4174,11 +4118,32 @@
       "height": 82
     },
     {
-      "gid": 2138,
-      "x": 15,
-      "y": 0,
-      "width": 52,
-      "height": 82
+      "gid": 2996,
+      "x": 27,
+      "y": 27,
+      "width": 128,
+      "height": 104
+    },
+    {
+      "gid": 2990,
+      "x": 27,
+      "y": 23,
+      "width": 38,
+      "height": 89
+    },
+    {
+      "gid": 2989,
+      "x": 24,
+      "y": 27,
+      "width": 57,
+      "height": 61
+    },
+    {
+      "gid": 2342,
+      "x": 28,
+      "y": 25,
+      "width": 22,
+      "height": 23
     }
   ],
   "walls": [

@@ -346,7 +346,7 @@
       498,
       498,
       498,
-      498,
+      495,
       498,
       498,
       498,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AwAAAAEAAAABAAAAAEAAAIAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAABAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AwAAAAEAAAABAAAAIEAAAIgAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAABAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3136,6 +3136,27 @@
       "y": 2,
       "width": 64,
       "height": 32
+    },
+    {
+      "gid": 2768,
+      "x": 3,
+      "y": 4,
+      "width": 134,
+      "height": 97
+    },
+    {
+      "gid": 2767,
+      "x": 2,
+      "y": 5,
+      "width": 136,
+      "height": 95
+    },
+    {
+      "gid": 2766,
+      "x": 5,
+      "y": 3,
+      "width": 55,
+      "height": 148
     }
   ],
   "walls": [

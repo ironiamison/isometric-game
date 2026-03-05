@@ -7,17 +7,17 @@
   "size": 32,
   "layers": {
     "ground": [
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
       2,
       2,
       2,
@@ -39,17 +39,17 @@
       320,
       320,
       403,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
+      515,
       2,
       2,
       2,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAQJAAAEAQAABgEAwAcBBAAAAQYAAMEGAAAJAxAAAQAAAAEAIAQBAQAAAQAAAAEAAAABAAAAgQBA+AEAAAAAAAAAUAAACECAAAAAAAAAAAGCAAAAxgAQAAwAAAAYAAEQEAgAAAAAAAAAAAAIAAAAgAAAAAAAAIAAAAAAAAAAAAA=",
+  "collision": "AAQJAP8HAQAAAgEAAAABBAAAAQYAAMEGAAAJAxAAAQAAAAEAIAQBAQAAAQAAAAEAAAABAAAAgQBA+AEAAAAAAAAAUAAACECAAAAAAAAAAAGCAAAAxgAQAAwAAAAYAAEQEAgAAAAAAAAAAAAIAAAAgAAAAAAAAIAAAAAAAAAAAAA=",
   "entities": [
     {
       "entityId": "barbarian",
@@ -3649,60 +3649,6 @@
       "edge": "down"
     },
     {
-      "gid": 362,
-      "x": 10,
-      "y": 0,
-      "edge": "right"
-    },
-    {
-      "gid": 362,
-      "x": 10,
-      "y": 1,
-      "edge": "right"
-    },
-    {
-      "gid": 362,
-      "x": 10,
-      "y": 2,
-      "edge": "right"
-    },
-    {
-      "gid": 362,
-      "x": 10,
-      "y": 3,
-      "edge": "right"
-    },
-    {
-      "gid": 361,
-      "x": 10,
-      "y": 3,
-      "edge": "down"
-    },
-    {
-      "gid": 361,
-      "x": 9,
-      "y": 3,
-      "edge": "down"
-    },
-    {
-      "gid": 361,
-      "x": 8,
-      "y": 3,
-      "edge": "down"
-    },
-    {
-      "gid": 361,
-      "x": 7,
-      "y": 3,
-      "edge": "down"
-    },
-    {
-      "gid": 361,
-      "x": 6,
-      "y": 3,
-      "edge": "down"
-    },
-    {
       "gid": 174,
       "x": 4,
       "y": 23,
@@ -3772,6 +3718,84 @@
       "gid": 347,
       "x": 7,
       "y": 20,
+      "edge": "right"
+    },
+    {
+      "gid": 2170,
+      "x": 0,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 1,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 2,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 3,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 4,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 5,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 6,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 7,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 8,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2170,
+      "x": 9,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2174,
+      "x": 10,
+      "y": 1,
+      "edge": "right"
+    },
+    {
+      "gid": 2171,
+      "x": 10,
+      "y": 1,
+      "edge": "down"
+    },
+    {
+      "gid": 2175,
+      "x": 10,
+      "y": 0,
       "edge": "right"
     }
   ],

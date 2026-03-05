@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "SKAAAAgAwP8IAEAASCBACFmgwABIIEAACABAAAiAwP9YIECAWKBAAEigQAAIAEABCABAAEggQABYoEAASCBAAAgAQAAYgEBAWCBAAEygQAJAoEAAAABAAAAAQAAIIEAADCBAAAcgQAAAAEAAAABAAAAAQAQAAEAAAwBAAAIAQAA=",
+  "collision": "SKAAAAgAwP8IAEAASCBACFmgwABIIEAACABAAAiAwP9YIECAWKBAAEigQAAIAEABCABAAEggQABYoEAASCBAAAgAQAAYgEBAWCBAAEygQAJAoEDgAABAIAAAQCAIIEAgDCBAQAcgQAAAAEAAAABAAAAAQAQAAEAAAwBAAAIAQAA=",
   "entities": [
     {
       "entityId": "crow",
@@ -3097,12 +3097,6 @@
       "entityId": "crow",
       "x": 25,
       "y": 23,
-      "level": 1
-    },
-    {
-      "entityId": "crow",
-      "x": 29,
-      "y": 20,
       "level": 1
     }
   ],
