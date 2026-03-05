@@ -9803,6 +9803,32 @@ impl Renderer {
                     };
                 // Slayer chip is now first (leftmost), so tooltip x = bar_x
                 self.render_slayer_task_chip_tooltip(state, bar_x, chip_y);
+
+                // Potion buff chip tooltips
+                if !state.active_potion_buffs.is_empty() {
+                    let chip_gap = 4.0 * s;
+                    let mut tooltip_cursor_x = bar_x;
+                    // Skip past slayer chip
+                    let (sw, _) = self.render_slayer_task_chip(state, -10000.0, -10000.0);
+                    if sw > 0.0 {
+                        tooltip_cursor_x += sw + chip_gap;
+                    }
+                    // Skip past combat style chip
+                    let (cw, _) = self.render_combat_style_chip(state, -10000.0, -10000.0);
+                    if cw > 0.0 {
+                        tooltip_cursor_x += cw + chip_gap;
+                    }
+                    // Iterate buff chips
+                    for buff in &state.active_potion_buffs {
+                        let (bw, bh) = self.render_potion_buff_chip(state, buff, -10000.0, -10000.0);
+                        if bw > 0.0 {
+                            self.render_potion_buff_chip_tooltip(
+                                state, buff, tooltip_cursor_x, chip_y, bw, bh,
+                            );
+                            tooltip_cursor_x += bw + chip_gap;
+                        }
+                    }
+                }
             }
         }
 

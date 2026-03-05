@@ -224,6 +224,84 @@ impl Renderer {
         (chip_w, chip_h)
     }
 
+    /// Render hover tooltip for a potion buff chip
+    pub(crate) fn render_potion_buff_chip_tooltip(
+        &self,
+        state: &GameState,
+        buff: &crate::game::ActivePotionBuff,
+        chip_x: f32,
+        chip_y: f32,
+        chip_w: f32,
+        chip_h: f32,
+    ) {
+        let (raw_mx, raw_my) = mouse_position();
+        let (vw, vh) = virtual_screen_size();
+        let mx = raw_mx * vw / screen_width();
+        let my = raw_my * vh / screen_height();
+
+        if mx < chip_x || mx > chip_x + chip_w || my < chip_y || my > chip_y + chip_h {
+            return;
+        }
+
+        let s = state.ui_state.ui_scale;
+        let tip_font = 16.0;
+        let line_h = 18.0 * s;
+        let tip_pad = 6.0 * s;
+
+        let now = macroquad::time::get_time();
+        let remaining = (buff.expires_at - now).max(0.0);
+        let remaining_secs = remaining as u64;
+        let time_str = if remaining_secs >= 60 {
+            format!("{}m {}s remaining", remaining_secs / 60, remaining_secs % 60)
+        } else {
+            format!("{}s remaining", remaining_secs)
+        };
+
+        // Potion display name from item registry
+        let potion_name = state
+            .item_registry
+            .get_or_placeholder(&buff.source_item_id)
+            .display_name
+            .clone();
+
+        let stat_label = match buff.stat.as_str() {
+            "attack" => "Attack",
+            "strength" => "Strength",
+            "defence" => "Defence",
+            "magic" => "Magic",
+            _ => &buff.stat,
+        };
+
+        let lines = [
+            (potion_name, TEXT_TITLE),
+            (format!("+{} {}", buff.amount, stat_label), TEXT_NORMAL),
+            (time_str, TEXT_DIM),
+        ];
+
+        let tip_w = lines
+            .iter()
+            .map(|(text, _)| self.measure_text_sharp(text, tip_font).width)
+            .fold(0.0f32, f32::max)
+            + tip_pad * 2.0;
+        let tip_h = tip_pad + lines.len() as f32 * line_h + tip_pad;
+
+        let tip_x = chip_x + chip_w + 4.0 * s;
+        let tip_y = chip_y;
+
+        draw_rectangle(tip_x, tip_y, tip_w, tip_h, Color::from_rgba(12, 12, 18, 240));
+        draw_rectangle_lines(tip_x, tip_y, tip_w, tip_h, 1.0, Color::from_rgba(80, 70, 55, 200));
+
+        for (i, (text, color)) in lines.iter().enumerate() {
+            self.draw_text_sharp(
+                text,
+                tip_x + tip_pad,
+                (tip_y + tip_pad + (i as f32 + 0.8) * line_h).floor(),
+                tip_font,
+                *color,
+            );
+        }
+    }
+
     /// Render hover tooltip for slayer task chip (called after other overlapping UI)
     pub(crate) fn render_slayer_task_chip_tooltip(&self, state: &GameState, x: f32, y: f32) {
         let task = match &state.ui_state.slayer_current_task {
