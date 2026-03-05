@@ -34,6 +34,7 @@ fn player_progression_snapshot(player: &super::Player) -> (i32, Vec<(&'static st
             ("woodcutting", player.skills.woodcutting.level),
             ("mining", player.skills.mining.level),
             ("alchemy", player.skills.alchemy.level),
+            ("combat", player.skills.combat_level()),
         ],
     )
 }
@@ -943,7 +944,8 @@ mod tests {
         assert!(entries.contains(&("defence", player.skills.defence.level)));
         assert!(entries.contains(&("fishing", player.skills.fishing.level)));
         assert!(entries.contains(&("alchemy", player.skills.alchemy.level)));
-        assert_eq!(entries.len(), 12);
+        assert!(entries.contains(&("combat", player.skills.combat_level())));
+        assert_eq!(entries.len(), 13);
     }
 
     #[test]
