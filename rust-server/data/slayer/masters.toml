@@ -176,6 +176,15 @@ weight = 4
 requires_unlock = true
 xp_per_kill = 45
 
+[[masters.tasks]]
+monster_id = "bone_monster"
+display_name = "Bone Monsters"
+count_min = 20
+count_max = 40
+weight = 4
+requires_unlock = true
+xp_per_kill = 55
+
 # ============================================================================
 # Chaeldar - Advanced Slayer Master
 # ============================================================================

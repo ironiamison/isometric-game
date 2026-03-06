@@ -27,6 +27,14 @@ category = "unlock"
 target_id = "rock_golem"
 
 [[rewards]]
+id = "unlock_bone_monster"
+display_name = "Unlock: Bone Monsters"
+description = "Unlock Bone Monsters as a slayer task"
+cost = 50
+category = "unlock"
+target_id = "bone_monster"
+
+[[rewards]]
 id = "slayer_helmet"
 display_name = "Slayer Helmet"
 description = "A helmet that boosts damage by 15% against your slayer task."
