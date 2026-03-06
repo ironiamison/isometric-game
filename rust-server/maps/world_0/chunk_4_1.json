@@ -3092,6 +3092,30 @@
       "x": 26,
       "y": 17,
       "level": 1
+    },
+    {
+      "entityId": "chicken",
+      "x": 24,
+      "y": 17,
+      "level": 1
+    },
+    {
+      "entityId": "chicken",
+      "x": 29,
+      "y": 14,
+      "level": 1
+    },
+    {
+      "entityId": "chicken",
+      "x": 24,
+      "y": 24,
+      "level": 1
+    },
+    {
+      "entityId": "chicken",
+      "x": 29,
+      "y": 30,
+      "level": 1
     }
   ],
   "mapObjects": [
