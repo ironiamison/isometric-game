@@ -76,6 +76,22 @@ count_max = 35
 weight = 8
 xp_per_kill = 10
 
+[[masters.tasks]]
+monster_id = "chicken"
+display_name = "Chickens"
+count_min = 20
+count_max = 40
+weight = 8
+xp_per_kill = 6
+
+[[masters.tasks]]
+monster_id = "goat"
+display_name = "Goats"
+count_min = 15
+count_max = 35
+weight = 8
+xp_per_kill = 10
+
 # ============================================================================
 # Mazchna - Intermediate Slayer Master
 # ============================================================================
