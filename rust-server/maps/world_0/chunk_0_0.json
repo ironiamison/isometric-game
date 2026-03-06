@@ -3085,18 +3085,12 @@
       0
     ]
   },
-  "collision": "AAYQAAAOAAAADgAAAA4AAAAAAAAAAAAAAAAAAAEAAAAA/EAAAQbhcAADgnAAQQQwAAEYcAIBIHAAAkBiAQKA/wASgIEABAAPBwiAHwMIgA8DEIAHAyCAHwFAwg8DwOABAwATBQAAFAUBQJT9IBQUAAAAFwAgABEAINDxfjjA//A=",
+  "collision": "AAYQAAAOAAAADgAAAA4AAAAAAAAAAAAAAAAAAAEAAAAA/EAAAf7hcAAHg3AAQwYwAAMccAIDOHAABkBiAQaA/wAWgIEADAAPBxiAHwMYgA8DMIAHA2CAHwHA4g8DwPsBAwAfBQAAHAUBQJz9IBQcAAAAHwAgABEAINDxfjjA//A=",
   "entities": [
     {
       "entityId": "crow",
       "x": 24,
       "y": 12,
-      "level": 1
-    },
-    {
-      "entityId": "crow",
-      "x": 13,
-      "y": 24,
       "level": 1
     },
     {
@@ -3112,20 +3106,21 @@
       "level": 1
     },
     {
-      "entityId": "fisherman_andy",
-      "x": 7,
-      "y": 28,
+      "entityId": "fire_pit",
+      "x": 12,
+      "y": 27,
       "level": 1
     },
     {
-      "entityId": "fire_pit",
-      "x": 15,
-      "y": 26
+      "entityId": "camp_cook",
+      "x": 7,
+      "y": 29,
+      "level": 1
     },
     {
-      "entityId": "camp_cook",
-      "x": 14,
-      "y": 25,
+      "entityId": "fisherman_andy",
+      "x": 15,
+      "y": 24,
       "level": 1
     }
   ],
@@ -3755,6 +3750,13 @@
       "width": 42,
       "height": 27,
       "noCollision": true
+    },
+    {
+      "gid": 2997,
+      "x": 12,
+      "y": 27,
+      "width": 180,
+      "height": 59
     }
   ],
   "walls": [
@@ -4231,12 +4233,6 @@
       "x": 11,
       "y": 0,
       "edge": "right"
-    },
-    {
-      "gid": 698,
-      "x": 12,
-      "y": 27,
-      "edge": "down"
     }
   ],
   "portals": [
