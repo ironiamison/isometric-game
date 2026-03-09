@@ -755,7 +755,7 @@ app.get('/api/assets/next-id/:category', async (req, res) => {
 });
 
 // Upload a single asset
-app.post('/api/assets/upload', upload.single('file'), async (req, res) => {
+app.post('/api/assets/upload', upload.single('file') as any, async (req, res) => {
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'No file uploaded' });
@@ -929,7 +929,7 @@ app.post('/api/assets/upload', upload.single('file'), async (req, res) => {
 });
 
 // Batch upload
-app.post('/api/assets/upload-batch', upload.array('files', 50), async (req, res) => {
+app.post('/api/assets/upload-batch', upload.array('files', 50) as any, async (req, res) => {
   try {
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
@@ -988,7 +988,7 @@ app.post('/api/assets/upload-batch', upload.array('files', 50), async (req, res)
 });
 
 // Detect animation in a single file
-app.post('/api/assets/detect-animation', upload.single('file'), async (req, res) => {
+app.post('/api/assets/detect-animation', upload.single('file') as any, async (req, res) => {
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'No file uploaded' });
