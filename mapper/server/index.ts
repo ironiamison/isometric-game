@@ -1,15 +1,32 @@
 import express from 'express';
 import cors from 'cors';
 import fs from 'fs/promises';
-import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import multer from 'multer';
-import { imageSize } from 'image-size';
 
 const execAsync = promisify(exec);
+
+// Read PNG dimensions from file header (bytes 16-23 of a valid PNG)
+async function readPngDimensions(filePath: string): Promise<{ width: number; height: number }> {
+  const fd = await fs.open(filePath, 'r');
+  try {
+    const buf = Buffer.alloc(24);
+    await fd.read(buf, 0, 24, 0);
+    // Validate PNG signature
+    if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4E || buf[3] !== 0x47) {
+      throw new Error('Not a valid PNG file');
+    }
+    // Width and height are at bytes 16-19 and 20-23 (big-endian uint32)
+    const width = buf.readUInt32BE(16);
+    const height = buf.readUInt32BE(20);
+    return { width, height };
+  } finally {
+    await fd.close();
+  }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -750,7 +767,7 @@ app.post('/api/assets/upload', upload.single('file'), async (req, res) => {
     }
 
     // Get dimensions
-    const dimensions = imageSize(await fs.readFile(file.path));
+    const dimensions = await readPngDimensions(file.path);
     if (!dimensions.width || !dimensions.height) {
       await fs.unlink(file.path);
       return res.status(400).json({ error: 'Could not read image dimensions' });
@@ -939,7 +956,7 @@ app.post('/api/assets/upload-batch', upload.array('files', 50), async (req, res)
     const results: Array<{ id: number; name: string; width: number; height: number }> = [];
 
     for (const file of files) {
-      const dimensions = imageSize(await fs.readFile(file.path));
+      const dimensions = await readPngDimensions(file.path);
       if (!dimensions.width || !dimensions.height) {
         await fs.unlink(file.path);
         continue;
