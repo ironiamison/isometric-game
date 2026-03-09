@@ -3,7 +3,10 @@ import { useEditorStore } from '@/state/store';
 import { isometricRenderer } from '@/core/IsometricRenderer';
 import { screenToWorldTile } from '@/core/coords';
 import { Tool, Layer } from '@/types';
+import type { DevNote } from '@/types';
 import { history } from '@/core/History';
+import { ContextMenu } from '@/components/ContextMenu';
+import { notesStorage } from '@/core/NotesStorage';
 import { objectLoader } from '@/core/ObjectLoader';
 import styles from './Canvas.module.css';
 
@@ -12,6 +15,7 @@ export function Canvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isPainting, setIsPainting] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; wx: number; wy: number } | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
   const {
@@ -80,6 +84,8 @@ export function Canvas() {
     setSelectedInteriorWall,
     findWallAtWorld,
     setSelectedWall,
+    addNote,
+    setSelectedNoteId,
   } = useEditorStore();
 
   // Setup canvas and renderer
@@ -746,8 +752,53 @@ export function Canvas() {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          const rect = canvasRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          const tile = screenToWorldTile(
+            { sx: e.clientX - rect.left, sy: e.clientY - rect.top },
+            viewport
+          );
+          if (tile) {
+            setContextMenu({ x: e.clientX, y: e.clientY, wx: tile.wx, wy: tile.wy });
+          }
+        }}
       />
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={[
+            {
+              label: 'Add Note Here',
+              onClick: () => {
+                const CHUNK_SIZE = 32;
+                const now = new Date().toISOString();
+                const note: DevNote = {
+                  id: crypto.randomUUID(),
+                  x: contextMenu.wx,
+                  y: contextMenu.wy,
+                  chunkCoord: {
+                    cx: Math.floor(contextMenu.wx / CHUNK_SIZE),
+                    cy: Math.floor(contextMenu.wy / CHUNK_SIZE),
+                  },
+                  text: '',
+                  category: 'todo',
+                  priority: 'medium',
+                  status: 'open',
+                  createdAt: now,
+                  updatedAt: now,
+                };
+                addNote(note);
+                notesStorage.create(note).catch(console.error);
+                setSelectedNoteId(note.id);
+              },
+            },
+          ]}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
       {editorMode === 'interior' && currentInterior && (
         <div className={styles.modeIndicator}>
           INTERIOR MODE
