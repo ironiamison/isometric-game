@@ -1,0 +1,287 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #2d2d44;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #3d3d5c;
+}
+
+.header:hover {
+  background: #3d3d5c;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.arrow {
+  font-size: 10px;
+  transition: transform 0.15s;
+  color: #888;
+}
+
+.arrowCollapsed {
+  transform: rotate(-90deg);
+}
+
+.title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #999;
+  font-weight: 600;
+}
+
+.badge {
+  font-size: 10px;
+  background: #3d3d5c;
+  color: #ccc;
+  padding: 1px 5px;
+  border-radius: 8px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 4px;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.iconButton:hover {
+  background: #4d4d6c;
+  color: #fff;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.filters {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  flex-wrap: wrap;
+}
+
+.filterChip {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid #4d4d6c;
+  background: none;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.filterChip:hover {
+  border-color: #6d6d8c;
+}
+
+.filterChipActive {
+  background: #3d3d5c;
+  color: #fff;
+  border-color: #5c7cfa;
+}
+
+.noteList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.noteCard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 2px;
+}
+
+.noteCard:hover {
+  background: #3d3d5c;
+}
+
+.noteCardSelected {
+  background: #3d3d5c;
+  border-color: #5c7cfa;
+}
+
+.noteCardResolved {
+  opacity: 0.5;
+}
+
+.noteHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+
+.categoryDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.priorityBadge {
+  font-size: 8px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #4d4d6c;
+  color: #ccc;
+  text-transform: uppercase;
+}
+
+.priorityHigh {
+  background: #dc3545;
+  color: #fff;
+}
+
+.noteText {
+  font-size: 11px;
+  color: #ccc;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.noteCoord {
+  font-size: 9px;
+  color: #777;
+}
+
+.anchorBadge {
+  font-size: 9px;
+  color: #4ecdc4;
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #252538;
+  border-radius: 4px;
+  margin: 4px;
+}
+
+.textarea {
+  background: #3d3d5c;
+  border: 1px solid #4d4d6c;
+  border-radius: 3px;
+  color: #e0e0e0;
+  padding: 6px;
+  font-size: 11px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: #5c7cfa;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 6px;
+}
+
+.select {
+  background: #3d3d5c;
+  border: 1px solid #4d4d6c;
+  border-radius: 3px;
+  color: #e0e0e0;
+  padding: 3px 6px;
+  font-size: 10px;
+  flex: 1;
+}
+
+.select:focus {
+  outline: none;
+  border-color: #5c7cfa;
+}
+
+.formActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.saveButton {
+  background: #5c7cfa;
+  border: none;
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.saveButton:hover {
+  background: #4c6ce0;
+}
+
+.deleteButton {
+  background: #dc3545;
+  border: none;
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.deleteButton:hover {
+  background: #c82333;
+}
+
+.resolveButton {
+  background: #28a745;
+  border: none;
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.resolveButton:hover {
+  background: #218838;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-size: 11px;
+}
