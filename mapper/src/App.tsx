@@ -6,6 +6,7 @@ import { objectLoader } from '@/core/ObjectLoader';
 import { chunkManager } from '@/core/ChunkManager';
 import { chunkKey } from '@/core/coords';
 import { storage } from '@/core/Storage';
+import { notesStorage } from '@/core/NotesStorage';
 import { MenuBar } from '@/components/MenuBar';
 import { Toolbar } from '@/components/Toolbar';
 import { Canvas } from '@/components/Canvas';
@@ -106,6 +107,7 @@ function App() {
     isLoading,
     loadingMessage,
     layerPanelCollapsed,
+    setNotes,
   } = useEditorStore();
 
   // Initialize app
@@ -184,6 +186,15 @@ function App() {
           setWorldBounds(chunkManager.getBounds());
         }
 
+        // Load dev notes
+        try {
+          const notes = await notesStorage.fetchAll();
+          setNotes(notes);
+          console.log(`Loaded ${notes.length} dev notes`);
+        } catch {
+          console.warn('Could not load dev notes');
+        }
+
         setLoading(false);
       } catch (error) {
         console.error('Failed to initialize:', error);
@@ -196,7 +207,7 @@ function App() {
     // Listen for connection status changes
     const unsubscribe = storage.onConnectionChange(setConnected);
     return () => unsubscribe();
-  }, [setTilesets, setEntityRegistry, setChunks, setWorldBounds, setLoading, setConnected]);
+  }, [setTilesets, setEntityRegistry, setChunks, setWorldBounds, setLoading, setConnected, setNotes]);
 
   // Auto-save every 30 seconds (only dirty chunks)
   useEffect(() => {
