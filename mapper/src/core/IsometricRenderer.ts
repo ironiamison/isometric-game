@@ -1,4 +1,4 @@
-import type { Chunk, Viewport, WorldCoord, MapObject, Wall, InteriorMap, SpriteRect } from '@/types';
+import type { Chunk, Viewport, WorldCoord, MapObject, Wall, InteriorMap, SpriteRect, DevNote } from '@/types';
 import {
   TILE_WIDTH,
   TILE_HEIGHT,
@@ -25,6 +25,7 @@ export interface RenderOptions {
   showEntities: boolean;
   showMapObjects: boolean;
   showPortals: boolean;
+  showNotes: boolean;
   visibleLayers: {
     ground: boolean;
     objects: boolean;
@@ -39,6 +40,7 @@ const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   showEntities: true,
   showMapObjects: true,
   showPortals: true,
+  showNotes: true,
   visibleLayers: {
     ground: true,
     objects: true,
@@ -50,6 +52,8 @@ export class IsometricRenderer {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private options: RenderOptions = DEFAULT_RENDER_OPTIONS;
+  private notes: DevNote[] = [];
+  private selectedNoteId: string | null = null;
 
   attach(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
@@ -70,6 +74,11 @@ export class IsometricRenderer {
 
   getOptions(): RenderOptions {
     return this.options;
+  }
+
+  setNotes(notes: DevNote[], selectedId: string | null): void {
+    this.notes = notes;
+    this.selectedNoteId = selectedId;
   }
 
   clear(): void {
@@ -134,6 +143,9 @@ export class IsometricRenderer {
     for (const chunk of sortedChunks) {
       this.renderGatheringZones(chunk, viewport);
     }
+
+    // Render dev notes
+    this.renderNotes(viewport);
 
     if (this.options.showGrid) {
       this.renderGrid(viewport);
@@ -205,6 +217,9 @@ export class IsometricRenderer {
 
     // Render exit portals
     this.renderInteriorExitPortals(interior, viewport);
+
+    // Render dev notes
+    this.renderNotes(viewport);
 
     if (this.options.showGrid) {
       this.renderGrid(viewport);
@@ -876,6 +891,57 @@ export class IsometricRenderer {
           screen.sy + (TILE_HEIGHT / 2) * viewport.zoom
         );
       }
+    }
+  }
+
+  private renderNotes(viewport: Viewport): void {
+    if (!this.ctx || !this.options.showNotes || this.notes.length === 0) return;
+
+    const CATEGORY_COLORS: Record<string, string> = {
+      todo: '#ff9800',
+      bug: '#f44336',
+      info: '#2196f3',
+      idea: '#4caf50',
+    };
+
+    for (const note of this.notes) {
+      const screen = worldToScreen({ wx: note.x, wy: note.y }, viewport);
+      const isSelected = note.id === this.selectedNoteId;
+      const isResolved = note.status === 'resolved';
+
+      const hh = (TILE_HEIGHT / 2) * viewport.zoom;
+      const centerX = screen.sx;
+      const centerY = screen.sy + hh;
+
+      this.ctx.save();
+      if (isResolved) this.ctx.globalAlpha = 0.3;
+
+      // Pin circle
+      const radius = note.priority === 'high' ? 6 : 4;
+      const color = CATEGORY_COLORS[note.category] || '#888';
+
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY, radius * viewport.zoom, 0, Math.PI * 2);
+      this.ctx.fillStyle = color;
+      this.ctx.fill();
+
+      if (isSelected) {
+        this.ctx.strokeStyle = '#fff';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+      }
+
+      // Label (show first ~20 chars at decent zoom)
+      if (viewport.zoom >= 0.5 && note.text) {
+        const label = note.text.length > 25 ? note.text.slice(0, 22) + '...' : note.text;
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = `${9 * Math.max(1, viewport.zoom)}px sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.fillText(label, centerX, centerY - radius * viewport.zoom - 2);
+      }
+
+      this.ctx.restore();
     }
   }
 
