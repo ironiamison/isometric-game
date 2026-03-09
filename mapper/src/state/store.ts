@@ -17,6 +17,7 @@ import type {
   SpawnPoint,
   ExitPortal,
   EditorMode,
+  DevNote,
 } from '@/types';
 import { Tool, Layer } from '@/types';
 import { chunkKey, worldToChunk, worldToLocal, localToIndex } from '@/core/coords';
@@ -128,6 +129,12 @@ interface EditorState {
 
   // Panel state
   layerPanelCollapsed: boolean;
+
+  // Notes state
+  notes: DevNote[];
+  showNotes: boolean;
+  selectedNoteId: string | null;
+  notesPanelCollapsed: boolean;
 }
 
 interface EditorActions {
@@ -284,6 +291,15 @@ interface EditorActions {
   // Jump to target
   jumpToPortalTarget: (portal: Portal) => Promise<void>;
   jumpToExitPortalTarget: (portal: ExitPortal) => void;
+
+  // Notes actions
+  setNotes: (notes: DevNote[]) => void;
+  addNote: (note: DevNote) => void;
+  updateNote: (id: string, updates: Partial<DevNote>) => void;
+  removeNote: (id: string) => void;
+  setSelectedNoteId: (id: string | null) => void;
+  setShowNotes: (show: boolean) => void;
+  setNotesPanelCollapsed: (collapsed: boolean) => void;
 }
 
 export const useEditorStore = create<EditorState & EditorActions>((set, get) => ({
@@ -347,6 +363,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   isConnected: false,
 
   layerPanelCollapsed: false,
+
+  // Notes
+  notes: [],
+  showNotes: true,
+  selectedNoteId: null,
+  notesPanelCollapsed: false,
 
   // World actions
   setChunks: (chunks, skipAutoSave = false) => {
@@ -1980,4 +2002,18 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       },
     });
   },
+
+  // Notes actions
+  setNotes: (notes) => set({ notes }),
+  addNote: (note) => set((state) => ({ notes: [...state.notes, note] })),
+  updateNote: (id, updates) => set((state) => ({
+    notes: state.notes.map(n => n.id === id ? { ...n, ...updates } : n),
+  })),
+  removeNote: (id) => set((state) => ({
+    notes: state.notes.filter(n => n.id !== id),
+    selectedNoteId: state.selectedNoteId === id ? null : state.selectedNoteId,
+  })),
+  setSelectedNoteId: (id) => set({ selectedNoteId: id }),
+  setShowNotes: (show) => set({ showNotes: show }),
+  setNotesPanelCollapsed: (collapsed) => set({ notesPanelCollapsed: collapsed }),
 }));
