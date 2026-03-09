@@ -1372,6 +1372,7 @@ async fn matchmake_join_or_create(
         &character_data.bank_json,
         character_data.bank_gold,
         character_data.bank_max_slots,
+        &character_data.combat_style_prefs,
     )
     .await;
 
@@ -2594,6 +2595,7 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                             &save_data.bank_json,
                                             save_data.bank_gold,
                                             save_data.bank_max_slots,
+                                            &save_data.combat_style_prefs,
                                         )
                                         .await
                                     {
@@ -3395,6 +3397,7 @@ async fn handle_socket(
                     &save_data.bank_json,
                     save_data.bank_gold,
                     save_data.bank_max_slots,
+                    &save_data.combat_style_prefs,
                 )
                 .await
             {
@@ -5181,6 +5184,7 @@ async fn main() {
                                 &save_data.bank_json,
                                 save_data.bank_gold,
                                 save_data.bank_max_slots,
+                                &save_data.combat_style_prefs,
                             )
                             .await
                         {
@@ -5455,6 +5459,7 @@ async fn main() {
                         &save_data.bank_json,
                         save_data.bank_gold,
                         save_data.bank_max_slots,
+                        &save_data.combat_style_prefs,
                     )
                     .await
                 {

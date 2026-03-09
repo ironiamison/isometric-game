@@ -790,18 +790,27 @@ impl GameRoom {
             }
         }
 
-        // Auto-fallback: if equipping a weapon, check if current combat style is valid
+        // Auto-fallback: if equipping a weapon, restore preferred combat style for this weapon type
         if equip_slot == EquipmentSlot::Weapon {
             use crate::game::CombatStyle;
             let new_weapon_type = equip_stats.weapon_type;
+            let weapon_key = match new_weapon_type {
+                WeaponType::Melee => "melee",
+                WeaponType::Ranged => "ranged",
+            };
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 if !player.combat_style.is_valid_for(new_weapon_type) {
-                    let available = CombatStyle::available_styles(new_weapon_type);
-                    player.combat_style = available[0];
+                    // Try to restore preferred style for this weapon type
+                    let preferred = player.combat_style_prefs.get(weapon_key)
+                        .copied()
+                        .filter(|s| s.is_valid_for(new_weapon_type));
+                    let new_style = preferred.unwrap_or(CombatStyle::available_styles(new_weapon_type)[0]);
+                    player.combat_style = new_style;
                     tracing::info!(
-                        "Player {} combat style auto-reset to {} for {:?} weapon",
+                        "Player {} combat style {} to {} for {:?} weapon",
                         player_id,
+                        if preferred.is_some() { "restored" } else { "auto-reset" },
                         player.combat_style.as_str(),
                         new_weapon_type
                     );
@@ -965,13 +974,15 @@ impl GameRoom {
                 self.handle_stop_gathering(player_id).await;
             }
 
-            // Auto-fallback: unequipping weapon means unarmed (melee)
+            // Auto-fallback: unequipping weapon means unarmed (melee) - restore preferred melee style
             use crate::game::CombatStyle;
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 if !player.combat_style.is_valid_for(WeaponType::Melee) {
-                    let available = CombatStyle::available_styles(WeaponType::Melee);
-                    player.combat_style = available[0];
+                    let preferred = player.combat_style_prefs.get("melee")
+                        .copied()
+                        .filter(|s| s.is_valid_for(WeaponType::Melee));
+                    player.combat_style = preferred.unwrap_or(CombatStyle::available_styles(WeaponType::Melee)[0]);
                 }
             }
             drop(players);

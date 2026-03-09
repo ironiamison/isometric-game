@@ -59,6 +59,7 @@ pub struct CharacterData {
     pub bank_json: String,           // JSON serialized bank vault contents
     pub bank_gold: i32,              // Gold stored in bank
     pub bank_max_slots: u32,         // Current max bank slots (upgradeable)
+    pub combat_style_prefs: String,  // JSON: per-weapon-type style preferences
 }
 
 // Available appearance options
@@ -615,6 +616,21 @@ impl Database {
             }
         }
 
+        // Migration: Add combat_style_prefs column for per-weapon-type style persistence
+        let combat_prefs_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'combat_style_prefs'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !combat_prefs_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN combat_style_prefs TEXT DEFAULT '{}'")
+                .execute(pool)
+                .await
+                .ok();
+        }
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -922,6 +938,7 @@ impl Database {
                         .unwrap_or_else(|_| "[]".to_string()),
                     bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
                     bank_max_slots: r.try_get::<i32, _>("bank_max_slots").unwrap_or(50) as u32,
+                    combat_style_prefs: r.try_get::<String, _>("combat_style_prefs").unwrap_or_else(|_| "{}".to_string()),
                 }
             })
             .collect())
@@ -1047,7 +1064,7 @@ impl Database {
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
                 sitting_at_x, sitting_at_y, entrance_x, entrance_y,
-                bank_json, bank_gold, bank_max_slots
+                bank_json, bank_gold, bank_max_slots, combat_style_prefs
             FROM characters WHERE id = ?"#,
         )
         .bind(character_id)
@@ -1150,6 +1167,7 @@ impl Database {
                     .unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
                 bank_max_slots: r.try_get::<i32, _>("bank_max_slots").unwrap_or(50) as u32,
+                combat_style_prefs: r.try_get::<String, _>("combat_style_prefs").unwrap_or_else(|_| "{}".to_string()),
             }
         }))
     }
@@ -1239,6 +1257,7 @@ impl Database {
         bank_json: &str,
         bank_gold: i32,
         bank_max_slots: u32,
+        combat_style_prefs: &str,
     ) -> Result<(), sqlx::Error> {
         // Serialize skills to JSON for the skills_json column
         let skills_json = serde_json::to_string(skills).unwrap_or_else(|_| "{}".to_string());
@@ -1262,7 +1281,8 @@ impl Database {
                 entrance_y = ?,
                 bank_json = ?,
                 bank_gold = ?,
-                bank_max_slots = ?
+                bank_max_slots = ?,
+                combat_style_prefs = ?
             WHERE id = ?"#,
         )
         .bind(x)
@@ -1293,6 +1313,7 @@ impl Database {
         .bind(bank_json)
         .bind(bank_gold)
         .bind(bank_max_slots as i32)
+        .bind(combat_style_prefs)
         .bind(character_id)
         .execute(&self.pool)
         .await?;

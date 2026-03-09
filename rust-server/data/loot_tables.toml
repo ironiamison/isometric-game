@@ -68,6 +68,7 @@ base_weight = 15
 level_scaling = 0.1
 items = [
     { id = "oyster", level = 60, weight = 5, xp_bonus = 80 },
+    { id = "raw_swordfish", level = 60, weight = 7, xp_bonus = 120 },
 ]
 
 # =============================================================================

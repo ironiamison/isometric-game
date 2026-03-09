@@ -181,6 +181,7 @@ pub struct PlayerSaveData {
     pub bank_json: String,
     pub bank_gold: i32,
     pub bank_max_slots: u32,
+    pub combat_style_prefs: String, // JSON: {"melee":"aggressive","ranged":"rapid"}
 }
 
 // ============================================================================
@@ -367,6 +368,7 @@ pub struct Player {
     pub hp: i32,
     pub skills: Skills,            // Combat skills (Hitpoints determines max HP)
     pub combat_style: CombatStyle, // Active combat style for XP distribution
+    pub combat_style_prefs: HashMap<String, CombatStyle>, // Per-weapon-type preferences (e.g. "melee" -> Aggressive)
     pub active: bool,              // Whether WebSocket is connected
     pub target_id: Option<String>, // Currently targeted entity (player or NPC)
     pub last_attack_time: u64,     // Timestamp of last attack (ms)
@@ -551,6 +553,7 @@ impl Player {
             mp: 10 + skills.magic.level * 2, // Mana = 10 + magic_level * 2
             skills,
             combat_style: CombatStyle::default(),
+            combat_style_prefs: HashMap::new(),
             active: false,
             target_id: None,
             last_attack_time: 0,
@@ -1981,6 +1984,7 @@ impl GameRoom {
         bank_json: &str,
         bank_gold: i32,
         bank_max_slots: u32,
+        combat_style_prefs_json: &str,
     ) {
         // Validate saved position — if the chunk doesn't exist on disk, reset to spawn
         let (safe_x, safe_y) = {
@@ -2022,6 +2026,30 @@ impl GameRoom {
         player.equipped_necklace = equipped_necklace;
         player.equipped_belt = equipped_belt;
         player.is_admin = is_admin;
+
+        // Restore combat style preferences and set active style based on equipped weapon
+        if let Ok(prefs) = serde_json::from_str::<HashMap<String, String>>(combat_style_prefs_json) {
+            for (weapon_key, style_str) in &prefs {
+                if let Some(style) = CombatStyle::from_str(style_str) {
+                    player.combat_style_prefs.insert(weapon_key.clone(), style);
+                }
+            }
+        }
+        // Determine weapon type from equipped weapon and restore preferred style
+        let weapon_type = player.equipped_weapon.as_ref()
+            .and_then(|wid| self.item_registry.get(wid))
+            .and_then(|def| def.equipment.as_ref())
+            .map(|eq| eq.weapon_type)
+            .unwrap_or(WeaponType::Melee);
+        let weapon_key = match weapon_type {
+            WeaponType::Melee => "melee",
+            WeaponType::Ranged => "ranged",
+        };
+        if let Some(&pref_style) = player.combat_style_prefs.get(weapon_key) {
+            if pref_style.is_valid_for(weapon_type) {
+                player.combat_style = pref_style;
+            }
+        }
 
         // Restore inventory from JSON - support both old (u8) and new (String) formats
         // Skip invalid slots (empty item_id or quantity <= 0) to prevent ghost items
@@ -2288,6 +2316,12 @@ impl GameRoom {
                 bank_json,
                 bank_gold: p.bank.gold,
                 bank_max_slots: p.bank_max_slots,
+                combat_style_prefs: {
+                    let prefs_map: HashMap<&str, &str> = p.combat_style_prefs.iter()
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
+                    serde_json::to_string(&prefs_map).unwrap_or_else(|_| "{}".to_string())
+                },
             }
         })
     }
@@ -2334,6 +2368,7 @@ impl GameRoom {
             bank_slots: Vec<(usize, String, i32)>,
             bank_gold: i32,
             bank_max_slots: u32,
+            combat_style_prefs: HashMap<String, CombatStyle>,
         }
 
         let mut result = HashMap::new();
@@ -2413,6 +2448,7 @@ impl GameRoom {
                                 .collect(),
                             bank_gold: p.bank.gold,
                             bank_max_slots: p.bank_max_slots,
+                            combat_style_prefs: p.combat_style_prefs.clone(),
                         },
                     );
                 }
@@ -2453,6 +2489,12 @@ impl GameRoom {
                     .unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: raw.bank_gold,
                 bank_max_slots: raw.bank_max_slots,
+                combat_style_prefs: {
+                    let prefs_map: HashMap<&str, &str> = raw.combat_style_prefs.iter()
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
+                    serde_json::to_string(&prefs_map).unwrap_or_else(|_| "{}".to_string())
+                },
             };
             result.insert(
                 pid,
@@ -2760,6 +2802,12 @@ impl GameRoom {
             // Only set if style is valid for current weapon type
             if style.is_valid_for(weapon_type) {
                 player.combat_style = style;
+                // Save preference for this weapon type
+                let weapon_key = match weapon_type {
+                    WeaponType::Melee => "melee",
+                    WeaponType::Ranged => "ranged",
+                };
+                player.combat_style_prefs.insert(weapon_key.to_string(), style);
             }
         }
     }
