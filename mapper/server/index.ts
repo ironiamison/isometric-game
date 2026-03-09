@@ -19,6 +19,7 @@ const mapperRoot = path.join(serverRoot, '..');
 const DATA_DIR = path.join(mapperRoot, 'mapper-data');
 const CHUNKS_DIR = path.join(DATA_DIR, 'chunks');
 const INTERIORS_DIR = path.join(DATA_DIR, 'interiors');
+const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 
 // Game server maps directory (for deploy)
 const GAME_SERVER_DIR = path.join(mapperRoot, '..', 'rust-server', 'maps');
@@ -29,6 +30,26 @@ const GAME_INTERIORS_DIR = path.join(GAME_SERVER_DIR, 'interiors');
 async function ensureDataDirs() {
   await fs.mkdir(CHUNKS_DIR, { recursive: true });
   await fs.mkdir(INTERIORS_DIR, { recursive: true });
+}
+
+// In-memory notes cache
+let notesCache: any[] = [];
+
+async function loadNotesFromDisk(): Promise<any[]> {
+  try {
+    const data = await fs.readFile(NOTES_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function saveNotesToDisk(notes: any[]): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(NOTES_FILE, JSON.stringify(notes, null, 2));
 }
 
 // Middleware
@@ -503,6 +524,75 @@ app.post('/api/deploy', async (_req, res) => {
   }
 });
 
+// --- Notes API ---
+
+// Get all notes (with optional filters)
+app.get('/api/notes', (_req, res) => {
+  let filtered = notesCache;
+
+  const { status, category, priority, chunk } = _req.query;
+  if (status) filtered = filtered.filter(n => n.status === status);
+  if (category) filtered = filtered.filter(n => n.category === category);
+  if (priority) filtered = filtered.filter(n => n.priority === priority);
+  if (chunk) {
+    const [cx, cy] = (chunk as string).split(',').map(Number);
+    filtered = filtered.filter(n => n.chunkCoord?.cx === cx && n.chunkCoord?.cy === cy);
+  }
+
+  res.json(filtered);
+});
+
+// Get single note
+app.get('/api/notes/:id', (req, res) => {
+  const note = notesCache.find(n => n.id === req.params.id);
+  if (!note) return res.status(404).json({ error: 'Note not found' });
+  res.json(note);
+});
+
+// Create note
+app.post('/api/notes', async (req, res) => {
+  try {
+    const note = req.body;
+    if (!note.id || !note.text === undefined) {
+      return res.status(400).json({ error: 'Note must have id and text' });
+    }
+    notesCache.push(note);
+    await saveNotesToDisk(notesCache);
+    res.json(note);
+  } catch (err) {
+    console.error('Error creating note:', err);
+    res.status(500).json({ error: 'Failed to create note' });
+  }
+});
+
+// Update note
+app.put('/api/notes/:id', async (req, res) => {
+  try {
+    const idx = notesCache.findIndex(n => n.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Note not found' });
+    notesCache[idx] = { ...notesCache[idx], ...req.body, id: req.params.id };
+    await saveNotesToDisk(notesCache);
+    res.json(notesCache[idx]);
+  } catch (err) {
+    console.error('Error updating note:', err);
+    res.status(500).json({ error: 'Failed to update note' });
+  }
+});
+
+// Delete note
+app.delete('/api/notes/:id', async (req, res) => {
+  try {
+    const idx = notesCache.findIndex(n => n.id === req.params.id);
+    if (idx === -1) return res.json({ success: true }); // idempotent
+    notesCache.splice(idx, 1);
+    await saveNotesToDisk(notesCache);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting note:', err);
+    res.status(500).json({ error: 'Failed to delete note' });
+  }
+});
+
 // Serve static frontend files (after API routes)
 app.use(express.static(distPath));
 
@@ -518,6 +608,8 @@ app.get('*', (req, res) => {
 // Start server
 async function main() {
   await ensureDataDirs();
+  notesCache = await loadNotesFromDisk();
+  console.log(`  notes: ${notesCache.length} loaded`);
   console.log('Paths:');
   console.log('  mapperRoot:', mapperRoot);
   console.log('  distPath:', distPath);
