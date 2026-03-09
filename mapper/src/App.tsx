@@ -15,6 +15,7 @@ import { ObjectPalette } from '@/components/ObjectPalette';
 import { LayerPanel } from '@/components/LayerPanel';
 import { EntityPanel } from '@/components/EntityPanel';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
+import { NotesPanel } from '@/components/NotesPanel';
 import './App.css';
 
 function App() {
@@ -359,8 +360,17 @@ function App() {
           onMouseDown={(e) => startResize('right', e)}
         />
         <div className="sidebar right" style={{ width: rightSidebarWidth }}>
-          <EntityPanel />
-          <PropertiesPanel />
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <EntityPanel />
+            </div>
+            <div style={{ flex: 0, overflow: 'hidden' }}>
+              <PropertiesPanel />
+            </div>
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden', borderTop: '1px solid #3d3d5c' }}>
+            <NotesPanel />
+          </div>
         </div>
       </div>
     </div>
