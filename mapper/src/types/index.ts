@@ -439,3 +439,27 @@ export interface Viewport {
   offsetY: number;
   zoom: number;
 }
+
+// Dev notes (mapper-only annotations)
+export type NoteCategory = 'todo' | 'bug' | 'info' | 'idea';
+export type NotePriority = 'low' | 'medium' | 'high';
+export type NoteStatus = 'open' | 'resolved';
+
+export interface NoteAnchor {
+  type: 'entity' | 'mapObject' | 'portal' | 'wall';
+  index: number;
+}
+
+export interface DevNote {
+  id: string;
+  x: number;               // World tile X
+  y: number;               // World tile Y
+  chunkCoord: ChunkCoord;
+  text: string;
+  category: NoteCategory;
+  priority: NotePriority;
+  status: NoteStatus;
+  anchor?: NoteAnchor;
+  createdAt: string;
+  updatedAt: string;
+}
