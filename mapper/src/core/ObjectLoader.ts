@@ -179,6 +179,63 @@ export class ObjectLoader {
   getWallsFirstGid(): number {
     return this.wallsFirstGid;
   }
+
+  // Add a single object from an individual image (for optimistic import preview)
+  async addObject(item: { id: number; name: string; width: number; height: number }, imagePath: string, animation?: { frames: number; fps: number }): Promise<void> {
+    const img = await this.loadImage(imagePath);
+    const frameWidth = animation ? item.width / animation.frames : item.width;
+    const obj: ObjectDefinition = {
+      ...item,
+      image: img,
+      atlasRect: { x: 0, y: 0, w: frameWidth, h: item.height },
+      frames: animation?.frames,
+      fps: animation?.fps,
+    };
+    this.objects.set(item.id, obj);
+  }
+
+  // Add a single wall from an individual image (for optimistic import preview)
+  async addWall(item: { id: number; name: string; width: number; height: number }, imagePath: string, animation?: { frames: number; fps: number }): Promise<void> {
+    const img = await this.loadImage(imagePath);
+    const frameWidth = animation ? item.width / animation.frames : item.width;
+    const obj: ObjectDefinition = {
+      ...item,
+      image: img,
+      atlasRect: { x: 0, y: 0, w: frameWidth, h: item.height },
+      frames: animation?.frames,
+      fps: animation?.fps,
+    };
+    this.walls.set(item.id, obj);
+  }
+
+  // Remove an object definition
+  removeObject(id: number): void {
+    this.objects.delete(id);
+  }
+
+  // Remove a wall definition
+  removeWall(id: number): void {
+    this.walls.delete(id);
+  }
+
+  // Reload everything from config and atlas (after atlas rebuild)
+  async reloadFromConfig(): Promise<void> {
+    // Clear cached manifest/animation data to force re-fetch
+    this.manifest = null;
+    this.animatedSprites = null;
+
+    const resp = await fetch('/mapper-config.json');
+    const config = await resp.json();
+
+    if (config.objects) {
+      this.objects.clear();
+      await this.loadObjects(config.objects);
+    }
+    if (config.walls) {
+      this.walls.clear();
+      await this.loadWalls(config.walls);
+    }
+  }
 }
 
 // Singleton instance

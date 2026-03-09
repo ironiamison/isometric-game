@@ -135,6 +135,10 @@ interface EditorState {
   showNotes: boolean;
   selectedNoteId: string | null;
   notesPanelCollapsed: boolean;
+
+  // Asset manager state
+  assetManagerOpen: boolean;
+  assetManagerTab: 'objects' | 'walls' | 'tiles';
 }
 
 interface EditorActions {
@@ -300,6 +304,11 @@ interface EditorActions {
   setSelectedNoteId: (id: string | null) => void;
   setShowNotes: (show: boolean) => void;
   setNotesPanelCollapsed: (collapsed: boolean) => void;
+
+  // Asset manager actions
+  openAssetManager: (tab?: 'objects' | 'walls' | 'tiles') => void;
+  closeAssetManager: () => void;
+  refreshAssets: () => void;
 }
 
 export const useEditorStore = create<EditorState & EditorActions>((set, get) => ({
@@ -2016,4 +2025,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   setSelectedNoteId: (id) => set({ selectedNoteId: id }),
   setShowNotes: (show) => set({ showNotes: show }),
   setNotesPanelCollapsed: (collapsed) => set({ notesPanelCollapsed: collapsed }),
+
+  // Asset manager
+  assetManagerOpen: false,
+  assetManagerTab: 'objects' as const,
+  openAssetManager: (tab) => set({ assetManagerOpen: true, assetManagerTab: tab || 'objects' }),
+  closeAssetManager: () => set({ assetManagerOpen: false }),
+  refreshAssets: () => {
+    // Trigger a re-render by updating tilesets with a new array reference
+    const state = get();
+    set({ tilesets: [...state.tilesets] });
+  },
 }));

@@ -161,5 +161,23 @@ def main():
     print("\nReview the output and adjust fps values or remove false positives as needed.")
 
 
+def single_file_mode(filepath: str):
+    """Analyze a single file and print JSON result to stdout."""
+    result = detect_animation(Path(filepath))
+    if result is not None:
+        frame_count, fps = result
+        print(json.dumps({"frames": frame_count, "fps": fps}))
+    else:
+        print("null")
+
+
 if __name__ == "__main__":
-    main()
+    if "--single" in sys.argv:
+        idx = sys.argv.index("--single")
+        if idx + 1 < len(sys.argv):
+            single_file_mode(sys.argv[idx + 1])
+        else:
+            print("null")
+            sys.exit(1)
+    else:
+        main()

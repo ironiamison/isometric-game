@@ -45,7 +45,10 @@ export function MenuBar() {
     saveCurrentInterior,
     setAvailableInteriors,
     resizeInterior,
+    openAssetManager,
   } = useEditorStore();
+
+  const [rebuildingAtlas, setRebuildingAtlas] = useState(false);
 
   const importInputRef = useRef<HTMLInputElement>(null);
   const importFullInputRef = useRef<HTMLInputElement>(null);
@@ -799,6 +802,44 @@ export function MenuBar() {
             </button>
             <button className={styles.dropdownItem} onClick={handleResetView}>
               Reset View
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.menuItem}>
+          <span className={styles.menuTitle}>Assets</span>
+          <div className={styles.dropdown}>
+            <button className={styles.dropdownItem} onClick={() => openAssetManager('objects')}>
+              Import Objects...
+            </button>
+            <button className={styles.dropdownItem} onClick={() => openAssetManager('walls')}>
+              Import Walls...
+            </button>
+            <button className={styles.dropdownItem} onClick={() => openAssetManager('tiles')}>
+              Import Tiles...
+            </button>
+            <div className={styles.separator} />
+            <button
+              className={styles.dropdownItem}
+              disabled={rebuildingAtlas}
+              onClick={async () => {
+                setRebuildingAtlas(true);
+                try {
+                  const resp = await fetch('/api/assets/rebuild-atlas', { method: 'POST' });
+                  const result = await resp.json();
+                  if (result.success) {
+                    alert(`Atlas rebuilt in ${result.duration}ms`);
+                  } else {
+                    alert(`Atlas rebuild failed: ${result.error}`);
+                  }
+                } catch (err) {
+                  alert(`Rebuild failed: ${(err as Error).message}`);
+                } finally {
+                  setRebuildingAtlas(false);
+                }
+              }}
+            >
+              {rebuildingAtlas ? 'Rebuilding...' : 'Rebuild Atlases'}
             </button>
           </div>
         </div>

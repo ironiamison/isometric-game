@@ -1,0 +1,248 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #2d2d44;
+  border: 1px solid #3d3d5c;
+  border-radius: 8px;
+  padding: 20px;
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 16px;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.closeButton:hover {
+  color: #fff;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 12px;
+  background: #3d3d5c;
+  border: 1px solid #4d4d6c;
+  border-radius: 4px;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: #4d4d6c;
+  color: #ccc;
+}
+
+.activeTab {
+  background: #5c7cfa;
+  border-color: #748ffc;
+  color: #fff;
+}
+
+.dropZone {
+  border: 2px dashed #4d4d6c;
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 16px;
+}
+
+.dropZone:hover,
+.dropZoneActive {
+  border-color: #5c7cfa;
+  background: rgba(92, 124, 250, 0.1);
+}
+
+.dropZoneText {
+  color: #888;
+  font-size: 13px;
+}
+
+.dropZoneText strong {
+  color: #5c7cfa;
+}
+
+.queue {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.queueItem {
+  display: flex;
+  gap: 12px;
+  padding: 8px;
+  background: #1a1a2e;
+  border: 1px solid #3d3d5c;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+
+.thumbnail {
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+  background: #252538;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.itemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: 12px;
+  color: #ccc;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemMeta {
+  font-size: 11px;
+  color: #666;
+}
+
+.itemFields {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.smallInput {
+  width: 80px;
+  padding: 4px 6px;
+  background: #2d2d44;
+  border: 1px solid #3d3d5c;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 11px;
+}
+
+.smallInput:focus {
+  outline: none;
+  border-color: #4ecdc4;
+}
+
+.animBadge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: #4ecdc4;
+  color: #1a1a2e;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.removeButton {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+}
+
+.removeButton:hover {
+  color: #ff6b6b;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.importButton {
+  padding: 8px 20px;
+  background: #4ecdc4;
+  color: #1a1a2e;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.importButton:hover {
+  background: #3dbdb5;
+}
+
+.importButton:disabled {
+  background: #3d3d5c;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.status {
+  font-size: 12px;
+  color: #888;
+}
+
+.statusSuccess {
+  color: #4ecdc4;
+}
+
+.statusError {
+  color: #ff6b6b;
+}
+
+.progressBar {
+  height: 3px;
+  background: #3d3d5c;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progressFill {
+  height: 100%;
+  background: #4ecdc4;
+  transition: width 0.3s;
+}

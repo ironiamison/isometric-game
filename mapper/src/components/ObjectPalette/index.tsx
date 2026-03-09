@@ -8,7 +8,7 @@ type Category = 'objects' | 'walls';
 type WallTool = 'wallDown' | 'wallRight';
 
 export function ObjectPalette() {
-  const { selectedObjectId, setSelectedObjectId, setActiveTool, activeTool } = useEditorStore();
+  const { selectedObjectId, setSelectedObjectId, setActiveTool, activeTool, openAssetManager, assetManagerOpen } = useEditorStore();
   const [objects, setObjects] = useState<ObjectDefinition[]>([]);
   const [walls, setWalls] = useState<ObjectDefinition[]>([]);
   const [category, setCategory] = useState<Category>('objects');
@@ -113,10 +113,23 @@ export function ObjectPalette() {
     }
   };
 
+  // Refresh when asset manager closes (new assets may have been imported)
+  useEffect(() => {
+    if (!assetManagerOpen) {
+      setObjects(objectLoader.getObjectsWithImages());
+      setWalls(objectLoader.getWallsWithImages());
+    }
+  }, [assetManagerOpen]);
+
   return (
     <div className={styles.palette}>
       <div className={styles.header}>
         <div className={styles.title}>Objects & Walls</div>
+        <button
+          className={styles.addButton}
+          onClick={() => openAssetManager(category)}
+          title="Import assets..."
+        >+</button>
       </div>
       <div className={styles.tabs}>
         <button
@@ -140,7 +153,7 @@ export function ObjectPalette() {
         onChange={(e) => setFilter(e.target.value)}
       />
       <div className={styles.info}>
-        {selectedObjectId ? `Selected: ${objects.find((o) => o.id === selectedObjectId)?.name || selectedObjectId}` : 'None selected'}
+        {selectedObjectId ? `Selected: ${(objects.find((o) => o.id === selectedObjectId) || walls.find((o) => o.id === selectedObjectId))?.name || selectedObjectId}` : 'None selected'}
       </div>
       <div className={styles.grid}>
         {filteredObjects.map((obj) => (

@@ -141,6 +141,79 @@ export class TilesetLoader {
   getConfig(): MapperConfig | null {
     return this.config;
   }
+
+  // Add new tiles optimistically by extending the existing tileset image
+  addTiles(tileImages: HTMLImageElement[]): void {
+    if (tileImages.length === 0) return;
+
+    // Get the first (typically only) tileset
+    const tileset = this.tilesets.values().next().value as Tileset | undefined;
+    if (!tileset || !tileset.imageElement) return;
+
+    const tileW = tileset.tileWidth;
+    const tileH = tileset.tileHeight;
+    const cols = tileset.columns;
+    const oldTileCount = tileset.tileCount;
+
+    // Create an offscreen canvas to hold existing + new tiles
+    const newTileCount = oldTileCount + tileImages.length;
+    const newRows = Math.ceil(newTileCount / cols);
+    const canvas = document.createElement('canvas');
+    canvas.width = cols * tileW;
+    canvas.height = newRows * tileH;
+
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingEnabled = false;
+
+    // Draw existing tilesheet
+    ctx.drawImage(tileset.imageElement, 0, 0);
+
+    // Draw new tiles at the end
+    for (let i = 0; i < tileImages.length; i++) {
+      const slot = oldTileCount + i;
+      const col = slot % cols;
+      const row = Math.floor(slot / cols);
+      ctx.drawImage(tileImages[i], col * tileW, row * tileH, tileW, tileH);
+    }
+
+    // Convert canvas to image
+    const newImg = new Image();
+    newImg.src = canvas.toDataURL();
+
+    // Update tileset in-place
+    tileset.imageElement = newImg;
+    tileset.rows = newRows;
+    tileset.tileCount = newTileCount;
+
+    // Rebuild GID map
+    this.buildGidMap();
+  }
+
+  // Reload tileset image from server (after tilesheet rebuild)
+  async reloadTileset(): Promise<void> {
+    const tileset = this.tilesets.values().next().value as Tileset | undefined;
+    if (!tileset) return;
+
+    // Force reload by adding cache-buster
+    const cacheBuster = `?t=${Date.now()}`;
+    const img = new Image();
+    const loadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Failed to reload tileset'));
+    });
+    img.src = tileset.image + cacheBuster;
+    await loadPromise;
+
+    // Recalculate dimensions
+    const rows = Math.floor(img.height / tileset.tileHeight);
+    const tileCount = tileset.columns * rows;
+
+    tileset.imageElement = img;
+    tileset.rows = rows;
+    tileset.tileCount = tileCount;
+
+    this.buildGidMap();
+  }
 }
 
 // Singleton instance

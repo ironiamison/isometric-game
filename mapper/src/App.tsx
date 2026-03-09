@@ -16,6 +16,7 @@ import { LayerPanel } from '@/components/LayerPanel';
 import { EntityPanel } from '@/components/EntityPanel';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { NotesPanel } from '@/components/NotesPanel';
+import { AssetManager } from '@/components/AssetManager';
 import './App.css';
 
 function App() {
@@ -373,6 +374,7 @@ function App() {
           </div>
         </div>
       </div>
+      <AssetManager />
     </div>
   );
 }

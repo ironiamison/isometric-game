@@ -6,7 +6,7 @@ import styles from './TilePalette.module.css';
 export function TilePalette() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { tilesets, selectedTileId, selectedTiles, setSelectedTileId, setActiveTool, setActiveLayer, fillSelectedTiles } = useEditorStore();
+  const { tilesets, selectedTileId, selectedTiles, setSelectedTileId, setActiveTool, setActiveLayer, fillSelectedTiles, openAssetManager } = useEditorStore();
   const [activeTileset, setActiveTileset] = useState<Tileset | null>(null);
   const [hoveredTile, setHoveredTile] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -163,6 +163,11 @@ export function TilePalette() {
     <div className={styles.palette}>
       <div className={styles.header}>
         <div className={styles.title}>Tiles</div>
+        <button
+          className={styles.addButton}
+          onClick={() => openAssetManager('tiles')}
+          title="Import tiles..."
+        >+</button>
         <div className={styles.zoomControls}>
           <button className={styles.zoomButton} onClick={zoomOut} title="Zoom Out">
             -
