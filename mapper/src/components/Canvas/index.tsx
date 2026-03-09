@@ -31,7 +31,10 @@ export function Canvas() {
     showEntities,
     showMapObjects,
     showPortals,
+    showNotes,
     visibleLayers,
+    notes,
+    selectedNoteId,
     editorMode,
     currentInterior,
     pan,
@@ -158,9 +161,15 @@ export function Canvas() {
       showEntities,
       showMapObjects,
       showPortals,
+      showNotes,
       visibleLayers,
     });
-  }, [showGrid, showChunkBounds, showCollision, showEntities, showMapObjects, showPortals, visibleLayers]);
+  }, [showGrid, showChunkBounds, showCollision, showEntities, showMapObjects, showPortals, showNotes, visibleLayers]);
+
+  // Pass notes to renderer
+  useEffect(() => {
+    isometricRenderer.setNotes(notes, selectedNoteId);
+  }, [notes, selectedNoteId]);
 
   // Render loop
   useEffect(() => {
