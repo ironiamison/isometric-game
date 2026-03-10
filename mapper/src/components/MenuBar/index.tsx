@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import { useEditorStore, cancelPendingSave } from '@/state/store';
 import { chunkManager } from '@/core/ChunkManager';
@@ -816,8 +817,8 @@ export function MenuBar() {
         </span>
       </div>
 
-      {/* New Interior Modal */}
-      {showNewInteriorModal && (
+      {/* Modals portaled to document.body to avoid backdrop-filter containing block */}
+      {showNewInteriorModal && createPortal(
         <div className={styles.modalOverlay} onClick={() => setShowNewInteriorModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3>New Interior Map</h3>
@@ -867,11 +868,11 @@ export function MenuBar() {
               <button onClick={handleCreateInterior} className={styles.primaryButton}>Create</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Open Interior Modal */}
-      {showOpenInteriorModal && (
+      {showOpenInteriorModal && createPortal(
         <div className={styles.modalOverlay} onClick={() => setShowOpenInteriorModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3>Open Interior Map</h3>
@@ -894,11 +895,11 @@ export function MenuBar() {
               <button onClick={() => setShowOpenInteriorModal(false)}>Cancel</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Download Map Data Modal */}
-      {showDownloadChunkModal && (
+      {showDownloadChunkModal && createPortal(
         <div className={styles.modalOverlay} onClick={() => setShowDownloadChunkModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3>Download Map Data</h3>
@@ -940,11 +941,11 @@ export function MenuBar() {
               <button onClick={() => setShowDownloadChunkModal(false)}>Close</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Resize Interior Modal */}
-      {showResizeInteriorModal && currentInterior && (
+      {showResizeInteriorModal && currentInterior && createPortal(
         <div className={styles.modalOverlay} onClick={() => setShowResizeInteriorModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3>Resize Interior Map</h3>
@@ -979,7 +980,8 @@ export function MenuBar() {
               <button onClick={handleConfirmResize} className={styles.primaryButton}>Resize</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
