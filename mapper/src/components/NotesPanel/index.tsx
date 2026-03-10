@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useEditorStore } from '@/state/store';
 import { notesStorage } from '@/core/NotesStorage';
+import { screenToWorldTile } from '@/core/coords';
 import type { DevNote, NoteCategory, NotePriority, NoteStatus } from '@/types';
 import styles from './NotesPanel.module.css';
 
@@ -55,6 +56,16 @@ export function NotesPanel() {
     });
   }, [notes, filterCategory, filterStatus]);
 
+  // Auto-open editing when a new note is selected with empty text (e.g. from right-click)
+  useEffect(() => {
+    if (selectedNoteId && !editingId) {
+      const note = notes.find(n => n.id === selectedNoteId);
+      if (note && note.text === '') {
+        startEditing(note);
+      }
+    }
+  }, [selectedNoteId]);
+
   const startEditing = (note: DevNote) => {
     setEditingId(note.id);
     setEditText(note.text);
@@ -64,7 +75,12 @@ export function NotesPanel() {
   };
 
   const handleCreate = async () => {
-    const tile = hoveredTile || { wx: 0, wy: 0 };
+    // Use hovered tile, or center of current viewport
+    const centerTile = screenToWorldTile(
+      { sx: window.innerWidth / 2, sy: window.innerHeight / 2 },
+      viewport
+    );
+    const tile = hoveredTile || centerTile;
     const CHUNK_SIZE = 32;
     const now = new Date().toISOString();
     const note: DevNote = {

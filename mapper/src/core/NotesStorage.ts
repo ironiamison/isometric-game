@@ -1,6 +1,7 @@
 import type { DevNote } from '@/types';
 
-const API_BASE = '';
+import { BASE_PATH } from './config';
+const API_BASE = BASE_PATH;
 
 class NotesStorage {
   async fetchAll(): Promise<DevNote[]> {

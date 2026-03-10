@@ -119,7 +119,7 @@ function App() {
 
       try {
         // Load config
-        const config = await tilesetLoader.loadConfig('/mapper-config.json');
+        const config = await tilesetLoader.loadConfig('/mapper/mapper-config.json');
 
         // Load tilesets
         setLoading(true, 'Loading tilesets...');
@@ -141,7 +141,7 @@ function App() {
         // Load entity registry
         setLoading(true, 'Loading entities...');
         try {
-          const registry = await entityRegistryLoader.loadFromDirectory('/entities');
+          const registry = await entityRegistryLoader.loadFromDirectory('/mapper/entities');
           setEntityRegistry(registry);
         } catch {
           // If TOML files can't be loaded, create empty registry

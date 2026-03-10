@@ -5,7 +5,7 @@ export class TilesetLoader {
   private gidToTileset: Map<number, Tileset> = new Map();
   private config: MapperConfig | null = null;
 
-  async loadConfig(configPath: string = '/mapper-config.json'): Promise<MapperConfig> {
+  async loadConfig(configPath: string = '/mapper/mapper-config.json'): Promise<MapperConfig> {
     const response = await fetch(configPath);
     if (!response.ok) {
       throw new Error(`Failed to load config: ${response.statusText}`);
@@ -28,7 +28,7 @@ export class TilesetLoader {
       image.onerror = () => reject(new Error(`Failed to load tileset image: ${config.image}`));
     });
 
-    image.src = config.image;
+    image.src = '/mapper' + config.image;
     await loadPromise;
 
     const rows = Math.floor(image.height / config.tileHeight);
@@ -201,7 +201,7 @@ export class TilesetLoader {
       img.onload = () => resolve(img);
       img.onerror = () => reject(new Error('Failed to reload tileset'));
     });
-    img.src = tileset.image + cacheBuster;
+    img.src = '/mapper' + tileset.image + cacheBuster;
     await loadPromise;
 
     // Recalculate dimensions

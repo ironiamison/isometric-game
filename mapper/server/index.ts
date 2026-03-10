@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -92,6 +93,67 @@ async function saveNotesToDisk(notes: any[]): Promise<void> {
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: false }));
+
+// --- Auth ---
+const AUTH_USER = process.env.MAPPER_USER || 'null';
+const AUTH_PASS = process.env.MAPPER_PASS || 'NANULL!';
+const AUTH_SECRET = crypto.randomBytes(32).toString('hex');
+
+function makeToken(): string {
+  return crypto.createHmac('sha256', AUTH_SECRET).update(AUTH_USER + AUTH_PASS).digest('hex');
+}
+
+function parseCookies(header: string | undefined): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  if (!header) return cookies;
+  for (const part of header.split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k) cookies[k] = v.join('=');
+  }
+  return cookies;
+}
+
+const LOGIN_HTML = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapper Login</title>
+<style>
+  body { font-family: system-ui; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #1a1a2e; color: #eee; }
+  form { background: #16213e; padding: 2rem; border-radius: 8px; min-width: 280px; }
+  h2 { margin-top: 0; }
+  input { display: block; width: 100%; padding: 0.5rem; margin: 0.5rem 0 1rem; border: 1px solid #444; border-radius: 4px; background: #0f3460; color: #eee; box-sizing: border-box; }
+  button { width: 100%; padding: 0.5rem; background: #e94560; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+  button:hover { background: #c73e54; }
+  .error { color: #e94560; font-size: 0.9rem; }
+</style></head><body>
+<form method="POST" action="/mapper/login">
+  <h2>Mapper Login</h2>
+  <label>Username<input name="username" required></label>
+  <label>Password<input name="password" type="password" required></label>
+  <button type="submit">Log in</button>
+  ERRPLACEHOLDER
+</form></body></html>`;
+
+app.post('/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (username === AUTH_USER && password === AUTH_PASS) {
+    res.setHeader('Set-Cookie', `mapper_token=${makeToken()}; Path=/mapper; HttpOnly; SameSite=Lax; Max-Age=31536000`);
+    return res.redirect('/mapper/');
+  }
+  res.status(401).send(LOGIN_HTML.replace('ERRPLACEHOLDER', '<p class="error">Invalid credentials</p>'));
+});
+
+app.get('/login', (_req, res) => {
+  res.send(LOGIN_HTML.replace('ERRPLACEHOLDER', ''));
+});
+
+// Auth check for all routes (except login)
+app.use((req, res, next) => {
+  if (req.path === '/login') return next();
+  const cookies = parseCookies(req.headers.cookie);
+  if (cookies.mapper_token === makeToken()) return next();
+  return res.redirect('/mapper/login');
+});
 
 // Frontend dist path (served after API routes)
 const distPath = path.join(mapperRoot, 'dist');
@@ -1066,7 +1128,10 @@ app.post('/api/assets/rebuild-atlas', async (_req, res) => {
 });
 
 // Serve static frontend files (after API routes)
+app.use('/mapper', express.static(distPath));
 app.use(express.static(distPath));
+// Serve individual sprite files from client assets (not in vite dist)
+app.use('/assets/sprites', express.static(CLIENT_SPRITES_DIR));
 
 // SPA fallback - serve index.html for non-API routes
 app.get('*', (req, res) => {

@@ -441,7 +441,7 @@ export function MenuBar() {
 
   const handleDeployToGameServer = async () => {
     try {
-      const response = await fetch('/api/deploy', { method: 'POST' });
+      const response = await fetch('/mapper/api/deploy', { method: 'POST' });
       const result = await response.json();
 
       if (result.success) {
@@ -825,7 +825,7 @@ export function MenuBar() {
               onClick={async () => {
                 setRebuildingAtlas(true);
                 try {
-                  const resp = await fetch('/api/assets/rebuild-atlas', { method: 'POST' });
+                  const resp = await fetch('/mapper/api/assets/rebuild-atlas', { method: 'POST' });
                   const result = await resp.json();
                   if (result.success) {
                     alert(`Atlas rebuilt in ${result.duration}ms`);

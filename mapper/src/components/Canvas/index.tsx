@@ -86,6 +86,8 @@ export function Canvas() {
     setSelectedWall,
     addNote,
     setSelectedNoteId,
+    setShowNotes,
+    setNotesPanelCollapsed,
   } = useEditorStore();
 
   // Setup canvas and renderer
@@ -793,6 +795,8 @@ export function Canvas() {
                 addNote(note);
                 notesStorage.create(note).catch(console.error);
                 setSelectedNoteId(note.id);
+                setShowNotes(true);
+                setNotesPanelCollapsed(false);
               },
             },
           ]}

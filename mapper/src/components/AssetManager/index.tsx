@@ -76,7 +76,7 @@ export function AssetManager() {
     try {
       const formData = new FormData();
       formData.append('file', item.file);
-      const resp = await fetch('/api/assets/detect-animation', { method: 'POST', body: formData });
+      const resp = await fetch('/mapper/api/assets/detect-animation', { method: 'POST', body: formData });
       const result = await resp.json();
 
       setQueue(prev => prev.map(q =>
@@ -115,7 +115,7 @@ export function AssetManager() {
         if (item.id !== undefined) formData.append('id', String(item.id));
         if (item.animation) formData.append('animation', JSON.stringify(item.animation));
 
-        const resp = await fetch('/api/assets/upload', { method: 'POST', body: formData });
+        const resp = await fetch('/mapper/api/assets/upload', { method: 'POST', body: formData });
         if (!resp.ok) {
           const err = await resp.json();
           throw new Error(err.error || 'Upload failed');
@@ -128,13 +128,13 @@ export function AssetManager() {
         if (tab === 'objects') {
           await objectLoader.addObject(
             { id: result.id, name: result.name || String(result.id), width: result.width, height: result.height },
-            `/assets/sprites/objects/${result.id}.png`,
+            `/mapper/assets/sprites/objects/${result.id}.png`,
             result.animation || undefined
           );
         } else if (tab === 'walls') {
           await objectLoader.addWall(
             { id: result.id, name: result.name || String(result.id), width: result.width, height: result.height },
-            `/assets/sprites/walls/${result.id}.png`,
+            `/mapper/assets/sprites/walls/${result.id}.png`,
             result.animation || undefined
           );
         } else if (tab === 'tiles' && result.tileIds) {
@@ -145,7 +145,7 @@ export function AssetManager() {
             await new Promise<void>((resolve, reject) => {
               img.onload = () => resolve();
               img.onerror = () => reject(new Error(`Failed to load tile ${tileId}`));
-              img.src = `/assets/sprites/tiles_preview/tile_${tileId}.png`;
+              img.src = `/mapper/assets/sprites/tiles_preview/tile_${tileId}.png`;
             });
             tileImages.push(img);
           }

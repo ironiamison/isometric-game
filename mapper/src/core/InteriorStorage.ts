@@ -1,7 +1,8 @@
 import type { InteriorMap, SerializedInteriorMap, SpawnPoint, ExitPortal } from '@/types';
 import { BitSet } from './BitSet';
 
-const API_BASE = '';
+import { BASE_PATH } from './config';
+const API_BASE = BASE_PATH;
 
 class InteriorStorageManager {
   private interiors: Map<string, InteriorMap> = new Map();

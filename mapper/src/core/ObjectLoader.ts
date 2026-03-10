@@ -30,7 +30,7 @@ export class ObjectLoader {
 
   private async loadManifest(): Promise<SpriteManifest> {
     if (this.manifest) return this.manifest;
-    const resp = await fetch('/assets/sprite_manifest.json');
+    const resp = await fetch('/mapper/assets/sprite_manifest.json');
     this.manifest = await resp.json();
     return this.manifest!;
   }
@@ -38,7 +38,7 @@ export class ObjectLoader {
   private async loadAnimatedSprites(): Promise<AnimatedSpritesData> {
     if (this.animatedSprites) return this.animatedSprites;
     try {
-      const resp = await fetch('/assets/animated_sprites.json');
+      const resp = await fetch('/mapper/assets/animated_sprites.json');
       this.animatedSprites = await resp.json();
     } catch {
       this.animatedSprites = { objects: {}, walls: {} };
@@ -61,7 +61,7 @@ export class ObjectLoader {
     const manifest = await this.loadManifest();
     const animData = await this.loadAnimatedSprites();
     const atlasInfo = manifest.objects_atlas;
-    const atlasImage = await this.loadImage(`/assets/${atlasInfo.file}`);
+    const atlasImage = await this.loadImage(`/mapper/assets/${atlasInfo.file}`);
 
     for (const item of config.items) {
       const spriteData = atlasInfo.sprites[String(item.id)];
@@ -115,7 +115,7 @@ export class ObjectLoader {
     const manifest = await this.loadManifest();
     const animData = await this.loadAnimatedSprites();
     const atlasInfo = manifest.walls_atlas;
-    const atlasImage = await this.loadImage(`/assets/${atlasInfo.file}`);
+    const atlasImage = await this.loadImage(`/mapper/assets/${atlasInfo.file}`);
 
     for (const item of config.items) {
       const spriteData = atlasInfo.sprites[String(item.id)];
@@ -224,7 +224,7 @@ export class ObjectLoader {
     this.manifest = null;
     this.animatedSprites = null;
 
-    const resp = await fetch('/mapper-config.json');
+    const resp = await fetch('/mapper/mapper-config.json');
     const config = await resp.json();
 
     if (config.objects) {

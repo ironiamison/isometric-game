@@ -7,7 +7,8 @@ const DB_VERSION = 1;
 const CHUNKS_STORE = 'chunks';
 
 // API base URL - empty string means same origin
-const API_BASE = '';
+import { BASE_PATH } from './config';
+const API_BASE = BASE_PATH;
 
 class StorageManager {
   private db: IDBDatabase | null = null;
