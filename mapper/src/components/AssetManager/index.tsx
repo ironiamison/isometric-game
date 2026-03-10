@@ -40,6 +40,20 @@ export function AssetManager() {
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const newItems: QueueItem[] = [];
 
+    // Fetch next available ID for sequential naming (objects/walls only)
+    let nextId: number | null = null;
+    if (tab !== 'tiles') {
+      try {
+        const resp = await fetch(`/mapper/api/assets/next-id/${tab}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          nextId = data.nextId;
+        }
+      } catch {
+        // Fall back to filename-based naming
+      }
+    }
+
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/png')) continue;
 
@@ -47,12 +61,17 @@ export function AssetManager() {
       const preview = await readFileAsDataURL(file);
       const dims = await getImageDimensions(preview);
 
+      // Auto-assign sequential ID and name for objects/walls
+      const autoId = nextId !== null ? nextId + newItems.length : undefined;
+      const autoName = autoId !== undefined ? String(autoId) : file.name.replace(/\.png$/i, '');
+
       const item: QueueItem = {
         file,
         preview,
         width: dims.width,
         height: dims.height,
-        name: file.name.replace(/\.png$/i, ''),
+        name: autoName,
+        id: autoId,
         animation: null,
         detecting: false,
       };

@@ -6,7 +6,8 @@ export class TilesetLoader {
   private config: MapperConfig | null = null;
 
   async loadConfig(configPath: string = '/mapper/mapper-config.json'): Promise<MapperConfig> {
-    const response = await fetch(configPath);
+    const sep = configPath.includes('?') ? '&' : '?';
+    const response = await fetch(`${configPath}${sep}_t=${Date.now()}`, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`Failed to load config: ${response.statusText}`);
     }

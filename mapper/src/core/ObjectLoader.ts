@@ -30,7 +30,7 @@ export class ObjectLoader {
 
   private async loadManifest(): Promise<SpriteManifest> {
     if (this.manifest) return this.manifest;
-    const resp = await fetch('/mapper/assets/sprite_manifest.json');
+    const resp = await fetch(`/mapper/assets/sprite_manifest.json?_t=${Date.now()}`, { cache: 'no-store' });
     this.manifest = await resp.json();
     return this.manifest!;
   }
@@ -66,15 +66,30 @@ export class ObjectLoader {
     for (const item of config.items) {
       const spriteData = atlasInfo.sprites[String(item.id)];
       const anim = animData.objects[String(item.id)];
+
+      // If not in atlas (e.g. atlas rebuild pending), fall back to individual file
+      let image: HTMLImageElement | undefined = spriteData ? atlasImage : undefined;
+      let atlasRect = spriteData ? {
+        x: spriteData.x,
+        y: spriteData.y,
+        w: anim ? spriteData.w / anim.frames : spriteData.w,
+        h: spriteData.h,
+      } : undefined;
+
+      if (!spriteData) {
+        try {
+          image = await this.loadImage(`/mapper/assets/sprites/objects/${item.id}.png`);
+          const frameWidth = anim ? item.width / anim.frames : item.width;
+          atlasRect = { x: 0, y: 0, w: frameWidth, h: item.height };
+        } catch {
+          // Individual file not available either
+        }
+      }
+
       const obj: ObjectDefinition = {
         ...item,
-        image: spriteData ? atlasImage : undefined,
-        atlasRect: spriteData ? {
-          x: spriteData.x,
-          y: spriteData.y,
-          w: anim ? spriteData.w / anim.frames : spriteData.w,
-          h: spriteData.h,
-        } : undefined,
+        image,
+        atlasRect,
         frames: anim?.frames,
         fps: anim?.fps,
       };
@@ -120,15 +135,30 @@ export class ObjectLoader {
     for (const item of config.items) {
       const spriteData = atlasInfo.sprites[String(item.id)];
       const anim = animData.walls[String(item.id)];
+
+      // If not in atlas (e.g. atlas rebuild pending), fall back to individual file
+      let image: HTMLImageElement | undefined = spriteData ? atlasImage : undefined;
+      let atlasRect = spriteData ? {
+        x: spriteData.x,
+        y: spriteData.y,
+        w: anim ? spriteData.w / anim.frames : spriteData.w,
+        h: spriteData.h,
+      } : undefined;
+
+      if (!spriteData) {
+        try {
+          image = await this.loadImage(`/mapper/assets/sprites/walls/${item.id}.png`);
+          const frameWidth = anim ? item.width / anim.frames : item.width;
+          atlasRect = { x: 0, y: 0, w: frameWidth, h: item.height };
+        } catch {
+          // Individual file not available either
+        }
+      }
+
       const obj: ObjectDefinition = {
         ...item,
-        image: spriteData ? atlasImage : undefined,
-        atlasRect: spriteData ? {
-          x: spriteData.x,
-          y: spriteData.y,
-          w: anim ? spriteData.w / anim.frames : spriteData.w,
-          h: spriteData.h,
-        } : undefined,
+        image,
+        atlasRect,
         frames: anim?.frames,
         fps: anim?.fps,
       };
@@ -224,7 +254,7 @@ export class ObjectLoader {
     this.manifest = null;
     this.animatedSprites = null;
 
-    const resp = await fetch('/mapper/mapper-config.json');
+    const resp = await fetch(`/mapper/mapper-config.json?_t=${Date.now()}`, { cache: 'no-store' });
     const config = await resp.json();
 
     if (config.objects) {

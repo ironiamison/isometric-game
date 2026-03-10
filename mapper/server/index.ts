@@ -410,8 +410,13 @@ app.get('/api/me', (_req, res) => {
   res.json({ username: AUTH_USER, worlds });
 });
 
-// Serve mapper-config.json from root
+// Serve mapper-config.json (live from disk, not from dist cache)
 app.get('/mapper-config.json', (_req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.sendFile(path.join(mapperRoot, 'mapper-config.json'));
+});
+app.get('/mapper/mapper-config.json', (_req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.sendFile(path.join(mapperRoot, 'mapper-config.json'));
 });
 
