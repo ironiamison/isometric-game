@@ -101,6 +101,29 @@ export function ObjectPalette() {
     return () => cancelAnimationFrame(rafId);
   }, [currentItems]);
 
+  const handleDelete = async (e: React.MouseEvent, obj: ObjectDefinition) => {
+    e.stopPropagation();
+    if (!confirm(`Delete "${obj.name}" from ${category}?`)) return;
+
+    try {
+      const res = await fetch(`/api/assets/${category}/${obj.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+
+      if (category === 'objects') {
+        objectLoader.removeObject(obj.id);
+        setObjects(objectLoader.getObjectsWithImages());
+      } else {
+        objectLoader.removeWall(obj.id);
+        setWalls(objectLoader.getWallsWithImages());
+      }
+      if (selectedObjectId === obj.id) {
+        setSelectedObjectId(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete asset:', err);
+    }
+  };
+
   const filteredObjects = filter
     ? currentItems.filter((obj) => obj.name.toLowerCase().includes(filter.toLowerCase()))
     : currentItems;
@@ -157,24 +180,32 @@ export function ObjectPalette() {
       </div>
       <div className={styles.grid}>
         {filteredObjects.map((obj) => (
-          <button
-            key={obj.id}
-            className={`${styles.item} ${selectedObjectId === obj.id ? styles.selected : ''}`}
-            onClick={() => {
-              setSelectedObjectId(obj.id);
-              // Use wall tool when selecting from walls tab, object tool otherwise
-              setActiveTool(category === 'walls' ? lastWallTool : 'object');
-            }}
-            title={`${obj.name} (${obj.width}x${obj.height})`}
-          >
-            <canvas
-              ref={(el) => setCanvasRef(obj.id, el)}
-              className={styles.preview}
-              width={64}
-              height={64}
-            />
-            <span className={styles.name}>{obj.name}</span>
-          </button>
+          <div key={obj.id} className={styles.itemWrapper}>
+            <button
+              className={`${styles.item} ${selectedObjectId === obj.id ? styles.selected : ''}`}
+              onClick={() => {
+                setSelectedObjectId(obj.id);
+                // Use wall tool when selecting from walls tab, object tool otherwise
+                setActiveTool(category === 'walls' ? lastWallTool : 'object');
+              }}
+              title={`${obj.name} (${obj.width}x${obj.height})`}
+            >
+              <canvas
+                ref={(el) => setCanvasRef(obj.id, el)}
+                className={styles.preview}
+                width={64}
+                height={64}
+              />
+              <span className={styles.name}>{obj.name}</span>
+            </button>
+            <button
+              className={styles.deleteButton}
+              onClick={(e) => handleDelete(e, obj)}
+              title={`Delete ${obj.name}`}
+            >
+              ×
+            </button>
+          </div>
         ))}
         {filteredObjects.length === 0 && (
           <div className={styles.empty}>No objects found</div>
