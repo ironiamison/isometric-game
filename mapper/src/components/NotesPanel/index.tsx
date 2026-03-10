@@ -76,7 +76,7 @@ export function NotesPanel() {
 
   const handleCreate = async () => {
     // Use hovered tile, or center of current canvas
-    const canvas = document.querySelector('canvas');
+    const canvas = document.getElementById('map-canvas') as HTMLCanvasElement | null;
     const canvasCenter = canvas
       ? { sx: canvas.width / 2, sy: canvas.height / 2 }
       : { sx: 400, sy: 200 };
@@ -131,12 +131,12 @@ export function NotesPanel() {
 
   const flyToNote = (note: DevNote) => {
     setSelectedNoteId(note.id);
-    // Center viewport on note's world position (same approach as jumpToPortalTarget)
+    // Center viewport on note's world position
     const TILE_WIDTH = 64;
     const TILE_HEIGHT = 32;
     const isoX = (note.x - note.y) * (TILE_WIDTH / 2);
     const isoY = (note.x + note.y) * (TILE_HEIGHT / 2);
-    const canvas = document.querySelector('canvas');
+    const canvas = document.getElementById('map-canvas') as HTMLCanvasElement | null;
     const centerX = canvas ? canvas.width / 2 : 400;
     const centerY = canvas ? canvas.height / 2 : 200;
     setViewport({

@@ -748,6 +748,7 @@ export function Canvas() {
     <div ref={containerRef} className={styles.container}>
       <canvas
         ref={canvasRef}
+        id="map-canvas"
         className={styles.canvas}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
