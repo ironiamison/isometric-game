@@ -8,7 +8,6 @@
   padding: 6px 0;
   gap: 2px;
   flex-shrink: 0;
-  overflow-y: auto;
 }
 
 .btn {

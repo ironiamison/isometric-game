@@ -150,6 +150,7 @@ const USERS: Record<string, { password: string; worlds: string[] }> = {
       : ['world_0'],
   },
   duck: { password: 'NADUCK!', worlds: ['world_0'] },
+  drei: { password: 'drei123', worlds: ['world_0', 'world_1'] },
 };
 const AUTH_SECRET = crypto.randomBytes(32).toString('hex');
 
