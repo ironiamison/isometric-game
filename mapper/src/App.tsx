@@ -23,14 +23,12 @@ function App() {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(250);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(250);
   const [tilePaletteHeight, setTilePaletteHeight] = useState(200);
-  const [objectPaletteHeight, setObjectPaletteHeight] = useState(300);
   const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
   const [isResizingPalette, setIsResizingPalette] = useState(false);
   const resizeStartX = useRef(0);
   const resizeStartY = useRef(0);
   const resizeStartWidth = useRef(0);
   const resizeStartTileHeight = useRef(0);
-  const resizeStartObjectHeight = useRef(0);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isResizing) {
@@ -49,12 +47,10 @@ function App() {
     } else if (isResizingPalette) {
       const delta = e.clientY - resizeStartY.current;
       const newTileHeight = resizeStartTileHeight.current + delta;
-      const newObjectHeight = resizeStartObjectHeight.current - delta;
 
-      // Clamp both heights (minimum 100px each)
-      if (newTileHeight >= 100 && newObjectHeight >= 100) {
+      // Clamp tile palette height (minimum 100px)
+      if (newTileHeight >= 100) {
         setTilePaletteHeight(newTileHeight);
-        setObjectPaletteHeight(newObjectHeight);
       }
     }
   }, [isResizing, isResizingPalette]);
@@ -94,7 +90,6 @@ function App() {
     setIsResizingPalette(true);
     resizeStartY.current = e.clientY;
     resizeStartTileHeight.current = tilePaletteHeight;
-    resizeStartObjectHeight.current = objectPaletteHeight;
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
   };
@@ -108,7 +103,6 @@ function App() {
     setConnected,
     isLoading,
     loadingMessage,
-    layerPanelCollapsed,
     setNotes,
     fetchUserInfo,
   } = useEditorStore();
@@ -345,9 +339,7 @@ function App() {
             onMouseDown={startPaletteResize}
           />
           <div style={{
-            height: layerPanelCollapsed ? undefined : objectPaletteHeight,
-            flex: layerPanelCollapsed ? 1 : undefined,
-            flexShrink: 0,
+            flex: 1,
             overflow: 'hidden',
             minHeight: 100,
           }}>

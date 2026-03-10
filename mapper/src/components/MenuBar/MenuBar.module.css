@@ -89,6 +89,17 @@
   margin: 4px;
 }
 
+.dropdownLabel {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 6px 12px 2px;
+  font-family: var(--font-heading);
+  pointer-events: none;
+}
+
 .status {
   display: flex;
   align-items: center;

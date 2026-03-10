@@ -85,7 +85,7 @@ interface ChunkCacheEntry {
 class ChunkTileCache {
   private cache = new Map<string, ChunkCacheEntry>();
   private accessOrder: string[] = [];
-  private maxSize = 40;
+  private maxSize = 120;
 
   getOrRender(
     key: string,
@@ -255,7 +255,7 @@ interface ObjectCacheEntry {
 class ChunkObjectCache {
   private cache = new Map<string, ObjectCacheEntry>();
   private accessOrder: string[] = [];
-  private maxSize = 40;
+  private maxSize = 120;
 
   getOrRender(key: string, chunk: Chunk): ObjectCacheEntry {
     let entry = this.cache.get(key);
@@ -555,7 +555,7 @@ export class IsometricRenderer {
   private interiorCache = new InteriorTileCache();
 
   /** Max number of new chunk caches to build per frame (tiles + objects combined). */
-  private readonly CACHE_BUILD_BUDGET = 3;
+  private cacheBuildBudget = 4;
   /** Tracks how many caches were built this frame. */
   private cacheBuildCount = 0;
 
@@ -609,6 +609,9 @@ export class IsometricRenderer {
 
     this.clear();
     this.cacheBuildCount = 0;
+    // At low zoom, each cache build is cheaper (drawn smaller) so allow more per frame.
+    // At zoom=1.0 → budget 4, at zoom=0.25 → budget 8
+    this.cacheBuildBudget = Math.max(4, Math.round(4 / Math.max(viewport.zoom, 0.1)));
 
     // Filter to only visible chunks before sorting
     const visibleChunks = chunks.filter((chunk) =>
@@ -678,7 +681,7 @@ export class IsometricRenderer {
     // If not cached and we've exceeded the per-frame build budget, skip this chunk.
     // It will be built and rendered in a subsequent frame.
     if (!this.tileCache.isCached(key, chunk, this.options.visibleLayers)) {
-      if (this.cacheBuildCount >= this.CACHE_BUILD_BUDGET) return;
+      if (this.cacheBuildCount >= this.cacheBuildBudget) return;
       this.cacheBuildCount++;
     }
 
@@ -714,7 +717,7 @@ export class IsometricRenderer {
 
     // Skip building new object caches if budget exhausted
     if (!this.objectCache.isCached(key, chunk)) {
-      if (this.cacheBuildCount >= this.CACHE_BUILD_BUDGET) return;
+      if (this.cacheBuildCount >= this.cacheBuildBudget) return;
       this.cacheBuildCount++;
     }
 

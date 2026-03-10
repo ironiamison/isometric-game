@@ -442,22 +442,6 @@ export function MenuBar() {
     }
   };
 
-  const handleDeployToGameServer = async () => {
-    try {
-      const response = await fetch(`/mapper/api/deploy?world=${currentWorld}`, { method: 'POST' });
-      const result = await response.json();
-
-      if (result.success) {
-        alert(`Deployed to game server!\n\n${result.chunksCopied} chunks\n${result.interiorsCopied} interiors\n\nRestart the game server to load the changes.`);
-      } else {
-        alert(`Deploy failed: ${result.error}`);
-      }
-    } catch (err) {
-      console.error('Deploy failed:', err);
-      alert(`Deploy failed: ${(err as Error).message}`);
-    }
-  };
-
   // Interior handlers
   const handleNewInterior = () => {
     setNewInteriorId('');
@@ -704,25 +688,29 @@ export function MenuBar() {
           <div className={styles.dropdown}>
             {editorMode === 'overworld' ? (
               <>
+                <div className={styles.dropdownLabel}>Save</div>
                 <button className={styles.dropdownItem} onClick={handleSyncToServer}>
                   Sync to Server
                 </button>
                 <button className={styles.dropdownItem} onClick={handleSaveAll}>
                   Download Modified ({getDirtyChunks().length})
                 </button>
+                <div className={styles.separator} />
+                <div className={styles.dropdownLabel}>Export</div>
                 <button className={styles.dropdownItem} onClick={handleExportToServer}>
                   Export to Directory...
                 </button>
-                <button className={styles.dropdownItem} onClick={handleDeployToGameServer}>
-                  Send to Game Server
-                </button>
-                <div className={styles.separator} />
                 <button className={styles.dropdownItem} onClick={handleExportMap}>
                   Export Map (JSON)
                 </button>
                 <button className={styles.dropdownItem} onClick={handleExportMapWithInteriors}>
                   Export Map + Interiors (JSON)
                 </button>
+                <button className={styles.dropdownItem} onClick={() => setShowDownloadChunkModal(true)}>
+                  Download Map Data (JSON)
+                </button>
+                <div className={styles.separator} />
+                <div className={styles.dropdownLabel}>Import</div>
                 <button className={styles.dropdownItem} onClick={handleImportMap}>
                   Import Map (JSON)
                 </button>
@@ -732,10 +720,8 @@ export function MenuBar() {
                 <button className={styles.dropdownItem} onClick={handleImportChunk}>
                   Import Chunk (JSON)
                 </button>
-                <button className={styles.dropdownItem} onClick={() => setShowDownloadChunkModal(true)}>
-                  Download Map Data (JSON)
-                </button>
                 <div className={styles.separator} />
+                <div className={styles.dropdownLabel}>Danger Zone</div>
                 <button className={styles.dropdownItem} onClick={handleResetToServer}>
                   Reset to Game Server
                 </button>
@@ -758,6 +744,7 @@ export function MenuBar() {
               </>
             )}
             <div className={styles.separator} />
+            <div className={styles.dropdownLabel}>Interiors</div>
             <button className={styles.dropdownItem} onClick={handleNewInterior}>
               New Interior Map...
             </button>

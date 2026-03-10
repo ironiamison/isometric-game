@@ -1,7 +1,8 @@
 .panel {
   background: var(--bg-panel);
   padding: 8px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border-subtle);
+  flex: none;
 }
 
 .panel.collapsed {
