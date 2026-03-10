@@ -335,8 +335,8 @@ function App() {
     <div className="app">
       <MenuBar />
       <div className="main">
+        <Toolbar />
         <div className="sidebar left" style={{ width: leftSidebarWidth }}>
-          <Toolbar />
           <div style={{ height: tilePaletteHeight, flexShrink: 0, overflow: 'hidden' }}>
             <TilePalette />
           </div>
