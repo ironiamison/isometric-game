@@ -193,6 +193,191 @@ class ChunkTileCache {
   }
 }
 
+// ─── Chunk Objects/Walls Cache ──────────────────────────────────────
+// Pre-renders static (non-animated) objects and walls per chunk.
+// Animated sprites are drawn dynamically on top each frame.
+
+/** Extra top padding on the object canvas for tall sprites extending above their base tile */
+const OBJ_CANVAS_TOP_PAD = 512;
+const OBJ_CANVAS_WIDTH = CHUNK_CANVAS_WIDTH;
+const OBJ_CANVAS_HEIGHT = CHUNK_CANVAS_HEIGHT + OBJ_CANVAS_TOP_PAD;
+const OBJ_CANVAS_OFFSET_X = CHUNK_CANVAS_OFFSET_X;
+
+interface AnimatedSpriteInfo {
+  type: 'object' | 'wall';
+  obj?: MapObject;
+  wall?: Wall;
+  depth: number;
+}
+
+interface ObjectCacheEntry {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  mapObjectsRef: MapObject[];
+  wallsRef: Wall[];
+  animatedSprites: AnimatedSpriteInfo[];
+}
+
+class ChunkObjectCache {
+  private cache = new Map<string, ObjectCacheEntry>();
+  private accessOrder: string[] = [];
+  private maxSize = 40;
+
+  getOrRender(key: string, chunk: Chunk): ObjectCacheEntry {
+    let entry = this.cache.get(key);
+
+    const isValid = entry &&
+      entry.mapObjectsRef === chunk.mapObjects &&
+      entry.wallsRef === chunk.walls;
+
+    if (isValid) {
+      this.touch(key);
+      return entry!;
+    }
+
+    if (!entry) {
+      const canvas = document.createElement('canvas');
+      canvas.width = OBJ_CANVAS_WIDTH;
+      canvas.height = OBJ_CANVAS_HEIGHT;
+      const ctx = canvas.getContext('2d')!;
+      ctx.imageSmoothingEnabled = false;
+      entry = {
+        canvas, ctx,
+        mapObjectsRef: chunk.mapObjects,
+        wallsRef: chunk.walls,
+        animatedSprites: [],
+      };
+      this.cache.set(key, entry);
+    }
+
+    this.renderToCache(entry, chunk);
+    entry.mapObjectsRef = chunk.mapObjects;
+    entry.wallsRef = chunk.walls;
+
+    this.touch(key);
+    this.evict();
+    return entry;
+  }
+
+  invalidate(key: string): void {
+    this.cache.delete(key);
+    const idx = this.accessOrder.indexOf(key);
+    if (idx >= 0) this.accessOrder.splice(idx, 1);
+  }
+
+  clear(): void {
+    this.cache.clear();
+    this.accessOrder.length = 0;
+  }
+
+  private touch(key: string): void {
+    const idx = this.accessOrder.indexOf(key);
+    if (idx >= 0) this.accessOrder.splice(idx, 1);
+    this.accessOrder.push(key);
+  }
+
+  private evict(): void {
+    while (this.cache.size > this.maxSize) {
+      const oldest = this.accessOrder.shift();
+      if (oldest) this.cache.delete(oldest);
+    }
+  }
+
+  private renderToCache(entry: ObjectCacheEntry, chunk: Chunk): void {
+    const { ctx } = entry;
+    ctx.clearRect(0, 0, OBJ_CANVAS_WIDTH, OBJ_CANVAS_HEIGHT);
+    entry.animatedSprites = [];
+
+    const halfTileW = TILE_WIDTH / 2;
+    const halfTileH = TILE_HEIGHT / 2;
+
+    // Build depth-sorted renderables
+    type Renderable = { depth: number; type: 'object' | 'wall'; obj?: MapObject; wall?: Wall };
+    const renderables: Renderable[] = [];
+
+    for (const obj of chunk.mapObjects) {
+      renderables.push({ depth: obj.x + obj.y, type: 'object', obj });
+    }
+    for (const wall of chunk.walls) {
+      renderables.push({ depth: wall.x + wall.y, type: 'wall', wall });
+    }
+    renderables.sort((a, b) => a.depth - b.depth);
+
+    for (const r of renderables) {
+      if (r.type === 'object' && r.obj) {
+        const obj = r.obj;
+        const objDef = objectLoader.getObject(objectLoader.gidToId(obj.gid));
+        if (!objDef?.image) continue;
+
+        // Skip animated sprites — they'll be drawn dynamically
+        if (objDef.frames && objDef.frames > 1) {
+          entry.animatedSprites.push({ type: 'object', obj, depth: r.depth });
+          continue;
+        }
+
+        const ar = objDef.atlasRect;
+        const spriteW = ar ? ar.w : obj.width;
+        const spriteH = ar ? ar.h : obj.height;
+
+        // Local iso position (same coord space as tile cache)
+        const localIsoX = (obj.x - obj.y) * halfTileW;
+        const localIsoY = (obj.x + obj.y) * halfTileH;
+        const centerX = localIsoX + OBJ_CANVAS_OFFSET_X;
+        const baseY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD;
+
+        const drawX = centerX - spriteW / 2;
+        const drawY = baseY - spriteH;
+
+        const srcX = ar ? ar.x : 0;
+        ctx.drawImage(
+          objDef.image,
+          srcX, ar ? ar.y : 0,
+          ar ? ar.w : objDef.image.width,
+          ar ? ar.h : objDef.image.height,
+          drawX, drawY,
+          spriteW, spriteH
+        );
+
+      } else if (r.type === 'wall' && r.wall) {
+        const wall = r.wall;
+        const objDef = objectLoader.getWallByGid(wall.gid);
+        if (!objDef?.image) continue;
+
+        if (objDef.frames && objDef.frames > 1) {
+          entry.animatedSprites.push({ type: 'wall', wall, depth: r.depth });
+          continue;
+        }
+
+        const ar = objDef.atlasRect;
+        const spriteW = ar ? ar.w : objDef.image.width;
+        const spriteH = ar ? ar.h : objDef.image.height;
+
+        const localIsoX = (wall.x - wall.y) * halfTileW;
+        const localIsoY = (wall.x + wall.y) * halfTileH;
+        const bottomVertexX = localIsoX + OBJ_CANVAS_OFFSET_X;
+        const bottomVertexY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD;
+
+        let drawX: number;
+        if (wall.edge === 'down') {
+          drawX = bottomVertexX - spriteW;
+        } else {
+          drawX = bottomVertexX;
+        }
+        const drawY = bottomVertexY - spriteH;
+
+        const srcX = ar ? ar.x : 0;
+        ctx.drawImage(
+          objDef.image,
+          srcX, ar ? ar.y : 0,
+          spriteW, spriteH,
+          drawX, drawY,
+          spriteW, spriteH
+        );
+      }
+    }
+  }
+}
+
 // ─── Interior Tile Cache ───────────────────────────────────────────
 // Same concept but for interior maps (single fixed-size grid).
 
@@ -307,6 +492,7 @@ export class IsometricRenderer {
   private notes: DevNote[] = [];
   private selectedNoteId: string | null = null;
   private tileCache = new ChunkTileCache();
+  private objectCache = new ChunkObjectCache();
   private interiorCache = new InteriorTileCache();
 
   attach(canvas: HTMLCanvasElement): void {
@@ -335,14 +521,16 @@ export class IsometricRenderer {
     this.selectedNoteId = selectedId;
   }
 
-  /** Invalidate the tile cache for a specific chunk (call after edits). */
+  /** Invalidate all caches for a specific chunk (call after edits). */
   invalidateChunk(key: string): void {
     this.tileCache.invalidate(key);
+    this.objectCache.invalidate(key);
   }
 
-  /** Clear all tile caches (e.g. on tileset reload). */
+  /** Clear all caches (e.g. on tileset/atlas reload). */
   clearTileCache(): void {
     this.tileCache.clear();
+    this.objectCache.clear();
     this.interiorCache.clear();
   }
 
@@ -381,7 +569,7 @@ export class IsometricRenderer {
 
     if (this.options.showMapObjects) {
       for (const chunk of sortedChunks) {
-        this.renderMapObjectsAndWalls(chunk, viewport);
+        this.blitCachedObjects(chunk, viewport);
       }
     }
 
@@ -436,6 +624,36 @@ export class IsometricRenderer {
     const destH = CHUNK_CANVAS_HEIGHT * viewport.zoom;
 
     this.ctx.drawImage(cached.canvas, destX, destY, destW, destH);
+  }
+
+  /** Blit cached static objects/walls, then draw animated sprites dynamically. */
+  private blitCachedObjects(chunk: Chunk, viewport: Viewport): void {
+    if (!this.ctx || !this.canvas) return;
+
+    const key = `${chunk.coord.cx},${chunk.coord.cy}`;
+    const cached = this.objectCache.getOrRender(key, chunk);
+
+    // Same iso origin as tile cache
+    const cx = chunk.coord.cx;
+    const cy = chunk.coord.cy;
+    const chunkIsoX = (cx - cy) * CHUNK_SIZE * (TILE_WIDTH / 2);
+    const chunkIsoY = (cx + cy) * CHUNK_SIZE * (TILE_HEIGHT / 2);
+
+    const destX = (chunkIsoX - OBJ_CANVAS_OFFSET_X) * viewport.zoom + viewport.offsetX;
+    const destY = (chunkIsoY - OBJ_CANVAS_TOP_PAD) * viewport.zoom + viewport.offsetY;
+    const destW = OBJ_CANVAS_WIDTH * viewport.zoom;
+    const destH = OBJ_CANVAS_HEIGHT * viewport.zoom;
+
+    this.ctx.drawImage(cached.canvas, destX, destY, destW, destH);
+
+    // Draw animated sprites dynamically on top
+    for (const anim of cached.animatedSprites) {
+      if (anim.type === 'object' && anim.obj) {
+        this.renderMapObject(anim.obj, chunk, viewport);
+      } else if (anim.type === 'wall' && anim.wall) {
+        this.renderWall(anim.wall, chunk, viewport);
+      }
+    }
   }
 
   // Render an interior map (fixed-size, not chunk-based)
