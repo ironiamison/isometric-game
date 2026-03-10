@@ -145,6 +145,24 @@ class ChunkTileCache {
     return entry;
   }
 
+  /** Check if a chunk is already cached and valid (no rendering). */
+  isCached(
+    key: string,
+    chunk: Chunk,
+    visibleLayers: { ground: boolean; objects: boolean; overhead: boolean },
+  ): boolean {
+    const entry = this.cache.get(key);
+    return !!(
+      entry &&
+      entry.groundRef === chunk.layers.ground &&
+      entry.objectsRef === chunk.layers.objects &&
+      entry.overheadRef === chunk.layers.overhead &&
+      entry.visibleGround === visibleLayers.ground &&
+      entry.visibleObjects === visibleLayers.objects &&
+      entry.visibleOverhead === visibleLayers.overhead
+    );
+  }
+
   invalidate(key: string): void {
     this.cache.delete(key);
     const idx = this.accessOrder.indexOf(key);
@@ -275,6 +293,16 @@ class ChunkObjectCache {
     this.touch(key);
     this.evict();
     return entry;
+  }
+
+  /** Check if a chunk's objects are already cached and valid. */
+  isCached(key: string, chunk: Chunk): boolean {
+    const entry = this.cache.get(key);
+    return !!(
+      entry &&
+      entry.mapObjectsRef === chunk.mapObjects &&
+      entry.wallsRef === chunk.walls
+    );
   }
 
   invalidate(key: string): void {
@@ -526,6 +554,11 @@ export class IsometricRenderer {
   private objectCache = new ChunkObjectCache();
   private interiorCache = new InteriorTileCache();
 
+  /** Max number of new chunk caches to build per frame (tiles + objects combined). */
+  private readonly CACHE_BUILD_BUDGET = 3;
+  /** Tracks how many caches were built this frame. */
+  private cacheBuildCount = 0;
+
   attach(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
@@ -575,6 +608,7 @@ export class IsometricRenderer {
     if (!this.ctx || !this.canvas) return;
 
     this.clear();
+    this.cacheBuildCount = 0;
 
     // Filter to only visible chunks before sorting
     const visibleChunks = chunks.filter((chunk) =>
@@ -640,6 +674,14 @@ export class IsometricRenderer {
     if (!this.ctx) return;
 
     const key = `${chunk.coord.cx},${chunk.coord.cy}`;
+
+    // If not cached and we've exceeded the per-frame build budget, skip this chunk.
+    // It will be built and rendered in a subsequent frame.
+    if (!this.tileCache.isCached(key, chunk, this.options.visibleLayers)) {
+      if (this.cacheBuildCount >= this.CACHE_BUILD_BUDGET) return;
+      this.cacheBuildCount++;
+    }
+
     const cached = this.tileCache.getOrRender(
       key,
       chunk,
@@ -669,6 +711,13 @@ export class IsometricRenderer {
     if (!this.ctx || !this.canvas) return;
 
     const key = `${chunk.coord.cx},${chunk.coord.cy}`;
+
+    // Skip building new object caches if budget exhausted
+    if (!this.objectCache.isCached(key, chunk)) {
+      if (this.cacheBuildCount >= this.CACHE_BUILD_BUDGET) return;
+      this.cacheBuildCount++;
+    }
+
     const cached = this.objectCache.getOrRender(key, chunk);
 
     // Same iso origin as tile cache
@@ -1185,40 +1234,6 @@ export class IsometricRenderer {
       }
     }
   }
-
-  // private renderMapObjectsAndWalls(chunk: Chunk, viewport: Viewport): void {
-  //   if (!this.ctx) return;
-
-  //   type Renderable =
-  //     | { type: 'object'; obj: MapObject }
-  //     | { type: 'wall'; wall: Wall };
-
-  //   const renderables: Array<{ depth: number; item: Renderable }> = [];
-
-  //   for (const obj of chunk.mapObjects) {
-  //     renderables.push({
-  //       depth: obj.x + obj.y,
-  //       item: { type: 'object', obj }
-  //     });
-  //   }
-
-  //   for (const wall of chunk.walls) {
-  //     renderables.push({
-  //       depth: wall.x + wall.y,
-  //       item: { type: 'wall', wall }
-  //     });
-  //   }
-
-  //   renderables.sort((a, b) => a.depth - b.depth);
-
-  //   for (const { item } of renderables) {
-  //     if (item.type === 'object') {
-  //       this.renderMapObject(item.obj, chunk, viewport);
-  //     } else {
-  //       this.renderWall(item.wall, chunk, viewport);
-  //     }
-  //   }
-  // }
 
   private renderMapObject(
     obj: MapObject,
