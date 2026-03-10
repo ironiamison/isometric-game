@@ -127,6 +127,11 @@ interface EditorState {
   // Connection state
   isConnected: boolean;
 
+  // World state
+  currentWorld: string;
+  availableWorlds: string[];
+  currentUsername: string | null;
+
   // Panel state
   layerPanelCollapsed: boolean;
 
@@ -305,6 +310,10 @@ interface EditorActions {
   setShowNotes: (show: boolean) => void;
   setNotesPanelCollapsed: (collapsed: boolean) => void;
 
+  // World actions
+  fetchUserInfo: () => Promise<void>;
+  switchWorld: (world: string) => Promise<void>;
+
   // Asset manager actions
   openAssetManager: (tab?: 'objects' | 'walls' | 'tiles') => void;
   closeAssetManager: () => void;
@@ -370,6 +379,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   loadingMessage: '',
 
   isConnected: false,
+
+  currentWorld: 'world_0',
+  availableWorlds: ['world_0'],
+  currentUsername: null,
 
   layerPanelCollapsed: false,
 
@@ -2025,6 +2038,100 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   setSelectedNoteId: (id) => set({ selectedNoteId: id }),
   setShowNotes: (show) => set({ showNotes: show }),
   setNotesPanelCollapsed: (collapsed) => set({ notesPanelCollapsed: collapsed }),
+
+  // World actions
+  fetchUserInfo: async () => {
+    try {
+      const response = await fetch('/mapper/api/me');
+      if (response.ok) {
+        const data = await response.json();
+        set({
+          availableWorlds: data.worlds || ['world_0'],
+          currentUsername: data.username || null,
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user info:', err);
+    }
+  },
+
+  switchWorld: async (world: string) => {
+    const state = get();
+    if (state.currentWorld === world) return;
+
+    // Save any dirty chunks in the current world first
+    cancelPendingSave();
+    const dirtyChunks = state.getDirtyChunks();
+    if (dirtyChunks.length > 0) {
+      await storage.saveDirtyChunks(state.chunks);
+    }
+
+    // Save current interior if dirty
+    if (state.currentInterior?.dirty) {
+      await interiorStorage.saveInterior(state.currentInterior);
+    }
+
+    // Switch storage to new world
+    storage.setWorld(world);
+    interiorStorage.setWorld(world);
+
+    // Clear editor state
+    set({
+      currentWorld: world,
+      chunks: new Map(),
+      currentInterior: null,
+      currentInteriorId: null,
+      editorMode: 'overworld' as EditorMode,
+      availableInteriors: [],
+      isLoading: true,
+      loadingMessage: `Loading ${world}...`,
+    });
+
+    // Load chunks for new world
+    try {
+      const loadedChunks = await storage.loadAllChunks();
+      set({ isConnected: storage.isConnected });
+
+      if (loadedChunks.size > 0) {
+        let minCx = Infinity, maxCx = -Infinity;
+        let minCy = Infinity, maxCy = -Infinity;
+        for (const chunk of loadedChunks.values()) {
+          minCx = Math.min(minCx, chunk.coord.cx);
+          maxCx = Math.max(maxCx, chunk.coord.cx);
+          minCy = Math.min(minCy, chunk.coord.cy);
+          maxCy = Math.max(maxCy, chunk.coord.cy);
+        }
+        set({
+          chunks: loadedChunks,
+          worldBounds: {
+            minCx: minCx === Infinity ? 0 : minCx,
+            maxCx: maxCx === -Infinity ? 0 : maxCx,
+            minCy: minCy === Infinity ? 0 : minCy,
+            maxCy: maxCy === -Infinity ? 0 : maxCy,
+          },
+        });
+      } else {
+        // Create empty default chunk
+        chunkManager.clear();
+        chunkManager.createEmptyChunk({ cx: 0, cy: 0 });
+        const newChunks = new Map<string, Chunk>();
+        for (const chunk of chunkManager.getAllChunks()) {
+          newChunks.set(chunkKey(chunk.coord), chunk);
+        }
+        set({
+          chunks: newChunks,
+          worldBounds: chunkManager.getBounds(),
+        });
+      }
+
+      // Clear undo history
+      history.clear();
+    } catch (err) {
+      console.error('Failed to load world:', err);
+    }
+
+    set({ isLoading: false, loadingMessage: '' });
+  },
 
   // Asset manager
   assetManagerOpen: false,

@@ -110,6 +110,7 @@ function App() {
     loadingMessage,
     layerPanelCollapsed,
     setNotes,
+    fetchUserInfo,
   } = useEditorStore();
 
   // Initialize app
@@ -118,6 +119,9 @@ function App() {
       setLoading(true, 'Loading configuration...');
 
       try {
+        // Fetch user info (determines available worlds)
+        await fetchUserInfo();
+
         // Load config
         const config = await tilesetLoader.loadConfig('/mapper/mapper-config.json');
 
@@ -209,7 +213,7 @@ function App() {
     // Listen for connection status changes
     const unsubscribe = storage.onConnectionChange(setConnected);
     return () => unsubscribe();
-  }, [setTilesets, setEntityRegistry, setChunks, setWorldBounds, setLoading, setConnected, setNotes]);
+  }, [setTilesets, setEntityRegistry, setChunks, setWorldBounds, setLoading, setConnected, setNotes, fetchUserInfo]);
 
   // Auto-save every 30 seconds (only dirty chunks)
   useEffect(() => {

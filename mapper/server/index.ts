@@ -43,9 +43,25 @@ const projectRoot = path.join(mapperRoot, '..');
 
 // Data directory for chunk storage
 const DATA_DIR = path.join(mapperRoot, 'mapper-data');
-const CHUNKS_DIR = path.join(DATA_DIR, 'chunks');
-const INTERIORS_DIR = path.join(DATA_DIR, 'interiors');
 const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
+
+// Valid worlds
+const VALID_WORLDS = ['world_0', 'world_1'] as const;
+
+function getWorldDirs(world: string) {
+  return {
+    chunksDir: path.join(DATA_DIR, world, 'chunks'),
+    interiorsDir: path.join(DATA_DIR, world, 'interiors'),
+    gameChunksDir: path.join(GAME_SERVER_DIR, world),
+    gameInteriorsDir: path.join(GAME_SERVER_DIR, 'interiors'), // shared
+  };
+}
+
+function getWorldFromRequest(req: express.Request): string {
+  const world = (req.query.world as string) || 'world_0';
+  if (!VALID_WORLDS.includes(world as any)) throw new Error(`Invalid world: ${world}`);
+  return world;
+}
 
 // Asset directories
 const CLIENT_ASSETS_DIR = path.join(projectRoot, 'client', 'assets');
@@ -57,17 +73,47 @@ const TILES_EXTRACTED_DIR = path.join(CLIENT_SPRITES_DIR, 'tiles_extracted');
 
 // Game server maps directory (for deploy)
 const GAME_SERVER_DIR = path.join(mapperRoot, '..', 'rust-server', 'maps');
-const GAME_CHUNKS_DIR = path.join(GAME_SERVER_DIR, 'world_0');
-const GAME_INTERIORS_DIR = path.join(GAME_SERVER_DIR, 'interiors');
 
 // Multer storage for file uploads (temp location)
 const upload = multer({ dest: path.join(DATA_DIR, 'uploads') });
 
-// Ensure data directories exist
+// Ensure data directories exist (with migration from flat layout to per-world)
 async function ensureDataDirs() {
-  await fs.mkdir(CHUNKS_DIR, { recursive: true });
-  await fs.mkdir(INTERIORS_DIR, { recursive: true });
   await fs.mkdir(path.join(DATA_DIR, 'uploads'), { recursive: true });
+
+  // Migration: if old flat layout exists (mapper-data/chunks/) but new layout doesn't, move data
+  const oldChunksDir = path.join(DATA_DIR, 'chunks');
+  const oldInteriorsDir = path.join(DATA_DIR, 'interiors');
+  const newWorld0Chunks = path.join(DATA_DIR, 'world_0', 'chunks');
+
+  try {
+    await fs.access(oldChunksDir);
+    try {
+      await fs.access(newWorld0Chunks);
+    } catch {
+      // Old layout exists, new doesn't — migrate
+      console.log('Migrating mapper-data from flat layout to per-world layout...');
+      await fs.mkdir(path.join(DATA_DIR, 'world_0'), { recursive: true });
+      await fs.rename(oldChunksDir, newWorld0Chunks);
+      console.log('  Moved chunks/ -> world_0/chunks/');
+      try {
+        await fs.access(oldInteriorsDir);
+        await fs.rename(oldInteriorsDir, path.join(DATA_DIR, 'world_0', 'interiors'));
+        console.log('  Moved interiors/ -> world_0/interiors/');
+      } catch {
+        // No old interiors dir, that's fine
+      }
+    }
+  } catch {
+    // No old chunks dir, no migration needed
+  }
+
+  // Ensure all world directories exist
+  for (const world of VALID_WORLDS) {
+    const dirs = getWorldDirs(world);
+    await fs.mkdir(dirs.chunksDir, { recursive: true });
+    await fs.mkdir(dirs.interiorsDir, { recursive: true });
+  }
 }
 
 // In-memory notes cache
@@ -117,22 +163,219 @@ function parseCookies(header: string | undefined): Record<string, string> {
 const LOGIN_HTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mapper Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Outfit:wght@600&display=swap" rel="stylesheet">
 <style>
-  body { font-family: system-ui; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #1a1a2e; color: #eee; }
-  form { background: #16213e; padding: 2rem; border-radius: 8px; min-width: 280px; }
-  h2 { margin-top: 0; }
-  input { display: block; width: 100%; padding: 0.5rem; margin: 0.5rem 0 1rem; border: 1px solid #444; border-radius: 4px; background: #0f3460; color: #eee; box-sizing: border-box; }
-  button { width: 100%; padding: 0.5rem; background: #e94560; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
-  button:hover { background: #c73e54; }
-  .error { color: #e94560; font-size: 0.9rem; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #0c0e1a;
+    color: #c8cad0;
+    overflow: hidden;
+  }
+
+  /* isometric grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(30deg, rgba(78, 205, 196, 0.03) 1px, transparent 1px),
+      linear-gradient(150deg, rgba(78, 205, 196, 0.03) 1px, transparent 1px),
+      linear-gradient(-30deg, rgba(78, 205, 196, 0.03) 1px, transparent 1px),
+      linear-gradient(-150deg, rgba(78, 205, 196, 0.03) 1px, transparent 1px);
+    background-size: 60px 34px;
+    background-position: 0 0, 0 0, 30px 17px, 30px 17px;
+    z-index: 0;
+  }
+
+  /* soft radial glow */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    width: 600px;
+    height: 600px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(78, 205, 196, 0.06) 0%, transparent 70%);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .login-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 360px;
+    padding: 0 20px;
+    animation: fadeUp 0.5s ease-out;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .brand {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .brand-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #4ecdc4 0%, #3a9e97 100%);
+    margin-bottom: 16px;
+    box-shadow: 0 4px 24px rgba(78, 205, 196, 0.2);
+  }
+
+  .brand-icon svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: #0c0e1a;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .brand h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: #eef0f4;
+    letter-spacing: -0.02em;
+  }
+
+  .brand p {
+    font-size: 13px;
+    color: #6b6e7a;
+    margin-top: 6px;
+  }
+
+  .card {
+    background: rgba(22, 25, 40, 0.7);
+    border: 1px solid rgba(78, 205, 196, 0.08);
+    border-radius: 16px;
+    padding: 32px 28px;
+    backdrop-filter: blur(12px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.03) inset,
+      0 16px 48px rgba(0, 0, 0, 0.3);
+  }
+
+  .field {
+    margin-bottom: 20px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #8a8d9a;
+    margin-bottom: 8px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .field input {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+    background: rgba(12, 14, 26, 0.6);
+    border: 1px solid rgba(78, 205, 196, 0.1);
+    border-radius: 10px;
+    color: #eef0f4;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .field input:focus {
+    border-color: rgba(78, 205, 196, 0.35);
+    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.08);
+  }
+
+  .field input::placeholder {
+    color: #3d3f4e;
+  }
+
+  button[type="submit"] {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin-top: 24px;
+    background: linear-gradient(135deg, #4ecdc4 0%, #3dbdb5 100%);
+    color: #0c0e1a;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
+    box-shadow: 0 2px 12px rgba(78, 205, 196, 0.2);
+  }
+
+  button[type="submit"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(78, 205, 196, 0.3);
+    filter: brightness(1.05);
+  }
+
+  button[type="submit"]:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 6px rgba(78, 205, 196, 0.15);
+  }
+
+  .error {
+    margin-top: 16px;
+    padding: 10px 14px;
+    background: rgba(233, 69, 96, 0.08);
+    border: 1px solid rgba(233, 69, 96, 0.2);
+    border-radius: 8px;
+    color: #f07088;
+    font-size: 13px;
+    text-align: center;
+  }
 </style></head><body>
-<form method="POST" action="/mapper/login">
-  <h2>Mapper Login</h2>
-  <label>Username<input name="username" required></label>
-  <label>Password<input name="password" type="password" required></label>
-  <button type="submit">Log in</button>
-  ERRPLACEHOLDER
-</form></body></html>`;
+<div class="login-container">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 3L2 9l10 6 10-6-10-6z"/><path d="M2 15l10 6 10-6"/><path d="M2 9v6"/><path d="M22 9v6"/></svg>
+    </div>
+    <h1>Mapper</h1>
+    <p>World editor</p>
+  </div>
+  <div class="card">
+    <form method="POST" action="/mapper/login">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" required autocomplete="username" placeholder="Enter username">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="Enter password">
+      </div>
+      <button type="submit">Sign in</button>
+      ERRPLACEHOLDER
+    </form>
+  </div>
+</div>
+</body></html>`;
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body || {};
@@ -158,6 +401,15 @@ app.use((req, res, next) => {
 // Frontend dist path (served after API routes)
 const distPath = path.join(mapperRoot, 'dist');
 
+// --- User Info ---
+app.get('/api/me', (_req, res) => {
+  const worlds: string[] = ['world_0'];
+  if (AUTH_USER === 'null') {
+    worlds.push('world_1');
+  }
+  res.json({ username: AUTH_USER, worlds });
+});
+
 // Serve mapper-config.json from root
 app.get('/mapper-config.json', (_req, res) => {
   res.sendFile(path.join(mapperRoot, 'mapper-config.json'));
@@ -166,9 +418,10 @@ app.get('/mapper-config.json', (_req, res) => {
 // --- Chunk API ---
 
 // List all chunks
-app.get('/api/chunks', async (_req, res) => {
+app.get('/api/chunks', async (req, res) => {
   try {
-    const files = await fs.readdir(CHUNKS_DIR);
+    const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
+    const files = await fs.readdir(chunksDir);
     const chunks = files
       .filter(f => f.endsWith('.json'))
       .map(f => {
@@ -187,15 +440,16 @@ app.get('/api/chunks', async (_req, res) => {
 });
 
 // Get all chunks in one request
-app.get('/api/chunks/all', async (_req, res) => {
+app.get('/api/chunks/all', async (req, res) => {
   try {
-    console.log(`[GET /api/chunks/all] Loading from ${CHUNKS_DIR}`);
-    const files = await fs.readdir(CHUNKS_DIR);
+    const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
+    console.log(`[GET /api/chunks/all] Loading from ${chunksDir}`);
+    const files = await fs.readdir(chunksDir);
     const chunks: Record<string, unknown> = {};
 
     for (const file of files) {
       if (!file.endsWith('.json')) continue;
-      const filePath = path.join(CHUNKS_DIR, file);
+      const filePath = path.join(chunksDir, file);
       const data = await fs.readFile(filePath, 'utf-8');
       const key = file.replace('.json', '').replace('_', ',');
       chunks[key] = JSON.parse(data);
@@ -220,8 +474,9 @@ app.get('/api/chunks/all', async (_req, res) => {
 // Get single chunk
 app.get('/api/chunks/:cx/:cy', async (req, res) => {
   try {
+    const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
     const { cx, cy } = req.params;
-    const filePath = path.join(CHUNKS_DIR, `${cx}_${cy}.json`);
+    const filePath = path.join(chunksDir, `${cx}_${cy}.json`);
     const data = await fs.readFile(filePath, 'utf-8');
     res.json(JSON.parse(data));
   } catch (err) {
@@ -237,9 +492,10 @@ app.get('/api/chunks/:cx/:cy', async (req, res) => {
 // Save single chunk
 app.put('/api/chunks/:cx/:cy', async (req, res) => {
   try {
+    const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
     const { cx, cy } = req.params;
     const chunk = req.body;
-    const filePath = path.join(CHUNKS_DIR, `${cx}_${cy}.json`);
+    const filePath = path.join(chunksDir, `${cx}_${cy}.json`);
     await fs.writeFile(filePath, JSON.stringify(chunk, null, 2));
     res.json({ success: true });
   } catch (err) {
@@ -251,12 +507,13 @@ app.put('/api/chunks/:cx/:cy', async (req, res) => {
 // Save multiple chunks at once
 app.put('/api/chunks', async (req, res) => {
   try {
+    const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
     const chunks = req.body as Record<string, unknown>;
-    console.log(`[PUT /api/chunks] Saving ${Object.keys(chunks).length} chunks to ${CHUNKS_DIR}`);
+    console.log(`[PUT /api/chunks] Saving ${Object.keys(chunks).length} chunks to ${chunksDir}`);
 
     for (const [key, chunk] of Object.entries(chunks)) {
       const [cx, cy] = key.split(',');
-      const filePath = path.join(CHUNKS_DIR, `${cx}_${cy}.json`);
+      const filePath = path.join(chunksDir, `${cx}_${cy}.json`);
       await fs.writeFile(filePath, JSON.stringify(chunk, null, 2));
       console.log(`  Saved chunk ${key} to ${filePath}`);
     }
@@ -271,8 +528,9 @@ app.put('/api/chunks', async (req, res) => {
 // Delete chunk
 app.delete('/api/chunks/:cx/:cy', async (req, res) => {
   try {
+    const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
     const { cx, cy } = req.params;
-    const filePath = path.join(CHUNKS_DIR, `${cx}_${cy}.json`);
+    const filePath = path.join(chunksDir, `${cx}_${cy}.json`);
     await fs.unlink(filePath);
     res.json({ success: true });
   } catch (err) {
@@ -288,9 +546,10 @@ app.delete('/api/chunks/:cx/:cy', async (req, res) => {
 // --- Interior Maps API ---
 
 // List all interior maps
-app.get('/api/interiors', async (_req, res) => {
+app.get('/api/interiors', async (req, res) => {
   try {
-    const files = await fs.readdir(INTERIORS_DIR);
+    const { interiorsDir } = getWorldDirs(getWorldFromRequest(req));
+    const files = await fs.readdir(interiorsDir);
     const interiors = files
       .filter(f => f.endsWith('.json'))
       .map(f => f.replace('.json', ''));
@@ -308,8 +567,9 @@ app.get('/api/interiors', async (_req, res) => {
 // Get single interior map
 app.get('/api/interiors/:id', async (req, res) => {
   try {
+    const { interiorsDir } = getWorldDirs(getWorldFromRequest(req));
     const { id } = req.params;
-    const filePath = path.join(INTERIORS_DIR, `${id}.json`);
+    const filePath = path.join(interiorsDir, `${id}.json`);
     const data = await fs.readFile(filePath, 'utf-8');
     res.json(JSON.parse(data));
   } catch (err) {
@@ -325,9 +585,10 @@ app.get('/api/interiors/:id', async (req, res) => {
 // Save interior map
 app.put('/api/interiors/:id', async (req, res) => {
   try {
+    const { interiorsDir } = getWorldDirs(getWorldFromRequest(req));
     const { id } = req.params;
     const interior = req.body;
-    const filePath = path.join(INTERIORS_DIR, `${id}.json`);
+    const filePath = path.join(interiorsDir, `${id}.json`);
     await fs.writeFile(filePath, JSON.stringify(interior, null, 2));
     res.json({ success: true });
   } catch (err) {
@@ -339,8 +600,9 @@ app.put('/api/interiors/:id', async (req, res) => {
 // Delete interior map
 app.delete('/api/interiors/:id', async (req, res) => {
   try {
+    const { interiorsDir } = getWorldDirs(getWorldFromRequest(req));
     const { id } = req.params;
-    const filePath = path.join(INTERIORS_DIR, `${id}.json`);
+    const filePath = path.join(interiorsDir, `${id}.json`);
     await fs.unlink(filePath);
     res.json({ success: true });
   } catch (err) {
@@ -356,14 +618,15 @@ app.delete('/api/interiors/:id', async (req, res) => {
 // --- Map Export/Import ---
 
 // Export entire map
-app.get('/api/map/export', async (_req, res) => {
+app.get('/api/map/export', async (req, res) => {
   try {
-    const files = await fs.readdir(CHUNKS_DIR);
+    const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
+    const files = await fs.readdir(chunksDir);
     const chunks: Record<string, unknown> = {};
 
     for (const file of files) {
       if (!file.endsWith('.json')) continue;
-      const filePath = path.join(CHUNKS_DIR, file);
+      const filePath = path.join(chunksDir, file);
       const data = await fs.readFile(filePath, 'utf-8');
       const key = file.replace('.json', '').replace('_', ',');
       chunks[key] = JSON.parse(data);
@@ -384,6 +647,7 @@ app.get('/api/map/export', async (_req, res) => {
 // Import entire map
 app.post('/api/map/import', async (req, res) => {
   try {
+    const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
     const { chunks } = req.body;
 
     if (!chunks || typeof chunks !== 'object') {
@@ -392,9 +656,9 @@ app.post('/api/map/import', async (req, res) => {
 
     // Clear existing chunks
     try {
-      const existingFiles = await fs.readdir(CHUNKS_DIR);
+      const existingFiles = await fs.readdir(chunksDir);
       for (const file of existingFiles) {
-        await fs.unlink(path.join(CHUNKS_DIR, file));
+        await fs.unlink(path.join(chunksDir, file));
       }
     } catch {
       // Directory might not exist yet
@@ -404,7 +668,7 @@ app.post('/api/map/import', async (req, res) => {
     let count = 0;
     for (const [key, chunk] of Object.entries(chunks)) {
       const [cx, cy] = key.split(',');
-      const filePath = path.join(CHUNKS_DIR, `${cx}_${cy}.json`);
+      const filePath = path.join(chunksDir, `${cx}_${cy}.json`);
       await fs.writeFile(filePath, JSON.stringify(chunk, null, 2));
       count++;
     }
@@ -455,21 +719,24 @@ function convertChunkToMapperFormat(gameChunk: Record<string, unknown>): Record<
 }
 
 // Sync maps FROM game server TO mapper (reverse of deploy)
-app.post('/api/sync-from-game-server', async (_req, res) => {
+app.post('/api/sync-from-game-server', async (req, res) => {
   try {
+    const world = getWorldFromRequest(req);
+    const { chunksDir, interiorsDir, gameChunksDir, gameInteriorsDir } = getWorldDirs(world);
+
     // Ensure mapper data directories exist
-    await fs.mkdir(CHUNKS_DIR, { recursive: true });
-    await fs.mkdir(INTERIORS_DIR, { recursive: true });
+    await fs.mkdir(chunksDir, { recursive: true });
+    await fs.mkdir(interiorsDir, { recursive: true });
 
     let chunksSynced = 0;
     let interiorsSynced = 0;
 
     // Convert and copy chunks (game server format -> mapper format)
     try {
-      const chunkFiles = await fs.readdir(GAME_CHUNKS_DIR);
+      const chunkFiles = await fs.readdir(gameChunksDir);
       for (const file of chunkFiles) {
         if (!file.endsWith('.json') || !file.startsWith('chunk_')) continue;
-        const srcPath = path.join(GAME_CHUNKS_DIR, file);
+        const srcPath = path.join(gameChunksDir, file);
 
         // Read and convert chunk
         const data = await fs.readFile(srcPath, 'utf-8');
@@ -478,7 +745,7 @@ app.post('/api/sync-from-game-server', async (_req, res) => {
 
         // Write to mapper without chunk_ prefix
         const destFilename = file.replace('chunk_', '');
-        const destPath = path.join(CHUNKS_DIR, destFilename);
+        const destPath = path.join(chunksDir, destFilename);
         await fs.writeFile(destPath, JSON.stringify(mapperChunk, null, 2));
         chunksSynced++;
       }
@@ -490,11 +757,11 @@ app.post('/api/sync-from-game-server', async (_req, res) => {
 
     // Copy interiors
     try {
-      const interiorFiles = await fs.readdir(GAME_INTERIORS_DIR);
+      const interiorFiles = await fs.readdir(gameInteriorsDir);
       for (const file of interiorFiles) {
         if (!file.endsWith('.json')) continue;
-        const srcPath = path.join(GAME_INTERIORS_DIR, file);
-        const destPath = path.join(INTERIORS_DIR, file);
+        const srcPath = path.join(gameInteriorsDir, file);
+        const destPath = path.join(interiorsDir, file);
         await fs.copyFile(srcPath, destPath);
         interiorsSynced++;
       }
@@ -504,7 +771,7 @@ app.post('/api/sync-from-game-server', async (_req, res) => {
       }
     }
 
-    console.log(`Synced ${chunksSynced} chunks and ${interiorsSynced} interiors from game server`);
+    console.log(`Synced ${chunksSynced} chunks and ${interiorsSynced} interiors from game server (${world})`);
     res.json({
       success: true,
       chunksSynced,
@@ -561,21 +828,24 @@ function convertChunkToGameFormat(mapperChunk: Record<string, unknown>): Record<
 }
 
 // Deploy maps to game server directory
-app.post('/api/deploy', async (_req, res) => {
+app.post('/api/deploy', async (req, res) => {
   try {
+    const world = getWorldFromRequest(req);
+    const { chunksDir, interiorsDir, gameChunksDir, gameInteriorsDir } = getWorldDirs(world);
+
     // Ensure game server directories exist
-    await fs.mkdir(GAME_CHUNKS_DIR, { recursive: true });
-    await fs.mkdir(GAME_INTERIORS_DIR, { recursive: true });
+    await fs.mkdir(gameChunksDir, { recursive: true });
+    await fs.mkdir(gameInteriorsDir, { recursive: true });
 
     let chunksCopied = 0;
     let interiorsCopied = 0;
 
     // Convert and copy chunks (mapper format -> game server format)
     try {
-      const chunkFiles = await fs.readdir(CHUNKS_DIR);
+      const chunkFiles = await fs.readdir(chunksDir);
       for (const file of chunkFiles) {
         if (!file.endsWith('.json')) continue;
-        const srcPath = path.join(CHUNKS_DIR, file);
+        const srcPath = path.join(chunksDir, file);
 
         // Read and convert chunk
         const data = await fs.readFile(srcPath, 'utf-8');
@@ -584,7 +854,7 @@ app.post('/api/deploy', async (_req, res) => {
 
         // Write to game server with chunk_ prefix
         const destFilename = `chunk_${file}`;
-        const destPath = path.join(GAME_CHUNKS_DIR, destFilename);
+        const destPath = path.join(gameChunksDir, destFilename);
         await fs.writeFile(destPath, JSON.stringify(gameChunk, null, 2));
         chunksCopied++;
       }
@@ -596,11 +866,11 @@ app.post('/api/deploy', async (_req, res) => {
 
     // Copy interiors (same filename format - already in correct format)
     try {
-      const interiorFiles = await fs.readdir(INTERIORS_DIR);
+      const interiorFiles = await fs.readdir(interiorsDir);
       for (const file of interiorFiles) {
         if (!file.endsWith('.json')) continue;
-        const srcPath = path.join(INTERIORS_DIR, file);
-        const destPath = path.join(GAME_INTERIORS_DIR, file);
+        const srcPath = path.join(interiorsDir, file);
+        const destPath = path.join(gameInteriorsDir, file);
         await fs.copyFile(srcPath, destPath);
         interiorsCopied++;
       }
@@ -610,7 +880,7 @@ app.post('/api/deploy', async (_req, res) => {
       }
     }
 
-    console.log(`Deployed ${chunksCopied} chunks and ${interiorsCopied} interiors to game server`);
+    console.log(`Deployed ${chunksCopied} chunks and ${interiorsCopied} interiors to game server (${world})`);
     res.json({
       success: true,
       chunksCopied,

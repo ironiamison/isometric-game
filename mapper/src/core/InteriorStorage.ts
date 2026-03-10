@@ -7,6 +7,24 @@ const API_BASE = BASE_PATH;
 class InteriorStorageManager {
   private interiors: Map<string, InteriorMap> = new Map();
   private interiorIds: string[] = [];
+  private _currentWorld: string = 'world_0';
+
+  get currentWorld(): string {
+    return this._currentWorld;
+  }
+
+  setWorld(world: string): void {
+    if (this._currentWorld === world) return;
+    this._currentWorld = world;
+    // Clear in-memory cache when switching worlds
+    this.interiors.clear();
+    this.interiorIds = [];
+  }
+
+  private worldParam(url: string): string {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}world=${this._currentWorld}`;
+  }
 
   // Get list of available interior map IDs
   getInteriorIds(): string[] {
@@ -199,7 +217,7 @@ class InteriorStorageManager {
   // Load list of available interiors from server
   async loadInteriorList(): Promise<string[]> {
     try {
-      const response = await fetch(`${API_BASE}/api/interiors`);
+      const response = await fetch(this.worldParam(`${API_BASE}/api/interiors`));
       if (!response.ok) {
         console.warn('Failed to load interior list from server');
         return [];
@@ -221,7 +239,7 @@ class InteriorStorageManager {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/interiors/${id}`);
+      const response = await fetch(this.worldParam(`${API_BASE}/api/interiors/${id}`));
       if (!response.ok) {
         console.warn(`Failed to load interior ${id}`);
         return null;
@@ -246,7 +264,7 @@ class InteriorStorageManager {
   async saveInterior(interior: InteriorMap): Promise<boolean> {
     try {
       const data = this.serializeInterior(interior);
-      const response = await fetch(`${API_BASE}/api/interiors/${interior.id}`, {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/interiors/${interior.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -271,7 +289,7 @@ class InteriorStorageManager {
   // Delete interior from server
   async deleteInterior(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/api/interiors/${id}`, {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/interiors/${id}`), {
         method: 'DELETE',
       });
 

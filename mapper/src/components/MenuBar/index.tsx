@@ -46,6 +46,9 @@ export function MenuBar() {
     setAvailableInteriors,
     resizeInterior,
     openAssetManager,
+    currentWorld,
+    availableWorlds,
+    switchWorld,
   } = useEditorStore();
 
   const [rebuildingAtlas, setRebuildingAtlas] = useState(false);
@@ -441,7 +444,7 @@ export function MenuBar() {
 
   const handleDeployToGameServer = async () => {
     try {
-      const response = await fetch('/mapper/api/deploy', { method: 'POST' });
+      const response = await fetch(`/mapper/api/deploy?world=${currentWorld}`, { method: 'POST' });
       const result = await response.json();
 
       if (result.success) {
@@ -846,6 +849,19 @@ export function MenuBar() {
       </div>
 
       <div className={styles.status}>
+        {availableWorlds.length > 1 ? (
+          <select
+            className={styles.worldSelector}
+            value={currentWorld}
+            onChange={(e) => switchWorld(e.target.value)}
+          >
+            {availableWorlds.map((w) => (
+              <option key={w} value={w}>{w}</option>
+            ))}
+          </select>
+        ) : (
+          <span className={styles.statusItem}>{currentWorld}</span>
+        )}
         {editorMode === 'interior' && currentInteriorId && (
           <span className={styles.statusItem}>
             Editing: {currentInteriorId} {currentInterior?.dirty ? '*' : ''}

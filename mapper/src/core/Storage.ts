@@ -2,7 +2,6 @@ import type { Chunk, ChunkCoord, SerializedInteriorMap } from '@/types';
 import { chunkKey } from './coords';
 import { interiorStorage } from './InteriorStorage';
 
-const DB_NAME = 'mapper-storage';
 const DB_VERSION = 1;
 const CHUNKS_STORE = 'chunks';
 
@@ -15,6 +14,31 @@ class StorageManager {
   private initPromise: Promise<void> | null = null;
   private _isConnected: boolean = false;
   private connectionListeners: Set<(connected: boolean) => void> = new Set();
+  private _currentWorld: string = 'world_0';
+
+  get currentWorld(): string {
+    return this._currentWorld;
+  }
+
+  setWorld(world: string): void {
+    if (this._currentWorld === world) return;
+    this._currentWorld = world;
+    // Close existing IndexedDB and reset init promise so it reopens with new name
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+    this.initPromise = null;
+  }
+
+  private get dbName(): string {
+    return `mapper-storage-${this._currentWorld}`;
+  }
+
+  private worldParam(url: string): string {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}world=${this._currentWorld}`;
+  }
 
   get isConnected(): boolean {
     return this._isConnected;
@@ -39,7 +63,7 @@ class StorageManager {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(this.dbName, DB_VERSION);
 
       request.onerror = () => {
         console.error('Failed to open IndexedDB:', request.error);
@@ -195,7 +219,7 @@ class StorageManager {
   async loadAllChunksFromServer(): Promise<Map<string, Chunk> | null> {
     try {
       // Add cache-busting to prevent browser from returning stale data
-      const response = await fetch(`${API_BASE}/api/chunks/all?_t=${Date.now()}`, {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/chunks/all?_t=${Date.now()}`), {
         cache: 'no-store',
       });
       if (!response.ok) {
@@ -221,7 +245,7 @@ class StorageManager {
   async saveChunkToServer(chunk: Chunk): Promise<boolean> {
     try {
       const { cx, cy } = chunk.coord;
-      const response = await fetch(`${API_BASE}/api/chunks/${cx}/${cy}`, {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/chunks/${cx}/${cy}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.chunkToStorable(chunk)),
@@ -247,7 +271,7 @@ class StorageManager {
         payload[key] = this.chunkToStorable(chunk);
       }
 
-      const response = await fetch(`${API_BASE}/api/chunks`, {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/chunks`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -268,7 +292,7 @@ class StorageManager {
 
   async deleteChunkFromServer(coord: ChunkCoord): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/api/chunks/${coord.cx}/${coord.cy}`, {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/chunks/${coord.cx}/${coord.cy}`), {
         method: 'DELETE',
       });
 
@@ -345,7 +369,7 @@ class StorageManager {
       }
 
       console.log(`[saveDirtyChunks] Sending PUT /api/chunks with keys:`, Object.keys(payload));
-      const response = await fetch(`${API_BASE}/api/chunks`, {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/chunks`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -373,7 +397,7 @@ class StorageManager {
    */
   async syncFromGameServer(): Promise<Map<string, Chunk> | null> {
     try {
-      const response = await fetch(`${API_BASE}/api/sync-from-game-server`, {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/sync-from-game-server`), {
         method: 'POST',
       });
       if (!response.ok) {
@@ -490,7 +514,7 @@ class StorageManager {
   async importToServer(jsonString: string): Promise<number> {
     const data = JSON.parse(jsonString);
 
-    const response = await fetch(`${API_BASE}/api/map/import`, {
+    const response = await fetch(this.worldParam(`${API_BASE}/api/map/import`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

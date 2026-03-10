@@ -245,3 +245,28 @@
   color: #fff;
   border-color: #4ecdc4;
 }
+
+.worldSelector {
+  background: #2d2d44;
+  color: #ccc;
+  border: 1px solid #3d3d5c;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+}
+
+.worldSelector:hover {
+  border-color: #4ecdc4;
+  color: #fff;
+}
+
+.worldSelector:focus {
+  border-color: #4ecdc4;
+}
+
+.worldSelector option {
+  background: #2d2d44;
+  color: #ccc;
+}
