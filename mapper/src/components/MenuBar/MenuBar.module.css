@@ -2,15 +2,16 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #1a1a2e;
-  border-bottom: 1px solid #3d3d5c;
+  background: rgba(20, 23, 36, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
   padding: 0 8px;
-  height: 32px;
+  height: 34px;
 }
 
 .menu {
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 
 .menuItem {
@@ -20,15 +21,19 @@
 .menuTitle {
   display: block;
   padding: 6px 12px;
-  color: #ccc;
+  color: var(--text-secondary);
   font-size: 12px;
+  font-family: var(--font-body);
+  font-weight: 500;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  letter-spacing: 0.01em;
 }
 
 .menuTitle:hover {
-  background: #2d2d44;
-  color: #fff;
+  background: rgba(78, 205, 196, 0.08);
+  color: var(--text-bright);
 }
 
 .dropdown {
@@ -36,13 +41,14 @@
   position: absolute;
   top: 100%;
   left: 0;
-  min-width: 180px;
-  background: #2d2d44;
-  border: 1px solid #3d3d5c;
-  border-radius: 4px;
-  padding: 4px 0;
+  min-width: 200px;
+  background: rgba(20, 23, 36, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  padding: 4px;
   z-index: 100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 1px rgba(78, 205, 196, 0.1);
 }
 
 .menuItem:hover .dropdown {
@@ -52,30 +58,33 @@
 .dropdownItem {
   display: block;
   width: 100%;
-  padding: 8px 12px;
+  padding: 7px 12px;
   background: none;
   border: none;
-  color: #ccc;
+  color: var(--text-primary);
   font-size: 12px;
+  font-family: var(--font-body);
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
+  border-radius: 5px;
+  transition: all 0.12s ease;
 }
 
 .dropdownItem:hover {
-  background: #3d3d5c;
-  color: #fff;
+  background: rgba(78, 205, 196, 0.1);
+  color: var(--text-bright);
 }
 
 .dropdownItem:disabled {
-  color: #666;
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 
 .separator {
   height: 1px;
-  background: #3d3d5c;
-  margin: 4px 0;
+  background: var(--border-subtle);
+  margin: 4px;
 }
 
 .status {
@@ -86,36 +95,41 @@
 
 .statusItem {
   font-size: 11px;
-  color: #888;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 .connectionStatus {
   display: flex;
   align-items: center;
   gap: 6px;
+  font-family: var(--font-body);
 }
 
 .connectionStatus::before {
   content: '';
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
 }
 
 .connected {
-  color: #4ecdc4;
+  color: var(--accent);
 }
 
 .connected::before {
-  background: #4ecdc4;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(78, 205, 196, 0.5);
 }
 
 .disconnected {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 .disconnected::before {
-  background: #ff6b6b;
+  background: var(--danger);
+  box-shadow: 0 0 6px rgba(240, 112, 136, 0.5);
 }
 
 /* Modal styles */
@@ -125,7 +139,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(8, 10, 18, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -133,46 +148,57 @@
 }
 
 .modal {
-  background: #2d2d44;
-  border: 1px solid #3d3d5c;
-  border-radius: 8px;
-  padding: 20px;
-  min-width: 320px;
+  background: rgba(22, 25, 40, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-medium);
+  border-radius: 16px;
+  padding: 24px;
+  min-width: 340px;
   max-width: 90%;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .modal h3 {
   margin: 0 0 16px;
-  color: #fff;
+  color: var(--text-bright);
   font-size: 16px;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .modalField {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .modalField label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-size: 12px;
-  color: #aaa;
+  font-family: var(--font-body);
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .modalField input {
   width: 100%;
-  padding: 8px 10px;
-  background: #1a1a2e;
-  border: 1px solid #3d3d5c;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 13px;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  color: var(--text-bright);
+  font-size: 14px;
+  font-family: var(--font-body);
   box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .modalField input:focus {
   outline: none;
-  border-color: #4ecdc4;
+  border-color: var(--border-focus);
+  box-shadow: var(--accent-glow);
 }
 
 .modalFieldRow {
@@ -188,35 +214,41 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .modalActions button {
-  padding: 8px 16px;
+  padding: 9px 18px;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 500;
   cursor: pointer;
-  background: #3d3d5c;
-  color: #ccc;
+  background: rgba(78, 205, 196, 0.08);
+  color: var(--text-primary);
+  transition: all 0.15s ease;
 }
 
 .modalActions button:hover {
-  background: #4d4d6c;
-  color: #fff;
+  background: rgba(78, 205, 196, 0.15);
+  color: var(--text-bright);
 }
 
 .primaryButton {
-  background: #4ecdc4 !important;
-  color: #1a1a2e !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover)) !important;
+  color: var(--bg-deepest) !important;
+  font-weight: 600 !important;
 }
 
 .primaryButton:hover {
-  background: #3dbdb5 !important;
+  filter: brightness(1.08) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.25) !important;
 }
 
 .emptyMessage {
-  color: #888;
+  color: var(--text-secondary);
   font-size: 13px;
   text-align: center;
   padding: 20px;
@@ -231,43 +263,48 @@
   display: block;
   width: 100%;
   padding: 10px 12px;
-  background: #1a1a2e;
-  border: 1px solid #3d3d5c;
-  border-radius: 4px;
-  color: #ccc;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-primary);
   font-size: 13px;
+  font-family: var(--font-body);
   text-align: left;
   cursor: pointer;
   margin-bottom: 4px;
+  transition: all 0.15s ease;
 }
 
 .interiorItem:hover {
-  background: #3d3d5c;
-  color: #fff;
-  border-color: #4ecdc4;
+  background: rgba(78, 205, 196, 0.08);
+  color: var(--text-bright);
+  border-color: var(--border-focus);
 }
 
 .worldSelector {
-  background: #2d2d44;
-  color: #ccc;
-  border: 1px solid #3d3d5c;
-  border-radius: 4px;
-  padding: 2px 6px;
+  background: rgba(78, 205, 196, 0.06);
+  color: var(--text-primary);
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  padding: 3px 8px;
   font-size: 11px;
+  font-family: var(--font-body);
   cursor: pointer;
   outline: none;
+  transition: all 0.15s ease;
 }
 
 .worldSelector:hover {
-  border-color: #4ecdc4;
-  color: #fff;
+  border-color: var(--border-focus);
+  color: var(--text-bright);
 }
 
 .worldSelector:focus {
-  border-color: #4ecdc4;
+  border-color: var(--border-focus);
+  box-shadow: var(--accent-glow);
 }
 
 .worldSelector option {
-  background: #2d2d44;
-  color: #ccc;
+  background: var(--bg-panel);
+  color: var(--text-primary);
 }

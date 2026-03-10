@@ -1,32 +1,42 @@
 .panel {
-  background: #2d2d44;
+  background: var(--bg-panel);
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid #3d3d5c;
+  border-bottom: 1px solid var(--border-subtle);
   flex: 1;
   min-height: 0;
 }
 
 .title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  color: #888;
+  color: var(--text-secondary);
   text-transform: uppercase;
+  letter-spacing: 0.06em;
   padding: 8px;
+  font-family: var(--font-heading);
 }
 
 .search {
   margin: 0 8px 8px;
-  padding: 6px 8px;
-  background: #3d3d5c;
-  border: 1px solid #4d4d6c;
-  border-radius: 4px;
-  color: #fff;
+  padding: 7px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-bright);
   font-size: 12px;
+  font-family: var(--font-body);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: var(--accent-glow);
 }
 
 .search::placeholder {
-  color: #666;
+  color: var(--text-muted);
 }
 
 .groups {
@@ -35,31 +45,34 @@
 }
 
 .group {
-  border-top: 1px solid #3d3d5c;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .groupHeader {
   width: 100%;
   padding: 8px;
-  background: #252538;
+  background: var(--bg-surface);
   border: none;
-  color: #ccc;
+  color: var(--text-primary);
   font-size: 11px;
   font-weight: 500;
+  font-family: var(--font-body);
   text-align: left;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
+  transition: background 0.12s ease;
 }
 
 .groupHeader:hover {
-  background: #2d2d44;
+  background: rgba(78, 205, 196, 0.06);
 }
 
 .arrow {
   font-size: 8px;
   width: 10px;
+  color: var(--text-secondary);
 }
 
 .entities {
@@ -71,40 +84,43 @@
   padding: 6px 8px;
   background: none;
   border: none;
-  border-radius: 4px;
-  color: #ccc;
+  border-radius: 5px;
+  color: var(--text-primary);
   text-align: left;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  transition: all 0.12s ease;
 }
 
 .entity:hover {
-  background: #3d3d5c;
+  background: rgba(78, 205, 196, 0.06);
 }
 
 .entity.selected {
-  background: #5c7cfa;
-  color: #fff;
+  background: rgba(78, 205, 196, 0.15);
+  color: var(--text-bright);
 }
 
 .entityName {
   font-size: 12px;
+  font-family: var(--font-body);
 }
 
 .entityId {
   font-size: 10px;
-  color: #888;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
 }
 
 .entity.selected .entityId {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(78, 205, 196, 0.7);
 }
 
 .empty {
   padding: 8px;
-  color: #666;
+  color: var(--text-muted);
   font-size: 11px;
   text-align: center;
 }

@@ -1,8 +1,8 @@
 .palette {
-  background: #2d2d44;
+  background: var(--bg-panel);
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid #3d3d5c;
+  border-bottom: 1px solid var(--border-subtle);
   height: 100%;
 }
 
@@ -11,15 +11,17 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px;
-  border-bottom: 1px solid #3d3d5c;
+  border-bottom: 1px solid var(--border-subtle);
   gap: 8px;
 }
 
 .title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  color: #888;
+  color: var(--text-secondary);
   text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: var(--font-heading);
 }
 
 .zoomControls {
@@ -31,43 +33,54 @@
 .zoomButton {
   width: 22px;
   height: 22px;
-  background: #3d3d5c;
-  border: 1px solid #4d4d6c;
-  border-radius: 4px;
-  color: #ccc;
+  background: rgba(78, 205, 196, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  color: var(--text-primary);
   font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  transition: all 0.15s ease;
 }
 
 .zoomButton:hover {
-  background: #4d4d6c;
+  background: rgba(78, 205, 196, 0.12);
+  border-color: var(--border-medium);
 }
 
 .zoomLevel {
   font-size: 10px;
-  color: #888;
+  color: var(--text-secondary);
   min-width: 36px;
   text-align: center;
+  font-family: var(--font-mono);
 }
 
 .select {
-  background: #3d3d5c;
-  border: 1px solid #4d4d6c;
-  border-radius: 4px;
-  color: #ccc;
+  background: rgba(78, 205, 196, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  color: var(--text-primary);
   padding: 4px 8px;
   font-size: 11px;
+  font-family: var(--font-body);
+  transition: border-color 0.15s ease;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--border-focus);
 }
 
 .info {
   font-size: 11px;
-  color: #888;
+  color: var(--text-secondary);
   padding: 4px 8px;
-  background: #252538;
+  background: var(--bg-surface);
+  font-family: var(--font-mono);
 }
 
 .canvasContainer {
@@ -84,10 +97,10 @@
 }
 
 .addButton {
-  background: #3d3d5c;
-  border: 1px solid #4d4d6c;
-  border-radius: 4px;
-  color: #888;
+  background: rgba(78, 205, 196, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  color: var(--text-secondary);
   font-size: 14px;
   width: 24px;
   height: 24px;
@@ -96,10 +109,12 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+  transition: all 0.15s ease;
 }
 
 .addButton:hover {
-  background: #4ecdc4;
-  color: #1a1a2e;
-  border-color: #4ecdc4;
+  background: var(--accent);
+  color: var(--bg-deepest);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(78, 205, 196, 0.3);
 }

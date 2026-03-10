@@ -1,7 +1,7 @@
 .panel {
-  background: #2d2d44;
+  background: var(--bg-panel);
   padding: 6px;
-  border-bottom: 1px solid #3d3d5c;
+  border-bottom: 1px solid var(--border-subtle);
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -10,13 +10,15 @@
 .title {
   font-size: 10px;
   font-weight: 600;
-  color: #888;
+  color: var(--text-secondary);
   text-transform: uppercase;
+  letter-spacing: 0.06em;
   margin-bottom: 4px;
+  font-family: var(--font-heading);
 }
 
 .empty {
-  color: #666;
+  color: var(--text-muted);
   font-size: 11px;
   padding: 8px 0;
 }
@@ -35,23 +37,28 @@
 
 .label {
   font-size: 11px;
-  color: #888;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-weight: 500;
 }
 
 .input,
 .select {
-  padding: 4px 6px;
-  background: #3d3d5c;
-  border: 1px solid #4d4d6c;
-  border-radius: 3px;
-  color: #fff;
+  padding: 5px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  color: var(--text-bright);
   font-size: 11px;
+  font-family: var(--font-body);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .input:focus,
 .select:focus {
   outline: none;
-  border-color: #5c7cfa;
+  border-color: var(--border-focus);
+  box-shadow: var(--accent-glow);
 }
 
 .checkboxLabel {
@@ -59,16 +66,18 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #ccc;
+  color: var(--text-primary);
   cursor: pointer;
+  font-family: var(--font-body);
 }
 
 .info {
   font-size: 10px;
-  color: #666;
-  padding: 4px 6px;
-  background: #252538;
-  border-radius: 3px;
+  color: var(--text-secondary);
+  padding: 5px 8px;
+  background: var(--bg-surface);
+  border-radius: 5px;
+  border: 1px solid var(--border-subtle);
 }
 
 .actions {
@@ -78,62 +87,74 @@
 }
 
 .deleteButton {
-  padding: 4px 10px;
-  background: #dc3545;
+  padding: 5px 12px;
+  background: var(--danger);
   border: none;
-  border-radius: 3px;
+  border-radius: 5px;
   color: #fff;
   font-size: 10px;
+  font-family: var(--font-body);
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .deleteButton:hover {
-  background: #c82333;
+  background: var(--danger-hover);
+  transform: translateY(-1px);
 }
 
 .value {
   font-size: 11px;
-  color: #ccc;
-  padding: 4px 6px;
-  background: #3d3d5c;
-  border-radius: 3px;
+  color: var(--text-primary);
+  padding: 5px 8px;
+  background: var(--bg-surface);
+  border-radius: 5px;
+  font-family: var(--font-mono);
 }
 
 .hint {
   font-size: 10px;
-  color: #666;
+  color: var(--text-muted);
   text-align: center;
   margin-top: 4px;
 }
 
 .jumpButton {
-  padding: 5px 10px;
-  background: #4ecdc4;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   border: none;
-  border-radius: 3px;
-  color: #1a1a2e;
+  border-radius: 6px;
+  color: var(--bg-deepest);
   font-size: 11px;
   font-weight: 600;
+  font-family: var(--font-body);
   cursor: pointer;
   width: 100%;
+  transition: all 0.15s ease;
 }
 
 .jumpButton:hover {
-  background: #3dbdb5;
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.25);
 }
 
 .applyAllButton {
-  padding: 5px 10px;
-  background: #6c757d;
-  border: none;
-  border-radius: 3px;
-  color: #fff;
+  padding: 6px 12px;
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  color: var(--text-primary);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
+  font-family: var(--font-body);
   cursor: pointer;
   width: 100%;
+  transition: all 0.15s ease;
 }
 
 .applyAllButton:hover {
-  background: #5a6268;
+  background: rgba(78, 205, 196, 0.18);
+  color: var(--text-bright);
 }

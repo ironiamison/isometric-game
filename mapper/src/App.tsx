@@ -369,7 +369,7 @@ function App() {
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <EntityPanel />
             </div>
-            <div style={{ flex: 0, overflow: 'hidden' }}>
+            <div style={{ flex: 'none', overflowY: 'auto', maxHeight: '50%' }}>
               <PropertiesPanel />
             </div>
           </div>

@@ -9,12 +9,13 @@
 
 .menu {
   position: fixed;
-  background: #2d2d44;
-  border: 1px solid #4d4d6c;
-  border-radius: 4px;
-  padding: 4px 0;
-  min-width: 160px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  background: rgba(20, 23, 36, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 170px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 1px rgba(78, 205, 196, 0.1);
   z-index: 1001;
 }
 
@@ -23,16 +24,19 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 12px;
+  padding: 7px 12px;
   border: none;
   background: none;
-  color: #ccc;
-  font-size: 11px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-body);
   cursor: pointer;
   text-align: left;
+  border-radius: 5px;
+  transition: all 0.12s ease;
 }
 
 .item:hover {
-  background: #3d3d5c;
-  color: #fff;
+  background: rgba(78, 205, 196, 0.1);
+  color: var(--text-bright);
 }
