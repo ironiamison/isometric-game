@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useEditorStore } from '@/state/store';
 import { isometricRenderer } from '@/core/IsometricRenderer';
-import { screenToWorldTile } from '@/core/coords';
+import { screenToWorldTile, worldToChunk } from '@/core/coords';
 import { Tool, Layer } from '@/types';
 import type { DevNote } from '@/types';
 import { history } from '@/core/History';
@@ -775,16 +775,12 @@ export function Canvas() {
             {
               label: 'Add Note Here',
               onClick: () => {
-                const CHUNK_SIZE = 32;
                 const now = new Date().toISOString();
                 const note: DevNote = {
                   id: crypto.randomUUID(),
                   x: contextMenu.wx,
                   y: contextMenu.wy,
-                  chunkCoord: {
-                    cx: Math.floor(contextMenu.wx / CHUNK_SIZE),
-                    cy: Math.floor(contextMenu.wy / CHUNK_SIZE),
-                  },
+                  chunkCoord: worldToChunk({ wx: contextMenu.wx, wy: contextMenu.wy }),
                   text: '',
                   category: 'todo',
                   priority: 'medium',

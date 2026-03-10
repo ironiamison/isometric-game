@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useEditorStore } from '@/state/store';
 import { notesStorage } from '@/core/NotesStorage';
-import { screenToWorldTile } from '@/core/coords';
+import { screenToWorldTile, worldToChunk } from '@/core/coords';
 import type { DevNote, NoteCategory, NotePriority, NoteStatus } from '@/types';
 import styles from './NotesPanel.module.css';
 
@@ -75,22 +75,19 @@ export function NotesPanel() {
   };
 
   const handleCreate = async () => {
-    // Use hovered tile, or center of current viewport
-    const centerTile = screenToWorldTile(
-      { sx: window.innerWidth / 2, sy: window.innerHeight / 2 },
-      viewport
-    );
+    // Use hovered tile, or center of current canvas
+    const canvas = document.querySelector('canvas');
+    const canvasCenter = canvas
+      ? { sx: canvas.width / 2, sy: canvas.height / 2 }
+      : { sx: 400, sy: 200 };
+    const centerTile = screenToWorldTile(canvasCenter, viewport);
     const tile = hoveredTile || centerTile;
-    const CHUNK_SIZE = 32;
     const now = new Date().toISOString();
     const note: DevNote = {
       id: generateId(),
       x: tile.wx,
       y: tile.wy,
-      chunkCoord: {
-        cx: Math.floor(tile.wx / CHUNK_SIZE),
-        cy: Math.floor(tile.wy / CHUNK_SIZE),
-      },
+      chunkCoord: worldToChunk(tile),
       text: '',
       category: 'todo',
       priority: 'medium',
@@ -134,18 +131,18 @@ export function NotesPanel() {
 
   const flyToNote = (note: DevNote) => {
     setSelectedNoteId(note.id);
-    // Center viewport on note's world position
+    // Center viewport on note's world position (same approach as jumpToPortalTarget)
     const TILE_WIDTH = 64;
     const TILE_HEIGHT = 32;
-    const screenX = (note.x - note.y) * (TILE_WIDTH / 2) * viewport.zoom;
-    const screenY = (note.x + note.y) * (TILE_HEIGHT / 2) * viewport.zoom;
+    const isoX = (note.x - note.y) * (TILE_WIDTH / 2);
+    const isoY = (note.x + note.y) * (TILE_HEIGHT / 2);
     const canvas = document.querySelector('canvas');
-    if (canvas) {
-      setViewport({
-        offsetX: canvas.width / 2 - screenX,
-        offsetY: canvas.height / 2 - screenY,
-      });
-    }
+    const centerX = canvas ? canvas.width / 2 : 400;
+    const centerY = canvas ? canvas.height / 2 : 200;
+    setViewport({
+      offsetX: centerX - isoX * viewport.zoom,
+      offsetY: centerY - isoY * viewport.zoom,
+    });
   };
 
   const openCount = notes.filter(n => n.status === 'open').length;
