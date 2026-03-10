@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import JSZip from 'jszip';
 import { useEditorStore, cancelPendingSave } from '@/state/store';
 import { chunkManager } from '@/core/ChunkManager';
-import { chunkKey } from '@/core/coords';
 import { history } from '@/core/History';
 import { storage } from '@/core/Storage';
 import { interiorStorage } from '@/core/InteriorStorage';
