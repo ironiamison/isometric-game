@@ -20,6 +20,11 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      '/mapper/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/mapper/, ''),
+      },
       '/mapper-config.json': {
         target: 'http://localhost:3000',
         changeOrigin: true,

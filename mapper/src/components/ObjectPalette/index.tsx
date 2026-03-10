@@ -106,7 +106,7 @@ export function ObjectPalette() {
     if (!confirm(`Delete "${obj.name}" from ${category}?`)) return;
 
     try {
-      const res = await fetch(`/api/assets/${category}/${obj.id}`, { method: 'DELETE' });
+      const res = await fetch(`/mapper/api/assets/${category}/${obj.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
 
       if (category === 'objects') {
