@@ -9332,15 +9332,7 @@ impl Renderer {
                 chip_row_h = chip_row_h.max(slayer_h);
             }
 
-            // Combat style chip (to the right of slayer task chip)
-            let (combat_w, combat_h) =
-                self.render_combat_style_chip(state, chip_cursor_x, chip_row_y);
-            if combat_w > 0.0 {
-                chip_cursor_x += combat_w + chip_gap;
-                chip_row_h = chip_row_h.max(combat_h);
-            }
-
-            // Potion buff chips (after combat style)
+            // Potion buff chips (after slayer task)
             let mut has_buff_chip = false;
             for buff in &state.active_potion_buffs {
                 let (buff_w, buff_h) =
@@ -9350,6 +9342,14 @@ impl Renderer {
                     chip_cursor_x += buff_w + chip_gap;
                     chip_row_h = chip_row_h.max(buff_h);
                 }
+            }
+
+            // Combat style chip (after potion buffs)
+            let (combat_w, combat_h) =
+                self.render_combat_style_chip(state, chip_cursor_x, chip_row_y);
+            if combat_w > 0.0 {
+                chip_cursor_x += combat_w + chip_gap;
+                chip_row_h = chip_row_h.max(combat_h);
             }
 
             let has_any_chip = combat_w > 0.0 || has_slayer_chip || has_buff_chip;
@@ -9797,7 +9797,7 @@ impl Renderer {
                 // Slayer chip is now first (leftmost), so tooltip x = bar_x
                 self.render_slayer_task_chip_tooltip(state, bar_x, chip_y);
 
-                // Potion buff chip tooltips
+                // Potion buff chip tooltips (positioned after slayer chip, before combat style)
                 if !state.active_potion_buffs.is_empty() {
                     let chip_gap = 4.0 * s;
                     let mut tooltip_cursor_x = bar_x;
@@ -9805,11 +9805,6 @@ impl Renderer {
                     let (sw, _) = self.render_slayer_task_chip(state, -10000.0, -10000.0);
                     if sw > 0.0 {
                         tooltip_cursor_x += sw + chip_gap;
-                    }
-                    // Skip past combat style chip
-                    let (cw, _) = self.render_combat_style_chip(state, -10000.0, -10000.0);
-                    if cw > 0.0 {
-                        tooltip_cursor_x += cw + chip_gap;
                     }
                     // Iterate buff chips
                     for buff in &state.active_potion_buffs {
