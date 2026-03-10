@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useEditorStore } from '@/state/store';
 import { objectLoader } from '@/core/ObjectLoader';
 import { tilesetLoader } from '@/core/TilesetLoader';
+import { isometricRenderer } from '@/core/IsometricRenderer';
 import styles from './AssetManager.module.css';
 
 interface QueueItem {
@@ -189,6 +190,7 @@ export function AssetManager() {
           } else {
             await objectLoader.reloadFromConfig();
           }
+          isometricRenderer.clearTileCache();
           refreshAssets();
         } catch (err) {
           console.warn('Atlas reload failed (may still be building):', err);
@@ -307,13 +309,15 @@ export function AssetManager() {
               </span>
             )}
           </div>
-          <button
-            className={styles.importButton}
-            onClick={handleImport}
-            disabled={queue.length === 0 || importing}
-          >
-            {importing ? 'Importing...' : `Import ${queue.length} file${queue.length !== 1 ? 's' : ''}`}
-          </button>
+          {(queue.length > 0 || importing) && (
+            <button
+              className={styles.importButton}
+              onClick={handleImport}
+              disabled={importing}
+            >
+              {importing ? 'Importing...' : `Import ${queue.length} file${queue.length !== 1 ? 's' : ''}`}
+            </button>
+          )}
         </div>
       </div>
     </div>

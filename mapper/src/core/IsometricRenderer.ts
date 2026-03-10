@@ -48,12 +48,266 @@ const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   },
 };
 
+// ─── Chunk Tile Cache ──────────────────────────────────────────────
+// Pre-renders chunk tile layers to an offscreen canvas so the main
+// render loop blits one image per chunk instead of ~3072 drawImage calls.
+
+/** Offscreen canvas dimensions for a 32x32 isometric chunk at zoom=1 */
+const CHUNK_CANVAS_WIDTH = CHUNK_SIZE * TILE_WIDTH;   // 2048
+const CHUNK_CANVAS_HEIGHT = CHUNK_SIZE * TILE_HEIGHT + TILE_HEIGHT; // 1056
+const CHUNK_CANVAS_OFFSET_X = CHUNK_CANVAS_WIDTH / 2; // 1024
+
+interface ChunkCacheEntry {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  groundRef: number[];
+  objectsRef: number[];
+  overheadRef: number[];
+  visibleGround: boolean;
+  visibleObjects: boolean;
+  visibleOverhead: boolean;
+}
+
+class ChunkTileCache {
+  private cache = new Map<string, ChunkCacheEntry>();
+  private accessOrder: string[] = [];
+  private maxSize = 40;
+
+  getOrRender(
+    key: string,
+    chunk: Chunk,
+    visibleLayers: { ground: boolean; objects: boolean; overhead: boolean }
+  ): ChunkCacheEntry {
+    let entry = this.cache.get(key);
+
+    // Check if the cached entry is still valid
+    const isValid = entry &&
+      entry.groundRef === chunk.layers.ground &&
+      entry.objectsRef === chunk.layers.objects &&
+      entry.overheadRef === chunk.layers.overhead &&
+      entry.visibleGround === visibleLayers.ground &&
+      entry.visibleObjects === visibleLayers.objects &&
+      entry.visibleOverhead === visibleLayers.overhead;
+
+    if (isValid) {
+      this.touch(key);
+      return entry!;
+    }
+
+    // Create or reuse canvas
+    if (!entry) {
+      const canvas = document.createElement('canvas');
+      canvas.width = CHUNK_CANVAS_WIDTH;
+      canvas.height = CHUNK_CANVAS_HEIGHT;
+      const ctx = canvas.getContext('2d')!;
+      ctx.imageSmoothingEnabled = false;
+      entry = {
+        canvas, ctx,
+        groundRef: chunk.layers.ground,
+        objectsRef: chunk.layers.objects,
+        overheadRef: chunk.layers.overhead,
+        visibleGround: visibleLayers.ground,
+        visibleObjects: visibleLayers.objects,
+        visibleOverhead: visibleLayers.overhead,
+      };
+      this.cache.set(key, entry);
+    }
+
+    // Render tiles to the offscreen canvas
+    this.renderToCache(entry, chunk, visibleLayers);
+
+    // Update tracked references
+    entry.groundRef = chunk.layers.ground;
+    entry.objectsRef = chunk.layers.objects;
+    entry.overheadRef = chunk.layers.overhead;
+    entry.visibleGround = visibleLayers.ground;
+    entry.visibleObjects = visibleLayers.objects;
+    entry.visibleOverhead = visibleLayers.overhead;
+
+    this.touch(key);
+    this.evict();
+    return entry;
+  }
+
+  invalidate(key: string): void {
+    this.cache.delete(key);
+    const idx = this.accessOrder.indexOf(key);
+    if (idx >= 0) this.accessOrder.splice(idx, 1);
+  }
+
+  clear(): void {
+    this.cache.clear();
+    this.accessOrder.length = 0;
+  }
+
+  private touch(key: string): void {
+    const idx = this.accessOrder.indexOf(key);
+    if (idx >= 0) this.accessOrder.splice(idx, 1);
+    this.accessOrder.push(key);
+  }
+
+  private evict(): void {
+    while (this.cache.size > this.maxSize) {
+      const oldest = this.accessOrder.shift();
+      if (oldest) this.cache.delete(oldest);
+    }
+  }
+
+  private renderToCache(
+    entry: ChunkCacheEntry,
+    chunk: Chunk,
+    visibleLayers: { ground: boolean; objects: boolean; overhead: boolean }
+  ): void {
+    const { ctx } = entry;
+    ctx.clearRect(0, 0, CHUNK_CANVAS_WIDTH, CHUNK_CANVAS_HEIGHT);
+
+    const halfTileW = TILE_WIDTH / 2;
+    const halfTileH = TILE_HEIGHT / 2;
+
+    for (let y = 0; y < CHUNK_SIZE; y++) {
+      for (let x = 0; x < CHUNK_SIZE; x++) {
+        const index = y * CHUNK_SIZE + x;
+
+        // Local isometric position (zoom=1, no viewport)
+        const localIsoX = (x - y) * halfTileW;
+        const localIsoY = (x + y) * halfTileH;
+        const drawX = localIsoX - halfTileW + CHUNK_CANVAS_OFFSET_X;
+        const drawY = localIsoY;
+
+        if (visibleLayers.ground) {
+          const gid = chunk.layers.ground[index];
+          if (gid > 0) tilesetLoader.drawTile(ctx, gid, drawX, drawY, 1);
+        }
+
+        if (visibleLayers.objects) {
+          const gid = chunk.layers.objects[index];
+          if (gid > 0) tilesetLoader.drawTile(ctx, gid, drawX, drawY, 1);
+        }
+
+        if (visibleLayers.overhead) {
+          const gid = chunk.layers.overhead[index];
+          if (gid > 0) tilesetLoader.drawTile(ctx, gid, drawX, drawY, 1);
+        }
+      }
+    }
+  }
+}
+
+// ─── Interior Tile Cache ───────────────────────────────────────────
+// Same concept but for interior maps (single fixed-size grid).
+
+interface InteriorCacheEntry {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  groundRef: number[];
+  objectsRef: number[];
+  overheadRef: number[];
+  visibleGround: boolean;
+  visibleObjects: boolean;
+  visibleOverhead: boolean;
+  width: number;
+  height: number;
+}
+
+class InteriorTileCache {
+  private entry: InteriorCacheEntry | null = null;
+
+  getOrRender(
+    interior: InteriorMap,
+    visibleLayers: { ground: boolean; objects: boolean; overhead: boolean }
+  ): InteriorCacheEntry {
+    const e = this.entry;
+    const isValid = e &&
+      e.groundRef === interior.layers.ground &&
+      e.objectsRef === interior.layers.objects &&
+      e.overheadRef === interior.layers.overhead &&
+      e.visibleGround === visibleLayers.ground &&
+      e.visibleObjects === visibleLayers.objects &&
+      e.visibleOverhead === visibleLayers.overhead &&
+      e.width === interior.width &&
+      e.height === interior.height;
+
+    if (isValid) return e!;
+
+    // Calculate canvas size for this interior
+    const w = interior.width;
+    const h = interior.height;
+    const canvasW = (w + h) * (TILE_WIDTH / 2);
+    const canvasH = (w + h) * (TILE_HEIGHT / 2) + TILE_HEIGHT;
+    const offsetX = h * (TILE_WIDTH / 2);
+
+    // Create or resize canvas
+    let canvas: HTMLCanvasElement;
+    let ctx: CanvasRenderingContext2D;
+    if (e && e.canvas.width === canvasW && e.canvas.height === canvasH) {
+      canvas = e.canvas;
+      ctx = e.ctx;
+    } else {
+      canvas = document.createElement('canvas');
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      ctx = canvas.getContext('2d')!;
+      ctx.imageSmoothingEnabled = false;
+    }
+
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    const halfTileW = TILE_WIDTH / 2;
+    const halfTileH = TILE_HEIGHT / 2;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const index = y * w + x;
+        const localIsoX = (x - y) * halfTileW;
+        const localIsoY = (x + y) * halfTileH;
+        const drawX = localIsoX - halfTileW + offsetX;
+        const drawY = localIsoY;
+
+        if (visibleLayers.ground) {
+          const gid = interior.layers.ground[index];
+          if (gid > 0) tilesetLoader.drawTile(ctx, gid, drawX, drawY, 1);
+        }
+        if (visibleLayers.objects) {
+          const gid = interior.layers.objects[index];
+          if (gid > 0) tilesetLoader.drawTile(ctx, gid, drawX, drawY, 1);
+        }
+        if (visibleLayers.overhead) {
+          const gid = interior.layers.overhead[index];
+          if (gid > 0) tilesetLoader.drawTile(ctx, gid, drawX, drawY, 1);
+        }
+      }
+    }
+
+    this.entry = {
+      canvas, ctx,
+      groundRef: interior.layers.ground,
+      objectsRef: interior.layers.objects,
+      overheadRef: interior.layers.overhead,
+      visibleGround: visibleLayers.ground,
+      visibleObjects: visibleLayers.objects,
+      visibleOverhead: visibleLayers.overhead,
+      width: w,
+      height: h,
+    };
+
+    return this.entry;
+  }
+
+  clear(): void {
+    this.entry = null;
+  }
+}
+
+// ─── Main Renderer ─────────────────────────────────────────────────
+
 export class IsometricRenderer {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private options: RenderOptions = DEFAULT_RENDER_OPTIONS;
   private notes: DevNote[] = [];
   private selectedNoteId: string | null = null;
+  private tileCache = new ChunkTileCache();
+  private interiorCache = new InteriorTileCache();
 
   attach(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
@@ -81,9 +335,20 @@ export class IsometricRenderer {
     this.selectedNoteId = selectedId;
   }
 
+  /** Invalidate the tile cache for a specific chunk (call after edits). */
+  invalidateChunk(key: string): void {
+    this.tileCache.invalidate(key);
+  }
+
+  /** Clear all tile caches (e.g. on tileset reload). */
+  clearTileCache(): void {
+    this.tileCache.clear();
+    this.interiorCache.clear();
+  }
+
   clear(): void {
     if (!this.ctx || !this.canvas) return;
-    this.ctx.fillStyle = '#1a1a2e';
+    this.ctx.fillStyle = '#0c0e1a';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
@@ -102,19 +367,18 @@ export class IsometricRenderer {
       return sumA - sumB;
     });
 
-    // Render each chunk
+    // ── Render tile layers (cached) ──
     for (const chunk of sortedChunks) {
-      this.renderChunk(chunk, viewport);
+      this.blitCachedChunk(chunk, viewport);
     }
 
-    // Render overlays
+    // ── Render overlays (dynamic, drawn every frame) ──
     if (this.options.showChunkBounds) {
       for (const chunk of sortedChunks) {
         this.renderChunkBounds(chunk, viewport);
       }
     }
 
-    // Render map objects and walls together (depth sorted)
     if (this.options.showMapObjects) {
       for (const chunk of sortedChunks) {
         this.renderMapObjectsAndWalls(chunk, viewport);
@@ -139,17 +403,39 @@ export class IsometricRenderer {
       }
     }
 
-    // Always render gathering zones when visible
     for (const chunk of sortedChunks) {
       this.renderGatheringZones(chunk, viewport);
     }
 
-    // Render dev notes
     this.renderNotes(viewport);
 
     if (this.options.showGrid) {
       this.renderGrid(viewport);
     }
+  }
+
+  /** Blit a cached chunk's tile canvas onto the main canvas. */
+  private blitCachedChunk(chunk: Chunk, viewport: Viewport): void {
+    if (!this.ctx) return;
+
+    const key = `${chunk.coord.cx},${chunk.coord.cy}`;
+    const cached = this.tileCache.getOrRender(key, chunk, this.options.visibleLayers);
+
+    // Calculate where the offscreen canvas maps to on screen.
+    // The chunk's world origin tile is at (cx*CHUNK_SIZE, cy*CHUNK_SIZE).
+    // In iso space (before viewport): isoX = (wx-wy)*(TW/2), isoY = (wx+wy)*(TH/2)
+    // The offscreen canvas top-left is offset by -CHUNK_CANVAS_OFFSET_X in iso X.
+    const cx = chunk.coord.cx;
+    const cy = chunk.coord.cy;
+    const chunkIsoX = (cx - cy) * CHUNK_SIZE * (TILE_WIDTH / 2);
+    const chunkIsoY = (cx + cy) * CHUNK_SIZE * (TILE_HEIGHT / 2);
+
+    const destX = (chunkIsoX - CHUNK_CANVAS_OFFSET_X) * viewport.zoom + viewport.offsetX;
+    const destY = chunkIsoY * viewport.zoom + viewport.offsetY;
+    const destW = CHUNK_CANVAS_WIDTH * viewport.zoom;
+    const destH = CHUNK_CANVAS_HEIGHT * viewport.zoom;
+
+    this.ctx.drawImage(cached.canvas, destX, destY, destW, destH);
   }
 
   // Render an interior map (fixed-size, not chunk-based)
@@ -158,41 +444,20 @@ export class IsometricRenderer {
 
     this.clear();
 
-    // Render tiles
-    for (let y = 0; y < interior.height; y++) {
-      for (let x = 0; x < interior.width; x++) {
-        const index = y * interior.width + x;
-        const worldCoord: WorldCoord = { wx: x, wy: y };
-        const screen = worldToScreen(worldCoord, viewport);
+    // ── Blit cached interior tiles ──
+    const cached = this.interiorCache.getOrRender(interior, this.options.visibleLayers);
+    const offsetX = interior.height * (TILE_WIDTH / 2);
+    const canvasW = cached.canvas.width;
+    const canvasH = cached.canvas.height;
 
-        const drawX = screen.sx - (TILE_WIDTH / 2) * viewport.zoom;
-        const drawY = screen.sy;
+    // Interior world origin is (0, 0). In iso: isoX=0, isoY=0.
+    // Offscreen canvas top-left is at (-offsetX, 0) in iso space.
+    const destX = -offsetX * viewport.zoom + viewport.offsetX;
+    const destY = viewport.offsetY;
+    const destW = canvasW * viewport.zoom;
+    const destH = canvasH * viewport.zoom;
 
-        // Render ground layer
-        if (this.options.visibleLayers.ground) {
-          const groundTile = interior.layers.ground[index];
-          if (groundTile > 0) {
-            tilesetLoader.drawTile(this.ctx, groundTile, drawX, drawY, viewport.zoom);
-          }
-        }
-
-        // Render objects layer
-        if (this.options.visibleLayers.objects) {
-          const objectTile = interior.layers.objects[index];
-          if (objectTile > 0) {
-            tilesetLoader.drawTile(this.ctx, objectTile, drawX, drawY, viewport.zoom);
-          }
-        }
-
-        // Render overhead layer
-        if (this.options.visibleLayers.overhead) {
-          const overheadTile = interior.layers.overhead[index];
-          if (overheadTile > 0) {
-            tilesetLoader.drawTile(this.ctx, overheadTile, drawX, drawY, viewport.zoom);
-          }
-        }
-      }
-    }
+    this.ctx.drawImage(cached.canvas, destX, destY, destW, destH);
 
     // Render interior bounds
     this.renderInteriorBounds(interior, viewport);
@@ -202,7 +467,7 @@ export class IsometricRenderer {
       this.renderInteriorObjectsAndWalls(interior, viewport);
     }
 
-    // Render collision overlay (on top of objects/walls so it's always visible)
+    // Render collision overlay
     if (this.options.showCollision) {
       this.renderInteriorCollision(interior, viewport);
     }
@@ -442,7 +707,6 @@ export class IsometricRenderer {
       const hw = (TILE_WIDTH / 2) * viewport.zoom;
       const hh = (TILE_HEIGHT / 2) * viewport.zoom;
 
-      // Draw green diamond for spawn point
       this.ctx.fillStyle = 'rgba(0, 255, 100, 0.5)';
       this.ctx.beginPath();
       this.ctx.moveTo(screen.sx, screen.sy);
@@ -456,7 +720,6 @@ export class IsometricRenderer {
       this.ctx.lineWidth = 2;
       this.ctx.stroke();
 
-      // Draw spawn name
       if (viewport.zoom >= 0.5) {
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = `bold ${10 * Math.max(1, viewport.zoom)}px sans-serif`;
@@ -483,7 +746,6 @@ export class IsometricRenderer {
           const hw = (TILE_WIDTH / 2) * viewport.zoom;
           const hh = (TILE_HEIGHT / 2) * viewport.zoom;
 
-          // Draw orange diamond for exit portal
           this.ctx.fillStyle = 'rgba(255, 165, 0, 0.5)';
           this.ctx.beginPath();
           this.ctx.moveTo(screen.sx, screen.sy);
@@ -499,7 +761,6 @@ export class IsometricRenderer {
         }
       }
 
-      // Draw exit label
       if (viewport.zoom >= 0.5) {
         const worldCoord: WorldCoord = { wx: exitPortal.x, wy: exitPortal.y };
         const screen = worldToScreen(worldCoord, viewport);
@@ -523,7 +784,6 @@ export class IsometricRenderer {
     const cx = chunk.coord.cx;
     const cy = chunk.coord.cy;
 
-    // Compute screen positions of the 4 world corners of this chunk
     const c0 = worldToScreen({ wx: cx * CHUNK_SIZE, wy: cy * CHUNK_SIZE }, viewport);
     const c1 = worldToScreen({ wx: (cx + 1) * CHUNK_SIZE, wy: cy * CHUNK_SIZE }, viewport);
     const c2 = worldToScreen({ wx: (cx + 1) * CHUNK_SIZE, wy: (cy + 1) * CHUNK_SIZE }, viewport);
@@ -534,52 +794,11 @@ export class IsometricRenderer {
     const minSy = Math.min(c0.sy, c1.sy, c2.sy, c3.sy);
     const maxSy = Math.max(c0.sy, c1.sy, c2.sy, c3.sy);
 
-    // Generous vertical padding for tall objects/walls that extend above their base tile
+    // Generous vertical padding for tall objects/walls
     const TALL_SPRITE_PADDING = 500 * viewport.zoom;
 
     return maxSx >= 0 && minSx <= this.canvas.width &&
            maxSy >= 0 && (minSy - TALL_SPRITE_PADDING) <= this.canvas.height;
-  }
-
-  private renderChunk(chunk: Chunk, viewport: Viewport): void {
-    if (!this.ctx) return;
-
-    // Render tiles in depth order (back to front for isometric)
-    for (let y = 0; y < chunk.height; y++) {
-      for (let x = 0; x < chunk.width; x++) {
-        const index = y * chunk.width + x;
-        const worldCoord = chunkLocalToWorld(chunk.coord, { lx: x, ly: y });
-        const screen = worldToScreen(worldCoord, viewport);
-
-        // Calculate draw position (top-left of tile)
-        const drawX = screen.sx - (TILE_WIDTH / 2) * viewport.zoom;
-        const drawY = screen.sy;
-
-        // Render ground layer
-        if (this.options.visibleLayers.ground) {
-          const groundTile = chunk.layers.ground[index];
-          if (groundTile > 0) {
-            tilesetLoader.drawTile(this.ctx, groundTile, drawX, drawY, viewport.zoom);
-          }
-        }
-
-        // Render objects layer
-        if (this.options.visibleLayers.objects) {
-          const objectTile = chunk.layers.objects[index];
-          if (objectTile > 0) {
-            tilesetLoader.drawTile(this.ctx, objectTile, drawX, drawY, viewport.zoom);
-          }
-        }
-
-        // Render overhead layer
-        if (this.options.visibleLayers.overhead) {
-          const overheadTile = chunk.layers.overhead[index];
-          if (overheadTile > 0) {
-            tilesetLoader.drawTile(this.ctx, overheadTile, drawX, drawY, viewport.zoom);
-          }
-        }
-      }
-    }
   }
 
   private renderChunkBounds(chunk: Chunk, viewport: Viewport): void {
@@ -632,7 +851,6 @@ export class IsometricRenderer {
         const worldCoord = chunkLocalToWorld(chunk.coord, local);
         const screen = worldToScreen(worldCoord, viewport);
 
-        // Draw diamond shape for collision
         const hw = (TILE_WIDTH / 2) * viewport.zoom;
         const hh = (TILE_HEIGHT / 2) * viewport.zoom;
 
@@ -650,14 +868,12 @@ export class IsometricRenderer {
   private renderMapObjectsAndWalls(chunk: Chunk, viewport: Viewport): void {
     if (!this.ctx) return;
 
-    // Create unified renderables list for depth sorting
     type Renderable =
       | { type: 'object'; obj: MapObject }
       | { type: 'wall'; wall: Wall };
 
     const renderables: Array<{ depth: number; item: Renderable }> = [];
 
-    // Add objects
     for (const obj of chunk.mapObjects) {
       renderables.push({
         depth: obj.x + obj.y,
@@ -665,7 +881,6 @@ export class IsometricRenderer {
       });
     }
 
-    // Add walls
     for (const wall of chunk.walls) {
       renderables.push({
         depth: wall.x + wall.y,
@@ -673,10 +888,8 @@ export class IsometricRenderer {
       });
     }
 
-    // Sort by depth (back to front)
     renderables.sort((a, b) => a.depth - b.depth);
 
-    // Render in sorted order
     for (const { item } of renderables) {
       if (item.type === 'object') {
         this.renderMapObject(item.obj, chunk, viewport);
@@ -692,20 +905,15 @@ export class IsometricRenderer {
     const worldCoord = chunkLocalToWorld(chunk.coord, { lx: obj.x, ly: obj.y });
     const screen = worldToScreen(worldCoord, viewport);
 
-    // Get the object definition using object-specific lookup (not getObjectByGid which checks walls first)
     const objDef = objectLoader.getObject(objectLoader.gidToId(obj.gid));
 
     if (objDef?.image) {
-      // Calculate draw position - objects are anchored at their base tile
-      // The sprite extends upward from the base position
-      // Use single-frame dimensions for animated sprites
       const r = objDef.atlasRect;
       const spriteW = r ? r.w : obj.width;
       const spriteH = r ? r.h : obj.height;
       const scaledWidth = spriteW * viewport.zoom;
       const scaledHeight = spriteH * viewport.zoom;
 
-      // Center horizontally on the tile, align bottom to tile position
       const drawX = screen.sx - scaledWidth / 2;
       const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
 
@@ -730,7 +938,6 @@ export class IsometricRenderer {
     const worldCoord = chunkLocalToWorld(chunk.coord, { lx: wall.x, ly: wall.y });
     const screen = worldToScreen(worldCoord, viewport);
 
-    // Get the wall definition using wall-specific lookup
     const objDef = objectLoader.getWallByGid(wall.gid);
 
     if (objDef?.image) {
@@ -740,7 +947,6 @@ export class IsometricRenderer {
       const scaledWidth = spriteW * viewport.zoom;
       const scaledHeight = spriteH * viewport.zoom;
 
-      // Bottom vertex of tile
       const bottomVertexX = screen.sx;
       const bottomVertexY = screen.sy + TILE_HEIGHT * viewport.zoom;
 
@@ -748,11 +954,9 @@ export class IsometricRenderer {
       let drawY: number;
 
       if (wall.edge === 'down') {
-        // Bottom-right corner of sprite at bottom vertex
         drawX = bottomVertexX - scaledWidth;
         drawY = bottomVertexY - scaledHeight;
       } else {
-        // Bottom-left corner of sprite at bottom vertex (right edge)
         drawX = bottomVertexX;
         drawY = bottomVertexY - scaledHeight;
       }
@@ -779,7 +983,6 @@ export class IsometricRenderer {
       const worldCoord = chunkLocalToWorld(chunk.coord, { lx: entity.x, ly: entity.y });
       const screen = worldToScreen(worldCoord, viewport);
 
-      // Draw entity marker
       const size = 8 * viewport.zoom;
       this.ctx.fillStyle = '#ffd93d';
       this.ctx.strokeStyle = '#000000';
@@ -790,7 +993,6 @@ export class IsometricRenderer {
       this.ctx.fill();
       this.ctx.stroke();
 
-      // Draw entity name
       if (viewport.zoom >= 0.5) {
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = `${10 * Math.max(1, viewport.zoom)}px sans-serif`;
@@ -808,7 +1010,6 @@ export class IsometricRenderer {
     if (!this.ctx || !chunk.portals) return;
 
     for (const portal of chunk.portals) {
-      // Render each tile of the portal
       for (let py = 0; py < portal.height; py++) {
         for (let px = 0; px < portal.width; px++) {
           const worldCoord = chunkLocalToWorld(chunk.coord, { lx: portal.x + px, ly: portal.y + py });
@@ -817,7 +1018,6 @@ export class IsometricRenderer {
           const hw = (TILE_WIDTH / 2) * viewport.zoom;
           const hh = (TILE_HEIGHT / 2) * viewport.zoom;
 
-          // Draw semi-transparent purple diamond
           this.ctx.fillStyle = 'rgba(128, 0, 255, 0.5)';
           this.ctx.beginPath();
           this.ctx.moveTo(screen.sx, screen.sy);
@@ -827,14 +1027,12 @@ export class IsometricRenderer {
           this.ctx.closePath();
           this.ctx.fill();
 
-          // Draw border
           this.ctx.strokeStyle = 'rgba(180, 0, 255, 0.8)';
           this.ctx.lineWidth = 2;
           this.ctx.stroke();
         }
       }
 
-      // Draw portal label on the first tile
       if (viewport.zoom >= 0.5) {
         const worldCoord = chunkLocalToWorld(chunk.coord, { lx: portal.x, ly: portal.y });
         const screen = worldToScreen(worldCoord, viewport);
@@ -864,7 +1062,6 @@ export class IsometricRenderer {
       const hw = (TILE_WIDTH / 2) * viewport.zoom;
       const hh = (TILE_HEIGHT / 2) * viewport.zoom;
 
-      // Draw semi-transparent teal diamond
       this.ctx.fillStyle = 'rgba(0, 180, 220, 0.4)';
       this.ctx.beginPath();
       this.ctx.moveTo(screen.sx, screen.sy);
@@ -874,12 +1071,10 @@ export class IsometricRenderer {
       this.ctx.closePath();
       this.ctx.fill();
 
-      // Draw border
       this.ctx.strokeStyle = 'rgba(0, 220, 255, 0.8)';
       this.ctx.lineWidth = 2;
       this.ctx.stroke();
 
-      // Draw zone label
       if (viewport.zoom >= 0.5) {
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = `bold ${9 * Math.max(1, viewport.zoom)}px sans-serif`;
@@ -916,7 +1111,6 @@ export class IsometricRenderer {
       this.ctx.save();
       if (isResolved) this.ctx.globalAlpha = 0.3;
 
-      // Pin circle
       const radius = note.priority === 'high' ? 6 : 4;
       const color = CATEGORY_COLORS[note.category] || '#888';
 
@@ -931,7 +1125,6 @@ export class IsometricRenderer {
         this.ctx.stroke();
       }
 
-      // Label (show first ~20 chars at decent zoom)
       if (viewport.zoom >= 0.5 && note.text) {
         const label = note.text.length > 25 ? note.text.slice(0, 22) + '...' : note.text;
         this.ctx.fillStyle = '#ffffff';
@@ -951,7 +1144,6 @@ export class IsometricRenderer {
     this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     this.ctx.lineWidth = 1;
 
-    // Calculate visible world bounds
     const topLeft = { wx: -50, wy: -50 };
     const bottomRight = { wx: 150, wy: 150 };
 
