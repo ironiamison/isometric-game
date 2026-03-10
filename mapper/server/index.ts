@@ -142,12 +142,26 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // --- Auth ---
-const AUTH_USER = process.env.MAPPER_USER || 'null';
-const AUTH_PASS = process.env.MAPPER_PASS || 'NANULL!';
+const USERS: Record<string, { password: string; worlds: string[] }> = {
+  [process.env.MAPPER_USER || 'null']: {
+    password: process.env.MAPPER_PASS || 'NANULL!',
+    worlds: process.env.MAPPER_USER === 'null' || !process.env.MAPPER_USER
+      ? ['world_0', 'world_1']
+      : ['world_0'],
+  },
+  duck: { password: 'NADUCK!', worlds: ['world_0'] },
+};
 const AUTH_SECRET = crypto.randomBytes(32).toString('hex');
 
-function makeToken(): string {
-  return crypto.createHmac('sha256', AUTH_SECRET).update(AUTH_USER + AUTH_PASS).digest('hex');
+function makeToken(username: string): string {
+  return crypto.createHmac('sha256', AUTH_SECRET).update(username).digest('hex');
+}
+
+function getUserFromToken(token: string): string | null {
+  for (const username of Object.keys(USERS)) {
+    if (makeToken(username) === token) return username;
+  }
+  return null;
 }
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -331,8 +345,9 @@ const LOGIN_HTML = `<!DOCTYPE html>
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body || {};
-  if (username === AUTH_USER && password === AUTH_PASS) {
-    res.setHeader('Set-Cookie', `mapper_token=${makeToken()}; Path=/mapper; HttpOnly; SameSite=Lax; Max-Age=31536000`);
+  const user = username && USERS[username];
+  if (user && password === user.password) {
+    res.setHeader('Set-Cookie', `mapper_token=${makeToken(username)}; Path=/mapper; HttpOnly; SameSite=Lax; Max-Age=31536000`);
     return res.redirect('/mapper/');
   }
   res.status(401).send(LOGIN_HTML.replace('ERRPLACEHOLDER', '<p class="error">Invalid credentials</p>'));
@@ -346,7 +361,11 @@ app.get('/login', (_req, res) => {
 app.use((req, res, next) => {
   if (req.path === '/login') return next();
   const cookies = parseCookies(req.headers.cookie);
-  if (cookies.mapper_token === makeToken()) return next();
+  const user = getUserFromToken(cookies.mapper_token || '');
+  if (user) {
+    (req as any).mapperUser = user;
+    return next();
+  }
   return res.redirect('/mapper/login');
 });
 
@@ -354,12 +373,10 @@ app.use((req, res, next) => {
 const distPath = path.join(mapperRoot, 'dist');
 
 // --- User Info ---
-app.get('/api/me', (_req, res) => {
-  const worlds: string[] = ['world_0'];
-  if (AUTH_USER === 'null') {
-    worlds.push('world_1');
-  }
-  res.json({ username: AUTH_USER, worlds });
+app.get('/api/me', (req, res) => {
+  const username = (req as any).mapperUser || 'unknown';
+  const user = USERS[username];
+  res.json({ username, worlds: user?.worlds || ['world_0'] });
 });
 
 // Serve mapper-config.json (live from disk, not from dist cache)

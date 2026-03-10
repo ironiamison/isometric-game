@@ -365,15 +365,13 @@ function App() {
           onMouseDown={(e) => startResize('right', e)}
         />
         <div className="sidebar right" style={{ width: rightSidebarWidth }}>
-          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <EntityPanel />
-            </div>
-            <div style={{ flex: 'none', overflowY: 'auto', maxHeight: '50%' }}>
-              <PropertiesPanel />
-            </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <EntityPanel />
           </div>
-          <div style={{ flex: 1, overflow: 'hidden', borderTop: '1px solid #3d3d5c' }}>
+          <div style={{ flex: 'none', overflowY: 'auto', maxHeight: '40%', borderTop: '1px solid var(--border-subtle)' }}>
+            <PropertiesPanel />
+          </div>
+          <div style={{ flex: 'none', maxHeight: '40%', overflow: 'hidden', borderTop: '1px solid var(--border-subtle)' }}>
             <NotesPanel />
           </div>
         </div>

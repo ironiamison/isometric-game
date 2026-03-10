@@ -2,8 +2,7 @@
   background: var(--bg-panel);
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid var(--border-subtle);
-  flex: 1;
+  height: 100%;
   min-height: 0;
 }
 
