@@ -223,47 +223,6 @@ const LOGIN_HTML = `<!DOCTYPE html>
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .brand {
-    text-align: center;
-    margin-bottom: 32px;
-  }
-
-  .brand-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #4ecdc4 0%, #3a9e97 100%);
-    margin-bottom: 16px;
-    box-shadow: 0 4px 24px rgba(78, 205, 196, 0.2);
-  }
-
-  .brand-icon svg {
-    width: 24px;
-    height: 24px;
-    fill: none;
-    stroke: #0c0e1a;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .brand h1 {
-    font-family: 'Outfit', sans-serif;
-    font-size: 22px;
-    font-weight: 600;
-    color: #eef0f4;
-    letter-spacing: -0.02em;
-  }
-
-  .brand p {
-    font-size: 13px;
-    color: #6b6e7a;
-    margin-top: 6px;
-  }
-
   .card {
     background: rgba(22, 25, 40, 0.7);
     border: 1px solid rgba(78, 205, 196, 0.08);
@@ -353,13 +312,6 @@ const LOGIN_HTML = `<!DOCTYPE html>
   }
 </style></head><body>
 <div class="login-container">
-  <div class="brand">
-    <div class="brand-icon">
-      <svg viewBox="0 0 24 24"><path d="M12 3L2 9l10 6 10-6-10-6z"/><path d="M2 15l10 6 10-6"/><path d="M2 9v6"/><path d="M22 9v6"/></svg>
-    </div>
-    <h1>Mapper</h1>
-    <p>World editor</p>
-  </div>
   <div class="card">
     <form method="POST" action="/mapper/login">
       <div class="field">
