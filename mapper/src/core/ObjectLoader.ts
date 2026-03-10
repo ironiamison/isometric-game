@@ -38,7 +38,7 @@ export class ObjectLoader {
   private async loadAnimatedSprites(): Promise<AnimatedSpritesData> {
     if (this.animatedSprites) return this.animatedSprites;
     try {
-      const resp = await fetch('/mapper/assets/animated_sprites.json');
+      const resp = await fetch(`/mapper/assets/animated_sprites.json?_t=${Date.now()}`, { cache: 'no-store' });
       this.animatedSprites = await resp.json();
     } catch {
       this.animatedSprites = { objects: {}, walls: {} };
@@ -61,7 +61,7 @@ export class ObjectLoader {
     const manifest = await this.loadManifest();
     const animData = await this.loadAnimatedSprites();
     const atlasInfo = manifest.objects_atlas;
-    const atlasImage = await this.loadImage(`/mapper/assets/${atlasInfo.file}`);
+    const atlasImage = await this.loadImage(`/mapper/assets/${atlasInfo.file}?_t=${Date.now()}`);
 
     for (const item of config.items) {
       const spriteData = atlasInfo.sprites[String(item.id)];
@@ -78,7 +78,7 @@ export class ObjectLoader {
 
       if (!spriteData) {
         try {
-          image = await this.loadImage(`/mapper/assets/sprites/objects/${item.id}.png`);
+          image = await this.loadImage(`/mapper/assets/sprites/objects/${item.id}.png?_t=${Date.now()}`);
           const frameWidth = anim ? item.width / anim.frames : item.width;
           atlasRect = { x: 0, y: 0, w: frameWidth, h: item.height };
         } catch {
@@ -130,7 +130,7 @@ export class ObjectLoader {
     const manifest = await this.loadManifest();
     const animData = await this.loadAnimatedSprites();
     const atlasInfo = manifest.walls_atlas;
-    const atlasImage = await this.loadImage(`/mapper/assets/${atlasInfo.file}`);
+    const atlasImage = await this.loadImage(`/mapper/assets/${atlasInfo.file}?_t=${Date.now()}`);
 
     for (const item of config.items) {
       const spriteData = atlasInfo.sprites[String(item.id)];
@@ -147,7 +147,7 @@ export class ObjectLoader {
 
       if (!spriteData) {
         try {
-          image = await this.loadImage(`/mapper/assets/sprites/walls/${item.id}.png`);
+          image = await this.loadImage(`/mapper/assets/sprites/walls/${item.id}.png?_t=${Date.now()}`);
           const frameWidth = anim ? item.width / anim.frames : item.width;
           atlasRect = { x: 0, y: 0, w: frameWidth, h: item.height };
         } catch {
@@ -212,7 +212,7 @@ export class ObjectLoader {
 
   // Add a single object from an individual image (for optimistic import preview)
   async addObject(item: { id: number; name: string; width: number; height: number }, imagePath: string, animation?: { frames: number; fps: number }): Promise<void> {
-    const img = await this.loadImage(imagePath);
+    const img = await this.loadImage(`${imagePath}?_t=${Date.now()}`);
     const frameWidth = animation ? item.width / animation.frames : item.width;
     const obj: ObjectDefinition = {
       ...item,
@@ -226,7 +226,7 @@ export class ObjectLoader {
 
   // Add a single wall from an individual image (for optimistic import preview)
   async addWall(item: { id: number; name: string; width: number; height: number }, imagePath: string, animation?: { frames: number; fps: number }): Promise<void> {
-    const img = await this.loadImage(imagePath);
+    const img = await this.loadImage(`${imagePath}?_t=${Date.now()}`);
     const frameWidth = animation ? item.width / animation.frames : item.width;
     const obj: ObjectDefinition = {
       ...item,

@@ -17,7 +17,7 @@
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-medium);
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px;
   width: 600px;
   max-width: 90vw;
   max-height: 80vh;
@@ -30,7 +30,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .header h3 {
@@ -61,7 +61,7 @@
 .tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .tab {
@@ -94,11 +94,10 @@
 .dropZone {
   border: 2px dashed var(--border-medium);
   border-radius: 12px;
-  padding: 32px;
+  padding: 24px;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-bottom: 16px;
 }
 
 .dropZone:hover,
@@ -118,10 +117,9 @@
 }
 
 .queue {
-  flex: 1;
   min-height: 0;
   overflow-y: auto;
-  margin-bottom: 16px;
+  margin-top: 12px;
 }
 
 .queueItem {
@@ -226,6 +224,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  margin-top: 12px;
 }
 
 .importButton {

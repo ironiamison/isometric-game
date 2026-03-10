@@ -229,51 +229,6 @@ export function MenuBar() {
     setViewport({ offsetX: 400, offsetY: 200, zoom: 1 });
   };
 
-  const handleResetToServer = async () => {
-    const confirmed = window.confirm(
-      'This will discard all local changes and reload map data from the game server.\n\nAre you sure?'
-    );
-    if (!confirmed) return;
-
-    try {
-      // Clear IndexedDB storage
-      await storage.clearLocal();
-
-      // Clear ChunkManager cache
-      chunkManager.clear();
-
-      // Sync from game server and load chunks
-      const serverChunks = await storage.syncFromGameServer();
-
-      if (serverChunks && serverChunks.size > 0) {
-        for (const [, chunk] of serverChunks) {
-          chunkManager.addChunk(chunk);
-        }
-      }
-
-      // If no chunks loaded, create a default chunk
-      if (chunkManager.getAllChunks().length === 0) {
-        chunkManager.createEmptyChunk({ cx: 0, cy: 0 });
-      }
-
-      // Update store
-      const newChunks = new Map<string, ReturnType<typeof chunkManager.getChunk>>();
-      for (const chunk of chunkManager.getAllChunks()) {
-        newChunks.set(chunkKey(chunk.coord), chunk);
-      }
-      setChunks(newChunks as Map<string, NonNullable<ReturnType<typeof chunkManager.getChunk>>>, true);
-      setWorldBounds(chunkManager.getBounds());
-
-      // Clear undo history
-      history.clear();
-
-      alert('Reset complete. Loaded fresh data from game server.');
-    } catch (err) {
-      console.error('Reset failed:', err);
-      alert(`Reset failed: ${(err as Error).message}`);
-    }
-  };
-
   const handleClearLocalData = async () => {
     const confirmed = window.confirm(
       'This will clear all locally saved map data.\n\nYour current session will not be affected, but changes will be lost on refresh.\n\nAre you sure?'
@@ -722,9 +677,6 @@ export function MenuBar() {
                 </button>
                 <div className={styles.separator} />
                 <div className={styles.dropdownLabel}>Danger Zone</div>
-                <button className={styles.dropdownItem} onClick={handleResetToServer}>
-                  Reset to Game Server
-                </button>
                 <button className={styles.dropdownItem} onClick={handleClearLocalData}>
                   Clear Local Storage
                 </button>
