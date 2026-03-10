@@ -311,7 +311,33 @@ fn activate_hotkey_slot(state: &mut GameState, slot_idx: usize) -> Vec<InputComm
         HotkeySlotBinding::Item { ref item_id } => {
             if let Some(inv_idx) = state.inventory.find_slot_by_item_id(item_id) {
                 let item_def = state.item_registry.get_or_placeholder(item_id);
-                if item_def.equipment.is_some() {
+                if item_id.ends_with("_seed") {
+                    // Seeds: plant on the farming patch the player is standing on
+                    if let Some(player) = state.get_local_player() {
+                        let px = player.x.round() as i32;
+                        let py = player.y.round() as i32;
+                        if let Some(patch_id) = state.farming_patch_positions.get(&(px, py)) {
+                            if let Some(patch) = state.farming_patches.get(patch_id) {
+                                if patch.state == "empty" {
+                                    vec![InputCommand::PlantSeed {
+                                        patch_id: patch_id.clone(),
+                                        item_id: item_id.clone(),
+                                    }]
+                                } else {
+                                    state.push_system_chat("This patch already has something planted.".to_string());
+                                    vec![]
+                                }
+                            } else {
+                                vec![]
+                            }
+                        } else {
+                            state.push_system_chat("Stand on a farming patch to plant seeds.".to_string());
+                            vec![]
+                        }
+                    } else {
+                        vec![]
+                    }
+                } else if item_def.equipment.is_some() {
                     vec![InputCommand::Equip {
                         slot_index: inv_idx as u8,
                     }]
