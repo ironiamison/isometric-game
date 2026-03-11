@@ -270,7 +270,8 @@ export interface SimplifiedChunk {
     overhead: number[];
   };
   collision: string; // Base64 encoded bitset
-  heights?: number[]; // Per-tile height values (omitted if all flat)
+  heightmap?: number[]; // Per-tile height values (omitted if all flat)
+  heights?: number[]; // Legacy alias for heightmap
   entities: SimplifiedEntitySpawn[];
   mapObjects: SimplifiedMapObject[];
   walls: SimplifiedWall[];

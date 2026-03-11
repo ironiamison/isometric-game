@@ -222,14 +222,22 @@ class ChunkTileCache {
 
         // Draw block side faces before the tile top (so tile covers the top edge)
         if (h > 0) {
-          // Get neighbor heights (fall back to 0 for out-of-chunk neighbors)
           const neighborRight = (x + 1 < CHUNK_SIZE && heights)
             ? heights[y * CHUNK_SIZE + (x + 1)] : 0;
           const neighborDown = (y + 1 < CHUNK_SIZE && heights)
             ? heights[(y + 1) * CHUNK_SIZE + x] : 0;
 
-          const centerX = drawX + halfTileW;
-          const centerY = drawY + halfTileH;
+          // Diamond corners of the elevated tile:
+          //   top:    (drawX + halfTileW, drawY)
+          //   right:  (drawX + TILE_WIDTH, drawY + halfTileH)
+          //   bottom: (drawX + halfTileW, drawY + TILE_HEIGHT)
+          //   left:   (drawX, drawY + halfTileH)
+          const bottomX = drawX + halfTileW;
+          const bottomY = drawY + TILE_HEIGHT;
+          const rightX = drawX + TILE_WIDTH;
+          const rightY = drawY + halfTileH;
+          const leftX = drawX;
+          const leftY = drawY + halfTileH;
 
           // Right face (+X direction, south-east) - lighter brown
           const rightDiff = h - neighborRight;
@@ -237,10 +245,10 @@ class ChunkTileCache {
             const faceH = rightDiff * halfTileH;
             ctx.fillStyle = "rgb(110, 85, 55)";
             ctx.beginPath();
-            ctx.moveTo(centerX, centerY);           // diamond center
-            ctx.lineTo(centerX + halfTileW, centerY - halfTileH); // diamond right
-            ctx.lineTo(centerX + halfTileW, centerY - halfTileH + faceH); // right bottom
-            ctx.lineTo(centerX, centerY + faceH);   // center bottom
+            ctx.moveTo(bottomX, bottomY);
+            ctx.lineTo(rightX, rightY);
+            ctx.lineTo(rightX, rightY + faceH);
+            ctx.lineTo(bottomX, bottomY + faceH);
             ctx.closePath();
             ctx.fill();
           }
@@ -251,10 +259,10 @@ class ChunkTileCache {
             const faceH = downDiff * halfTileH;
             ctx.fillStyle = "rgb(75, 58, 38)";
             ctx.beginPath();
-            ctx.moveTo(centerX, centerY);           // diamond center
-            ctx.lineTo(centerX - halfTileW, centerY - halfTileH); // diamond left
-            ctx.lineTo(centerX - halfTileW, centerY - halfTileH + faceH); // left bottom
-            ctx.lineTo(centerX, centerY + faceH);   // center bottom
+            ctx.moveTo(bottomX, bottomY);
+            ctx.lineTo(leftX, leftY);
+            ctx.lineTo(leftX, leftY + faceH);
+            ctx.lineTo(bottomX, bottomY + faceH);
             ctx.closePath();
             ctx.fill();
           }
@@ -301,6 +309,7 @@ interface ObjectCacheEntry {
   ctx: CanvasRenderingContext2D;
   mapObjectsRef: MapObject[];
   wallsRef: Wall[];
+  heightsRef: Uint8Array | undefined;
   animatedSprites: AnimatedSpriteInfo[];
 }
 
@@ -315,7 +324,8 @@ class ChunkObjectCache {
     const isValid =
       entry &&
       entry.mapObjectsRef === chunk.mapObjects &&
-      entry.wallsRef === chunk.walls;
+      entry.wallsRef === chunk.walls &&
+      entry.heightsRef === chunk.heights;
 
     if (isValid) {
       this.touch(key);
@@ -333,6 +343,7 @@ class ChunkObjectCache {
         ctx,
         mapObjectsRef: chunk.mapObjects,
         wallsRef: chunk.walls,
+        heightsRef: chunk.heights,
         animatedSprites: [],
       };
       this.cache.set(key, entry);
@@ -341,6 +352,7 @@ class ChunkObjectCache {
     this.renderToCache(entry, chunk);
     entry.mapObjectsRef = chunk.mapObjects;
     entry.wallsRef = chunk.walls;
+    entry.heightsRef = chunk.heights;
 
     this.touch(key);
     this.evict();
@@ -353,7 +365,8 @@ class ChunkObjectCache {
     return !!(
       entry &&
       entry.mapObjectsRef === chunk.mapObjects &&
-      entry.wallsRef === chunk.walls
+      entry.wallsRef === chunk.walls &&
+      entry.heightsRef === chunk.heights
     );
   }
 
@@ -406,6 +419,8 @@ class ChunkObjectCache {
     }
     renderables.sort((a, b) => a.depth - b.depth);
 
+    const heights = chunk.heights;
+
     for (const r of renderables) {
       if (r.type === "object" && r.obj) {
         const obj = r.obj;
@@ -422,11 +437,15 @@ class ChunkObjectCache {
         const spriteW = ar ? ar.w : obj.width;
         const spriteH = ar ? ar.h : obj.height;
 
+        // Get height at this tile
+        const tileH = heights ? heights[obj.y * CHUNK_SIZE + obj.x] || 0 : 0;
+        const zOffset = tileH * halfTileH;
+
         // Local iso position (same coord space as tile cache)
         const localIsoX = (obj.x - obj.y) * halfTileW;
         const localIsoY = (obj.x + obj.y) * halfTileH;
         const centerX = localIsoX + OBJ_CANVAS_OFFSET_X;
-        const baseY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD;
+        const baseY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD - zOffset;
 
         const drawX = centerX - spriteW / 2;
         const drawY = baseY - spriteH;
@@ -457,10 +476,14 @@ class ChunkObjectCache {
         const spriteW = ar ? ar.w : objDef.image.width;
         const spriteH = ar ? ar.h : objDef.image.height;
 
+        // Get height at this tile
+        const tileH = heights ? heights[wall.y * CHUNK_SIZE + wall.x] || 0 : 0;
+        const zOffset = tileH * halfTileH;
+
         const localIsoX = (wall.x - wall.y) * halfTileW;
         const localIsoY = (wall.x + wall.y) * halfTileH;
         const bottomVertexX = localIsoX + OBJ_CANVAS_OFFSET_X;
-        const bottomVertexY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD;
+        const bottomVertexY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD - zOffset;
 
         let drawX: number;
         if (wall.edge === "down") {
@@ -1339,6 +1362,10 @@ export class IsometricRenderer {
     const worldCoord = chunkLocalToWorld(chunk.coord, { lx: obj.x, ly: obj.y });
     const screen = worldToScreen(worldCoord, viewport);
 
+    // Apply height offset
+    const tileH = chunk.heights ? chunk.heights[obj.y * CHUNK_SIZE + obj.x] || 0 : 0;
+    const zOffset = tileH * (TILE_HEIGHT / 2) * viewport.zoom;
+
     const objDef = objectLoader.getObject(objectLoader.gidToId(obj.gid));
 
     if (objDef?.image) {
@@ -1349,7 +1376,7 @@ export class IsometricRenderer {
       const scaledHeight = spriteH * viewport.zoom;
 
       const drawX = screen.sx - scaledWidth / 2;
-      const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
+      const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight - zOffset;
 
       const srcX = r ? getAnimatedSourceX(r, objDef.frames, objDef.fps) : 0;
       this.ctx.drawImage(
@@ -1375,6 +1402,10 @@ export class IsometricRenderer {
     });
     const screen = worldToScreen(worldCoord, viewport);
 
+    // Apply height offset
+    const tileH = chunk.heights ? chunk.heights[wall.y * CHUNK_SIZE + wall.x] || 0 : 0;
+    const zOffset = tileH * (TILE_HEIGHT / 2) * viewport.zoom;
+
     const objDef = objectLoader.getWallByGid(wall.gid);
 
     if (objDef?.image) {
@@ -1385,7 +1416,7 @@ export class IsometricRenderer {
       const scaledHeight = spriteH * viewport.zoom;
 
       const bottomVertexX = screen.sx;
-      const bottomVertexY = screen.sy + TILE_HEIGHT * viewport.zoom;
+      const bottomVertexY = screen.sy + TILE_HEIGHT * viewport.zoom - zOffset;
 
       let drawX: number;
       let drawY: number;

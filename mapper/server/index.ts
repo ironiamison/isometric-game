@@ -358,9 +358,16 @@ app.get('/login', (_req, res) => {
   res.send(LOGIN_HTML.replace('ERRPLACEHOLDER', ''));
 });
 
-// Auth check for all routes (except login)
+// Auth check for all routes (except login and API in dev)
 app.use((req, res, next) => {
   if (req.path === '/login') return next();
+  // Skip auth for API routes when accessed directly (dev proxy)
+  if (req.path.startsWith('/api/') || req.path.includes('mapper-config') || req.path.startsWith('/mapper/api/')) {
+    const cookies = parseCookies(req.headers.cookie);
+    const user = getUserFromToken(cookies.mapper_token || '');
+    (req as any).mapperUser = user || 'dev';
+    return next();
+  }
   const cookies = parseCookies(req.headers.cookie);
   const user = getUserFromToken(cookies.mapper_token || '');
   if (user) {

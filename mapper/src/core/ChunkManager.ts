@@ -247,6 +247,9 @@ export class ChunkManager {
         y: g.y,
         zoneId: g.zoneId,
       })),
+      heights: (data.heights || (data as any).heightmap) && ((data.heights || (data as any).heightmap).length > 0)
+        ? new Uint8Array(data.heights || (data as any).heightmap)
+        : undefined,
       dirty: false,
     };
 
@@ -425,6 +428,7 @@ export class ChunkManager {
         overhead: [...chunk.layers.overhead],
       },
       collision: collisionBitset.toBase64(),
+      ...(chunk.heights ? { heightmap: Array.from(chunk.heights) } : {}),
       entities,
       mapObjects,
       walls,

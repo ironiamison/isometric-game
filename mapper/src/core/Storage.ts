@@ -199,15 +199,14 @@ class StorageManager {
       collision: Array.from(chunk.collision),
     };
     if (chunk.heights) {
-      result.heights = Array.from(chunk.heights);
-    } else {
-      delete result.heights;
+      result.heightmap = Array.from(chunk.heights);
     }
+    delete result.heights;
     return result;
   }
 
   private storableToChunk(stored: Record<string, unknown>): Chunk {
-    const heightsArr = stored.heights as number[] | undefined;
+    const heightsArr = (stored.heightmap || stored.heights) as number[] | undefined;
     return {
       coord: stored.coord as ChunkCoord,
       width: stored.width as number,
