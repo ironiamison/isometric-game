@@ -156,6 +156,7 @@ pub struct CraftingState {
 pub struct PlayerSaveData {
     pub x: f32,
     pub y: f32,
+    pub z: i32,
     pub hp: i32,
     pub prayer_points: i32,
     pub mp: i32,
@@ -1968,6 +1969,7 @@ impl GameRoom {
         name: &str,
         x: i32,
         y: i32,
+        z: i32,
         hp: i32,
         prayer_points: i32,
         mp: i32,
@@ -1996,20 +1998,21 @@ impl GameRoom {
         combat_style_prefs_json: &str,
     ) {
         // Validate saved position — if the chunk doesn't exist on disk, reset to spawn
-        let (safe_x, safe_y) = {
+        let (safe_x, safe_y, safe_z) = {
             let coord = ChunkCoord::from_world(x, y);
             if self.world.chunk_file_exists(coord) {
-                (x, y)
+                (x, y, z)
             } else {
                 tracing::warn!(
                     "Player {} has invalid position ({}, {}) — chunk {:?} missing on disk, resetting to spawn",
                     player_id, x, y, coord
                 );
-                (WORLD_SPAWN_X, WORLD_SPAWN_Y)
+                (WORLD_SPAWN_X, WORLD_SPAWN_Y, 0)
             }
         };
 
         let mut player = Player::new(player_id, name, safe_x, safe_y, gender, skin, hair_style, hair_color);
+        player.z = safe_z;
         player.bank_max_slots = bank_max_slots;
         player.bank = item::Bank::new_with_size(bank_max_slots as usize);
 
@@ -2023,6 +2026,7 @@ impl GameRoom {
             player.hp = player.max_hp();
             player.x = WORLD_SPAWN_X;
             player.y = WORLD_SPAWN_Y;
+            player.z = 0;
         }
         player.inventory.gold = gold;
         player.equipped_head = equipped_head;
@@ -2300,6 +2304,7 @@ impl GameRoom {
             PlayerSaveData {
                 x: p.x as f32,
                 y: p.y as f32,
+                z: p.z,
                 hp: p.hp,
                 prayer_points: p.prayer_points,
                 mp: p.mp,
@@ -2353,6 +2358,7 @@ impl GameRoom {
         struct RawPlayerSnapshot {
             x: i32,
             y: i32,
+            z: i32,
             hp: i32,
             prayer_points: i32,
             mp: i32,
@@ -2423,6 +2429,7 @@ impl GameRoom {
                         RawPlayerSnapshot {
                             x: p.x,
                             y: p.y,
+                            z: p.z,
                             hp: p.hp,
                             prayer_points: p.prayer_points,
                             mp: p.mp,
@@ -2472,6 +2479,7 @@ impl GameRoom {
             let save_data = PlayerSaveData {
                 x: raw.x as f32,
                 y: raw.y as f32,
+                z: raw.z,
                 hp: raw.hp,
                 prayer_points: raw.prayer_points,
                 mp: raw.mp,

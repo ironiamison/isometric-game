@@ -3426,6 +3426,16 @@ impl Renderer {
                 local_y: i32,
                 chunk_coord: crate::game::ChunkCoord,
             },
+            /// Block side face - rendered at lower depth than the tile surface so entities
+            /// standing on the same-height platform aren't occluded by adjacent side faces
+            BlockSide {
+                screen_x: f32,
+                screen_y: f32,
+                height: u8,
+                local_x: i32,
+                local_y: i32,
+                chunk_coord: crate::game::ChunkCoord,
+            },
             ChunkObject(&'a MapObject),
             ChunkObjectShaking(&'a MapObject, f32), // Object with shake offset
             ChunkWall(&'a Wall),
@@ -3583,6 +3593,20 @@ impl Renderer {
                             local_y,
                             chunk_coord: *coord,
                         }));
+                        // Add block side faces as separate renderables at lower depth.
+                        // This prevents entities on the same-height platform from being
+                        // occluded by side faces of tiles at higher x+y.
+                        // Depth offset -1.0 ensures entities one tile in front (at the
+                        // same Z level) always render on top of the side face.
+                        let side_depth = calculate_depth_z(wx, wy, h as f32, 1) - 1.0;
+                        renderables.push((side_depth, Renderable::BlockSide {
+                            screen_x,
+                            screen_y,
+                            height: h,
+                            local_x,
+                            local_y,
+                            chunk_coord: *coord,
+                        }));
                     }
                 }
             }
@@ -3594,10 +3618,14 @@ impl Renderer {
                 continue;
             }
             let is_local = state.local_player_id.as_ref() == Some(&player.id);
-            // +0.25 bias ensures the player always renders on top of the elevated
-            // tile they're standing on, even when interpolation makes their fractional
-            // position dip slightly below the tile's integer coordinates.
-            let mut depth = calculate_depth_z(player.x, player.y, player.z, 1) + 0.25;
+            // Use ceil() on the interpolated position for depth so that during
+            // movement the player sorts at the higher of the two tiles they're
+            // between. This prevents both source and destination tiles from
+            // rendering on top of the player mid-step. Max with target_depth
+            // handles the forward-movement case as an extra safety net.
+            let ceil_depth = calculate_depth_z(player.x.ceil(), player.y.ceil(), player.z, 1);
+            let target_depth = calculate_depth_z(player.target_x, player.target_y, player.target_z, 1);
+            let mut depth = ceil_depth.max(target_depth) + 0.25;
             // Sitting players render on top of the chair object at the same tile
             if player.animation.state == crate::render::animation::AnimationState::SittingChair {
                 depth += 0.5;
@@ -3610,7 +3638,9 @@ impl Renderer {
             if !is_visible_world(npc.x, npc.y) {
                 continue;
             }
-            let depth = calculate_depth_z(npc.x, npc.y, npc.z, 1) + 0.25;
+            let ceil_depth = calculate_depth_z(npc.x.ceil(), npc.y.ceil(), npc.z, 1);
+            let target_depth = calculate_depth_z(npc.target_x, npc.target_y, npc.target_z, 1);
+            let depth = ceil_depth.max(target_depth) + 0.25;
             renderables.push((depth, Renderable::Npc(npc)));
         }
 
@@ -3886,7 +3916,18 @@ impl Renderer {
                         )),
                         false, tint,
                     );
-                    // Draw block side faces
+                    // Side faces are drawn separately via BlockSide renderable
+                    // at a lower depth to prevent occluding same-height entities.
+                }
+                Renderable::BlockSide {
+                    screen_x,
+                    screen_y,
+                    height,
+                    local_x,
+                    local_y,
+                    chunk_coord,
+                } => {
+                    let zoom = state.camera.zoom;
                     if let Some(chunk) = state.chunk_manager.chunks().get(&chunk_coord) {
                         self.draw_block_sides(
                             chunk, local_x, local_y, height,

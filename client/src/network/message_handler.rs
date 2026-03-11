@@ -197,7 +197,12 @@ fn handle_player_joined(value: &rmpv::Value, state: &mut GameState) {
         gender,
         skin
     );
+    let z = extract_i32(value, "z").unwrap_or(0);
     let mut player = Player::new(id.clone(), name, x, y, gender, skin);
+    // Snap Z immediately so players on elevated platforms render correctly
+    player.z = z as f32;
+    player.server_z = z as f32;
+    player.target_z = z as f32;
     player.hair_style = hair_style;
     player.hair_color = hair_color;
     player.equipped_head = equipped_head;
@@ -579,6 +584,11 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                     );
                     let mut new_player =
                         Player::new(id.clone(), name.clone(), px as f32, py as f32, gender, skin);
+                    // Snap Z immediately so players on elevated platforms don't
+                    // briefly appear at ground level when first created.
+                    new_player.z = z as f32;
+                    new_player.server_z = z as f32;
+                    new_player.target_z = z as f32;
                     new_player.hair_style = hair_style;
                     new_player.hair_color = hair_color;
                     new_player.equipped_head = equipped_head;
@@ -807,6 +817,10 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             } else {
                 // New NPC - add to state
                 let mut npc = Npc::new(id.clone(), entity_type, x, y);
+                // Snap Z immediately so NPCs on elevated platforms render correctly
+                npc.z = npc_z;
+                npc.server_z = npc_z;
+                npc.target_z = npc_z;
                 npc.display_name = display_name;
                 npc.direction = Direction::from_u8(direction);
                 npc.hp = hp;
