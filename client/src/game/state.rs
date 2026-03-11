@@ -424,8 +424,10 @@ pub struct Projectile {
     pub sprite: String,
     pub start_x: f32,
     pub start_y: f32,
+    pub start_z: f32,
     pub end_x: f32,
     pub end_y: f32,
+    pub end_z: f32,
     pub start_time: f64,
     pub duration: f64,
 }
@@ -442,12 +444,13 @@ impl Projectile {
         current_time - self.start_time >= self.duration
     }
 
-    /// Get current world position
-    pub fn current_pos(&self, current_time: f64) -> (f32, f32) {
+    /// Get current world position with Z
+    pub fn current_pos(&self, current_time: f64) -> (f32, f32, f32) {
         let t = self.progress(current_time);
         let x = self.start_x + (self.end_x - self.start_x) * t;
         let y = self.start_y + (self.end_y - self.start_y) * t;
-        (x, y)
+        let z = self.start_z + (self.end_z - self.start_z) * t;
+        (x, y, z)
     }
 }
 

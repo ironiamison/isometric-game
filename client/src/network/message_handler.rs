@@ -1032,24 +1032,30 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // Spawn projectile for ranged attacks
                 if let Some(ref projectile_type) = projectile {
                     if let Some(ref source_id) = source_id {
-                        // Get source tile center (rounded to ensure straight isometric lines)
+                        // Get source position + Z (check players then NPCs)
                         let source_pos = if let Some(player) = state.players.get(source_id) {
-                            Some((player.x.round(), player.y.round()))
+                            Some((player.x.round(), player.y.round(), player.z))
+                        } else if let Some(npc) = state.npcs.get(source_id) {
+                            Some((npc.x.round(), npc.y.round(), npc.z))
                         } else {
                             None
                         };
 
-                        if let Some((src_x, src_y)) = source_pos {
+                        if let Some((src_x, src_y, src_z)) = source_pos {
                             // Target tile center (rounded for straight isometric lines)
                             let end_x = target_x.round();
                             let end_y = target_y.round();
+                            // Look up target Z from terrain height
+                            let end_z = state.chunk_manager.get_height(end_x as i32, end_y as i32) as f32;
 
                             state.projectiles.push(crate::game::Projectile {
                                 sprite: projectile_type.clone(),
                                 start_x: src_x,
                                 start_y: src_y,
+                                start_z: src_z,
                                 end_x,
                                 end_y,
+                                end_z,
                                 start_time: current_time,
                                 duration: 0.15, // Fast arrow travel
                             });

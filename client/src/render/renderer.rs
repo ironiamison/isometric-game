@@ -3582,12 +3582,10 @@ impl Renderer {
                             local_y,
                             chunk_coord: *coord,
                         }));
-                        // Add block side faces as separate renderables at lower depth.
-                        // This prevents entities on the same-height platform from being
-                        // occluded by side faces of tiles at higher x+y.
-                        // Depth offset -1.0 ensures entities one tile in front (at the
-                        // same Z level) always render on top of the side face.
-                        let side_depth = calculate_depth_z(wx, wy, h as f32, 1) - 1.0;
+                        // Block side faces render just below the elevated tile surface.
+                        // Entity depth offset (+0.25) ensures entities on the same platform
+                        // always render above the block sides at their tile.
+                        let side_depth = calculate_depth_z(wx, wy, h as f32, 1) - 0.01;
                         renderables.push((side_depth, Renderable::BlockSide {
                             screen_x,
                             screen_y,
@@ -5240,18 +5238,21 @@ impl Renderer {
         let current_time = macroquad::time::get_time();
 
         for projectile in &state.projectiles {
-            let (world_x, world_y) = projectile.current_pos(current_time);
-            let (screen_x, screen_y_raw) = world_to_screen(world_x, world_y, &state.camera);
+            let (world_x, world_y, world_z) = projectile.current_pos(current_time);
+            let (screen_x, screen_y_raw) =
+                world_to_screen_z(world_x, world_y, world_z, &state.camera);
 
             // Offset arrow vertically to match player center (not feet)
-            let arrow_y_offset = -40.0 * state.camera.zoom;
+            let arrow_y_offset = -24.0 * state.camera.zoom;
             let screen_y = screen_y_raw + arrow_y_offset;
 
-            // Calculate direction in SCREEN space (accounts for isometric transform)
-            let (start_screen_x, start_screen_y) =
-                world_to_screen(projectile.start_x, projectile.start_y, &state.camera);
-            let (end_screen_x, end_screen_y) =
-                world_to_screen(projectile.end_x, projectile.end_y, &state.camera);
+            // Calculate direction in SCREEN space (accounts for isometric transform + elevation)
+            let (start_screen_x, start_screen_y) = world_to_screen_z(
+                projectile.start_x, projectile.start_y, projectile.start_z, &state.camera,
+            );
+            let (end_screen_x, end_screen_y) = world_to_screen_z(
+                projectile.end_x, projectile.end_y, projectile.end_z, &state.camera,
+            );
             let dx = end_screen_x - start_screen_x;
             let dy = end_screen_y - start_screen_y;
             let angle = dy.atan2(dx);
@@ -5999,14 +6000,13 @@ impl Renderer {
     }
 
     /// Draw a selection highlight around the tile at the given world position
-    fn render_tile_selection(&self, world_x: f32, world_y: f32, camera: &Camera) {
+    fn render_tile_selection(&self, world_x: f32, world_y: f32, world_z: f32, camera: &Camera) {
         // Get the tile the entity is standing on (floor to get tile coords)
         let tile_x = world_x.floor();
         let tile_y = world_y.floor();
 
-        // Get the center of that tile in screen space
-        // Offset by half_h to align with where entities visually stand on the tile
-        let (center_x, center_y) = world_to_screen(tile_x + 0.5, tile_y + 0.5, camera);
+        // Get the center of that tile in screen space, accounting for Z elevation
+        let (center_x, center_y) = world_to_screen_z(tile_x + 0.5, tile_y + 0.5, world_z, camera);
         let center_y = center_y - TILE_HEIGHT * camera.zoom / 2.0;
 
         // Tile dimensions (half-sizes for diamond corners), scaled by zoom
@@ -6213,7 +6213,7 @@ impl Renderer {
 
         // Selection highlight (draw first, behind player, at ground level)
         if is_selected && !player.is_dead {
-            self.render_tile_selection(player.x, player.y, camera);
+            self.render_tile_selection(player.x, player.y, player.z, camera);
         }
 
         // Vertical offset for sitting on chair (shift up to center on tile)
@@ -7472,7 +7472,7 @@ impl Renderer {
 
         // Selection highlight (draw first, behind NPC) - skip while dying
         if is_selected && npc.death_timer.is_none() {
-            self.render_tile_selection(npc.x, npc.y, camera);
+            self.render_tile_selection(npc.x, npc.y, npc.z, camera);
         }
 
         // Name color based on NPC type
