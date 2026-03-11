@@ -1650,7 +1650,7 @@ chop_success_bonus = 0.16
 
 [bronze_pickaxe]
 display_name = "Bronze Pickaxe"
-sprite = "pickaxe"
+sprite = "bronze_pickaxe"
 category = "equipment"
 max_stack = 1
 base_price = 50
@@ -1662,7 +1662,7 @@ mine_success_bonus = 0.0
 
 [iron_pickaxe]
 display_name = "Iron Pickaxe"
-sprite = "pickaxe"
+sprite = "iron_pickaxe"
 category = "equipment"
 max_stack = 1
 base_price = 150
@@ -1674,7 +1674,7 @@ mine_success_bonus = 0.04
 
 [steel_pickaxe]
 display_name = "Steel Pickaxe"
-sprite = "pickaxe"
+sprite = "steel_pickaxe"
 category = "equipment"
 max_stack = 1
 base_price = 500
@@ -1686,7 +1686,7 @@ mine_success_bonus = 0.08
 
 [rune_pickaxe]
 display_name = "Rune Pickaxe"
-sprite = "pickaxe"
+sprite = "rune_pickaxe"
 category = "equipment"
 max_stack = 1
 base_price = 5000
