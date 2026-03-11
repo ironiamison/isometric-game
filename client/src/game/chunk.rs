@@ -394,7 +394,7 @@ impl ChunkManager {
         screen_y: f32,
         camera: &crate::game::Camera,
     ) -> (i32, i32, i32) {
-        use crate::render::isometric::{screen_to_world, TILE_HEIGHT};
+        use crate::render::isometric::{screen_to_world, world_to_screen_z_exact, TILE_HEIGHT};
 
         // Try elevated tiles first (highest Z down to 1)
         const MAX_PROBE_Z: i32 = 15;
@@ -405,6 +405,16 @@ impl ChunkManager {
             let ty = wy.round() as i32;
             let terrain_h = self.get_height(tx, ty) as i32;
             if terrain_h == probe_z {
+                // Verify cursor is on the tile's diamond surface, not on
+                // the block side face below it. The diamond extends
+                // TILE_HEIGHT/4 below its center.
+                let (_, center_sy) = world_to_screen_z_exact(
+                    tx as f32 + 0.5, ty as f32 + 0.5, probe_z as f32, camera,
+                );
+                let half_diamond = (TILE_HEIGHT / 4.0) * camera.zoom;
+                if screen_y > center_sy + half_diamond {
+                    continue; // Cursor is below the surface (on block side)
+                }
                 return (tx, ty, probe_z);
             }
         }

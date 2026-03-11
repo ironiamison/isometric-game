@@ -96,26 +96,42 @@ impl GameRoom {
                                 player.z = ground_height;
                                 player.grounded = true;
                                 player.jump_ticks = 0;
+                                player.fall_ticks = 0;
                             }
                         } else {
                             // Already at or below ground
                             player.z = ground_height;
                             player.grounded = true;
                             player.jump_ticks = 0;
+                            player.fall_ticks = 0;
                         }
                     }
                 } else if !player.grounded {
-                    // Gravity: fall 1 block per tick when not jumping and not grounded
-                    let ground_height = self.world.get_height_at_sync(player.x, player.y, &chunks_guard);
-                    if player.z > ground_height {
-                        player.z -= 1;
-                        if player.z <= ground_height {
+                    // Accelerating gravity: slow start, speeds up as fall continues.
+                    // This matches the client's proportional Z interpolation speed
+                    // (z_speed = 8 * dz.abs().max(1.0)) so visuals stay in sync.
+                    player.fall_ticks += 1;
+                    let should_drop = if player.fall_ticks <= 2 {
+                        player.fall_ticks % 3 == 0 // ~6.7 blocks/sec
+                    } else if player.fall_ticks <= 5 {
+                        player.fall_ticks % 2 == 0 // ~10 blocks/sec
+                    } else {
+                        true // 20 blocks/sec (every tick)
+                    };
+                    if should_drop {
+                        let ground_height = self.world.get_height_at_sync(player.x, player.y, &chunks_guard);
+                        if player.z > ground_height {
+                            player.z -= 1;
+                            if player.z <= ground_height {
+                                player.z = ground_height;
+                                player.grounded = true;
+                                player.fall_ticks = 0;
+                            }
+                        } else {
                             player.z = ground_height;
                             player.grounded = true;
+                            player.fall_ticks = 0;
                         }
-                    } else {
-                        player.z = ground_height;
-                        player.grounded = true;
                     }
                 }
             }
@@ -476,6 +492,9 @@ impl GameRoom {
                     player.y = target_y;
                     player.z = result_z;
                     player.grounded = result_grounded;
+                    if result_grounded {
+                        player.fall_ticks = 0;
+                    }
                     player.last_move_tick = current_tick;
                     player.mark_move_seq_processed(sampled_seq);
                     moved_players.insert(id.clone());

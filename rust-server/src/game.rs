@@ -359,6 +359,8 @@ pub struct Player {
     pub grounded: bool,
     /// Remaining jump ticks (counts down from 6; rise for first 3, fall after)
     pub jump_ticks: u32,
+    /// How many ticks the player has been falling (for accelerating gravity)
+    pub fall_ticks: u32,
     pub spawn_x: i32,
     pub spawn_y: i32,
     // Queued movement direction (-1, 0, or 1)
@@ -546,6 +548,7 @@ impl Player {
             z: 0,
             grounded: true,
             jump_ticks: 0,
+            fall_ticks: 0,
             spawn_x,
             spawn_y,
             move_dx: 0,
@@ -869,6 +872,7 @@ impl Player {
         self.last_regen_time = 0;
         // Reset movement cooldown so the player can move immediately after respawning
         self.last_move_tick = 0;
+        self.fall_ticks = 0;
         self.clear_move_intent();
         chair_to_free
     }
