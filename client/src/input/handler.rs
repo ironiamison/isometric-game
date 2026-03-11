@@ -1699,10 +1699,6 @@ enum MoveDir {
     Down,
     Left,
     Right,
-    UpLeft,
-    UpRight,
-    DownLeft,
-    DownRight,
 }
 
 impl MoveDir {
@@ -1713,41 +1709,45 @@ impl MoveDir {
             MoveDir::Left => 1,
             MoveDir::Up => 2,
             MoveDir::Right => 3,
-            MoveDir::DownLeft => 4,
-            MoveDir::DownRight => 5,
-            MoveDir::UpLeft => 6,
-            MoveDir::UpRight => 7,
             MoveDir::None => 0, // Default to down
         }
     }
 
-    /// Build from separate axis states
-    fn from_axes(up: bool, down: bool, left: bool, right: bool) -> Self {
-        let vert = if up && !down {
-            Some(true) // up
-        } else if down && !up {
-            Some(false) // down
-        } else {
-            None
+    /// Determine direction from held keys + just-pressed info.
+    /// Last key pressed wins. When released, falls back to whatever is still held.
+    fn from_keys(
+        up: bool, down: bool, left: bool, right: bool,
+        up_just: bool, down_just: bool, left_just: bool, right_just: bool,
+        active: MoveDir,
+    ) -> Self {
+        // If a key was just pressed this frame, it takes priority
+        // (check in reverse order so last-processed wins if multiple pressed same frame)
+        let mut new_active = active;
+        if up_just { new_active = MoveDir::Up; }
+        if down_just { new_active = MoveDir::Down; }
+        if left_just { new_active = MoveDir::Left; }
+        if right_just { new_active = MoveDir::Right; }
+
+        // If the active direction's key is still held, use it
+        let active_held = match new_active {
+            MoveDir::Up => up,
+            MoveDir::Down => down,
+            MoveDir::Left => left,
+            MoveDir::Right => right,
+            MoveDir::None => false,
         };
-        let horiz = if left && !right {
-            Some(true) // left
-        } else if right && !left {
-            Some(false) // right
-        } else {
-            None
-        };
-        match (vert, horiz) {
-            (Some(true), Some(true)) => MoveDir::UpLeft,
-            (Some(true), Some(false)) => MoveDir::UpRight,
-            (Some(false), Some(true)) => MoveDir::DownLeft,
-            (Some(false), Some(false)) => MoveDir::DownRight,
-            (Some(true), None) => MoveDir::Up,
-            (Some(false), None) => MoveDir::Down,
-            (None, Some(true)) => MoveDir::Left,
-            (None, Some(false)) => MoveDir::Right,
-            (None, None) => MoveDir::None,
+        if active_held {
+            return new_active;
         }
+
+        // Active key was released — fall back to whatever is still held
+        // (pick first found, priority doesn't matter since only one should remain)
+        if up { return MoveDir::Up; }
+        if down { return MoveDir::Down; }
+        if left { return MoveDir::Left; }
+        if right { return MoveDir::Right; }
+
+        MoveDir::None
     }
 
     /// Convert to velocity vector
@@ -1757,10 +1757,6 @@ impl MoveDir {
             MoveDir::Down => (0.0, 1.0),
             MoveDir::Left => (-1.0, 0.0),
             MoveDir::Right => (1.0, 0.0),
-            MoveDir::UpLeft => (-1.0, -1.0),
-            MoveDir::UpRight => (1.0, -1.0),
-            MoveDir::DownLeft => (-1.0, 1.0),
-            MoveDir::DownRight => (1.0, 1.0),
             MoveDir::None => (0.0, 0.0),
         }
     }
@@ -8439,8 +8435,12 @@ impl InputHandler {
             self.reset_auto_path_motion_state();
         }
 
-        // Determine new direction from keyboard - supports diagonals when two keys held
-        let keyboard_dir = MoveDir::from_axes(up, down, left, right);
+        // Determine new direction from keyboard - last key pressed wins
+        let keyboard_dir = MoveDir::from_keys(
+            up, down, left, right,
+            up_just, down_just, left_just, right_just,
+            self.prev_dir,
+        );
 
         // Combine keyboard and D-pad: D-pad takes priority if active
         let new_dir = if has_dpad_input {
@@ -8449,10 +8449,22 @@ impl InputHandler {
                 DPadDirection::Down => MoveDir::Down,
                 DPadDirection::Left => MoveDir::Left,
                 DPadDirection::Right => MoveDir::Right,
-                DPadDirection::UpLeft => MoveDir::UpLeft,
-                DPadDirection::UpRight => MoveDir::UpRight,
-                DPadDirection::DownLeft => MoveDir::DownLeft,
-                DPadDirection::DownRight => MoveDir::DownRight,
+                // Map diagonals to the axis that differs from prev (cardinal only)
+                DPadDirection::UpLeft | DPadDirection::UpRight | DPadDirection::DownLeft | DPadDirection::DownRight => {
+                    let (dx, dy) = match dpad_dir {
+                        DPadDirection::UpLeft => (true, true),    // left=true, up=true
+                        DPadDirection::UpRight => (false, true),  // right, up
+                        DPadDirection::DownLeft => (true, false), // left, down
+                        DPadDirection::DownRight => (false, false), // right, down
+                        _ => unreachable!(),
+                    };
+                    let prev_is_vertical = matches!(self.prev_dir, MoveDir::Up | MoveDir::Down);
+                    if prev_is_vertical {
+                        if dx { MoveDir::Left } else { MoveDir::Right }
+                    } else {
+                        if dy { MoveDir::Up } else { MoveDir::Down }
+                    }
+                }
                 DPadDirection::None => keyboard_dir,
             }
         } else {
@@ -8472,6 +8484,7 @@ impl InputHandler {
                 // Direction released
                 if self.move_sent {
                     // Was moving, now stopped - send stop command
+                    macroquad::logging::info!("[MOVE] KEY RELEASED -> STOP (prev={:?})", self.prev_dir);
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                     self.last_dx = 0.0;
                     self.last_dy = 0.0;
@@ -8612,6 +8625,7 @@ impl InputHandler {
                     } else if let Some(player) = state.get_local_player() {
                         let player_x = player.server_x.round() as i32;
                         let player_y = player.server_y.round() as i32;
+                        let player_z = player.server_z.round() as i32;
                         let target_x = player_x + dx as i32;
                         let target_y = player_y + dy as i32;
                         let tile_walkable = state
@@ -8619,12 +8633,16 @@ impl InputHandler {
                             .is_walkable(target_x as f32, target_y as f32);
                         let occupied = build_occupied_set(state, false);
                         let not_occupied = !occupied.contains(&(target_x, target_y));
-                        tile_walkable && not_occupied
+                        // Match server: block if target terrain is more than 1 block above player
+                        let target_height = state.chunk_manager.get_height(target_x, target_y) as i32;
+                        let height_ok = (target_height - player_z) <= 1;
+                        tile_walkable && not_occupied && height_ok
                     } else {
                         false
                     };
 
                     if can_move {
+                        macroquad::logging::info!("[MOVE] SEND ({}, {}) dir={:?}", dx, dy, new_dir);
                         commands.push(InputCommand::Move { dx, dy });
                         self.last_dx = dx;
                         self.last_dy = dy;
@@ -8638,8 +8656,10 @@ impl InputHandler {
                         }
                     } else {
                         // Can't move - face that direction instead
+                        macroquad::logging::info!("[MOVE] BLOCKED dir={:?} sitting={}", new_dir, state.is_sitting);
                         if self.move_sent || self.touch_controls.was_dpad_move_sent() {
                             // Was moving, send stop
+                            macroquad::logging::info!("[MOVE] BLOCKED->STOP (was moving)");
                             commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                             self.move_sent = false;
                             self.touch_controls.set_dpad_move_sent(false);

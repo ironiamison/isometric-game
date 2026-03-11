@@ -2041,12 +2041,15 @@ impl GameState {
         self.next_move_seq = self.next_move_seq.wrapping_add(1);
         let seq = self.next_move_seq;
 
-        // Track only directional intents; stop packets (0,0) are not predictive.
         if dx.abs() > 0.1 || dy.abs() > 0.1 {
             self.pending_move_seqs.push_back(seq);
             while self.pending_move_seqs.len() > 128 {
                 self.pending_move_seqs.pop_front();
             }
+        } else {
+            // Stop command: clear all pending predictions immediately so
+            // lookahead goes to 0 and the visual stops predicting ahead.
+            self.pending_move_seqs.clear();
         }
 
         seq

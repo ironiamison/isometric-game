@@ -455,6 +455,8 @@ impl GameRoom {
                                             player.z = new_z;
                                             player.grounded = new_grounded;
                                             player.last_move_tick = current_tick;
+                                            player.last_move_vel_x = new_dx;
+                                            player.last_move_vel_y = new_dy;
                                             player.mark_move_seq_processed(new_seq);
                                             moved_players.insert(id.clone());
                                             if !self.quest_locations.is_empty() {
@@ -496,6 +498,8 @@ impl GameRoom {
                         player.fall_ticks = 0;
                     }
                     player.last_move_tick = current_tick;
+                    player.last_move_vel_x = sampled_dx;
+                    player.last_move_vel_y = sampled_dy;
                     player.mark_move_seq_processed(sampled_seq);
                     moved_players.insert(id.clone());
                     if !self.quest_locations.is_empty() {

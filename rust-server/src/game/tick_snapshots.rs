@@ -36,8 +36,19 @@ fn player_update_from_player(
         y: player.y,
         z: player.z,
         direction: player.direction as u8,
-        vel_x: player.move_dx,
-        vel_y: player.move_dy,
+        // Use queued intent if a move is pending, otherwise use last
+        // successful move direction. This gives stable vel during continuous
+        // movement without stale vel on direction changes.
+        vel_x: if player.pending_move_seq.is_some() {
+            player.move_dx
+        } else {
+            player.last_move_vel_x
+        },
+        vel_y: if player.pending_move_seq.is_some() {
+            player.move_dy
+        } else {
+            player.last_move_vel_y
+        },
         move_ack_seq: move_ack_seq(player.last_processed_move_seq),
         hp: player.hp,
         max_hp: player.max_hp(),

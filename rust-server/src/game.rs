@@ -366,6 +366,9 @@ pub struct Player {
     // Queued movement direction (-1, 0, or 1)
     pub move_dx: i32,
     pub move_dy: i32,
+    // Direction of last successful move (for stable StateSync vel)
+    pub last_move_vel_x: i32,
+    pub last_move_vel_y: i32,
     pub pending_move_seq: Option<u32>,
     pub last_received_move_seq: u32,
     pub last_processed_move_seq: u32,
@@ -553,6 +556,8 @@ impl Player {
             spawn_y,
             move_dx: 0,
             move_dy: 0,
+            last_move_vel_x: 0,
+            last_move_vel_y: 0,
             pending_move_seq: None,
             last_received_move_seq: 0,
             last_processed_move_seq: 0,
@@ -844,11 +849,18 @@ impl Player {
         self.pending_move_seq = None;
     }
 
+    /// Clear intent and also reset the last-move vel (explicit stop).
+    fn stop_moving(&mut self) {
+        self.clear_move_intent();
+        self.last_move_vel_x = 0;
+        self.last_move_vel_y = 0;
+    }
+
     fn reject_pending_move(&mut self) {
         if let Some(seq) = self.pending_move_seq {
             self.mark_move_seq_processed(seq);
         }
-        self.clear_move_intent();
+        self.stop_moving();
     }
 
     pub fn ready_to_respawn(&self, current_time: u64) -> bool {
@@ -873,7 +885,7 @@ impl Player {
         // Reset movement cooldown so the player can move immediately after respawning
         self.last_move_tick = 0;
         self.fall_ticks = 0;
-        self.clear_move_intent();
+        self.stop_moving();
         chair_to_free
     }
 
@@ -3142,9 +3154,9 @@ impl GameRoom {
                     // Queue movement intent only. Facing updates when a move is
                     // actually applied in the tick loop.
                     if move_dx == 0 && move_dy == 0 {
-                        // Stop intent is processed immediately.
+                        // Stop intent: clear everything including last-move vel.
                         player.mark_move_seq_processed(move_seq);
-                        player.clear_move_intent();
+                        player.stop_moving();
                     } else {
                         player.move_dx = move_dx;
                         player.move_dy = move_dy;

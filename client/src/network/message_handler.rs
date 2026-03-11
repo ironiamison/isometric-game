@@ -441,7 +441,9 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 }
 
                 if let (Some(x), Some(y)) = (x, y) {
-                    // Set server state - local player direction only updates when moving
+                    if is_local_player && (vel_x != 0.0 || vel_y != 0.0 || player.vel_x != 0.0 || player.vel_y != 0.0) {
+                        macroquad::logging::info!("[SYNC] pos=({},{}) z={} vel=({},{}) ack={:?}", x, y, z, vel_x, vel_y, move_ack_seq);
+                    }
                     player.set_server_state(
                         x as f32,
                         y as f32,

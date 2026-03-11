@@ -3619,7 +3619,9 @@ impl Renderer {
                 && player.target_x <= player.x.floor()
                 && player.target_y <= player.y.floor();
             let mut depth = if descending_away {
-                calculate_depth(player.x.floor(), player.y.floor(), 1) - 0.02
+                // Use visual Z so depth decreases gradually as player falls,
+                // rather than instantly dropping to ground-level depth
+                calculate_depth_z(player.x.floor(), player.y.floor(), player.z, 1) - 0.02
             } else {
                 let ceil_depth = calculate_depth_z(player.x.ceil(), player.y.ceil(), player.z, 1);
                 let target_depth = calculate_depth_z(player.target_x, player.target_y, player.target_z, 1);
@@ -3641,7 +3643,7 @@ impl Renderer {
                 && npc.target_x <= npc.x.floor()
                 && npc.target_y <= npc.y.floor();
             let depth = if descending_away {
-                calculate_depth(npc.x.floor(), npc.y.floor(), 1) - 0.02
+                calculate_depth_z(npc.x.floor(), npc.y.floor(), npc.z, 1) - 0.02
             } else {
                 let ceil_depth = calculate_depth_z(npc.x.ceil(), npc.y.ceil(), npc.z, 1);
                 let target_depth = calculate_depth_z(npc.target_x, npc.target_y, npc.target_z, 1);
