@@ -3582,10 +3582,12 @@ impl Renderer {
                             local_y,
                             chunk_coord: *coord,
                         }));
-                        // Block side faces render just below the elevated tile surface.
-                        // Entity depth offset (+0.25) ensures entities on the same platform
-                        // always render above the block sides at their tile.
-                        let side_depth = calculate_depth_z(wx, wy, h as f32, 1) - 0.01;
+                        // Block sides need Z for correct sorting against adjacent
+                        // elevated tiles on the same platform, but cap it so tall
+                        // blocks (h>=3) don't occlude ground-level entities at
+                        // adjacent tiles (which have depth base+1+0.25).
+                        let capped_h = (h as f32).min(2.5);
+                        let side_depth = calculate_depth_z(wx, wy, capped_h, 1) - 0.01;
                         renderables.push((side_depth, Renderable::BlockSide {
                             screen_x,
                             screen_y,
@@ -3610,9 +3612,19 @@ impl Renderer {
             // between. This prevents both source and destination tiles from
             // rendering on top of the player mid-step. Max with target_depth
             // handles the forward-movement case as an extra safety net.
-            let ceil_depth = calculate_depth_z(player.x.ceil(), player.y.ceil(), player.z, 1);
-            let target_depth = calculate_depth_z(player.target_x, player.target_y, player.target_z, 1);
-            let mut depth = ceil_depth.max(target_depth) + 0.25;
+            // When descending away from camera (-x or -y), sort behind the
+            // cliff edge. When descending toward camera (+x or +y), keep
+            // normal depth so the player stays in front of the edge face.
+            let descending_away = player.target_z < player.z
+                && player.target_x <= player.x.floor()
+                && player.target_y <= player.y.floor();
+            let mut depth = if descending_away {
+                calculate_depth(player.x.floor(), player.y.floor(), 1) - 0.02
+            } else {
+                let ceil_depth = calculate_depth_z(player.x.ceil(), player.y.ceil(), player.z, 1);
+                let target_depth = calculate_depth_z(player.target_x, player.target_y, player.target_z, 1);
+                ceil_depth.max(target_depth) + 0.25
+            };
             // Sitting players render on top of the chair object at the same tile
             if player.animation.state == crate::render::animation::AnimationState::SittingChair {
                 depth += 0.5;
@@ -3625,9 +3637,16 @@ impl Renderer {
             if !is_visible_world(npc.x, npc.y) {
                 continue;
             }
-            let ceil_depth = calculate_depth_z(npc.x.ceil(), npc.y.ceil(), npc.z, 1);
-            let target_depth = calculate_depth_z(npc.target_x, npc.target_y, npc.target_z, 1);
-            let depth = ceil_depth.max(target_depth) + 0.25;
+            let descending_away = npc.target_z < npc.z
+                && npc.target_x <= npc.x.floor()
+                && npc.target_y <= npc.y.floor();
+            let depth = if descending_away {
+                calculate_depth(npc.x.floor(), npc.y.floor(), 1) - 0.02
+            } else {
+                let ceil_depth = calculate_depth_z(npc.x.ceil(), npc.y.ceil(), npc.z, 1);
+                let target_depth = calculate_depth_z(npc.target_x, npc.target_y, npc.target_z, 1);
+                ceil_depth.max(target_depth) + 0.25
+            };
             renderables.push((depth, Renderable::Npc(npc)));
         }
 
