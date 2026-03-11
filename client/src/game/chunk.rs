@@ -385,6 +385,52 @@ impl ChunkManager {
         self.chunks.insert(coord, chunk);
     }
 
+    /// Pick the tile under a screen position, accounting for elevation.
+    /// Probes from highest Z down to find the topmost elevated tile the cursor is over.
+    /// Returns (tile_x, tile_y, tile_z).
+    pub fn pick_tile_at_screen(
+        &self,
+        screen_x: f32,
+        screen_y: f32,
+        camera: &crate::game::Camera,
+    ) -> (i32, i32, i32) {
+        use crate::render::isometric::{screen_to_world, TILE_HEIGHT};
+
+        // Try elevated tiles first (highest Z down to 1)
+        const MAX_PROBE_Z: i32 = 15;
+        for probe_z in (1..=MAX_PROBE_Z).rev() {
+            let z_offset = probe_z as f32 * (TILE_HEIGHT / 2.0) * camera.zoom;
+            let (wx, wy) = screen_to_world(screen_x, screen_y + z_offset, camera);
+            let tx = wx.round() as i32;
+            let ty = wy.round() as i32;
+            let terrain_h = self.get_height(tx, ty) as i32;
+            if terrain_h == probe_z {
+                return (tx, ty, probe_z);
+            }
+        }
+
+        // Fall back to ground level
+        let (wx, wy) = screen_to_world(screen_x, screen_y, camera);
+        let tx = wx.round() as i32;
+        let ty = wy.round() as i32;
+        let z = self.get_height(tx, ty) as i32;
+        (tx, ty, z)
+    }
+
+    /// Get terrain height at a world position (returns 0 if no heightmap or unloaded)
+    pub fn get_height(&self, world_x: i32, world_y: i32) -> u8 {
+        if self.interior_size.is_some() {
+            return 0; // Interiors don't use heightmaps
+        }
+        let coord = ChunkCoord::from_world(world_x, world_y);
+        if let Some(chunk) = self.chunks.get(&coord) {
+            let (local_x, local_y) = world_to_local(world_x, world_y);
+            chunk.get_height(local_x, local_y)
+        } else {
+            0
+        }
+    }
+
     /// Check if a world position is walkable
     pub fn is_walkable(&self, world_x: f32, world_y: f32) -> bool {
         let x = world_x.floor() as i32;

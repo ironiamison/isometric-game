@@ -1,6 +1,6 @@
 //! Unified hotkey bar rendering — items + spells mixed in 5 slots with presets
 
-use super::super::isometric::world_to_screen;
+use super::super::isometric::world_to_screen_z;
 use super::super::Renderer;
 use super::common::*;
 use crate::game::hotkey::HotkeySlotBinding;
@@ -615,7 +615,8 @@ impl Renderer {
         let zoom = state.camera.zoom;
 
         for (item_id, item) in &state.ground_items {
-            let (screen_x, screen_y) = world_to_screen(item.x, item.y, &state.camera);
+            let item_z = state.chunk_manager.get_height(item.x as i32, item.y as i32) as f32;
+            let (screen_x, screen_y) = world_to_screen_z(item.x, item.y, item_z, &state.camera);
 
             // Clickable area - centered on where items actually render (slightly above tile center)
             let click_width = 44.0 * zoom;
@@ -633,7 +634,8 @@ impl Renderer {
 
             if is_hovered {
                 // Draw tile hover effect
-                self.render_tile_hover(item.x as i32, item.y as i32, &state.camera);
+                let item_z = state.chunk_manager.get_height(item.x as i32, item.y as i32) as i32;
+                self.render_tile_hover(item.x as i32, item.y as i32, item_z, &state.camera);
 
                 // Get item definition for display name
                 let item_def = state.item_registry.get_or_placeholder(&item.item_id);

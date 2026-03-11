@@ -1831,6 +1831,7 @@ pub struct GameState {
 
     // Tile hover state (world coordinates of tile under mouse)
     pub hovered_tile: Option<(i32, i32)>,
+    pub hovered_tile_z: i32,
 
     // Entity hover state (ID of entity under mouse cursor)
     pub hovered_entity_id: Option<String>,
@@ -1989,6 +1990,7 @@ impl GameState {
             state_sync_catchup_ticks: 0,
             debug_mode: false,
             hovered_tile: None,
+            hovered_tile_z: 0,
             hovered_entity_id: None,
             auto_path: None,
             auto_action_state: None,

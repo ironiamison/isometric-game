@@ -3364,32 +3364,7 @@ impl Renderer {
         let t0 = get_time();
         self.render_tilemap_layer(state, LayerType::Ground);
 
-        // 1.5. Render hovered tile border if hovering over a tile
-        if let Some((tile_x, tile_y)) = state.hovered_tile {
-            self.render_tile_hover(tile_x, tile_y, &state.camera);
-        }
-
-        // 1.6. Render drop zone highlights when dragging from inventory
-        if let Some(ref drag) = state.ui_state.drag_state {
-            if matches!(drag.source, DragSource::Inventory(_)) {
-                if let Some(player) = state.get_local_player() {
-                    let player_x = player.x.round() as i32;
-                    let player_y = player.y.round() as i32;
-
-                    // Render the 9 tiles (player tile + 8 adjacent) as drop zones
-                    for dy in -1..=1 {
-                        for dx in -1..=1 {
-                            let tile_x = player_x + dx;
-                            let tile_y = player_y + dy;
-
-                            // Check if this tile is currently hovered
-                            let is_hovered = state.hovered_tile == Some((tile_x, tile_y));
-                            self.render_drop_zone(tile_x, tile_y, &state.camera, is_hovered);
-                        }
-                    }
-                }
-            }
-        }
+        // (Drop zone highlights are now rendered in the depth-sorted pass)
         // 1.7. Render farming patches
         self.render_farming_patches(state);
 
@@ -3415,6 +3390,19 @@ impl Renderer {
                 x: u32,
                 y: u32,
                 tile_id: u32,
+            },
+            /// Tile hover highlight - depth-sorted between elevated tiles and entities
+            TileHover {
+                tile_x: i32,
+                tile_y: i32,
+                tile_z: i32,
+            },
+            /// Drop zone highlight - depth-sorted to render on top of elevated blocks
+            DropZone {
+                tile_x: i32,
+                tile_y: i32,
+                tile_z: i32,
+                is_hovered: bool,
             },
             /// Elevated ground tile (z > 0) - depth-sorted with entities for proper occlusion
             ElevatedTile {
@@ -3528,12 +3516,13 @@ impl Renderer {
             wx >= vis_min_x && wx <= vis_max_x && wy >= vis_min_y && wy <= vis_max_y
         };
 
-        // Add ground items (render below entities)
+        // Add ground items (depth-sorted with entities, accounting for elevation)
         for item in state.ground_items.values() {
             if !is_visible_world(item.x, item.y) {
                 continue;
             }
-            let depth = calculate_depth(item.x, item.y, 0); // Lower layer than entities
+            let item_z = state.chunk_manager.get_height(item.x.round() as i32, item.y.round() as i32) as f32;
+            let depth = calculate_depth_z(item.x, item.y, item_z, 1) + 0.01;
             renderables.push((depth, Renderable::Item(item)));
         }
 
@@ -3862,6 +3851,37 @@ impl Renderer {
             ));
         }
 
+        // Add drop zone highlights as depth-sorted renderables (draws above blocks, below entities)
+        if let Some(ref drag) = state.ui_state.drag_state {
+            if matches!(drag.source, DragSource::Inventory(_)) {
+                if let Some(player) = state.get_local_player() {
+                    let player_x = player.x.round() as i32;
+                    let player_y = player.y.round() as i32;
+
+                    for dy in -1..=1 {
+                        for dx in -1..=1 {
+                            let tile_x = player_x + dx;
+                            let tile_y = player_y + dy;
+                            let tile_z = state.chunk_manager.get_height(tile_x, tile_y) as i32;
+                            let is_hovered = state.hovered_tile == Some((tile_x, tile_y));
+                            let depth = calculate_depth_z(tile_x as f32, tile_y as f32, tile_z as f32, 1) + 0.02;
+                            renderables.push((depth, Renderable::DropZone { tile_x, tile_y, tile_z, is_hovered }));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add tile hover highlight as a depth-sorted renderable (draws above blocks, below entities)
+        if let Some((tile_x, tile_y)) = state.hovered_tile {
+            let z = state.hovered_tile_z;
+            // Depth just above elevated tiles/block sides but below entities at the same position.
+            // Entities use calculate_depth_z(x, y, z, 1). We use the same but subtract a small amount
+            // so the highlight renders just before any entity on that tile.
+            let depth = calculate_depth_z(tile_x as f32, tile_y as f32, z as f32, 1) - 0.1;
+            renderables.push((depth, Renderable::TileHover { tile_x, tile_y, tile_z: z }));
+        }
+
         // Sort by depth (painter's algorithm)
         // Must use stable sort: items at the same depth (e.g. walls on tiles
         // with equal x+y) must keep a consistent order to avoid flickering.
@@ -3870,6 +3890,12 @@ impl Renderer {
         // 3. Render sorted entities
         for (_, renderable) in renderables {
             match renderable {
+                Renderable::TileHover { tile_x, tile_y, tile_z } => {
+                    self.render_tile_hover(tile_x, tile_y, tile_z, &state.camera);
+                }
+                Renderable::DropZone { tile_x, tile_y, tile_z, is_hovered } => {
+                    self.render_drop_zone(tile_x, tile_y, tile_z, &state.camera, is_hovered);
+                }
                 Renderable::Item(item) => {
                     self.render_ground_item(item, &state.camera, state);
                 }
@@ -6007,10 +6033,10 @@ impl Renderer {
     }
 
     /// Draw corner indicators for the hovered tile
-    pub(crate) fn render_tile_hover(&self, tile_x: i32, tile_y: i32, camera: &Camera) {
-        // Get the center of the tile in screen space
+    pub(crate) fn render_tile_hover(&self, tile_x: i32, tile_y: i32, tile_z: i32, camera: &Camera) {
+        // Get the center of the tile in screen space, accounting for Z elevation
         let (center_x, center_y) =
-            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+            world_to_screen_z(tile_x as f32 + 0.5, tile_y as f32 + 0.5, tile_z as f32, camera);
         let center_y = center_y - TILE_HEIGHT * camera.zoom / 2.0;
 
         // Tile dimensions (half-sizes for diamond corners), scaled by zoom
@@ -6108,12 +6134,13 @@ impl Renderer {
         &self,
         tile_x: i32,
         tile_y: i32,
+        tile_z: i32,
         camera: &Camera,
         is_hovered: bool,
     ) {
-        // Get the center of the tile in screen space
+        // Get the center of the tile in screen space, accounting for Z elevation
         let (center_x, center_y) =
-            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+            world_to_screen_z(tile_x as f32 + 0.5, tile_y as f32 + 0.5, tile_z as f32, camera);
         let center_y = center_y - TILE_HEIGHT * camera.zoom / 2.0;
 
         // Tile dimensions (half-sizes for diamond corners), scaled by zoom

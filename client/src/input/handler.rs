@@ -7,7 +7,6 @@ use crate::game::{
 };
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
-use crate::render::isometric::screen_to_world;
 use crate::render::{section_sort_key, sections_for_tab, SECTION_HEADER_HEIGHT};
 use crate::settings::{save_ui_settings, UiSettings};
 use crate::ui::{UiElementId, UiLayout};
@@ -2036,19 +2035,26 @@ impl InputHandler {
 
         let touch_active = self.touch_controls.consumed_touch();
         if state.ui_state.hovered_element.is_none() && !touch_active {
-            let (world_x, world_y) = screen_to_world(mx, my, &state.camera);
-            let tile_x = world_x.round() as i32;
-            let tile_y = world_y.round() as i32;
+            // Pick tile accounting for elevation (elevated tiles take priority)
+            let (tile_x, tile_y, tile_z) =
+                state.chunk_manager.pick_tile_at_screen(mx, my, &state.camera);
             state.hovered_tile = Some((tile_x, tile_y));
+            state.hovered_tile_z = tile_z;
 
-            let hover_radius = 0.6;
+            // Entity hover: compare in screen space so Z-elevated entities
+            // are hovered when the cursor visually overlaps them.
+            let hover_radius_px = 0.6 * crate::render::isometric::TILE_WIDTH * state.camera.zoom * 0.5;
+            let hover_radius_sq = hover_radius_px * hover_radius_px;
             let mut hovered_entity: Option<String> = None;
 
             for npc in state.npcs.values() {
                 if npc.state != crate::game::npc::NpcState::Dead {
-                    let dx = world_x - npc.x;
-                    let dy = world_y - npc.y;
-                    if dx * dx + dy * dy < hover_radius * hover_radius {
+                    let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
+                        npc.x, npc.y, npc.z, &state.camera,
+                    );
+                    let dx = mx - sx;
+                    let dy = my - sy;
+                    if dx * dx + dy * dy < hover_radius_sq {
                         hovered_entity = Some(npc.id.clone());
                         break;
                     }
@@ -2058,9 +2064,12 @@ impl InputHandler {
             if hovered_entity.is_none() {
                 for player in state.players.values() {
                     if !player.is_dead {
-                        let dx = world_x - player.x;
-                        let dy = world_y - player.y;
-                        if dx * dx + dy * dy < hover_radius * hover_radius {
+                        let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
+                            player.x, player.y, player.z, &state.camera,
+                        );
+                        let dx = mx - sx;
+                        let dy = my - sy;
+                        if dx * dx + dy * dy < hover_radius_sq {
                             hovered_entity = Some(player.id.clone());
                             break;
                         }
@@ -9615,11 +9624,10 @@ impl InputHandler {
         if mouse_clicked && clicked_element.is_none() {
             let (raw_x, raw_y) = mouse_position();
             let (mouse_x, mouse_y) = screen_to_virtual_coords(raw_x, raw_y);
-            let (world_x, world_y) = screen_to_world(mouse_x, mouse_y, &state.camera);
 
-            // Get the clicked tile coordinates
-            let clicked_tile_x = world_x.round() as i32;
-            let clicked_tile_y = world_y.round() as i32;
+            // Get the clicked tile coordinates (elevation-aware)
+            let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) =
+                state.chunk_manager.pick_tile_at_screen(mouse_x, mouse_y, &state.camera);
 
             // Find entity on the exact clicked tile
             let mut clicked_player: Option<String> = None;
@@ -10275,8 +10283,9 @@ impl InputHandler {
                     commands.push(InputCommand::CancelAutoAction);
                 }
 
-                let tile_x = world_x.round() as i32;
-                let tile_y = world_y.round() as i32;
+                // Use elevation-aware tile picking for click-to-move
+                let tile_x = clicked_tile_x;
+                let tile_y = clicked_tile_y;
 
                 // Only path if within range and walkable
                 const MAX_PATH_DISTANCE: i32 = 32;
@@ -10328,9 +10337,9 @@ impl InputHandler {
         if mouse_right_clicked && clicked_element.is_none() {
             let (raw_x, raw_y) = mouse_position();
             let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
-            let (world_x, world_y) = screen_to_world(mouse_vx, mouse_vy, &state.camera);
-            let clicked_tile_x = world_x.round() as i32;
-            let clicked_tile_y = world_y.round() as i32;
+            // Use elevation-aware tile picking for right-click
+            let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) =
+                state.chunk_manager.pick_tile_at_screen(mouse_vx, mouse_vy, &state.camera);
 
             // Determine what's under the cursor, same priority as left-click
             let target = 'find_target: {

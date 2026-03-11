@@ -44,13 +44,23 @@ fn heuristic(a: (i32, i32), b: (i32, i32)) -> i32 {
     (a.0 - b.0).abs() + (a.1 - b.1).abs()
 }
 
+/// Check if movement between two tiles is allowed by height rules.
+/// Matches server logic: can step up at most 1 block, can step down any amount.
+fn can_traverse_height(chunk_manager: &ChunkManager, from: (i32, i32), to: (i32, i32)) -> bool {
+    let from_h = chunk_manager.get_height(from.0, from.1) as i32;
+    let to_h = chunk_manager.get_height(to.0, to.1) as i32;
+    let height_diff = to_h - from_h;
+    // Can step up at most 1 block; can step down any amount
+    height_diff <= 1
+}
+
 /// Find a path from start to goal using A* algorithm.
 /// Returns None if no path exists or goal is too far.
 ///
 /// # Arguments
 /// * `start` - Starting grid position
 /// * `goal` - Target grid position
-/// * `chunk_manager` - For walkability checks
+/// * `chunk_manager` - For walkability and height checks
 /// * `occupied` - Set of tiles occupied by entities (players/NPCs)
 /// * `max_distance` - Maximum allowed distance (Chebyshev)
 pub fn find_path(
@@ -127,6 +137,11 @@ pub fn find_path(
 
             // Check walkability
             if !chunk_manager.is_walkable(neighbor.0 as f32, neighbor.1 as f32) {
+                continue;
+            }
+
+            // Check height traversability (can't climb more than 1 block)
+            if !can_traverse_height(chunk_manager, current.pos, neighbor) {
                 continue;
             }
 
@@ -271,6 +286,11 @@ pub fn find_path_within_range(
             let neighbor = (current.pos.0 + ndx, current.pos.1 + ndy);
 
             if !chunk_manager.is_walkable(neighbor.0 as f32, neighbor.1 as f32) {
+                continue;
+            }
+
+            // Check height traversability (can't climb more than 1 block)
+            if !can_traverse_height(chunk_manager, current.pos, neighbor) {
                 continue;
             }
 
