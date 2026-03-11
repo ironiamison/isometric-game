@@ -3424,18 +3424,20 @@ impl Renderer {
                 local_y: i32,
                 chunk_coord: crate::game::ChunkCoord,
             },
-            ChunkObject(&'a MapObject),
-            ChunkObjectShaking(&'a MapObject, f32), // Object with shake offset
-            ChunkWall(&'a Wall),
+            ChunkObject(&'a MapObject, f32),          // Object with tile_z
+            ChunkObjectShaking(&'a MapObject, f32, f32), // Object with shake offset and tile_z
+            ChunkWall(&'a Wall, f32),                  // Wall with tile_z
             TreeTimer {
                 tile_x: i32,
                 tile_y: i32,
+                tile_z: f32,
                 progress: f32,
             },
             FallingTree {
                 gid: u32,
                 tile_x: i32,
                 tile_y: i32,
+                tile_z: f32,
                 angle: f32,
                 alpha: f32,
                 y_offset: f32,
@@ -3444,12 +3446,14 @@ impl Renderer {
                 gid: u32,
                 tile_x: i32,
                 tile_y: i32,
+                tile_z: f32,
                 scale: f32,
                 alpha: f32,
             },
             RockTimer {
                 tile_x: i32,
                 tile_y: i32,
+                tile_z: f32,
                 progress: f32,
             },
         }
@@ -3757,14 +3761,16 @@ impl Renderer {
                 if crumbling_rock_positions.contains(&(obj.tile_x, obj.tile_y)) {
                     continue;
                 }
-                let depth = calculate_depth(wx, wy, 1);
+                let (lx, ly) = crate::game::chunk::world_to_local(obj.tile_x, obj.tile_y);
+                let tile_z = chunk.get_height(lx, ly) as f32;
+                let depth = calculate_depth_z(wx, wy, tile_z, 1);
                 // Check if object is shaking (tree or rock) and apply offset
                 let tree_shake = tree_shake_offsets.get(&(obj.tile_x, obj.tile_y)).copied();
                 let rock_shake = rock_shake_offsets.get(&(obj.tile_x, obj.tile_y)).copied();
                 if let Some(offset) = tree_shake.or(rock_shake) {
-                    renderables.push((depth, Renderable::ChunkObjectShaking(obj, offset)));
+                    renderables.push((depth, Renderable::ChunkObjectShaking(obj, offset, tile_z)));
                 } else {
-                    renderables.push((depth, Renderable::ChunkObject(obj)));
+                    renderables.push((depth, Renderable::ChunkObject(obj, tile_z)));
                 }
             }
             for wall in &chunk.walls {
@@ -3773,8 +3779,10 @@ impl Renderer {
                 if wx < vis_min_x || wx > vis_max_x || wy < vis_min_y || wy > vis_max_y {
                     continue;
                 }
-                let depth = calculate_depth(wx, wy, 1);
-                renderables.push((depth, Renderable::ChunkWall(wall)));
+                let (lx, ly) = crate::game::chunk::world_to_local(wall.tile_x, wall.tile_y);
+                let tile_z = chunk.get_height(lx, ly) as f32;
+                let depth = calculate_depth_z(wx, wy, tile_z, 1);
+                renderables.push((depth, Renderable::ChunkWall(wall, tile_z)));
             }
         }
 
@@ -3792,12 +3800,14 @@ impl Renderer {
             }
             let elapsed = current_time - info.depleted_at;
             let progress = (elapsed / total_duration).clamp(0.0, 1.0) as f32;
-            let depth = calculate_depth(wx, wy, 1);
+            let tile_z = state.chunk_manager.get_height(*tile_x, *tile_y) as f32;
+            let depth = calculate_depth_z(wx, wy, tile_z, 1);
             renderables.push((
                 depth,
                 Renderable::TreeTimer {
                     tile_x: *tile_x,
                     tile_y: *tile_y,
+                    tile_z,
                     progress,
                 },
             ));
@@ -3816,12 +3826,14 @@ impl Renderer {
             }
             let elapsed = current_time - info.depleted_at;
             let progress = (elapsed / total_duration).clamp(0.0, 1.0) as f32;
-            let depth = calculate_depth(wx, wy, 1);
+            let tile_z = state.chunk_manager.get_height(*tile_x, *tile_y) as f32;
+            let depth = calculate_depth_z(wx, wy, tile_z, 1);
             renderables.push((
                 depth,
                 Renderable::RockTimer {
                     tile_x: *tile_x,
                     tile_y: *tile_y,
+                    tile_z,
                     progress,
                 },
             ));
@@ -3835,13 +3847,15 @@ impl Renderer {
                 continue;
             }
             let (angle, alpha, y_offset) = ft.get_transform();
-            let depth = calculate_depth(wx, wy, 1);
+            let tile_z = state.chunk_manager.get_height(ft.x, ft.y) as f32;
+            let depth = calculate_depth_z(wx, wy, tile_z, 1);
             renderables.push((
                 depth,
                 Renderable::FallingTree {
                     gid: ft.gid,
                     tile_x: ft.x,
                     tile_y: ft.y,
+                    tile_z,
                     angle,
                     alpha,
                     y_offset,
@@ -3857,13 +3871,15 @@ impl Renderer {
                 continue;
             }
             let (scale, alpha) = cr.get_transform();
-            let depth = calculate_depth(wx, wy, 1);
+            let tile_z = state.chunk_manager.get_height(cr.x, cr.y) as f32;
+            let depth = calculate_depth_z(wx, wy, tile_z, 1);
             renderables.push((
                 depth,
                 Renderable::CrumblingRock {
                     gid: cr.gid,
                     tile_x: cr.x,
                     tile_y: cr.y,
+                    tile_z,
                     scale,
                     alpha,
                 },
@@ -3980,26 +3996,28 @@ impl Renderer {
                         );
                     }
                 }
-                Renderable::ChunkObject(obj) => {
-                    self.render_map_object(obj, &state.camera);
+                Renderable::ChunkObject(obj, tile_z) => {
+                    self.render_map_object(obj, tile_z, &state.camera);
                 }
-                Renderable::ChunkObjectShaking(obj, offset) => {
-                    self.render_map_object_shaking(obj, offset, &state.camera);
+                Renderable::ChunkObjectShaking(obj, offset, tile_z) => {
+                    self.render_map_object_shaking(obj, offset, tile_z, &state.camera);
                 }
-                Renderable::ChunkWall(wall) => {
-                    self.render_wall(wall, &state.camera);
+                Renderable::ChunkWall(wall, tile_z) => {
+                    self.render_wall(wall, tile_z, &state.camera);
                 }
                 Renderable::TreeTimer {
                     tile_x,
                     tile_y,
+                    tile_z,
                     progress,
                 } => {
-                    self.render_tree_timer(tile_x, tile_y, progress, &state.camera);
+                    self.render_tree_timer(tile_x, tile_y, tile_z, progress, &state.camera);
                 }
                 Renderable::FallingTree {
                     gid,
                     tile_x,
                     tile_y,
+                    tile_z,
                     angle,
                     alpha,
                     y_offset,
@@ -4008,6 +4026,7 @@ impl Renderer {
                         gid,
                         tile_x,
                         tile_y,
+                        tile_z,
                         angle,
                         alpha,
                         y_offset,
@@ -4018,18 +4037,20 @@ impl Renderer {
                     gid,
                     tile_x,
                     tile_y,
+                    tile_z,
                     scale,
                     alpha,
                 } => {
-                    self.render_crumbling_rock(gid, tile_x, tile_y, scale, alpha, &state.camera);
+                    self.render_crumbling_rock(gid, tile_x, tile_y, tile_z, scale, alpha, &state.camera);
                 }
                 Renderable::RockTimer {
                     tile_x,
                     tile_y,
+                    tile_z,
                     progress,
                 } => {
                     // Reuse tree timer rendering — same pie chart style
-                    self.render_tree_timer(tile_x, tile_y, progress, &state.camera);
+                    self.render_tree_timer(tile_x, tile_y, tile_z, progress, &state.camera);
                 }
             }
         }
@@ -4231,12 +4252,12 @@ impl Renderer {
     }
 
     /// Render a single pie chart timer for a depleted tree (called during depth-sorted rendering)
-    fn render_tree_timer(&self, tile_x: i32, tile_y: i32, progress: f32, camera: &Camera) {
+    fn render_tree_timer(&self, tile_x: i32, tile_y: i32, tile_z: f32, progress: f32, camera: &Camera) {
         let zoom = camera.zoom;
 
         // Convert tile position to screen position (center of tile)
         let (screen_x, mut screen_y) =
-            world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+            world_to_screen_z(tile_x as f32 + 0.5, tile_y as f32 + 0.5, tile_z, camera);
         // Adjust Y to center on tile (world_to_screen gives bottom of tile)
         screen_y -= 16.0 * zoom;
 
@@ -8686,10 +8707,10 @@ impl Renderer {
     }
 
     /// Render a map object (tree, rock, decoration) from chunk data
-    fn render_map_object(&self, obj: &MapObject, camera: &Camera) {
+    fn render_map_object(&self, obj: &MapObject, tile_z: f32, camera: &Camera) {
         // Get screen position for the tile CENTER (add 0.5 to tile coords)
         let (screen_x, screen_y) =
-            world_to_screen(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, camera);
+            world_to_screen_z(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, tile_z, camera);
         let zoom = camera.zoom;
 
         // Try to get the sprite for this gid
@@ -8756,9 +8777,9 @@ impl Renderer {
     }
 
     /// Render a map object with a horizontal shake offset (for trees being chopped)
-    fn render_map_object_shaking(&self, obj: &MapObject, shake_offset: f32, camera: &Camera) {
+    fn render_map_object_shaking(&self, obj: &MapObject, shake_offset: f32, tile_z: f32, camera: &Camera) {
         let (screen_x, screen_y) =
-            world_to_screen(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, camera);
+            world_to_screen_z(obj.tile_x as f32 + 0.5, obj.tile_y as f32 + 0.5, tile_z, camera);
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(obj.gid) {
@@ -8805,13 +8826,14 @@ impl Renderer {
         gid: u32,
         tile_x: i32,
         tile_y: i32,
+        tile_z: f32,
         angle: f32,
         alpha: f32,
         _y_offset: f32,
         camera: &Camera,
     ) {
         // The pivot point (tree base) should stay fixed at pivot_x, pivot_y
-        let (pivot_x, pivot_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+        let (pivot_x, pivot_y) = world_to_screen_z(tile_x as f32 + 0.5, tile_y as f32 + 0.5, tile_z, camera);
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
@@ -8907,11 +8929,12 @@ impl Renderer {
         gid: u32,
         tile_x: i32,
         tile_y: i32,
+        tile_z: f32,
         scale: f32,
         alpha: f32,
         camera: &Camera,
     ) {
-        let (base_x, base_y) = world_to_screen(tile_x as f32 + 0.5, tile_y as f32 + 0.5, camera);
+        let (base_x, base_y) = world_to_screen_z(tile_x as f32 + 0.5, tile_y as f32 + 0.5, tile_z, camera);
         let zoom = camera.zoom;
 
         if let Some((texture, source_rect)) = self.get_object_sprite(gid) {
@@ -8953,13 +8976,16 @@ impl Renderer {
     }
 
     /// Render a wall on a tile edge
-    fn render_wall(&self, wall: &Wall, camera: &Camera) {
+    fn render_wall(&self, wall: &Wall, tile_z: f32, camera: &Camera) {
         let zoom = camera.zoom;
 
         // Get the tile's top vertex screen position (same as mapper)
         // Use exact coordinates to avoid rounding errors
-        let (screen_x, screen_y) =
+        let (sx, sy) =
             world_to_screen_exact(wall.tile_x as f32, wall.tile_y as f32, camera);
+        // Apply Z offset to raise wall to tile elevation
+        let screen_x = sx;
+        let screen_y = sy - tile_z * (TILE_HEIGHT / 2.0) * zoom;
 
         // Tiles are centered on their world_to_screen position, so
         // bottom vertex is at center + half tile height (not full height)
