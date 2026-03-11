@@ -40,6 +40,7 @@ export interface RenderOptions {
   showMapObjects: boolean;
   showPortals: boolean;
   showNotes: boolean;
+  showHeights: boolean;
   visibleLayers: {
     ground: boolean;
     objects: boolean;
@@ -55,6 +56,7 @@ const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   showMapObjects: true,
   showPortals: true,
   showNotes: true,
+  showHeights: false,
   visibleLayers: {
     ground: true,
     objects: true,
@@ -68,7 +70,9 @@ const DEFAULT_RENDER_OPTIONS: RenderOptions = {
 
 /** Offscreen canvas dimensions for a 32x32 isometric chunk at zoom=1 */
 const CHUNK_CANVAS_WIDTH = CHUNK_SIZE * TILE_WIDTH; // 2048
-const CHUNK_CANVAS_HEIGHT = CHUNK_SIZE * TILE_HEIGHT + TILE_HEIGHT; // 1056
+/** Extra top padding on the tile canvas for elevated tiles (max height 15 * halfTileH) */
+const HEIGHT_TOP_PAD = 15 * (TILE_HEIGHT / 2); // 240
+const CHUNK_CANVAS_HEIGHT = CHUNK_SIZE * TILE_HEIGHT + TILE_HEIGHT + HEIGHT_TOP_PAD; // 1296
 const CHUNK_CANVAS_OFFSET_X = CHUNK_CANVAS_WIDTH / 2; // 1024
 
 interface ChunkCacheEntry {
@@ -77,6 +81,7 @@ interface ChunkCacheEntry {
   groundRef: number[];
   objectsRef: number[];
   overheadRef: number[];
+  heightsRef: Uint8Array | undefined;
   visibleGround: boolean;
   visibleObjects: boolean;
   visibleOverhead: boolean;
@@ -100,6 +105,7 @@ class ChunkTileCache {
       entry.groundRef === chunk.layers.ground &&
       entry.objectsRef === chunk.layers.objects &&
       entry.overheadRef === chunk.layers.overhead &&
+      entry.heightsRef === chunk.heights &&
       entry.visibleGround === visibleLayers.ground &&
       entry.visibleObjects === visibleLayers.objects &&
       entry.visibleOverhead === visibleLayers.overhead;
@@ -122,6 +128,7 @@ class ChunkTileCache {
         groundRef: chunk.layers.ground,
         objectsRef: chunk.layers.objects,
         overheadRef: chunk.layers.overhead,
+        heightsRef: chunk.heights,
         visibleGround: visibleLayers.ground,
         visibleObjects: visibleLayers.objects,
         visibleOverhead: visibleLayers.overhead,
@@ -136,6 +143,7 @@ class ChunkTileCache {
     entry.groundRef = chunk.layers.ground;
     entry.objectsRef = chunk.layers.objects;
     entry.overheadRef = chunk.layers.overhead;
+    entry.heightsRef = chunk.heights;
     entry.visibleGround = visibleLayers.ground;
     entry.visibleObjects = visibleLayers.objects;
     entry.visibleOverhead = visibleLayers.overhead;
@@ -157,6 +165,7 @@ class ChunkTileCache {
       entry.groundRef === chunk.layers.ground &&
       entry.objectsRef === chunk.layers.objects &&
       entry.overheadRef === chunk.layers.overhead &&
+      entry.heightsRef === chunk.heights &&
       entry.visibleGround === visibleLayers.ground &&
       entry.visibleObjects === visibleLayers.objects &&
       entry.visibleOverhead === visibleLayers.overhead
@@ -197,16 +206,59 @@ class ChunkTileCache {
 
     const halfTileW = TILE_WIDTH / 2;
     const halfTileH = TILE_HEIGHT / 2;
+    const heights = chunk.heights;
 
     for (let y = 0; y < CHUNK_SIZE; y++) {
       for (let x = 0; x < CHUNK_SIZE; x++) {
         const index = y * CHUNK_SIZE + x;
+        const h = heights ? heights[index] : 0;
+        const zOffset = h * halfTileH;
 
         // Local isometric position (zoom=1, no viewport)
         const localIsoX = (x - y) * halfTileW;
         const localIsoY = (x + y) * halfTileH;
         const drawX = localIsoX - halfTileW + CHUNK_CANVAS_OFFSET_X;
-        const drawY = localIsoY;
+        const drawY = localIsoY + HEIGHT_TOP_PAD - zOffset;
+
+        // Draw block side faces before the tile top (so tile covers the top edge)
+        if (h > 0) {
+          // Get neighbor heights (fall back to 0 for out-of-chunk neighbors)
+          const neighborRight = (x + 1 < CHUNK_SIZE && heights)
+            ? heights[y * CHUNK_SIZE + (x + 1)] : 0;
+          const neighborDown = (y + 1 < CHUNK_SIZE && heights)
+            ? heights[(y + 1) * CHUNK_SIZE + x] : 0;
+
+          const centerX = drawX + halfTileW;
+          const centerY = drawY + halfTileH;
+
+          // Right face (+X direction, south-east) - lighter brown
+          const rightDiff = h - neighborRight;
+          if (rightDiff > 0) {
+            const faceH = rightDiff * halfTileH;
+            ctx.fillStyle = "rgb(110, 85, 55)";
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);           // diamond center
+            ctx.lineTo(centerX + halfTileW, centerY - halfTileH); // diamond right
+            ctx.lineTo(centerX + halfTileW, centerY - halfTileH + faceH); // right bottom
+            ctx.lineTo(centerX, centerY + faceH);   // center bottom
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          // Left face (+Y direction, south-west) - darker brown
+          const downDiff = h - neighborDown;
+          if (downDiff > 0) {
+            const faceH = downDiff * halfTileH;
+            ctx.fillStyle = "rgb(75, 58, 38)";
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);           // diamond center
+            ctx.lineTo(centerX - halfTileW, centerY - halfTileH); // diamond left
+            ctx.lineTo(centerX - halfTileW, centerY - halfTileH + faceH); // left bottom
+            ctx.lineTo(centerX, centerY + faceH);   // center bottom
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
 
         if (visibleLayers.ground) {
           const gid = chunk.layers.ground[index];
@@ -665,6 +717,12 @@ export class IsometricRenderer {
       this.renderGatheringZones(chunk, viewport);
     }
 
+    if (this.options.showHeights) {
+      for (const chunk of sortedChunks) {
+        this.renderHeightLabels(chunk, viewport);
+      }
+    }
+
     this.renderNotes(viewport);
 
     if (this.options.showGrid) {
@@ -702,7 +760,7 @@ export class IsometricRenderer {
 
     const destX =
       (chunkIsoX - CHUNK_CANVAS_OFFSET_X) * viewport.zoom + viewport.offsetX;
-    const destY = chunkIsoY * viewport.zoom + viewport.offsetY;
+    const destY = (chunkIsoY - HEIGHT_TOP_PAD) * viewport.zoom + viewport.offsetY;
     const destW = CHUNK_CANVAS_WIDTH * viewport.zoom;
     const destH = CHUNK_CANVAS_HEIGHT * viewport.zoom;
 
@@ -1208,6 +1266,39 @@ export class IsometricRenderer {
       centerScreen.sx,
       centerScreen.sy,
     );
+  }
+
+  private renderHeightLabels(chunk: Chunk, viewport: Viewport): void {
+    if (!this.ctx || !chunk.heights) return;
+
+    const halfTileH = (TILE_HEIGHT / 2) * viewport.zoom;
+    const fontSize = Math.max(8, Math.round(12 * viewport.zoom));
+    this.ctx.font = `bold ${fontSize}px monospace`;
+    this.ctx.textAlign = "center";
+    this.ctx.textBaseline = "middle";
+
+    for (let i = 0; i < chunk.width * chunk.height; i++) {
+      const h = chunk.heights[i];
+      if (h === 0) continue;
+
+      const local = indexToLocal(i, chunk.width);
+      const worldCoord = chunkLocalToWorld(chunk.coord, local);
+      const screen = worldToScreen(worldCoord, viewport);
+      const zOffset = h * halfTileH;
+
+      const cx = screen.sx;
+      const cy = screen.sy + (TILE_HEIGHT / 2) * viewport.zoom - zOffset;
+
+      // Background circle
+      this.ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, fontSize * 0.7, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Height number
+      this.ctx.fillStyle = "#ffcc00";
+      this.ctx.fillText(String(h), cx, cy);
+    }
   }
 
   private renderCollisionOverlay(chunk: Chunk, viewport: Viewport): void {

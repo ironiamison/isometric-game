@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Flag,
   LogOut,
+  Mountain,
   type LucideIcon,
 } from 'lucide-react';
 import styles from './Toolbar.module.css';
@@ -43,6 +44,7 @@ const tools: ToolDef[] = [
   { id: Tool.Object, label: 'Object', shortcut: 'O', icon: Box, group: 'main' },
   { id: Tool.Portal, label: 'Portal', shortcut: 'P', icon: DoorOpen, group: 'main', mode: 'overworld' },
   { id: Tool.GatheringZone, label: 'Gathering', shortcut: 'F', icon: Pickaxe, group: 'main', mode: 'overworld' },
+  { id: Tool.HeightRaise, label: 'Height', shortcut: 'H', icon: Mountain, group: 'main', mode: 'overworld' },
   { id: Tool.WallDown, label: 'Wall Down', shortcut: 'D', icon: House, group: 'walls', composite: { icon: ArrowDown } },
   { id: Tool.WallRight, label: 'Wall Right', shortcut: 'R', icon: House, group: 'walls', composite: { icon: ArrowRight } },
   { id: Tool.SpawnPoint, label: 'Spawn Point', shortcut: 'S', icon: Flag, group: 'interior', mode: 'interior' },

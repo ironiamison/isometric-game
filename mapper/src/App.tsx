@@ -309,6 +309,9 @@ function App() {
         case 'i':
           store.setActiveTool('eyedropper');
           break;
+        case 'h':
+          store.setActiveTool('heightRaise');
+          break;
       }
     };
 

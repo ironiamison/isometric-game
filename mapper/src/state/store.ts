@@ -182,6 +182,7 @@ interface EditorActions {
   setTile: (world: WorldCoord, layer: Layer, tileId: number) => void;
   toggleCollision: (world: WorldCoord) => void;
   fillTiles: (start: WorldCoord, layer: Layer, tileId: number) => void;
+  adjustHeight: (world: WorldCoord, delta: number) => void;
 
   // Magic wand selection
   magicWandSelect: (world: WorldCoord, layer: Layer) => void;
@@ -617,6 +618,40 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       collision: bitset.getRaw(),
       dirty: true,
     }));
+  },
+
+  adjustHeight: (world, delta) => {
+    const chunkCoord = worldToChunk(world);
+    const chunk = get().getOrCreateChunk(chunkCoord);
+    const local = worldToLocal(world);
+    const index = localToIndex(local);
+
+    // Get current height
+    const currentHeight = chunk.heights ? chunk.heights[index] : 0;
+    const newHeight = Math.max(0, Math.min(15, currentHeight + delta));
+    if (newHeight === currentHeight) return;
+
+    history.push({
+      type: 'adjustHeight',
+      description: `${delta > 0 ? 'Raise' : 'Lower'} height at ${world.wx},${world.wy}`,
+      undo: () => get().adjustHeight(world, -delta),
+      redo: () => get().adjustHeight(world, delta),
+    });
+
+    get().updateChunk(chunkCoord, (c) => {
+      const heights = c.heights
+        ? new Uint8Array(c.heights)
+        : new Uint8Array(c.width * c.height);
+      heights[index] = newHeight;
+
+      // If all heights are 0, drop the array to save space
+      const allZero = heights.every((h) => h === 0);
+      return {
+        ...c,
+        heights: allZero ? undefined : heights,
+        dirty: true,
+      };
+    });
   },
 
   fillTiles: (start, layer, tileId) => {

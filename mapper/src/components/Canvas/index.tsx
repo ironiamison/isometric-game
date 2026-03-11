@@ -17,6 +17,7 @@ export function Canvas() {
   const [isPainting, setIsPainting] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; wx: number; wy: number } | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
+  const heightDelta = useRef(0); // +1 for raise, -1 for lower (during drag)
 
   const {
     chunks,
@@ -54,6 +55,7 @@ export function Canvas() {
     addMapObject,
     removeMapObject,
     addPortal,
+    adjustHeight,
     toggleGatheringZone,
     findGatheringZoneAtWorld,
     setSelectedGatheringZone,
@@ -170,9 +172,10 @@ export function Canvas() {
       showMapObjects,
       showPortals,
       showNotes,
+      showHeights: activeTool === Tool.HeightRaise,
       visibleLayers,
     });
-  }, [showGrid, showChunkBounds, showCollision, showEntities, showMapObjects, showPortals, showNotes, visibleLayers]);
+  }, [showGrid, showChunkBounds, showCollision, showEntities, showMapObjects, showPortals, showNotes, visibleLayers, activeTool]);
 
   // Pass notes to renderer
   useEffect(() => {
@@ -610,6 +613,9 @@ export function Canvas() {
           }
           break;
         }
+        case Tool.HeightRaise:
+          adjustHeight(worldTile, 1);
+          break;
       }
     },
     [
@@ -641,6 +647,7 @@ export function Canvas() {
       setSelectedMapObject,
       findPortalAtWorld,
       setSelectedPortal,
+      adjustHeight,
       toggleWall,
       setInteriorTile,
       toggleInteriorCollision,
@@ -676,16 +683,37 @@ export function Canvas() {
         return;
       }
 
+      // Right click for height lowering
+      if (e.button === 2 && activeTool === Tool.HeightRaise) {
+        e.preventDefault();
+        setIsPainting(true);
+        heightDelta.current = -1;
+        history.beginGroup('height lower stroke');
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const screenX = e.clientX - rect.left;
+          const screenY = e.clientY - rect.top;
+          const worldTile = screenToWorldTile({ sx: screenX, sy: screenY }, viewport);
+          adjustHeight(worldTile, -1);
+        }
+        return;
+      }
+
       // Left click for tool action
       if (e.button === 0) {
         setIsPainting(true);
         if (activeTool === Tool.Paint || activeTool === Tool.Eraser) {
           history.beginGroup(`${activeTool} stroke`);
         }
+        if (activeTool === Tool.HeightRaise) {
+          heightDelta.current = 1;
+          history.beginGroup('height raise stroke');
+        }
         handleToolAction(e.clientX, e.clientY);
       }
     },
-    [activeTool, handleToolAction]
+    [activeTool, handleToolAction, viewport, adjustHeight]
   );
 
   const handleMouseMove = useCallback(
@@ -710,12 +738,16 @@ export function Canvas() {
       if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser)) {
         handleToolAction(e.clientX, e.clientY);
       }
+
+      if (isPainting && activeTool === Tool.HeightRaise) {
+        adjustHeight(worldTile, heightDelta.current);
+      }
     },
-    [viewport, isPanning, isPainting, activeTool, pan, setHoveredTile, handleToolAction]
+    [viewport, isPanning, isPainting, activeTool, pan, setHoveredTile, handleToolAction, adjustHeight]
   );
 
   const handleMouseUp = useCallback(() => {
-    if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser)) {
+    if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser || activeTool === Tool.HeightRaise)) {
       history.endGroup();
     }
     setIsPanning(false);
@@ -724,7 +756,7 @@ export function Canvas() {
 
   const handleMouseLeave = useCallback(() => {
     setHoveredTile(null);
-    if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser)) {
+    if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser || activeTool === Tool.HeightRaise)) {
       history.endGroup();
     }
     setIsPanning(false);
@@ -757,6 +789,8 @@ export function Canvas() {
         onWheel={handleWheel}
         onContextMenu={(e) => {
           e.preventDefault();
+          // Right-click is used for lowering in HeightRaise mode
+          if (activeTool === Tool.HeightRaise) return;
           const rect = canvasRef.current?.getBoundingClientRect();
           if (!rect) return;
           const tile = screenToWorldTile(
@@ -809,6 +843,17 @@ export function Canvas() {
       {hoveredTile && (
         <div className={styles.coords}>
           {hoveredTile.wx}, {hoveredTile.wy}
+          {activeTool === Tool.HeightRaise && (() => {
+            const cc = worldToChunk(hoveredTile);
+            const chunk = chunks.get(`${cc.cx},${cc.cy}`);
+            if (chunk?.heights) {
+              const lx = ((hoveredTile.wx % 32) + 32) % 32;
+              const ly = ((hoveredTile.wy % 32) + 32) % 32;
+              const h = chunk.heights[ly * 32 + lx];
+              if (h > 0) return ` (H: ${h})`;
+            }
+            return ' (H: 0)';
+          })()}
         </div>
       )}
     </div>
