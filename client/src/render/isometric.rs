@@ -18,9 +18,11 @@ pub fn world_to_screen(world_x: f32, world_y: f32, camera: &Camera) -> (f32, f32
     let cam_iso_y = (camera.x + camera.y) * (TILE_HEIGHT / 2.0);
 
     // Apply camera offset and zoom, center on screen (using virtual size for mobile)
+    // Camera Z shifts view to keep player centered when at elevation
+    let cam_z_offset = camera.z * (TILE_HEIGHT / 2.0) * camera.zoom;
     let (vw, vh) = virtual_screen_size();
     let screen_x = (iso_x - cam_iso_x) * camera.zoom + (vw / 2.0).floor();
-    let screen_y = (iso_y - cam_iso_y) * camera.zoom + (vh / 2.0).floor();
+    let screen_y = (iso_y - cam_iso_y) * camera.zoom + (vh / 2.0).floor() + cam_z_offset;
 
     // Pixel snap for crisp rendering (no sub-pixel jitter)
     (screen_x.round(), screen_y.round())
@@ -35,9 +37,10 @@ pub fn world_to_screen_exact(world_x: f32, world_y: f32, camera: &Camera) -> (f3
     let cam_iso_x = (camera.x - camera.y) * (TILE_WIDTH / 2.0);
     let cam_iso_y = (camera.x + camera.y) * (TILE_HEIGHT / 2.0);
 
+    let cam_z_offset = camera.z * (TILE_HEIGHT / 2.0) * camera.zoom;
     let (vw, vh) = virtual_screen_size();
     let screen_x = (iso_x - cam_iso_x) * camera.zoom + (vw / 2.0).floor();
-    let screen_y = (iso_y - cam_iso_y) * camera.zoom + (vh / 2.0).floor();
+    let screen_y = (iso_y - cam_iso_y) * camera.zoom + (vh / 2.0).floor() + cam_z_offset;
 
     (screen_x, screen_y)
 }
@@ -49,9 +52,10 @@ pub fn screen_to_world(screen_x: f32, screen_y: f32, camera: &Camera) -> (f32, f
     let cam_iso_y = (camera.x + camera.y) * (TILE_HEIGHT / 2.0);
 
     // Reverse the screen transformation (using virtual size for mobile)
+    let cam_z_offset = camera.z * (TILE_HEIGHT / 2.0) * camera.zoom;
     let (vw, vh) = virtual_screen_size();
     let iso_x = (screen_x - vw / 2.0) / camera.zoom + cam_iso_x;
-    let iso_y = (screen_y - vh / 2.0) / camera.zoom + cam_iso_y;
+    let iso_y = (screen_y - cam_z_offset - vh / 2.0) / camera.zoom + cam_iso_y;
 
     // Reverse the isometric transformation
     let world_x = (iso_x / (TILE_WIDTH / 2.0) + iso_y / (TILE_HEIGHT / 2.0)) / 2.0;

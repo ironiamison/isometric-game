@@ -258,6 +258,7 @@ pub struct AutoActionState {
 pub struct Camera {
     pub x: f32,
     pub y: f32,
+    pub z: f32,
     pub zoom: f32,
     pub initialized: bool,
     pub transition_from: Option<(f32, f32)>, // Starting position of transition
@@ -269,6 +270,7 @@ impl Default for Camera {
         Self {
             x: 0.0,
             y: 0.0,
+            z: 0.0,
             zoom: 1.0,
             initialized: false,
             transition_from: None,
@@ -2226,6 +2228,7 @@ impl GameState {
                     self.camera.x = player.x;
                     self.camera.y = player.y;
                 }
+                self.camera.z = player.z;
                 self.camera.initialized = true;
             }
         }

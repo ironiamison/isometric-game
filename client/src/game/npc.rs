@@ -261,7 +261,13 @@ impl Npc {
         if dz.abs() < 0.01 {
             self.z = self.target_z;
         } else {
-            let z_step = 8.0 * delta;
+            // Base speed 8 blocks/sec; falling scales with drop distance
+            let z_speed = if dz < 0.0 {
+                8.0 * dz.abs().max(1.0)
+            } else {
+                8.0
+            };
+            let z_step = z_speed * delta;
             if z_step >= dz.abs() {
                 self.z = self.target_z;
             } else {
