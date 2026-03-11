@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api, type LeaderboardEntry, type PlayerProfileRanks } from '../api'
+import { UserRound, Copy, Check, ArrowLeft } from 'lucide-react'
 
 type ProfileStat = {
   label: string
@@ -118,7 +119,10 @@ export function PlayerProfile() {
   return (
     <div className="space-y-5">
       <section className="pixel-box relative overflow-hidden rounded-xl bg-[radial-gradient(circle_at_25%_10%,rgba(212,168,68,0.22),transparent_50%),radial-gradient(circle_at_90%_0%,rgba(90,114,71,0.16),transparent_48%),var(--panel)] p-6 md:p-7">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Player Showcase</p>
+        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>
+          <UserRound size={14} className="text-[var(--gold)]" />
+          Player Showcase
+        </p>
         <h1 className="mt-2 text-4xl text-[var(--text)]">{player.name}</h1>
         <div className="mt-3 flex flex-wrap gap-2 text-sm">
           <span className="rounded-full border border-[var(--panel-border)] bg-[var(--panel-soft)] px-3 py-1 text-[var(--text-soft)]">
@@ -134,15 +138,16 @@ export function PlayerProfile() {
         <div className="mt-5 flex flex-wrap gap-3">
           <button
             onClick={copyUrl}
-            className="pixel-btn rounded-md bg-[var(--gold)] px-4 py-2 text-sm font-bold text-[#1a1210] hover:bg-[var(--gold-light)]"
+            className="pixel-btn inline-flex items-center gap-1.5 rounded-md bg-[var(--gold)] px-4 py-2 text-sm font-bold text-[#1a1210] hover:bg-[var(--gold-light)]"
           >
-            {copied ? 'Link copied' : 'Copy profile URL'}
+            {copied ? <><Check size={14} /> Link copied</> : <><Copy size={14} /> Copy profile URL</>}
           </button>
           <Link
             to="/leaderboards"
-            className="pixel-btn rounded-md bg-[var(--panel-soft)] px-4 py-2 text-sm font-bold text-[var(--text-soft)] hover:text-[var(--text)]"
+            className="pixel-btn inline-flex items-center gap-1.5 rounded-md bg-[var(--panel-soft)] px-4 py-2 text-sm font-bold text-[var(--text-soft)] hover:text-[var(--text)]"
           >
-            View all leaderboards
+            <ArrowLeft size={14} />
+            Leaderboards
           </Link>
         </div>
         <p className="mt-3 text-xs text-[var(--muted)]">{sharePath}</p>

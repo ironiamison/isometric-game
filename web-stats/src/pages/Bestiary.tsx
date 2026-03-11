@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, type Entity } from '../api'
+import { Skull, Search } from 'lucide-react'
 
 export function Bestiary() {
   useEffect(() => { document.title = 'Bestiary — New Aeven World Statistics' }, [])
@@ -23,7 +24,10 @@ export function Bestiary() {
   return (
     <div className="space-y-6">
       <section className="pixel-box relative overflow-hidden rounded-xl bg-[radial-gradient(circle_at_20%_15%,rgba(180,60,60,0.18),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(212,168,68,0.14),transparent_45%),var(--panel)] px-6 py-7 md:px-8">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Field Guide</p>
+        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>
+          <Skull size={14} className="text-[var(--ember)]" />
+          Field Guide
+        </p>
         <h1 className="mt-2 text-3xl font-bold text-[var(--text)] md:text-4xl">Bestiary</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-soft)]">
           Every monster in New Aeven. Stats, drops, and scaling — know your enemy.
@@ -31,13 +35,16 @@ export function Bestiary() {
       </section>
 
       <div className="flex items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search monsters..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-lg border border-[var(--panel-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none focus:border-[var(--gold)] transition-colors"
-        />
+        <div className="relative w-full max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+          <input
+            type="text"
+            placeholder="Search monsters..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-[var(--panel-border)] bg-[var(--bg)] py-2 pl-9 pr-4 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none transition-colors focus:border-[var(--gold)]"
+          />
+        </div>
         {data && (
           <span className="rounded-full bg-[var(--gold)] px-3 py-0.5 text-sm font-bold text-[#1a1210]">
             {filtered.length}
