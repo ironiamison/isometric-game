@@ -60,12 +60,34 @@ pub fn screen_to_world(screen_x: f32, screen_y: f32, camera: &Camera) -> (f32, f
     (world_x, world_y)
 }
 
+/// Convert world (game) coordinates with Z height to screen (pixel) coordinates
+/// Z offsets the entity upward: each Z unit = half a tile height
+pub fn world_to_screen_z(world_x: f32, world_y: f32, world_z: f32, camera: &Camera) -> (f32, f32) {
+    let (sx, sy) = world_to_screen(world_x, world_y, camera);
+    let z_offset = world_z * (TILE_HEIGHT / 2.0) * camera.zoom;
+    (sx, (sy - z_offset).round())
+}
+
+/// Convert world to screen with Z, without pixel snapping (for calculations)
+pub fn world_to_screen_z_exact(world_x: f32, world_y: f32, world_z: f32, camera: &Camera) -> (f32, f32) {
+    let (sx, sy) = world_to_screen_exact(world_x, world_y, camera);
+    let z_offset = world_z * (TILE_HEIGHT / 2.0) * camera.zoom;
+    (sx, sy - z_offset)
+}
+
 /// Calculate isometric depth for sorting (painter's algorithm)
 /// Higher values should be rendered later (on top)
 pub fn calculate_depth(world_x: f32, world_y: f32, layer: u32) -> f32 {
     // Layer provides broad ordering (floor < entities < effects)
     // Within a layer, sort by x + y (entities further down-right render on top)
     (layer as f32 * 10000.0) + world_x + world_y
+}
+
+/// Calculate isometric depth with Z for sorting (painter's algorithm)
+/// Z contributes 0.5 depth per level — enough to maintain stable ordering
+/// at the same x+y position, without dominating spatial sort.
+pub fn calculate_depth_z(world_x: f32, world_y: f32, world_z: f32, layer: u32) -> f32 {
+    (layer as f32 * 10000.0) + world_x + world_y + world_z * 0.5
 }
 
 #[cfg(test)]

@@ -10,8 +10,8 @@ use super::animation::{
 };
 use super::font::BitmapFont;
 use super::isometric::{
-    calculate_depth, screen_to_world, world_to_screen, world_to_screen_exact, TILE_HEIGHT,
-    TILE_WIDTH,
+    calculate_depth, calculate_depth_z, screen_to_world, world_to_screen, world_to_screen_exact,
+    world_to_screen_z, TILE_HEIGHT, TILE_WIDTH,
 };
 use super::shaders;
 use super::ui::common::{SlotState, CORNER_ACCENT_SIZE, EXP_BAR_GAP};
@@ -2042,6 +2042,89 @@ impl Renderer {
         }
     }
 
+    /// Draw a tile sprite with a color tint (for height-based lighting)
+    fn draw_tile_sprite_tinted(
+        &self,
+        screen_x: f32,
+        screen_y: f32,
+        tile_id: u32,
+        zoom: f32,
+        world_pos: Option<(f32, f32)>,
+        water_effects: bool,
+        tint: Color,
+    ) {
+        let scaled_width = TILE_WIDTH * zoom;
+        let scaled_height = TILE_HEIGHT * zoom;
+
+        let is_water = tile_id == 418 && water_effects;
+        if is_water {
+            if let Some(ref mat) = self.water_material {
+                mat.set_uniform("Time", get_time() as f32);
+                gl_use_material(mat);
+            }
+        }
+
+        if let (Some(tileset), Some(uv)) = (&self.tileset, self.get_tile_uv(tile_id)) {
+            let draw_x = screen_x - scaled_width / 2.0;
+            let draw_y = screen_y - scaled_height / 2.0;
+            let source = Rect::new(
+                uv.x * tileset.width(),
+                uv.y * tileset.height(),
+                TILESET_TILE_WIDTH,
+                TILESET_TILE_HEIGHT,
+            );
+
+            draw_texture_ex(
+                tileset,
+                draw_x,
+                draw_y,
+                tint,
+                DrawTextureParams {
+                    source: Some(source),
+                    dest_size: Some(Vec2::new(scaled_width, scaled_height)),
+                    ..Default::default()
+                },
+            );
+
+            if is_water && self.water_material.is_some() {
+                gl_use_default_material();
+            }
+
+            if is_water {
+                if let (Some(ref mat), Some((wx, wy))) = (&self.water_overlay_material, world_pos) {
+                    mat.set_uniform("Time", get_time() as f32);
+                    mat.set_uniform("WorldPos", (wx, wy));
+                    gl_use_material(mat);
+                    draw_texture_ex(
+                        tileset,
+                        draw_x,
+                        draw_y,
+                        tint,
+                        DrawTextureParams {
+                            source: Some(source),
+                            dest_size: Some(Vec2::new(scaled_width, scaled_height)),
+                            ..Default::default()
+                        },
+                    );
+                    gl_use_default_material();
+                }
+            }
+        } else {
+            let color = get_tile_color(tile_id);
+            let tinted = Color::new(
+                color.r * tint.r,
+                color.g * tint.g,
+                color.b * tint.b,
+                color.a,
+            );
+            self.draw_isometric_tile(screen_x, screen_y, tinted, zoom);
+
+            if is_water && self.water_material.is_some() {
+                gl_use_default_material();
+            }
+        }
+    }
+
     fn minimap_preview_rect(&self) -> Rect {
         let (sw, _) = virtual_screen_size();
         let s = self.font_scale.get();
@@ -3333,6 +3416,16 @@ impl Renderer {
                 y: u32,
                 tile_id: u32,
             },
+            /// Elevated ground tile (z > 0) - depth-sorted with entities for proper occlusion
+            ElevatedTile {
+                screen_x: f32,
+                screen_y: f32,
+                tile_id: u32,
+                height: u8,
+                local_x: i32,
+                local_y: i32,
+                chunk_coord: crate::game::ChunkCoord,
+            },
             ChunkObject(&'a MapObject),
             ChunkObjectShaking(&'a MapObject, f32), // Object with shake offset
             ChunkWall(&'a Wall),
@@ -3434,13 +3527,77 @@ impl Renderer {
             renderables.push((depth, Renderable::Item(item)));
         }
 
+        // Add elevated ground tiles (z > 0) for depth-sorted rendering with entities
+        {
+            let zoom = state.camera.zoom;
+            let dx_step = (TILE_WIDTH / 2.0) * zoom;
+            let dy_step = (TILE_HEIGHT / 2.0) * zoom;
+            for (coord, chunk) in state.chunk_manager.chunks().iter() {
+                if chunk.heights.is_none() {
+                    continue;
+                }
+                let chunk_offset_x = coord.x * CHUNK_SIZE as i32;
+                let chunk_offset_y = coord.y * CHUNK_SIZE as i32;
+                let (base_sx, base_sy) = world_to_screen_exact(
+                    chunk_offset_x as f32,
+                    chunk_offset_y as f32,
+                    &state.camera,
+                );
+                for local_y in 0..CHUNK_SIZE as i32 {
+                    for local_x in 0..CHUNK_SIZE as i32 {
+                        let h = chunk.get_height(local_x as u32, local_y as u32);
+                        if h == 0 {
+                            continue;
+                        }
+                        let wx = (chunk_offset_x + local_x) as f32;
+                        let wy = (chunk_offset_y + local_y) as f32;
+                        if !is_visible_world(wx, wy) {
+                            continue;
+                        }
+                        let screen_x = (base_sx + local_x as f32 * dx_step - local_y as f32 * dx_step).round();
+                        let screen_y = (base_sy + local_x as f32 * dy_step + local_y as f32 * dy_step
+                            - h as f32 * (TILE_HEIGHT / 2.0) * zoom).round();
+
+                        let tile_id = {
+                            let idx = (local_y as u32 * CHUNK_SIZE + local_x as u32) as usize;
+                            let base_id = chunk.layers.iter()
+                                .find(|l| l.layer_type == ChunkLayerType::Ground)
+                                .and_then(|l| l.tiles.get(idx).copied())
+                                .unwrap_or(0);
+                            state.ground_tile_overrides
+                                .get(&(chunk_offset_x + local_x, chunk_offset_y + local_y))
+                                .copied()
+                                .unwrap_or(base_id)
+                        };
+                        if tile_id == 0 {
+                            continue;
+                        }
+                        // Depth: same x+y plane as entities, but use z for proper ordering
+                        let depth = calculate_depth_z(wx, wy, h as f32, 1);
+                        renderables.push((depth, Renderable::ElevatedTile {
+                            screen_x,
+                            screen_y,
+                            tile_id,
+                            height: h,
+                            local_x,
+                            local_y,
+                            chunk_coord: *coord,
+                        }));
+                    }
+                }
+            }
+        }
+
         // Add players
         for player in state.players.values() {
             if !is_visible_world(player.x, player.y) {
                 continue;
             }
             let is_local = state.local_player_id.as_ref() == Some(&player.id);
-            let mut depth = calculate_depth(player.x, player.y, 1);
+            // +0.25 bias ensures the player always renders on top of the elevated
+            // tile they're standing on, even when interpolation makes their fractional
+            // position dip slightly below the tile's integer coordinates.
+            let mut depth = calculate_depth_z(player.x, player.y, player.z, 1) + 0.25;
             // Sitting players render on top of the chair object at the same tile
             if player.animation.state == crate::render::animation::AnimationState::SittingChair {
                 depth += 0.5;
@@ -3453,7 +3610,7 @@ impl Renderer {
             if !is_visible_world(npc.x, npc.y) {
                 continue;
             }
-            let depth = calculate_depth(npc.x, npc.y, 1);
+            let depth = calculate_depth_z(npc.x, npc.y, npc.z, 1) + 0.25;
             renderables.push((depth, Renderable::Npc(npc)));
         }
 
@@ -3706,6 +3863,36 @@ impl Renderer {
                 Renderable::Tile { x, y, tile_id } => {
                     let (screen_x, screen_y) = world_to_screen(x as f32, y as f32, &state.camera);
                     self.draw_isometric_object(screen_x, screen_y, tile_id, state.camera.zoom);
+                }
+                Renderable::ElevatedTile {
+                    screen_x,
+                    screen_y,
+                    tile_id,
+                    height,
+                    local_x,
+                    local_y,
+                    chunk_coord,
+                } => {
+                    let zoom = state.camera.zoom;
+                    // Tint based on height for depth perception
+                    let brightness = 1.0 + height as f32 * 0.06;
+                    let c = (brightness * 255.0).min(255.0) as u8;
+                    let tint = Color::from_rgba(c, c, c, 255);
+                    self.draw_tile_sprite_tinted(
+                        screen_x, screen_y, tile_id, zoom,
+                        Some((
+                            (chunk_coord.x * CHUNK_SIZE as i32 + local_x) as f32,
+                            (chunk_coord.y * CHUNK_SIZE as i32 + local_y) as f32,
+                        )),
+                        false, tint,
+                    );
+                    // Draw block side faces
+                    if let Some(chunk) = state.chunk_manager.chunks().get(&chunk_coord) {
+                        self.draw_block_sides(
+                            chunk, local_x, local_y, height,
+                            screen_x, screen_y, zoom, state, &chunk_coord,
+                        );
+                    }
                 }
                 Renderable::ChunkObject(obj) => {
                     self.render_map_object(obj, &state.camera);
@@ -4174,7 +4361,7 @@ impl Renderer {
                 continue;
             }
 
-            let (screen_x, screen_y) = world_to_screen(player.x, player.y, &state.camera);
+            let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, &state.camera);
             let zoom = state.camera.zoom;
             let font_size = 16.0 * zoom;
             let scaled_sprite_height = SPRITE_HEIGHT * zoom;
@@ -4269,7 +4456,7 @@ impl Renderer {
                 continue;
             }
 
-            let (screen_x, screen_y) = world_to_screen(npc.x, npc.y, &state.camera);
+            let (screen_x, screen_y) = world_to_screen_z(npc.x, npc.y, npc.z, &state.camera);
             let zoom = state.camera.zoom;
 
             // Compute sprite height to find top_y
@@ -4398,7 +4585,7 @@ impl Renderer {
             }
             // Show for local player too (so they see their shop is open)
 
-            let (screen_x, screen_y) = world_to_screen(player.x, player.y, &state.camera);
+            let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, &state.camera);
             let has_sprite = self
                 .get_player_sprite(&player.gender, &player.skin)
                 .is_some();
@@ -4668,7 +4855,7 @@ impl Renderer {
             };
 
             // Get player screen position
-            let (screen_x, screen_y) = world_to_screen(player.x, player.y, &state.camera);
+            let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, &state.camera);
 
             // Fade out in the last 1 second (age 4-5)
             let alpha = if age > 4.0 {
@@ -4837,7 +5024,7 @@ impl Renderer {
             }
 
             // Get NPC screen position
-            let (screen_x, screen_y) = world_to_screen(npc.x, npc.y, &state.camera);
+            let (screen_x, screen_y) = world_to_screen_z(npc.x, npc.y, npc.z, &state.camera);
 
             // Fade out in the last 1 second (age 4-5)
             let alpha = if age > 4.0 {
@@ -5480,6 +5667,15 @@ impl Renderer {
                                 continue;
                             }
 
+                            // Skip elevated ground tiles - they render in the depth-sorted entity pass
+                            // so they can properly occlude entities behind them
+                            if chunk_layer_type == ChunkLayerType::Ground {
+                                let tile_height_z = chunk.get_height(local_x as u32, local_y as u32);
+                                if tile_height_z > 0 {
+                                    continue;
+                                }
+                            }
+
                             let screen_x = (row_sx + local_x as f32 * dx).round();
                             let screen_y = (row_sy + local_x as f32 * dy).round();
 
@@ -5515,6 +5711,24 @@ impl Renderer {
                                 Some((world_x as f32, world_y as f32)),
                                 water_effects,
                             );
+
+                            // Ambient occlusion: darken ground tiles adjacent to elevated tiles
+                            if chunk_layer_type == ChunkLayerType::Ground && chunk.heights.is_some() {
+                                // Check if any neighbor is elevated (cast shadow on this flat tile)
+                                let max_neighbor_h = [
+                                    if local_x > 0 { chunk.get_height((local_x - 1) as u32, local_y as u32) } else { 0 },
+                                    if local_y > 0 { chunk.get_height(local_x as u32, (local_y - 1) as u32) } else { 0 },
+                                    if local_x + 1 < tile_width as i32 { chunk.get_height((local_x + 1) as u32, local_y as u32) } else { 0 },
+                                    if local_y + 1 < tile_height as i32 { chunk.get_height(local_x as u32, (local_y + 1) as u32) } else { 0 },
+                                ].into_iter().max().unwrap_or(0);
+
+                                if max_neighbor_h > 0 {
+                                    // Draw a semi-transparent dark overlay
+                                    let shadow_alpha = (max_neighbor_h as f32 * 25.0).min(80.0) as u8;
+                                    let shadow = Color::from_rgba(0, 0, 0, shadow_alpha);
+                                    self.draw_isometric_tile(screen_x, screen_y, shadow, zoom);
+                                }
+                            }
 
                             // Draw collision indicator in debug mode
                             if state.debug_mode
@@ -5587,6 +5801,72 @@ impl Renderer {
                 }
             }
         }
+    }
+
+    /// Draw block side faces when a tile is elevated above its neighbors.
+    /// In isometric view, we see the south (+X) and east (+Y) faces.
+    fn draw_block_sides(
+        &self,
+        chunk: &crate::game::chunk::Chunk,
+        local_x: i32,
+        local_y: i32,
+        tile_height: u8,
+        screen_x: f32,
+        screen_y: f32,
+        zoom: f32,
+        state: &GameState,
+        coord: &crate::game::ChunkCoord,
+    ) {
+        let hw = TILE_WIDTH / 2.0 * zoom;  // half width
+        let hh = TILE_HEIGHT / 2.0 * zoom; // half height
+
+        // Diamond vertices of this tile (centered at screen_x, screen_y)
+        let top = (screen_x, screen_y - hh);
+        let right = (screen_x + hw, screen_y);
+        let bottom = (screen_x, screen_y + hh);
+        let left = (screen_x - hw, screen_y);
+
+        // Side face colors: earthy brown tones
+        // Right face (south, +X direction) gets more light
+        // Left face (east, +Y direction) is in shadow
+        let front_right = Color::from_rgba(110, 85, 55, 255);  // lit brown (+X face)
+        let front_left = Color::from_rgba(75, 58, 38, 255);    // shadow brown (+Y face)
+
+        // Helper to get neighbor height (handles chunk boundaries)
+        let get_neighbor = |nx: i32, ny: i32| -> u8 {
+            if nx >= 0 && nx < CHUNK_SIZE as i32 && ny >= 0 && ny < CHUNK_SIZE as i32 {
+                chunk.get_height(nx as u32, ny as u32)
+            } else {
+                let world_x = coord.x * CHUNK_SIZE as i32 + nx;
+                let world_y = coord.y * CHUNK_SIZE as i32 + ny;
+                let neighbor_coord = crate::game::ChunkCoord::from_world(world_x, world_y);
+                state.chunk_manager.chunks().get(&neighbor_coord)
+                    .map(|c| {
+                        let (lx, ly) = crate::game::chunk::world_to_local(world_x, world_y);
+                        c.get_height(lx, ly)
+                    })
+                    .unwrap_or(0)
+            }
+        };
+
+        // +X face (south/front-right): right→bottom edge, extends down
+        let nh = get_neighbor(local_x + 1, local_y);
+        if tile_height > nh {
+            let d = (tile_height - nh) as f32 * hh;
+            draw_triangle(vec2(right.0, right.1), vec2(bottom.0, bottom.1), vec2(bottom.0, bottom.1 + d), front_right);
+            draw_triangle(vec2(right.0, right.1), vec2(bottom.0, bottom.1 + d), vec2(right.0, right.1 + d), front_right);
+        }
+
+        // +Y face (east/front-left): left→bottom edge, extends down
+        let nh = get_neighbor(local_x, local_y + 1);
+        if tile_height > nh {
+            let d = (tile_height - nh) as f32 * hh;
+            draw_triangle(vec2(left.0, left.1), vec2(bottom.0, bottom.1), vec2(bottom.0, bottom.1 + d), front_left);
+            draw_triangle(vec2(left.0, left.1), vec2(bottom.0, bottom.1 + d), vec2(left.0, left.1 + d), front_left);
+        }
+
+        // Back faces (-X, -Y) are not drawn — in isometric view the tile surface
+        // occludes them, and depth sorting handles entity occlusion correctly.
     }
 
     fn draw_collision_indicator(&self, screen_x: f32, screen_y: f32, zoom: f32) {
@@ -5853,7 +6133,7 @@ impl Renderer {
         camera: &Camera,
         item_registry: &crate::game::item_registry::ItemRegistry,
     ) {
-        let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
+        let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, camera);
         let zoom = camera.zoom;
 
         // Scaled sprite dimensions
@@ -5863,7 +6143,7 @@ impl Renderer {
         // Dead players are faded
         let alpha = if player.is_dead { 100 } else { 255 };
 
-        // Selection highlight (draw first, behind player)
+        // Selection highlight (draw first, behind player, at ground level)
         if is_selected && !player.is_dead {
             self.render_tile_selection(player.x, player.y, camera);
         }
@@ -7080,7 +7360,7 @@ impl Renderer {
         // --- Phase 2: Draw the composited RT to screen with silhouette tint ---
         set_default_camera();
 
-        let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
+        let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, camera);
         let zoom = camera.zoom;
         let sit_offset_y =
             if player.animation.state == crate::render::animation::AnimationState::SittingChair {
@@ -7111,7 +7391,7 @@ impl Renderer {
     }
 
     fn render_npc(&self, npc: &Npc, is_selected: bool, is_hovered: bool, camera: &Camera) {
-        let (screen_x, screen_y) = world_to_screen(npc.x, npc.y, camera);
+        let (screen_x, screen_y) = world_to_screen_z(npc.x, npc.y, npc.z, camera);
         let zoom = camera.zoom;
 
         // Don't render if death animation is complete
@@ -7394,7 +7674,19 @@ impl Renderer {
             return;
         }
 
-        let (screen_x, screen_y) = world_to_screen(item.x, item.y, camera);
+        // Look up terrain height at item position for Z-aware rendering
+        let item_z = {
+            let ix = item.x.round() as i32;
+            let iy = item.y.round() as i32;
+            let coord = crate::game::ChunkCoord::from_world(ix, iy);
+            state.chunk_manager.chunks().get(&coord)
+                .map(|chunk| {
+                    let (lx, ly) = crate::game::chunk::world_to_local(ix, iy);
+                    chunk.get_height(lx as u32, ly as u32) as f32
+                })
+                .unwrap_or(0.0)
+        };
+        let (screen_x, screen_y) = world_to_screen_z(item.x, item.y, item_z, camera);
         let zoom = camera.zoom;
         let time = macroquad::time::get_time();
         let elapsed = time - item.animation_time;
@@ -7507,7 +7799,7 @@ impl Renderer {
         };
         use crate::game::Direction;
 
-        let (screen_x, screen_y) = world_to_screen(player.x, player.y, camera);
+        let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, camera);
         let zoom = camera.zoom;
         let time = macroquad::time::get_time();
 

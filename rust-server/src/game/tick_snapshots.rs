@@ -34,6 +34,7 @@ fn player_update_from_player(
         name: player.name.clone(),
         x: player.x,
         y: player.y,
+        z: player.z,
         direction: player.direction as u8,
         vel_x: player.move_dx,
         vel_y: player.move_dy,

@@ -69,6 +69,15 @@ impl GameRoom {
                     false
                 }
             };
+            let height_check = |wx: i32, wy: i32| -> i32 {
+                let coord = ChunkCoord::from_world(wx, wy);
+                if let Some(chunk) = chunks_guard.get(&coord) {
+                    let (lx, ly) = world_to_local(wx, wy);
+                    chunk.get_height(lx as u32, ly as u32) as i32
+                } else {
+                    0
+                }
+            };
 
             let mut occupied_tiles = build_overworld_occupied_tiles(
                 npcs.values()
@@ -94,6 +103,7 @@ impl GameRoom {
                     &occupied_tiles,
                     current_time,
                     &walkable_check,
+                    &height_check,
                 ) {
                     npc_attacks.push((
                         npc.id.clone(),

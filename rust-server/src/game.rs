@@ -353,6 +353,11 @@ pub struct Player {
     // Grid position (integer tile coordinates)
     pub x: i32,
     pub y: i32,
+    pub z: i32,
+    /// Whether the player is on the ground (can jump)
+    pub grounded: bool,
+    /// Remaining jump ticks (counts down from 6; rise for first 3, fall after)
+    pub jump_ticks: u32,
     pub spawn_x: i32,
     pub spawn_y: i32,
     // Queued movement direction (-1, 0, or 1)
@@ -537,6 +542,9 @@ impl Player {
             name: name.to_string(),
             x: spawn_x,
             y: spawn_y,
+            z: 0,
+            grounded: true,
+            jump_ticks: 0,
             spawn_x,
             spawn_y,
             move_dx: 0,
@@ -929,6 +937,7 @@ pub struct PlayerUpdate {
     pub name: String,
     pub x: i32,
     pub y: i32,
+    pub z: i32,
     pub direction: u8,
     // Velocity for client-side prediction (-1, 0, or 1)
     pub vel_x: i32,
@@ -3102,34 +3111,21 @@ impl GameRoom {
                     player.clear_move_intent();
                 } else {
                     // Convert to grid movement (-1, 0, or 1)
-                    // No diagonal movement in grid-based system
-                    let move_dx: i32;
-                    let move_dy: i32;
-
-                    if dx.abs() > dy.abs() {
-                        // Horizontal priority
-                        move_dx = if dx > 0.1 {
-                            1
-                        } else if dx < -0.1 {
-                            -1
-                        } else {
-                            0
-                        };
-                        move_dy = 0;
-                    } else if dy.abs() > 0.1 {
-                        // Vertical priority
-                        move_dx = 0;
-                        move_dy = if dy > 0.1 {
-                            1
-                        } else if dy < -0.1 {
-                            -1
-                        } else {
-                            0
-                        };
+                    // Supports diagonal movement (both axes non-zero)
+                    let move_dx = if dx > 0.1 {
+                        1
+                    } else if dx < -0.1 {
+                        -1
                     } else {
-                        move_dx = 0;
-                        move_dy = 0;
-                    }
+                        0
+                    };
+                    let move_dy = if dy > 0.1 {
+                        1
+                    } else if dy < -0.1 {
+                        -1
+                    } else {
+                        0
+                    };
 
                     // Queue movement intent only. Facing updates when a move is
                     // actually applied in the tick loop.
@@ -3353,6 +3349,17 @@ impl GameRoom {
                 player.last_move_tick = current_tick;
                 player.is_dashing = true;
                 player.reject_pending_move();
+            }
+        }
+    }
+
+    /// Handle jump command - initiate a jump if the player is grounded
+    pub async fn handle_jump(&self, player_id: &str) {
+        let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            if player.grounded && !player.is_dead && player.active {
+                player.grounded = false;
+                player.jump_ticks = 6; // 6 ticks = 300ms airtime at 20Hz
             }
         }
     }
@@ -6504,6 +6511,8 @@ impl GameRoom {
                     })
                     .collect(),
                 portals,
+                heightmap: chunk.height_data.as_ref().map(|h| h.heights.clone()),
+                block_types: chunk.height_data.as_ref().map(|h| h.block_types.clone()),
             })
         } else {
             Some(ServerMessage::ChunkNotFound { chunk_x, chunk_y })

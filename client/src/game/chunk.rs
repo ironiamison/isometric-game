@@ -142,6 +142,10 @@ pub struct Chunk {
     pub walls: Vec<Wall>,
     /// Portals that teleport players to other maps
     pub portals: Vec<Portal>,
+    /// Optional heightmap data (CHUNK_SIZE^2 u8 values, None = flat z=0)
+    pub heights: Option<Vec<u8>>,
+    /// Optional block type data (CHUNK_SIZE^2 u8 values)
+    pub block_types: Option<Vec<u8>>,
 }
 
 impl Chunk {
@@ -157,6 +161,8 @@ impl Chunk {
             objects: Vec::new(),
             walls: Vec::new(),
             portals: Vec::new(),
+            heights: None,
+            block_types: None,
         }
     }
 
@@ -177,6 +183,26 @@ impl Chunk {
         }
         let idx = (local_y * CHUNK_SIZE + local_x) as usize;
         !self.collision.get(idx).copied().unwrap_or(true)
+    }
+
+    /// Get height at a local tile position (returns 0 if no heightmap)
+    pub fn get_height(&self, local_x: u32, local_y: u32) -> u8 {
+        if let Some(ref heights) = self.heights {
+            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            heights.get(index).copied().unwrap_or(0)
+        } else {
+            0
+        }
+    }
+
+    /// Get block type at a local tile position (returns 0 if no block type data)
+    pub fn get_block_type(&self, local_x: u32, local_y: u32) -> u8 {
+        if let Some(ref block_types) = self.block_types {
+            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            block_types.get(index).copied().unwrap_or(0)
+        } else {
+            0
+        }
     }
 
     /// Unpack collision data from server bytes
@@ -306,6 +332,8 @@ impl ChunkManager {
         objects: Vec<MapObject>,
         walls: Vec<Wall>,
         portals: Vec<Portal>,
+        heights: Option<Vec<u8>>,
+        block_types: Option<Vec<u8>>,
     ) {
         // Don't load world chunks when in interior mode
         if self.interior_size.is_some() {
@@ -342,6 +370,10 @@ impl ChunkManager {
 
         // Load portals
         chunk.portals = portals;
+
+        // Load optional height data
+        chunk.heights = heights;
+        chunk.block_types = block_types;
 
         // Remove from pending
         self.pending_requests.remove(&coord);
@@ -539,6 +571,8 @@ impl ChunkManager {
             objects,
             walls,
             portals,
+            heights: None,
+            block_types: None,
         };
 
         self.chunks.insert(coord, chunk);

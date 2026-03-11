@@ -1422,6 +1422,7 @@ pub enum InputCommand {
         direction: u8,
     },
     Attack,
+    Jump,
     Target {
         entity_id: String,
     },
@@ -1691,25 +1692,77 @@ pub enum InputCommand {
     },
 }
 
-/// Cardinal directions for isometric movement (no diagonals)
+/// Movement directions for isometric movement (cardinal + diagonal)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum CardinalDir {
+enum MoveDir {
     None,
     Up,
     Down,
     Left,
     Right,
+    UpLeft,
+    UpRight,
+    DownLeft,
+    DownRight,
 }
 
-impl CardinalDir {
+impl MoveDir {
     /// Convert to server direction enum value (matches Direction enum)
     fn to_direction_u8(self) -> u8 {
         match self {
-            CardinalDir::Down => 0,
-            CardinalDir::Left => 1,
-            CardinalDir::Up => 2,
-            CardinalDir::Right => 3,
-            CardinalDir::None => 0, // Default to down
+            MoveDir::Down => 0,
+            MoveDir::Left => 1,
+            MoveDir::Up => 2,
+            MoveDir::Right => 3,
+            MoveDir::DownLeft => 4,
+            MoveDir::DownRight => 5,
+            MoveDir::UpLeft => 6,
+            MoveDir::UpRight => 7,
+            MoveDir::None => 0, // Default to down
+        }
+    }
+
+    /// Build from separate axis states
+    fn from_axes(up: bool, down: bool, left: bool, right: bool) -> Self {
+        let vert = if up && !down {
+            Some(true) // up
+        } else if down && !up {
+            Some(false) // down
+        } else {
+            None
+        };
+        let horiz = if left && !right {
+            Some(true) // left
+        } else if right && !left {
+            Some(false) // right
+        } else {
+            None
+        };
+        match (vert, horiz) {
+            (Some(true), Some(true)) => MoveDir::UpLeft,
+            (Some(true), Some(false)) => MoveDir::UpRight,
+            (Some(false), Some(true)) => MoveDir::DownLeft,
+            (Some(false), Some(false)) => MoveDir::DownRight,
+            (Some(true), None) => MoveDir::Up,
+            (Some(false), None) => MoveDir::Down,
+            (None, Some(true)) => MoveDir::Left,
+            (None, Some(false)) => MoveDir::Right,
+            (None, None) => MoveDir::None,
+        }
+    }
+
+    /// Convert to velocity vector
+    fn to_velocity(self) -> (f32, f32) {
+        match self {
+            MoveDir::Up => (0.0, -1.0),
+            MoveDir::Down => (0.0, 1.0),
+            MoveDir::Left => (-1.0, 0.0),
+            MoveDir::Right => (1.0, 0.0),
+            MoveDir::UpLeft => (-1.0, -1.0),
+            MoveDir::UpRight => (1.0, -1.0),
+            MoveDir::DownLeft => (-1.0, 1.0),
+            MoveDir::DownRight => (1.0, 1.0),
+            MoveDir::None => (0.0, 0.0),
         }
     }
 }
@@ -1893,9 +1946,9 @@ pub struct InputHandler {
     last_dx: f32,
     last_dy: f32,
     // Track which direction was pressed first (for priority)
-    current_dir: CardinalDir,
+    current_dir: MoveDir,
     // Track previous direction for detecting key release
-    prev_dir: CardinalDir,
+    prev_dir: MoveDir,
     // Periodic movement-intent resend interval
     last_send_time: f64,
     send_interval: f64,
@@ -1917,8 +1970,8 @@ impl InputHandler {
         Self {
             last_dx: 0.0,
             last_dy: 0.0,
-            current_dir: CardinalDir::None,
-            prev_dir: CardinalDir::None,
+            current_dir: MoveDir::None,
+            prev_dir: MoveDir::None,
             last_send_time: 0.0,
             send_interval: 0.05, // 50ms keeps facing/move intent responsive
             last_attack_time: 0.0,
@@ -8377,46 +8430,20 @@ impl InputHandler {
             self.reset_auto_path_motion_state();
         }
 
-        // Determine new direction from keyboard - only one direction at a time
-        // Newly pressed keys override current direction (last-key-wins),
-        // then keep current direction if still held, then fall back to any held key
-        let keyboard_dir = if up_just {
-            CardinalDir::Up
-        } else if down_just {
-            CardinalDir::Down
-        } else if left_just {
-            CardinalDir::Left
-        } else if right_just {
-            CardinalDir::Right
-        } else {
-            match self.current_dir {
-                CardinalDir::Up if up => CardinalDir::Up,
-                CardinalDir::Down if down => CardinalDir::Down,
-                CardinalDir::Left if left => CardinalDir::Left,
-                CardinalDir::Right if right => CardinalDir::Right,
-                _ => {
-                    if up {
-                        CardinalDir::Up
-                    } else if down {
-                        CardinalDir::Down
-                    } else if left {
-                        CardinalDir::Left
-                    } else if right {
-                        CardinalDir::Right
-                    } else {
-                        CardinalDir::None
-                    }
-                }
-            }
-        };
+        // Determine new direction from keyboard - supports diagonals when two keys held
+        let keyboard_dir = MoveDir::from_axes(up, down, left, right);
 
         // Combine keyboard and D-pad: D-pad takes priority if active
         let new_dir = if has_dpad_input {
             match dpad_dir {
-                DPadDirection::Up => CardinalDir::Up,
-                DPadDirection::Down => CardinalDir::Down,
-                DPadDirection::Left => CardinalDir::Left,
-                DPadDirection::Right => CardinalDir::Right,
+                DPadDirection::Up => MoveDir::Up,
+                DPadDirection::Down => MoveDir::Down,
+                DPadDirection::Left => MoveDir::Left,
+                DPadDirection::Right => MoveDir::Right,
+                DPadDirection::UpLeft => MoveDir::UpLeft,
+                DPadDirection::UpRight => MoveDir::UpRight,
+                DPadDirection::DownLeft => MoveDir::DownLeft,
+                DPadDirection::DownRight => MoveDir::DownRight,
                 DPadDirection::None => keyboard_dir,
             }
         } else {
@@ -8428,11 +8455,11 @@ impl InputHandler {
 
         // Handle keyboard direction key press/release for face vs move
         if dir_changed && !has_dpad_input {
-            if keyboard_dir != CardinalDir::None && self.prev_dir == CardinalDir::None {
+            if keyboard_dir != MoveDir::None && self.prev_dir == MoveDir::None {
                 // New direction pressed - record time
                 self.dir_press_time = current_time;
                 self.move_sent = false;
-            } else if keyboard_dir == CardinalDir::None && self.prev_dir != CardinalDir::None {
+            } else if keyboard_dir == MoveDir::None && self.prev_dir != MoveDir::None {
                 // Direction released
                 if self.move_sent {
                     // Was moving, now stopped - send stop command
@@ -8458,7 +8485,7 @@ impl InputHandler {
                         self.last_send_time = current_time;
                     }
                 }
-            } else if keyboard_dir != CardinalDir::None && self.prev_dir != CardinalDir::None {
+            } else if keyboard_dir != MoveDir::None && self.prev_dir != MoveDir::None {
                 // Direction changed while holding
                 if self.move_sent {
                     // Already moving - continue moving in new direction immediately (no threshold wait)
@@ -8511,21 +8538,12 @@ impl InputHandler {
         self.current_dir = keyboard_dir;
 
         // Convert direction to velocity
-        let (dx, dy): (f32, f32) = match new_dir {
-            CardinalDir::Up => (0.0, -1.0),
-            CardinalDir::Down => (0.0, 1.0),
-            CardinalDir::Left => (-1.0, 0.0),
-            CardinalDir::Right => (1.0, 0.0),
-            CardinalDir::None => (0.0, 0.0),
-        };
+        let (dx, dy): (f32, f32) = new_dir.to_velocity();
 
         // Only send Move commands if held past the threshold
         // Don't move while attacking - check both attack key/touch button and animation state
-        let attack_key_down = if classic {
-            is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl)
-        } else {
-            is_key_down(KeyCode::Space)
-        };
+        let attack_key_down =
+            is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
         let is_attacking = attack_key_down
             || self.touch_controls.attack_pressed()
             || state.get_local_player().map_or(false, |p| {
@@ -8538,7 +8556,7 @@ impl InputHandler {
             });
 
         // Check if we have any movement input (keyboard or D-pad)
-        let has_movement_input = new_dir != CardinalDir::None;
+        let has_movement_input = new_dir != MoveDir::None;
 
         // Movement while sitting is handled server-side (direction-validated auto-stand)
         // Just let the move command go through - server will stand up if direction matches
@@ -8630,7 +8648,7 @@ impl InputHandler {
         }
 
         // Handle keyboard release when D-pad not active - send stop command
-        if !has_dpad_input && keyboard_dir == CardinalDir::None && self.move_sent {
+        if !has_dpad_input && keyboard_dir == MoveDir::None && self.move_sent {
             // Already handled above in dir_changed block
         }
 
@@ -9204,7 +9222,12 @@ impl InputHandler {
             }
         }
 
-        // Attack (Space key or touch attack button) - holding continues attacking with cooldown
+        // Jump (Space key) - send jump command on press
+        if is_key_pressed(KeyCode::Space) && !state.is_sitting {
+            commands.push(InputCommand::Jump);
+        }
+
+        // Attack (Ctrl key or touch attack button) - holding continues attacking with cooldown
         // If fishing rod equipped and on/near a fishing tile, start gathering instead
         // Also stop movement when attacking (player must stand still)
         let attack_input = attack_key_down || self.touch_controls.attack_pressed();

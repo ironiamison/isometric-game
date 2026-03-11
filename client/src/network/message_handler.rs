@@ -358,6 +358,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             // Server sends i32 grid positions
             let x = extract_i32(player_value, "x");
             let y = extract_i32(player_value, "y");
+            let z = extract_i32(player_value, "z").unwrap_or(0);
             let direction = extract_i32(player_value, "direction");
             let hp = extract_i32(player_value, "hp");
             let max_hp = extract_i32(player_value, "maxHp");
@@ -439,6 +440,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                     player.set_server_state(
                         x as f32,
                         y as f32,
+                        z,
                         vel_x,
                         vel_y,
                         dir,
@@ -740,6 +742,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             // Server sends i32 grid positions
             let x = extract_i32(npc_value, "x").unwrap_or(0) as f32;
             let y = extract_i32(npc_value, "y").unwrap_or(0) as f32;
+            let npc_z = extract_i32(npc_value, "z").unwrap_or(0) as f32;
             let direction = extract_u8(npc_value, "direction").unwrap_or(0);
             let hp = extract_i32(npc_value, "hp").unwrap_or(50);
             let max_hp = extract_i32(npc_value, "max_hp").unwrap_or(50);
@@ -761,6 +764,8 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             if let Some(npc) = state.npcs.get_mut(&id) {
                 // Update existing NPC - interpolate toward new grid position
                 npc.set_server_position(x, y);
+                npc.server_z = npc_z;
+                npc.target_z = npc_z;
                 npc.direction = Direction::from_u8(direction);
                 // Update last_damage_time if HP decreased (ensures HP bar shows)
                 if hp < npc.hp {
@@ -1583,11 +1588,24 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
+                // Parse optional heightmap data
+                let heightmap: Option<Vec<u8>> = extract_array(value, "heightmap").map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_i64().map(|i| i as u8))
+                        .collect()
+                });
+                let block_types: Option<Vec<u8>> = extract_array(value, "blockTypes").map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_i64().map(|i| i as u8))
+                        .collect()
+                });
+
                 log::debug!("Received chunk data: ({}, {}) with {} layers, {} collision bytes, {} objects, {} walls, {} portals",
                     chunk_x, chunk_y, layers.len(), collision.len(), objects.len(), walls.len(), portals.len());
 
                 state.chunk_manager.load_chunk(
                     chunk_x, chunk_y, layers, &collision, objects, walls, portals,
+                    heightmap, block_types,
                 );
             }
         }

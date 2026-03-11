@@ -4474,6 +4474,9 @@ async fn handle_client_message(
         ClientMessage::Dash => {
             room.handle_dash(player_id).await;
         }
+        ClientMessage::Jump => {
+            room.handle_jump(player_id).await;
+        }
         ClientMessage::Face { direction } => {
             room.handle_face(player_id, direction).await;
         }
