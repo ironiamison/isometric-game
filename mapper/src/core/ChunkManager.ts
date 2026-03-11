@@ -250,6 +250,12 @@ export class ChunkManager {
       heights: (data.heights || (data as any).heightmap) && ((data.heights || (data as any).heightmap).length > 0)
         ? new Uint8Array(data.heights || (data as any).heightmap)
         : undefined,
+      blockTypesDown: data.blockTypesDown && data.blockTypesDown.length > 0
+        ? new Uint16Array(data.blockTypesDown)
+        : undefined,
+      blockTypesRight: data.blockTypesRight && data.blockTypesRight.length > 0
+        ? new Uint16Array(data.blockTypesRight)
+        : undefined,
       dirty: false,
     };
 
@@ -429,6 +435,8 @@ export class ChunkManager {
       },
       collision: collisionBitset.toBase64(),
       ...(chunk.heights ? { heightmap: Array.from(chunk.heights) } : {}),
+      ...(chunk.blockTypesDown ? { blockTypesDown: Array.from(chunk.blockTypesDown) } : {}),
+      ...(chunk.blockTypesRight ? { blockTypesRight: Array.from(chunk.blockTypesRight) } : {}),
       entities,
       mapObjects,
       walls,

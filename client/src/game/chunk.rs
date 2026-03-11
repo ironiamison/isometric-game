@@ -144,8 +144,10 @@ pub struct Chunk {
     pub portals: Vec<Portal>,
     /// Optional heightmap data (CHUNK_SIZE^2 u8 values, None = flat z=0)
     pub heights: Option<Vec<u8>>,
-    /// Optional block type data (CHUNK_SIZE^2 u8 values)
-    pub block_types: Option<Vec<u8>>,
+    /// Optional block type data for down (+Y) side face (CHUNK_SIZE^2 u16 values)
+    pub block_types_down: Option<Vec<u16>>,
+    /// Optional block type data for right (+X) side face (CHUNK_SIZE^2 u16 values)
+    pub block_types_right: Option<Vec<u16>>,
 }
 
 impl Chunk {
@@ -162,7 +164,8 @@ impl Chunk {
             walls: Vec::new(),
             portals: Vec::new(),
             heights: None,
-            block_types: None,
+            block_types_down: None,
+            block_types_right: None,
         }
     }
 
@@ -195,11 +198,21 @@ impl Chunk {
         }
     }
 
-    /// Get block type at a local tile position (returns 0 if no block type data)
-    pub fn get_block_type(&self, local_x: u32, local_y: u32) -> u8 {
-        if let Some(ref block_types) = self.block_types {
+    /// Get block type for down (+Y) face at a local tile position (returns 0 if no data)
+    pub fn get_block_type_down(&self, local_x: u32, local_y: u32) -> u16 {
+        if let Some(ref bt) = self.block_types_down {
             let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
-            block_types.get(index).copied().unwrap_or(0)
+            bt.get(index).copied().unwrap_or(0)
+        } else {
+            0
+        }
+    }
+
+    /// Get block type for right (+X) face at a local tile position (returns 0 if no data)
+    pub fn get_block_type_right(&self, local_x: u32, local_y: u32) -> u16 {
+        if let Some(ref bt) = self.block_types_right {
+            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            bt.get(index).copied().unwrap_or(0)
         } else {
             0
         }
@@ -333,7 +346,8 @@ impl ChunkManager {
         walls: Vec<Wall>,
         portals: Vec<Portal>,
         heights: Option<Vec<u8>>,
-        block_types: Option<Vec<u8>>,
+        block_types_down: Option<Vec<u16>>,
+        block_types_right: Option<Vec<u16>>,
     ) {
         // Don't load world chunks when in interior mode
         if self.interior_size.is_some() {
@@ -373,7 +387,8 @@ impl ChunkManager {
 
         // Load optional height data
         chunk.heights = heights;
-        chunk.block_types = block_types;
+        chunk.block_types_down = block_types_down;
+        chunk.block_types_right = block_types_right;
 
         // Remove from pending
         self.pending_requests.remove(&coord);
@@ -628,7 +643,8 @@ impl ChunkManager {
             walls,
             portals,
             heights: None,
-            block_types: None,
+            block_types_down: None,
+            block_types_right: None,
         };
 
         self.chunks.insert(coord, chunk);

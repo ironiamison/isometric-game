@@ -222,14 +222,20 @@ impl World {
                 .map(|v| v.as_u64().unwrap_or(0) as u8)
                 .collect();
             if heights.len() == (CHUNK_SIZE * CHUNK_SIZE) as usize {
-                let block_types = if let Some(bt) = value["blockTypes"].as_array() {
-                    bt.iter().map(|v| v.as_u64().unwrap_or(0) as u8).collect()
+                let block_types_down = if let Some(bt) = value["blockTypesDown"].as_array() {
+                    bt.iter().map(|v| v.as_u64().unwrap_or(0) as u16).collect()
                 } else {
-                    vec![0u8; (CHUNK_SIZE * CHUNK_SIZE) as usize]
+                    vec![0u16; (CHUNK_SIZE * CHUNK_SIZE) as usize]
+                };
+                let block_types_right = if let Some(bt) = value["blockTypesRight"].as_array() {
+                    bt.iter().map(|v| v.as_u64().unwrap_or(0) as u16).collect()
+                } else {
+                    vec![0u16; (CHUNK_SIZE * CHUNK_SIZE) as usize]
                 };
                 chunk.height_data = Some(crate::chunk::HeightData {
                     heights,
-                    block_types,
+                    block_types_down,
+                    block_types_right,
                 });
             }
         }

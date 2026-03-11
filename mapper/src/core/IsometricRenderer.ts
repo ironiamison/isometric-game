@@ -82,6 +82,8 @@ interface ChunkCacheEntry {
   objectsRef: number[];
   overheadRef: number[];
   heightsRef: Uint8Array | undefined;
+  blockTypesDownRef: Uint16Array | undefined;
+  blockTypesRightRef: Uint16Array | undefined;
   visibleGround: boolean;
   visibleObjects: boolean;
   visibleOverhead: boolean;
@@ -106,6 +108,8 @@ class ChunkTileCache {
       entry.objectsRef === chunk.layers.objects &&
       entry.overheadRef === chunk.layers.overhead &&
       entry.heightsRef === chunk.heights &&
+      entry.blockTypesDownRef === chunk.blockTypesDown &&
+      entry.blockTypesRightRef === chunk.blockTypesRight &&
       entry.visibleGround === visibleLayers.ground &&
       entry.visibleObjects === visibleLayers.objects &&
       entry.visibleOverhead === visibleLayers.overhead;
@@ -129,6 +133,8 @@ class ChunkTileCache {
         objectsRef: chunk.layers.objects,
         overheadRef: chunk.layers.overhead,
         heightsRef: chunk.heights,
+        blockTypesDownRef: chunk.blockTypesDown,
+        blockTypesRightRef: chunk.blockTypesRight,
         visibleGround: visibleLayers.ground,
         visibleObjects: visibleLayers.objects,
         visibleOverhead: visibleLayers.overhead,
@@ -144,6 +150,8 @@ class ChunkTileCache {
     entry.objectsRef = chunk.layers.objects;
     entry.overheadRef = chunk.layers.overhead;
     entry.heightsRef = chunk.heights;
+    entry.blockTypesDownRef = chunk.blockTypesDown;
+    entry.blockTypesRightRef = chunk.blockTypesRight;
     entry.visibleGround = visibleLayers.ground;
     entry.visibleObjects = visibleLayers.objects;
     entry.visibleOverhead = visibleLayers.overhead;
@@ -207,6 +215,8 @@ class ChunkTileCache {
     const halfTileW = TILE_WIDTH / 2;
     const halfTileH = TILE_HEIGHT / 2;
     const heights = chunk.heights;
+    const blockTypesDown = chunk.blockTypesDown;
+    const blockTypesRight = chunk.blockTypesRight;
 
     for (let y = 0; y < CHUNK_SIZE; y++) {
       for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -227,11 +237,6 @@ class ChunkTileCache {
           const neighborDown = (y + 1 < CHUNK_SIZE && heights)
             ? heights[(y + 1) * CHUNK_SIZE + x] : 0;
 
-          // Diamond corners of the elevated tile:
-          //   top:    (drawX + halfTileW, drawY)
-          //   right:  (drawX + TILE_WIDTH, drawY + halfTileH)
-          //   bottom: (drawX + halfTileW, drawY + TILE_HEIGHT)
-          //   left:   (drawX, drawY + halfTileH)
           const bottomX = drawX + halfTileW;
           const bottomY = drawY + TILE_HEIGHT;
           const rightX = drawX + TILE_WIDTH;
@@ -239,32 +244,97 @@ class ChunkTileCache {
           const leftX = drawX;
           const leftY = drawY + halfTileH;
 
-          // Right face (+X direction, south-east) - lighter brown
+          // Look up wall sprites for each face independently
+          const btDown = blockTypesDown ? blockTypesDown[index] : 0;
+          const btRight = blockTypesRight ? blockTypesRight[index] : 0;
+          const wallsFirstGid = objectLoader.getWallsFirstGid();
+          const rightWallDef = btRight > 0 ? objectLoader.getWallByGid(wallsFirstGid + btRight) : undefined;
+          const downWallDef = btDown > 0 ? objectLoader.getWallByGid(wallsFirstGid + btDown) : undefined;
+
+          // Right face (+X direction, south-east)
           const rightDiff = h - neighborRight;
           if (rightDiff > 0) {
-            const faceH = rightDiff * halfTileH;
-            ctx.fillStyle = "rgb(110, 85, 55)";
-            ctx.beginPath();
-            ctx.moveTo(bottomX, bottomY);
-            ctx.lineTo(rightX, rightY);
-            ctx.lineTo(rightX, rightY + faceH);
-            ctx.lineTo(bottomX, bottomY + faceH);
-            ctx.closePath();
-            ctx.fill();
+            if (rightWallDef?.image) {
+              const ar = rightWallDef.atlasRect;
+              const spriteW = ar ? ar.w : rightWallDef.image.width;
+              const spriteH = ar ? ar.h : rightWallDef.image.height;
+              const srcX = ar ? ar.x : 0;
+              const srcY = ar ? ar.y : 0;
+              const faceH = rightDiff * halfTileH;
+              // Clip to the face parallelogram
+              ctx.save();
+              ctx.beginPath();
+              ctx.moveTo(bottomX, bottomY);
+              ctx.lineTo(rightX, rightY);
+              ctx.lineTo(rightX, rightY + faceH);
+              ctx.lineTo(bottomX, bottomY + faceH);
+              ctx.closePath();
+              ctx.clip();
+              // Tile sprites from bottom up, overlapping by halfTileH for seamless parallelogram tiling
+              const effectiveH = Math.max(spriteH - halfTileH, 1);
+              const count = Math.ceil(faceH / effectiveH) + 1;
+              for (let i = 0; i < count; i++) {
+                ctx.drawImage(
+                  rightWallDef.image,
+                  srcX, srcY, spriteW, spriteH,
+                  bottomX, bottomY + faceH - spriteH - i * effectiveH, spriteW, spriteH,
+                );
+              }
+              ctx.restore();
+            } else {
+              const faceH = rightDiff * halfTileH;
+              ctx.fillStyle = "rgb(110, 85, 55)";
+              ctx.beginPath();
+              ctx.moveTo(bottomX, bottomY);
+              ctx.lineTo(rightX, rightY);
+              ctx.lineTo(rightX, rightY + faceH);
+              ctx.lineTo(bottomX, bottomY + faceH);
+              ctx.closePath();
+              ctx.fill();
+            }
           }
 
-          // Left face (+Y direction, south-west) - darker brown
+          // Left face (+Y direction, south-west)
           const downDiff = h - neighborDown;
           if (downDiff > 0) {
-            const faceH = downDiff * halfTileH;
-            ctx.fillStyle = "rgb(75, 58, 38)";
-            ctx.beginPath();
-            ctx.moveTo(bottomX, bottomY);
-            ctx.lineTo(leftX, leftY);
-            ctx.lineTo(leftX, leftY + faceH);
-            ctx.lineTo(bottomX, bottomY + faceH);
-            ctx.closePath();
-            ctx.fill();
+            if (downWallDef?.image) {
+              const ar = downWallDef.atlasRect;
+              const spriteW = ar ? ar.w : downWallDef.image.width;
+              const spriteH = ar ? ar.h : downWallDef.image.height;
+              const srcX = ar ? ar.x : 0;
+              const srcY = ar ? ar.y : 0;
+              const faceH = downDiff * halfTileH;
+              // Clip to the face parallelogram
+              ctx.save();
+              ctx.beginPath();
+              ctx.moveTo(bottomX, bottomY);
+              ctx.lineTo(leftX, leftY);
+              ctx.lineTo(leftX, leftY + faceH);
+              ctx.lineTo(bottomX, bottomY + faceH);
+              ctx.closePath();
+              ctx.clip();
+              // Tile sprites from bottom up, overlapping by halfTileH for seamless parallelogram tiling
+              const effectiveH = Math.max(spriteH - halfTileH, 1);
+              const count = Math.ceil(faceH / effectiveH) + 1;
+              for (let i = 0; i < count; i++) {
+                ctx.drawImage(
+                  downWallDef.image,
+                  srcX, srcY, spriteW, spriteH,
+                  bottomX - spriteW, bottomY + faceH - spriteH - i * effectiveH, spriteW, spriteH,
+                );
+              }
+              ctx.restore();
+            } else {
+              const faceH = downDiff * halfTileH;
+              ctx.fillStyle = "rgb(75, 58, 38)";
+              ctx.beginPath();
+              ctx.moveTo(bottomX, bottomY);
+              ctx.lineTo(leftX, leftY);
+              ctx.lineTo(leftX, leftY + faceH);
+              ctx.lineTo(bottomX, bottomY + faceH);
+              ctx.closePath();
+              ctx.fill();
+            }
           }
         }
 

@@ -92,6 +92,8 @@ interface EditorState {
   selectedTileId: number;
   selectedEntityId: string | null; // Entity type ID from palette (for placing new entities)
   selectedObjectId: number | null; // File ID of selected object for placement
+  selectedBlockTypeDown: number; // Wall sprite ID for down (+Y) side face (0 = plain)
+  selectedBlockTypeRight: number; // Wall sprite ID for right (+X) side face (0 = plain)
 
   // Selection state (for placed items on map)
   selectedEntitySpawn: { chunkCoord: ChunkCoord; spawnId: string } | null;
@@ -165,6 +167,8 @@ interface EditorActions {
   setSelectedTileId: (id: number) => void;
   setSelectedEntityId: (id: string | null) => void;
   setSelectedObjectId: (id: number | null) => void;
+  setSelectedBlockTypeDown: (blockType: number) => void;
+  setSelectedBlockTypeRight: (blockType: number) => void;
 
   // Selection actions (for placed items)
   setSelectedEntitySpawn: (selection: { chunkCoord: ChunkCoord; spawnId: string } | null) => void;
@@ -183,6 +187,7 @@ interface EditorActions {
   toggleCollision: (world: WorldCoord) => void;
   fillTiles: (start: WorldCoord, layer: Layer, tileId: number) => void;
   adjustHeight: (world: WorldCoord, delta: number) => void;
+  setBlockType: (world: WorldCoord, blockTypeDown: number, blockTypeRight: number) => void;
 
   // Magic wand selection
   magicWandSelect: (world: WorldCoord, layer: Layer) => void;
@@ -352,6 +357,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   selectedTileId: 1,
   selectedEntityId: null,
   selectedObjectId: null,
+  selectedBlockTypeDown: 0,
+  selectedBlockTypeRight: 0,
 
   selectedEntitySpawn: null,
   selectedMapObject: null,
@@ -460,6 +467,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   setSelectedTileId: (id) => set({ selectedTileId: id }),
   setSelectedEntityId: (id) => set({ selectedEntityId: id }),
   setSelectedObjectId: (id) => set({ selectedObjectId: id }),
+  setSelectedBlockTypeDown: (blockType) => set({ selectedBlockTypeDown: blockType }),
+  setSelectedBlockTypeRight: (blockType) => set({ selectedBlockTypeRight: blockType }),
 
   // Selection actions (for placed items)
   setSelectedEntitySpawn: (selection) => set({ selectedEntitySpawn: selection }),
@@ -649,6 +658,46 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       return {
         ...c,
         heights: allZero ? undefined : heights,
+        dirty: true,
+      };
+    });
+  },
+
+  setBlockType: (world, blockTypeDown, blockTypeRight) => {
+    const chunkCoord = worldToChunk(world);
+    const chunk = get().getOrCreateChunk(chunkCoord);
+    const local = worldToLocal(world);
+    const index = localToIndex(local);
+
+    const currentDown = chunk.blockTypesDown ? chunk.blockTypesDown[index] : 0;
+    const currentRight = chunk.blockTypesRight ? chunk.blockTypesRight[index] : 0;
+    if (currentDown === blockTypeDown && currentRight === blockTypeRight) return;
+
+    const oldDown = currentDown;
+    const oldRight = currentRight;
+    history.push({
+      type: 'setBlockType',
+      description: `Set block type at ${world.wx},${world.wy} to D:${blockTypeDown} R:${blockTypeRight}`,
+      undo: () => get().setBlockType(world, oldDown, oldRight),
+      redo: () => get().setBlockType(world, blockTypeDown, blockTypeRight),
+    });
+
+    get().updateChunk(chunkCoord, (c) => {
+      const btDown = c.blockTypesDown
+        ? new Uint16Array(c.blockTypesDown)
+        : new Uint16Array(c.width * c.height);
+      const btRight = c.blockTypesRight
+        ? new Uint16Array(c.blockTypesRight)
+        : new Uint16Array(c.width * c.height);
+      btDown[index] = blockTypeDown;
+      btRight[index] = blockTypeRight;
+
+      const allDownZero = btDown.every((t) => t === 0);
+      const allRightZero = btRight.every((t) => t === 0);
+      return {
+        ...c,
+        blockTypesDown: allDownZero ? undefined : btDown,
+        blockTypesRight: allRightZero ? undefined : btRight,
         dirty: true,
       };
     });

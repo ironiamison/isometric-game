@@ -3420,6 +3420,8 @@ impl Renderer {
                 screen_x: f32,
                 screen_y: f32,
                 height: u8,
+                block_type_down: u16,
+                block_type_right: u16,
                 local_x: i32,
                 local_y: i32,
                 chunk_coord: crate::game::ChunkCoord,
@@ -3586,16 +3588,18 @@ impl Renderer {
                             local_y,
                             chunk_coord: *coord,
                         }));
-                        // Block sides need Z for correct sorting against adjacent
-                        // elevated tiles on the same platform, but cap it so tall
-                        // blocks (h>=3) don't occlude ground-level entities at
-                        // adjacent tiles (which have depth base+1+0.25).
-                        let capped_h = (h as f32).min(2.5);
-                        let side_depth = calculate_depth_z(wx, wy, capped_h, 1) - 0.01;
+                        // Block sides extend downward from the tile surface, so they
+                        // should sort at ground level — behind neighboring tiles that
+                        // are in front in isometric view (higher x+y).
+                        let bt_down = chunk.get_block_type_down(local_x as u32, local_y as u32);
+                        let bt_right = chunk.get_block_type_right(local_x as u32, local_y as u32);
+                        let side_depth = calculate_depth(wx, wy, 1) - 0.01;
                         renderables.push((side_depth, Renderable::BlockSide {
                             screen_x,
                             screen_y,
                             height: h,
+                            block_type_down: bt_down,
+                            block_type_right: bt_right,
                             local_x,
                             local_y,
                             chunk_coord: *coord,
@@ -3984,6 +3988,8 @@ impl Renderer {
                     screen_x,
                     screen_y,
                     height,
+                    block_type_down,
+                    block_type_right,
                     local_x,
                     local_y,
                     chunk_coord,
@@ -3991,7 +3997,7 @@ impl Renderer {
                     let zoom = state.camera.zoom;
                     if let Some(chunk) = state.chunk_manager.chunks().get(&chunk_coord) {
                         self.draw_block_sides(
-                            chunk, local_x, local_y, height,
+                            chunk, local_x, local_y, height, block_type_down, block_type_right,
                             screen_x, screen_y, zoom, state, &chunk_coord,
                         );
                     }
@@ -5921,6 +5927,8 @@ impl Renderer {
         local_x: i32,
         local_y: i32,
         tile_height: u8,
+        block_type_down: u16,
+        block_type_right: u16,
         screen_x: f32,
         screen_y: f32,
         zoom: f32,
@@ -5931,16 +5939,9 @@ impl Renderer {
         let hh = TILE_HEIGHT / 2.0 * zoom; // half height
 
         // Diamond vertices of this tile (centered at screen_x, screen_y)
-        let top = (screen_x, screen_y - hh);
         let right = (screen_x + hw, screen_y);
         let bottom = (screen_x, screen_y + hh);
         let left = (screen_x - hw, screen_y);
-
-        // Side face colors: earthy brown tones
-        // Right face (south, +X direction) gets more light
-        // Left face (east, +Y direction) is in shadow
-        let front_right = Color::from_rgba(110, 85, 55, 255);  // lit brown (+X face)
-        let front_left = Color::from_rgba(75, 58, 38, 255);    // shadow brown (+Y face)
 
         // Helper to get neighbor height (handles chunk boundaries)
         let get_neighbor = |nx: i32, ny: i32| -> u8 {
@@ -5959,20 +5960,118 @@ impl Renderer {
             }
         };
 
-        // +X face (south/front-right): right→bottom edge, extends down
+        // Each face has its own wall sprite ID. 0 = no sprite (fall back to colored triangles).
+        let down_gid = if block_type_down > 0 { WALLS_FIRSTGID + block_type_down as u32 } else { 0 };
+        let right_gid = if block_type_right > 0 { WALLS_FIRSTGID + block_type_right as u32 } else { 0 };
+        let right_sprite = if right_gid > 0 { self.get_wall_sprite(right_gid) } else { None };
+        let down_sprite = if down_gid > 0 { self.get_wall_sprite(down_gid) } else { None };
+
+        // +X face (south/front-right): sprite left edge at bottom vertex
         let nh = get_neighbor(local_x + 1, local_y);
         if tile_height > nh {
-            let d = (tile_height - nh) as f32 * hh;
-            draw_triangle(vec2(right.0, right.1), vec2(bottom.0, bottom.1), vec2(bottom.0, bottom.1 + d), front_right);
-            draw_triangle(vec2(right.0, right.1), vec2(bottom.0, bottom.1 + d), vec2(right.0, right.1 + d), front_right);
+            let units = (tile_height - nh) as usize;
+            if let Some((tex, source_rect)) = right_sprite {
+                let face_h = units as f32 * hh;
+                let src_w = source_rect.map_or(tex.width(), |r| r.w);
+                let src_h = source_rect.map_or(tex.height(), |r| r.h);
+                let scaled_w = (src_w * zoom).round();
+                let sprite_h = (src_h * zoom).round();
+                // Overlap sprites by hh to tile parallelogram shapes seamlessly
+                let effective_h = (sprite_h - hh).max(1.0);
+                let count = (face_h / effective_h).ceil() as i32;
+                // Allow hh above bottom vertex for the parallelogram's slanted top edge;
+                // the tile surface covers that triangle via depth sorting
+                let clip_top = bottom.1 - hh;
+                let face_bottom = bottom.1 + face_h;
+                for i in 0..count {
+                    let draw_x = bottom.0;
+                    let mut draw_y = face_bottom - sprite_h - i as f32 * effective_h;
+                    let mut src = source_rect;
+                    let mut dest_h = sprite_h;
+                    // Clip sprite above face parallelogram bounds
+                    if draw_y < clip_top {
+                        let clip = clip_top - draw_y;
+                        let clip_src = clip / zoom;
+                        draw_y = clip_top;
+                        dest_h -= clip;
+                        src = Some(match src {
+                            Some(r) => Rect::new(r.x, r.y + clip_src, r.w, r.h - clip_src),
+                            None => Rect::new(0.0, clip_src, src_w, src_h - clip_src),
+                        });
+                    }
+                    if dest_h <= 0.0 { continue; }
+                    draw_texture_ex(
+                        tex,
+                        draw_x.round(),
+                        draw_y.round(),
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some(Vec2::new(scaled_w, dest_h)),
+                            source: src,
+                            ..Default::default()
+                        },
+                    );
+                }
+            } else {
+                let d = units as f32 * hh;
+                let color = Color::from_rgba(110, 85, 55, 255);
+                draw_triangle(vec2(right.0, right.1), vec2(bottom.0, bottom.1), vec2(bottom.0, bottom.1 + d), color);
+                draw_triangle(vec2(right.0, right.1), vec2(bottom.0, bottom.1 + d), vec2(right.0, right.1 + d), color);
+            }
         }
 
-        // +Y face (east/front-left): left→bottom edge, extends down
+        // +Y face (east/front-left): sprite right edge at bottom vertex
         let nh = get_neighbor(local_x, local_y + 1);
         if tile_height > nh {
-            let d = (tile_height - nh) as f32 * hh;
-            draw_triangle(vec2(left.0, left.1), vec2(bottom.0, bottom.1), vec2(bottom.0, bottom.1 + d), front_left);
-            draw_triangle(vec2(left.0, left.1), vec2(bottom.0, bottom.1 + d), vec2(left.0, left.1 + d), front_left);
+            let units = (tile_height - nh) as usize;
+            if let Some((tex, source_rect)) = down_sprite {
+                let face_h = units as f32 * hh;
+                let src_w = source_rect.map_or(tex.width(), |r| r.w);
+                let src_h = source_rect.map_or(tex.height(), |r| r.h);
+                let scaled_w = (src_w * zoom).round();
+                let sprite_h = (src_h * zoom).round();
+                // Overlap sprites by hh to tile parallelogram shapes seamlessly
+                let effective_h = (sprite_h - hh).max(1.0);
+                let count = (face_h / effective_h).ceil() as i32;
+                // Allow hh above bottom vertex for the parallelogram's slanted top edge;
+                // the tile surface covers that triangle via depth sorting
+                let clip_top = bottom.1 - hh;
+                let face_bottom = bottom.1 + face_h;
+                for i in 0..count {
+                    let draw_x = bottom.0 - scaled_w;
+                    let mut draw_y = face_bottom - sprite_h - i as f32 * effective_h;
+                    let mut src = source_rect;
+                    let mut dest_h = sprite_h;
+                    // Clip sprite above face parallelogram bounds
+                    if draw_y < clip_top {
+                        let clip = clip_top - draw_y;
+                        let clip_src = clip / zoom;
+                        draw_y = clip_top;
+                        dest_h -= clip;
+                        src = Some(match src {
+                            Some(r) => Rect::new(r.x, r.y + clip_src, r.w, r.h - clip_src),
+                            None => Rect::new(0.0, clip_src, src_w, src_h - clip_src),
+                        });
+                    }
+                    if dest_h <= 0.0 { continue; }
+                    draw_texture_ex(
+                        tex,
+                        draw_x.round(),
+                        draw_y.round(),
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some(Vec2::new(scaled_w, dest_h)),
+                            source: src,
+                            ..Default::default()
+                        },
+                    );
+                }
+            } else {
+                let d = units as f32 * hh;
+                let color = Color::from_rgba(75, 58, 38, 255);
+                draw_triangle(vec2(left.0, left.1), vec2(bottom.0, bottom.1), vec2(bottom.0, bottom.1 + d), color);
+                draw_triangle(vec2(left.0, left.1), vec2(bottom.0, bottom.1 + d), vec2(left.0, left.1 + d), color);
+            }
         }
 
         // Back faces (-X, -Y) are not drawn — in isometric view the tile surface

@@ -8,13 +8,14 @@ type Category = 'objects' | 'walls';
 type WallTool = 'wallDown' | 'wallRight';
 
 export function ObjectPalette() {
-  const { selectedObjectId, setSelectedObjectId, setActiveTool, activeTool, openAssetManager, assetManagerOpen } = useEditorStore();
+  const { selectedObjectId, setSelectedObjectId, setActiveTool, activeTool, openAssetManager, assetManagerOpen, selectedBlockTypeDown, selectedBlockTypeRight, setSelectedBlockTypeDown, setSelectedBlockTypeRight } = useEditorStore();
   const [objects, setObjects] = useState<ObjectDefinition[]>([]);
   const [walls, setWalls] = useState<ObjectDefinition[]>([]);
   const [category, setCategory] = useState<Category>('objects');
   const [filter, setFilter] = useState('');
   const [lastWallTool, setLastWallTool] = useState<WallTool>('wallDown');
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+  const isBlockTypeTool = activeTool === 'blockType';
 
   // Load objects and walls when component mounts
   useEffect(() => {
@@ -28,6 +29,10 @@ export function ObjectPalette() {
   useEffect(() => {
     if (activeTool === 'wallDown' || activeTool === 'wallRight') {
       setLastWallTool(activeTool as WallTool);
+    }
+    // Auto-switch to walls tab when block type tool is active
+    if (activeTool === 'blockType') {
+      setCategory('walls');
     }
   }, [activeTool]);
 
@@ -176,19 +181,42 @@ export function ObjectPalette() {
         onChange={(e) => setFilter(e.target.value)}
       />
       <div className={styles.info}>
-        {selectedObjectId ? `Selected: ${(objects.find((o) => o.id === selectedObjectId) || walls.find((o) => o.id === selectedObjectId))?.name || selectedObjectId}` : 'None selected'}
+        {isBlockTypeTool && category === 'walls' ? (
+          <>
+            Down: {selectedBlockTypeDown ? (walls.find(w => w.id === selectedBlockTypeDown)?.name || selectedBlockTypeDown) : 'none'}
+            {' | '}
+            Right: {selectedBlockTypeRight ? (walls.find(w => w.id === selectedBlockTypeRight)?.name || selectedBlockTypeRight) : 'none'}
+          </>
+        ) : (
+          selectedObjectId ? `Selected: ${(objects.find((o) => o.id === selectedObjectId) || walls.find((o) => o.id === selectedObjectId))?.name || selectedObjectId}` : 'None selected'
+        )}
       </div>
       <div className={styles.grid}>
-        {filteredObjects.map((obj) => (
+        {filteredObjects.map((obj) => {
+          const wallId = obj.id;
+          const isDownSelected = isBlockTypeTool && category === 'walls' && selectedBlockTypeDown === wallId;
+          const isRightSelected = isBlockTypeTool && category === 'walls' && selectedBlockTypeRight === wallId;
+          return (
           <div key={obj.id} className={styles.itemWrapper}>
             <button
-              className={`${styles.item} ${selectedObjectId === obj.id ? styles.selected : ''}`}
+              className={`${styles.item} ${isBlockTypeTool && category === 'walls' ? `${isDownSelected ? styles.selectedDown : ''} ${isRightSelected ? styles.selectedRight : ''}` : selectedObjectId === obj.id ? styles.selected : ''}`}
               onClick={() => {
-                setSelectedObjectId(obj.id);
-                // Use wall tool when selecting from walls tab, object tool otherwise
-                setActiveTool(category === 'walls' ? lastWallTool : 'object');
+                if (isBlockTypeTool && category === 'walls') {
+                  setSelectedBlockTypeDown(wallId);
+                } else {
+                  setSelectedObjectId(obj.id);
+                  setActiveTool(category === 'walls' ? lastWallTool : 'object');
+                }
               }}
-              title={`${obj.name} (${obj.width}x${obj.height})`}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                if (isBlockTypeTool && category === 'walls') {
+                  setSelectedBlockTypeRight(wallId);
+                }
+              }}
+              title={isBlockTypeTool && category === 'walls'
+                ? `${obj.name} — LMB: Down face, RMB: Right face`
+                : `${obj.name} (${obj.width}x${obj.height})`}
             >
               <canvas
                 ref={(el) => setCanvasRef(obj.id, el)}
@@ -197,6 +225,13 @@ export function ObjectPalette() {
                 height={64}
               />
               <span className={styles.name}>{obj.name}</span>
+              {isBlockTypeTool && category === 'walls' && (isDownSelected || isRightSelected) && (
+                <span className={styles.blockTypeLabel}>
+                  {isDownSelected && <span className={styles.labelDown}>Down</span>}
+                  {isDownSelected && isRightSelected && ' '}
+                  {isRightSelected && <span className={styles.labelRight}>Right</span>}
+                </span>
+              )}
             </button>
             <button
               className={styles.deleteButton}
@@ -206,7 +241,8 @@ export function ObjectPalette() {
               ×
             </button>
           </div>
-        ))}
+          );
+        })}
         {filteredObjects.length === 0 && (
           <div className={styles.empty}>No objects found</div>
         )}

@@ -192,8 +192,10 @@ impl ChunkLayer {
 pub struct HeightData {
     /// Height in blocks for each tile (CHUNK_SIZE * CHUNK_SIZE)
     pub heights: Vec<u8>,
-    /// Block type for each tile (0 = grass, 1 = stone, 2 = sand, etc.)
-    pub block_types: Vec<u8>,
+    /// Wall sprite ID for down (+Y) side face per tile (0 = plain)
+    pub block_types_down: Vec<u16>,
+    /// Wall sprite ID for right (+X) side face per tile (0 = plain)
+    pub block_types_right: Vec<u16>,
 }
 
 impl HeightData {
@@ -205,12 +207,20 @@ impl HeightData {
         self.heights.get(idx).copied().unwrap_or(0)
     }
 
-    pub fn get_block_type(&self, local_x: u32, local_y: u32) -> u8 {
+    pub fn get_block_type_down(&self, local_x: u32, local_y: u32) -> u16 {
         if local_x >= CHUNK_SIZE || local_y >= CHUNK_SIZE {
             return 0;
         }
         let idx = (local_y * CHUNK_SIZE + local_x) as usize;
-        self.block_types.get(idx).copied().unwrap_or(0)
+        self.block_types_down.get(idx).copied().unwrap_or(0)
+    }
+
+    pub fn get_block_type_right(&self, local_x: u32, local_y: u32) -> u16 {
+        if local_x >= CHUNK_SIZE || local_y >= CHUNK_SIZE {
+            return 0;
+        }
+        let idx = (local_y * CHUNK_SIZE + local_x) as usize;
+        self.block_types_right.get(idx).copied().unwrap_or(0)
     }
 }
 

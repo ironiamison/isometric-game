@@ -6536,7 +6536,8 @@ impl GameRoom {
                     .collect(),
                 portals,
                 heightmap: chunk.height_data.as_ref().map(|h| h.heights.clone()),
-                block_types: chunk.height_data.as_ref().map(|h| h.block_types.clone()),
+                block_types_down: chunk.height_data.as_ref().map(|h| h.block_types_down.clone()),
+                block_types_right: chunk.height_data.as_ref().map(|h| h.block_types_right.clone()),
             })
         } else {
             Some(ServerMessage::ChunkNotFound { chunk_x, chunk_y })

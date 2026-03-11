@@ -1616,9 +1616,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .filter_map(|v| v.as_i64().map(|i| i as u8))
                         .collect()
                 });
-                let block_types: Option<Vec<u8>> = extract_array(value, "blockTypes").map(|arr| {
+                let block_types_down: Option<Vec<u16>> = extract_array(value, "blockTypesDown").map(|arr| {
                     arr.iter()
-                        .filter_map(|v| v.as_i64().map(|i| i as u8))
+                        .filter_map(|v| v.as_i64().map(|i| i as u16))
+                        .collect()
+                });
+                let block_types_right: Option<Vec<u16>> = extract_array(value, "blockTypesRight").map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_i64().map(|i| i as u16))
                         .collect()
                 });
 
@@ -1627,7 +1632,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 state.chunk_manager.load_chunk(
                     chunk_x, chunk_y, layers, &collision, objects, walls, portals,
-                    heightmap, block_types,
+                    heightmap, block_types_down, block_types_right,
                 );
             }
         }

@@ -56,6 +56,9 @@ export function Canvas() {
     removeMapObject,
     addPortal,
     adjustHeight,
+    setBlockType,
+    selectedBlockTypeDown,
+    selectedBlockTypeRight,
     toggleGatheringZone,
     findGatheringZoneAtWorld,
     setSelectedGatheringZone,
@@ -616,6 +619,9 @@ export function Canvas() {
         case Tool.HeightRaise:
           adjustHeight(worldTile, 1);
           break;
+        case Tool.BlockType:
+          setBlockType(worldTile, selectedBlockTypeDown, selectedBlockTypeRight);
+          break;
       }
     },
     [
@@ -710,6 +716,9 @@ export function Canvas() {
           heightDelta.current = 1;
           history.beginGroup('height raise stroke');
         }
+        if (activeTool === Tool.BlockType) {
+          history.beginGroup('block type stroke');
+        }
         handleToolAction(e.clientX, e.clientY);
       }
     },
@@ -742,12 +751,16 @@ export function Canvas() {
       if (isPainting && activeTool === Tool.HeightRaise) {
         adjustHeight(worldTile, heightDelta.current);
       }
+
+      if (isPainting && activeTool === Tool.BlockType) {
+        setBlockType(worldTile, selectedBlockTypeDown, selectedBlockTypeRight);
+      }
     },
-    [viewport, isPanning, isPainting, activeTool, pan, setHoveredTile, handleToolAction, adjustHeight]
+    [viewport, isPanning, isPainting, activeTool, pan, setHoveredTile, handleToolAction, adjustHeight, setBlockType, selectedBlockTypeDown, selectedBlockTypeRight]
   );
 
   const handleMouseUp = useCallback(() => {
-    if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser || activeTool === Tool.HeightRaise)) {
+    if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser || activeTool === Tool.HeightRaise || activeTool === Tool.BlockType)) {
       history.endGroup();
     }
     setIsPanning(false);
@@ -756,7 +769,7 @@ export function Canvas() {
 
   const handleMouseLeave = useCallback(() => {
     setHoveredTile(null);
-    if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser || activeTool === Tool.HeightRaise)) {
+    if (isPainting && (activeTool === Tool.Paint || activeTool === Tool.Eraser || activeTool === Tool.HeightRaise || activeTool === Tool.BlockType)) {
       history.endGroup();
     }
     setIsPanning(false);
@@ -834,6 +847,33 @@ export function Canvas() {
           onClose={() => setContextMenu(null)}
         />
       )}
+      {activeTool === Tool.BlockType && (
+        <div className={styles.modeIndicator} style={{ gap: '8px', pointerEvents: 'auto' }}>
+          <span>Down:</span>
+          <input
+            type="number"
+            min={0}
+            max={65535}
+            value={selectedBlockTypeDown}
+            onChange={(e) => useEditorStore.getState().setSelectedBlockTypeDown(parseInt(e.target.value) || 0)}
+            onKeyDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ width: '50px', padding: '2px 4px', background: '#333', color: '#fff', border: '1px solid #555', borderRadius: '3px' }}
+          />
+          <span>Right:</span>
+          <input
+            type="number"
+            min={0}
+            max={65535}
+            value={selectedBlockTypeRight}
+            onChange={(e) => useEditorStore.getState().setSelectedBlockTypeRight(parseInt(e.target.value) || 0)}
+            onKeyDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ width: '50px', padding: '2px 4px', background: '#333', color: '#fff', border: '1px solid #555', borderRadius: '3px' }}
+          />
+          <span style={{ fontSize: '11px', opacity: 0.7 }}>(wall sprite IDs, 0 = plain)</span>
+        </div>
+      )}
       {editorMode === 'interior' && currentInterior && (
         <div className={styles.modeIndicator}>
           INTERIOR MODE
@@ -843,16 +883,19 @@ export function Canvas() {
       {hoveredTile && (
         <div className={styles.coords}>
           {hoveredTile.wx}, {hoveredTile.wy}
-          {activeTool === Tool.HeightRaise && (() => {
+          {(activeTool === Tool.HeightRaise || activeTool === Tool.BlockType) && (() => {
             const cc = worldToChunk(hoveredTile);
             const chunk = chunks.get(`${cc.cx},${cc.cy}`);
-            if (chunk?.heights) {
-              const lx = ((hoveredTile.wx % 32) + 32) % 32;
-              const ly = ((hoveredTile.wy % 32) + 32) % 32;
-              const h = chunk.heights[ly * 32 + lx];
-              if (h > 0) return ` (H: ${h})`;
+            const lx = ((hoveredTile.wx % 32) + 32) % 32;
+            const ly = ((hoveredTile.wy % 32) + 32) % 32;
+            const idx = ly * 32 + lx;
+            const h = chunk?.heights ? chunk.heights[idx] : 0;
+            const btD = chunk?.blockTypesDown ? chunk.blockTypesDown[idx] : 0;
+            const btR = chunk?.blockTypesRight ? chunk.blockTypesRight[idx] : 0;
+            if (activeTool === Tool.BlockType) {
+              return ` (H: ${h}, D: ${btD}, R: ${btR})`;
             }
-            return ' (H: 0)';
+            return ` (H: ${h})`;
           })()}
         </div>
       )}

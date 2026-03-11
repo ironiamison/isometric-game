@@ -202,6 +202,12 @@ class StorageManager {
       result.heightmap = Array.from(chunk.heights);
     }
     delete result.heights;
+    if (chunk.blockTypesDown) {
+      result.blockTypesDown = Array.from(chunk.blockTypesDown);
+    }
+    if (chunk.blockTypesRight) {
+      result.blockTypesRight = Array.from(chunk.blockTypesRight);
+    }
     return result;
   }
 
@@ -214,6 +220,12 @@ class StorageManager {
       layers: stored.layers as Chunk['layers'],
       collision: new Uint8Array(stored.collision as number[]),
       heights: heightsArr && heightsArr.length > 0 ? new Uint8Array(heightsArr) : undefined,
+      blockTypesDown: (stored.blockTypesDown as number[])?.length > 0
+        ? new Uint16Array(stored.blockTypesDown as number[])
+        : undefined,
+      blockTypesRight: (stored.blockTypesRight as number[])?.length > 0
+        ? new Uint16Array(stored.blockTypesRight as number[])
+        : undefined,
       entities: stored.entities as Chunk['entities'],
       mapObjects: (stored.mapObjects as Chunk['mapObjects']) || [],
       walls: (stored.walls as Chunk['walls']) || [],

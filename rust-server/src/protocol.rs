@@ -746,7 +746,8 @@ pub enum ServerMessage {
         walls: Vec<ChunkWallData>,     // Edge-aligned walls
         portals: Vec<ChunkPortalData>, // Portals to other maps
         heightmap: Option<Vec<u8>>,    // Optional height data (CHUNK_SIZE^2 bytes)
-        block_types: Option<Vec<u8>>,  // Optional block type data (CHUNK_SIZE^2 bytes)
+        block_types_down: Option<Vec<u16>>,  // Wall sprite IDs for down (+Y) side face
+        block_types_right: Option<Vec<u16>>, // Wall sprite IDs for right (+X) side face
     },
     ChunkNotFound {
         chunk_x: i32,
@@ -3325,7 +3326,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             walls,
             portals,
             heightmap,
-            block_types,
+            block_types_down,
+            block_types_right,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -3466,9 +3468,13 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 let hm_values: Vec<Value> = hm.iter().map(|&h| Value::Integer((h as i64).into())).collect();
                 map.push((Value::String("heightmap".into()), Value::Array(hm_values)));
             }
-            if let Some(bt) = block_types {
+            if let Some(bt) = block_types_down {
                 let bt_values: Vec<Value> = bt.iter().map(|&b| Value::Integer((b as i64).into())).collect();
-                map.push((Value::String("blockTypes".into()), Value::Array(bt_values)));
+                map.push((Value::String("blockTypesDown".into()), Value::Array(bt_values)));
+            }
+            if let Some(bt) = block_types_right {
+                let bt_values: Vec<Value> = bt.iter().map(|&b| Value::Integer((b as i64).into())).collect();
+                map.push((Value::String("blockTypesRight".into()), Value::Array(bt_values)));
             }
 
             Value::Map(map)
