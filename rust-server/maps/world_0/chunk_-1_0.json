@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "ACAAAABYAAAAAAAAAIECAMASAAAgFAABEBoQPnAK8CNQDgggyAUEoI8XBqDBHwIgAAACIAAAMmAAADIgwA8CIIAYBCDBCAgkgQhwoMFCAKCBBgCggBIAoAATkKA+GQSgwKUAoBwnACHkNgAgADcQYBBEA2CAhwEgIPgBICAABj8=",
+  "collision": "ACAAAABYAAAACAAAAIkCAMASAAAgFAABEBoQPnAK8ANQDggAyAUEgI8XBqDBHwIgAAACIAAAMmAAABIgwA8CIIAYBCDBCAgggQhwoMFKAKCBFgCggBIAoAATkKA+OQSgwKUAoBwnACHkdgAgAHcQYBBEA2CAhwEgIPgBICAABj8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3097,12 +3097,6 @@
       "entityId": "crow",
       "x": 28,
       "y": 4,
-      "level": 1
-    },
-    {
-      "entityId": "adventurer_guide",
-      "x": 23,
-      "y": 9,
       "level": 1
     },
     {
@@ -3151,6 +3145,12 @@
       "entityId": "old_thomas",
       "x": 2,
       "y": 14,
+      "level": 1
+    },
+    {
+      "entityId": "adventurer_guide",
+      "x": 22,
+      "y": 5,
       "level": 1
     }
   ],
@@ -3252,13 +3252,6 @@
       "y": 11,
       "width": 57,
       "height": 40
-    },
-    {
-      "gid": 1274,
-      "x": 21,
-      "y": 14,
-      "width": 121,
-      "height": 121
     },
     {
       "gid": 1269,
@@ -3632,13 +3625,6 @@
       "height": 32
     },
     {
-      "gid": 1831,
-      "x": 26,
-      "y": 17,
-      "width": 44,
-      "height": 91
-    },
-    {
       "gid": 1444,
       "x": 4,
       "y": 21,
@@ -3805,6 +3791,20 @@
       "y": 28,
       "width": 154,
       "height": 154
+    },
+    {
+      "gid": 1469,
+      "x": 29,
+      "y": 30,
+      "width": 25,
+      "height": 157
+    },
+    {
+      "gid": 1831,
+      "x": 20,
+      "y": 13,
+      "width": 44,
+      "height": 91
     }
   ],
   "walls": [
@@ -4376,24 +4376,6 @@
       "gid": 395,
       "x": 29,
       "y": 11,
-      "edge": "right"
-    },
-    {
-      "gid": 395,
-      "x": 29,
-      "y": 9,
-      "edge": "right"
-    },
-    {
-      "gid": 395,
-      "x": 29,
-      "y": 7,
-      "edge": "right"
-    },
-    {
-      "gid": 395,
-      "x": 29,
-      "y": 8,
       "edge": "right"
     },
     {
