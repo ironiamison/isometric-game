@@ -54,7 +54,7 @@ const tools: ToolDef[] = [
 ];
 
 export function Toolbar() {
-  const { activeTool, setActiveTool, editorMode } = useEditorStore();
+  const { activeTool, setActiveTool, editorMode, brushSize, setBrushSize } = useEditorStore();
 
   const visibleTools = tools.filter((t) => !t.mode || t.mode === editorMode);
 
@@ -100,6 +100,22 @@ export function Toolbar() {
           {interiorTools.map(renderButton)}
         </>
       )}
+      <div className={styles.spacer} />
+      <div className={styles.brushSize} data-tooltip={`Brush Size (Ctrl+Scroll)`}>
+        <span className={styles.brushLabel}>{brushSize}</span>
+        <div className={styles.brushControls}>
+          <button
+            className={styles.brushBtn}
+            onClick={() => setBrushSize(brushSize - 1)}
+            disabled={brushSize <= 1}
+          >-</button>
+          <button
+            className={styles.brushBtn}
+            onClick={() => setBrushSize(brushSize + 1)}
+            disabled={brushSize >= 15}
+          >+</button>
+        </div>
+      </div>
     </div>
   );
 }

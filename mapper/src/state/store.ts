@@ -89,6 +89,7 @@ interface EditorState {
   // Tool state
   activeTool: Tool;
   activeLayer: Layer;
+  brushSize: number;
   selectedTileId: number;
   selectedEntityId: string | null; // Entity type ID from palette (for placing new entities)
   selectedObjectId: number | null; // File ID of selected object for placement
@@ -164,6 +165,7 @@ interface EditorActions {
   // Tool actions
   setActiveTool: (tool: Tool) => void;
   setActiveLayer: (layer: Layer) => void;
+  setBrushSize: (size: number) => void;
   setSelectedTileId: (id: number) => void;
   setSelectedEntityId: (id: string | null) => void;
   setSelectedObjectId: (id: number | null) => void;
@@ -354,6 +356,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   activeTool: Tool.Paint,
   activeLayer: Layer.Ground,
+  brushSize: 1,
   selectedTileId: 1,
   selectedEntityId: null,
   selectedObjectId: null,
@@ -464,6 +467,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   // Tool actions
   setActiveTool: (tool) => set({ activeTool: tool }),
   setActiveLayer: (layer) => set({ activeLayer: layer }),
+  setBrushSize: (size) => set({ brushSize: Math.max(1, Math.min(15, size)) }),
   setSelectedTileId: (id) => set({ selectedTileId: id }),
   setSelectedEntityId: (id) => set({ selectedEntityId: id }),
   setSelectedObjectId: (id) => set({ selectedObjectId: id }),

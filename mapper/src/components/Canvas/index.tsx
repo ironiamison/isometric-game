@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useEditorStore } from '@/state/store';
 import { isometricRenderer } from '@/core/IsometricRenderer';
-import { screenToWorldTile, worldToChunk } from '@/core/coords';
+import { screenToWorldTile, worldToChunk, getBrushTiles } from '@/core/coords';
 import { Tool, Layer } from '@/types';
 import type { DevNote } from '@/types';
 import { history } from '@/core/History';
@@ -25,6 +25,7 @@ export function Canvas() {
     hoveredTile,
     activeTool,
     activeLayer,
+    brushSize,
     selectedTileId,
     selectedEntityId,
     selectedObjectId,
@@ -62,6 +63,7 @@ export function Canvas() {
     toggleGatheringZone,
     findGatheringZoneAtWorld,
     setSelectedGatheringZone,
+    setBrushSize,
     setSelectedTileId,
     findEntityAtWorld,
     setSelectedEntitySpawn,
@@ -231,8 +233,13 @@ export function Canvas() {
         }
       }
 
-      // Highlight hovered tile (works for both modes)
+      // Highlight brush area (works for both modes)
       if (hoveredTile) {
+        const brushTiles = getBrushTiles(hoveredTile, brushSize);
+        for (const t of brushTiles) {
+          isometricRenderer.highlightTile(t, viewport, 'rgba(255, 255, 255, 0.4)', true);
+        }
+        // Outline the center tile more prominently
         isometricRenderer.highlightTile(hoveredTile, viewport, '#ffffff');
       }
 
@@ -244,7 +251,7 @@ export function Canvas() {
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [chunks, viewport, hoveredTile, selectedTiles, selectedPortal, editorMode, currentInterior]);
+  }, [chunks, viewport, hoveredTile, brushSize, selectedTiles, selectedPortal, editorMode, currentInterior]);
 
   // Handle tool action at position
   const handleToolAction = useCallback(
@@ -257,41 +264,49 @@ export function Canvas() {
       const screenY = clientY - rect.top;
       const worldTile = screenToWorldTile({ sx: screenX, sy: screenY }, viewport);
 
+      const tiles = getBrushTiles(worldTile, brushSize);
+
       // Interior mode handling
       if (editorMode === 'interior' && currentInterior) {
-        // Check bounds
-        if (worldTile.wx < 0 || worldTile.wx >= currentInterior.width ||
-            worldTile.wy < 0 || worldTile.wy >= currentInterior.height) {
-          return; // Outside interior bounds
-        }
-
         switch (activeTool) {
           case Tool.Paint:
             if (activeLayer === Layer.Ground || activeLayer === Layer.Objects || activeLayer === Layer.Overhead) {
-              setInteriorTile(worldTile.wx, worldTile.wy, activeLayer, selectedTileId);
+              for (const t of tiles) {
+                if (t.wx >= 0 && t.wx < currentInterior.width && t.wy >= 0 && t.wy < currentInterior.height) {
+                  setInteriorTile(t.wx, t.wy, activeLayer, selectedTileId);
+                }
+              }
             }
             break;
           case Tool.Eraser:
             if (activeLayer === Layer.Entities) {
-              const entity = currentInterior.entities.find(
-                (e) => e.x === worldTile.wx && e.y === worldTile.wy
-              );
-              if (entity) {
-                removeInteriorEntity(entity.id);
+              for (const t of tiles) {
+                const entity = currentInterior.entities.find(
+                  (e) => e.x === t.wx && e.y === t.wy
+                );
+                if (entity) removeInteriorEntity(entity.id);
               }
             } else if (activeLayer === Layer.MapObjects) {
-              const obj = currentInterior.mapObjects.find(
-                (o) => o.x === worldTile.wx && o.y === worldTile.wy
-              );
-              if (obj) {
-                removeInteriorMapObject(obj.id);
+              for (const t of tiles) {
+                const obj = currentInterior.mapObjects.find(
+                  (o) => o.x === t.wx && o.y === t.wy
+                );
+                if (obj) removeInteriorMapObject(obj.id);
               }
             } else if (activeLayer === Layer.Ground || activeLayer === Layer.Objects || activeLayer === Layer.Overhead) {
-              setInteriorTile(worldTile.wx, worldTile.wy, activeLayer, 0);
+              for (const t of tiles) {
+                if (t.wx >= 0 && t.wx < currentInterior.width && t.wy >= 0 && t.wy < currentInterior.height) {
+                  setInteriorTile(t.wx, t.wy, activeLayer, 0);
+                }
+              }
             }
             break;
           case Tool.Collision:
-            toggleInteriorCollision(worldTile.wx, worldTile.wy);
+            for (const t of tiles) {
+              if (t.wx >= 0 && t.wx < currentInterior.width && t.wy >= 0 && t.wy < currentInterior.height) {
+                toggleInteriorCollision(t.wx, t.wy);
+              }
+            }
             break;
           case Tool.Fill:
             if (activeLayer === Layer.Ground || activeLayer === Layer.Objects || activeLayer === Layer.Overhead) {
@@ -299,7 +314,6 @@ export function Canvas() {
             }
             break;
           case Tool.Entity: {
-            // Check for existing entity to select
             const existingInteriorEntity = currentInterior.entities.find(
               (e) => e.x === worldTile.wx && e.y === worldTile.wy
             );
@@ -307,12 +321,15 @@ export function Canvas() {
               setSelectedInteriorEntity(existingInteriorEntity.id);
               setSelectedInteriorMapObject(null);
             } else if (selectedEntityId) {
-              addInteriorEntity(worldTile.wx, worldTile.wy, selectedEntityId);
+              for (const t of tiles) {
+                if (t.wx >= 0 && t.wx < currentInterior.width && t.wy >= 0 && t.wy < currentInterior.height) {
+                  addInteriorEntity(t.wx, t.wy, selectedEntityId);
+                }
+              }
             }
             break;
           }
           case Tool.Object: {
-            // Check for existing object at this exact tile
             const existingInteriorObj = currentInterior.mapObjects.find(
               (o) => o.x === worldTile.wx && o.y === worldTile.wy
             );
@@ -322,13 +339,16 @@ export function Canvas() {
             } else if (selectedObjectId) {
               const objDef = objectLoader.getObject(selectedObjectId);
               if (objDef) {
-                addInteriorMapObject(worldTile.wx, worldTile.wy, selectedObjectId, objDef.width, objDef.height);
+                for (const t of tiles) {
+                  if (t.wx >= 0 && t.wx < currentInterior.width && t.wy >= 0 && t.wy < currentInterior.height) {
+                    addInteriorMapObject(t.wx, t.wy, selectedObjectId, objDef.width, objDef.height);
+                  }
+                }
               }
             }
             break;
           }
           case Tool.Select: {
-            // Select entities, map objects, or walls in interior mode
             const entityAtInteriorPos = currentInterior.entities.find(
               (e) => e.x === worldTile.wx && e.y === worldTile.wy
             );
@@ -353,7 +373,6 @@ export function Canvas() {
                   setSelectedInteriorEntity(null);
                   setSelectedInteriorMapObject(null);
                 } else {
-                  // Nothing at position, clear selection
                   setSelectedInteriorEntity(null);
                   setSelectedInteriorMapObject(null);
                   setSelectedInteriorWall(null);
@@ -388,20 +407,22 @@ export function Canvas() {
                 const gid = wallDef
                   ? objectLoader.wallIdToGid(selectedObjectId)
                   : objectLoader.idToGid(selectedObjectId);
-                toggleInteriorWall(worldTile.wx, worldTile.wy, edge, gid);
+                for (const t of tiles) {
+                  if (t.wx >= 0 && t.wx < currentInterior.width && t.wy >= 0 && t.wy < currentInterior.height) {
+                    toggleInteriorWall(t.wx, t.wy, edge, gid);
+                  }
+                }
               }
             }
             break;
           }
           case Tool.SpawnPoint: {
-            // Check if spawn point exists at this location
             const existingSpawn = currentInterior.spawnPoints.find(
               (sp) => sp.x === worldTile.wx && sp.y === worldTile.wy
             );
             if (existingSpawn) {
               removeSpawnPoint(existingSpawn.name);
             } else {
-              // Prompt for spawn point name
               const name = prompt('Enter spawn point name:', `spawn_${currentInterior.spawnPoints.length}`);
               if (name) {
                 addSpawnPoint(name, worldTile.wx, worldTile.wy);
@@ -410,13 +431,10 @@ export function Canvas() {
             break;
           }
           case Tool.ExitPortal: {
-            // Check if exit portal exists at this location
             const existingExit = findExitPortalAt(worldTile.wx, worldTile.wy);
             if (existingExit) {
-              // Select the existing exit portal
               setSelectedExitPortal({ portalId: existingExit.id });
             } else {
-              // Add new exit portal and select it
               const newPortal = addExitPortal(worldTile.wx, worldTile.wy);
               setSelectedExitPortal({ portalId: newPortal.id });
             }
@@ -430,35 +448,41 @@ export function Canvas() {
       switch (activeTool) {
         case Tool.Paint:
           if (activeLayer === Layer.Ground || activeLayer === Layer.Objects || activeLayer === Layer.Overhead) {
-            // If there's an active selection, fill all selected tiles
             if (selectedTiles.size > 0) {
               fillSelectedTiles(activeLayer, selectedTileId);
             } else {
-              setTile(worldTile, activeLayer, selectedTileId);
+              for (const t of tiles) {
+                setTile(t, activeLayer, selectedTileId);
+              }
             }
           }
           break;
         case Tool.Eraser: {
           if (activeLayer === Layer.Entities) {
-            // Erase entity at position
-            const entityAtPos = findEntityAtWorld(worldTile);
-            if (entityAtPos) {
-              removeEntity(entityAtPos.chunkCoord, entityAtPos.entity.id);
+            for (const t of tiles) {
+              const entityAtPos = findEntityAtWorld(t);
+              if (entityAtPos) {
+                removeEntity(entityAtPos.chunkCoord, entityAtPos.entity.id);
+              }
             }
           } else if (activeLayer === Layer.MapObjects) {
-            // Erase map object at position
-            const objectAtPos = findMapObjectAtWorld(worldTile);
-            if (objectAtPos) {
-              removeMapObject(objectAtPos.chunkCoord, objectAtPos.object.id);
+            for (const t of tiles) {
+              const objectAtPos = findMapObjectAtWorld(t);
+              if (objectAtPos) {
+                removeMapObject(objectAtPos.chunkCoord, objectAtPos.object.id);
+              }
             }
           } else if (activeLayer === Layer.Ground || activeLayer === Layer.Objects || activeLayer === Layer.Overhead) {
-            // Erase tile
-            setTile(worldTile, activeLayer, 0);
+            for (const t of tiles) {
+              setTile(t, activeLayer, 0);
+            }
           }
           break;
         }
         case Tool.Collision:
-          toggleCollision(worldTile);
+          for (const t of tiles) {
+            toggleCollision(t);
+          }
           break;
         case Tool.Fill:
           if (activeLayer === Layer.Ground || activeLayer === Layer.Objects || activeLayer === Layer.Overhead) {
@@ -471,7 +495,6 @@ export function Canvas() {
           }
           break;
         case Tool.Entity: {
-          // First check if there's an existing entity to select
           const existingEntity = findEntityAtWorld(worldTile);
           if (existingEntity) {
             setSelectedEntitySpawn({
@@ -479,13 +502,13 @@ export function Canvas() {
               spawnId: existingEntity.entity.id,
             });
           } else if (selectedEntityId) {
-            // No existing entity, place a new one
-            addEntity(worldTile, selectedEntityId);
+            for (const t of tiles) {
+              addEntity(t, selectedEntityId);
+            }
           }
           break;
         }
         case Tool.Object: {
-          // First check if there's an existing object to select
           const existingObject = findMapObjectAtWorld(worldTile);
           if (existingObject) {
             setSelectedMapObject({
@@ -493,16 +516,16 @@ export function Canvas() {
               objectId: existingObject.object.id,
             });
           } else if (selectedObjectId) {
-            // No existing object, place a new one
             const objDef = objectLoader.getObject(selectedObjectId);
             if (objDef) {
-              addMapObject(worldTile, selectedObjectId, objDef.width, objDef.height);
+              for (const t of tiles) {
+                addMapObject(t, selectedObjectId, objDef.width, objDef.height);
+              }
             }
           }
           break;
         }
         case Tool.Select: {
-          // Select tool can select entities, objects, or walls
           const entityAtPos = findEntityAtWorld(worldTile);
           if (entityAtPos) {
             setSelectedEntitySpawn({
@@ -530,7 +553,6 @@ export function Canvas() {
                 setSelectedEntitySpawn(null);
                 setSelectedMapObject(null);
               } else {
-                // Nothing at position, clear selection
                 setSelectedEntitySpawn(null);
                 setSelectedMapObject(null);
                 setSelectedWall(null);
@@ -540,7 +562,6 @@ export function Canvas() {
           break;
         }
         case Tool.Eyedropper: {
-          // Pick tile from clicked position
           const chunk = useEditorStore.getState().getChunk({
             cx: Math.floor(worldTile.wx / 32),
             cy: Math.floor(worldTile.wy / 32),
@@ -566,24 +587,22 @@ export function Canvas() {
         }
         case Tool.WallDown:
         case Tool.WallRight: {
-          // Place or remove wall at position
           if (selectedObjectId) {
-            // Check walls first, then objects
             const wallDef = objectLoader.getWall(selectedObjectId);
             const objDef = wallDef || objectLoader.getObject(selectedObjectId);
             if (objDef) {
               const edge = activeTool === Tool.WallDown ? 'down' : 'right';
-              // Use wall GID if it's a wall, otherwise object GID
               const gid = wallDef
                 ? objectLoader.wallIdToGid(selectedObjectId)
                 : objectLoader.idToGid(selectedObjectId);
-              toggleWall(worldTile, edge, gid);
+              for (const t of tiles) {
+                toggleWall(t, edge, gid);
+              }
             }
           }
           break;
         }
         case Tool.Portal: {
-          // First check if there's an existing portal to select
           const existingPortal = findPortalAtWorld(worldTile);
           if (existingPortal) {
             setSelectedPortal({
@@ -591,7 +610,6 @@ export function Canvas() {
               portalId: existingPortal.portal.id,
             });
           } else {
-            // No existing portal, place a new one
             const newPortal = addPortal(worldTile);
             setSelectedPortal({
               chunkCoord: useEditorStore.getState().getChunk({
@@ -617,10 +635,14 @@ export function Canvas() {
           break;
         }
         case Tool.HeightRaise:
-          adjustHeight(worldTile, 1);
+          for (const t of tiles) {
+            adjustHeight(t, 1);
+          }
           break;
         case Tool.BlockType:
-          setBlockType(worldTile, selectedBlockTypeDown, selectedBlockTypeRight);
+          for (const t of tiles) {
+            setBlockType(t, selectedBlockTypeDown, selectedBlockTypeRight);
+          }
           break;
       }
     },
@@ -628,6 +650,7 @@ export function Canvas() {
       viewport,
       activeTool,
       activeLayer,
+      brushSize,
       selectedTileId,
       selectedEntityId,
       selectedObjectId,
@@ -701,7 +724,10 @@ export function Canvas() {
           const screenX = e.clientX - rect.left;
           const screenY = e.clientY - rect.top;
           const worldTile = screenToWorldTile({ sx: screenX, sy: screenY }, viewport);
-          adjustHeight(worldTile, -1);
+          const brushTiles = getBrushTiles(worldTile, brushSize);
+          for (const t of brushTiles) {
+            adjustHeight(t, -1);
+          }
         }
         return;
       }
@@ -749,14 +775,20 @@ export function Canvas() {
       }
 
       if (isPainting && activeTool === Tool.HeightRaise) {
-        adjustHeight(worldTile, heightDelta.current);
+        const brushTiles = getBrushTiles(worldTile, brushSize);
+        for (const t of brushTiles) {
+          adjustHeight(t, heightDelta.current);
+        }
       }
 
       if (isPainting && activeTool === Tool.BlockType) {
-        setBlockType(worldTile, selectedBlockTypeDown, selectedBlockTypeRight);
+        const brushTiles = getBrushTiles(worldTile, brushSize);
+        for (const t of brushTiles) {
+          setBlockType(t, selectedBlockTypeDown, selectedBlockTypeRight);
+        }
       }
     },
-    [viewport, isPanning, isPainting, activeTool, pan, setHoveredTile, handleToolAction, adjustHeight, setBlockType, selectedBlockTypeDown, selectedBlockTypeRight]
+    [viewport, isPanning, isPainting, activeTool, brushSize, pan, setHoveredTile, handleToolAction, adjustHeight, setBlockType, selectedBlockTypeDown, selectedBlockTypeRight]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -779,13 +811,19 @@ export function Canvas() {
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        // CTRL+scroll to change brush size
+        const delta = e.deltaY > 0 ? -1 : 1;
+        setBrushSize(brushSize + delta);
+        return;
+      }
       const factor = e.deltaY > 0 ? 0.9 : 1.1;
       const rect = canvasRef.current?.getBoundingClientRect();
       if (rect) {
         zoom(factor, e.clientX - rect.left, e.clientY - rect.top);
       }
     },
-    [zoom]
+    [zoom, brushSize, setBrushSize]
   );
 
 
