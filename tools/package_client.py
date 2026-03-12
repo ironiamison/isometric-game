@@ -61,6 +61,10 @@ def main() -> None:
 
     if args.atlas_only:
         sprites_root = out_dir / "assets" / "sprites"
+        # Remove tiles_extracted — client only uses the compiled tiles.png
+        tiles_extracted = sprites_root / "tiles_extracted"
+        if tiles_extracted.exists():
+            shutil.rmtree(tiles_extracted)
         atlas_dirs = [
             "players",
             "hair",
