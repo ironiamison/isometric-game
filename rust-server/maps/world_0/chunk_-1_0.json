@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "ACAAAABYAAAACAAAAIkCAMASAAAgFAABEBoQPnAK8ANQDggAyAUEgI8XBqDBHwIgAAACIAAAMmAAABIgwA8CIIAYBCDBCAgggQhwoMFKAKCBFgCggBIAoAATkKA+OQSgwKUAoBwnACHkdgAgAHcQYBBEA2CAhwEgIPgBICAABj8=",
+  "collision": "ACAAAABYAAAACAAAAIkCAMASAAAgFAABEBoQPnAK8ANQDggAyAUEgI8XBqDBHwIgAAACIAAAImAAABIgwA8CIIAYBCDBCAgggQhwoMFKAKCBFgCggBIAoAATkKA+OQSgwKUAoBwnACHkdgAgAHcQYBBEA2CAhwEgIPgBICAABj8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3798,13 +3798,6 @@
       "y": 30,
       "width": 25,
       "height": 157
-    },
-    {
-      "gid": 1831,
-      "x": 20,
-      "y": 13,
-      "width": 44,
-      "height": 91
     }
   ],
   "walls": [
