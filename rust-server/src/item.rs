@@ -230,7 +230,7 @@ pub const DEFAULT_BANK_SIZE: usize = 50;
 /// Number of slots added per bank upgrade purchase
 pub const BANK_UPGRADE_SLOTS: usize = 10;
 /// Maximum bank size after all upgrades
-pub const BANK_MAX_SIZE: usize = 100;
+pub const BANK_MAX_SIZE: usize = 200;
 /// Gold cost per bank upgrade
 pub const BANK_UPGRADE_COST: i32 = 5_000;
 
