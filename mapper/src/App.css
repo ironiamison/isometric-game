@@ -156,6 +156,69 @@ body {
   letter-spacing: 0.02em;
 }
 
+/* Sidebar collapse toggle — thin strip when sidebar is hidden */
+.sidebar-toggle {
+  width: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 6px;
+  background: var(--bg-panel);
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: all 0.12s ease;
+}
+
+.sidebar-toggle.left {
+  border-right: 1px solid var(--border-subtle);
+}
+
+.sidebar-toggle.right {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.sidebar-toggle:hover {
+  color: var(--text-bright);
+  background: rgba(78, 205, 196, 0.06);
+}
+
+/* Collapse button inside expanded sidebar */
+.sidebar-collapse-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 10;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.sidebar-collapse-btn:hover {
+  color: var(--text-bright);
+  background: rgba(78, 205, 196, 0.1);
+  border-color: var(--accent);
+}
+
+/* Sidebar needs relative positioning for the collapse button */
+.sidebar {
+  position: relative;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

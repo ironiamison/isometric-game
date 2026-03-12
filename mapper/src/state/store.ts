@@ -136,6 +136,7 @@ interface EditorState {
   currentUsername: string | null;
 
   // Panel state
+  paletteSide: 'left' | 'right';
   layerPanelCollapsed: boolean;
 
   // Notes state
@@ -246,6 +247,8 @@ interface EditorActions {
   setConnected: (isConnected: boolean) => void;
 
   // Panel actions
+  setPaletteSide: (side: 'left' | 'right') => void;
+  togglePaletteSide: () => void;
   setLayerPanelCollapsed: (collapsed: boolean) => void;
 
   // Utility
@@ -395,6 +398,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   availableWorlds: ['world_0'],
   currentUsername: null,
 
+  paletteSide: (localStorage.getItem('mapper-palette-side') as 'left' | 'right') || 'left',
   layerPanelCollapsed: false,
 
   // Notes
@@ -1513,6 +1517,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   setConnected: (isConnected) => set({ isConnected }),
 
   // Panel actions
+  setPaletteSide: (side) => {
+    localStorage.setItem('mapper-palette-side', side);
+    set({ paletteSide: side });
+  },
+  togglePaletteSide: () => {
+    const newSide = useEditorStore.getState().paletteSide === 'left' ? 'right' : 'left';
+    localStorage.setItem('mapper-palette-side', newSide);
+    set({ paletteSide: newSide });
+  },
   setLayerPanelCollapsed: (collapsed) => set({ layerPanelCollapsed: collapsed }),
 
   // Utility

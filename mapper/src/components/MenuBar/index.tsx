@@ -49,6 +49,8 @@ export function MenuBar() {
     currentWorld,
     availableWorlds,
     switchWorld,
+    paletteSide,
+    togglePaletteSide,
   } = useEditorStore();
 
   const [rebuildingAtlas, setRebuildingAtlas] = useState(false);
@@ -734,6 +736,10 @@ export function MenuBar() {
             </button>
             <button className={styles.dropdownItem} onClick={toggleChunkBounds}>
               {showChunkBounds ? '✓ ' : '  '}Show Chunk Bounds
+            </button>
+            <div className={styles.separator} />
+            <button className={styles.dropdownItem} onClick={togglePaletteSide}>
+              Palettes on {paletteSide === 'left' ? 'Right' : 'Left'}
             </button>
             <div className={styles.separator} />
             <button className={styles.dropdownItem} onClick={handleZoomIn}>
