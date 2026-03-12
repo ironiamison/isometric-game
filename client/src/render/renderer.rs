@@ -7780,71 +7780,9 @@ impl Renderer {
 
                 scaled_height
             } else {
-                // Fallback: colored ellipse rendering
-                let (mut base_color, mut highlight_color) = if npc.is_hostile() {
-                    (
-                        Color::from_rgba(80, 180, 80, 255),
-                        Color::from_rgba(120, 220, 120, 255),
-                    )
-                } else {
-                    (
-                        Color::from_rgba(100, 120, 200, 255),
-                        Color::from_rgba(140, 160, 240, 255),
-                    )
-                };
-
-                // Apply death tint to ellipse colors
-                base_color.r *= tint_color.r;
-                base_color.g *= tint_color.g;
-                base_color.b *= tint_color.b;
-                base_color.a *= tint_color.a;
-                highlight_color.r *= tint_color.r;
-                highlight_color.g *= tint_color.g;
-                highlight_color.b *= tint_color.b;
-                highlight_color.a *= tint_color.a;
-
-                // Only animate wobble for hostile/moving NPCs; static NPCs (altars etc.) stay still
-                let wobble = if npc.is_hostile() {
-                    (macroquad::time::get_time() * 4.0 + npc.animation.frame as f64).sin() as f32
-                } else {
-                    0.0
-                };
-                let radius = (10.0 + wobble * 1.5) * zoom;
-                let height_offset = (8.0 + wobble * 2.0) * zoom;
-
-                // Draw shadow (unless disabled)
-                if !npc.no_shadow {
-                    draw_ellipse(
-                        screen_x,
-                        screen_y,
-                        16.0 * zoom,
-                        6.0 * zoom,
-                        0.0,
-                        Color::from_rgba(0, 0, 0, 60),
-                    );
-                }
-
-                // Draw NPC body (oval blob)
-                draw_ellipse(
-                    screen_x,
-                    screen_y - height_offset,
-                    radius,
-                    radius * 0.7,
-                    0.0,
-                    base_color,
-                );
-
-                // Highlight
-                draw_ellipse(
-                    screen_x - 3.0 * zoom,
-                    screen_y - height_offset - 2.0 * zoom,
-                    radius * 0.3,
-                    radius * 0.2,
-                    0.0,
-                    highlight_color,
-                );
-
-                (height_offset + radius) * 2.0
+                // No sprite available — render nothing, just return a plausible height
+                // so name tags / selection indicators still position correctly.
+                40.0 * zoom
             };
 
         // Skip UI elements (name, health bar, icons) while dying
