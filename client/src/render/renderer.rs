@@ -3414,14 +3414,17 @@ impl Renderer {
                 local_y: i32,
                 chunk_coord: crate::game::ChunkCoord,
             },
-            /// Block side face - rendered at lower depth than the tile surface so entities
-            /// standing on the same-height platform aren't occluded by adjacent side faces
+            /// Block side face - each face (+X right, +Y down) is pushed as a
+            /// separate renderable with direction-aware depth so that entities
+            /// in front sort correctly while lower tiles don't clip the cliff.
             BlockSide {
                 screen_x: f32,
                 screen_y: f32,
                 height: u8,
                 block_type_down: u16,
                 block_type_right: u16,
+                skip_right: bool,
+                skip_down: bool,
                 local_x: i32,
                 local_y: i32,
                 chunk_coord: crate::game::ChunkCoord,
@@ -3588,22 +3591,54 @@ impl Renderer {
                             local_y,
                             chunk_coord: *coord,
                         }));
-                        // Block sides extend downward from the tile surface, so they
-                        // should sort at ground level — behind neighboring tiles that
-                        // are in front in isometric view (higher x+y).
+                        // Block sides extend downward from the tile surface.
+                        // Each face is pushed separately with depth based on its
+                        // neighbor's height: sort just BELOW the neighbor's tile
+                        // surface (-0.12) so the neighbor covers the face's bottom
+                        // edge, while the face stays above things further behind.
                         let bt_down = chunk.get_block_type_down(local_x as u32, local_y as u32);
                         let bt_right = chunk.get_block_type_right(local_x as u32, local_y as u32);
-                        let side_depth = calculate_depth(wx, wy, 1) - 0.01;
-                        renderables.push((side_depth, Renderable::BlockSide {
-                            screen_x,
-                            screen_y,
-                            height: h,
-                            block_type_down: bt_down,
-                            block_type_right: bt_right,
-                            local_x,
-                            local_y,
-                            chunk_coord: *coord,
-                        }));
+
+                        // Helper to get neighbor height (handles chunk boundaries)
+                        let get_nh = |nx: i32, ny: i32| -> u8 {
+                            if nx >= 0 && nx < CHUNK_SIZE as i32 && ny >= 0 && ny < CHUNK_SIZE as i32 {
+                                chunk.get_height(nx as u32, ny as u32)
+                            } else {
+                                let nwx = chunk_offset_x + nx;
+                                let nwy = chunk_offset_y + ny;
+                                let nc = crate::game::ChunkCoord::from_world(nwx, nwy);
+                                state.chunk_manager.chunks().get(&nc)
+                                    .map(|c| {
+                                        let (lx, ly) = crate::game::chunk::world_to_local(nwx, nwy);
+                                        c.get_height(lx, ly)
+                                    })
+                                    .unwrap_or(0)
+                            }
+                        };
+
+                        // Right (+X) face: sits between (x,y) and (x+1,y)
+                        let right_nh = get_nh(local_x + 1, local_y);
+                        if h > right_nh {
+                            let rd = calculate_depth_z(wx + 1.0, wy, right_nh as f32, 1) - 0.12;
+                            renderables.push((rd, Renderable::BlockSide {
+                                screen_x, screen_y, height: h,
+                                block_type_down: bt_down, block_type_right: bt_right,
+                                skip_right: false, skip_down: true,
+                                local_x, local_y, chunk_coord: *coord,
+                            }));
+                        }
+
+                        // Down (+Y) face: sits between (x,y) and (x,y+1)
+                        let down_nh = get_nh(local_x, local_y + 1);
+                        if h > down_nh {
+                            let dd = calculate_depth_z(wx, wy + 1.0, down_nh as f32, 1) - 0.12;
+                            renderables.push((dd, Renderable::BlockSide {
+                                screen_x, screen_y, height: h,
+                                block_type_down: bt_down, block_type_right: bt_right,
+                                skip_right: true, skip_down: false,
+                                local_x, local_y, chunk_coord: *coord,
+                            }));
+                        }
                     }
                 }
             }
@@ -3785,7 +3820,10 @@ impl Renderer {
                 }
                 let (lx, ly) = crate::game::chunk::world_to_local(wall.tile_x, wall.tile_y);
                 let tile_z = chunk.get_height(lx, ly) as f32;
-                let depth = calculate_depth_z(wx, wy, tile_z, 1);
+                // Walls are tall sprites extending upward from the tile surface.
+                // Add a small depth boost so they sort above elevated tiles at the
+                // same effective depth, but still below entities (+0.25).
+                let depth = calculate_depth_z(wx, wy, tile_z, 1) + 0.2;
                 renderables.push((depth, Renderable::ChunkWall(wall, tile_z)));
             }
         }
@@ -3941,6 +3979,30 @@ impl Renderer {
                 Renderable::Player(player, is_local) => {
                     let is_selected = state.selected_entity_id.as_ref() == Some(&player.id);
                     let is_hovered = state.hovered_entity_id.as_ref() == Some(&player.id);
+                    // Interpolate ground height at player position for smooth
+                    // shadow movement during height transitions
+                    let ground_z = {
+                        let chunks = state.chunk_manager.chunks();
+                        let get_h = |wx: i32, wy: i32| -> f32 {
+                            let c = crate::game::ChunkCoord::from_world(wx, wy);
+                            let (lx, ly) = crate::game::chunk::world_to_local(wx, wy);
+                            chunks.get(&c)
+                                .map(|ch| ch.get_height(lx, ly) as f32)
+                                .unwrap_or(0.0)
+                        };
+                        let px = player.x.floor() as i32;
+                        let py = player.y.floor() as i32;
+                        let fx = player.x - player.x.floor();
+                        let fy = player.y - player.y.floor();
+                        let h00 = get_h(px, py);
+                        let h10 = get_h(px + 1, py);
+                        let h01 = get_h(px, py + 1);
+                        let h11 = get_h(px + 1, py + 1);
+                        h00 * (1.0 - fx) * (1.0 - fy)
+                            + h10 * fx * (1.0 - fy)
+                            + h01 * (1.0 - fx) * fy
+                            + h11 * fx * fy
+                    };
                     self.render_player(
                         player,
                         is_local,
@@ -3948,6 +4010,7 @@ impl Renderer {
                         is_hovered,
                         &state.camera,
                         &state.item_registry,
+                        ground_z,
                     );
                 }
                 Renderable::Npc(npc) => {
@@ -3970,7 +4033,19 @@ impl Renderer {
                 } => {
                     let zoom = state.camera.zoom;
                     // Tint based on height for depth perception
-                    let brightness = 1.0 + height as f32 * 0.06;
+                    let mut brightness = 1.0 + height as f32 * 0.06;
+
+                    // Ambient occlusion: darken when a neighbor behind (-X/-Y) is taller
+                    if let Some(chunk) = state.chunk_manager.chunks().get(&chunk_coord) {
+                        let h_nx = if local_x > 0 { chunk.get_height((local_x - 1) as u32, local_y as u32) } else { 0 };
+                        let h_ny = if local_y > 0 { chunk.get_height(local_x as u32, (local_y - 1) as u32) } else { 0 };
+                        let max_diff = (h_nx as i32 - height as i32).max(h_ny as i32 - height as i32).max(0);
+                        if max_diff > 0 {
+                            brightness -= max_diff as f32 * 0.15;
+                            brightness = brightness.max(0.5);
+                        }
+                    }
+
                     let c = (brightness * 255.0).min(255.0) as u8;
                     let tint = Color::from_rgba(c, c, c, 255);
                     self.draw_tile_sprite_tinted(
@@ -3990,6 +4065,8 @@ impl Renderer {
                     height,
                     block_type_down,
                     block_type_right,
+                    skip_right,
+                    skip_down,
                     local_x,
                     local_y,
                     chunk_coord,
@@ -3999,6 +4076,7 @@ impl Renderer {
                         self.draw_block_sides(
                             chunk, local_x, local_y, height, block_type_down, block_type_right,
                             screen_x, screen_y, zoom, state, &chunk_coord,
+                            skip_right, skip_down,
                         );
                     }
                 }
@@ -5818,32 +5896,36 @@ impl Renderer {
                                 tile_id
                             };
 
-                            // Draw tile sprite (or fallback to colored tile)
-                            self.draw_tile_sprite(
-                                screen_x,
-                                screen_y,
-                                tile_id,
-                                zoom,
-                                Some((world_x as f32, world_y as f32)),
-                                water_effects,
-                            );
-
-                            // Ambient occlusion: darken ground tiles adjacent to elevated tiles
-                            if chunk_layer_type == ChunkLayerType::Ground && chunk.heights.is_some() {
-                                // Check if any neighbor is elevated (cast shadow on this flat tile)
-                                let max_neighbor_h = [
-                                    if local_x > 0 { chunk.get_height((local_x - 1) as u32, local_y as u32) } else { 0 },
-                                    if local_y > 0 { chunk.get_height(local_x as u32, (local_y - 1) as u32) } else { 0 },
-                                    if local_x + 1 < tile_width as i32 { chunk.get_height((local_x + 1) as u32, local_y as u32) } else { 0 },
-                                    if local_y + 1 < tile_height as i32 { chunk.get_height(local_x as u32, (local_y + 1) as u32) } else { 0 },
-                                ].into_iter().max().unwrap_or(0);
-
-                                if max_neighbor_h > 0 {
-                                    // Draw a semi-transparent dark overlay
-                                    let shadow_alpha = (max_neighbor_h as f32 * 25.0).min(80.0) as u8;
-                                    let shadow = Color::from_rgba(0, 0, 0, shadow_alpha);
-                                    self.draw_isometric_tile(screen_x, screen_y, shadow, zoom);
+                            // Ambient occlusion: darken tiles when a neighbor behind them
+                            // (north/west in world = -X/-Y) is taller, simulating shadow
+                            let ao_tint = if chunk_layer_type == ChunkLayerType::Ground && chunk.heights.is_some() {
+                                let h = chunk.get_height(local_x as u32, local_y as u32);
+                                let h_nx = if local_x > 0 { chunk.get_height((local_x - 1) as u32, local_y as u32) } else { 0 };
+                                let h_ny = if local_y > 0 { chunk.get_height(local_x as u32, (local_y - 1) as u32) } else { 0 };
+                                let max_diff = (h_nx as i32 - h as i32).max(h_ny as i32 - h as i32).max(0);
+                                if max_diff > 0 {
+                                    let brightness = (1.0 - max_diff as f32 * 0.15).max(0.5);
+                                    Some(Color::new(brightness, brightness, brightness, 1.0))
+                                } else {
+                                    None
                                 }
+                            } else {
+                                None
+                            };
+
+                            // Draw tile sprite with optional AO tint baked in
+                            if let Some(tint) = ao_tint {
+                                self.draw_tile_sprite_tinted(
+                                    screen_x, screen_y, tile_id, zoom,
+                                    Some((world_x as f32, world_y as f32)),
+                                    water_effects, tint,
+                                );
+                            } else {
+                                self.draw_tile_sprite(
+                                    screen_x, screen_y, tile_id, zoom,
+                                    Some((world_x as f32, world_y as f32)),
+                                    water_effects,
+                                );
                             }
 
                             // Draw collision indicator in debug mode
@@ -5934,6 +6016,8 @@ impl Renderer {
         zoom: f32,
         state: &GameState,
         coord: &crate::game::ChunkCoord,
+        skip_right: bool,
+        skip_down: bool,
     ) {
         let hw = TILE_WIDTH / 2.0 * zoom;  // half width
         let hh = TILE_HEIGHT / 2.0 * zoom; // half height
@@ -5966,9 +6050,15 @@ impl Renderer {
         let right_sprite = if right_gid > 0 { self.get_wall_sprite(right_gid) } else { None };
         let down_sprite = if down_gid > 0 { self.get_wall_sprite(down_gid) } else { None };
 
+        // Directional face tints — light comes from top-right, so:
+        //   +X face (SE, catches more light) = slightly darkened
+        //   +Y face (SW, faces away from light) = more darkened
+        let right_tint = Color::new(0.82, 0.82, 0.82, 1.0);
+        let down_tint = Color::new(0.65, 0.65, 0.65, 1.0);
+
         // +X face (south/front-right): sprite left edge at bottom vertex
         let nh = get_neighbor(local_x + 1, local_y);
-        if tile_height > nh {
+        if !skip_right && tile_height > nh {
             let units = (tile_height - nh) as usize;
             if let Some((tex, source_rect)) = right_sprite {
                 let face_h = units as f32 * hh;
@@ -6004,7 +6094,7 @@ impl Renderer {
                         tex,
                         draw_x.round(),
                         draw_y.round(),
-                        WHITE,
+                        right_tint,
                         DrawTextureParams {
                             dest_size: Some(Vec2::new(scaled_w, dest_h)),
                             source: src,
@@ -6014,7 +6104,7 @@ impl Renderer {
                 }
             } else {
                 let d = units as f32 * hh;
-                let color = Color::from_rgba(110, 85, 55, 255);
+                let color = Color::from_rgba(90, 70, 45, 255);
                 draw_triangle(vec2(right.0, right.1), vec2(bottom.0, bottom.1), vec2(bottom.0, bottom.1 + d), color);
                 draw_triangle(vec2(right.0, right.1), vec2(bottom.0, bottom.1 + d), vec2(right.0, right.1 + d), color);
             }
@@ -6022,7 +6112,7 @@ impl Renderer {
 
         // +Y face (east/front-left): sprite right edge at bottom vertex
         let nh = get_neighbor(local_x, local_y + 1);
-        if tile_height > nh {
+        if !skip_down && tile_height > nh {
             let units = (tile_height - nh) as usize;
             if let Some((tex, source_rect)) = down_sprite {
                 let face_h = units as f32 * hh;
@@ -6058,7 +6148,7 @@ impl Renderer {
                         tex,
                         draw_x.round(),
                         draw_y.round(),
-                        WHITE,
+                        down_tint,
                         DrawTextureParams {
                             dest_size: Some(Vec2::new(scaled_w, dest_h)),
                             source: src,
@@ -6068,7 +6158,7 @@ impl Renderer {
                 }
             } else {
                 let d = units as f32 * hh;
-                let color = Color::from_rgba(75, 58, 38, 255);
+                let color = Color::from_rgba(49, 38, 25, 255);
                 draw_triangle(vec2(left.0, left.1), vec2(bottom.0, bottom.1), vec2(bottom.0, bottom.1 + d), color);
                 draw_triangle(vec2(left.0, left.1), vec2(bottom.0, bottom.1 + d), vec2(left.0, left.1 + d), color);
             }
@@ -6341,6 +6431,7 @@ impl Renderer {
         is_hovered: bool,
         camera: &Camera,
         item_registry: &crate::game::item_registry::ItemRegistry,
+        ground_z: f32,
     ) {
         let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, camera);
         let zoom = camera.zoom;
@@ -6365,14 +6456,18 @@ impl Renderer {
                 0.0
             };
 
-        // Draw shadow under player
+        // Draw shadow at ground level, scaled by height above ground
+        let height_above_ground = (player.z - ground_z).max(0.0);
+        let shadow_scale = (1.0 - height_above_ground * 0.15).clamp(0.4, 1.0);
+        let shadow_alpha = ((60.0 - height_above_ground * 12.0).clamp(15.0, 60.0)) as u8;
+        let (shadow_sx, shadow_sy) = world_to_screen_z(player.x, player.y, ground_z, camera);
         draw_ellipse(
-            screen_x,
-            screen_y + 4.0 * zoom,
-            16.0 * zoom,
-            7.0 * zoom,
+            shadow_sx,
+            shadow_sy + 4.0 * zoom,
+            16.0 * zoom * shadow_scale,
+            7.0 * zoom * shadow_scale,
             0.0,
-            Color::from_rgba(0, 0, 0, 60),
+            Color::from_rgba(0, 0, 0, shadow_alpha),
         );
 
         // Try to render sprite based on player's appearance, fall back to colored circle

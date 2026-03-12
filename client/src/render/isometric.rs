@@ -88,10 +88,10 @@ pub fn calculate_depth(world_x: f32, world_y: f32, layer: u32) -> f32 {
 }
 
 /// Calculate isometric depth with Z for sorting (painter's algorithm)
-/// Z contributes 0.5 depth per level — enough to maintain stable ordering
-/// at the same x+y position, without dominating spatial sort.
+/// Z contributes 1.0 depth per level — matching the screen-space contribution
+/// of x or y movement (each shifts by TILE_HEIGHT/2 pixels).
 pub fn calculate_depth_z(world_x: f32, world_y: f32, world_z: f32, layer: u32) -> f32 {
-    (layer as f32 * 10000.0) + world_x + world_y + world_z * 0.5
+    (layer as f32 * 10000.0) + world_x + world_y + world_z
 }
 
 #[cfg(test)]
