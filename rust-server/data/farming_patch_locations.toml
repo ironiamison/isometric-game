@@ -1,462 +1,462 @@
 # Farming patch locations in the world
 # Each patch is a fixed allotment that players can plant seeds in.
-# Plot 1: 4x4 grid from (13,-25) to (16,-22) in chunk (0,-1)
-# Plot 2: 4x4 grid from (13,-30) to (16,-27)
-# Plot 3: 4x4 grid from (8,-30) to (11,-27)
-# Plot 4: 4x4 grid from (8,-25) to (11,-22)
+# Plot 1: 4x4 grid from (-7,-30) to (-4,-27)
+# Plot 2: 4x4 grid from (-2,-30) to (1,-27)
+# Plot 3: 4x4 grid from (-2,-25) to (1,-22)
+# Plot 4: 4x4 grid from (-7,-25) to (-4,-22)
 
-# ===== Plot 1 (x: 13-16, y: -25 to -22) =====
+# ===== Plot 1 (x: -7 to -4, y: -30 to -27) =====
 
 [[patches]]
 id = "allotment_1"
-x = 13
-y = -25
+x = -7
+y = -30
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_2"
-x = 14
-y = -25
+x = -6
+y = -30
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_3"
-x = 15
-y = -25
+x = -5
+y = -30
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_4"
-x = 16
-y = -25
+x = -4
+y = -30
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_5"
-x = 13
-y = -24
+x = -7
+y = -29
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_6"
-x = 14
-y = -24
+x = -6
+y = -29
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_7"
-x = 15
-y = -24
+x = -5
+y = -29
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_8"
-x = 16
-y = -24
+x = -4
+y = -29
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_9"
-x = 13
-y = -23
+x = -7
+y = -28
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_10"
-x = 14
-y = -23
+x = -6
+y = -28
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_11"
-x = 15
-y = -23
+x = -5
+y = -28
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_12"
-x = 16
-y = -23
+x = -4
+y = -28
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_13"
-x = 13
-y = -22
+x = -7
+y = -27
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_14"
-x = 14
-y = -22
+x = -6
+y = -27
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_15"
-x = 15
-y = -22
+x = -5
+y = -27
 patch_type = "allotment"
 plot = 1
 
 [[patches]]
 id = "allotment_16"
-x = 16
-y = -22
+x = -4
+y = -27
 patch_type = "allotment"
 plot = 1
 
-# ===== Plot 2 (x: 13-16, y: -30 to -27) =====
+# ===== Plot 2 (x: -2 to 1, y: -30 to -27) =====
 
 [[patches]]
 id = "allotment_17"
-x = 13
+x = -2
 y = -30
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_18"
-x = 14
+x = -1
 y = -30
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_19"
-x = 15
+x = 0
 y = -30
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_20"
-x = 16
+x = 1
 y = -30
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_21"
-x = 13
+x = -2
 y = -29
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_22"
-x = 14
+x = -1
 y = -29
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_23"
-x = 15
+x = 0
 y = -29
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_24"
-x = 16
+x = 1
 y = -29
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_25"
-x = 13
+x = -2
 y = -28
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_26"
-x = 14
+x = -1
 y = -28
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_27"
-x = 15
+x = 0
 y = -28
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_28"
-x = 16
+x = 1
 y = -28
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_29"
-x = 13
+x = -2
 y = -27
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_30"
-x = 14
+x = -1
 y = -27
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_31"
-x = 15
+x = 0
 y = -27
 patch_type = "allotment"
 plot = 2
 
 [[patches]]
 id = "allotment_32"
-x = 16
+x = 1
 y = -27
 patch_type = "allotment"
 plot = 2
 
-# ===== Plot 3 (x: 8-11, y: -30 to -27) =====
+# ===== Plot 3 (x: -2 to 1, y: -25 to -22) =====
 
 [[patches]]
 id = "allotment_33"
-x = 8
-y = -30
+x = -2
+y = -25
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_34"
-x = 9
-y = -30
+x = -1
+y = -25
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_35"
-x = 10
-y = -30
+x = 0
+y = -25
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_36"
-x = 11
-y = -30
+x = 1
+y = -25
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_37"
-x = 8
-y = -29
+x = -2
+y = -24
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_38"
-x = 9
-y = -29
+x = -1
+y = -24
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_39"
-x = 10
-y = -29
+x = 0
+y = -24
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_40"
-x = 11
-y = -29
+x = 1
+y = -24
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_41"
-x = 8
-y = -28
+x = -2
+y = -23
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_42"
-x = 9
-y = -28
+x = -1
+y = -23
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_43"
-x = 10
-y = -28
+x = 0
+y = -23
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_44"
-x = 11
-y = -28
+x = 1
+y = -23
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_45"
-x = 8
-y = -27
+x = -2
+y = -22
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_46"
-x = 9
-y = -27
+x = -1
+y = -22
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_47"
-x = 10
-y = -27
+x = 0
+y = -22
 patch_type = "allotment"
 plot = 3
 
 [[patches]]
 id = "allotment_48"
-x = 11
-y = -27
+x = 1
+y = -22
 patch_type = "allotment"
 plot = 3
 
-# ===== Plot 4 (x: 8-11, y: -25 to -22) =====
+# ===== Plot 4 (x: -7 to -4, y: -25 to -22) =====
 
 [[patches]]
 id = "allotment_49"
-x = 8
+x = -7
 y = -25
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_50"
-x = 9
+x = -6
 y = -25
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_51"
-x = 10
+x = -5
 y = -25
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_52"
-x = 11
+x = -4
 y = -25
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_53"
-x = 8
+x = -7
 y = -24
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_54"
-x = 9
+x = -6
 y = -24
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_55"
-x = 10
+x = -5
 y = -24
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_56"
-x = 11
+x = -4
 y = -24
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_57"
-x = 8
+x = -7
 y = -23
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_58"
-x = 9
+x = -6
 y = -23
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_59"
-x = 10
+x = -5
 y = -23
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_60"
-x = 11
+x = -4
 y = -23
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_61"
-x = 8
+x = -7
 y = -22
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_62"
-x = 9
+x = -6
 y = -22
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_63"
-x = 10
+x = -5
 y = -22
 patch_type = "allotment"
 plot = 4
 
 [[patches]]
 id = "allotment_64"
-x = 11
+x = -4
 y = -22
 patch_type = "allotment"
 plot = 4
