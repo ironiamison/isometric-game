@@ -3094,12 +3094,6 @@
       "level": 1
     },
     {
-      "entityId": "master_farmer",
-      "x": 9,
-      "y": 31,
-      "level": 1
-    },
-    {
       "entityId": "sheep",
       "x": 4,
       "y": 6,
@@ -3423,13 +3417,6 @@
       "y": 19,
       "width": 66,
       "height": 77
-    },
-    {
-      "gid": 2999,
-      "x": 22,
-      "y": 27,
-      "width": 133,
-      "height": 86
     },
     {
       "gid": 2997,
