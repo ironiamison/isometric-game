@@ -18,11 +18,11 @@ use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Scree
 
 use crate::game::tutorial::TutorialManager;
 
-// pub const SERVER_URL: &str = "http://localhost:2567";
-// pub const WS_URL: &str = "ws://localhost:2567";
+pub const SERVER_URL: &str = "http://localhost:2567";
+pub const WS_URL: &str = "ws://localhost:2567";
 
-pub const SERVER_URL: &str = "https://aeven.xyz";
-pub const WS_URL: &str = "wss://aeven.xyz";
+// pub const SERVER_URL: &str = "https://aeven.xyz";
+// pub const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -37,15 +37,15 @@ pub fn maybe_show_control_scheme_dialogue(game_state: &mut GameState) {
             quest_id: "__control_scheme__".to_string(),
             npc_id: String::new(),
             speaker: "Control Scheme".to_string(),
-            text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
+            text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Ctrl to jump, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
             choices: vec![
                 crate::game::state::DialogueChoice {
                     id: "modern".to_string(),
-                    text: "Modern (WASD + Space + Enter)".to_string(),
+                    text: "Modern (WASD + Space Attack + Enter)".to_string(),
                 },
                 crate::game::state::DialogueChoice {
                     id: "classic".to_string(),
-                    text: "Classic (Arrows + Ctrl + Always-on Chat)".to_string(),
+                    text: "Classic (Arrows + Ctrl Attack + Always-on Chat)".to_string(),
                 },
             ],
             show_time: get_time(),
@@ -388,6 +388,7 @@ pub fn run_game_frame(
                 }
                 ClientMessage::Attack
             }
+            InputCommand::Jump => ClientMessage::Jump,
             InputCommand::Target { entity_id } => ClientMessage::Target {
                 entity_id: entity_id.clone(),
             },

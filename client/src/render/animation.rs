@@ -107,8 +107,8 @@ pub fn get_animation_config(state: AnimationState) -> AnimationConfig {
         AnimationState::SittingChair => AnimationConfig::new(2, 2, 1.0, true, false),
         // Sitting ground on row 3, frames 0-1
         AnimationState::SittingGround => AnimationConfig::new(3, 2, 1.0, true, false),
-        // Casting on row 1, frames 4-5
-        AnimationState::Casting => AnimationConfig::new(1, 2, 6.0, false, false),
+        // Casting on row 1, frame 4 (down/right) or 5 (up/left) - single frame per direction
+        AnimationState::Casting => AnimationConfig::new(1, 1, 6.0, false, false),
         // Shooting bow on row 3, frame 2 for down/right, frame 3 for up/left (single frame per direction)
         AnimationState::ShootingBow => AnimationConfig::new(3, 1, 7.0, false, false),
     }
@@ -249,8 +249,12 @@ impl PlayerAnimation {
                 (3, frame_index)
             }
             AnimationState::Casting => {
-                // Row 1, frames 4-5
-                (1, 4 + frame_index)
+                // Row 1, frame 4 for down/right, frame 5 for up/left
+                if use_up_left_anim {
+                    (1, 5)
+                } else {
+                    (1, 4)
+                }
             }
             AnimationState::ShootingBow => {
                 // Row 3, frame 2 for down/right, frame 3 for up/left
@@ -774,7 +778,7 @@ pub fn get_boot_offset(
                 }
             }
         }
-        AnimationState::Casting => (0.0, 0.0),
+        AnimationState::Casting => (-1.0, 1.0),
         AnimationState::ShootingBow => {
             // Same offsets as 2nd attack frame
             if use_back {
@@ -960,7 +964,13 @@ pub fn get_body_armor_offset(
                 }
             }
         }
-        AnimationState::Casting => (0.0, 0.0),
+        AnimationState::Casting => {
+            if use_back {
+                (-1.0, -2.0)
+            } else {
+                (0.0, -3.0)
+            }
+        }
         AnimationState::ShootingBow => {
             // Up/Left: right 1px for up (mirrored left for left), up 2px
             // Down/Right: left 4px, up 3px (mirrored for right)
@@ -1091,9 +1101,9 @@ pub fn get_head_offset(
         }
         AnimationState::Casting => {
             if use_back {
-                (-1.0, 0.0)
+                (-3.0, 0.0)
             } else {
-                (0.0, 0.0)
+                (-2.0, 0.0)
             }
         }
         AnimationState::ShootingBow => {

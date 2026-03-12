@@ -99,6 +99,39 @@ export function isInChunk(world: WorldCoord, chunk: ChunkCoord): boolean {
   );
 }
 
+// Get all tiles in a diamond brush area.
+// Odd sizes: diamond centered on tile (Manhattan distance radius).
+// Even sizes: diamond centered on 2x2 block (top-left at center tile).
+export function getBrushTiles(center: WorldCoord, brushSize: number): WorldCoord[] {
+  if (brushSize <= 1) return [center];
+  const tiles: WorldCoord[] = [];
+  if (brushSize % 2 === 1) {
+    // Odd: diamond with radius r centered on the tile
+    const r = (brushSize - 1) / 2;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) <= r) {
+          tiles.push({ wx: center.wx + dx, wy: center.wy + dy });
+        }
+      }
+    }
+  } else {
+    // Even: 2x2 core expanded by diamond radius r
+    const r = (brushSize - 2) / 2;
+    for (let dy = -r; dy <= r + 1; dy++) {
+      for (let dx = -r; dx <= r + 1; dx++) {
+        // Distance from nearest point in the 2x2 core (0..1, 0..1)
+        const distX = dx < 0 ? -dx : dx > 1 ? dx - 1 : 0;
+        const distY = dy < 0 ? -dy : dy > 1 ? dy - 1 : 0;
+        if (distX + distY <= r) {
+          tiles.push({ wx: center.wx + dx, wy: center.wy + dy });
+        }
+      }
+    }
+  }
+  return tiles;
+}
+
 // Get tile bounds in screen space for rendering
 export function getTileScreenBounds(
   world: WorldCoord,

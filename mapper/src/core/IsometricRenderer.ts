@@ -40,6 +40,7 @@ export interface RenderOptions {
   showMapObjects: boolean;
   showPortals: boolean;
   showNotes: boolean;
+  showHeights: boolean;
   visibleLayers: {
     ground: boolean;
     objects: boolean;
@@ -55,6 +56,7 @@ const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   showMapObjects: true,
   showPortals: true,
   showNotes: true,
+  showHeights: false,
   visibleLayers: {
     ground: true,
     objects: true,
@@ -68,7 +70,9 @@ const DEFAULT_RENDER_OPTIONS: RenderOptions = {
 
 /** Offscreen canvas dimensions for a 32x32 isometric chunk at zoom=1 */
 const CHUNK_CANVAS_WIDTH = CHUNK_SIZE * TILE_WIDTH; // 2048
-const CHUNK_CANVAS_HEIGHT = CHUNK_SIZE * TILE_HEIGHT + TILE_HEIGHT; // 1056
+/** Extra top padding on the tile canvas for elevated tiles (max height 15 * halfTileH) */
+const HEIGHT_TOP_PAD = 15 * (TILE_HEIGHT / 2); // 240
+const CHUNK_CANVAS_HEIGHT = CHUNK_SIZE * TILE_HEIGHT + TILE_HEIGHT + HEIGHT_TOP_PAD; // 1296
 const CHUNK_CANVAS_OFFSET_X = CHUNK_CANVAS_WIDTH / 2; // 1024
 
 interface ChunkCacheEntry {
@@ -77,6 +81,9 @@ interface ChunkCacheEntry {
   groundRef: number[];
   objectsRef: number[];
   overheadRef: number[];
+  heightsRef: Uint8Array | undefined;
+  blockTypesDownRef: Uint16Array | undefined;
+  blockTypesRightRef: Uint16Array | undefined;
   visibleGround: boolean;
   visibleObjects: boolean;
   visibleOverhead: boolean;
@@ -100,6 +107,9 @@ class ChunkTileCache {
       entry.groundRef === chunk.layers.ground &&
       entry.objectsRef === chunk.layers.objects &&
       entry.overheadRef === chunk.layers.overhead &&
+      entry.heightsRef === chunk.heights &&
+      entry.blockTypesDownRef === chunk.blockTypesDown &&
+      entry.blockTypesRightRef === chunk.blockTypesRight &&
       entry.visibleGround === visibleLayers.ground &&
       entry.visibleObjects === visibleLayers.objects &&
       entry.visibleOverhead === visibleLayers.overhead;
@@ -122,6 +132,9 @@ class ChunkTileCache {
         groundRef: chunk.layers.ground,
         objectsRef: chunk.layers.objects,
         overheadRef: chunk.layers.overhead,
+        heightsRef: chunk.heights,
+        blockTypesDownRef: chunk.blockTypesDown,
+        blockTypesRightRef: chunk.blockTypesRight,
         visibleGround: visibleLayers.ground,
         visibleObjects: visibleLayers.objects,
         visibleOverhead: visibleLayers.overhead,
@@ -136,6 +149,9 @@ class ChunkTileCache {
     entry.groundRef = chunk.layers.ground;
     entry.objectsRef = chunk.layers.objects;
     entry.overheadRef = chunk.layers.overhead;
+    entry.heightsRef = chunk.heights;
+    entry.blockTypesDownRef = chunk.blockTypesDown;
+    entry.blockTypesRightRef = chunk.blockTypesRight;
     entry.visibleGround = visibleLayers.ground;
     entry.visibleObjects = visibleLayers.objects;
     entry.visibleOverhead = visibleLayers.overhead;
@@ -157,6 +173,7 @@ class ChunkTileCache {
       entry.groundRef === chunk.layers.ground &&
       entry.objectsRef === chunk.layers.objects &&
       entry.overheadRef === chunk.layers.overhead &&
+      entry.heightsRef === chunk.heights &&
       entry.visibleGround === visibleLayers.ground &&
       entry.visibleObjects === visibleLayers.objects &&
       entry.visibleOverhead === visibleLayers.overhead
@@ -197,16 +214,135 @@ class ChunkTileCache {
 
     const halfTileW = TILE_WIDTH / 2;
     const halfTileH = TILE_HEIGHT / 2;
+    const heights = chunk.heights;
+    const blockTypesDown = chunk.blockTypesDown;
+    const blockTypesRight = chunk.blockTypesRight;
 
     for (let y = 0; y < CHUNK_SIZE; y++) {
       for (let x = 0; x < CHUNK_SIZE; x++) {
         const index = y * CHUNK_SIZE + x;
+        const h = heights ? heights[index] : 0;
+        const zOffset = h * halfTileH;
 
         // Local isometric position (zoom=1, no viewport)
         const localIsoX = (x - y) * halfTileW;
         const localIsoY = (x + y) * halfTileH;
         const drawX = localIsoX - halfTileW + CHUNK_CANVAS_OFFSET_X;
-        const drawY = localIsoY;
+        const drawY = localIsoY + HEIGHT_TOP_PAD - zOffset;
+
+        // Draw block side faces before the tile top (so tile covers the top edge)
+        if (h > 0) {
+          const neighborRight = (x + 1 < CHUNK_SIZE && heights)
+            ? heights[y * CHUNK_SIZE + (x + 1)] : 0;
+          const neighborDown = (y + 1 < CHUNK_SIZE && heights)
+            ? heights[(y + 1) * CHUNK_SIZE + x] : 0;
+
+          const bottomX = drawX + halfTileW;
+          const bottomY = drawY + TILE_HEIGHT;
+          const rightX = drawX + TILE_WIDTH;
+          const rightY = drawY + halfTileH;
+          const leftX = drawX;
+          const leftY = drawY + halfTileH;
+
+          // Look up wall sprites for each face independently
+          const btDown = blockTypesDown ? blockTypesDown[index] : 0;
+          const btRight = blockTypesRight ? blockTypesRight[index] : 0;
+          const wallsFirstGid = objectLoader.getWallsFirstGid();
+          const rightWallDef = btRight > 0 ? objectLoader.getWallByGid(wallsFirstGid + btRight) : undefined;
+          const downWallDef = btDown > 0 ? objectLoader.getWallByGid(wallsFirstGid + btDown) : undefined;
+
+          // Right face (+X direction, south-east)
+          const rightDiff = h - neighborRight;
+          if (rightDiff > 0) {
+            if (rightWallDef?.image) {
+              const ar = rightWallDef.atlasRect;
+              const spriteW = ar ? ar.w : rightWallDef.image.width;
+              const spriteH = ar ? ar.h : rightWallDef.image.height;
+              const srcX = ar ? ar.x : 0;
+              const srcY = ar ? ar.y : 0;
+              const faceH = rightDiff * halfTileH;
+              // Clip to the face parallelogram
+              ctx.save();
+              ctx.beginPath();
+              ctx.moveTo(bottomX, bottomY);
+              ctx.lineTo(rightX, rightY);
+              ctx.lineTo(rightX, rightY + faceH);
+              ctx.lineTo(bottomX, bottomY + faceH);
+              ctx.closePath();
+              ctx.clip();
+              // Directional tint: right face (+X, SE) catches more light
+              ctx.globalAlpha = 0.82;
+              // Tile sprites from bottom up, overlapping by halfTileH for seamless parallelogram tiling
+              const effectiveH = Math.max(spriteH - halfTileH, 1);
+              const count = Math.ceil(faceH / effectiveH) + 1;
+              for (let i = 0; i < count; i++) {
+                ctx.drawImage(
+                  rightWallDef.image,
+                  srcX, srcY, spriteW, spriteH,
+                  bottomX, bottomY + faceH - spriteH - i * effectiveH, spriteW, spriteH,
+                );
+              }
+              ctx.globalAlpha = 1.0;
+              ctx.restore();
+            } else {
+              const faceH = rightDiff * halfTileH;
+              ctx.fillStyle = "rgb(90, 70, 45)";
+              ctx.beginPath();
+              ctx.moveTo(bottomX, bottomY);
+              ctx.lineTo(rightX, rightY);
+              ctx.lineTo(rightX, rightY + faceH);
+              ctx.lineTo(bottomX, bottomY + faceH);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+
+          // Left face (+Y direction, south-west)
+          const downDiff = h - neighborDown;
+          if (downDiff > 0) {
+            if (downWallDef?.image) {
+              const ar = downWallDef.atlasRect;
+              const spriteW = ar ? ar.w : downWallDef.image.width;
+              const spriteH = ar ? ar.h : downWallDef.image.height;
+              const srcX = ar ? ar.x : 0;
+              const srcY = ar ? ar.y : 0;
+              const faceH = downDiff * halfTileH;
+              // Clip to the face parallelogram
+              ctx.save();
+              ctx.beginPath();
+              ctx.moveTo(bottomX, bottomY);
+              ctx.lineTo(leftX, leftY);
+              ctx.lineTo(leftX, leftY + faceH);
+              ctx.lineTo(bottomX, bottomY + faceH);
+              ctx.closePath();
+              ctx.clip();
+              // Directional tint: down face (+Y, SW) faces away from light
+              ctx.globalAlpha = 0.65;
+              // Tile sprites from bottom up, overlapping by halfTileH for seamless parallelogram tiling
+              const effectiveH = Math.max(spriteH - halfTileH, 1);
+              const count = Math.ceil(faceH / effectiveH) + 1;
+              for (let i = 0; i < count; i++) {
+                ctx.drawImage(
+                  downWallDef.image,
+                  srcX, srcY, spriteW, spriteH,
+                  bottomX - spriteW, bottomY + faceH - spriteH - i * effectiveH, spriteW, spriteH,
+                );
+              }
+              ctx.globalAlpha = 1.0;
+              ctx.restore();
+            } else {
+              const faceH = downDiff * halfTileH;
+              ctx.fillStyle = "rgb(49, 38, 25)";
+              ctx.beginPath();
+              ctx.moveTo(bottomX, bottomY);
+              ctx.lineTo(leftX, leftY);
+              ctx.lineTo(leftX, leftY + faceH);
+              ctx.lineTo(bottomX, bottomY + faceH);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+        }
 
         if (visibleLayers.ground) {
           const gid = chunk.layers.ground[index];
@@ -249,6 +385,7 @@ interface ObjectCacheEntry {
   ctx: CanvasRenderingContext2D;
   mapObjectsRef: MapObject[];
   wallsRef: Wall[];
+  heightsRef: Uint8Array | undefined;
   animatedSprites: AnimatedSpriteInfo[];
 }
 
@@ -263,7 +400,8 @@ class ChunkObjectCache {
     const isValid =
       entry &&
       entry.mapObjectsRef === chunk.mapObjects &&
-      entry.wallsRef === chunk.walls;
+      entry.wallsRef === chunk.walls &&
+      entry.heightsRef === chunk.heights;
 
     if (isValid) {
       this.touch(key);
@@ -281,6 +419,7 @@ class ChunkObjectCache {
         ctx,
         mapObjectsRef: chunk.mapObjects,
         wallsRef: chunk.walls,
+        heightsRef: chunk.heights,
         animatedSprites: [],
       };
       this.cache.set(key, entry);
@@ -289,6 +428,7 @@ class ChunkObjectCache {
     this.renderToCache(entry, chunk);
     entry.mapObjectsRef = chunk.mapObjects;
     entry.wallsRef = chunk.walls;
+    entry.heightsRef = chunk.heights;
 
     this.touch(key);
     this.evict();
@@ -301,7 +441,8 @@ class ChunkObjectCache {
     return !!(
       entry &&
       entry.mapObjectsRef === chunk.mapObjects &&
-      entry.wallsRef === chunk.walls
+      entry.wallsRef === chunk.walls &&
+      entry.heightsRef === chunk.heights
     );
   }
 
@@ -354,6 +495,8 @@ class ChunkObjectCache {
     }
     renderables.sort((a, b) => a.depth - b.depth);
 
+    const heights = chunk.heights;
+
     for (const r of renderables) {
       if (r.type === "object" && r.obj) {
         const obj = r.obj;
@@ -370,11 +513,15 @@ class ChunkObjectCache {
         const spriteW = ar ? ar.w : obj.width;
         const spriteH = ar ? ar.h : obj.height;
 
+        // Get height at this tile
+        const tileH = heights ? heights[obj.y * CHUNK_SIZE + obj.x] || 0 : 0;
+        const zOffset = tileH * halfTileH;
+
         // Local iso position (same coord space as tile cache)
         const localIsoX = (obj.x - obj.y) * halfTileW;
         const localIsoY = (obj.x + obj.y) * halfTileH;
         const centerX = localIsoX + OBJ_CANVAS_OFFSET_X;
-        const baseY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD;
+        const baseY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD - zOffset;
 
         const drawX = centerX - spriteW / 2;
         const drawY = baseY - spriteH;
@@ -405,10 +552,14 @@ class ChunkObjectCache {
         const spriteW = ar ? ar.w : objDef.image.width;
         const spriteH = ar ? ar.h : objDef.image.height;
 
+        // Get height at this tile
+        const tileH = heights ? heights[wall.y * CHUNK_SIZE + wall.x] || 0 : 0;
+        const zOffset = tileH * halfTileH;
+
         const localIsoX = (wall.x - wall.y) * halfTileW;
         const localIsoY = (wall.x + wall.y) * halfTileH;
         const bottomVertexX = localIsoX + OBJ_CANVAS_OFFSET_X;
-        const bottomVertexY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD;
+        const bottomVertexY = localIsoY + TILE_HEIGHT + OBJ_CANVAS_TOP_PAD - zOffset;
 
         let drawX: number;
         if (wall.edge === "down") {
@@ -665,6 +816,12 @@ export class IsometricRenderer {
       this.renderGatheringZones(chunk, viewport);
     }
 
+    if (this.options.showHeights) {
+      for (const chunk of sortedChunks) {
+        this.renderHeightLabels(chunk, viewport);
+      }
+    }
+
     this.renderNotes(viewport);
 
     if (this.options.showGrid) {
@@ -702,7 +859,7 @@ export class IsometricRenderer {
 
     const destX =
       (chunkIsoX - CHUNK_CANVAS_OFFSET_X) * viewport.zoom + viewport.offsetX;
-    const destY = chunkIsoY * viewport.zoom + viewport.offsetY;
+    const destY = (chunkIsoY - HEIGHT_TOP_PAD) * viewport.zoom + viewport.offsetY;
     const destW = CHUNK_CANVAS_WIDTH * viewport.zoom;
     const destH = CHUNK_CANVAS_HEIGHT * viewport.zoom;
 
@@ -1210,6 +1367,39 @@ export class IsometricRenderer {
     );
   }
 
+  private renderHeightLabels(chunk: Chunk, viewport: Viewport): void {
+    if (!this.ctx || !chunk.heights) return;
+
+    const halfTileH = (TILE_HEIGHT / 2) * viewport.zoom;
+    const fontSize = Math.max(8, Math.round(12 * viewport.zoom));
+    this.ctx.font = `bold ${fontSize}px monospace`;
+    this.ctx.textAlign = "center";
+    this.ctx.textBaseline = "middle";
+
+    for (let i = 0; i < chunk.width * chunk.height; i++) {
+      const h = chunk.heights[i];
+      if (h === 0) continue;
+
+      const local = indexToLocal(i, chunk.width);
+      const worldCoord = chunkLocalToWorld(chunk.coord, local);
+      const screen = worldToScreen(worldCoord, viewport);
+      const zOffset = h * halfTileH;
+
+      const cx = screen.sx;
+      const cy = screen.sy + (TILE_HEIGHT / 2) * viewport.zoom - zOffset;
+
+      // Background circle
+      this.ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, fontSize * 0.7, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Height number
+      this.ctx.fillStyle = "#ffcc00";
+      this.ctx.fillText(String(h), cx, cy);
+    }
+  }
+
   private renderCollisionOverlay(chunk: Chunk, viewport: Viewport): void {
     if (!this.ctx) return;
 
@@ -1248,6 +1438,10 @@ export class IsometricRenderer {
     const worldCoord = chunkLocalToWorld(chunk.coord, { lx: obj.x, ly: obj.y });
     const screen = worldToScreen(worldCoord, viewport);
 
+    // Apply height offset
+    const tileH = chunk.heights ? chunk.heights[obj.y * CHUNK_SIZE + obj.x] || 0 : 0;
+    const zOffset = tileH * (TILE_HEIGHT / 2) * viewport.zoom;
+
     const objDef = objectLoader.getObject(objectLoader.gidToId(obj.gid));
 
     if (objDef?.image) {
@@ -1258,7 +1452,7 @@ export class IsometricRenderer {
       const scaledHeight = spriteH * viewport.zoom;
 
       const drawX = screen.sx - scaledWidth / 2;
-      const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight;
+      const drawY = screen.sy + TILE_HEIGHT * viewport.zoom - scaledHeight - zOffset;
 
       const srcX = r ? getAnimatedSourceX(r, objDef.frames, objDef.fps) : 0;
       this.ctx.drawImage(
@@ -1284,6 +1478,10 @@ export class IsometricRenderer {
     });
     const screen = worldToScreen(worldCoord, viewport);
 
+    // Apply height offset
+    const tileH = chunk.heights ? chunk.heights[wall.y * CHUNK_SIZE + wall.x] || 0 : 0;
+    const zOffset = tileH * (TILE_HEIGHT / 2) * viewport.zoom;
+
     const objDef = objectLoader.getWallByGid(wall.gid);
 
     if (objDef?.image) {
@@ -1294,7 +1492,7 @@ export class IsometricRenderer {
       const scaledHeight = spriteH * viewport.zoom;
 
       const bottomVertexX = screen.sx;
-      const bottomVertexY = screen.sy + TILE_HEIGHT * viewport.zoom;
+      const bottomVertexY = screen.sy + TILE_HEIGHT * viewport.zoom - zOffset;
 
       let drawX: number;
       let drawY: number;

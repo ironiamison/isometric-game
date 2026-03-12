@@ -197,7 +197,12 @@ fn handle_player_joined(value: &rmpv::Value, state: &mut GameState) {
         gender,
         skin
     );
+    let z = extract_i32(value, "z").unwrap_or(0);
     let mut player = Player::new(id.clone(), name, x, y, gender, skin);
+    // Snap Z immediately so players on elevated platforms render correctly
+    player.z = z as f32;
+    player.server_z = z as f32;
+    player.target_z = z as f32;
     player.hair_style = hair_style;
     player.hair_color = hair_color;
     player.equipped_head = equipped_head;
@@ -358,6 +363,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             // Server sends i32 grid positions
             let x = extract_i32(player_value, "x");
             let y = extract_i32(player_value, "y");
+            let z = extract_i32(player_value, "z").unwrap_or(0);
             let direction = extract_i32(player_value, "direction");
             let hp = extract_i32(player_value, "hp");
             let max_hp = extract_i32(player_value, "maxHp");
@@ -435,10 +441,13 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 }
 
                 if let (Some(x), Some(y)) = (x, y) {
-                    // Set server state - local player direction only updates when moving
+                    if is_local_player && (vel_x != 0.0 || vel_y != 0.0 || player.vel_x != 0.0 || player.vel_y != 0.0) {
+                        macroquad::logging::info!("[SYNC] pos=({},{}) z={} vel=({},{}) ack={:?}", x, y, z, vel_x, vel_y, move_ack_seq);
+                    }
                     player.set_server_state(
                         x as f32,
                         y as f32,
+                        z,
                         vel_x,
                         vel_y,
                         dir,
@@ -577,6 +586,11 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                     );
                     let mut new_player =
                         Player::new(id.clone(), name.clone(), px as f32, py as f32, gender, skin);
+                    // Snap Z immediately so players on elevated platforms don't
+                    // briefly appear at ground level when first created.
+                    new_player.z = z as f32;
+                    new_player.server_z = z as f32;
+                    new_player.target_z = z as f32;
                     new_player.hair_style = hair_style;
                     new_player.hair_color = hair_color;
                     new_player.equipped_head = equipped_head;
@@ -740,6 +754,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             // Server sends i32 grid positions
             let x = extract_i32(npc_value, "x").unwrap_or(0) as f32;
             let y = extract_i32(npc_value, "y").unwrap_or(0) as f32;
+            let npc_z = extract_i32(npc_value, "z").unwrap_or(0) as f32;
             let direction = extract_u8(npc_value, "direction").unwrap_or(0);
             let hp = extract_i32(npc_value, "hp").unwrap_or(50);
             let max_hp = extract_i32(npc_value, "max_hp").unwrap_or(50);
@@ -761,6 +776,8 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             if let Some(npc) = state.npcs.get_mut(&id) {
                 // Update existing NPC - interpolate toward new grid position
                 npc.set_server_position(x, y);
+                npc.server_z = npc_z;
+                npc.target_z = npc_z;
                 npc.direction = Direction::from_u8(direction);
                 // Update last_damage_time if HP decreased (ensures HP bar shows)
                 if hp < npc.hp {
@@ -802,6 +819,10 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             } else {
                 // New NPC - add to state
                 let mut npc = Npc::new(id.clone(), entity_type, x, y);
+                // Snap Z immediately so NPCs on elevated platforms render correctly
+                npc.z = npc_z;
+                npc.server_z = npc_z;
+                npc.target_z = npc_z;
                 npc.display_name = display_name;
                 npc.direction = Direction::from_u8(direction);
                 npc.hp = hp;
@@ -1013,24 +1034,30 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // Spawn projectile for ranged attacks
                 if let Some(ref projectile_type) = projectile {
                     if let Some(ref source_id) = source_id {
-                        // Get source tile center (rounded to ensure straight isometric lines)
+                        // Get source position + Z (check players then NPCs)
                         let source_pos = if let Some(player) = state.players.get(source_id) {
-                            Some((player.x.round(), player.y.round()))
+                            Some((player.x.round(), player.y.round(), player.z))
+                        } else if let Some(npc) = state.npcs.get(source_id) {
+                            Some((npc.x.round(), npc.y.round(), npc.z))
                         } else {
                             None
                         };
 
-                        if let Some((src_x, src_y)) = source_pos {
+                        if let Some((src_x, src_y, src_z)) = source_pos {
                             // Target tile center (rounded for straight isometric lines)
                             let end_x = target_x.round();
                             let end_y = target_y.round();
+                            // Look up target Z from terrain height
+                            let end_z = state.chunk_manager.get_height(end_x as i32, end_y as i32) as f32;
 
                             state.projectiles.push(crate::game::Projectile {
                                 sprite: projectile_type.clone(),
                                 start_x: src_x,
                                 start_y: src_y,
+                                start_z: src_z,
                                 end_x,
                                 end_y,
+                                end_z,
                                 start_time: current_time,
                                 duration: 0.15, // Fast arrow travel
                             });
@@ -1583,11 +1610,29 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
+                // Parse optional heightmap data
+                let heightmap: Option<Vec<u8>> = extract_array(value, "heightmap").map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_i64().map(|i| i as u8))
+                        .collect()
+                });
+                let block_types_down: Option<Vec<u16>> = extract_array(value, "blockTypesDown").map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_i64().map(|i| i as u16))
+                        .collect()
+                });
+                let block_types_right: Option<Vec<u16>> = extract_array(value, "blockTypesRight").map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_i64().map(|i| i as u16))
+                        .collect()
+                });
+
                 log::debug!("Received chunk data: ({}, {}) with {} layers, {} collision bytes, {} objects, {} walls, {} portals",
                     chunk_x, chunk_y, layers.len(), collision.len(), objects.len(), walls.len(), portals.len());
 
                 state.chunk_manager.load_chunk(
                     chunk_x, chunk_y, layers, &collision, objects, walls, portals,
+                    heightmap, block_types_down, block_types_right,
                 );
             }
         }

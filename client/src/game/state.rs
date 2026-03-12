@@ -258,6 +258,7 @@ pub struct AutoActionState {
 pub struct Camera {
     pub x: f32,
     pub y: f32,
+    pub z: f32,
     pub zoom: f32,
     pub initialized: bool,
     pub transition_from: Option<(f32, f32)>, // Starting position of transition
@@ -269,6 +270,7 @@ impl Default for Camera {
         Self {
             x: 0.0,
             y: 0.0,
+            z: 0.0,
             zoom: 1.0,
             initialized: false,
             transition_from: None,
@@ -424,8 +426,10 @@ pub struct Projectile {
     pub sprite: String,
     pub start_x: f32,
     pub start_y: f32,
+    pub start_z: f32,
     pub end_x: f32,
     pub end_y: f32,
+    pub end_z: f32,
     pub start_time: f64,
     pub duration: f64,
 }
@@ -442,12 +446,13 @@ impl Projectile {
         current_time - self.start_time >= self.duration
     }
 
-    /// Get current world position
-    pub fn current_pos(&self, current_time: f64) -> (f32, f32) {
+    /// Get current world position with Z
+    pub fn current_pos(&self, current_time: f64) -> (f32, f32, f32) {
         let t = self.progress(current_time);
         let x = self.start_x + (self.end_x - self.start_x) * t;
         let y = self.start_y + (self.end_y - self.start_y) * t;
-        (x, y)
+        let z = self.start_z + (self.end_z - self.start_z) * t;
+        (x, y, z)
     }
 }
 
@@ -1828,9 +1833,13 @@ pub struct GameState {
 
     // Debug
     pub debug_mode: bool,
+    /// Debug animation viewer: cycles through all animation states/frames
+    /// None = off, Some((state_index, paused)) = active
+    pub debug_anim_viewer: Option<(usize, bool)>,
 
     // Tile hover state (world coordinates of tile under mouse)
     pub hovered_tile: Option<(i32, i32)>,
+    pub hovered_tile_z: i32,
 
     // Entity hover state (ID of entity under mouse cursor)
     pub hovered_entity_id: Option<String>,
@@ -1988,7 +1997,9 @@ impl GameState {
             high_ping_movement_mode: false,
             state_sync_catchup_ticks: 0,
             debug_mode: false,
+            debug_anim_viewer: None,
             hovered_tile: None,
+            hovered_tile_z: 0,
             hovered_entity_id: None,
             auto_path: None,
             auto_action_state: None,
@@ -2034,12 +2045,15 @@ impl GameState {
         self.next_move_seq = self.next_move_seq.wrapping_add(1);
         let seq = self.next_move_seq;
 
-        // Track only directional intents; stop packets (0,0) are not predictive.
         if dx.abs() > 0.1 || dy.abs() > 0.1 {
             self.pending_move_seqs.push_back(seq);
             while self.pending_move_seqs.len() > 128 {
                 self.pending_move_seqs.pop_front();
             }
+        } else {
+            // Stop command: clear all pending predictions immediately so
+            // lookahead goes to 0 and the visual stops predicting ahead.
+            self.pending_move_seqs.clear();
         }
 
         seq
@@ -2221,6 +2235,7 @@ impl GameState {
                     self.camera.x = player.x;
                     self.camera.y = player.y;
                 }
+                self.camera.z = player.z;
                 self.camera.initialized = true;
             }
         }

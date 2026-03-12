@@ -89,3 +89,82 @@
   color: var(--accent);
   stroke-width: 3;
 }
+
+/* Spacer pushes brush size to bottom */
+.spacer {
+  flex: 1;
+}
+
+/* Brush size indicator */
+.brushSize {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.brushSize::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--bg-elevated);
+  color: var(--text-bright);
+  font-size: 11px;
+  font-family: var(--font-body);
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-medium);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1000;
+}
+
+.brushSize:hover::after {
+  opacity: 1;
+}
+
+.brushLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+  font-family: var(--font-mono, monospace);
+  line-height: 1;
+}
+
+.brushControls {
+  display: flex;
+  gap: 1px;
+}
+
+.brushBtn {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+}
+
+.brushBtn:hover:not(:disabled) {
+  color: var(--text-bright);
+  background: rgba(78, 205, 196, 0.1);
+  border-color: var(--accent);
+}
+
+.brushBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}

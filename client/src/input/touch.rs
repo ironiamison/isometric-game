@@ -38,7 +38,7 @@ fn virtual_screen_size() -> (f32, f32) {
     }
 }
 
-/// D-pad direction
+/// D-pad direction (cardinal + diagonal)
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum DPadDirection {
     None,
@@ -46,16 +46,24 @@ pub enum DPadDirection {
     Down,
     Left,
     Right,
+    UpLeft,
+    UpRight,
+    DownLeft,
+    DownRight,
 }
 
 impl DPadDirection {
     pub fn to_direction_u8(self) -> u8 {
-        // Must match server Direction enum: Down=0, Left=1, Up=2, Right=3
+        // Must match server Direction enum
         match self {
             DPadDirection::Down => 0,
             DPadDirection::Left => 1,
             DPadDirection::Up => 2,
             DPadDirection::Right => 3,
+            DPadDirection::DownLeft => 4,
+            DPadDirection::DownRight => 5,
+            DPadDirection::UpLeft => 6,
+            DPadDirection::UpRight => 7,
             DPadDirection::None => 0, // Default to down
         }
     }
@@ -66,6 +74,10 @@ impl DPadDirection {
             DPadDirection::Down => (0.0, 1.0),
             DPadDirection::Left => (-1.0, 0.0),
             DPadDirection::Right => (1.0, 0.0),
+            DPadDirection::UpLeft => (-1.0, -1.0),
+            DPadDirection::UpRight => (1.0, -1.0),
+            DPadDirection::DownLeft => (-1.0, 1.0),
+            DPadDirection::DownRight => (1.0, 1.0),
             DPadDirection::None => (0.0, 0.0),
         }
     }
@@ -121,25 +133,37 @@ impl VirtualDPad {
     fn get_button_rect(&self, dir: DPadDirection) -> (f32, f32, f32, f32) {
         let half = self.button_size / 2.0;
         let offset = self.button_size + self.gap;
+        let diag_size = self.button_size * 0.75;
+        let diag_half = diag_size / 2.0;
 
-        let (ox, oy) = match dir {
-            DPadDirection::Up => (0.0, -offset),
-            DPadDirection::Down => (0.0, offset),
-            DPadDirection::Left => (-offset, 0.0),
-            DPadDirection::Right => (offset, 0.0),
-            DPadDirection::None => (0.0, 0.0),
-        };
-
-        (
-            self.center.x + ox - half,
-            self.center.y + oy - half,
-            self.button_size,
-            self.button_size,
-        )
+        match dir {
+            DPadDirection::Up => (self.center.x - half, self.center.y - offset - half, self.button_size, self.button_size),
+            DPadDirection::Down => (self.center.x - half, self.center.y + offset - half, self.button_size, self.button_size),
+            DPadDirection::Left => (self.center.x - offset - half, self.center.y - half, self.button_size, self.button_size),
+            DPadDirection::Right => (self.center.x + offset - half, self.center.y - half, self.button_size, self.button_size),
+            DPadDirection::UpLeft => (self.center.x - offset - diag_half, self.center.y - offset - diag_half, diag_size, diag_size),
+            DPadDirection::UpRight => (self.center.x + offset - diag_half, self.center.y - offset - diag_half, diag_size, diag_size),
+            DPadDirection::DownLeft => (self.center.x - offset - diag_half, self.center.y + offset - diag_half, diag_size, diag_size),
+            DPadDirection::DownRight => (self.center.x + offset - diag_half, self.center.y + offset - diag_half, diag_size, diag_size),
+            DPadDirection::None => (self.center.x - half, self.center.y - half, self.button_size, self.button_size),
+        }
     }
 
     /// Check which direction a point is in
     fn hit_test(&self, x: f32, y: f32) -> DPadDirection {
+        // Check diagonals first (smaller, in corners)
+        for dir in [
+            DPadDirection::UpLeft,
+            DPadDirection::UpRight,
+            DPadDirection::DownLeft,
+            DPadDirection::DownRight,
+        ] {
+            let (rx, ry, rw, rh) = self.get_button_rect(dir);
+            if x >= rx && x < rx + rw && y >= ry && y < ry + rh {
+                return dir;
+            }
+        }
+        // Then check cardinals
         for dir in [
             DPadDirection::Up,
             DPadDirection::Down,
@@ -275,15 +299,18 @@ impl VirtualDPad {
 
     /// Render the D-pad
     pub fn render(&self) {
-        let directions = [
-            DPadDirection::Up,
-            DPadDirection::Down,
-            DPadDirection::Left,
-            DPadDirection::Right,
+        let all_directions = [
+            (DPadDirection::Up, "^"),
+            (DPadDirection::Down, "v"),
+            (DPadDirection::Left, "<"),
+            (DPadDirection::Right, ">"),
+            (DPadDirection::UpLeft, "\\"),
+            (DPadDirection::UpRight, "/"),
+            (DPadDirection::DownLeft, "/"),
+            (DPadDirection::DownRight, "\\"),
         ];
-        let arrows = ["^", "v", "<", ">"];
 
-        for (dir, arrow) in directions.iter().zip(arrows.iter()) {
+        for (dir, arrow) in &all_directions {
             let (x, y, w, h) = self.get_button_rect(*dir);
             let is_pressed = self.current_dir == *dir;
 
@@ -360,20 +387,22 @@ impl VirtualJoystick {
         }
     }
 
-    /// Map an angle to a 4-way cardinal direction
+    /// Map an angle to an 8-way direction
     fn angle_to_direction(dx: f32, dy: f32) -> DPadDirection {
-        // atan2 gives angle from positive X axis, but we want cardinal directions
         let angle = dy.atan2(dx);
-        // Divide circle into 4 quadrants: right (-45..45), down (45..135), left (135..-135), up (-135..-45)
         let pi = std::f32::consts::PI;
-        if angle > -pi / 4.0 && angle <= pi / 4.0 {
-            DPadDirection::Right
-        } else if angle > pi / 4.0 && angle <= 3.0 * pi / 4.0 {
-            DPadDirection::Down
-        } else if angle > -3.0 * pi / 4.0 && angle <= -pi / 4.0 {
-            DPadDirection::Up
-        } else {
-            DPadDirection::Left
+        // Divide circle into 8 sectors of 45 degrees each
+        let sector = ((angle + pi) / (pi / 4.0)).floor() as i32 % 8;
+        match sector {
+            0 => DPadDirection::Left,      // -180 to -135
+            1 => DPadDirection::UpLeft,    // -135 to -90
+            2 => DPadDirection::Up,        // -90 to -45
+            3 => DPadDirection::UpRight,   // -45 to 0
+            4 => DPadDirection::Right,     // 0 to 45
+            5 => DPadDirection::DownRight, // 45 to 90
+            6 => DPadDirection::Down,      // 90 to 135
+            7 => DPadDirection::DownLeft,  // 135 to 180
+            _ => DPadDirection::None,
         }
     }
 

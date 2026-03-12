@@ -358,9 +358,16 @@ app.get('/login', (_req, res) => {
   res.send(LOGIN_HTML.replace('ERRPLACEHOLDER', ''));
 });
 
-// Auth check for all routes (except login)
+// Auth check for all routes (except login and API in dev)
 app.use((req, res, next) => {
   if (req.path === '/login') return next();
+  // Skip auth for API routes when accessed directly (dev proxy)
+  if (req.path.startsWith('/api/') || req.path.includes('mapper-config') || req.path.startsWith('/mapper/api/')) {
+    const cookies = parseCookies(req.headers.cookie);
+    const user = getUserFromToken(cookies.mapper_token || '');
+    (req as any).mapperUser = user || 'dev';
+    return next();
+  }
   const cookies = parseCookies(req.headers.cookie);
   const user = getUserFromToken(cookies.mapper_token || '');
   if (user) {
@@ -1098,11 +1105,28 @@ app.post('/api/assets/upload', upload.single('file') as any, async (req, res) =>
         }
       }
 
-      // Find next tile index
+      // Ensure tiles_extracted/ is populated from the current tiles.png
+      // so that reconstruct doesn't wipe existing tiles
       await fs.mkdir(TILES_EXTRACTED_DIR, { recursive: true });
       const existingTiles = await fs.readdir(TILES_EXTRACTED_DIR);
+      const hasTileFiles = existingTiles.some(f => /^tile_\d+\.png$/.test(f));
+      if (!hasTileFiles) {
+        const tilesPath = path.join(CLIENT_SPRITES_DIR, 'tiles.png');
+        try {
+          await fs.access(tilesPath);
+          console.log('[Tile Import] tiles_extracted/ is empty, extracting from tiles.png first...');
+          await execAsync(
+            `cd "${projectRoot}" && python3 tools/tiles_sheet.py extract --input "${tilesPath}" --output "${TILES_EXTRACTED_DIR}"`,
+            { timeout: 60000 }
+          );
+        } catch {
+          // tiles.png doesn't exist yet — first-time import, nothing to extract
+        }
+      }
+      // Re-read after potential extraction to get accurate max index
+      const tileFiles = await fs.readdir(TILES_EXTRACTED_DIR);
       let maxIdx = -1;
-      for (const f of existingTiles) {
+      for (const f of tileFiles) {
         const m = f.match(/^tile_(\d+)\.png$/);
         if (m) maxIdx = Math.max(maxIdx, parseInt(m[1]));
       }

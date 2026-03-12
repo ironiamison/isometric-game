@@ -18,9 +18,11 @@ pub fn world_to_screen(world_x: f32, world_y: f32, camera: &Camera) -> (f32, f32
     let cam_iso_y = (camera.x + camera.y) * (TILE_HEIGHT / 2.0);
 
     // Apply camera offset and zoom, center on screen (using virtual size for mobile)
+    // Camera Z shifts view to keep player centered when at elevation
+    let cam_z_offset = camera.z * (TILE_HEIGHT / 2.0) * camera.zoom;
     let (vw, vh) = virtual_screen_size();
     let screen_x = (iso_x - cam_iso_x) * camera.zoom + (vw / 2.0).floor();
-    let screen_y = (iso_y - cam_iso_y) * camera.zoom + (vh / 2.0).floor();
+    let screen_y = (iso_y - cam_iso_y) * camera.zoom + (vh / 2.0).floor() + cam_z_offset;
 
     // Pixel snap for crisp rendering (no sub-pixel jitter)
     (screen_x.round(), screen_y.round())
@@ -35,9 +37,10 @@ pub fn world_to_screen_exact(world_x: f32, world_y: f32, camera: &Camera) -> (f3
     let cam_iso_x = (camera.x - camera.y) * (TILE_WIDTH / 2.0);
     let cam_iso_y = (camera.x + camera.y) * (TILE_HEIGHT / 2.0);
 
+    let cam_z_offset = camera.z * (TILE_HEIGHT / 2.0) * camera.zoom;
     let (vw, vh) = virtual_screen_size();
     let screen_x = (iso_x - cam_iso_x) * camera.zoom + (vw / 2.0).floor();
-    let screen_y = (iso_y - cam_iso_y) * camera.zoom + (vh / 2.0).floor();
+    let screen_y = (iso_y - cam_iso_y) * camera.zoom + (vh / 2.0).floor() + cam_z_offset;
 
     (screen_x, screen_y)
 }
@@ -49,9 +52,10 @@ pub fn screen_to_world(screen_x: f32, screen_y: f32, camera: &Camera) -> (f32, f
     let cam_iso_y = (camera.x + camera.y) * (TILE_HEIGHT / 2.0);
 
     // Reverse the screen transformation (using virtual size for mobile)
+    let cam_z_offset = camera.z * (TILE_HEIGHT / 2.0) * camera.zoom;
     let (vw, vh) = virtual_screen_size();
     let iso_x = (screen_x - vw / 2.0) / camera.zoom + cam_iso_x;
-    let iso_y = (screen_y - vh / 2.0) / camera.zoom + cam_iso_y;
+    let iso_y = (screen_y - cam_z_offset - vh / 2.0) / camera.zoom + cam_iso_y;
 
     // Reverse the isometric transformation
     let world_x = (iso_x / (TILE_WIDTH / 2.0) + iso_y / (TILE_HEIGHT / 2.0)) / 2.0;
@@ -60,12 +64,34 @@ pub fn screen_to_world(screen_x: f32, screen_y: f32, camera: &Camera) -> (f32, f
     (world_x, world_y)
 }
 
+/// Convert world (game) coordinates with Z height to screen (pixel) coordinates
+/// Z offsets the entity upward: each Z unit = half a tile height
+pub fn world_to_screen_z(world_x: f32, world_y: f32, world_z: f32, camera: &Camera) -> (f32, f32) {
+    let (sx, sy) = world_to_screen(world_x, world_y, camera);
+    let z_offset = world_z * (TILE_HEIGHT / 2.0) * camera.zoom;
+    (sx, (sy - z_offset).round())
+}
+
+/// Convert world to screen with Z, without pixel snapping (for calculations)
+pub fn world_to_screen_z_exact(world_x: f32, world_y: f32, world_z: f32, camera: &Camera) -> (f32, f32) {
+    let (sx, sy) = world_to_screen_exact(world_x, world_y, camera);
+    let z_offset = world_z * (TILE_HEIGHT / 2.0) * camera.zoom;
+    (sx, sy - z_offset)
+}
+
 /// Calculate isometric depth for sorting (painter's algorithm)
 /// Higher values should be rendered later (on top)
 pub fn calculate_depth(world_x: f32, world_y: f32, layer: u32) -> f32 {
     // Layer provides broad ordering (floor < entities < effects)
     // Within a layer, sort by x + y (entities further down-right render on top)
     (layer as f32 * 10000.0) + world_x + world_y
+}
+
+/// Calculate isometric depth with Z for sorting (painter's algorithm)
+/// Z contributes 1.0 depth per level — matching the screen-space contribution
+/// of x or y movement (each shifts by TILE_HEIGHT/2 pixels).
+pub fn calculate_depth_z(world_x: f32, world_y: f32, world_z: f32, layer: u32) -> f32 {
+    (layer as f32 * 10000.0) + world_x + world_y + world_z
 }
 
 #[cfg(test)]

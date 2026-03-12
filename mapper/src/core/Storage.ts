@@ -194,19 +194,38 @@ class StorageManager {
   // --- Server API ---
 
   private chunkToStorable(chunk: Chunk): object {
-    return {
+    const result: Record<string, unknown> = {
       ...chunk,
       collision: Array.from(chunk.collision),
     };
+    if (chunk.heights) {
+      result.heightmap = Array.from(chunk.heights);
+    }
+    delete result.heights;
+    if (chunk.blockTypesDown) {
+      result.blockTypesDown = Array.from(chunk.blockTypesDown);
+    }
+    if (chunk.blockTypesRight) {
+      result.blockTypesRight = Array.from(chunk.blockTypesRight);
+    }
+    return result;
   }
 
   private storableToChunk(stored: Record<string, unknown>): Chunk {
+    const heightsArr = (stored.heightmap || stored.heights) as number[] | undefined;
     return {
       coord: stored.coord as ChunkCoord,
       width: stored.width as number,
       height: stored.height as number,
       layers: stored.layers as Chunk['layers'],
       collision: new Uint8Array(stored.collision as number[]),
+      heights: heightsArr && heightsArr.length > 0 ? new Uint8Array(heightsArr) : undefined,
+      blockTypesDown: (stored.blockTypesDown as number[])?.length > 0
+        ? new Uint16Array(stored.blockTypesDown as number[])
+        : undefined,
+      blockTypesRight: (stored.blockTypesRight as number[])?.length > 0
+        ? new Uint16Array(stored.blockTypesRight as number[])
+        : undefined,
       entities: stored.entities as Chunk['entities'],
       mapObjects: (stored.mapObjects as Chunk['mapObjects']) || [],
       walls: (stored.walls as Chunk['walls']) || [],

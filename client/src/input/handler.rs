@@ -7,7 +7,6 @@ use crate::game::{
 };
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
-use crate::render::isometric::screen_to_world;
 use crate::render::{section_sort_key, sections_for_tab, SECTION_HEADER_HEIGHT};
 use crate::settings::{save_ui_settings, UiSettings};
 use crate::ui::{UiElementId, UiLayout};
@@ -1422,6 +1421,7 @@ pub enum InputCommand {
         direction: u8,
     },
     Attack,
+    Jump,
     Target {
         entity_id: String,
     },
@@ -1691,9 +1691,9 @@ pub enum InputCommand {
     },
 }
 
-/// Cardinal directions for isometric movement (no diagonals)
+/// Movement directions for isometric movement (cardinal + diagonal)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum CardinalDir {
+enum MoveDir {
     None,
     Up,
     Down,
@@ -1701,15 +1701,63 @@ enum CardinalDir {
     Right,
 }
 
-impl CardinalDir {
+impl MoveDir {
     /// Convert to server direction enum value (matches Direction enum)
     fn to_direction_u8(self) -> u8 {
         match self {
-            CardinalDir::Down => 0,
-            CardinalDir::Left => 1,
-            CardinalDir::Up => 2,
-            CardinalDir::Right => 3,
-            CardinalDir::None => 0, // Default to down
+            MoveDir::Down => 0,
+            MoveDir::Left => 1,
+            MoveDir::Up => 2,
+            MoveDir::Right => 3,
+            MoveDir::None => 0, // Default to down
+        }
+    }
+
+    /// Determine direction from held keys + just-pressed info.
+    /// Last key pressed wins. When released, falls back to whatever is still held.
+    fn from_keys(
+        up: bool, down: bool, left: bool, right: bool,
+        up_just: bool, down_just: bool, left_just: bool, right_just: bool,
+        active: MoveDir,
+    ) -> Self {
+        // If a key was just pressed this frame, it takes priority
+        // (check in reverse order so last-processed wins if multiple pressed same frame)
+        let mut new_active = active;
+        if up_just { new_active = MoveDir::Up; }
+        if down_just { new_active = MoveDir::Down; }
+        if left_just { new_active = MoveDir::Left; }
+        if right_just { new_active = MoveDir::Right; }
+
+        // If the active direction's key is still held, use it
+        let active_held = match new_active {
+            MoveDir::Up => up,
+            MoveDir::Down => down,
+            MoveDir::Left => left,
+            MoveDir::Right => right,
+            MoveDir::None => false,
+        };
+        if active_held {
+            return new_active;
+        }
+
+        // Active key was released — fall back to whatever is still held
+        // (pick first found, priority doesn't matter since only one should remain)
+        if up { return MoveDir::Up; }
+        if down { return MoveDir::Down; }
+        if left { return MoveDir::Left; }
+        if right { return MoveDir::Right; }
+
+        MoveDir::None
+    }
+
+    /// Convert to velocity vector
+    fn to_velocity(self) -> (f32, f32) {
+        match self {
+            MoveDir::Up => (0.0, -1.0),
+            MoveDir::Down => (0.0, 1.0),
+            MoveDir::Left => (-1.0, 0.0),
+            MoveDir::Right => (1.0, 0.0),
+            MoveDir::None => (0.0, 0.0),
         }
     }
 }
@@ -1893,9 +1941,9 @@ pub struct InputHandler {
     last_dx: f32,
     last_dy: f32,
     // Track which direction was pressed first (for priority)
-    current_dir: CardinalDir,
+    current_dir: MoveDir,
     // Track previous direction for detecting key release
-    prev_dir: CardinalDir,
+    prev_dir: MoveDir,
     // Periodic movement-intent resend interval
     last_send_time: f64,
     send_interval: f64,
@@ -1917,8 +1965,8 @@ impl InputHandler {
         Self {
             last_dx: 0.0,
             last_dy: 0.0,
-            current_dir: CardinalDir::None,
-            prev_dir: CardinalDir::None,
+            current_dir: MoveDir::None,
+            prev_dir: MoveDir::None,
             last_send_time: 0.0,
             send_interval: 0.05, // 50ms keeps facing/move intent responsive
             last_attack_time: 0.0,
@@ -1983,19 +2031,26 @@ impl InputHandler {
 
         let touch_active = self.touch_controls.consumed_touch();
         if state.ui_state.hovered_element.is_none() && !touch_active {
-            let (world_x, world_y) = screen_to_world(mx, my, &state.camera);
-            let tile_x = world_x.round() as i32;
-            let tile_y = world_y.round() as i32;
+            // Pick tile accounting for elevation (elevated tiles take priority)
+            let (tile_x, tile_y, tile_z) =
+                state.chunk_manager.pick_tile_at_screen(mx, my, &state.camera);
             state.hovered_tile = Some((tile_x, tile_y));
+            state.hovered_tile_z = tile_z;
 
-            let hover_radius = 0.6;
+            // Entity hover: compare in screen space so Z-elevated entities
+            // are hovered when the cursor visually overlaps them.
+            let hover_radius_px = 0.6 * crate::render::isometric::TILE_WIDTH * state.camera.zoom * 0.5;
+            let hover_radius_sq = hover_radius_px * hover_radius_px;
             let mut hovered_entity: Option<String> = None;
 
             for npc in state.npcs.values() {
                 if npc.state != crate::game::npc::NpcState::Dead {
-                    let dx = world_x - npc.x;
-                    let dy = world_y - npc.y;
-                    if dx * dx + dy * dy < hover_radius * hover_radius {
+                    let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
+                        npc.x, npc.y, npc.z, &state.camera,
+                    );
+                    let dx = mx - sx;
+                    let dy = my - sy;
+                    if dx * dx + dy * dy < hover_radius_sq {
                         hovered_entity = Some(npc.id.clone());
                         break;
                     }
@@ -2005,9 +2060,12 @@ impl InputHandler {
             if hovered_entity.is_none() {
                 for player in state.players.values() {
                     if !player.is_dead {
-                        let dx = world_x - player.x;
-                        let dy = world_y - player.y;
-                        if dx * dx + dy * dy < hover_radius * hover_radius {
+                        let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
+                            player.x, player.y, player.z, &state.camera,
+                        );
+                        let dx = mx - sx;
+                        let dy = my - sy;
+                        if dx * dx + dy * dy < hover_radius_sq {
                             hovered_entity = Some(player.id.clone());
                             break;
                         }
@@ -8377,46 +8435,36 @@ impl InputHandler {
             self.reset_auto_path_motion_state();
         }
 
-        // Determine new direction from keyboard - only one direction at a time
-        // Newly pressed keys override current direction (last-key-wins),
-        // then keep current direction if still held, then fall back to any held key
-        let keyboard_dir = if up_just {
-            CardinalDir::Up
-        } else if down_just {
-            CardinalDir::Down
-        } else if left_just {
-            CardinalDir::Left
-        } else if right_just {
-            CardinalDir::Right
-        } else {
-            match self.current_dir {
-                CardinalDir::Up if up => CardinalDir::Up,
-                CardinalDir::Down if down => CardinalDir::Down,
-                CardinalDir::Left if left => CardinalDir::Left,
-                CardinalDir::Right if right => CardinalDir::Right,
-                _ => {
-                    if up {
-                        CardinalDir::Up
-                    } else if down {
-                        CardinalDir::Down
-                    } else if left {
-                        CardinalDir::Left
-                    } else if right {
-                        CardinalDir::Right
-                    } else {
-                        CardinalDir::None
-                    }
-                }
-            }
-        };
+        // Determine new direction from keyboard - last key pressed wins
+        let keyboard_dir = MoveDir::from_keys(
+            up, down, left, right,
+            up_just, down_just, left_just, right_just,
+            self.prev_dir,
+        );
 
         // Combine keyboard and D-pad: D-pad takes priority if active
         let new_dir = if has_dpad_input {
             match dpad_dir {
-                DPadDirection::Up => CardinalDir::Up,
-                DPadDirection::Down => CardinalDir::Down,
-                DPadDirection::Left => CardinalDir::Left,
-                DPadDirection::Right => CardinalDir::Right,
+                DPadDirection::Up => MoveDir::Up,
+                DPadDirection::Down => MoveDir::Down,
+                DPadDirection::Left => MoveDir::Left,
+                DPadDirection::Right => MoveDir::Right,
+                // Map diagonals to the axis that differs from prev (cardinal only)
+                DPadDirection::UpLeft | DPadDirection::UpRight | DPadDirection::DownLeft | DPadDirection::DownRight => {
+                    let (dx, dy) = match dpad_dir {
+                        DPadDirection::UpLeft => (true, true),    // left=true, up=true
+                        DPadDirection::UpRight => (false, true),  // right, up
+                        DPadDirection::DownLeft => (true, false), // left, down
+                        DPadDirection::DownRight => (false, false), // right, down
+                        _ => unreachable!(),
+                    };
+                    let prev_is_vertical = matches!(self.prev_dir, MoveDir::Up | MoveDir::Down);
+                    if prev_is_vertical {
+                        if dx { MoveDir::Left } else { MoveDir::Right }
+                    } else {
+                        if dy { MoveDir::Up } else { MoveDir::Down }
+                    }
+                }
                 DPadDirection::None => keyboard_dir,
             }
         } else {
@@ -8428,14 +8476,15 @@ impl InputHandler {
 
         // Handle keyboard direction key press/release for face vs move
         if dir_changed && !has_dpad_input {
-            if keyboard_dir != CardinalDir::None && self.prev_dir == CardinalDir::None {
+            if keyboard_dir != MoveDir::None && self.prev_dir == MoveDir::None {
                 // New direction pressed - record time
                 self.dir_press_time = current_time;
                 self.move_sent = false;
-            } else if keyboard_dir == CardinalDir::None && self.prev_dir != CardinalDir::None {
+            } else if keyboard_dir == MoveDir::None && self.prev_dir != MoveDir::None {
                 // Direction released
                 if self.move_sent {
                     // Was moving, now stopped - send stop command
+                    macroquad::logging::info!("[MOVE] KEY RELEASED -> STOP (prev={:?})", self.prev_dir);
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                     self.last_dx = 0.0;
                     self.last_dy = 0.0;
@@ -8458,7 +8507,7 @@ impl InputHandler {
                         self.last_send_time = current_time;
                     }
                 }
-            } else if keyboard_dir != CardinalDir::None && self.prev_dir != CardinalDir::None {
+            } else if keyboard_dir != MoveDir::None && self.prev_dir != MoveDir::None {
                 // Direction changed while holding
                 if self.move_sent {
                     // Already moving - continue moving in new direction immediately (no threshold wait)
@@ -8511,13 +8560,7 @@ impl InputHandler {
         self.current_dir = keyboard_dir;
 
         // Convert direction to velocity
-        let (dx, dy): (f32, f32) = match new_dir {
-            CardinalDir::Up => (0.0, -1.0),
-            CardinalDir::Down => (0.0, 1.0),
-            CardinalDir::Left => (-1.0, 0.0),
-            CardinalDir::Right => (1.0, 0.0),
-            CardinalDir::None => (0.0, 0.0),
-        };
+        let (dx, dy): (f32, f32) = new_dir.to_velocity();
 
         // Only send Move commands if held past the threshold
         // Don't move while attacking - check both attack key/touch button and animation state
@@ -8538,7 +8581,7 @@ impl InputHandler {
             });
 
         // Check if we have any movement input (keyboard or D-pad)
-        let has_movement_input = new_dir != CardinalDir::None;
+        let has_movement_input = new_dir != MoveDir::None;
 
         // Movement while sitting is handled server-side (direction-validated auto-stand)
         // Just let the move command go through - server will stand up if direction matches
@@ -8585,6 +8628,7 @@ impl InputHandler {
                     } else if let Some(player) = state.get_local_player() {
                         let player_x = player.server_x.round() as i32;
                         let player_y = player.server_y.round() as i32;
+                        let player_z = player.server_z.round() as i32;
                         let target_x = player_x + dx as i32;
                         let target_y = player_y + dy as i32;
                         let tile_walkable = state
@@ -8592,12 +8636,16 @@ impl InputHandler {
                             .is_walkable(target_x as f32, target_y as f32);
                         let occupied = build_occupied_set(state, false);
                         let not_occupied = !occupied.contains(&(target_x, target_y));
-                        tile_walkable && not_occupied
+                        // Match server: block if target terrain is more than 1 block above player
+                        let target_height = state.chunk_manager.get_height(target_x, target_y) as i32;
+                        let height_ok = (target_height - player_z) <= 1;
+                        tile_walkable && not_occupied && height_ok
                     } else {
                         false
                     };
 
                     if can_move {
+                        macroquad::logging::info!("[MOVE] SEND ({}, {}) dir={:?}", dx, dy, new_dir);
                         commands.push(InputCommand::Move { dx, dy });
                         self.last_dx = dx;
                         self.last_dy = dy;
@@ -8611,8 +8659,10 @@ impl InputHandler {
                         }
                     } else {
                         // Can't move - face that direction instead
+                        macroquad::logging::info!("[MOVE] BLOCKED dir={:?} sitting={}", new_dir, state.is_sitting);
                         if self.move_sent || self.touch_controls.was_dpad_move_sent() {
                             // Was moving, send stop
+                            macroquad::logging::info!("[MOVE] BLOCKED->STOP (was moving)");
                             commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                             self.move_sent = false;
                             self.touch_controls.set_dpad_move_sent(false);
@@ -8630,7 +8680,7 @@ impl InputHandler {
         }
 
         // Handle keyboard release when D-pad not active - send stop command
-        if !has_dpad_input && keyboard_dir == CardinalDir::None && self.move_sent {
+        if !has_dpad_input && keyboard_dir == MoveDir::None && self.move_sent {
             // Already handled above in dir_changed block
         }
 
@@ -9204,7 +9254,12 @@ impl InputHandler {
             }
         }
 
-        // Attack (Space key or touch attack button) - holding continues attacking with cooldown
+        // Jump (Ctrl key, modern only) - send jump command on press
+        if !classic && (is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl)) && !state.is_sitting {
+            commands.push(InputCommand::Jump);
+        }
+
+        // Attack (Space/Ctrl key or touch attack button) - holding continues attacking with cooldown
         // If fishing rod equipped and on/near a fishing tile, start gathering instead
         // Also stop movement when attacking (player must stand still)
         let attack_input = attack_key_down || self.touch_controls.attack_pressed();
@@ -9592,11 +9647,10 @@ impl InputHandler {
         if mouse_clicked && clicked_element.is_none() {
             let (raw_x, raw_y) = mouse_position();
             let (mouse_x, mouse_y) = screen_to_virtual_coords(raw_x, raw_y);
-            let (world_x, world_y) = screen_to_world(mouse_x, mouse_y, &state.camera);
 
-            // Get the clicked tile coordinates
-            let clicked_tile_x = world_x.round() as i32;
-            let clicked_tile_y = world_y.round() as i32;
+            // Get the clicked tile coordinates (elevation-aware)
+            let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) =
+                state.chunk_manager.pick_tile_at_screen(mouse_x, mouse_y, &state.camera);
 
             // Find entity on the exact clicked tile
             let mut clicked_player: Option<String> = None;
@@ -10252,8 +10306,9 @@ impl InputHandler {
                     commands.push(InputCommand::CancelAutoAction);
                 }
 
-                let tile_x = world_x.round() as i32;
-                let tile_y = world_y.round() as i32;
+                // Use elevation-aware tile picking for click-to-move
+                let tile_x = clicked_tile_x;
+                let tile_y = clicked_tile_y;
 
                 // Only path if within range and walkable
                 const MAX_PATH_DISTANCE: i32 = 32;
@@ -10305,9 +10360,9 @@ impl InputHandler {
         if mouse_right_clicked && clicked_element.is_none() {
             let (raw_x, raw_y) = mouse_position();
             let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
-            let (world_x, world_y) = screen_to_world(mouse_vx, mouse_vy, &state.camera);
-            let clicked_tile_x = world_x.round() as i32;
-            let clicked_tile_y = world_y.round() as i32;
+            // Use elevation-aware tile picking for right-click
+            let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) =
+                state.chunk_manager.pick_tile_at_screen(mouse_vx, mouse_vy, &state.camera);
 
             // Determine what's under the cursor, same priority as left-click
             let target = 'find_target: {

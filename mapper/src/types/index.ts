@@ -84,6 +84,8 @@ export const Tool = {
   SpawnPoint: 'spawnPoint',
   ExitPortal: 'exitPortal',
   GatheringZone: 'gatheringZone',
+  HeightRaise: 'heightRaise',
+  BlockType: 'blockType',
 } as const;
 export type Tool = typeof Tool[keyof typeof Tool];
 
@@ -152,6 +154,9 @@ export interface Chunk {
     overhead: number[];
   };
   collision: Uint8Array; // Bitset for collision
+  heights?: Uint8Array; // Per-tile height (0-15), undefined = flat
+  blockTypesDown?: Uint16Array; // Per-tile wall sprite ID for down (+Y) side face, undefined = plain
+  blockTypesRight?: Uint16Array; // Per-tile wall sprite ID for right (+X) side face, undefined = plain
   entities: EntitySpawn[];
   mapObjects: MapObject[]; // Trees, rocks, decorations
   walls: Wall[];
@@ -268,6 +273,10 @@ export interface SimplifiedChunk {
     overhead: number[];
   };
   collision: string; // Base64 encoded bitset
+  heightmap?: number[]; // Per-tile height values (omitted if all flat)
+  heights?: number[]; // Legacy alias for heightmap
+  blockTypesDown?: number[]; // Per-tile wall sprite ID for down (+Y) side face
+  blockTypesRight?: number[]; // Per-tile wall sprite ID for right (+X) side face
   entities: SimplifiedEntitySpawn[];
   mapObjects: SimplifiedMapObject[];
   walls: SimplifiedWall[];

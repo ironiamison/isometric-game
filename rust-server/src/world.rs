@@ -215,6 +215,31 @@ impl World {
             }
         }
 
+        // Parse height data (optional - missing means flat at z=0)
+        if let Some(heightmap) = value["heightmap"].as_array() {
+            let heights: Vec<u8> = heightmap
+                .iter()
+                .map(|v| v.as_u64().unwrap_or(0) as u8)
+                .collect();
+            if heights.len() == (CHUNK_SIZE * CHUNK_SIZE) as usize {
+                let block_types_down = if let Some(bt) = value["blockTypesDown"].as_array() {
+                    bt.iter().map(|v| v.as_u64().unwrap_or(0) as u16).collect()
+                } else {
+                    vec![0u16; (CHUNK_SIZE * CHUNK_SIZE) as usize]
+                };
+                let block_types_right = if let Some(bt) = value["blockTypesRight"].as_array() {
+                    bt.iter().map(|v| v.as_u64().unwrap_or(0) as u16).collect()
+                } else {
+                    vec![0u16; (CHUNK_SIZE * CHUNK_SIZE) as usize]
+                };
+                chunk.height_data = Some(crate::chunk::HeightData {
+                    heights,
+                    block_types_down,
+                    block_types_right,
+                });
+            }
+        }
+
         // Parse entities
         if let Some(entities) = value["entities"].as_array() {
             for entity in entities {
@@ -599,6 +624,18 @@ impl World {
             chunk.is_walkable_local(local_x, local_y)
         } else {
             false
+        }
+    }
+
+    /// Get the terrain height at a world position from loaded chunks.
+    /// Returns 0 for tiles in unloaded chunks or chunks without height data.
+    pub fn get_height_at_sync(&self, world_x: i32, world_y: i32, chunks: &std::collections::HashMap<ChunkCoord, std::sync::Arc<crate::chunk::Chunk>>) -> i32 {
+        let coord = ChunkCoord::from_world(world_x, world_y);
+        if let Some(chunk) = chunks.get(&coord) {
+            let (local_x, local_y) = world_to_local(world_x, world_y);
+            chunk.get_height(local_x, local_y) as i32
+        } else {
+            0
         }
     }
 

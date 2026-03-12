@@ -25,6 +25,7 @@ function App() {
   const [tilePaletteHeight, setTilePaletteHeight] = useState(200);
   const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
   const [isResizingPalette, setIsResizingPalette] = useState(false);
+  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   const resizeStartX = useRef(0);
   const resizeStartY = useRef(0);
   const resizeStartWidth = useRef(0);
@@ -105,6 +106,7 @@ function App() {
     loadingMessage,
     setNotes,
     fetchUserInfo,
+    paletteSide,
   } = useEditorStore();
 
   // Initialize app
@@ -309,6 +311,9 @@ function App() {
         case 'i':
           store.setActiveTool('eyedropper');
           break;
+        case 'h':
+          store.setActiveTool('heightRaise');
+          break;
       }
     };
 
@@ -325,48 +330,114 @@ function App() {
     );
   }
 
+  const paletteSidebar = (
+    <>
+      <div style={{ height: tilePaletteHeight, flexShrink: 0, overflow: 'hidden' }}>
+        <TilePalette />
+      </div>
+      <div
+        className="palette-resize-handle"
+        onMouseDown={startPaletteResize}
+      />
+      <div style={{
+        flex: 1,
+        overflow: 'hidden',
+        minHeight: 100,
+      }}>
+        <ObjectPalette />
+      </div>
+      <LayerPanel />
+    </>
+  );
+
+  // Which physical side the properties sidebar is on
+  const propertiesSide = paletteSide === 'left' ? 'right' : 'left';
+  // Chevron points toward edge when expanded, away when collapsed
+  const collapseChevron = propertiesCollapsed
+    ? (propertiesSide === 'right' ? '\u2039' : '\u203A')
+    : (propertiesSide === 'right' ? '\u203A' : '\u2039');
+
+  const propertiesSidebar = (
+    <>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <EntityPanel />
+      </div>
+      <div style={{ flex: 'none', overflowY: 'auto', maxHeight: '40%', borderTop: '1px solid var(--border-subtle)' }}>
+        <PropertiesPanel />
+      </div>
+      <div style={{ flex: 'none', maxHeight: '40%', overflow: 'hidden', borderTop: '1px solid var(--border-subtle)' }}>
+        <NotesPanel />
+      </div>
+    </>
+  );
+
+  const leftIsProperties = paletteSide === 'right';
+  const rightIsProperties = paletteSide === 'left';
+
   return (
     <div className="app">
       <MenuBar />
       <div className="main">
         <Toolbar />
-        <div className="sidebar left" style={{ width: leftSidebarWidth }}>
-          <div style={{ height: tilePaletteHeight, flexShrink: 0, overflow: 'hidden' }}>
-            <TilePalette />
-          </div>
-          <div
-            className="palette-resize-handle"
-            onMouseDown={startPaletteResize}
-          />
-          <div style={{
-            flex: 1,
-            overflow: 'hidden',
-            minHeight: 100,
-          }}>
-            <ObjectPalette />
-          </div>
-          <LayerPanel />
-        </div>
-        <div
-          className="resize-handle"
-          onMouseDown={(e) => startResize('left', e)}
-        />
+        {/* Left sidebar */}
+        {leftIsProperties && propertiesCollapsed ? (
+          <button
+            className="sidebar-toggle left"
+            onClick={() => setPropertiesCollapsed(false)}
+          >
+            {collapseChevron}
+          </button>
+        ) : (
+          <>
+            <div className="sidebar left" style={{ width: leftSidebarWidth }}>
+              {leftIsProperties ? (
+                <>
+                  <button
+                    className="sidebar-collapse-btn"
+                    onClick={() => setPropertiesCollapsed(true)}
+                  >
+                    {collapseChevron}
+                  </button>
+                  {propertiesSidebar}
+                </>
+              ) : paletteSidebar}
+            </div>
+            <div
+              className="resize-handle"
+              onMouseDown={(e) => startResize('left', e)}
+            />
+          </>
+        )}
         <Canvas />
-        <div
-          className="resize-handle"
-          onMouseDown={(e) => startResize('right', e)}
-        />
-        <div className="sidebar right" style={{ width: rightSidebarWidth }}>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <EntityPanel />
-          </div>
-          <div style={{ flex: 'none', overflowY: 'auto', maxHeight: '40%', borderTop: '1px solid var(--border-subtle)' }}>
-            <PropertiesPanel />
-          </div>
-          <div style={{ flex: 'none', maxHeight: '40%', overflow: 'hidden', borderTop: '1px solid var(--border-subtle)' }}>
-            <NotesPanel />
-          </div>
-        </div>
+        {/* Right sidebar */}
+        {rightIsProperties && propertiesCollapsed ? (
+          <button
+            className="sidebar-toggle right"
+            onClick={() => setPropertiesCollapsed(false)}
+          >
+            {collapseChevron}
+          </button>
+        ) : (
+          <>
+            <div
+              className="resize-handle"
+              onMouseDown={(e) => startResize('right', e)}
+            />
+            <div className="sidebar right" style={{ width: rightSidebarWidth }}>
+              {rightIsProperties ? (
+                <>
+                  <button
+                    className="sidebar-collapse-btn"
+                    onClick={() => setPropertiesCollapsed(true)}
+                  >
+                    {collapseChevron}
+                  </button>
+                  {propertiesSidebar}
+                </>
+              ) : paletteSidebar}
+            </div>
+          </>
+        )}
       </div>
       <AssetManager />
     </div>

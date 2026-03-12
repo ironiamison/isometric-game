@@ -1347,6 +1347,7 @@ async fn matchmake_join_or_create(
         &character_data.name,
         character_data.x as i32,
         character_data.y as i32,
+        character_data.z,
         character_data.hp,
         character_data.prayer_points,
         character_data.mp,
@@ -2571,6 +2572,7 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                             character_id,
                                             save_data.x,
                                             save_data.y,
+                                            save_data.z,
                                             save_data.hp,
                                             save_data.prayer_points,
                                             save_data.mp,
@@ -3373,6 +3375,7 @@ async fn handle_socket(
                     character_id,
                     save_data.x,
                     save_data.y,
+                    save_data.z,
                     save_data.hp,
                     save_data.prayer_points,
                     save_data.mp,
@@ -4474,6 +4477,9 @@ async fn handle_client_message(
         ClientMessage::Dash => {
             room.handle_dash(player_id).await;
         }
+        ClientMessage::Jump => {
+            room.handle_jump(player_id).await;
+        }
         ClientMessage::Face { direction } => {
             room.handle_face(player_id, direction).await;
         }
@@ -5160,6 +5166,7 @@ async fn main() {
                                 character_id,
                                 save_data.x,
                                 save_data.y,
+                                save_data.z,
                                 save_data.hp,
                                 save_data.prayer_points,
                                 save_data.mp,
@@ -5435,6 +5442,7 @@ async fn main() {
                         character_id,
                         save_data.x,
                         save_data.y,
+                        save_data.z,
                         save_data.hp,
                         save_data.prayer_points,
                         save_data.mp,

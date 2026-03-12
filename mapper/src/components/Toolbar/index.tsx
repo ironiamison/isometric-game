@@ -17,6 +17,8 @@ import {
   ArrowRight,
   Flag,
   LogOut,
+  Mountain,
+  Layers,
   type LucideIcon,
 } from 'lucide-react';
 import styles from './Toolbar.module.css';
@@ -43,6 +45,8 @@ const tools: ToolDef[] = [
   { id: Tool.Object, label: 'Object', shortcut: 'O', icon: Box, group: 'main' },
   { id: Tool.Portal, label: 'Portal', shortcut: 'P', icon: DoorOpen, group: 'main', mode: 'overworld' },
   { id: Tool.GatheringZone, label: 'Gathering', shortcut: 'F', icon: Pickaxe, group: 'main', mode: 'overworld' },
+  { id: Tool.HeightRaise, label: 'Height', shortcut: 'H', icon: Mountain, group: 'main', mode: 'overworld' },
+  { id: Tool.BlockType, label: 'Block Type', shortcut: 'T', icon: Layers, group: 'main', mode: 'overworld' },
   { id: Tool.WallDown, label: 'Wall Down', shortcut: 'D', icon: House, group: 'walls', composite: { icon: ArrowDown } },
   { id: Tool.WallRight, label: 'Wall Right', shortcut: 'R', icon: House, group: 'walls', composite: { icon: ArrowRight } },
   { id: Tool.SpawnPoint, label: 'Spawn Point', shortcut: 'S', icon: Flag, group: 'interior', mode: 'interior' },
@@ -50,7 +54,7 @@ const tools: ToolDef[] = [
 ];
 
 export function Toolbar() {
-  const { activeTool, setActiveTool, editorMode } = useEditorStore();
+  const { activeTool, setActiveTool, editorMode, brushSize, setBrushSize } = useEditorStore();
 
   const visibleTools = tools.filter((t) => !t.mode || t.mode === editorMode);
 
@@ -96,6 +100,22 @@ export function Toolbar() {
           {interiorTools.map(renderButton)}
         </>
       )}
+      <div className={styles.spacer} />
+      <div className={styles.brushSize} data-tooltip={`Brush Size (Ctrl+Scroll)`}>
+        <span className={styles.brushLabel}>{brushSize}</span>
+        <div className={styles.brushControls}>
+          <button
+            className={styles.brushBtn}
+            onClick={() => setBrushSize(brushSize - 1)}
+            disabled={brushSize <= 1}
+          >-</button>
+          <button
+            className={styles.brushBtn}
+            onClick={() => setBrushSize(brushSize + 1)}
+            disabled={brushSize >= 15}
+          >+</button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -21,6 +21,9 @@ pub enum ClientMessage {
     #[serde(rename = "dash")]
     Dash,
 
+    #[serde(rename = "jump")]
+    Jump,
+
     #[serde(rename = "face")]
     Face { direction: u8 },
 
@@ -394,6 +397,7 @@ impl ClientMessage {
         match self {
             ClientMessage::Move { .. } => "Move",
             ClientMessage::Dash => "Dash",
+            ClientMessage::Jump => "Jump",
             ClientMessage::Face { .. } => "Face",
             ClientMessage::Chat { .. } => "Chat",
             ClientMessage::Attack => "Attack",
@@ -741,6 +745,9 @@ pub enum ServerMessage {
         objects: Vec<ChunkObjectData>, // Map objects (trees, rocks, etc.)
         walls: Vec<ChunkWallData>,     // Edge-aligned walls
         portals: Vec<ChunkPortalData>, // Portals to other maps
+        heightmap: Option<Vec<u8>>,    // Optional height data (CHUNK_SIZE^2 bytes)
+        block_types_down: Option<Vec<u16>>,  // Wall sprite IDs for down (+Y) side face
+        block_types_right: Option<Vec<u16>>, // Wall sprite IDs for right (+X) side face
     },
     ChunkNotFound {
         chunk_x: i32,
@@ -1764,6 +1771,10 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
         Value::Integer((p.y as i64).into()),
     ));
     pmap.push((
+        Value::String("z".into()),
+        Value::Integer((p.z as i64).into()),
+    ));
+    pmap.push((
         Value::String("direction".into()),
         Value::Integer((p.direction as i64).into()),
     ));
@@ -1962,6 +1973,10 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
     nmap.push((
         Value::String("y".into()),
         Value::Integer((n.y as i64).into()),
+    ));
+    nmap.push((
+        Value::String("z".into()),
+        Value::Integer((n.z as i64).into()),
     ));
     nmap.push((
         Value::String("direction".into()),
@@ -3310,6 +3325,9 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             objects,
             walls,
             portals,
+            heightmap,
+            block_types_down,
+            block_types_right,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -3444,6 +3462,20 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 })
                 .collect();
             map.push((Value::String("portals".into()), Value::Array(portal_values)));
+
+            // Encode optional heightmap data
+            if let Some(hm) = heightmap {
+                let hm_values: Vec<Value> = hm.iter().map(|&h| Value::Integer((h as i64).into())).collect();
+                map.push((Value::String("heightmap".into()), Value::Array(hm_values)));
+            }
+            if let Some(bt) = block_types_down {
+                let bt_values: Vec<Value> = bt.iter().map(|&b| Value::Integer((b as i64).into())).collect();
+                map.push((Value::String("blockTypesDown".into()), Value::Array(bt_values)));
+            }
+            if let Some(bt) = block_types_right {
+                let bt_values: Vec<Value> = bt.iter().map(|&b| Value::Integer((b as i64).into())).collect();
+                map.push((Value::String("blockTypesRight".into()), Value::Array(bt_values)));
+            }
 
             Value::Map(map)
         }
@@ -6276,6 +6308,7 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             Ok(ClientMessage::Move { dx, dy, seq })
         }
         "dash" => Ok(ClientMessage::Dash),
+        "jump" => Ok(ClientMessage::Jump),
         "face" => {
             let direction = msg_data
                 .as_map()

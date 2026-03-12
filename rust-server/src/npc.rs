@@ -79,6 +79,7 @@ pub struct Npc {
     // Grid position (server authoritative)
     pub x: i32,
     pub y: i32,
+    pub z: i32,
     pub spawn_x: i32,
     pub spawn_y: i32,
     pub direction: Direction,
@@ -159,6 +160,7 @@ impl Npc {
             prototype_id: prototype_id.to_string(),
             x,
             y,
+            z: 0,
             spawn_x: x,
             spawn_y: y,
             direction: facing_override
@@ -411,6 +413,7 @@ impl Npc {
         current_time: u64,
         occupied_tiles: &HashSet<(i32, i32)>,
         walkable_check: &dyn Fn(i32, i32) -> bool,
+        height_check: &dyn Fn(i32, i32) -> i32,
     ) -> bool {
         // Check movement cooldown
         if current_time - self.last_move_time < self.get_move_cooldown_ms() {
@@ -471,6 +474,13 @@ impl Npc {
                 continue; // Tile has collision
             }
 
+            // Check height difference - NPCs can auto-step up 1 block but not more
+            let target_height = height_check(new_x, new_y);
+            let height_diff = target_height - self.z;
+            if height_diff > 1 {
+                continue; // Too high to step up
+            }
+
             // Check if tile is occupied by another NPC or player
             if occupied_tiles.contains(&(new_x, new_y)) {
                 continue; // Try next candidate
@@ -479,6 +489,7 @@ impl Npc {
             // Found a valid move
             self.x = new_x;
             self.y = new_y;
+            self.z = target_height;
             self.last_move_time = current_time;
 
             // Update facing direction
@@ -499,6 +510,7 @@ impl Npc {
         other_npc_positions: &HashSet<(i32, i32)>, // positions of other NPCs and players (excluding self)
         current_time: u64,
         walkable_check: &dyn Fn(i32, i32) -> bool,
+        height_check: &dyn Fn(i32, i32) -> i32,
     ) -> Option<(String, i32)> {
         // Reset attack flag each tick - will be set to true if we attack this tick
         self.just_attacked = false;
@@ -589,6 +601,7 @@ impl Npc {
                             current_time,
                             other_npc_positions,
                             walkable_check,
+                            height_check,
                         );
 
                         if moved {
@@ -664,6 +677,7 @@ impl Npc {
                             current_time,
                             other_npc_positions,
                             walkable_check,
+                            height_check,
                         );
                     }
                     // If in range but movement not done, stay in Chasing and wait
@@ -735,6 +749,7 @@ impl Npc {
                         current_time,
                         other_npc_positions,
                         walkable_check,
+                        height_check,
                     );
                 }
             }
@@ -761,6 +776,7 @@ pub struct NpcUpdate {
     pub display_name: String,
     pub x: i32, // Grid position
     pub y: i32, // Grid position
+    pub z: i32, // Height position
     pub direction: u8,
     pub hp: i32,
     pub max_hp: i32,
@@ -811,6 +827,7 @@ impl From<&Npc> for NpcUpdate {
             display_name: npc.stats.display_name.clone(),
             x: npc.x,
             y: npc.y,
+            z: npc.z,
             direction: npc.direction as u8,
             hp: npc.hp,
             max_hp: npc.max_hp,

@@ -180,6 +180,40 @@
   color: var(--text-bright);
 }
 
+.item.selectedDown {
+  background: rgba(92, 124, 250, 0.15);
+  border-color: #5c7cfa;
+  box-shadow: 0 0 8px rgba(92, 124, 250, 0.2);
+}
+
+.item.selectedRight {
+  background: rgba(255, 107, 107, 0.15);
+  border-color: #ff6b6b;
+  box-shadow: 0 0 8px rgba(255, 107, 107, 0.2);
+}
+
+.item.selectedDown.selectedRight {
+  background: linear-gradient(135deg, rgba(92, 124, 250, 0.15), rgba(255, 107, 107, 0.15));
+  border-image: linear-gradient(135deg, #5c7cfa, #ff6b6b) 1;
+  box-shadow: 0 0 8px rgba(92, 124, 250, 0.15), 0 0 8px rgba(255, 107, 107, 0.15);
+}
+
+.blockTypeLabel {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 1px;
+}
+
+.labelDown {
+  color: #5c7cfa;
+}
+
+.labelRight {
+  color: #ff6b6b;
+}
+
 .empty {
   grid-column: 1 / -1;
   padding: 16px;

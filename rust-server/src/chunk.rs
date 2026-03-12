@@ -187,6 +187,43 @@ impl ChunkLayer {
     }
 }
 
+/// Height data for block-based terrain (heightmap + block types per tile)
+#[derive(Debug, Clone)]
+pub struct HeightData {
+    /// Height in blocks for each tile (CHUNK_SIZE * CHUNK_SIZE)
+    pub heights: Vec<u8>,
+    /// Wall sprite ID for down (+Y) side face per tile (0 = plain)
+    pub block_types_down: Vec<u16>,
+    /// Wall sprite ID for right (+X) side face per tile (0 = plain)
+    pub block_types_right: Vec<u16>,
+}
+
+impl HeightData {
+    pub fn get_height(&self, local_x: u32, local_y: u32) -> u8 {
+        if local_x >= CHUNK_SIZE || local_y >= CHUNK_SIZE {
+            return 0;
+        }
+        let idx = (local_y * CHUNK_SIZE + local_x) as usize;
+        self.heights.get(idx).copied().unwrap_or(0)
+    }
+
+    pub fn get_block_type_down(&self, local_x: u32, local_y: u32) -> u16 {
+        if local_x >= CHUNK_SIZE || local_y >= CHUNK_SIZE {
+            return 0;
+        }
+        let idx = (local_y * CHUNK_SIZE + local_x) as usize;
+        self.block_types_down.get(idx).copied().unwrap_or(0)
+    }
+
+    pub fn get_block_type_right(&self, local_x: u32, local_y: u32) -> u16 {
+        if local_x >= CHUNK_SIZE || local_y >= CHUNK_SIZE {
+            return 0;
+        }
+        let idx = (local_y * CHUNK_SIZE + local_x) as usize;
+        self.block_types_right.get(idx).copied().unwrap_or(0)
+    }
+}
+
 /// Server-side chunk containing collision and tile data
 #[derive(Debug, Clone)]
 pub struct Chunk {
@@ -205,6 +242,8 @@ pub struct Chunk {
     pub portals: Vec<Portal>,
     /// Gathering zone markers (fishing spots, etc.)
     pub gathering_zones: Vec<GatheringZoneMarker>,
+    /// Optional height data for block-based terrain (None = flat z=0)
+    pub height_data: Option<HeightData>,
 }
 
 impl Chunk {
@@ -223,6 +262,7 @@ impl Chunk {
             walls: Vec::new(),
             portals: Vec::new(),
             gathering_zones: Vec::new(),
+            height_data: None,
         }
     }
 
@@ -337,6 +377,14 @@ impl Chunk {
         }
         let idx = (local_y * CHUNK_SIZE + local_x) as usize;
         !self.collision.get(idx).copied().unwrap_or(true)
+    }
+
+    /// Get the terrain height at a local position (0 if no height data)
+    pub fn get_height(&self, local_x: u32, local_y: u32) -> u8 {
+        self.height_data
+            .as_ref()
+            .map(|h| h.get_height(local_x, local_y))
+            .unwrap_or(0)
     }
 
     /// Set collision at local position

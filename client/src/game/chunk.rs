@@ -142,6 +142,12 @@ pub struct Chunk {
     pub walls: Vec<Wall>,
     /// Portals that teleport players to other maps
     pub portals: Vec<Portal>,
+    /// Optional heightmap data (CHUNK_SIZE^2 u8 values, None = flat z=0)
+    pub heights: Option<Vec<u8>>,
+    /// Optional block type data for down (+Y) side face (CHUNK_SIZE^2 u16 values)
+    pub block_types_down: Option<Vec<u16>>,
+    /// Optional block type data for right (+X) side face (CHUNK_SIZE^2 u16 values)
+    pub block_types_right: Option<Vec<u16>>,
 }
 
 impl Chunk {
@@ -157,6 +163,9 @@ impl Chunk {
             objects: Vec::new(),
             walls: Vec::new(),
             portals: Vec::new(),
+            heights: None,
+            block_types_down: None,
+            block_types_right: None,
         }
     }
 
@@ -177,6 +186,36 @@ impl Chunk {
         }
         let idx = (local_y * CHUNK_SIZE + local_x) as usize;
         !self.collision.get(idx).copied().unwrap_or(true)
+    }
+
+    /// Get height at a local tile position (returns 0 if no heightmap)
+    pub fn get_height(&self, local_x: u32, local_y: u32) -> u8 {
+        if let Some(ref heights) = self.heights {
+            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            heights.get(index).copied().unwrap_or(0)
+        } else {
+            0
+        }
+    }
+
+    /// Get block type for down (+Y) face at a local tile position (returns 0 if no data)
+    pub fn get_block_type_down(&self, local_x: u32, local_y: u32) -> u16 {
+        if let Some(ref bt) = self.block_types_down {
+            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            bt.get(index).copied().unwrap_or(0)
+        } else {
+            0
+        }
+    }
+
+    /// Get block type for right (+X) face at a local tile position (returns 0 if no data)
+    pub fn get_block_type_right(&self, local_x: u32, local_y: u32) -> u16 {
+        if let Some(ref bt) = self.block_types_right {
+            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            bt.get(index).copied().unwrap_or(0)
+        } else {
+            0
+        }
     }
 
     /// Unpack collision data from server bytes
@@ -306,6 +345,9 @@ impl ChunkManager {
         objects: Vec<MapObject>,
         walls: Vec<Wall>,
         portals: Vec<Portal>,
+        heights: Option<Vec<u8>>,
+        block_types_down: Option<Vec<u16>>,
+        block_types_right: Option<Vec<u16>>,
     ) {
         // Don't load world chunks when in interior mode
         if self.interior_size.is_some() {
@@ -343,6 +385,11 @@ impl ChunkManager {
         // Load portals
         chunk.portals = portals;
 
+        // Load optional height data
+        chunk.heights = heights;
+        chunk.block_types_down = block_types_down;
+        chunk.block_types_right = block_types_right;
+
         // Remove from pending
         self.pending_requests.remove(&coord);
 
@@ -351,6 +398,62 @@ impl ChunkManager {
 
         // Store chunk
         self.chunks.insert(coord, chunk);
+    }
+
+    /// Pick the tile under a screen position, accounting for elevation.
+    /// Probes from highest Z down to find the topmost elevated tile the cursor is over.
+    /// Returns (tile_x, tile_y, tile_z).
+    pub fn pick_tile_at_screen(
+        &self,
+        screen_x: f32,
+        screen_y: f32,
+        camera: &crate::game::Camera,
+    ) -> (i32, i32, i32) {
+        use crate::render::isometric::{screen_to_world, world_to_screen_z_exact, TILE_HEIGHT};
+
+        // Try elevated tiles first (highest Z down to 1)
+        const MAX_PROBE_Z: i32 = 15;
+        for probe_z in (1..=MAX_PROBE_Z).rev() {
+            let z_offset = probe_z as f32 * (TILE_HEIGHT / 2.0) * camera.zoom;
+            let (wx, wy) = screen_to_world(screen_x, screen_y + z_offset, camera);
+            let tx = wx.round() as i32;
+            let ty = wy.round() as i32;
+            let terrain_h = self.get_height(tx, ty) as i32;
+            if terrain_h == probe_z {
+                // Verify cursor is on the tile's diamond surface, not on
+                // the block side face below it. The diamond extends
+                // TILE_HEIGHT/4 below its center.
+                let (_, center_sy) = world_to_screen_z_exact(
+                    tx as f32 + 0.5, ty as f32 + 0.5, probe_z as f32, camera,
+                );
+                let half_diamond = (TILE_HEIGHT / 4.0) * camera.zoom;
+                if screen_y > center_sy + half_diamond {
+                    continue; // Cursor is below the surface (on block side)
+                }
+                return (tx, ty, probe_z);
+            }
+        }
+
+        // Fall back to ground level
+        let (wx, wy) = screen_to_world(screen_x, screen_y, camera);
+        let tx = wx.round() as i32;
+        let ty = wy.round() as i32;
+        let z = self.get_height(tx, ty) as i32;
+        (tx, ty, z)
+    }
+
+    /// Get terrain height at a world position (returns 0 if no heightmap or unloaded)
+    pub fn get_height(&self, world_x: i32, world_y: i32) -> u8 {
+        if self.interior_size.is_some() {
+            return 0; // Interiors don't use heightmaps
+        }
+        let coord = ChunkCoord::from_world(world_x, world_y);
+        if let Some(chunk) = self.chunks.get(&coord) {
+            let (local_x, local_y) = world_to_local(world_x, world_y);
+            chunk.get_height(local_x, local_y)
+        } else {
+            0
+        }
     }
 
     /// Check if a world position is walkable
@@ -539,6 +642,9 @@ impl ChunkManager {
             objects,
             walls,
             portals,
+            heights: None,
+            block_types_down: None,
+            block_types_right: None,
         };
 
         self.chunks.insert(coord, chunk);

@@ -108,14 +108,17 @@ pub struct Player {
     // Rendered position (smoothly interpolated each frame)
     pub x: f32,
     pub y: f32,
+    pub z: f32,
 
     // Server-authoritative position (for local player reconciliation)
     pub server_x: f32,
     pub server_y: f32,
+    pub server_z: f32,
 
     // Target for other players' interpolation
     pub target_x: f32,
     pub target_y: f32,
+    pub target_z: f32,
 
     // Movement velocity (-1, 0, or 1 per axis, normalized for diagonal)
     pub vel_x: f32,
@@ -194,10 +197,13 @@ impl Player {
             name,
             x,
             y,
+            z: 0.0,
             server_x: x,
             server_y: y,
+            server_z: 0.0,
             target_x: x,
             target_y: y,
+            target_z: 0.0,
             vel_x: 0.0,
             vel_y: 0.0,
             direction: Direction::Down,
@@ -330,10 +336,13 @@ impl Player {
         self.max_hp = hp;
         self.x = x;
         self.y = y;
+        self.z = 0.0;
         self.server_x = x;
         self.server_y = y;
+        self.server_z = 0.0;
         self.target_x = x;
         self.target_y = y;
+        self.target_z = 0.0;
         // Reset animation to standing (in case player died while sitting)
         self.animation.state = AnimationState::Idle;
     }
@@ -343,6 +352,7 @@ impl Player {
         self.set_server_state(
             new_x,
             new_y,
+            self.server_z as i32,
             0.0,
             0.0,
             self.direction,
@@ -360,6 +370,7 @@ impl Player {
         &mut self,
         x: f32,
         y: f32,
+        z: i32,
         vel_x: f32,
         vel_y: f32,
         dir: Direction,
@@ -376,6 +387,8 @@ impl Player {
 
         self.server_x = x;
         self.server_y = y;
+        self.server_z = z as f32;
+        self.target_z = z as f32;
         self.vel_x = vel_x;
         self.vel_y = vel_y;
 
@@ -511,6 +524,25 @@ impl Player {
         let dy = self.target_y - self.y;
         let old_x = self.x;
         let old_y = self.y;
+
+        // Z interpolation
+        let dz = self.target_z - self.z;
+        if dz.abs() < 0.01 {
+            self.z = self.target_z;
+        } else {
+            // Base speed 8 blocks/sec; falling scales with drop distance
+            let z_speed = if dz < 0.0 {
+                8.0 * dz.abs().max(1.0)
+            } else {
+                8.0
+            };
+            let z_step = z_speed * delta;
+            if z_step >= dz.abs() {
+                self.z = self.target_z;
+            } else {
+                self.z += dz.signum() * z_step;
+            }
+        }
 
         if dx.abs() < 0.01 && dy.abs() < 0.01 {
             self.x = self.target_x;

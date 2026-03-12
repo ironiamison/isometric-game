@@ -18,6 +18,9 @@ pub enum ClientMessage {
     #[serde(rename = "dash")]
     Dash,
 
+    #[serde(rename = "jump")]
+    Jump,
+
     #[serde(rename = "face")]
     Face { direction: u8 },
 
@@ -331,6 +334,7 @@ impl ClientMessage {
                 "move"
             }
             ClientMessage::Dash => "dash",
+            ClientMessage::Jump => "jump",
             ClientMessage::Face { direction } => {
                 data.insert(
                     "direction".into(),

@@ -32,6 +32,7 @@ pub struct CharacterData {
     pub hair_color: Option<i32>, // 0-6 (color variant index)
     pub x: f32,
     pub y: f32,
+    pub z: i32,
     pub hp: i32,
     pub prayer_points: i32,
     pub mp: i32,
@@ -631,6 +632,21 @@ impl Database {
                 .ok();
         }
 
+        // Migration: Add z column for player elevation persistence
+        let z_exists: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('characters') WHERE name = 'z'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if !z_exists {
+            sqlx::query("ALTER TABLE characters ADD COLUMN z INTEGER DEFAULT 0")
+                .execute(pool)
+                .await
+                .ok();
+        }
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -833,7 +849,7 @@ impl Database {
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
                 sitting_at_x, sitting_at_y, entrance_x, entrance_y,
-                bank_json, bank_gold, bank_max_slots
+                bank_json, bank_gold, bank_max_slots, combat_style_prefs, z
             FROM characters WHERE account_id = ? ORDER BY created_at DESC"#,
         )
         .bind(account_id)
@@ -875,6 +891,7 @@ impl Database {
                     hair_color: r.try_get::<Option<i32>, _>("hair_color").unwrap_or(None),
                     x: r.get("x"),
                     y: r.get("y"),
+                    z: r.try_get::<i32, _>("z").unwrap_or(0),
                     hp: r.get("hp"),
                     prayer_points: r
                         .try_get::<Option<i32>, _>("prayer_points")
@@ -1064,7 +1081,7 @@ impl Database {
                 equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
                 inventory_json, skills_json, played_time, is_admin, created_at, current_map,
                 sitting_at_x, sitting_at_y, entrance_x, entrance_y,
-                bank_json, bank_gold, bank_max_slots, combat_style_prefs
+                bank_json, bank_gold, bank_max_slots, combat_style_prefs, z
             FROM characters WHERE id = ?"#,
         )
         .bind(character_id)
@@ -1104,6 +1121,7 @@ impl Database {
                 hair_color: r.try_get::<Option<i32>, _>("hair_color").unwrap_or(None),
                 x: r.get("x"),
                 y: r.get("y"),
+                z: r.try_get::<i32, _>("z").unwrap_or(0),
                 hp: r.get("hp"),
                 prayer_points: r
                     .try_get::<Option<i32>, _>("prayer_points")
@@ -1233,6 +1251,7 @@ impl Database {
         character_id: i64,
         x: f32,
         y: f32,
+        z: i32,
         hp: i32,
         prayer_points: i32,
         mp: i32,
@@ -1268,7 +1287,7 @@ impl Database {
 
         sqlx::query(
             r#"UPDATE characters SET
-                x = ?, y = ?, hp = ?, prayer_points = ?, mp = ?, max_hp = ?, level = ?,
+                x = ?, y = ?, z = ?, hp = ?, prayer_points = ?, mp = ?, max_hp = ?, level = ?,
                 gold = ?, inventory_json = ?, skills_json = ?,
                 equipped_head = ?, equipped_body = ?, equipped_weapon = ?,
                 equipped_back = ?, equipped_feet = ?, equipped_ring = ?,
@@ -1287,6 +1306,7 @@ impl Database {
         )
         .bind(x)
         .bind(y)
+        .bind(z)
         .bind(hp)
         .bind(prayer_points)
         .bind(mp)

@@ -89,9 +89,12 @@ interface EditorState {
   // Tool state
   activeTool: Tool;
   activeLayer: Layer;
+  brushSize: number;
   selectedTileId: number;
   selectedEntityId: string | null; // Entity type ID from palette (for placing new entities)
   selectedObjectId: number | null; // File ID of selected object for placement
+  selectedBlockTypeDown: number; // Wall sprite ID for down (+Y) side face (0 = plain)
+  selectedBlockTypeRight: number; // Wall sprite ID for right (+X) side face (0 = plain)
 
   // Selection state (for placed items on map)
   selectedEntitySpawn: { chunkCoord: ChunkCoord; spawnId: string } | null;
@@ -133,6 +136,7 @@ interface EditorState {
   currentUsername: string | null;
 
   // Panel state
+  paletteSide: 'left' | 'right';
   layerPanelCollapsed: boolean;
 
   // Notes state
@@ -162,9 +166,12 @@ interface EditorActions {
   // Tool actions
   setActiveTool: (tool: Tool) => void;
   setActiveLayer: (layer: Layer) => void;
+  setBrushSize: (size: number) => void;
   setSelectedTileId: (id: number) => void;
   setSelectedEntityId: (id: string | null) => void;
   setSelectedObjectId: (id: number | null) => void;
+  setSelectedBlockTypeDown: (blockType: number) => void;
+  setSelectedBlockTypeRight: (blockType: number) => void;
 
   // Selection actions (for placed items)
   setSelectedEntitySpawn: (selection: { chunkCoord: ChunkCoord; spawnId: string } | null) => void;
@@ -182,6 +189,8 @@ interface EditorActions {
   setTile: (world: WorldCoord, layer: Layer, tileId: number) => void;
   toggleCollision: (world: WorldCoord) => void;
   fillTiles: (start: WorldCoord, layer: Layer, tileId: number) => void;
+  adjustHeight: (world: WorldCoord, delta: number) => void;
+  setBlockType: (world: WorldCoord, blockTypeDown: number, blockTypeRight: number) => void;
 
   // Magic wand selection
   magicWandSelect: (world: WorldCoord, layer: Layer) => void;
@@ -238,6 +247,8 @@ interface EditorActions {
   setConnected: (isConnected: boolean) => void;
 
   // Panel actions
+  setPaletteSide: (side: 'left' | 'right') => void;
+  togglePaletteSide: () => void;
   setLayerPanelCollapsed: (collapsed: boolean) => void;
 
   // Utility
@@ -348,9 +359,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   activeTool: Tool.Paint,
   activeLayer: Layer.Ground,
+  brushSize: 1,
   selectedTileId: 1,
   selectedEntityId: null,
   selectedObjectId: null,
+  selectedBlockTypeDown: 0,
+  selectedBlockTypeRight: 0,
 
   selectedEntitySpawn: null,
   selectedMapObject: null,
@@ -384,6 +398,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   availableWorlds: ['world_0'],
   currentUsername: null,
 
+  paletteSide: (localStorage.getItem('mapper-palette-side') as 'left' | 'right') || 'left',
   layerPanelCollapsed: false,
 
   // Notes
@@ -456,9 +471,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   // Tool actions
   setActiveTool: (tool) => set({ activeTool: tool }),
   setActiveLayer: (layer) => set({ activeLayer: layer }),
+  setBrushSize: (size) => set({ brushSize: Math.max(1, Math.min(15, size)) }),
   setSelectedTileId: (id) => set({ selectedTileId: id }),
   setSelectedEntityId: (id) => set({ selectedEntityId: id }),
   setSelectedObjectId: (id) => set({ selectedObjectId: id }),
+  setSelectedBlockTypeDown: (blockType) => set({ selectedBlockTypeDown: blockType }),
+  setSelectedBlockTypeRight: (blockType) => set({ selectedBlockTypeRight: blockType }),
 
   // Selection actions (for placed items)
   setSelectedEntitySpawn: (selection) => set({ selectedEntitySpawn: selection }),
@@ -617,6 +635,80 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       collision: bitset.getRaw(),
       dirty: true,
     }));
+  },
+
+  adjustHeight: (world, delta) => {
+    const chunkCoord = worldToChunk(world);
+    const chunk = get().getOrCreateChunk(chunkCoord);
+    const local = worldToLocal(world);
+    const index = localToIndex(local);
+
+    // Get current height
+    const currentHeight = chunk.heights ? chunk.heights[index] : 0;
+    const newHeight = Math.max(0, Math.min(15, currentHeight + delta));
+    if (newHeight === currentHeight) return;
+
+    history.push({
+      type: 'adjustHeight',
+      description: `${delta > 0 ? 'Raise' : 'Lower'} height at ${world.wx},${world.wy}`,
+      undo: () => get().adjustHeight(world, -delta),
+      redo: () => get().adjustHeight(world, delta),
+    });
+
+    get().updateChunk(chunkCoord, (c) => {
+      const heights = c.heights
+        ? new Uint8Array(c.heights)
+        : new Uint8Array(c.width * c.height);
+      heights[index] = newHeight;
+
+      // If all heights are 0, drop the array to save space
+      const allZero = heights.every((h) => h === 0);
+      return {
+        ...c,
+        heights: allZero ? undefined : heights,
+        dirty: true,
+      };
+    });
+  },
+
+  setBlockType: (world, blockTypeDown, blockTypeRight) => {
+    const chunkCoord = worldToChunk(world);
+    const chunk = get().getOrCreateChunk(chunkCoord);
+    const local = worldToLocal(world);
+    const index = localToIndex(local);
+
+    const currentDown = chunk.blockTypesDown ? chunk.blockTypesDown[index] : 0;
+    const currentRight = chunk.blockTypesRight ? chunk.blockTypesRight[index] : 0;
+    if (currentDown === blockTypeDown && currentRight === blockTypeRight) return;
+
+    const oldDown = currentDown;
+    const oldRight = currentRight;
+    history.push({
+      type: 'setBlockType',
+      description: `Set block type at ${world.wx},${world.wy} to D:${blockTypeDown} R:${blockTypeRight}`,
+      undo: () => get().setBlockType(world, oldDown, oldRight),
+      redo: () => get().setBlockType(world, blockTypeDown, blockTypeRight),
+    });
+
+    get().updateChunk(chunkCoord, (c) => {
+      const btDown = c.blockTypesDown
+        ? new Uint16Array(c.blockTypesDown)
+        : new Uint16Array(c.width * c.height);
+      const btRight = c.blockTypesRight
+        ? new Uint16Array(c.blockTypesRight)
+        : new Uint16Array(c.width * c.height);
+      btDown[index] = blockTypeDown;
+      btRight[index] = blockTypeRight;
+
+      const allDownZero = btDown.every((t) => t === 0);
+      const allRightZero = btRight.every((t) => t === 0);
+      return {
+        ...c,
+        blockTypesDown: allDownZero ? undefined : btDown,
+        blockTypesRight: allRightZero ? undefined : btRight,
+        dirty: true,
+      };
+    });
   },
 
   fillTiles: (start, layer, tileId) => {
@@ -1425,6 +1517,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   setConnected: (isConnected) => set({ isConnected }),
 
   // Panel actions
+  setPaletteSide: (side) => {
+    localStorage.setItem('mapper-palette-side', side);
+    set({ paletteSide: side });
+  },
+  togglePaletteSide: () => {
+    const newSide = useEditorStore.getState().paletteSide === 'left' ? 'right' : 'left';
+    localStorage.setItem('mapper-palette-side', newSide);
+    set({ paletteSide: newSide });
+  },
   setLayerPanelCollapsed: (collapsed) => set({ layerPanelCollapsed: collapsed }),
 
   // Utility

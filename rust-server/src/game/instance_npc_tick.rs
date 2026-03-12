@@ -111,12 +111,14 @@ impl GameRoom {
                 let old_pos = (npc.x, npc.y);
                 occupied_tiles.remove(&old_pos);
 
+                let height_check = |_wx: i32, _wy: i32| -> i32 { 0 };
                 if let Some((target_id, max_hit)) = npc.update(
                     delta_time,
                     &inst_player_list,
                     &occupied_tiles,
                     current_time,
                     &walkable_check,
+                    &height_check,
                 ) {
                     npc_attacks.push((
                         npc.id.clone(),
