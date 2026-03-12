@@ -3949,13 +3949,12 @@ impl Renderer {
             }
         }
 
-        // Add tile hover highlight as a depth-sorted renderable (draws above blocks, below entities)
+        // Add tile hover highlight as a depth-sorted renderable (draws above tile surface, below objects/entities)
         if let Some((tile_x, tile_y)) = state.hovered_tile {
             let z = state.hovered_tile_z;
-            // Depth just above elevated tiles/block sides but below entities at the same position.
-            // Elevated tiles use calculate_depth_z(x, y, z, 1) (+0.0), entities use (+0.25).
-            // We use +0.12 to render above the tile surface but below entities.
-            let depth = calculate_depth_z(tile_x as f32, tile_y as f32, z as f32, 1) + 0.12;
+            // Elevated tiles at +0.0, objects at +0.0 (but pushed after tiles so stable sort
+            // puts them on top), entities at +0.25. Use -0.01 to render just below objects.
+            let depth = calculate_depth_z(tile_x as f32, tile_y as f32, z as f32, 1) - 0.01;
             renderables.push((depth, Renderable::TileHover { tile_x, tile_y, tile_z: z }));
         }
 

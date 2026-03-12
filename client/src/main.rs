@@ -735,6 +735,53 @@ fn run_game_frame(
                     player.skin = skins[next_idx].to_string();
                     log::info!("Debug: Changed skin to {}", player.skin);
                 }
+
+                // F8 to toggle/cycle animation viewer
+                if is_key_pressed(KeyCode::F8) {
+                    use crate::render::animation::AnimationState;
+                    let anim_states = [
+                        AnimationState::Idle,
+                        AnimationState::Walking,
+                        AnimationState::Attacking,
+                        AnimationState::SittingGround,
+                        AnimationState::SittingChair,
+                        AnimationState::Casting,
+                        AnimationState::ShootingBow,
+                    ];
+                    game_state.debug_anim_viewer = match game_state.debug_anim_viewer {
+                        None => {
+                            player.animation.set_state(anim_states[0]);
+                            player.animation.frame = 0.0;
+                            Some((0, true))
+                        }
+                        Some((idx, paused)) => {
+                            let next = idx + 1;
+                            if next >= anim_states.len() {
+                                // Restore normal animation
+                                player.animation.set_state(AnimationState::Idle);
+                                None
+                            } else {
+                                player.animation.set_state(anim_states[next]);
+                                player.animation.frame = 0.0;
+                                Some((next, paused))
+                            }
+                        }
+                    };
+                }
+
+                // F9/F10 to step frames when animation viewer is active
+                if let Some((_, ref mut paused)) = game_state.debug_anim_viewer {
+                    // F10 to toggle pause/play
+                    if is_key_pressed(KeyCode::F10) {
+                        *paused = !*paused;
+                    }
+                    // F9 to step forward one frame (auto-pauses)
+                    if is_key_pressed(KeyCode::F9) {
+                        let config = crate::render::animation::get_animation_config(player.animation.state);
+                        player.animation.frame = ((player.animation.frame as u32 + 1) % config.frame_count) as f32;
+                        *paused = true;
+                    }
+                }
             }
         }
     }
@@ -1334,10 +1381,27 @@ fn run_game_frame(
     }
 
     // 4. Update game state
+    // Save debug animation state before update overwrites it
+    let debug_anim_freeze = if let Some((idx, true)) = game_state.debug_anim_viewer {
+        if let Some(local_id) = &game_state.local_player_id {
+            game_state.players.get(local_id).map(|p| (idx, p.animation.state, p.animation.frame))
+        } else { None }
+    } else { None };
+
     let update_start = get_time();
     game_state.update(delta);
     game_state.update_transition(delta);
     let update_ms = (get_time() - update_start) * 1000.0;
+
+    // Restore frozen animation after update
+    if let Some((_idx, frozen_state, frozen_frame)) = debug_anim_freeze {
+        if let Some(local_id) = &game_state.local_player_id.clone() {
+            if let Some(player) = game_state.players.get_mut(local_id) {
+                player.animation.state = frozen_state;
+                player.animation.frame = frozen_frame;
+            }
+        }
+    }
 
     // 4b. Request chunks around player position
     if let Some(player) = game_state.get_local_player() {
@@ -1370,8 +1434,19 @@ fn run_game_frame(
 
     // 5. Debug info (render after game state update to show current frame data)
     if game_state.debug_mode {
-        let debug_y_offset = 20.0;
+        // Position below the stat bars (name tag + HP/MP/Prayer bars)
+        let debug_y_offset = 115.0;
         let y = |base: f32| base + debug_y_offset;
+
+        // Semi-transparent background for readability
+        draw_rectangle(
+            4.0,
+            debug_y_offset + 8.0,
+            340.0,
+            440.0,
+            Color::from_rgba(0, 0, 0, 140),
+        );
+
         let fps_cap_str = match game_state.frame_timings.fps_cap {
             Some(cap) => format!(" (cap: {})", cap),
             None => " (uncapped)".to_string(),
@@ -1449,6 +1524,34 @@ fn run_game_frame(
                 16.0,
                 Color::from_rgba(150, 200, 255, 255),
             );
+
+            // Animation viewer info
+            if let Some((idx, paused)) = game_state.debug_anim_viewer {
+                let anim_names = ["Idle", "Walking", "Attacking", "SittingGround", "SittingChair", "Casting", "ShootingBow"];
+                let config = crate::render::animation::get_animation_config(player.animation.state);
+                let pause_str = if paused { "PAUSED" } else { "PLAYING" };
+                renderer.draw_text_sharp(
+                    &format!(
+                        "Anim: {} frame {}/{} {} [F8:next F9:step F10:pause]",
+                        anim_names[idx],
+                        player.animation.frame as u32,
+                        config.frame_count,
+                        pause_str,
+                    ),
+                    10.0,
+                    y(160.0),
+                    16.0,
+                    Color::from_rgba(255, 200, 100, 255),
+                );
+            } else {
+                renderer.draw_text_sharp(
+                    "Anim viewer: off [F8 to start]",
+                    10.0,
+                    y(160.0),
+                    16.0,
+                    Color::from_rgba(150, 150, 150, 255),
+                );
+            }
         }
 
         // Frame timing breakdown

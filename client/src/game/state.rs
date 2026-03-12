@@ -1833,6 +1833,9 @@ pub struct GameState {
 
     // Debug
     pub debug_mode: bool,
+    /// Debug animation viewer: cycles through all animation states/frames
+    /// None = off, Some((state_index, paused)) = active
+    pub debug_anim_viewer: Option<(usize, bool)>,
 
     // Tile hover state (world coordinates of tile under mouse)
     pub hovered_tile: Option<(i32, i32)>,
@@ -1994,6 +1997,7 @@ impl GameState {
             high_ping_movement_mode: false,
             state_sync_catchup_ticks: 0,
             debug_mode: false,
+            debug_anim_viewer: None,
             hovered_tile: None,
             hovered_tile_z: 0,
             hovered_entity_id: None,
