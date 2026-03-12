@@ -309,6 +309,7 @@ hostile = false
 friendly = true
 plot_seller = true
 wander_enabled = false
+facing = "right"
 
 [master_farmer.speech]
 radius = 5

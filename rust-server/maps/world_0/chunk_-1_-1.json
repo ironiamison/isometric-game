@@ -3098,6 +3098,12 @@
       "x": 29,
       "y": 0,
       "level": 1
+    },
+    {
+      "entityId": "master_farmer",
+      "x": 25,
+      "y": 6,
+      "level": 1
     }
   ],
   "mapObjects": [

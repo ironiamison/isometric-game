@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkABAADEAT8AQAA=",
+  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkAAAADEAD8AQAA=",
   "entities": [
     {
       "entityId": "wild_boar",
@@ -3133,12 +3133,6 @@
       "entityId": "sheep",
       "x": 27,
       "y": 0,
-      "level": 1
-    },
-    {
-      "entityId": "master_farmer",
-      "x": 25,
-      "y": 28,
       "level": 1
     },
     {
@@ -3866,24 +3860,6 @@
       "gid": 905,
       "x": 28,
       "y": 20,
-      "edge": "right"
-    },
-    {
-      "gid": 2037,
-      "x": 24,
-      "y": 30,
-      "edge": "down"
-    },
-    {
-      "gid": 2038,
-      "x": 24,
-      "y": 30,
-      "edge": "right"
-    },
-    {
-      "gid": 2039,
-      "x": 24,
-      "y": 29,
       "edge": "right"
     }
   ],
