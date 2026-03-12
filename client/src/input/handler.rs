@@ -8564,8 +8564,11 @@ impl InputHandler {
 
         // Only send Move commands if held past the threshold
         // Don't move while attacking - check both attack key/touch button and animation state
-        let attack_key_down =
-            is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
+        let attack_key_down = if classic {
+            is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl)
+        } else {
+            is_key_down(KeyCode::Space)
+        };
         let is_attacking = attack_key_down
             || self.touch_controls.attack_pressed()
             || state.get_local_player().map_or(false, |p| {
@@ -9251,12 +9254,12 @@ impl InputHandler {
             }
         }
 
-        // Jump (Space key) - send jump command on press
-        if is_key_pressed(KeyCode::Space) && !state.is_sitting {
+        // Jump (Ctrl key, modern only) - send jump command on press
+        if !classic && (is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl)) && !state.is_sitting {
             commands.push(InputCommand::Jump);
         }
 
-        // Attack (Ctrl key or touch attack button) - holding continues attacking with cooldown
+        // Attack (Space/Ctrl key or touch attack button) - holding continues attacking with cooldown
         // If fishing rod equipped and on/near a fishing tile, start gathering instead
         // Also stop movement when attacking (player must stand still)
         let attack_input = attack_key_down || self.touch_controls.attack_pressed();

@@ -295,10 +295,10 @@ async fn main() {
                                     quest_id: "__control_scheme__".to_string(),
                                     npc_id: String::new(),
                                     speaker: "Control Scheme".to_string(),
-                                    text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
+                                    text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Ctrl to jump, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
                                     choices: vec![
-                                        game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space + Enter)".to_string() },
-                                        game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl + Always-on Chat)".to_string() },
+                                        game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space Attack + Enter)".to_string() },
+                                        game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl Attack + Always-on Chat)".to_string() },
                                     ],
                                     show_time: get_time(),
                                 });
@@ -420,10 +420,10 @@ async fn main() {
                                                         quest_id: "__control_scheme__".to_string(),
                                                         npc_id: String::new(),
                                                         speaker: "Control Scheme".to_string(),
-                                                        text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
+                                                        text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Ctrl to jump, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
                                                         choices: vec![
-                                                            game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space + Enter)".to_string() },
-                                                            game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl + Always-on Chat)".to_string() },
+                                                            game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space Attack + Enter)".to_string() },
+                                                            game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl Attack + Always-on Chat)".to_string() },
                                                         ],
                                                         show_time: get_time(),
                                                     });
@@ -484,10 +484,10 @@ async fn main() {
                                     quest_id: "__control_scheme__".to_string(),
                                     npc_id: String::new(),
                                     speaker: "Control Scheme".to_string(),
-                                    text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
+                                    text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Ctrl to jump, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
                                     choices: vec![
-                                        game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space + Enter)".to_string() },
-                                        game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl + Always-on Chat)".to_string() },
+                                        game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space Attack + Enter)".to_string() },
+                                        game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl Attack + Always-on Chat)".to_string() },
                                     ],
                                     show_time: get_time(),
                                 });
