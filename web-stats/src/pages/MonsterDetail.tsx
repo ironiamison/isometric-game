@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api'
+import { Skull, ArrowLeft, TrendingUp, Droplets, ScrollText } from 'lucide-react'
 
 function scaleHp(baseHp: number, level: number) {
   return Math.round(baseHp * (1 + 0.10 * Math.max(0, level - 1)))
@@ -88,7 +89,10 @@ export function MonsterDetail() {
     <div className="space-y-5">
       {/* Header */}
       <section className="pixel-box relative overflow-hidden rounded-xl bg-[radial-gradient(circle_at_25%_10%,rgba(180,60,60,0.18),transparent_50%),radial-gradient(circle_at_90%_0%,rgba(212,168,68,0.14),transparent_48%),var(--panel)] p-6 md:p-7">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Bestiary Entry</p>
+        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>
+          <Skull size={14} className="text-[var(--ember)]" />
+          Bestiary Entry
+        </p>
         <h1 className="mt-2 text-4xl text-[var(--text)]">{monster.display_name}</h1>
         {monster.description && (
           <p className="mt-2 text-sm text-[var(--text-soft)]">{monster.description}</p>
@@ -108,9 +112,10 @@ export function MonsterDetail() {
         <div className="mt-5">
           <Link
             to="/bestiary"
-            className="pixel-btn rounded-md bg-[var(--panel-soft)] px-4 py-2 text-sm font-bold text-[var(--text-soft)] hover:text-[var(--text)]"
+            className="pixel-btn inline-flex items-center gap-1.5 rounded-md bg-[var(--panel-soft)] px-4 py-2 text-sm font-bold text-[var(--text-soft)] hover:text-[var(--text)]"
           >
-            Back to Bestiary
+            <ArrowLeft size={14} />
+            Bestiary
           </Link>
         </div>
       </section>
@@ -129,7 +134,10 @@ export function MonsterDetail() {
 
       {/* Level Scaling Table */}
       <section className="pixel-box rounded-xl bg-[var(--panel)] p-4 md:p-5 space-y-3">
-        <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Level Scaling</p>
+        <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>
+          <TrendingUp size={13} className="text-[var(--gold)]" />
+          Level Scaling
+        </p>
         <p className="text-xs text-[var(--text-soft)]">
           HP scales +10% per level, damage +15% per level, XP and gold multiply by level.
         </p>
@@ -174,7 +182,10 @@ export function MonsterDetail() {
       {/* Drop Table */}
       {monster.loot.length > 0 && (
         <section className="pixel-box rounded-xl bg-[var(--panel)] p-4 md:p-5 space-y-3">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Drop Table</p>
+          <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>
+            <Droplets size={13} className="text-[var(--water)]" />
+            Drop Table
+          </p>
           <div className="overflow-x-auto rounded-xl border border-[var(--panel-border)]">
             <table className="w-full">
               <thead>
@@ -211,7 +222,10 @@ export function MonsterDetail() {
       {/* Related Quests */}
       {monster.quest_ids.length > 0 && (
         <section className="pixel-box rounded-xl bg-[var(--panel)] p-4 md:p-5 space-y-3">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Related Quests</p>
+          <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>
+            <ScrollText size={13} className="text-[var(--gold)]" />
+            Related Quests
+          </p>
           <div className="flex flex-wrap gap-2">
             {monster.quest_ids.map(qid => (
               <span

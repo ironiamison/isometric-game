@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, type LeaderboardEntry, type LeaderboardSort } from '../api'
+import { Trophy, Search } from 'lucide-react'
 
 type NumericField = Exclude<keyof LeaderboardEntry, 'name'>
 
@@ -105,7 +106,10 @@ export function Leaderboards() {
   return (
     <div className="space-y-6">
       <section className="pixel-box relative overflow-hidden rounded-xl bg-[radial-gradient(circle_at_20%_15%,rgba(212,168,68,0.22),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(90,114,71,0.16),transparent_45%),var(--panel)] px-6 py-7 md:px-8">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>Hall Of Legends</p>
+        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>
+          <Trophy size={14} className="text-[var(--gold)]" />
+          Hall Of Legends
+        </p>
         <h1 className="mt-2 text-3xl font-bold text-[var(--text)] md:text-4xl">Player Leaderboards</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--text-soft)]">
           Every skill. Every record. Find your name — or someone to beat.
@@ -160,13 +164,16 @@ export function Leaderboards() {
           <p className="text-sm text-[var(--text-soft)]">
             Active board: <span className="text-[var(--text)]">{metric.label}</span> — {metric.hint}
           </p>
-          <input
-            type="text"
-            placeholder="Search player..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-[var(--panel-border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none transition-colors focus:border-[var(--gold)] md:max-w-xs"
-          />
+          <div className="relative w-full md:max-w-xs">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+            <input
+              type="text"
+              placeholder="Search player..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-[var(--panel-border)] bg-[var(--bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none transition-colors focus:border-[var(--gold)]"
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-[var(--panel-border)]">

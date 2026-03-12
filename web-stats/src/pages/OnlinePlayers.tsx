@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, type OnlinePlayer } from '../api'
+import { Users } from 'lucide-react'
 
 type SortKey = keyof OnlinePlayer
 type SortDir = 'asc' | 'desc'
@@ -51,6 +52,7 @@ export function OnlinePlayers() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
+        <Users size={22} className="text-[var(--gold)]" />
         <h1 className="text-2xl font-bold text-[var(--text)]">Online Players</h1>
         {data && (
           <span className="rounded-full bg-[var(--gold)] px-3 py-0.5 text-sm font-bold text-[#1a1210]">

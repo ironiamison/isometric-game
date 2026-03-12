@@ -64,7 +64,6 @@ h4 {
   position: relative;
   transition: transform 0.1s, box-shadow 0.1s;
   text-decoration: none;
-  display: inline-block;
   text-align: center;
   box-shadow:
     inset -2px -2px 0 rgba(0, 0, 0, 0.2),

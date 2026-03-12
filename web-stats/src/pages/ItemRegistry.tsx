@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Item } from '../api'
+import { Gem, Search } from 'lucide-react'
 
 const CATEGORIES = ['all', 'equipment', 'consumable', 'material', 'quest'] as const
 
@@ -47,6 +48,7 @@ export function ItemRegistry() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
+        <Gem size={22} className="text-[var(--gold)]" />
         <h1 className="text-2xl font-bold text-[var(--text)]">Item Registry</h1>
         {data && (
           <span className="rounded-full bg-[var(--gold)] px-3 py-0.5 text-sm font-bold text-[#1a1210]">
@@ -56,13 +58,16 @@ export function ItemRegistry() {
       </div>
 
       {/* Search */}
-      <input
-        type="text"
-        placeholder="Search items..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        className="w-full max-w-sm rounded-lg border border-[var(--panel-border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none focus:border-[var(--gold)] transition-colors"
-      />
+      <div className="relative w-full max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+        <input
+          type="text"
+          placeholder="Search items..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full rounded-lg border border-[var(--panel-border)] bg-[var(--bg)] py-2 pl-9 pr-4 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none transition-colors focus:border-[var(--gold)]"
+        />
+      </div>
 
       {/* Category filters */}
       <div className="flex flex-wrap gap-2">
