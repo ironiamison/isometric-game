@@ -415,6 +415,300 @@ item_id = "steel_sword"
 count = 1
 
 # =============================================================================
+# Bronze Scimitar (Smithing Level 5)
+# =============================================================================
+
+[bronze_scimitar]
+display_name = "Bronze Scimitar"
+description = "Forge a curved bronze blade on the anvil."
+category = "smithing"
+section = "equipment"
+level_required = 5
+station = "anvil"
+craft_time_ms = 5000
+xp = 25
+
+[[bronze_scimitar.ingredients]]
+item_id = "bronze_bar"
+count = 3
+
+[[bronze_scimitar.results]]
+item_id = "bronze_scimitar"
+count = 1
+
+# =============================================================================
+# Iron Scimitar (Smithing Level 15)
+# =============================================================================
+
+[iron_scimitar]
+display_name = "Iron Scimitar"
+description = "Forge a curved iron blade."
+category = "smithing"
+section = "equipment"
+level_required = 15
+station = "anvil"
+craft_time_ms = 5000
+xp = 50
+
+[[iron_scimitar.ingredients]]
+item_id = "iron_bar"
+count = 3
+
+[[iron_scimitar.results]]
+item_id = "iron_scimitar"
+count = 1
+
+# =============================================================================
+# Steel Scimitar (Smithing Level 30)
+# =============================================================================
+
+[steel_scimitar]
+display_name = "Steel Scimitar"
+description = "Forge a keen steel scimitar."
+category = "smithing"
+section = "equipment"
+level_required = 30
+station = "anvil"
+craft_time_ms = 7000
+xp = 90
+
+[[steel_scimitar.ingredients]]
+item_id = "steel_bar"
+count = 3
+
+[[steel_scimitar.results]]
+item_id = "steel_scimitar"
+count = 1
+
+# =============================================================================
+# Mithril Gear (Smithing Level 40)
+# =============================================================================
+
+[mithril_body]
+display_name = "Mithril Platemail (M)"
+description = "Forge lightweight mithril plate armor."
+category = "smithing"
+section = "equipment"
+level_required = 40
+station = "anvil"
+craft_time_ms = 8000
+xp = 140
+
+[[mithril_body.ingredients]]
+item_id = "mithril_bar"
+count = 5
+
+[[mithril_body.results]]
+item_id = "mithril_body"
+count = 1
+
+[mithril_body_female]
+display_name = "Mithril Platemail (F)"
+description = "Forge lightweight mithril plate armor."
+category = "smithing"
+section = "equipment"
+level_required = 40
+station = "anvil"
+craft_time_ms = 8000
+xp = 140
+
+[[mithril_body_female.ingredients]]
+item_id = "mithril_bar"
+count = 5
+
+[[mithril_body_female.results]]
+item_id = "mithril_body_female"
+count = 1
+
+[mithril_sword]
+display_name = "Mithril Sword"
+description = "Forge a lightweight mithril blade."
+category = "smithing"
+section = "equipment"
+level_required = 40
+station = "anvil"
+craft_time_ms = 8000
+xp = 120
+
+[[mithril_sword.ingredients]]
+item_id = "mithril_bar"
+count = 3
+
+[[mithril_sword.results]]
+item_id = "mithril_sword"
+count = 1
+
+[mithril_scimitar]
+display_name = "Mithril Scimitar"
+description = "Forge a feather-light mithril scimitar."
+category = "smithing"
+section = "equipment"
+level_required = 40
+station = "anvil"
+craft_time_ms = 8000
+xp = 120
+
+[[mithril_scimitar.ingredients]]
+item_id = "mithril_bar"
+count = 3
+
+[[mithril_scimitar.results]]
+item_id = "mithril_scimitar"
+count = 1
+
+# =============================================================================
+# Adamant Gear (Smithing Level 50)
+# =============================================================================
+
+[adamant_body]
+display_name = "Adamant Platemail (M)"
+description = "Forge dense adamant plate armor."
+category = "smithing"
+section = "equipment"
+level_required = 50
+station = "anvil"
+craft_time_ms = 10000
+xp = 190
+
+[[adamant_body.ingredients]]
+item_id = "adamant_bar"
+count = 5
+
+[[adamant_body.results]]
+item_id = "adamant_body"
+count = 1
+
+[adamant_body_female]
+display_name = "Adamant Platemail (F)"
+description = "Forge dense adamant plate armor."
+category = "smithing"
+section = "equipment"
+level_required = 50
+station = "anvil"
+craft_time_ms = 10000
+xp = 190
+
+[[adamant_body_female.ingredients]]
+item_id = "adamant_bar"
+count = 5
+
+[[adamant_body_female.results]]
+item_id = "adamant_body_female"
+count = 1
+
+[adamant_sword]
+display_name = "Adamant Sword"
+description = "Forge a heavy adamant blade."
+category = "smithing"
+section = "equipment"
+level_required = 50
+station = "anvil"
+craft_time_ms = 10000
+xp = 160
+
+[[adamant_sword.ingredients]]
+item_id = "adamant_bar"
+count = 3
+
+[[adamant_sword.results]]
+item_id = "adamant_sword"
+count = 1
+
+[adamant_scimitar]
+display_name = "Adamant Scimitar"
+description = "Forge a heavy adamant scimitar."
+category = "smithing"
+section = "equipment"
+level_required = 50
+station = "anvil"
+craft_time_ms = 10000
+xp = 160
+
+[[adamant_scimitar.ingredients]]
+item_id = "adamant_bar"
+count = 3
+
+[[adamant_scimitar.results]]
+item_id = "adamant_scimitar"
+count = 1
+
+# =============================================================================
+# Rune Gear (Smithing Level 60)
+# =============================================================================
+
+[rune_body]
+display_name = "Rune Platemail (M)"
+description = "Forge runite plate armor pulsing with power."
+category = "smithing"
+section = "equipment"
+level_required = 60
+station = "anvil"
+craft_time_ms = 12000
+xp = 250
+
+[[rune_body.ingredients]]
+item_id = "rune_bar"
+count = 5
+
+[[rune_body.results]]
+item_id = "rune_body"
+count = 1
+
+[rune_body_female]
+display_name = "Rune Platemail (F)"
+description = "Forge runite plate armor pulsing with power."
+category = "smithing"
+section = "equipment"
+level_required = 60
+station = "anvil"
+craft_time_ms = 12000
+xp = 250
+
+[[rune_body_female.ingredients]]
+item_id = "rune_bar"
+count = 5
+
+[[rune_body_female.results]]
+item_id = "rune_body_female"
+count = 1
+
+[rune_sword]
+display_name = "Rune Sword"
+description = "Forge a runite blade pulsing with energy."
+category = "smithing"
+section = "equipment"
+level_required = 60
+station = "anvil"
+craft_time_ms = 12000
+xp = 210
+
+[[rune_sword.ingredients]]
+item_id = "rune_bar"
+count = 3
+
+[[rune_sword.results]]
+item_id = "rune_sword"
+count = 1
+
+[rune_scimitar]
+display_name = "Rune Scimitar"
+description = "Forge a runite scimitar humming with power."
+category = "smithing"
+section = "equipment"
+level_required = 60
+station = "anvil"
+craft_time_ms = 12000
+xp = 210
+
+[[rune_scimitar.ingredients]]
+item_id = "rune_bar"
+count = 3
+
+[[rune_scimitar.results]]
+item_id = "rune_scimitar"
+count = 1
+
+# =============================================================================
 # Ancient Gear (Smithing Level 45)
 # =============================================================================
 

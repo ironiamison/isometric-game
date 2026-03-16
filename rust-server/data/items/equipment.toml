@@ -1379,6 +1379,192 @@ attack_bonus = 0
 strength_bonus = 3
 defence_bonus = 4
 
+# --- Mithril Tier (Level 35) ---
+
+[mithril_body]
+display_name = "Mithril Platemail (M)"
+sprite = "mithril_platebody_male"
+description = "Lightweight mithril armor. Strong as steel but half the weight."
+category = "equipment"
+max_stack = 1
+base_price = 3500
+sellable = true
+[mithril_body.equipment]
+slot_type = "body"
+defence_level_required = 35
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 16
+
+[mithril_body_female]
+display_name = "Mithril Platemail (F)"
+sprite = "mithril_platebody_female"
+description = "Lightweight mithril armor. Strong as steel but half the weight."
+category = "equipment"
+max_stack = 1
+base_price = 3500
+sellable = true
+[mithril_body_female.equipment]
+slot_type = "body"
+defence_level_required = 35
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 16
+
+[mithril_boots]
+display_name = "Mithril Boots"
+sprite = "mithril_boots"
+description = "Feather-light mithril boots. You barely feel them."
+category = "equipment"
+max_stack = 1
+base_price = 2200
+sellable = true
+[mithril_boots.equipment]
+slot_type = "feet"
+defence_level_required = 35
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 9
+
+[mithril_gloves]
+display_name = "Mithril Gloves"
+sprite = "mithril_gloves"
+description = "Mithril gauntlets that move like a second skin."
+category = "equipment"
+max_stack = 1
+base_price = 1800
+sellable = true
+[mithril_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 35
+attack_bonus = 0
+strength_bonus = 4
+defence_bonus = 5
+
+# --- Adamant Tier (Level 45) ---
+
+[adamant_body]
+display_name = "Adamant Platemail (M)"
+sprite = "adamant_platebody_male"
+description = "Dense adamant armor. Nearly impenetrable."
+category = "equipment"
+max_stack = 1
+base_price = 7000
+sellable = true
+[adamant_body.equipment]
+slot_type = "body"
+defence_level_required = 45
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 20
+
+[adamant_body_female]
+display_name = "Adamant Platemail (F)"
+sprite = "adamant_platebody_female"
+description = "Dense adamant armor. Nearly impenetrable."
+category = "equipment"
+max_stack = 1
+base_price = 7000
+sellable = true
+[adamant_body_female.equipment]
+slot_type = "body"
+defence_level_required = 45
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 20
+
+[adamant_boots]
+display_name = "Adamant Boots"
+sprite = "adamant_boots"
+description = "Adamant boots that could stop a blade."
+category = "equipment"
+max_stack = 1
+base_price = 4500
+sellable = true
+[adamant_boots.equipment]
+slot_type = "feet"
+defence_level_required = 45
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 12
+
+[adamant_gloves]
+display_name = "Adamant Gloves"
+sprite = "adamant_gloves"
+description = "Adamant gauntlets forged for war."
+category = "equipment"
+max_stack = 1
+base_price = 3500
+sellable = true
+[adamant_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 45
+attack_bonus = 0
+strength_bonus = 5
+defence_bonus = 7
+
+# --- Rune Tier (Level 55) ---
+
+[rune_body]
+display_name = "Rune Platemail (M)"
+sprite = "rune_platebody_male"
+description = "Runite armor pulsing with magical energy. The finest protection gold can buy."
+category = "equipment"
+max_stack = 1
+base_price = 14000
+sellable = true
+[rune_body.equipment]
+slot_type = "body"
+defence_level_required = 55
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 25
+
+[rune_body_female]
+display_name = "Rune Platemail (F)"
+sprite = "rune_platebody_female"
+description = "Runite armor pulsing with magical energy. The finest protection gold can buy."
+category = "equipment"
+max_stack = 1
+base_price = 14000
+sellable = true
+[rune_body_female.equipment]
+slot_type = "body"
+defence_level_required = 55
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 25
+
+[rune_boots]
+display_name = "Rune Boots"
+sprite = "rune_boots"
+description = "Runite boots humming with power. Unmatched protection."
+category = "equipment"
+max_stack = 1
+base_price = 8000
+sellable = true
+[rune_boots.equipment]
+slot_type = "feet"
+defence_level_required = 55
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 15
+
+[rune_gloves]
+display_name = "Rune Gloves"
+sprite = "rune_gloves"
+description = "Runite gauntlets. The pinnacle of smithing craft."
+category = "equipment"
+max_stack = 1
+base_price = 6500
+sellable = true
+[rune_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 55
+attack_bonus = 0
+strength_bonus = 6
+defence_bonus = 9
+
 # --- Ancient Tier (Level 40) ---
 # Note: ancient_boots is defined in the FEET section above (replaced from level 20 to tier 4)
 
