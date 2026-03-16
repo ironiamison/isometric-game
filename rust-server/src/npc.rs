@@ -30,7 +30,9 @@ pub enum NpcState {
     Attacking, // 2
     Returning, // 3
     Dead,      // 4
-    Wandering, // 5 - added at end to preserve existing state values
+    Wandering,  // 5 - added at end to preserve existing state values
+    Submerging, // 6
+    Emerging,   // 7
 }
 
 // ============================================================================
@@ -771,6 +773,9 @@ impl Npc {
             }
 
             NpcState::Dead => {}
+            NpcState::Submerging | NpcState::Emerging => {
+                // Handled by boss_tick; no generic AI behavior
+            }
         }
 
         attack_result

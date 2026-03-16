@@ -12,6 +12,8 @@ pub enum NpcState {
     Attacking = 2,
     Returning = 3,
     Dead = 4,
+    Submerging = 6,
+    Emerging = 7,
 }
 
 impl NpcState {
@@ -22,6 +24,8 @@ impl NpcState {
             2 => NpcState::Attacking,
             3 => NpcState::Returning,
             4 => NpcState::Dead,
+            6 => NpcState::Submerging,
+            7 => NpcState::Emerging,
             _ => NpcState::Idle,
         }
     }
