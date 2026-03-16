@@ -770,6 +770,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             let is_banker = extract_bool(npc_value, "is_banker").unwrap_or(false);
             let is_slayer_master = extract_bool(npc_value, "is_slayer_master").unwrap_or(false);
             let is_friendly = extract_bool(npc_value, "is_friendly").unwrap_or(false);
+            let is_port_master = extract_bool(npc_value, "is_port_master").unwrap_or(false);
             let station_type = extract_string(npc_value, "station_type");
             let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
             let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
@@ -814,6 +815,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 npc.is_banker = is_banker;
                 npc.is_slayer_master = is_slayer_master;
                 npc.is_friendly = is_friendly;
+                npc.is_port_master = is_port_master;
                 npc.station_type = station_type;
                 npc.move_speed = move_speed;
                 npc.no_shadow = no_shadow;
@@ -839,6 +841,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 npc.is_banker = is_banker;
                 npc.is_slayer_master = is_slayer_master;
                 npc.is_friendly = is_friendly;
+                npc.is_port_master = is_port_master;
                 npc.station_type = station_type;
                 npc.move_speed = move_speed;
                 npc.no_shadow = no_shadow;
@@ -1939,6 +1942,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         }
 
         "dialogueClosed" => {
+            // If we're in a port travel fade, transition to fade-in
+            if matches!(
+                state.map_transition.state,
+                crate::game::state::TransitionState::FadingOut
+                    | crate::game::state::TransitionState::Loading
+            ) {
+                state.map_transition.state = crate::game::state::TransitionState::FadingIn;
+            }
             // Keep Adventurer Guide panel open and reset to its initial state.
             if !reset_adventurer_guide_dialogue(state) {
                 state.ui_state.active_dialogue = None;

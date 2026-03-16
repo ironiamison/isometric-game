@@ -463,6 +463,18 @@ pub fn run_game_frame(
                     }
                     continue;
                 }
+                // Start port travel fade if selecting a port destination
+                if quest_id.starts_with("port:") && choice_id.starts_with("port_dest_") {
+                    game_state.map_transition = crate::game::state::MapTransition {
+                        state: crate::game::state::TransitionState::FadingOut,
+                        progress: 0.0,
+                        target_map_type: String::new(),
+                        target_map_id: String::new(),
+                        target_spawn_x: 0.0,
+                        target_spawn_y: 0.0,
+                        instance_id: String::new(),
+                    };
+                }
                 ClientMessage::DialogueChoice {
                     quest_id: quest_id.clone(),
                     choice_id: choice_id.clone(),

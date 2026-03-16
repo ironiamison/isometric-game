@@ -86,6 +86,8 @@ pub struct Npc {
     pub is_slayer_master: bool,
     /// Whether this NPC is friendly (non-attackable, no level shown)
     pub is_friendly: bool,
+    /// Whether this NPC is a port master (offers travel between locations)
+    pub is_port_master: bool,
     /// Station type (e.g. "furnace", "anvil") if this NPC is a crafting station
     pub station_type: Option<String>,
     /// Delay before death animation starts (so killing blow attack animation is visible)
@@ -121,6 +123,7 @@ impl Npc {
             is_banker: false,
             is_slayer_master: false,
             is_friendly: false,
+            is_port_master: false,
             move_speed: 2.0, // Default, will be set by server
             last_damage_time: 0.0,
             death_timer: None,
@@ -141,6 +144,7 @@ impl Npc {
             || self.is_altar
             || self.is_banker
             || self.is_slayer_master
+            || self.is_port_master
             || self.station_type.is_some()
         {
             self.display_name.clone()
@@ -162,6 +166,7 @@ impl Npc {
             && !self.is_altar
             && !self.is_banker
             && !self.is_slayer_master
+            && !self.is_port_master
             && self.station_type.is_none()
     }
 
