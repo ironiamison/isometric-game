@@ -2096,6 +2096,10 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
         Value::String("is_friendly".into()),
         Value::Boolean(n.is_friendly),
     ));
+    nmap.push((
+        Value::String("is_port_master".into()),
+        Value::Boolean(n.is_port_master),
+    ));
     if let Some(ref st) = n.station_type {
         nmap.push((
             Value::String("station_type".into()),
@@ -2644,6 +2648,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     nmap.push((
                         Value::String("is_friendly".into()),
                         Value::Boolean(n.is_friendly),
+                    ));
+                    nmap.push((
+                        Value::String("is_port_master".into()),
+                        Value::Boolean(n.is_port_master),
                     ));
                     if let Some(ref st) = n.station_type {
                         nmap.push((
