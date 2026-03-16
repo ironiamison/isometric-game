@@ -1,6 +1,6 @@
 use super::GameRoom;
 use crate::boss::BossEvent;
-use crate::npc::Npc;
+use crate::npc::{Npc, NpcState};
 use crate::protocol::ServerMessage;
 
 pub const BOSS_MAP_ID: &str = "desert_wurm_arena";
@@ -329,7 +329,34 @@ impl GameRoom {
                     let mut npcs = instance.npcs.write().await;
                     if let Some(npc) = npcs.get_mut(&npc_id) {
                         npc.invulnerable = invulnerable;
-                        npc.hidden = invulnerable;
+                    }
+                }
+            }
+            BossEvent::SetBossNpcState {
+                instance_id,
+                npc_id,
+                state,
+            } => {
+                if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                    let mut npcs = instance.npcs.write().await;
+                    if let Some(npc) = npcs.get_mut(&npc_id) {
+                        npc.state = match state {
+                            6 => NpcState::Submerging,
+                            7 => NpcState::Emerging,
+                            _ => NpcState::Idle,
+                        };
+                    }
+                }
+            }
+            BossEvent::HideBoss {
+                instance_id,
+                npc_id,
+                hidden,
+            } => {
+                if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                    let mut npcs = instance.npcs.write().await;
+                    if let Some(npc) = npcs.get_mut(&npc_id) {
+                        npc.hidden = hidden;
                     }
                 }
             }

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 // ---------------------------------------------------------------------------
 
 const DIG_DURATION_MS: u64 = 3000;
+const SUBMERGE_ANIM_MS: u64 = 500;
 const EMERGE_DURATION_MS: u64 = 1500;
 const AOE_WARNING_DELAY_MS: u64 = 1500;
 pub const MINION_EXPLOSION_DAMAGE: i32 = 10;
@@ -29,6 +30,7 @@ pub enum BossPhase {
 #[derive(Debug, Clone, PartialEq)]
 pub enum WurmState {
     Surface,
+    Submerging { ends_at: u64 },
     Digging { ends_at: u64 },
     Emerging { ends_at: u64, target_x: i32, target_y: i32 },
     Dead,
@@ -135,6 +137,16 @@ pub enum BossEvent {
         instance_id: String,
         npc_id: String,
         invulnerable: bool,
+    },
+    SetBossNpcState {
+        instance_id: String,
+        npc_id: String,
+        state: u8,
+    },
+    HideBoss {
+        instance_id: String,
+        npc_id: String,
+        hidden: bool,
     },
     Announcement {
         instance_id: String,
@@ -282,15 +294,22 @@ impl BossState {
                 // Check dig timer
                 if current_time.saturating_sub(self.last_dig_time) >= config.dig_interval {
                     self.last_dig_time = current_time;
-                    self.wurm_state = WurmState::Digging {
-                        ends_at: current_time + DIG_DURATION_MS,
+                    self.wurm_state = WurmState::Submerging {
+                        ends_at: current_time + SUBMERGE_ANIM_MS,
                     };
 
-                    // Boss becomes invulnerable while underground
+                    // Boss becomes invulnerable immediately
                     events.push(BossEvent::SetBossInvulnerable {
                         instance_id: self.instance_id.clone(),
                         npc_id: self.boss_npc_id.clone(),
                         invulnerable: true,
+                    });
+
+                    // Tell client to play submerge animation
+                    events.push(BossEvent::SetBossNpcState {
+                        instance_id: self.instance_id.clone(),
+                        npc_id: self.boss_npc_id.clone(),
+                        state: 6,
                     });
                 }
 
@@ -319,6 +338,20 @@ impl BossState {
                             y,
                         });
                     }
+                }
+            }
+            WurmState::Submerging { ends_at } => {
+                if current_time >= ends_at {
+                    // Submerge animation finished, now actually hide and start digging
+                    self.wurm_state = WurmState::Digging {
+                        ends_at: current_time + DIG_DURATION_MS,
+                    };
+
+                    events.push(BossEvent::HideBoss {
+                        instance_id: self.instance_id.clone(),
+                        npc_id: self.boss_npc_id.clone(),
+                        hidden: true,
+                    });
                 }
             }
             WurmState::Digging { ends_at } => {
@@ -358,6 +391,26 @@ impl BossState {
                         target_x: tx,
                         target_y: ty,
                     };
+
+                    // Move boss to new position, unhide, and play emerge animation
+                    events.push(BossEvent::MoveBoss {
+                        instance_id: self.instance_id.clone(),
+                        npc_id: self.boss_npc_id.clone(),
+                        x: tx,
+                        y: ty,
+                    });
+
+                    events.push(BossEvent::HideBoss {
+                        instance_id: self.instance_id.clone(),
+                        npc_id: self.boss_npc_id.clone(),
+                        hidden: false,
+                    });
+
+                    events.push(BossEvent::SetBossNpcState {
+                        instance_id: self.instance_id.clone(),
+                        npc_id: self.boss_npc_id.clone(),
+                        state: 7,
+                    });
                 }
             }
             WurmState::Emerging {
@@ -366,22 +419,22 @@ impl BossState {
                 target_y,
             } => {
                 if current_time >= ends_at {
-                    // Move boss to the emerge position
+                    // Update internal position tracking
                     self.boss_x = target_x;
                     self.boss_y = target_y;
-
-                    events.push(BossEvent::MoveBoss {
-                        instance_id: self.instance_id.clone(),
-                        npc_id: self.boss_npc_id.clone(),
-                        x: target_x,
-                        y: target_y,
-                    });
 
                     // Boss becomes vulnerable again
                     events.push(BossEvent::SetBossInvulnerable {
                         instance_id: self.instance_id.clone(),
                         npc_id: self.boss_npc_id.clone(),
                         invulnerable: false,
+                    });
+
+                    // Back to idle animation
+                    events.push(BossEvent::SetBossNpcState {
+                        instance_id: self.instance_id.clone(),
+                        npc_id: self.boss_npc_id.clone(),
+                        state: 0,
                     });
 
                     self.wurm_state = WurmState::Surface;
@@ -429,6 +482,7 @@ impl BossState {
         };
         let wurm_str = match &self.wurm_state {
             WurmState::Surface => "surface",
+            WurmState::Submerging { .. } => "submerging",
             WurmState::Digging { .. } => "digging",
             WurmState::Emerging { .. } => "emerging",
             WurmState::Dead => "dead",
@@ -510,7 +564,7 @@ impl BossState {
     pub fn is_invulnerable(&self) -> bool {
         matches!(
             self.wurm_state,
-            WurmState::Digging { .. } | WurmState::Emerging { .. }
+            WurmState::Submerging { .. } | WurmState::Digging { .. } | WurmState::Emerging { .. }
         )
     }
 }
