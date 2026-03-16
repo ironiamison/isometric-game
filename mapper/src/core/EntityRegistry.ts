@@ -61,6 +61,8 @@ export class EntityRegistryLoader {
       `${basePath}/npcs/villagers.toml`,
       `${basePath}/npcs/altar.toml`,
       `${basePath}/npcs/arena.toml`,
+      `${basePath}/npcs/awakening.toml`,
+      `${basePath}/npcs/koth.toml`,
       `${basePath}/npcs/merchants.toml`,
       `${basePath}/npcs/quest_givers.toml`,
       `${basePath}/npcs/stations.toml`,
@@ -70,6 +72,9 @@ export class EntityRegistryLoader {
       `${basePath}/monsters/forest_creatures.toml`,
       `${basePath}/monsters/dangerous_creatures.toml`,
       `${basePath}/monsters/corrupted_creatures.toml`,
+      `${basePath}/monsters/desert_boss.toml`,
+      `${basePath}/monsters/koth_enemies.toml`,
+      `${basePath}/monsters/awakening.toml`,
       `${basePath}/monsters/creatures.toml`,
       `${basePath}/monsters/enemies.toml`,
     ];
