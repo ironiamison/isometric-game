@@ -520,24 +520,6 @@ count = 5
 item_id = "mithril_body_female"
 count = 1
 
-[mithril_sword]
-display_name = "Mithril Sword"
-description = "Forge a lightweight mithril blade."
-category = "smithing"
-section = "equipment"
-level_required = 40
-station = "anvil"
-craft_time_ms = 8000
-xp = 120
-
-[[mithril_sword.ingredients]]
-item_id = "mithril_bar"
-count = 3
-
-[[mithril_sword.results]]
-item_id = "mithril_sword"
-count = 1
-
 [mithril_scimitar]
 display_name = "Mithril Scimitar"
 description = "Forge a feather-light mithril scimitar."
@@ -596,24 +578,6 @@ count = 5
 item_id = "adamant_body_female"
 count = 1
 
-[adamant_sword]
-display_name = "Adamant Sword"
-description = "Forge a heavy adamant blade."
-category = "smithing"
-section = "equipment"
-level_required = 50
-station = "anvil"
-craft_time_ms = 10000
-xp = 160
-
-[[adamant_sword.ingredients]]
-item_id = "adamant_bar"
-count = 3
-
-[[adamant_sword.results]]
-item_id = "adamant_sword"
-count = 1
-
 [adamant_scimitar]
 display_name = "Adamant Scimitar"
 description = "Forge a heavy adamant scimitar."
@@ -670,24 +634,6 @@ count = 5
 
 [[rune_body_female.results]]
 item_id = "rune_body_female"
-count = 1
-
-[rune_sword]
-display_name = "Rune Sword"
-description = "Forge a runite blade pulsing with energy."
-category = "smithing"
-section = "equipment"
-level_required = 60
-station = "anvil"
-craft_time_ms = 12000
-xp = 210
-
-[[rune_sword.ingredients]]
-item_id = "rune_bar"
-count = 3
-
-[[rune_sword.results]]
-item_id = "rune_sword"
 count = 1
 
 [rune_scimitar]
