@@ -422,6 +422,13 @@ impl Npc {
         (x1 - x2).abs().max((y1 - y2).abs())
     }
 
+    /// Minimum Chebyshev distance from point (px, py) to any tile in a size-N NPC at (nx, ny).
+    fn grid_distance_to_npc(px: i32, py: i32, nx: i32, ny: i32, size: i32) -> i32 {
+        let closest_x = px.clamp(nx, nx + size - 1);
+        let closest_y = py.clamp(ny, ny + size - 1);
+        (px - closest_x).abs().max((py - closest_y).abs())
+    }
+
     /// Check if target is within attack range AND in a cardinal direction (not diagonal)
     fn is_in_attack_range(x1: i32, y1: i32, x2: i32, y2: i32, range: i32) -> bool {
         let dx = (x1 - x2).abs();
@@ -562,7 +569,7 @@ impl Npc {
                             if *hp <= 0 {
                                 continue; // Skip dead players
                             }
-                            let dist = Self::grid_distance(self.x, self.y, *px, *py);
+                            let dist = Self::grid_distance_to_npc(*px, *py, self.x, self.y, self.stats.size);
                             if dist <= aggro_range {
                                 if nearest.is_none() || dist < nearest.as_ref().unwrap().1 {
                                     nearest = Some((player_id.clone(), dist));
@@ -604,7 +611,7 @@ impl Npc {
                             if *hp <= 0 {
                                 continue;
                             }
-                            let dist = Self::grid_distance(self.x, self.y, *px, *py);
+                            let dist = Self::grid_distance_to_npc(*px, *py, self.x, self.y, self.stats.size);
                             if dist <= aggro_range {
                                 self.target_id = Some(player_id.clone());
                                 self.state = NpcState::Chasing;
@@ -675,7 +682,7 @@ impl Npc {
                 if let Some((tx, ty)) = target_pos {
                     let spawn_dist =
                         Self::grid_distance(self.x, self.y, self.spawn_x, self.spawn_y);
-                    let target_dist = Self::grid_distance(self.x, self.y, tx, ty);
+                    let target_dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size);
                     let movement_done =
                         current_time - self.last_move_time >= self.get_move_cooldown_ms();
 
@@ -683,23 +690,14 @@ impl Npc {
                         // Too far from spawn OR target got too far away, return home
                         self.state = NpcState::Returning;
                         self.target_id = None;
-                    } else if Self::is_in_attack_range(
-                        self.x,
-                        self.y,
-                        tx,
-                        ty,
-                        self.get_attack_range(),
-                    ) && movement_done
+                    } else {
+                    let dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size);
+                    let in_range = dist > 0 && dist <= self.get_attack_range();
+                    if in_range && movement_done
                     {
-                        // In attack range (cardinal direction only) and movement completed
+                        // In attack range and movement completed
                         self.state = NpcState::Attacking;
-                    } else if !Self::is_in_attack_range(
-                        self.x,
-                        self.y,
-                        tx,
-                        ty,
-                        self.get_attack_range(),
-                    ) {
+                    } else if !in_range {
                         // Not in range, move toward target (one tile at a time)
                         self.try_move_toward(
                             tx,
@@ -711,6 +709,7 @@ impl Npc {
                         );
                     }
                     // If in range but movement not done, stay in Chasing and wait
+                    }
                 } else {
                     // Target lost (died or disconnected)
                     self.state = NpcState::Returning;
@@ -728,13 +727,17 @@ impl Npc {
                 });
 
                 if let Some((target_id, tx, ty)) = target_info {
-                    if !Self::is_in_attack_range(self.x, self.y, tx, ty, self.get_attack_range()) {
-                        // Target moved out of range or not in cardinal direction, chase again
+                    let dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size);
+                    let in_range = dist > 0 && dist <= self.get_attack_range();
+                    if !in_range {
+                        // Target moved out of range, chase again
                         self.state = NpcState::Chasing;
                     } else {
-                        // Face target
-                        let dx = tx - self.x;
-                        let dy = ty - self.y;
+                        // Face target (use closest tile of footprint for direction)
+                        let closest_x = tx.clamp(self.x, self.x + self.stats.size - 1);
+                        let closest_y = ty.clamp(self.y, self.y + self.stats.size - 1);
+                        let dx = tx - closest_x;
+                        let dy = ty - closest_y;
                         if dx != 0 || dy != 0 {
                             self.direction =
                                 crate::game::Direction::from_velocity(dx as f32, dy as f32);

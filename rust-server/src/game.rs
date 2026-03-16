@@ -5548,14 +5548,14 @@ impl GameRoom {
                             {
                                 let npcs = instance.npcs.read().await;
                                 npcs.get(npc_id)
-                                    .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y))))
+                                    .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y, n.stats.size))))
                             } else {
                                 (false, None)
                             }
                         } else {
                             let npcs = self.npcs.read().await;
                             npcs.get(npc_id)
-                                .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y))))
+                                .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y, n.stats.size))))
                         };
 
                         if !npc_alive {
@@ -5564,11 +5564,13 @@ impl GameRoom {
                         }
 
                         // Check if in range and cooldown ready
-                        let (in_range, cooldown_ready) = if let Some((npc_x, npc_y)) = npc_pos {
+                        let (in_range, cooldown_ready) = if let Some((npc_x, npc_y, npc_size)) = npc_pos {
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
-                                let dx = (player.x - npc_x).abs();
-                                let dy = (player.y - npc_y).abs();
+                                let closest_x = player.x.clamp(npc_x, npc_x + npc_size - 1);
+                                let closest_y = player.y.clamp(npc_y, npc_y + npc_size - 1);
+                                let dx = (player.x - closest_x).abs();
+                                let dy = (player.y - closest_y).abs();
                                 let (weapon_range, weapon_is_ranged) =
                                     if let Some(ref weapon_id) = player.equipped_weapon {
                                         if let Some(item_def) = self.item_registry.get(weapon_id) {
@@ -5599,11 +5601,13 @@ impl GameRoom {
 
                         if in_range && cooldown_ready {
                             // Compute facing direction toward NPC target
-                            let face_dir = if let Some((npc_x, npc_y)) = npc_pos {
+                            let face_dir = if let Some((npc_x, npc_y, npc_size)) = npc_pos {
                                 let players = self.players.read().await;
                                 if let Some(player) = players.get(&pid) {
-                                    let dx = npc_x - player.x;
-                                    let dy = npc_y - player.y;
+                                    let closest_x = player.x.clamp(npc_x, npc_x + npc_size - 1);
+                                    let closest_y = player.y.clamp(npc_y, npc_y + npc_size - 1);
+                                    let dx = closest_x - player.x;
+                                    let dy = closest_y - player.y;
                                     Some(direction_from_delta(dx, dy))
                                 } else {
                                     None

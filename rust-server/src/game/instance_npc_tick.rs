@@ -148,7 +148,8 @@ impl GameRoom {
                 // Check explosive minion contact with players
                 if npc.is_alive() && npc.prototype_id == "wurm_minion" {
                     for (player_id, px, py, _php) in &inst_player_list {
-                        if npc.x == *px && npc.y == *py {
+                        if crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size)
+                            .any(|(tx, ty)| tx == *px && ty == *py) {
                             // Contact! Kill the minion to trigger explosion
                             npc.hp = 0;
                             npc.state = crate::npc::NpcState::Dead;
