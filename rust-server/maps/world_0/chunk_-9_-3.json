@@ -3096,6 +3096,21 @@
       "entityId": "rock",
       "x": 30,
       "y": 21
+    },
+    {
+      "entityId": "rock_golem",
+      "x": 10,
+      "y": 1
+    },
+    {
+      "entityId": "biter",
+      "x": 2,
+      "y": 18
+    },
+    {
+      "entityId": "biter",
+      "x": 27,
+      "y": 8
     }
   ],
   "mapObjects": [

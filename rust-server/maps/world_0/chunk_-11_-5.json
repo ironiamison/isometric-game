@@ -3091,6 +3091,11 @@
       "entityId": "evil_cactus",
       "x": 29,
       "y": 10
+    },
+    {
+      "entityId": "biter",
+      "x": 11,
+      "y": 5
     }
   ],
   "mapObjects": [
