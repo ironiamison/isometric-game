@@ -1834,20 +1834,17 @@ impl Renderer {
         set
     }
 
-    /// Check if a rectangular region of an image contains any non-transparent pixels.
-    /// Samples a grid of pixels rather than checking every single one for performance.
+    /// Check if a rectangular region of an image contains any non-transparent pixel.
+    /// Returns false only if every pixel in the region has zero alpha.
     fn frame_has_visible_pixels(img: &Image, x: u32, y: u32, w: u32, h: u32) -> bool {
-        // Sample every 2 pixels for speed — transparent frames will have 0 alpha everywhere
-        let step = 2;
         let img_w = img.width() as u32;
         let img_h = img.height() as u32;
-        for py in (0..h).step_by(step) {
-            for px in (0..w).step_by(step) {
+        for py in 0..h {
+            for px in 0..w {
                 let sx = x + px;
                 let sy = y + py;
                 if sx < img_w && sy < img_h {
-                    let color = img.get_pixel(sx, sy);
-                    if color.a > 0.0 {
+                    if img.get_pixel(sx, sy).a > 0.0 {
                         return true;
                     }
                 }
