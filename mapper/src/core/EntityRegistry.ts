@@ -67,10 +67,12 @@ export class EntityRegistryLoader {
       `${basePath}/npcs/quest_givers.toml`,
       `${basePath}/npcs/stations.toml`,
       `${basePath}/npcs/slayer_masters.toml`,
+      `${basePath}/npcs/port_masters.toml`,
       // Monsters
       `${basePath}/monsters/pig.toml`,
       `${basePath}/monsters/forest_creatures.toml`,
       `${basePath}/monsters/dangerous_creatures.toml`,
+      `${basePath}/monsters/desert_creatures.toml`,
       `${basePath}/monsters/corrupted_creatures.toml`,
       `${basePath}/monsters/desert_boss.toml`,
       `${basePath}/monsters/koth_enemies.toml`,

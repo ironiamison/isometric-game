@@ -3085,9 +3085,24 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAQ=",
   "entities": [],
-  "mapObjects": [],
+  "mapObjects": [
+    {
+      "gid": 2430,
+      "x": 26,
+      "y": 31,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 1614,
+      "x": 29,
+      "y": 30,
+      "width": 31,
+      "height": 41
+    }
+  ],
   "walls": [],
   "portals": [],
   "gatheringZones": []

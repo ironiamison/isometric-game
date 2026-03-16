@@ -1095,6 +1095,59 @@ quantity_max = 1
 
 [desert_wurm.behaviors]
 hostile = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 6000
+
+# =============================================================================
+# Wurm - Slayer-only variant
+# =============================================================================
+
+[wurm]
+display_name = "Wurm"
+sprite = "wurm"
+animation_type = "standard"
+description = "A vicious burrowing wurm. Only assigned as a slayer task by Chaeldar."
+
+[wurm.stats]
+level = 22
+max_hp = 100
+damage = 14
+attack_bonus = 7
+defence_bonus = 11
+attack_range = 1
+aggro_range = 5
+chase_range = 7
+move_cooldown_ms = 520
+attack_cooldown_ms = 1900
+respawn_time_ms = 48000
+
+[wurm.rewards]
+exp_base = 115
+gold_min = 25
+gold_max = 55
+
+[[wurm.loot]]
+item_id = "big_bones"
+drop_chance = 0.6
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot]]
+item_id = "wurm_blade"
+drop_chance = 0.001
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot]]
+item_id = "cactus_seed"
+drop_chance = 0.033
+quantity_min = 1
+quantity_max = 1
+
+[wurm.behaviors]
+hostile = true
 slayer_only = true
 wander_enabled = true
 wander_radius = 3

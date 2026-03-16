@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AKBAAJzzQAD88wAAn/9AAJz/QACc80AA///h/0AAIgBgAQAAQgAAAIAAAACAAQCA8AMAgFAAAEAwAAAgQAAAEEAAABCAAQAIAAAACAAAAASAAQAD4ACAAOABQADAASAAgAEQAIABEADAAQwAgAEDAICDAACAQQAAgCEAAP8fAAA=",
+  "collision": "AKBAAJzzQAD88wAAn/9AAJz/QACc80AA///hx0AAIgBgAQAAQgAAAIAAAACAAQCA8AMAgFAAAEAwAAAgQAAAEEAAABCAAQAIAAAACAAAAASAAQAD4ACAAOABQADAASAAgAEQAIABEADAAQwAgAEDAICDAACAQQAAgCEAAP8fAAA=",
   "entities": [
     {
       "entityId": "cow",
@@ -3908,24 +3908,6 @@
     {
       "gid": 169,
       "x": 26,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 169,
-      "x": 27,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 169,
-      "x": 28,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 169,
-      "x": 29,
       "y": 6,
       "edge": "down"
     },

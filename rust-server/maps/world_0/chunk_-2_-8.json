@@ -3086,7 +3086,13 @@
     ]
   },
   "collision": "AAgIAAAICAAACAgAAAgIAAAICAAACAgAAAgIAAAICAAACAgAAAgIAAAI+P8ACAAAACgCAQAIAAAACAAAAAgAAAAIAAEACAAAAPD//wAAAAAAAAAAAAAAAAAAAAAAAAAAAPD//wAIAAAAiAACAAgAAAAIAAAACAAAAIgAAgAMAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "port_master_new_aeven",
+      "x": 19,
+      "y": 30
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1268,

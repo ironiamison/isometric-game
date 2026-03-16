@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAA/AAACAIAAAABAACQCAAAUAAAABAAAACBAAAAoAAAAAAAAABAAAAAAgIAAIAAAAAABAAABAEAAAAIAAAAAgAACBAAAAAUAAAQAQAAAAg=",
+  "collision": "AAAAAAAAAAAAAAAQAAAAAAAAAAgAAAAAAAAAgAAAgAAAAAAAAAAAAAAAQAAAAAAAAAAA/AAACAIAAAIBAACQCAAAUAQAABAAAACBAAAAoAAAAAAAAABIAAAAAgIAAIAAAAAABAAABAEAAAAIAAAAAgAACBAAAAAUAAAQAQAAAAg=",
   "entities": [],
   "mapObjects": [
     {
@@ -3115,6 +3115,48 @@
       "y": 30,
       "width": 35,
       "height": 56
+    },
+    {
+      "gid": 2430,
+      "x": 19,
+      "y": 21,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2430,
+      "x": 23,
+      "y": 7,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2297,
+      "x": 26,
+      "y": 16,
+      "width": 45,
+      "height": 66
+    },
+    {
+      "gid": 1618,
+      "x": 31,
+      "y": 6,
+      "width": 55,
+      "height": 72
+    },
+    {
+      "gid": 1618,
+      "x": 17,
+      "y": 14,
+      "width": 55,
+      "height": 72
+    },
+    {
+      "gid": 1619,
+      "x": 28,
+      "y": 2,
+      "width": 33,
+      "height": 45
     }
   ],
   "walls": [

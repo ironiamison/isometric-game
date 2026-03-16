@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "wIBAAAADwI8ADEABABBAAQAgQAEAIEABAEBEAQCAQAEAgEABAABBAQAAQQEAAEH/AABCAAAA/v8AAAIAAAAEQAAAKAQAAJBAAAAQAQAAIBEAACAAAAAgAAAAYAIAAMAAAAAAAAAAcIAAAFwAAAB8AACABPgAAAL4IAAReQDACSA=",
+  "collision": "wIBAAAADwI8ADEABABBAAQAgQAEAIEABAEBEAQCAQAEAgEABAABBAQAAQQEAAEH/AABCAAAA/v8AAAIAAAAEQAAAKAAAAJBAAAAQAQAAIBEAACAAAAAgAAAAYAIAAMAAAAAAAAAAcIAAAFwAAAB8AACABPgAAAL4IAAReQDACSA=",
   "entities": [
     {
       "entityId": "wild_boar",
@@ -3097,12 +3097,6 @@
       "entityId": "farmer_barley",
       "x": 29,
       "y": 0,
-      "level": 1
-    },
-    {
-      "entityId": "master_farmer",
-      "x": 25,
-      "y": 6,
       "level": 1
     }
   ],
@@ -3466,13 +3460,6 @@
     },
     {
       "gid": 1263,
-      "x": 26,
-      "y": 16,
-      "width": 108,
-      "height": 161
-    },
-    {
-      "gid": 1263,
       "x": 30,
       "y": 17,
       "width": 108,
@@ -3487,15 +3474,15 @@
     },
     {
       "gid": 1266,
-      "x": 30,
-      "y": 15,
+      "x": 28,
+      "y": 19,
       "width": 37,
       "height": 32
     },
     {
       "gid": 1266,
-      "x": 28,
-      "y": 19,
+      "x": 30,
+      "y": 15,
       "width": 37,
       "height": 32
     }

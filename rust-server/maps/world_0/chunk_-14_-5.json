@@ -3085,8 +3085,14 @@
       0
     ]
   },
-  "collision": "gwAAAPgAAAQAAAcA/uAwAAEegAAAAACOOAAY4ISDBwDceYABCgEADQoBgCEKQQKBCkECAQFwAIEJAQCpCwFAqQhBRoEIATyB2AEA8QAAAAn/P/wJABAACAAAAAgBAAAIoX6ACKBCAAiiAgAIAgIACABCAAAAfgAAAAAAAAAAAAA=",
-  "entities": [],
+  "collision": "gwAAAPgAAAQAAAcA/uAwAAEegAAAAACOOAAY4ISDBwDceYABCgEADQoBgCEKQSKBCkECAQFwAIEJAQCpCwFAqQhBRoEIATyB2AEA+QAAAAn/P/wJABAACAAAAAgBAAAIoX6ACKBCAAiiAgAIAwIACARCABAIfgAgEAAAQCAAAIA=",
+  "entities": [
+    {
+      "entityId": "master_farmer",
+      "x": 7,
+      "y": 28
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1504,
@@ -3500,6 +3506,13 @@
       "y": 10,
       "width": 35,
       "height": 56
+    },
+    {
+      "gid": 1614,
+      "x": 21,
+      "y": 11,
+      "width": 31,
+      "height": 41
     }
   ],
   "walls": [
@@ -4420,6 +4433,42 @@
       "x": 7,
       "y": 0,
       "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 0,
+      "y": 27,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 2,
+      "y": 28,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 3,
+      "y": 29,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 4,
+      "y": 30,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 5,
+      "y": 31,
+      "edge": "right"
+    },
+    {
+      "gid": 1301,
+      "x": 2,
+      "y": 28,
+      "edge": "down"
     }
   ],
   "portals": [],

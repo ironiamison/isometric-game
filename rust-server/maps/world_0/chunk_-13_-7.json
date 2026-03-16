@@ -3085,8 +3085,14 @@
       0
     ]
   },
-  "collision": "AAAYwAAAADAAAIAPAQAAAAEAAAAAAAAAAgAAAAAAAAAEAAAABAAAAIQAAAARAAAAIAAAAIAAAAAAAgAAAAABAAgAEQAAAAEgAACBAAAAAQAAgAAAAMAAAIA/AAAAAAAAAAAAAAAAAP4AAAAAAAAAAAAACAAAAFAAAAAAAAAAIIA=",
-  "entities": [],
+  "collision": "AAAYwAAAADAAAIAPAQAAAAEAAAAAAAAAAgAAAAAAAAAEAAAABAAAAIQAAAARAAAAIAAAAoAAAAAAAgAAAAABAAgAEUAAAAEgAAKBAAAACQAAgAAQAMAAAIA/AAAAAAAAAAAAAAAAAP4AAAAAAAAAAAAACAAAAFAAAAAAAgAAIIA=",
+  "entities": [
+    {
+      "entityId": "cactus",
+      "x": 10,
+      "y": 10
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1703,
@@ -3122,6 +3128,48 @@
       "y": 17,
       "width": 35,
       "height": 56
+    },
+    {
+      "gid": 2430,
+      "x": 25,
+      "y": 12,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2430,
+      "x": 19,
+      "y": 19,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2430,
+      "x": 9,
+      "y": 18,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2430,
+      "x": 25,
+      "y": 30,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 1618,
+      "x": 28,
+      "y": 20,
+      "width": 55,
+      "height": 72
+    },
+    {
+      "gid": 1619,
+      "x": 30,
+      "y": 16,
+      "width": 33,
+      "height": 45
     }
   ],
   "walls": [

@@ -131,10 +131,10 @@
       396,
       320,
       2,
-      2,
-      2,
-      2,
-      2,
+      207,
+      207,
+      207,
+      207,
       2,
       403,
       403,
@@ -163,10 +163,10 @@
       396,
       320,
       2,
-      2,
-      2,
-      2,
-      2,
+      207,
+      207,
+      207,
+      207,
       2,
       2,
       403,
@@ -195,10 +195,10 @@
       396,
       320,
       2,
-      2,
-      2,
-      2,
-      2,
+      207,
+      207,
+      207,
+      207,
       320,
       2,
       2,
@@ -227,10 +227,10 @@
       320,
       2,
       2,
-      2,
-      2,
-      2,
-      2,
+      207,
+      207,
+      207,
+      207,
       2,
       2,
       2,
@@ -290,7 +290,7 @@
       320,
       2,
       2,
-      2,
+      207,
       556,
       556,
       556,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAA+AAAAAQAAAAEAwAABAIAAAQGAAAEGgB49iIARE1C4AMcghAgDIIJIQgiBiDIAgAIiBIgAAgCAAAYDghAGAAAQAgAAEgYAwFAGAKAAAAOAAAMAgAABgKcAAYCAAA9AwAAFUAAAAUADAAVIAAAHAAAAAyTAQAEBAAADAgAAAw=",
+  "collision": "AAAC/AAAAgQAAAIEAwACBAIAAgQGAAIEGgB8HiIARj5C4APsghAgzIIJIYgiBiDIAgAIiBIgAAgCAAAYAghAGAAAQAgAAEgYAAFAGAKAAAAOAAAMAgAABgKcAAYCAAA9AwAAFUAAAAUADAAVIAAAnAAAAAyTAQBEBAAAzAgAAAw=",
   "entities": [
     {
       "entityId": "snake",
@@ -3094,9 +3094,27 @@
       "level": 1
     },
     {
-      "entityId": "wolf_spider",
-      "x": 24,
-      "y": 16,
+      "entityId": "spider",
+      "x": 21,
+      "y": 26,
+      "level": 1
+    },
+    {
+      "entityId": "spider",
+      "x": 19,
+      "y": 19,
+      "level": 1
+    },
+    {
+      "entityId": "spider",
+      "x": 25,
+      "y": 14,
+      "level": 1
+    },
+    {
+      "entityId": "spider",
+      "x": 29,
+      "y": 12,
       "level": 1
     }
   ],
@@ -3410,20 +3428,6 @@
       "height": 52
     },
     {
-      "gid": 1442,
-      "x": 3,
-      "y": 17,
-      "width": 52,
-      "height": 52
-    },
-    {
-      "gid": 1442,
-      "x": 5,
-      "y": 21,
-      "width": 52,
-      "height": 52
-    },
-    {
       "gid": 1666,
       "x": 19,
       "y": 12,
@@ -3487,13 +3491,6 @@
       "height": 106
     },
     {
-      "gid": 2902,
-      "x": 28,
-      "y": 8,
-      "width": 80,
-      "height": 75
-    },
-    {
       "gid": 2901,
       "x": 28,
       "y": 18,
@@ -3543,13 +3540,6 @@
       "height": 72
     },
     {
-      "gid": 2850,
-      "x": 30,
-      "y": 7,
-      "width": 52,
-      "height": 72
-    },
-    {
       "gid": 2696,
       "x": 29,
       "y": 23,
@@ -3565,18 +3555,6 @@
     }
   ],
   "walls": [
-    {
-      "gid": 595,
-      "x": 1,
-      "y": 18,
-      "edge": "down"
-    },
-    {
-      "gid": 598,
-      "x": 0,
-      "y": 18,
-      "edge": "right"
-    },
     {
       "gid": 596,
       "x": 0,
@@ -3833,18 +3811,6 @@
       "gid": 174,
       "x": 10,
       "y": 22,
-      "edge": "down"
-    },
-    {
-      "gid": 174,
-      "x": 2,
-      "y": 15,
-      "edge": "down"
-    },
-    {
-      "gid": 174,
-      "x": 3,
-      "y": 15,
       "edge": "down"
     },
     {
@@ -4142,30 +4108,33 @@
       "edge": "right"
     },
     {
+      "gid": 2209,
+      "x": 30,
+      "y": 30,
+      "edge": "down"
+    },
+    {
+      "gid": 2210,
+      "x": 31,
+      "y": 30,
+      "edge": "down"
+    },
+    {
       "gid": 2170,
       "x": 28,
       "y": 6,
       "edge": "down"
-    },
-    {
-      "gid": 2170,
-      "x": 29,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 2170,
-      "x": 30,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 2170,
-      "x": 31,
-      "y": 6,
-      "edge": "down"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 30,
+      "y": 28,
+      "width": 1,
+      "height": 1,
+      "targetMap": "Spiderzone_questguy",
+      "targetSpawn": "enter"
+    }
+  ],
   "gatheringZones": []
 }

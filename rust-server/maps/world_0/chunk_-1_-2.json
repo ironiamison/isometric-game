@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkAAAADEAD8AQAA=",
+  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkABAADEAT8AQAA=",
   "entities": [
     {
       "entityId": "wild_boar",
@@ -3136,15 +3136,15 @@
       "level": 1
     },
     {
-      "entityId": "crow",
-      "x": 29,
-      "y": 18,
+      "entityId": "master_farmer",
+      "x": 25,
+      "y": 28,
       "level": 1
     },
     {
-      "entityId": "farmer_grace",
+      "entityId": "crow",
       "x": 29,
-      "y": 16,
+      "y": 18,
       "level": 1
     }
   ],
@@ -3265,13 +3265,6 @@
       "gid": 1357,
       "x": 16,
       "y": 20,
-      "width": 29,
-      "height": 31
-    },
-    {
-      "gid": 1357,
-      "x": 22,
-      "y": 29,
       "width": 29,
       "height": 31
     },
@@ -3860,6 +3853,24 @@
       "gid": 905,
       "x": 28,
       "y": 20,
+      "edge": "right"
+    },
+    {
+      "gid": 2037,
+      "x": 24,
+      "y": 30,
+      "edge": "down"
+    },
+    {
+      "gid": 2038,
+      "x": 24,
+      "y": 30,
+      "edge": "right"
+    },
+    {
+      "gid": 2039,
+      "x": 24,
+      "y": 29,
       "edge": "right"
     }
   ],

@@ -271,8 +271,8 @@ requires_unlock = true
 xp_per_kill = 80
 
 [[masters.tasks]]
-monster_id = "desert_wurm"
-display_name = "Desert Wurms"
+monster_id = "wurm"
+display_name = "Wurms"
 count_min = 30
 count_max = 55
 weight = 5

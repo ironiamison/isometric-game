@@ -571,7 +571,7 @@
       418,
       418,
       418,
-      418,
+      649,
       649,
       649,
       649,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "FMAZAAAAAAAAAAAAAAD8AQAAAgAAAAIQHgACAAEAAgAAAAIQAAACEAAAAhAAAAIQAAACEACAABAACAAQAAAAEAAAwP8AACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "FMAZAAAAAAAAAAAAAAD8AQAAAgAAAAIQHgACAAEAAgAAAAIQAAACEAAAAhA/AAIQgAcCCADwABAACAIQAAAAEAAAzv8AACAAAADg/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3122,6 +3122,13 @@
       "y": 5,
       "width": 35,
       "height": 56
+    },
+    {
+      "gid": 2951,
+      "x": 17,
+      "y": 14,
+      "width": 53,
+      "height": 72
     }
   ],
   "walls": [
@@ -3392,16 +3399,199 @@
     {
       "gid": 1362,
       "x": 28,
+      "y": 8,
+      "edge": "right"
+    },
+    {
+      "gid": 1358,
+      "x": 28,
       "y": 9,
       "edge": "right"
     },
     {
-      "gid": 1362,
+      "gid": 1301,
+      "x": 0,
+      "y": 11,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 1,
+      "y": 11,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 2,
+      "y": 11,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 3,
+      "y": 11,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 4,
+      "y": 11,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 5,
+      "y": 11,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 7,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 8,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 9,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 10,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 12,
+      "y": 13,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 13,
+      "y": 13,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 14,
+      "y": 13,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 17,
+      "y": 16,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 18,
+      "y": 16,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 19,
+      "y": 16,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 22,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 21,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 23,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 24,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 25,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 27,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 26,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
       "x": 28,
-      "y": 8,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 29,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 30,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1301,
+      "x": 31,
+      "y": 18,
+      "edge": "down"
+    },
+    {
+      "gid": 1294,
+      "x": 10,
+      "y": 12,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 5,
+      "y": 11,
       "edge": "right"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "x": 28,
+      "y": 12,
+      "width": 1,
+      "height": 1,
+      "targetMap": "deep_desert_weapon_shop",
+      "targetSpawn": "entrance"
+    }
+  ],
   "gatheringZones": []
 }

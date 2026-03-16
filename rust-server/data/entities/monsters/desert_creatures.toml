@@ -1,0 +1,195 @@
+# Desert Creatures - Enemies and wildlife found in the desert region
+
+# =============================================================================
+# Evil Cactus - Hostile desert plant
+# =============================================================================
+
+[evil_cactus]
+display_name = "Evil Cactus"
+sprite = "evil_cactus"
+animation_type = "standard"
+description = "A prickly cactus animated by dark desert magic. Its spines are razor-sharp."
+
+[evil_cactus.stats]
+level = 22
+max_hp = 95
+damage = 13
+attack_bonus = 7
+defence_bonus = 14
+attack_range = 1
+aggro_range = 4
+chase_range = 5
+move_cooldown_ms = 650
+attack_cooldown_ms = 2000
+respawn_time_ms = 40000
+
+[evil_cactus.rewards]
+exp_base = 110
+gold_min = 15
+gold_max = 40
+
+[[evil_cactus.loot]]
+item_id = "cactus_seed"
+drop_chance = 0.05
+quantity_min = 1
+quantity_max = 1
+
+[[evil_cactus.loot]]
+item_id = "big_bones"
+drop_chance = 0.4
+quantity_min = 1
+quantity_max = 1
+
+[evil_cactus.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 2
+wander_pause_min_ms = 4000
+wander_pause_max_ms = 8000
+
+# =============================================================================
+# Bandit Camel 1 - Friendly desert scenery NPC
+# =============================================================================
+
+[bandit_camel_1]
+display_name = "Bandit Rider"
+sprite = "bandit_camel_1"
+animation_type = "standard"
+description = "A desert bandit mounted on a camel."
+
+[bandit_camel_1.stats]
+max_hp = 100
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[bandit_camel_1.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[bandit_camel_1.behaviors]
+hostile = false
+wander_enabled = false
+
+# =============================================================================
+# Bandit Camel 2 - Friendly desert scenery NPC
+# =============================================================================
+
+[bandit_camel_2]
+display_name = "Bandit Lancer"
+sprite = "bandit_camel_2"
+animation_type = "standard"
+description = "A heavily armed bandit on camelback."
+
+[bandit_camel_2.stats]
+max_hp = 100
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[bandit_camel_2.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[bandit_camel_2.behaviors]
+hostile = false
+wander_enabled = false
+
+# =============================================================================
+# Bandit 1 - Friendly desert scenery NPC
+# =============================================================================
+
+[bandit_1]
+display_name = "Desert Bandit"
+sprite = "bandit_1"
+animation_type = "standard"
+description = "A desert bandit standing guard."
+
+[bandit_1.stats]
+max_hp = 100
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[bandit_1.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[bandit_1.behaviors]
+hostile = false
+wander_enabled = false
+facing = "right"
+
+# =============================================================================
+# Bandit 2 - Friendly desert scenery NPC
+# =============================================================================
+
+[bandit_2]
+display_name = "Desert Marauder"
+sprite = "bandit_2"
+animation_type = "standard"
+description = "A hardened desert marauder."
+
+[bandit_2.stats]
+max_hp = 100
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[bandit_2.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[bandit_2.behaviors]
+hostile = false
+wander_enabled = false
+facing = "right"
+
+# =============================================================================
+# Camel - Friendly desert scenery NPC
+# =============================================================================
+
+[camel]
+display_name = "Camel"
+sprite = "camel"
+animation_type = "standard"
+description = "A docile desert camel. It eyes you warily but means no harm."
+
+[camel.stats]
+max_hp = 100
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[camel.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[camel.behaviors]
+hostile = false
+wander_enabled = false
