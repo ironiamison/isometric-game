@@ -271,6 +271,16 @@ requires_unlock = true
 xp_per_kill = 80
 
 [[masters.tasks]]
+monster_id = "golden_scarab"
+display_name = "Golden Scarabs"
+count_min = 30
+count_max = 55
+weight = 6
+slayer_level_required = 50
+requires_unlock = true
+xp_per_kill = 85
+
+[[masters.tasks]]
 monster_id = "wurm"
 display_name = "Wurms"
 count_min = 30

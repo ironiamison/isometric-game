@@ -635,6 +635,53 @@ wander_pause_min_ms = 2000
 wander_pause_max_ms = 5000
 
 # =============================================================================
+# Biter
+# =============================================================================
+
+[biter]
+display_name = "Biter"
+sprite = "biter"
+animation_type = "standard"
+description = "A vicious creature that snaps at anything that moves."
+
+[biter.stats]
+level = 9
+max_hp = 38
+damage = 5
+attack_bonus = 4
+defence_bonus = 2
+attack_range = 1
+aggro_range = 5
+chase_range = 7
+move_cooldown_ms = 380
+attack_cooldown_ms = 1500
+respawn_time_ms = 14000
+
+[biter.rewards]
+exp_base = 38
+gold_min = 8
+gold_max = 18
+
+[[biter.loot]]
+item_id = "spoiled_meat"
+drop_chance = 0.35
+quantity_min = 1
+quantity_max = 2
+
+[[biter.loot]]
+item_id = "big_bones"
+drop_chance = 0.5
+quantity_min = 1
+quantity_max = 1
+
+[biter.behaviors]
+hostile = true
+wander_enabled = true
+wander_radius = 4
+wander_pause_min_ms = 2000
+wander_pause_max_ms = 5000
+
+# =============================================================================
 # Elf (hostile)
 # =============================================================================
 

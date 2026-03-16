@@ -49,6 +49,48 @@ wander_pause_min_ms = 4000
 wander_pause_max_ms = 8000
 
 # =============================================================================
+# Golden Scarab - Slayer-only desert creature
+# =============================================================================
+
+[golden_scarab]
+display_name = "Golden Scarab"
+sprite = "golden_scarab"
+animation_type = "standard"
+description = "A massive scarab beetle with a gleaming golden carapace. Only assigned as a slayer task by Chaeldar."
+
+[golden_scarab.stats]
+level = 24
+max_hp = 105
+damage = 14
+attack_bonus = 8
+defence_bonus = 15
+attack_range = 1
+aggro_range = 4
+chase_range = 6
+move_cooldown_ms = 600
+attack_cooldown_ms = 1900
+respawn_time_ms = 45000
+
+[golden_scarab.rewards]
+exp_base = 125
+gold_min = 20
+gold_max = 50
+
+[[golden_scarab.loot]]
+item_id = "big_bones"
+drop_chance = 0.5
+quantity_min = 1
+quantity_max = 1
+
+[golden_scarab.behaviors]
+hostile = true
+slayer_only = true
+wander_enabled = true
+wander_radius = 3
+wander_pause_min_ms = 3000
+wander_pause_max_ms = 6000
+
+# =============================================================================
 # Bandit Camel 1 - Friendly desert scenery NPC
 # =============================================================================
 
@@ -75,6 +117,7 @@ gold_max = 0
 
 [bandit_camel_1.behaviors]
 hostile = false
+friendly = true
 wander_enabled = false
 
 # =============================================================================
@@ -104,6 +147,7 @@ gold_max = 0
 
 [bandit_camel_2.behaviors]
 hostile = false
+friendly = true
 wander_enabled = false
 
 # =============================================================================
@@ -133,6 +177,7 @@ gold_max = 0
 
 [bandit_1.behaviors]
 hostile = false
+friendly = true
 wander_enabled = false
 facing = "right"
 
@@ -163,6 +208,7 @@ gold_max = 0
 
 [bandit_2.behaviors]
 hostile = false
+friendly = true
 wander_enabled = false
 facing = "right"
 
