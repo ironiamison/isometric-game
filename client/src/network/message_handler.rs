@@ -776,6 +776,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             let move_speed = extract_f32(npc_value, "move_speed").unwrap_or(2.0);
             let no_shadow = extract_bool(npc_value, "no_shadow").unwrap_or(false);
             let render_offset_y = extract_f32(npc_value, "render_offset_y").unwrap_or(0.0);
+            let size = extract_i32(npc_value, "size").unwrap_or(1);
 
             if let Some(npc) = state.npcs.get_mut(&id) {
                 // Update existing NPC - interpolate toward new grid position
@@ -821,10 +822,11 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 npc.move_speed = move_speed;
                 npc.no_shadow = no_shadow;
                 npc.render_offset_y = render_offset_y;
+                npc.size = size;
             } else {
                 // New NPC - add to state
                 let mut npc = Npc::new(id.clone(), entity_type, x, y);
-                if npc.entity_type == "desert_wurm" {
+                if npc.entity_type == "big_wurm" {
                     npc.animation.layout = NpcAnimationLayout::BossWurm;
                 }
                 // Snap Z immediately so NPCs on elevated platforms render correctly
@@ -850,6 +852,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 npc.move_speed = move_speed;
                 npc.no_shadow = no_shadow;
                 npc.render_offset_y = render_offset_y;
+                npc.size = size;
                 state.npcs.insert(id, npc);
             }
         }

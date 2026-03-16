@@ -96,6 +96,8 @@ pub struct Npc {
     pub station_type: Option<String>,
     /// Delay before death animation starts (so killing blow attack animation is visible)
     pub death_delay: Option<f32>,
+    /// NPC footprint size (1 = single tile, 2 = 2x2, etc.)
+    pub size: i32,
 }
 
 impl Npc {
@@ -137,6 +139,7 @@ impl Npc {
             render_offset_y: 0.0,
             station_type: None,
             death_delay: None,
+            size: 1,
         }
     }
 
