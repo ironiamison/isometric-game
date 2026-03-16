@@ -536,7 +536,7 @@ export function PropertiesPanel() {
               min={1}
               onChange={(e) => {
                 const val = e.target.value.trim();
-                handleChange('level', val === '' ? undefined : (parseInt(val) || 1));
+                handleChange('level', val === '' ? 0 : (parseInt(val) || 1));
               }}
             />
           </div>
@@ -698,7 +698,7 @@ export function PropertiesPanel() {
               min={1}
               onChange={(e) => {
                 const val = e.target.value.trim();
-                handleChange('level', val === '' ? undefined : (parseInt(val) || 1));
+                handleChange('level', val === '' ? 0 : (parseInt(val) || 1));
               }}
             />
           </div>
