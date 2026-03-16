@@ -246,6 +246,8 @@ impl EntityRegistry {
         let mut loot: Vec<LootEntry> = parent.map(|p| p.loot.clone()).unwrap_or_default();
         loot.extend(raw.loot.clone());
 
+        let size = raw.size.unwrap_or_else(|| parent.map(|p| p.size).unwrap_or(1));
+
         // Parse animation type
         let animation_type = raw
             .animation_type
@@ -297,6 +299,7 @@ impl EntityRegistry {
                 .port
                 .clone()
                 .or_else(|| parent.and_then(|p| p.port.clone())),
+            size,
         })
     }
 

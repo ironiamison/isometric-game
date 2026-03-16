@@ -244,6 +244,7 @@ pub struct RawEntityPrototype {
     pub dialogue: Option<DialogueConfig>,
     pub speech: Option<RawSpeechConfig>,
     pub port: Option<PortConfig>,
+    pub size: Option<i32>,
 }
 
 // ============================================================================
@@ -400,6 +401,7 @@ pub struct EntityPrototype {
     pub dialogue: DialogueConfig,
     pub speech: Option<SpeechConfig>,
     pub port: Option<PortConfig>,
+    pub size: i32,
 }
 
 impl EntityPrototype {

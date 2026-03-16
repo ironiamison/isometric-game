@@ -3,6 +3,12 @@ use rand::Rng;
 use serde::Serialize;
 use std::collections::HashSet;
 
+/// Returns an iterator over all tiles occupied by an NPC of the given size,
+/// anchored at (x, y) as the top-left corner.
+pub fn npc_occupied_tiles(x: i32, y: i32, size: i32) -> impl Iterator<Item = (i32, i32)> {
+    (0..size).flat_map(move |dy| (0..size).map(move |dx| (x + dx, y + dy)))
+}
+
 // ============================================================================
 // Level Scaling
 // ============================================================================
@@ -70,6 +76,7 @@ pub struct PrototypeStats {
     pub render_offset_y: f32,
     pub hp_regen_percent_per_sec: f32,
     pub station_type: Option<String>,
+    pub size: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -161,6 +168,7 @@ impl Npc {
             no_shadow: prototype.behaviors.no_shadow,
             render_offset_y: prototype.behaviors.render_offset_y,
             station_type: prototype.behaviors.station_type.clone(),
+            size: prototype.size,
         };
 
         Self {
@@ -831,6 +839,8 @@ pub struct NpcUpdate {
     pub render_offset_y: f32,
     /// Station type (e.g. "furnace", "anvil") if this NPC is a crafting station
     pub station_type: Option<String>,
+    /// Size of the NPC in tiles (NxN). Default 1.
+    pub size: i32,
 }
 
 impl From<&Npc> for NpcUpdate {
@@ -870,6 +880,7 @@ impl From<&Npc> for NpcUpdate {
             no_shadow: npc.stats.no_shadow,
             render_offset_y: npc.stats.render_offset_y,
             station_type: npc.station_type().map(|s| s.to_string()),
+            size: npc.stats.size,
         }
     }
 }
