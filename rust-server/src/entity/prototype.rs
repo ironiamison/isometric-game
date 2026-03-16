@@ -96,6 +96,8 @@ pub struct RawEntityBehaviors {
     #[serde(default)]
     pub koth_rewards: bool,
     #[serde(default)]
+    pub port_master: bool,
+    #[serde(default)]
     pub friendly: bool,
     #[serde(default)]
     pub wander_enabled: bool,
@@ -201,6 +203,20 @@ pub struct DialogueConfig {
     pub quest_complete: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct PortDestination {
+    pub name: String,
+    pub x: i32,
+    pub y: i32,
+    pub cost: i32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PortConfig {
+    #[serde(default)]
+    pub destinations: Vec<PortDestination>,
+}
+
 /// Raw entity prototype as loaded directly from TOML
 #[derive(Debug, Clone, Deserialize)]
 pub struct RawEntityPrototype {
@@ -227,6 +243,7 @@ pub struct RawEntityPrototype {
     pub quest_giver: Option<QuestGiverConfig>,
     pub dialogue: Option<DialogueConfig>,
     pub speech: Option<RawSpeechConfig>,
+    pub port: Option<PortConfig>,
 }
 
 // ============================================================================
@@ -297,6 +314,7 @@ pub struct EntityBehaviors {
     pub plot_seller: bool,
     pub slayer_master: bool,
     pub koth_rewards: bool,
+    pub port_master: bool,
     pub friendly: bool,
     pub wander_enabled: bool,
     pub wander_radius: i32,
@@ -322,6 +340,7 @@ impl Default for EntityBehaviors {
             plot_seller: false,
             slayer_master: false,
             koth_rewards: false,
+            port_master: false,
             friendly: false,
             wander_enabled: false,
             wander_radius: 3,
@@ -348,6 +367,7 @@ impl From<&RawEntityBehaviors> for EntityBehaviors {
             plot_seller: raw.plot_seller,
             slayer_master: raw.slayer_master,
             koth_rewards: raw.koth_rewards,
+            port_master: raw.port_master,
             friendly: raw.friendly,
             wander_enabled: raw.wander_enabled,
             wander_radius: raw.wander_radius.unwrap_or(3),
@@ -379,6 +399,7 @@ pub struct EntityPrototype {
     pub quest_giver: Option<QuestGiverConfig>,
     pub dialogue: DialogueConfig,
     pub speech: Option<SpeechConfig>,
+    pub port: Option<PortConfig>,
 }
 
 impl EntityPrototype {
@@ -396,5 +417,6 @@ impl EntityPrototype {
             || self.behaviors.teleporter
             || self.behaviors.altar
             || self.behaviors.plot_seller
+            || self.behaviors.port_master
     }
 }

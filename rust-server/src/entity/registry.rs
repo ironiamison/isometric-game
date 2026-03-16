@@ -293,6 +293,10 @@ impl EntityRegistry {
                 .as_ref()
                 .map(SpeechConfig::from)
                 .or_else(|| parent.and_then(|p| p.speech.clone())),
+            port: raw
+                .port
+                .clone()
+                .or_else(|| parent.and_then(|p| p.port.clone())),
         })
     }
 
