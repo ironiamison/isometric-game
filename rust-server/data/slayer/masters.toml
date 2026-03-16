@@ -269,3 +269,13 @@ weight = 4
 slayer_level_required = 50
 requires_unlock = true
 xp_per_kill = 80
+
+[[masters.tasks]]
+monster_id = "desert_wurm"
+display_name = "Desert Wurms"
+count_min = 30
+count_max = 55
+weight = 5
+slayer_level_required = 55
+requires_unlock = true
+xp_per_kill = 90

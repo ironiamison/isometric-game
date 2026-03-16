@@ -123,7 +123,7 @@ sellable = true
 
 [cactus_seed]
 display_name = "Cactus Seed"
-sprite = "cactus_seed"
+sprite = "strawberry_seed"
 description = "A prickly seed from the deep desert. Plant it in a farming patch."
 category = "material"
 max_stack = 99
