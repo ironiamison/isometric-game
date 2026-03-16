@@ -902,6 +902,7 @@ pub enum ServerMessage {
     AoeDamage {
         tiles: Vec<(i32, i32)>,
         damage: i32,
+        effect: String,
     },
     Explosion {
         x: i32,
@@ -4408,13 +4409,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((Value::String("effect".into()), Value::String(effect.clone().into())));
             Value::Map(map)
         }
-        ServerMessage::AoeDamage { tiles, damage } => {
+        ServerMessage::AoeDamage { tiles, damage, effect } => {
             let mut map = Vec::new();
             let tile_values: Vec<Value> = tiles.iter().map(|(x, y)| {
                 Value::Array(vec![Value::Integer((*x as i64).into()), Value::Integer((*y as i64).into())])
             }).collect();
             map.push((Value::String("tiles".into()), Value::Array(tile_values)));
             map.push((Value::String("damage".into()), Value::Integer((*damage as i64).into())));
+            map.push((Value::String("effect".into()), Value::String(effect.clone().into())));
             Value::Map(map)
         }
         ServerMessage::Explosion { x, y, radius, damage } => {

@@ -115,6 +115,7 @@ pub enum BossEvent {
         instance_id: String,
         tiles: Vec<(i32, i32)>,
         damage: i32,
+        effect: String,
     },
     Explosion {
         instance_id: String,
@@ -464,6 +465,7 @@ impl BossState {
                     instance_id: self.instance_id.clone(),
                     tiles: zone.tiles.clone(),
                     damage: zone.damage,
+                    effect: "rocks_aoe".to_string(),
                 });
                 completed_indices.push(i);
             }

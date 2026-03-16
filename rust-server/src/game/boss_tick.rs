@@ -156,6 +156,7 @@ impl GameRoom {
                 instance_id,
                 tiles,
                 damage,
+                effect,
             } => {
                 // Damage players standing on affected tiles
                 let player_ids = self.get_instance_player_ids(&instance_id).await;
@@ -189,7 +190,7 @@ impl GameRoom {
 
                 self.send_to_instance(
                     &instance_id,
-                    ServerMessage::AoeDamage { tiles, damage },
+                    ServerMessage::AoeDamage { tiles, damage, effect },
                 )
                 .await;
             }
